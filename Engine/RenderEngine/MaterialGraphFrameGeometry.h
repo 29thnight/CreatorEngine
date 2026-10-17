@@ -2,6 +2,7 @@
 #include "MaterialGraphGeometryContract.h"
 #include "MaterialGraphVisibilityContract.h"
 #include "MaterialGraphMeshSurface.h"
+#include "MaterialGraphTransientBufferPool.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "../Utility_Framework/StandardLibrary.h"
@@ -31,6 +32,7 @@ struct SceneFrameGeometry final
     static_assert(sizeof(Record) == 128);
     static_assert(offsetof(Record, owner) == 68);
     IRenderDeviceServices* device{};
+    std::shared_ptr<TransientBufferPool> pool;
     std::vector<Record> records{Record{}};
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> geometry{nullptr};
     uint32_t nextPrimitiveAddress{1};
@@ -59,8 +61,8 @@ struct SceneFrameGeometry final
     mutable uint64_t graphEpoch{};
     ~SceneFrameGeometry()
     {
-        if (device && buffer.IsValid())
-            device->ReleaseBuffer(buffer);
+        if (device)
+            ReleaseSceneBuffer(*device, pool, buffer);
     }
 
     bool Upload(std::string& error)
@@ -81,7 +83,7 @@ struct SceneFrameGeometry final
         RHIBufferDesc desc;
         desc.bytes = bytes;
         desc.debugName = L"METEOR.Scene.Geometry.Table";
-        return device->CreateBuffer(desc, buffer, error);
+        return CreateSceneBuffer(*device, pool.get(), desc, buffer, error);
     }
     void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneFrameGeometry> owner) const
     {

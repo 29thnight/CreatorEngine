@@ -731,28 +731,32 @@ namespace ce
 
         m_memoryBytes += closed.memory_bytes();
         m_frames.push_back(std::move(closed));
-        for (auto it = m_deferredCounters.begin(); it != m_deferredCounters.end();)
+        // Compact once: erasing each consumed entry moves the remaining queue
+        // repeatedly and adopts checked iterators while the renderer is recording.
+        std::size_t waiting = 0;
+        const std::size_t count = m_deferredCounters.size();
+        for (std::size_t index = 0; index < count; ++index)
         {
-            if (it->frame == engine_frame)
+            const deferred_counter value = m_deferredCounters[index];
+            if (value.frame == engine_frame)
             {
-                record_counter(it->frame, it->sample);
-                it = m_deferredCounters.erase(it);
+                record_counter(value.frame, value.sample);
             }
-            else if (it->frame < engine_frame)
+            else if (value.frame < engine_frame)
             {
                 if (counter_loss_trace_enabled())
                 {
                     std::fprintf(stderr, "[profile.counter.skipped-frame] counterFrame=%u closedFrame=%u id=%u\n",
-                        it->frame, engine_frame, static_cast<unsigned>(it->sample.id));
+                        value.frame, engine_frame, static_cast<unsigned>(value.sample.id));
                 }
                 ++m_droppedCounters;
-                it = m_deferredCounters.erase(it);
             }
             else
             {
-                ++it;
+                m_deferredCounters[waiting++] = value;
             }
         }
+        m_deferredCounters.resize(waiting);
 
         // 방금 프레임 하나가 닫혔다. 그 프레임을 기다리던 구간이 있으면
         // 지금 들어간다 — 닫히기 **전에** 온 것들의 자리가 여기다.
@@ -807,14 +811,22 @@ namespace ce
             ++m_droppedCounters;
             return;
         }
-        for (auto it = m_frames.rbegin(); it != m_frames.rend(); ++it)
+        // Collector-exclusive storage cannot change during this lookup. Use
+        // indices and contiguous samples so Debug iterator adoption does not take
+        // the STL process-wide lock for every frame/counter visited. Never retain
+        // a pointer across push_back, trim, clear, or capture publication.
+        for (std::size_t frameIndex = m_frames.size(); frameIndex > 0; --frameIndex)
         {
-            if (it->engine_frame != engine_frame)
+            frame_record& frame = m_frames[frameIndex - 1];
+            if (frame.engine_frame != engine_frame)
             {
                 continue;
             }
-            for (auto& existing : it->counters)
+            profile_counter_sample* const samples = frame.counters.data();
+            const std::size_t count = frame.counters.size();
+            for (std::size_t index = 0; index < count; ++index)
             {
+                profile_counter_sample& existing = samples[index];
                 if (existing.id == sample.id && existing.cpu.session == sample.cpu.session &&
                     existing.cpu.tick == sample.cpu.tick && existing.cpu.task == sample.cpu.task)
                 {
@@ -822,9 +834,9 @@ namespace ce
                     return;
                 }
             }
-            const std::size_t before = it->memory_bytes();
-            it->counters.push_back(sample);
-            m_memoryBytes += it->memory_bytes() - before;
+            const std::size_t before = frame.memory_bytes();
+            frame.counters.push_back(sample);
+            m_memoryBytes += frame.memory_bytes() - before;
             return;
         }
         if (!m_frames.empty() && engine_frame < m_frames.front().engine_frame)

@@ -110,7 +110,7 @@ void ValidateStreamDescriptors(ModelGeometryStreamMetadata& value)
     }
     Require(flat->size() == value.archive->packets.size(), "Streaming descriptor/page count mismatch");
     const auto& groups = value.lods.groups;
-    std::vector<bool> covered(flat->size());
+    ce::dynamic_bitset covered(flat->size());
     for (uint32_t ordinal = 0; ordinal < groups.size(); ++ordinal)
     {
         const auto& group = groups[ordinal];
@@ -137,11 +137,11 @@ void ValidateStreamDescriptors(ModelGeometryStreamMetadata& value)
         for (uint32_t index = 0; index < group.meshletCount; ++index)
         {
             const auto meshlet = group.firstMeshlet + index;
-            Require(!covered[meshlet], "Streaming DAG overlapping groups");
-            covered[meshlet] = true; (*flat)[meshlet].reserved = ordinal;
+            Require(!covered.test(meshlet), "Streaming DAG overlapping groups");
+            covered.set(meshlet, true); (*flat)[meshlet].reserved = ordinal;
         }
     }
-    Require(groups.empty() ? value.lods.levels.empty() : std::ranges::all_of(covered, [](bool v) { return v; }),
+    Require(groups.empty() ? value.lods.levels.empty() : covered.count() == covered.size(),
             "Streaming DAG topology coverage");
     value.flatDescriptors = std::move(flat);
 }
@@ -226,14 +226,14 @@ bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArt
         value.mesh.bounds = metadata.bounds; value.mesh.meshlets = metadata.meshlets; value.mesh.coarseLods = metadata.lods;
         value.requiredBoneCount = metadata.requiredBoneCount; value.requiredSkinBindingSha256 = metadata.requiredSkinBindingSha256;
         std::vector<std::byte> vertices(uint64_t(metadata.vertexCount) * metadata.stride);
-        std::vector<bool> seen(metadata.vertexCount);
+        ce::dynamic_bitset seen(metadata.vertexCount);
         auto archive = std::make_shared<assets::cluster::Archive>(*metadata.archive);
         archive->packets.clear();
         archive->pagedTopology = false; // Explicit CPU expansion uses QMC1 attribute packets.
         uint32_t page{};
         const auto level = [&](MeshletPayload& topology, std::vector<uint32_t>& indices, uint32_t ordinal) {
             const auto& counts = metadata.counts.at(ordinal);
-            indices.resize(counts.indexCount); std::vector<bool> primitives(counts.primitiveRemapCount);
+            indices.resize(counts.indexCount); ce::dynamic_bitset primitives(counts.primitiveRemapCount);
             for (const auto& descriptor : topology.descriptors)
             {
                 const auto stored = bytes.subspan(archive->fileOffsets.at(page), archive->packetSizes.at(page));
@@ -249,14 +249,14 @@ bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArt
                     const auto source = assets::quantized::Word(stored,view.sourceOffset + vertex * 4);
                     auto* destination = vertices.data() + uint64_t(source) * metadata.stride;
                     const auto* decoded = raw.data() + uint64_t(vertex) * metadata.stride;
-                    Require(!seen[source] || std::memcmp(destination,decoded,metadata.stride) == 0, "Inconsistent shared geometry vertex");
-                    std::memcpy(destination,decoded,metadata.stride); seen[source] = true;
+                    Require(!seen.test(source) || std::memcmp(destination,decoded,metadata.stride) == 0, "Inconsistent shared geometry vertex");
+                    std::memcpy(destination,decoded,metadata.stride); seen.set(source, true);
                     topology.vertexRemap.push_back(source);
                 }
                 for (uint32_t triangle = 0; triangle < view.triangles; ++triangle)
                 {
                     const auto primitive = assets::quantized::Word(stored,view.primitiveOffset + triangle * 4);
-                    Require(!primitives[primitive], "Duplicate geometry primitive"); primitives[primitive] = true;
+                    Require(!primitives.test(primitive), "Duplicate geometry primitive"); primitives.set(primitive, true);
                     topology.primitiveRemap.push_back(primitive);
                     for (uint32_t corner = 0; corner < 3; ++corner)
                     {
@@ -269,7 +269,7 @@ bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArt
                 archive->fileOffsets[page] += 32;
                 archive->packetSizes[page] = static_cast<uint32_t>(view.attributes.size()); ++page;
             }
-            Require(std::ranges::all_of(primitives,[](bool present){return present;}), "Missing geometry primitive");
+            Require(primitives.count() == primitives.size(), "Missing geometry primitive");
         };
         level(value.mesh.meshlets,value.mesh.indices,0);
         for (uint32_t index = 0; index < value.mesh.coarseLods.levels.size(); ++index)

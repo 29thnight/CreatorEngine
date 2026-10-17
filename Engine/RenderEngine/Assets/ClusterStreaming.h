@@ -161,14 +161,22 @@ class Stream final
             m_pending.insert(m_pending.begin(), m_feedback.begin(), m_feedback.end());
             m_feedback.clear();
         }
+        // The pending vector remains the priority queue; the mask is membership
+        // only. This includes feedback inserted ahead of older view requests.
+        std::vector<std::uint8_t> pendingGroups(m_groups.size());
+        for (const auto group : std::span{m_pending})
+        {
+            pendingGroups[group] = 1;
+        }
         // All views prepared in one recording consume one immutable cut.
         // New view requests are retained and serviced in the next recording.
         for (auto group : requests)
         {
             quantized::Require(group < m_groups.size(), "Cluster stream request range");
-            if (std::find(m_pending.begin(), m_pending.end(), group) == m_pending.end())
+            if (!pendingGroups[group])
             {
                 m_pending.push_back(group);
+                pendingGroups[group] = 1;
             }
         }
         if (m_current && m_recording == recording)
@@ -179,20 +187,21 @@ class Stream final
                                "Cluster budgets cannot change within one recording");
             return m_current;
         }
-        std::set<uint32_t> wantedPages;
-        for (auto request : m_pending)
+        // Page membership only; a flat mask avoids one tree node per page per recording.
+        std::vector<std::uint8_t> wantedPages(m_archive->packets.size());
+        for (auto request : std::span{m_pending})
         {
             for (auto group = request; group != UINT32_MAX; group = m_groups[group].parentGroup)
             {
                 const auto& g = m_groups[group];
                 for (uint32_t i = 0; i < g.meshletCount; ++i)
                 {
-                    wantedPages.insert(g.firstMeshlet + i);
+                    wantedPages[g.firstMeshlet + i] = true;
                 }
             }
         }
         std::erase_if(m_reads, [&](const auto& read) {
-            return !wantedPages.contains(read.first) &&
+            return !wantedPages[read.first] &&
                    read.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
         });
         auto next = std::make_shared<ResidentSet>();
@@ -202,7 +211,7 @@ class Stream final
         next->groups.resize(m_groups.size());
         auto remaining = budget.residentBytes;
         uint64_t scheduledBytes{};
-        std::vector<bool> attempted(m_groups.size());
+        std::vector<std::uint8_t> attempted(m_groups.size());
         const auto admit = [&](uint32_t group, bool mandatory) {
             if (attempted[group])
             {
@@ -293,18 +302,21 @@ class Stream final
         }
         // Service requests in view priority order, admitting their ancestor
         // chain first. Keep recently used old groups only in remaining space.
-        for (auto request : m_pending)
+        std::vector<uint32_t> chain;
+        chain.reserve(16);
+        for (auto request : std::span{m_pending})
         {
-            std::vector<uint32_t> chain;
+            chain.clear();
             for (auto g = request; g != UINT32_MAX; g = m_groups[g].parentGroup)
             {
                 chain.push_back(g);
             }
-            for (auto it = chain.rbegin(); it != chain.rend(); ++it)
+            for (std::size_t index = chain.size(); index > 0; --index)
             {
-                if (!next->groups[*it])
+                const auto group = chain[index - 1];
+                if (!next->groups[group])
                 {
-                    admit(*it, false);
+                    admit(group, false);
                 }
             }
             if (next->groups[request])

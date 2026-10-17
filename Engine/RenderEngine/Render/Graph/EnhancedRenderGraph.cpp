@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -7,6 +8,15 @@
 
 namespace
 {
+    template<class Values>
+    void ClearNonempty(Values& values)
+    {
+        if (!values.empty())
+        {
+            values.clear();
+        }
+    }
+
     class TransientPreparationTimer
     {
     public:
@@ -99,6 +109,7 @@ RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle han
 
 void EnhancedRenderGraph::Reset()
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphReset">()};
     RequireQueueIdle();
     ReleaseResources();
     m_recordedRecording = 0;
@@ -108,7 +119,11 @@ void EnhancedRenderGraph::Reset()
     m_measurementDomain = RGMeasurementDomain::Normal;
     m_queueExecutionMode = 0;
     m_resources.clear();
-    m_passes.clear();
+    for (auto& pass : m_passes)
+    {
+        ClearPassMetadata(pass);
+    }
+    m_passes = {};
     m_finalStateRequirements.clear();
     m_executeOrder.clear();
     m_timingSignature.reset();
@@ -210,7 +225,7 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
         return {};
     }
 
-    Resource entry{};
+    auto& entry = m_resources.emplace_back();
     entry.buffer = resource;
     entry.bufferKind = true;
     entry.state = currentState;
@@ -219,8 +234,7 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     if (m_scheduling == RGSchedulingMode::ExplicitVersioned) entry.versions.push_back({RGHandle::kInvalid, false});
     entry.name = name;
 
-    handle.index = static_cast<uint16_t>(m_resources.size());
-    m_resources.push_back(std::move(entry));
+    handle.index = static_cast<uint16_t>(m_resources.size() - 1);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
@@ -238,7 +252,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
         return {};
     }
 
-    Resource entry{};
+    auto& entry = m_resources.emplace_back();
     entry.handle = resource;
     entry.state = currentState;
     entry.writeback = stateWriteback;
@@ -246,8 +260,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
     if (m_scheduling == RGSchedulingMode::ExplicitVersioned) entry.versions.push_back({RGHandle::kInvalid, false});
     entry.name = name;
 
-    handle.index = static_cast<uint16_t>(m_resources.size());
-    m_resources.push_back(std::move(entry));
+    handle.index = static_cast<uint16_t>(m_resources.size() - 1);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
@@ -260,15 +273,14 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
     {
         return {};
     }
-    Resource entry{};
+    auto& entry = m_resources.emplace_back();
     entry.desc = desc;
     entry.state = RHIResourceState::Common;
     entry.imported = false;
     entry.name = desc.name;
 
     RGHandle handle{};
-    handle.index = static_cast<uint16_t>(m_resources.size());
-    m_resources.push_back(std::move(entry));
+    handle.index = static_cast<uint16_t>(m_resources.size() - 1);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
@@ -281,12 +293,11 @@ RGHandle EnhancedRenderGraph::CreateBuffer(const RGBufferDesc& desc)
     {
         return {};
     }
-    Resource entry{};
+    auto& entry = m_resources.emplace_back();
     entry.bufferDesc = desc;
     entry.bufferKind = true;
     entry.name = desc.name;
-    const auto index = static_cast<uint16_t>(m_resources.size());
-    m_resources.push_back(std::move(entry));
+    const auto index = static_cast<uint16_t>(m_resources.size() - 1);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned
         ? VersionHandle(index, RGHandle::kInvalid) : RGHandle{index};
@@ -440,7 +451,7 @@ bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, const std::string
 {
     if (!ValidVersionHandle(resource)) return false;
     for (const auto& pass : m_passes) if (pass.name == producer)
-        for (const auto& use : pass.usages)
+        for (const auto& use : std::span{pass.usages})
             if (use.handle.index == resource.index && use.handle.kind == resource.kind &&
                 use.handle.epoch == resource.epoch &&
                 (use.access == RGAccessMode::Write || use.access == RGAccessMode::ReadWrite))
@@ -465,40 +476,85 @@ void EnhancedRenderGraph::RequireImportedFinalState(RGHandle handle, RHIResource
     m_compiled = false;
 }
 
+EnhancedRenderGraph::Pass& EnhancedRenderGraph::AppendPass()
+{
+    const auto index = m_passes.size();
+    if (index == m_passStorage.size())
+    {
+        m_passStorage.emplace_back();
+    }
+    m_passes = std::span{m_passStorage}.first(index + 1);
+    return m_passes[index];
+}
+
+void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
+{
+    // Checked vector iterators use the Debug STL global lock. Empty containers
+    // have nothing to orphan; retain their proxies and allocation across frames.
+    pass.execute = {};
+    pass.splitExecute = {};
+    pass.repeatedExecute = {};
+    ClearNonempty(pass.name);
+    ClearNonempty(pass.usages);
+    ClearNonempty(pass.transitions);
+    ClearNonempty(pass.bufferTransitions);
+    ClearNonempty(pass.uavBarriers);
+    ClearNonempty(pass.uavBufferBarriers);
+    ClearNonempty(pass.finalTransitions);
+    ClearNonempty(pass.finalBufferTransitions);
+    ClearNonempty(pass.aliasTextures);
+    ClearNonempty(pass.aliasBuffers);
+    ClearNonempty(pass.poisonBuffers);
+    ClearNonempty(pass.aliasClears);
+    ClearNonempty(pass.phases);
+    ClearNonempty(pass.firstPhaseBarriers);
+    ClearNonempty(pass.repeatPhaseBarriers);
+    pass.maxSlices = 1;
+    pass.recordCost = 0;
+    pass.hasSideEffect = false;
+    pass.culled = false;
+    pass.computeCompatible = false;
+    pass.recordingSideEffect = false;
+    pass.recordingIndependent = false;
+    pass.repeatCount = 1;
+    pass.repeated = false;
+}
+
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
-    const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
+    std::vector<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
 {
     RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
     {
         return {};
     }
-    Pass pass{};
+    // Construct vector-owning metadata in place. Moving a temporary Pass also
+    // constructs every checked-iterator proxy again in a Debug build.
+    auto& pass = AppendPass();
     pass.name = name;
-    pass.usages = usages;
+    pass.usages = std::move(usages);
     pass.execute = std::move(execute);
     pass.hasSideEffect = hasSideEffect;
 
     RGPassId id{};
-    id.index = static_cast<uint16_t>(m_passes.size());
-    m_passes.push_back(std::move(pass));
+    id.index = static_cast<uint16_t>(m_passes.size() - 1);
     m_compiled = false;
     return id;
 }
 
 RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
-    const std::vector<RGPassUsage>& usages, const std::vector<RepeatedPhase>& phases,
+    std::vector<RGPassUsage> usages, std::vector<RepeatedPhase> phases,
     uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
 {
     RequireQueueIdle();
-    const auto id = AddPass(name, usages, {}, hasSideEffect);
+    const auto id = AddPass(name, std::move(usages), {}, hasSideEffect);
     if (!id.IsValid())
     {
         return {};
     }
     auto& pass = m_passes[id.index];
     pass.repeated = true;
-    pass.phases = phases;
+    pass.phases = std::move(phases);
     pass.repeatCount = repeatCount;
     pass.repeatedExecute = std::move(execute);
     pass.recordCost = recordCost;
@@ -506,7 +562,7 @@ RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
 }
 
 RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
-    const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
+    std::vector<RGPassUsage> usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
     RequireQueueIdle();
@@ -514,23 +570,23 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     {
         return {};
     }
-    Pass pass{};
+    auto& pass = AppendPass();
     pass.name = name;
-    pass.usages = usages;
+    pass.usages = std::move(usages);
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.hasSideEffect = hasSideEffect;
     pass.recordCost = recordCost;
 
     RGPassId id{};
-    id.index = static_cast<uint16_t>(m_passes.size());
-    m_passes.push_back(std::move(pass));
+    id.index = static_cast<uint16_t>(m_passes.size() - 1);
     m_compiled = false;
     return id;
 }
 
 bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
 {
+    ce::profile_scope orderProfile{ce::marker<"RenderGraphDependencyOrder">()};
     m_executeOrder.clear();
     const size_t count = m_passes.size();
     if (count > RGPassId::kInvalid || m_resources.size() > RGHandle::kInvalid)
@@ -538,7 +594,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
     struct Edge { uint16_t to, resource; uint16_t version{0}; };
     std::vector<std::vector<Edge>> edges(count);
     std::vector<uint32_t> incoming(count, 0);
-    std::vector<bool> alive(count, true);
+    ce::dynamic_bitset alive(count, true);
     m_versionEdges.clear();
     if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
     {
@@ -625,7 +681,14 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         // accesses; they must not keep discarded versions or dead readers alive.
         alive.assign(count, false);
         std::vector<uint16_t> roots;
-        const auto retain = [&](uint16_t p) { if(!alive[p]) { alive[p]=true; roots.push_back(p); } };
+        const auto retain = [&](uint16_t p)
+        {
+            if (!alive.test(p))
+            {
+                alive.set(p, true);
+                roots.push_back(p);
+            }
+        };
         for(size_t p=0; p<count; ++p) if(m_passes[p].hasSideEffect) retain(static_cast<uint16_t>(p));
         for(size_t r=0; r<m_resources.size(); ++r)
             if(m_resources[r].imported && producers[r].size()>1)
@@ -641,7 +704,10 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 for (const auto producer : producers[r][v]) retain(producer);
             }
         }
-        for(size_t p=0; p<count; ++p) m_passes[p].culled=!alive[p];
+        for (size_t p = 0; p < count; ++p)
+        {
+            m_passes[p].culled = !alive.test(p);
+        }
         const auto edge = [&](int32_t from, uint16_t to, uint16_t r, uint16_t v, Reason reason) {
             if (from<0 || from==to) return;
             m_versionEdges.push_back({static_cast<uint32_t>(from),to,r,v,reason});
@@ -657,7 +723,13 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             for (size_t v=0; v<producers[r].size(); ++v)
             {
                 std::vector<uint16_t> current;
-                for (const auto producer : producers[r][v]) if (alive[producer]) current.push_back(producer);
+                for (const auto producer : producers[r][v])
+                {
+                    if (alive.test(producer))
+                    {
+                        current.push_back(producer);
+                    }
+                }
                 if (!current.empty())
                 {
                     for (const auto producer : current)
@@ -673,8 +745,12 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                     }
                     pendingReaders.clear(); previousWriters=current; previousVersion=static_cast<uint16_t>(v);
                 }
-                for (const auto reader : consumers[r][v]) if (alive[reader])
+                for (const auto reader : consumers[r][v])
                 {
+                    if (!alive.test(reader))
+                    {
+                        continue;
+                    }
                     for (const auto producer : current)
                         edge(producer,reader,static_cast<uint16_t>(r),static_cast<uint16_t>(v),Reason::RAW);
                     pendingReaders.push_back({reader,static_cast<uint16_t>(v)});
@@ -686,7 +762,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
     {
     std::vector<int32_t> writer(m_resources.size(), -1);
     std::vector<std::vector<uint16_t>> readers(m_resources.size());
-    std::vector<bool> modifies(m_resources.size(), false);
+    ce::dynamic_bitset modifies(m_resources.size(), false);
     for (size_t p = 0; p < count; ++p)
     {
         std::vector<uint16_t> seen;
@@ -715,8 +791,11 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 if (writer[r] >= 0) return fail("multiple writers require RG2 versions: " + m_resources[r].name
                     + " (first: " + m_passes[writer[r]].name + ")");
                 writer[r] = static_cast<int32_t>(p);
-                modifies[r] = u.access == RGAccessMode::ReadWrite;
-                if (modifies[r] && !m_resources[r].imported) return fail("ReadWrite needs initialized imported input: " + m_resources[r].name);
+                modifies.set(r, u.access == RGAccessMode::ReadWrite);
+                if (modifies.test(r) && !m_resources[r].imported)
+                {
+                    return fail("ReadWrite needs initialized imported input: " + m_resources[r].name);
+                }
             }
             if (Reads(u)) readers[r].push_back(static_cast<uint16_t>(p));
         }
@@ -732,7 +811,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             }
             const auto producer = static_cast<uint16_t>(writer[r]);
             if (producer == consumer) continue; // sole imported ReadWrite
-            if (modifies[r])
+            if (modifies.test(r))
             { outError = "RG1 ambiguous ReadWrite chain requires RG2 versions: " + m_resources[r].name; return false; }
             auto& outgoing = edges[producer];
             if (std::none_of(outgoing.begin(), outgoing.end(), [&](const Edge& e) { return e.to == consumer; }))
@@ -743,13 +822,13 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
     // fences, unlike hasSideEffect (which only retains a pass during culling).
     for (uint16_t fence = 0; fence < count; ++fence)
     {
-        if (!alive[fence] || !m_passes[fence].recordingSideEffect)
+        if (!alive.test(fence) || !m_passes[fence].recordingSideEffect)
         {
             continue;
         }
         for (uint16_t pass = 0; pass < count; ++pass)
         {
-            if (!alive[pass] || pass == fence)
+            if (!alive.test(pass) || pass == fence)
             {
                 continue;
             }
@@ -766,14 +845,20 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         }
     }
     std::priority_queue<uint16_t, std::vector<uint16_t>, std::greater<uint16_t>> ready;
-    for (size_t p = 0; p < count; ++p) if (alive[p] && !incoming[p]) ready.push(static_cast<uint16_t>(p));
+    for (size_t p = 0; p < count; ++p)
+    {
+        if (alive.test(p) && !incoming[p])
+        {
+            ready.push(static_cast<uint16_t>(p));
+        }
+    }
     std::vector<uint16_t> order;
     while (!ready.empty())
     {
         const auto p = ready.top(); ready.pop(); order.push_back(p);
         for (const auto& e : edges[p]) if (--incoming[e.to] == 0) ready.push(e.to);
     }
-    if (order.size() != static_cast<size_t>(std::count(alive.begin(),alive.end(),true)))
+    if (order.size() != alive.count())
     {
         // Iterative DFS: report a real cycle with resource labels, without
         // recursion depth depending on the number of authored passes.
@@ -782,7 +867,10 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         std::vector<Visit> stack;
         for (size_t root = 0; root < count; ++root)
         {
-            if (!alive[root] || color[root]) continue;
+            if (!alive.test(root) || color[root])
+            {
+                continue;
+            }
             stack.push_back({static_cast<uint16_t>(root), 0}); color[root] = 1;
             while (!stack.empty())
             {
@@ -817,7 +905,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         {
             for (const auto& edge : edges[from])
             {
-                if (alive[from] && alive[edge.to] && from >= edge.to)
+                if (alive.test(from) && alive.test(edge.to) && from >= edge.to)
                 {
                     outError = "Declaration order violates dependency: " + m_passes[from].name + " -> " +
                                m_passes[edge.to].name + " resource=" +
@@ -860,13 +948,13 @@ bool EnhancedRenderGraph::BuildOrder(std::string& outError)
     m_executeOrder.clear();
     if (0 == passCount) return true;
 
-    std::vector<bool> written(m_resources.size(), false);
+    ce::dynamic_bitset written(m_resources.size(), false);
 
     for (size_t passIndex = 0; passIndex < passCount; ++passIndex)
     {
         const Pass& pass = m_passes[passIndex];
 
-        for (const auto& usage : pass.usages)
+        for (const auto& usage : std::span{pass.usages})
         {
             if (usage.access != RGAccessMode::LegacyState)
             { outError = "Explicit access requires ExplicitSingleWriter scheduling: " + pass.name; return false; }
@@ -876,11 +964,11 @@ bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 
             if (IsWriteState(usage.state))
             {
-                written[resourceIndex] = true;
+                written.set(resourceIndex, true);
                 continue;
             }
 
-            if (!resource.imported && !written[resourceIndex])
+            if (!resource.imported && !written.test(resourceIndex))
             {
                 outError = "선언 순서가 데이터 흐름과 어긋난다: 패스 '" + pass.name
                     + "'가 아직 아무도 쓰지 않은 '" + resource.name + "'을 읽는다";
@@ -967,7 +1055,7 @@ void EnhancedRenderGraph::CullPasses()
     // 실행 순서에서 걷어낸 패스를 뺀다.
     std::vector<uint16_t> survivors;
     survivors.reserve(m_executeOrder.size());
-    for (uint16_t index : m_executeOrder)
+    for (uint16_t index : std::span{m_executeOrder})
     {
         if (!m_passes[index].culled) survivors.push_back(index);
     }
@@ -1220,7 +1308,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
 
 void EnhancedRenderGraph::UpdateResourceUses()
 {
-    for (auto& resource : m_resources)
+    for (auto& resource : std::span{m_resources})
     {
         resource.used = false;
         resource.firstUse = 0xFFFFFFFF;
@@ -1252,7 +1340,7 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
     {
         return false;
     }
-    for (auto& resource : m_resources)
+    for (auto& resource : std::span{m_resources})
     {
         if (resource.imported || !resource.used || resource.IsValid())
         {
@@ -1352,9 +1440,11 @@ EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSche
     // A live scene declares dozens of passes/resources per recording. Pass owns
     // several vectors; growing the outer array repeatedly also rebuilds their
     // checked-iterator proxies in Debug. These are initial capacities, not limits.
-    m_resources.reserve(256);
-    m_passes.reserve(128);
-    m_executeOrder.reserve(128);
+    // The METEOR scene graph alone records ~190 passes; 128 forced one full
+    // relocation of every Pass per frame.
+    m_resources.reserve(512);
+    m_passStorage.reserve(512);
+    m_executeOrder.reserve(512);
     m_resourceEpoch = NextResourceEpoch();
     services.RegisterUploadTransactionListener(this);
 }
@@ -1371,7 +1461,7 @@ void EnhancedRenderGraph::OnUploadAccepted(uint64_t recording, RHICompletionPoin
     {
         return;
     }
-    for (auto& resource : m_resources)
+    for (auto& resource : std::span{m_resources})
     {
         if (resource.writeback)
         {
@@ -1392,7 +1482,7 @@ void EnhancedRenderGraph::OnUploadAccepted(uint64_t recording, RHICompletionPoin
 //   알 길이 없다.
 void EnhancedRenderGraph::ReleaseResources()
 {
-    for (auto& resource : m_resources)
+    for (auto& resource : std::span{m_resources})
     {
         if (!resource.IsValid()) continue;
 
@@ -1465,6 +1555,9 @@ void EnhancedRenderGraph::ReleaseResources()
 
 bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphValidateRepeated">()};
+    std::vector<size_t> outerIndices(m_resources.size(), SIZE_MAX);
+    std::vector<size_t> seenPhase(m_resources.size(), SIZE_MAX);
     for (const auto& pass : m_passes)
     {
         if (!pass.repeated)
@@ -1482,36 +1575,52 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
         {
             return fail("requires versioned access, a callback, and bounded nonempty phases/repetitions");
         }
-        std::vector<bool> initialized(pass.usages.size()), used(pass.usages.size()), written(pass.usages.size());
+        std::ranges::fill(std::span{outerIndices}, SIZE_MAX);
+        std::ranges::fill(std::span{seenPhase}, SIZE_MAX);
+        // Word-backed bitsets avoid container-bound iterator proxy adoption.
+        ce::dynamic_bitset initialized(pass.usages.size()), used(pass.usages.size()), written(pass.usages.size());
         for (size_t index = 0; index < pass.usages.size(); ++index)
         {
-            initialized[index] = pass.usages[index].access != RGAccessMode::Write;
+            const auto resourceIndex = pass.usages[index].handle.index;
+            if (resourceIndex >= outerIndices.size())
+            {
+                return fail("invalid external resource");
+            }
+            // Preserve first-match semantics; the DAG validator rejects any
+            // duplicate outer declarations, including on a cache miss.
+            if (outerIndices[resourceIndex] == SIZE_MAX)
+            {
+                outerIndices[resourceIndex] = index;
+            }
+            initialized.set(index, pass.usages[index].access != RGAccessMode::Write);
         }
-        for (const auto& phase : pass.phases)
+        for (size_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
         {
+            const auto& phase = pass.phases[phaseIndex];
             if (phase.name.empty() || phase.usages.empty())
             {
                 return fail("phase names and resource contracts must be nonempty");
             }
-            std::vector<uint16_t> seen;
-            for (const auto& usage : phase.usages)
+            for (const auto& usage : std::span{phase.usages})
             {
-                const auto found = std::find_if(pass.usages.begin(), pass.usages.end(), [&](const auto& outer)
+                const auto resourceIndex = usage.handle.index;
+                if (resourceIndex >= outerIndices.size() || outerIndices[resourceIndex] == SIZE_MAX)
                 {
-                    return outer.handle.index == usage.handle.index;
-                });
-                if (found == pass.usages.end() || !ValidVersionHandle(usage.handle) ||
+                    return fail("undeclared resource in phase '" + phase.name + "'");
+                }
+                const auto index = outerIndices[resourceIndex];
+                const auto* found = &pass.usages[index];
+                if (!ValidVersionHandle(usage.handle) ||
                     found->handle.version != usage.handle.version || found->handle.kind != usage.handle.kind ||
                     found->handle.epoch != usage.handle.epoch)
                 {
                     return fail("undeclared or different resource version in phase '" + phase.name + "'");
                 }
-                const auto index = static_cast<size_t>(found - pass.usages.begin());
-                if (std::find(seen.begin(), seen.end(), usage.handle.index) != seen.end())
+                if (seenPhase[resourceIndex] == phaseIndex)
                 {
                     return fail("duplicate resource in phase '" + phase.name + "'");
                 }
-                seen.push_back(usage.handle.index);
+                seenPhase[resourceIndex] = phaseIndex;
                 if (usage.access == RGAccessMode::LegacyState ||
                     usage.access < RGAccessMode::Read || usage.access > RGAccessMode::ReadWrite ||
                     usage.state < RHIResourceState::Common || usage.state > RHIResourceState::VertexAndShaderResource ||
@@ -1529,27 +1638,27 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
                 {
                     return fail("access/state mismatch in phase '" + phase.name + "'");
                 }
-                if (!used[index] && found->state != usage.state)
+                if (!used.test(index) && found->state != usage.state)
                 {
                     return fail("external state must match first phase use: " + m_resources[usage.handle.index].name);
                 }
                 if ((found->access == RGAccessMode::Read && Writes(usage)) ||
-                    (Reads(usage) && !initialized[index]))
+                    (Reads(usage) && !initialized.test(index)))
                 {
                     return fail("phase writes an external Read or reads an uninitialized output: " +
                         m_resources[usage.handle.index].name);
                 }
-                used[index] = true;
+                used.set(index, true);
                 if (Writes(usage))
                 {
-                    initialized[index] = true;
-                    written[index] = true;
+                    initialized.set(index, true);
+                    written.set(index, true);
                 }
             }
         }
         for (size_t index = 0; index < pass.usages.size(); ++index)
         {
-            if (!used[index] || (Writes(pass.usages[index]) && !written[index]))
+            if (!used.test(index) || (Writes(pass.usages[index]) && !written.test(index)))
             {
                 return fail("external resource contract has no corresponding phase access/write");
             }
@@ -1566,7 +1675,7 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
         }
         if (pass.repeated)
         {
-            for (const auto& phase : pass.phases)
+            for (const auto& phase : std::span{pass.phases})
             {
                 maximumBarriers += uint64_t(phase.usages.size()) * pass.repeatCount;
             }
@@ -1622,7 +1731,7 @@ bool EnhancedRenderGraph::ValidateFinalStates(std::string& outError) const
     return true;
 }
 
-void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite)
+void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, ce::dynamic_bitset& previousWrite)
 {
     // 첫 반복만 외부 상태에서 출발한다. 이후 반복은 고정된 마지막 단계에서
     // 돌아오므로 배리어 표 두 벌이면 타일 수와 무관하게 같은 계약을 표현한다.
@@ -1634,13 +1743,13 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& pr
         for (size_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
         {
             auto& plan = plans[phaseIndex];
-            for (const auto& usage : pass.phases[phaseIndex].usages)
+            for (const auto& usage : std::span{pass.phases[phaseIndex].usages})
             {
                 auto& resource = m_resources[usage.handle.index];
                 if (resource.state == usage.state)
                 {
                     if (usage.state == RHIResourceState::UnorderedAccess &&
-                        (previousWrite[usage.handle.index] || Writes(usage)))
+                        (previousWrite.test(usage.handle.index) || Writes(usage)))
                     {
                         if (resource.IsBuffer())
                         {
@@ -1661,7 +1770,7 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& pr
                     plan.transitions.push_back({resource.handle, resource.state, usage.state});
                 }
                 resource.state = usage.state;
-                previousWrite[usage.handle.index] = Writes(usage);
+                previousWrite.set(usage.handle.index, Writes(usage));
             }
             const auto count = plan.transitions.size() + plan.bufferTransitions.size() +
                 plan.uavBarriers.size() + plan.uavBufferBarriers.size();
@@ -1675,19 +1784,20 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& pr
     }
 }
 
-void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
+void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds,
     PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue,
-    const std::vector<bool>* retainedGraphicsTextures)
+    const ce::dynamic_bitset* retainedGraphicsTextures)
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphPlanBarriers">()};
     const bool queuePlan = batchEnds != nullptr;
     m_stats.barriersEmitted = 0;
     m_stats.barrierBatches = 0;
-    std::vector<bool> previousWrite(m_resources.size(),true);
+    ce::dynamic_bitset previousWrite(m_resources.size(),true);
     std::vector<uint16_t> previousAtomicVersion(m_resources.size(), RGHandle::kInvalid);
     std::vector<RHIResourceState> finalStates;
     const auto retainsState = [&](size_t index)
     {
-        return retainedGraphicsTextures && (*retainedGraphicsTextures)[index];
+        return retainedGraphicsTextures && retainedGraphicsTextures->test(index);
     };
     const auto appendTransition = [](PhaseBarrierPlan& plan, const Resource& resource,
         RHIResourceState before, RHIResourceState after)
@@ -1705,7 +1815,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             plan.transitions.push_back({resource.handle, before, after});
         }
     };
-    for (auto& resource : m_resources)
+    for (auto& resource : std::span{m_resources})
     {
         if (queuePlan)
         {
@@ -1728,20 +1838,20 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             resource.initialState = resource.state;
         }
     }
-    for (auto& pass : m_passes)
+    for (auto& pass : std::span{m_passes})
     {
-        pass.transitions.clear();
-        pass.bufferTransitions.clear();
-        pass.uavBarriers.clear();
-        pass.uavBufferBarriers.clear();
-        pass.finalTransitions.clear();
-        pass.finalBufferTransitions.clear();
-        pass.firstPhaseBarriers.clear();
-        pass.repeatPhaseBarriers.clear();
-        pass.aliasTextures.clear();
-        pass.aliasBuffers.clear();
-        pass.poisonBuffers.clear();
-        pass.aliasClears.clear();
+        ClearNonempty(pass.transitions);
+        ClearNonempty(pass.bufferTransitions);
+        ClearNonempty(pass.uavBarriers);
+        ClearNonempty(pass.uavBufferBarriers);
+        ClearNonempty(pass.finalTransitions);
+        ClearNonempty(pass.finalBufferTransitions);
+        ClearNonempty(pass.firstPhaseBarriers);
+        ClearNonempty(pass.repeatPhaseBarriers);
+        ClearNonempty(pass.aliasTextures);
+        ClearNonempty(pass.aliasBuffers);
+        ClearNonempty(pass.poisonBuffers);
+        ClearNonempty(pass.aliasClears);
     }
 
     for (uint16_t index = 0; index < m_resources.size(); ++index)
@@ -1790,7 +1900,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
     // 실행 순서를 따라가며 상태를 추적한다. 요구 상태와 다르면 그 패스 앞에
     // 전이를 붙인다. 한 패스의 전이는 전부 모아 두었다가 한 번에 넣는다 —
     // 배리어를 호출마다 흩뿌리면 GPU가 그때마다 파이프라인을 비운다.
-    for (uint16_t passIndex : m_executeOrder)
+    for (uint16_t passIndex : std::span{m_executeOrder})
     {
         Pass& pass = m_passes[passIndex];
 
@@ -1801,7 +1911,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
         }
         else
         {
-            for (const auto& usage : pass.usages)
+            for (const auto& usage : std::span{pass.usages})
             {
                 if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
                 {
@@ -1827,7 +1937,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
                     // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
                     // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
                     if (RHIResourceState::UnorderedAccess == usage.state && !siblingAtomic &&
-                        (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite[usage.handle.index] || Writes(usage)))
+                        (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite.test(usage.handle.index) || Writes(usage)))
                     {
                         if (resource.IsBuffer())
                         {
@@ -1838,7 +1948,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
                             pass.uavBarriers.push_back(resource.handle);
                         }
                     }
-                    previousWrite[usage.handle.index]=Writes(usage);
+                    previousWrite.set(usage.handle.index, Writes(usage));
                     continue;
                 }
 
@@ -1854,7 +1964,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
                 }
 
                 resource.state = usage.state;
-                previousWrite[usage.handle.index]=Writes(usage);
+                previousWrite.set(usage.handle.index, Writes(usage));
             }
 
             const size_t barrierCount = pass.transitions.size() +
@@ -1868,7 +1978,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
             }
         }
 
-        if (queuePlan && (*batchEnds)[passIndex])
+        if (queuePlan && batchEnds->test(passIndex))
         {
             // Graphics-only nondecaying textures retain explicit state on the
             // same FIFO queue. Buffers, unknown textures and cross-queue resources
@@ -1881,7 +1991,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
                 {
                     appendTransition(boundary, resource, resource.state, RHIResourceState::Common);
                     resource.state = RHIResourceState::Common;
-                    previousWrite[index] = true;
+                    previousWrite.set(index, true);
                 }
             }
             pass.finalTransitions = std::move(boundary.transitions);
@@ -1920,7 +2030,7 @@ void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
 
     // 다른 뷰·다음 프레임도 같은 캐시 상태로 시작하도록 마지막 소비 뒤 복구한다.
     // 분할 패스의 마지막 조각에 기록하므로 일부 draw 앞에서 복구하지 않는다.
-    for (const auto& requirement : m_finalStateRequirements)
+    for (const auto& requirement : std::span{m_finalStateRequirements})
     {
         auto& resource = m_resources[requirement.handle.index];
         if (!resource.used || resource.state == requirement.state)
@@ -1958,7 +2068,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
     output.orderPolicy = m_orderPolicy;
     output.executeOrder = m_executeOrder;
     output.queueExecution = m_queueDiagnostics;
-    for (const auto& resource : m_resources)
+    for (const auto& resource : std::span{m_resources})
     {
         output.resources.push_back({resource.name, resource.imported, resource.IsBuffer(),
             resource.used, resource.firstUse, resource.lastUse,
@@ -1997,7 +2107,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         {
             copy.compiledIndex = static_cast<int32_t>(position - m_executeOrder.begin());
         }
-        for (const auto& usage : pass.usages)
+        for (const auto& usage : std::span{pass.usages})
         {
             copy.usages.push_back({usage.handle.index, usage.state, Writes(usage), usage.access, usage.handle.version, usage.handle.kind});
         }
@@ -2047,7 +2157,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         {
             DiagnosticPass::Phase phase;
             phase.name = pass.phases[phaseIndex].name;
-            for (const auto& usage : pass.phases[phaseIndex].usages)
+            for (const auto& usage : std::span{pass.phases[phaseIndex].usages})
             {
                 phase.usages.push_back({usage.handle.index, usage.state, Writes(usage), usage.access,
                     usage.handle.version, usage.handle.kind});
@@ -2143,7 +2253,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
     mix(static_cast<uint64_t>(m_scheduling));
     mix(static_cast<uint64_t>(m_orderPolicy));
     mix(m_resources.size());
-    for (const auto& resource : m_resources)
+    for (const auto& resource : std::span{m_resources})
     {
         mixName(resource.name);
         mix(resource.imported);
@@ -2152,7 +2262,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         mix(resource.firstUse);
         mix(resource.lastUse);
         mix(resource.versions.size());
-        for (const auto& version : resource.versions)
+        for (const auto& version : std::span{resource.versions})
         {
             mix(version.parent);
             mix(version.modify);
@@ -2166,7 +2276,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         mix(pass.culled);
         mix(pass.sideEffect);
         mix(pass.usages.size());
-        for (const auto& usage : pass.usages)
+        for (const auto& usage : std::span{pass.usages})
         {
             mix(usage.resource);
             mix(usage.version);
@@ -2176,11 +2286,11 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         }
         mix(pass.repeatCount);
         mix(pass.phases.size());
-        for (const auto& phase : pass.phases)
+        for (const auto& phase : std::span{pass.phases})
         {
             mixName(phase.name);
             mix(phase.usages.size());
-            for (const auto& usage : phase.usages)
+            for (const auto& usage : std::span{phase.usages})
             {
                 mix(usage.resource);
                 mix(usage.version);
@@ -2223,7 +2333,7 @@ void EnhancedRenderGraph::BuildDependencyWaves()
     for(const auto& edge:m_versionEdges) predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
     std::vector<uint16_t> parent(m_passes.size(),RGPassId::kInvalid);
     uint16_t last=RGPassId::kInvalid;
-    for(const auto p:m_executeOrder)
+    for(const auto p:std::span{m_executeOrder})
     {
         m_dependencyWaves[p]=0;
         for(const auto producer:predecessors[p])
@@ -2245,22 +2355,29 @@ void EnhancedRenderGraph::BuildDependencyWaves()
 
 void EnhancedRenderGraph::InheritStructuralSchedule(const EnhancedRenderGraph& previous)
 {
-    RequireQueueIdle();
-    m_structuralSchedule = previous.m_structuralSchedule;
-    m_compiled = false;
+    InheritStructuralSchedule(previous.m_structuralSchedule, previous.m_alternateSchedule);
 }
 
 void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous)
 {
+    InheritStructuralSchedule(previous, {});
+}
+
+void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous,
+    const std::shared_ptr<const StructuralSchedule>& alternate)
+{
     RequireQueueIdle();
-    if (previous) m_structuralSchedule = *previous;
+    if (previous)
+    {
+        m_structuralSchedule = previous;
+    }
+    m_alternateSchedule = alternate;
     m_compiled = false;
 }
 
 std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> EnhancedRenderGraph::SnapshotStructuralSchedule() const
 {
-    return m_structuralSchedule.key
-        ? std::make_shared<const StructuralSchedule>(m_structuralSchedule) : nullptr;
+    return m_structuralSchedule && m_structuralSchedule->key ? m_structuralSchedule : nullptr;
 }
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
@@ -2301,7 +2418,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     }
 
     // Device/storage validity is not structural: validate even when reusing a DAG.
-    for (const auto& resource : m_resources)
+    for (const auto& resource : std::span{m_resources})
     {
         if (!std::any_of(resource.versions.begin(), resource.versions.end(),
             [](const Resource::Version& v) { return v.atomicMin64; })) continue;
@@ -2318,36 +2435,55 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     // authored-contract key. Exact byte comparison avoids hash collision reuse.
     for (auto& pass : m_passes) pass.culled = false;
     BuildTimingSignature();
-    const auto structuralKey = m_timingSignature;
-    const bool reuse = m_structuralSchedule.key && *m_structuralSchedule.key == *structuralKey;
-    if (reuse)
     {
-        m_executeOrder = m_structuralSchedule.order;
-        m_dependencyWaves = m_structuralSchedule.waves;
-        m_criticalPath = m_structuralSchedule.criticalPath;
-        m_versionEdges = m_structuralSchedule.edges;
-        for (size_t i = 0; i < m_passes.size(); ++i) m_passes[i].culled = m_structuralSchedule.culled[i];
-        m_stats.passesCulled = static_cast<uint32_t>(m_passes.size() - m_executeOrder.size());
-        m_stats.structuralScheduleReused = true;
-        for (const auto wave : m_dependencyWaves)
-            if (wave >= 0) m_stats.dependencyWaveCount = (std::max)(m_stats.dependencyWaveCount, static_cast<uint32_t>(wave + 1));
-        ce::profile_instant(ce::marker<"RenderGraphScheduleReused">());
-    }
-    else
-    {
-        if (!BuildOrder(outError)) return false;
-        CullPasses();
-        BuildDependencyWaves();
-        // Bound retained metadata. Large/diagnostic graphs still compile normally.
-        if (structuralKey->size() <= 1024 * 1024 && m_passes.size() <= 4096)
+        ce::profile_scope scheduleProfile{ce::marker<"RenderGraphSchedule">()};
+        const auto structuralKey = m_timingSignature;
+        bool reuse = m_structuralSchedule && m_structuralSchedule->key &&
+            *m_structuralSchedule->key == *structuralKey;
+        if (!reuse && m_alternateSchedule && m_alternateSchedule->key &&
+            *m_alternateSchedule->key == *structuralKey)
         {
-            m_structuralSchedule.key = structuralKey;
-            m_structuralSchedule.order = m_executeOrder;
-            m_structuralSchedule.waves = m_dependencyWaves;
-            m_structuralSchedule.criticalPath = m_criticalPath;
-            m_structuralSchedule.edges = m_versionEdges;
-            m_structuralSchedule.culled.clear();
-            for (const auto& pass : m_passes) m_structuralSchedule.culled.push_back(pass.culled);
+            std::swap(m_structuralSchedule, m_alternateSchedule);
+            reuse = true;
+        }
+        if (reuse)
+        {
+            m_executeOrder = m_structuralSchedule->order;
+            m_dependencyWaves = m_structuralSchedule->waves;
+            m_criticalPath = m_structuralSchedule->criticalPath;
+            m_versionEdges = m_structuralSchedule->edges;
+            for (size_t i = 0; i < m_passes.size(); ++i)
+            {
+                m_passes[i].culled = m_structuralSchedule->culled.test(i);
+            }
+            m_stats.passesCulled = static_cast<uint32_t>(m_passes.size() - m_executeOrder.size());
+            m_stats.structuralScheduleReused = true;
+            for (const auto wave : m_dependencyWaves)
+                if (wave >= 0) m_stats.dependencyWaveCount = (std::max)(m_stats.dependencyWaveCount, static_cast<uint32_t>(wave + 1));
+            ce::profile_instant(ce::marker<"RenderGraphScheduleReused">());
+        }
+        else
+        {
+            if (!BuildOrder(outError)) return false;
+            CullPasses();
+            BuildDependencyWaves();
+            // Bound retained metadata. Large/diagnostic graphs still compile normally.
+            if (structuralKey->size() <= 1024 * 1024 && m_passes.size() <= 4096)
+            {
+                auto schedule = std::make_shared<StructuralSchedule>();
+                schedule->key = structuralKey;
+                schedule->order = m_executeOrder;
+                schedule->waves = m_dependencyWaves;
+                schedule->criticalPath = m_criticalPath;
+                schedule->edges = m_versionEdges;
+                schedule->culled.reserve(m_passes.size());
+                for (const auto& pass : std::span{m_passes})
+                {
+                    schedule->culled.push_back(pass.culled);
+                }
+                m_alternateSchedule = std::move(m_structuralSchedule);
+                m_structuralSchedule = std::move(schedule);
+            }
         }
     }
 
@@ -2367,7 +2503,12 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     }
 
     m_stats.passesExecuted = static_cast<uint32_t>(m_executeOrder.size());
-    BuildTimingSignature();
+    // Reachability is the only serialized field changed by compilation. Keep
+    // the authored signature when every pass survives, including cache hits.
+    if (m_stats.passesCulled != 0)
+    {
+        PatchTimingSignatureReachability();
+    }
     m_compileGeneration = NextRenderGraphCompileGeneration();
     m_compiled = true;
     return true;
@@ -2407,16 +2548,25 @@ void EnhancedRenderGraph::DeclareRecordingIndependent(RGPassId pass)
 
 void EnhancedRenderGraph::BuildTimingSignature()
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphSignature">()};
     // 프레임마다 달라지는 핸들/epoch/포인터는 빼되 선언 슬롯, 이름, 접근과
     // 반복 구조는 전부 넣는다. 문자열 길이를 먼저 적으므로 같은 이름, 빈 이름,
     // '(xN)'이 실제 이름인 경우도 서로 다른 선언을 합치지 않는다.
+    m_signatureCulledOffsets.clear();
+    m_signatureCulledOffsets.reserve(m_passes.size());
     std::string signature;
+    signature.reserve(m_structuralSchedule && m_structuralSchedule->key ? m_structuralSchedule->key->size() :
+        m_resources.size() * 256 + m_passes.size() * 256);
+    // The object bytes are already the exact little-endian key; append them once.
+    static_assert(std::endian::native == std::endian::little);
     const auto number = [&](uint64_t value)
     {
-        for (uint32_t byte = 0; byte < sizeof(value); ++byte)
-        {
-            signature.push_back(static_cast<char>((value >> (byte * 8)) & 0xFFu));
-        }
+        signature.append(reinterpret_cast<const char*>(&value), sizeof(value));
+    };
+    // Same bytes as one number() per value, in one append.
+    const auto numbers = [&](std::initializer_list<uint64_t> values)
+    {
+        signature.append(reinterpret_cast<const char*>(values.begin()), values.size() * sizeof(uint64_t));
     };
     const auto name = [&](const std::string& value)
     {
@@ -2426,14 +2576,12 @@ void EnhancedRenderGraph::BuildTimingSignature()
     const auto usages = [&](const std::vector<RGPassUsage>& values)
     {
         number(values.size());
-        for (const auto& usage : values)
+        for (const auto& usage : std::span{values})
         {
-            number(usage.handle.index);
-            number(usage.handle.version);
-            number(m_scheduling != RGSchedulingMode::ExplicitVersioned || ValidVersionHandle(usage.handle));
-            number(static_cast<uint64_t>(usage.handle.kind));
-            number(static_cast<uint64_t>(usage.state));
-            number(static_cast<uint64_t>(usage.access));
+            numbers({usage.handle.index, usage.handle.version,
+                uint64_t{m_scheduling != RGSchedulingMode::ExplicitVersioned || ValidVersionHandle(usage.handle)},
+                static_cast<uint64_t>(usage.handle.kind), static_cast<uint64_t>(usage.state),
+                static_cast<uint64_t>(usage.access)});
         }
     };
     number(static_cast<uint64_t>(m_measurementDomain));
@@ -2443,16 +2591,32 @@ void EnhancedRenderGraph::BuildTimingSignature()
     number(m_extendLifetimes);
     number(m_poison);
     number(m_resources.size());
-    std::unordered_set<uint32_t> importedTextureIds, importedBufferIds;
-    for (const auto& resource : m_resources)
+    // Whether each import is the first resource naming its (kind, id). Sorting
+    // (identity, index) pairs gives the same answer as per-kind set insertion.
+    std::vector<std::pair<uint64_t, uint32_t>> imports;
+    for (uint32_t index = 0; index < m_resources.size(); ++index)
     {
+        const auto& resource = m_resources[index];
+        if (resource.imported)
+            imports.emplace_back((uint64_t{resource.IsBuffer()} << 32) |
+                (resource.IsBuffer() ? resource.buffer.id : resource.handle.id), index);
+    }
+    if (!imports.empty())
+    {
+        std::sort(imports.data(), imports.data() + imports.size());
+    }
+    std::vector<uint8_t> firstImport(m_resources.size());
+    for (size_t i = 0; i < imports.size(); ++i)
+        firstImport[imports[i].second] = i == 0 || imports[i - 1].first != imports[i].first;
+    for (uint32_t index = 0; index < m_resources.size(); ++index)
+    {
+        const auto& resource = m_resources[index];
         name(resource.name);
         number(resource.imported);
         number(resource.bufferKind);
         if (resource.imported)
         {
-            auto& identities = resource.IsBuffer() ? importedBufferIds : importedTextureIds;
-            number(identities.insert(resource.IsBuffer() ? resource.buffer.id : resource.handle.id).second);
+            number(firstImport[index]);
         }
         if (resource.bufferKind)
         {
@@ -2462,54 +2626,61 @@ void EnhancedRenderGraph::BuildTimingSignature()
         }
         else
         {
-            number(resource.desc.width);
-            number(resource.desc.height);
-            number(resource.desc.arraySize);
-            number(static_cast<uint64_t>(resource.desc.format));
-            number(resource.desc.allowRenderTarget);
-            number(resource.desc.allowDepthStencil);
-            number(resource.desc.allowUnorderedAccess);
+            numbers({resource.desc.width, resource.desc.height, resource.desc.arraySize,
+                static_cast<uint64_t>(resource.desc.format), uint64_t(resource.desc.allowRenderTarget),
+                uint64_t(resource.desc.allowDepthStencil), uint64_t(resource.desc.allowUnorderedAccess)});
             for (const float component : resource.desc.clearColor)
             {
                 number(std::bit_cast<uint32_t>(component));
             }
         }
         number(resource.versions.size());
-        for (const auto& version : resource.versions)
+        for (const auto& version : std::span{resource.versions})
         {
-            number(version.parent);
-            number(version.modify);
-            number(version.atomicMin64);
+            numbers({version.parent, uint64_t(version.modify), uint64_t(version.atomicMin64)});
         }
     }
     number(m_passes.size());
-    for (const auto& pass : m_passes)
+    for (const auto& pass : std::span{m_passes})
     {
         name(pass.name);
-        number(pass.culled);
-        number(pass.hasSideEffect);
-        number(pass.computeCompatible);
-        number(pass.recordingSideEffect);
-        number(pass.maxSlices);
-        number(pass.recordCost);
-        number(static_cast<bool>(pass.splitExecute));
-        number(pass.repeated);
-        number(pass.repeatCount);
+        m_signatureCulledOffsets.push_back(signature.size());
+        numbers({uint64_t(pass.culled), uint64_t(pass.hasSideEffect), uint64_t(pass.computeCompatible),
+            uint64_t(pass.recordingSideEffect), pass.maxSlices, pass.recordCost,
+            uint64_t(static_cast<bool>(pass.splitExecute)), uint64_t(pass.repeated), pass.repeatCount});
         usages(pass.usages);
         number(pass.phases.size());
-        for (const auto& phase : pass.phases)
+        for (const auto& phase : std::span{pass.phases})
         {
             name(phase.name);
             usages(phase.usages);
         }
     }
     number(m_finalStateRequirements.size());
-    for (const auto& requirement : m_finalStateRequirements)
+    for (const auto& requirement : std::span{m_finalStateRequirements})
     {
-        number(requirement.handle.index);
-        number(requirement.handle.version);
-        number(static_cast<uint64_t>(requirement.handle.kind));
-        number(static_cast<uint64_t>(requirement.state));
+        numbers({requirement.handle.index, requirement.handle.version,
+            static_cast<uint64_t>(requirement.handle.kind), static_cast<uint64_t>(requirement.state)});
+    }
+    m_timingSignature = std::make_shared<const std::string>(std::move(signature));
+}
+
+// Compilation changes only reachability, so rewrite those fields in a copy
+// instead of serializing the whole graph again. The result is byte-identical
+// to BuildTimingSignature() on the compiled graph.
+void EnhancedRenderGraph::PatchTimingSignatureReachability()
+{
+    if (!m_timingSignature || m_signatureCulledOffsets.size() != m_passes.size())
+    {
+        BuildTimingSignature();
+        return;
+    }
+    ce::profile_scope profile{ce::marker<"RenderGraphSignature">()};
+    std::string signature = *m_timingSignature;
+    for (size_t i = 0; i < m_passes.size(); ++i)
+    {
+        const uint64_t culled = m_passes[i].culled;
+        std::memcpy(signature.data() + m_signatureCulledOffsets[i], &culled, sizeof(culled));
     }
     m_timingSignature = std::make_shared<const std::string>(std::move(signature));
 }
@@ -2525,7 +2696,7 @@ std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHi
     // 겹쳐 실행할 graphics 비용도 필요하다. 표시 이름이 아닌 선언 정체성으로
     // 조회해야 같은 이름의 다른 패스와 분할 조각이 서로 비용을 덮지 않는다.
     hints.reserve(m_executeOrder.size());
-    for (const auto index : m_executeOrder)
+    for (const auto index : std::span{m_executeOrder})
     {
         const auto& pass = m_passes[index];
         const auto sample = measurement(TimingIdentity(index));
@@ -2570,7 +2741,7 @@ bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
     {
         return false;
     }
-    for (const auto& phase : pass.phases)
+    for (const auto& phase : std::span{pass.phases})
     {
         if (!compatible(phase.usages))
         {
@@ -2911,7 +3082,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     std::vector<uint64_t> costs(m_passes.size(), 0);
     std::vector<uint16_t> candidates;
     plan.predictionComplete = true;
-    for (const auto pass : m_executeOrder)
+    for (const auto pass : std::span{m_executeOrder})
     {
         const auto* hint = byPass[pass];
         const bool measured = hint && hint->hasGpuMeasurement;
@@ -2952,7 +3123,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     // Leave the normal serial order and barriers alone on every early fallback.
     if (candidates.empty() || (overlap && !plan.predictionComplete))
     {
-        for (const auto pass : m_executeOrder)
+        for (const auto pass : std::span{m_executeOrder})
         {
             plan.entries.push_back({pass, RHIQueueKind::Graphics});
         }
@@ -3007,10 +3178,10 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         // unit: moving one member alone adds two handoffs. Try chains first, then
         // single toggles to drop members that do not help.
         std::vector<uint16_t> component(m_passes.size(), RGPassId::kInvalid);
-        std::vector<bool> candidate(m_passes.size(), false);
+        ce::dynamic_bitset candidatePasses(m_passes.size(), false);
         for (const auto pass : candidates)
         {
-            candidate[pass] = true;
+            candidatePasses.set(pass, true);
         }
         for (const auto root : candidates)
         {
@@ -3028,7 +3199,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
                 {
                     for (const auto next : *neighbours)
                     {
-                        if (candidate[next] && component[next] == RGPassId::kInvalid)
+                        if (candidatePasses.test(next) && component[next] == RGPassId::kInvalid)
                         {
                             component[next] = root;
                             members.push_back(next);
@@ -3067,7 +3238,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         output = std::move(plan);
         return true;
     }
-    for (const auto pass : m_executeOrder)
+    for (const auto pass : std::span{m_executeOrder})
     {
         for (const auto producer : predecessors[pass])
         {
@@ -3126,7 +3297,7 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
 
     context.graph = this;
 
-    for (uint16_t passIndex : m_executeOrder)
+    for (uint16_t passIndex : std::span{m_executeOrder})
     {
         Pass& pass = m_passes[passIndex];
 
@@ -3340,9 +3511,20 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // 임계값은 실측으로 정한다. 여기서 미리 정해 두고 '대충 이쯤이면 되겠지'로
     // 넘어가면, 다음에 기록 비용이 또 바뀌었을 때 아무도 다시 재지 않는다.
     uint32_t totalRecordCost = 0;
-    for (const size_t index : m_executeOrder)
+    uint64_t estimatedRecordingWork = 0;
+    const auto bindingWork = [](const Pass& pass)
+    {
+        uint64_t uses = pass.usages.size();
+        for (const auto& phase : std::span{pass.phases})
+        {
+            uses += uint64_t(phase.usages.size()) * pass.repeatCount;
+        }
+        return uses;
+    };
+    for (const size_t index : std::span{m_executeOrder})
     {
         totalRecordCost += m_passes[index].recordCost;
+        estimatedRecordingWork += 1 + uint64_t(m_passes[index].recordCost) + bindingWork(m_passes[index]);
     }
 
     // 호출부가 병렬을 요청했더라도 그래프가 되무른다 — 이 판단을 호출부마다
@@ -3354,10 +3536,13 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // 통째로 기록한 것과 같다는 것이 분할 조각의 계약이다.
     const bool recordingSideEffects = std::any_of(m_executeOrder.begin(), m_executeOrder.end(),
         [&](uint16_t pass) { return m_passes[pass].recordingSideEffect; });
+    const bool bindingAware = m_recordingWorkloadBalance && m_scheduling == RGSchedulingMode::ExplicitVersioned;
     const bool declineParallel = recordingSideEffects ||
-        (0 != totalRecordCost && totalRecordCost < m_parallelCostThreshold);
+        (0 != totalRecordCost && totalRecordCost < m_parallelCostThreshold &&
+            (!bindingAware || estimatedRecordingWork < m_parallelCostThreshold));
 
     m_stats.totalRecordCost = totalRecordCost;
+    m_stats.estimatedRecordingWork = estimatedRecordingWork;
     m_stats.parallelDeclined = declineParallel;
 
     const uint32_t poolWorkers = declineParallel ? 1u : (std::max)(1u,
@@ -3389,12 +3574,17 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
     // backend가 immediate upload/copy를 먼저 제출하고 worker recording용
     // allocation version을 연다. 호출부가 Flush를 빼먹을 수 없게 경계 안에 둔다.
-    if (m_preparedPool)
     {
-        m_preparedRecordingConsumed = true;
+        ce::profile_scope profile{ce::marker<"RenderCommandRecord.Prepare">()};
+        if (m_preparedPool)
+        {
+            m_preparedRecordingConsumed = true;
+        }
+        else if (!pool.Prepare(outError))
+        {
+            return false;
+        }
     }
-    else if (!pool.Prepare(outError))
-        return false;
 
     // ── 배분: 연속 블록 ──
     //
@@ -3408,111 +3598,280 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // 그 대가를 확인했다 — 패스 6 · 워커 4에서 Shadow와 GBuffer가 같은 워커에
     // 가면서 드로우 44에서 1.12배, 176에서 0.81배로 방향조차 흔들렸다.
     // 워커를 넉넉히 주면(아래에서 단위 수로 클램프한다) 일관된다.
-    std::vector<uint32_t> unitWorker(unitCount, 0);
-    for (size_t i = 0; i < unitCount; ++i)
+    struct RecordingShape
     {
-        unitWorker[i] = static_cast<uint32_t>(i * workers / unitCount);
-    }
-    std::vector<uint32_t> unitWave(unitCount, 0);
-    uint32_t waveCount = 1;
-    m_stats.recordingBalanced = false;
-    if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
+        uint16_t pass;
+        uint32_t slice, slices, declared;
+        uint64_t bindings;
+        bool independent, split;
+        bool operator==(const RecordingShape&) const = default;
+    };
+    struct CachedRecordingPlan
     {
-        std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
-        for (const auto& edge : m_versionEdges)
-            predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
-        std::vector<uint32_t> passWave(m_passes.size()), targetWave(workers);
-        std::vector<uint32_t> passSingleTarget(m_passes.size());
-        const auto planWaves = [&](const std::vector<uint32_t>& targets, std::vector<uint32_t>& waves)
+        std::shared_ptr<const StructuralSchedule> schedule;
+        uint32_t workers{0}, waveCount{1};
+        bool balanced{false};
+        std::vector<RecordingShape> shapes;
+        std::vector<uint32_t> unitWorker, unitWave;
+        std::vector<std::vector<size_t>> workerUnits;
+    };
+    // CPU metadata only: no callbacks, encoders, native handles or frame owners.
+    // A bounded owner-thread cache also serves graph storage in other frame slots.
+    // Workers cannot recursively record, so an active entry cannot be evicted by
+    // its callbacks. Exact immutable schedule identity and unit shapes gate reuse.
+    static thread_local std::array<std::optional<CachedRecordingPlan>, 8> cachedPlans;
+    static thread_local size_t nextCachedPlan = 0;
+    const bool cacheEligible = bindingAware && !recordingSideEffects && workers > 1 &&
+        m_structuralSchedule && unitCount <= 4096;
+    const auto shape = [&](size_t i)
+    {
+        const auto pass = m_executeOrder[units[i].order];
+        const auto& value = m_passes[pass];
+        return RecordingShape{pass, units[i].slice, units[i].sliceCount, value.recordCost,
+            bindingWork(value), value.recordingIndependent, bool(value.splitExecute)};
+    };
+    CachedRecordingPlan scratch;
+    const CachedRecordingPlan* selectedPlan = nullptr;
+    if (cacheEligible)
+    {
+        for (const auto& entry : cachedPlans)
         {
-            std::fill(passWave.begin(), passWave.end(), 0);
-            std::fill(targetWave.begin(), targetWave.end(), 0);
-            std::fill(passSingleTarget.begin(), passSingleTarget.end(), UINT32_MAX);
-            uint32_t count = 1;
-            for (size_t begin = 0; begin < unitCount;)
+            if (!entry || entry->schedule != m_structuralSchedule || entry->workers != workers ||
+                entry->shapes.size() != unitCount)
             {
-                size_t end = begin + 1;
-                while (end < unitCount && units[end].order == units[begin].order) ++end;
-                const auto pass = m_executeOrder[units[begin].order];
-                uint32_t wave = 0;
-                const uint32_t singleTarget = end - begin == 1 ? targets[begin] : UINT32_MAX;
-                for (const auto producer : predecessors[pass])
-                {
-                    // Unannotated/split consumers retain CPU joins. Independent
-                    // GPU consumers still keep all GPU list order/barriers.
-                    const uint32_t join = singleTarget != UINT32_MAX &&
-                        (passSingleTarget[producer] == singleTarget || m_passes[pass].recordingIndependent) ? 0u : 1u;
-                    wave = (std::max)(wave, passWave[producer] + join);
-                }
-                passSingleTarget[pass] = singleTarget;
-                for (size_t i = begin; i < end; ++i) wave = (std::max)(wave, targetWave[targets[i]]);
-                for (size_t i = begin; i < end; ++i) { waves[i] = wave; targetWave[targets[i]] = wave; }
-                passWave[pass] = wave;
-                count = (std::max)(count, wave + 1);
-                begin = end;
+                continue;
             }
-            return count;
-        };
-        waveCount = planWaves(unitWorker, unitWave);
-        if (m_recordingWorkloadBalance && unitCount > workers)
-        {
-            // These are CPU command-recording work units, never GPU timings.
-            // Base callback + declared resource uses + declared draw-batch cost.
-            // Split callbacks share the declared work; every slice has overhead.
-            std::vector<uint64_t> costs(unitCount);
-            uint64_t total = 0;
+            bool matches = true;
             for (size_t i = 0; i < unitCount; ++i)
             {
-                const auto index = m_executeOrder[units[i].order];
-                const auto& pass = m_passes[index];
-                const uint64_t declared = uint64_t(pass.recordCost) / units[i].sliceCount;
-                // Physical history-buffer states alternate between frames. Using
-                // emitted barrier counts would move CPU partition boundaries and
-                // make capture join counts nondeterministic for identical inputs.
-                uint64_t resourceUses = pass.usages.size();
-                for (const auto& phase : pass.phases)
-                    resourceUses += uint64_t(phase.usages.size()) * pass.repeatCount;
-                const uint64_t bindingWork = units[i].slice == 0 ? resourceUses : 0;
-                costs[i] = (std::min)(uint64_t(UINT32_MAX), 1 + declared + bindingWork);
-                total += costs[i];
-            }
-            // Contiguous nonempty blocks: target order remains GPU execute order.
-            std::vector<uint32_t> candidate(unitCount);
-            uint64_t prefix = 0;
-            uint32_t target = 0;
-            for (size_t i = 0; i < unitCount; ++i)
-            {
-                const uint32_t desired = static_cast<uint32_t>((std::min)(uint64_t(workers - 1), prefix * workers / total));
-                if (i && target + 1 < workers &&
-                    (desired > target || unitCount - i <= workers - 1 - target)) ++target;
-                candidate[i] = target;
-                prefix += costs[i];
-            }
-            const auto peak = [&](const std::vector<uint32_t>& targets)
-            {
-                std::vector<uint64_t> sums(workers);
-                for (size_t i = 0; i < unitCount; ++i) sums[targets[i]] += costs[i];
-                return *std::max_element(sums.begin(), sums.end());
-            };
-            if (peak(candidate) < peak(unitWorker))
-            {
-                std::vector<uint32_t> candidateWaves(unitCount);
-                const uint32_t candidateCount = planWaves(candidate, candidateWaves);
-                if (candidateCount <= waveCount)
+                if (entry->shapes[i] != shape(i))
                 {
-                    unitWorker = std::move(candidate);
-                    unitWave = std::move(candidateWaves);
-                    waveCount = candidateCount;
-                    m_stats.recordingBalanced = true;
+                    matches = false;
+                    break;
                 }
+            }
+            if (matches)
+            {
+                selectedPlan = &*entry;
+                break;
             }
         }
     }
-    std::vector<std::vector<size_t>> workerUnits(workers);
-    for (size_t i = 0; i < unitCount; ++i)
+    if (!selectedPlan)
     {
-        workerUnits[unitWorker[i]].push_back(i);
+        ce::profile_scope profile{ce::marker<"RenderCommandRecord.Plan">()};
+        auto& unitWorker = scratch.unitWorker;
+        unitWorker.assign(unitCount, 0);
+        for (size_t i = 0; i < unitCount; ++i)
+        {
+            unitWorker[i] = static_cast<uint32_t>(i * workers / unitCount);
+        }
+        auto& unitWave = scratch.unitWave;
+        unitWave.assign(unitCount, 0);
+        uint32_t waveCount = 1;
+        m_stats.recordingBalanced = false;
+        if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
+        {
+            std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
+            for (const auto& edge : std::span{m_versionEdges})
+            {
+                predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
+            }
+            std::vector<uint32_t> passWave(m_passes.size()), targetWave(workers);
+            std::vector<uint32_t> passSingleTarget(m_passes.size());
+            const auto planWaves = [&](const std::vector<uint32_t>& targets, std::vector<uint32_t>& waves)
+            {
+                std::ranges::fill(std::span{passWave}, 0u);
+                std::ranges::fill(std::span{targetWave}, 0u);
+                std::ranges::fill(std::span{passSingleTarget}, UINT32_MAX);
+                uint32_t count = 1;
+                for (size_t begin = 0; begin < unitCount;)
+                {
+                    size_t end = begin + 1;
+                    while (end < unitCount && units[end].order == units[begin].order)
+                    {
+                        ++end;
+                    }
+                    const auto pass = m_executeOrder[units[begin].order];
+                    uint32_t wave = 0;
+                    const uint32_t singleTarget = end - begin == 1 ? targets[begin] : UINT32_MAX;
+                    for (const auto producer : std::span{predecessors[pass]})
+                    {
+                        // Unannotated/split consumers retain CPU joins. Independent
+                        // GPU consumers still keep all GPU list order/barriers.
+                        const uint32_t join = singleTarget != UINT32_MAX &&
+                            (passSingleTarget[producer] == singleTarget || m_passes[pass].recordingIndependent) ? 0u : 1u;
+                        wave = (std::max)(wave, passWave[producer] + join);
+                    }
+                    passSingleTarget[pass] = singleTarget;
+                    for (size_t i = begin; i < end; ++i)
+                    {
+                        wave = (std::max)(wave, targetWave[targets[i]]);
+                    }
+                    for (size_t i = begin; i < end; ++i)
+                    {
+                        waves[i] = wave;
+                        targetWave[targets[i]] = wave;
+                    }
+                    passWave[pass] = wave;
+                    count = (std::max)(count, wave + 1);
+                    begin = end;
+                }
+                return count;
+            };
+            waveCount = planWaves(unitWorker, unitWave);
+            if (m_recordingWorkloadBalance && unitCount > workers && workers <= IRHIParallelCommandPool::kMaxWorkers)
+            {
+                // These are CPU command-recording work units, never GPU timings.
+                // Base callback + declared resource uses + declared draw-batch cost.
+                // Split callbacks share the declared work; every slice has overhead.
+                std::vector<uint64_t> costs(unitCount);
+                uint64_t total = 0;
+                for (size_t i = 0; i < unitCount; ++i)
+                {
+                    const auto index = m_executeOrder[units[i].order];
+                    const auto& pass = m_passes[index];
+                    const uint64_t declared = uint64_t(pass.recordCost) / units[i].sliceCount;
+                    // Physical history-buffer states alternate between frames. Using
+                    // emitted barrier counts would move CPU partition boundaries and
+                    // make capture join counts nondeterministic for identical inputs.
+                    const uint64_t bindings = units[i].slice == 0 ? bindingWork(pass) : 0;
+                    costs[i] = (std::min)(uint64_t(UINT32_MAX), 1 + declared + bindings);
+                    total += costs[i];
+                }
+                // Contiguous nonempty blocks: target order remains GPU execute order.
+                std::vector<uint32_t> candidate(unitCount);
+                uint64_t prefix = 0;
+                uint32_t target = 0;
+                for (size_t i = 0; i < unitCount; ++i)
+                {
+                    const uint32_t desired = static_cast<uint32_t>((std::min)(uint64_t(workers - 1), prefix * workers / total));
+                    if (i && target + 1 < workers &&
+                        (desired > target || unitCount - i <= workers - 1 - target))
+                    {
+                        ++target;
+                    }
+                    candidate[i] = target;
+                    prefix += costs[i];
+                }
+                // Minimize the wave critical path, not the largest lifetime sum
+                // for a target: separate target blocks may still execute serially.
+                const uint32_t maximumWaves = waveCount;
+                const auto criticalWork = [&](const std::vector<uint32_t>& targets,
+                                              const std::vector<uint32_t>& waves, uint32_t count)
+                {
+                    std::vector<uint64_t> sums(size_t(count) * workers, 0);
+                    for (size_t i = 0; i < unitCount; ++i)
+                    {
+                        sums[size_t(waves[i]) * workers + targets[i]] += costs[i];
+                    }
+                    uint64_t result = 0;
+                    for (uint32_t wave = 0; wave < count; ++wave)
+                    {
+                        uint64_t longest = 0;
+                        for (uint32_t worker = 0; worker < workers; ++worker)
+                        {
+                            longest = (std::max)(longest, sums[size_t(wave) * workers + worker]);
+                        }
+                        result += longest;
+                    }
+                    return result;
+                };
+                uint64_t best = criticalWork(unitWorker, unitWave, waveCount);
+                const auto consider = [&](const std::vector<uint32_t>& targets)
+                {
+                    std::vector<uint32_t> waves(unitCount);
+                    const uint32_t count = planWaves(targets, waves);
+                    if (count > maximumWaves)
+                    {
+                        return;
+                    }
+                    const uint64_t work = criticalWork(targets, waves, count);
+                    if (work < best || (work == best && count < waveCount))
+                    {
+                        unitWorker = targets;
+                        unitWave = std::move(waves);
+                        waveCount = count;
+                        best = work;
+                        m_stats.recordingBalanced = true;
+                    }
+                };
+                consider(candidate);
+                // Bounded cold-plan search. Boundaries remain contiguous/nonempty;
+                // every trial retains the same CPU dependencies and GPU list order.
+                if (cacheEligible && unitCount <= 512)
+                {
+                    uint32_t trials = 0;
+                    for (unsigned iteration = 0; iteration < 2; ++iteration)
+                    {
+                        for (uint32_t boundary = 1; boundary < workers && trials < 64; ++boundary)
+                        {
+                            size_t left = 0;
+                            while (left < unitCount && unitWorker[left] < boundary - 1)
+                            {
+                                ++left;
+                            }
+                            size_t right = left;
+                            while (right < unitCount && unitWorker[right] <= boundary)
+                            {
+                                ++right;
+                            }
+                            for (size_t step = 1; step < 9 && trials < 64; ++step)
+                            {
+                                const size_t position = left + (right - left) * step / 9;
+                                if (position <= left || position >= right)
+                                {
+                                    continue;
+                                }
+                                auto trial = unitWorker;
+                                for (size_t i = left; i < right; ++i)
+                                {
+                                    trial[i] = i < position ? boundary - 1 : boundary;
+                                }
+                                ++trials;
+                                consider(trial);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        auto& workerUnits = scratch.workerUnits;
+        workerUnits.resize(workers);
+        for (size_t i = 0; i < unitCount; ++i)
+        {
+            workerUnits[unitWorker[i]].push_back(i);
+        }
+        scratch.waveCount = waveCount;
+        scratch.balanced = m_stats.recordingBalanced;
+        scratch.workers = workers;
+        if (cacheEligible)
+        {
+            scratch.schedule = m_structuralSchedule;
+            scratch.shapes.reserve(unitCount);
+            for (size_t i = 0; i < unitCount; ++i)
+            {
+                scratch.shapes.push_back(shape(i));
+            }
+            auto& entry = cachedPlans[nextCachedPlan++ % cachedPlans.size()];
+            entry.emplace(std::move(scratch));
+            selectedPlan = &*entry;
+        }
+        else
+        {
+            selectedPlan = &scratch;
+        }
+        ce::profile_instant(ce::marker<"RenderCommandRecord.PlanBuild">());
     }
+    else
+    {
+        ce::profile_instant(ce::marker<"RenderCommandRecord.PlanReuse">());
+    }
+    const auto& unitWorker = selectedPlan->unitWorker;
+    const auto& unitWave = selectedPlan->unitWave;
+    const auto& workerUnits = selectedPlan->workerUnits;
+    const uint32_t waveCount = selectedPlan->waveCount;
+    m_stats.recordingBalanced = selectedPlan->balanced;
     m_stats.recordingWaveCount = waveCount;
     m_stats.recordingJobDispatchCount = 0;
     m_stats.recordingWorkerJobCount = 0;
@@ -3529,12 +3888,15 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     //
     // Open은 얼로케이터를 Reset하므로 스레드 안전하지 않다. 기록에 들어가기
     // 전에 한 스레드에서 끝내 두면 워커는 '이미 열린 리스트에 기록'만 한다.
-    for (uint32_t worker = 0; worker < workers; ++worker)
     {
-        if (!pool.OpenWorker(worker, outError))
+        ce::profile_scope profile{ce::marker<"RenderCommandRecord.Open">()};
+        for (uint32_t worker = 0; worker < workers; ++worker)
         {
-            discardRecording();
-            return false;
+            if (!pool.OpenWorker(worker, outError))
+            {
+                discardRecording();
+                return false;
+            }
         }
     }
 
@@ -3542,9 +3904,23 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // 되고, 그 상태는 원인을 찾기가 매우 어렵다.
     std::vector<std::string> workerErrors(workers);
     std::atomic<bool> failed{ false };
+#if !CE_SHIPPING
+    const auto recordingContext = ce::current_cpu_context;
+#endif
+    static const std::array workerMarkers{
+        ce::marker<"RenderCommandRecord.Worker0">(), ce::marker<"RenderCommandRecord.Worker1">(),
+        ce::marker<"RenderCommandRecord.Worker2">(), ce::marker<"RenderCommandRecord.Worker3">(),
+        ce::marker<"RenderCommandRecord.Worker4">(), ce::marker<"RenderCommandRecord.Worker5">(),
+        ce::marker<"RenderCommandRecord.Worker6">(), ce::marker<"RenderCommandRecord.Worker7">()};
 
     const auto recordRange = [&](uint32_t worker)
     {
+#if !CE_SHIPPING
+        ce::profile_context_scope contextScope{recordingContext};
+#endif
+        const auto workerMarker = worker < workerMarkers.size() ? workerMarkers[worker] :
+            ce::marker<"RenderCommandRecord.WorkerOther">();
+        ce::profile_scope profile{workerMarker};
         ExecuteContext context{};
         context.graph = this;
 
@@ -3617,6 +3993,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // RunParallel은 모든 콜백이 끝난 뒤 반환/throw하므로 아래에서 안전하게 닫는다.
     try
     {
+        ce::profile_scope profile{ce::marker<"RenderCommandRecord.DispatchJoin">()};
         if (recordingSideEffects)
         {
             // The entire graph is one unsplit target in this uncommon path.
@@ -3729,7 +4106,13 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
     // 3-15A의 경계: 여기서는 native queue를 건드리지 않는다. 기록 당시 frame
     // slot과 순서를 batch 값에 밀봉하고 제출은 호출부(향후 RHI thread)가 한다.
-    if (!pool.FinalizeRecordedBatch(submission, batchDesc, outBatch, outError)) return false;
+    {
+        ce::profile_scope profile{ce::marker<"RenderCommandRecord.Finalize">()};
+        if (!pool.FinalizeRecordedBatch(submission, batchDesc, outBatch, outError))
+        {
+            return false;
+        }
+    }
     // Batch recording IDs are assigned later, when admission reserves completion.
     m_recordedRecording = m_deviceServices->GetCurrentUploadRecordingId();
 

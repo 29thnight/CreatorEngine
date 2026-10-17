@@ -411,6 +411,54 @@ void Run(const std::filesystem::path& root)
     std::cout << "LX_MATERIAL_RENDER_BINDINGS_OK checks=" << checks << " gpuComponents=" << gpuComponents
               << " samplerSlots=4 samplerTables=1 frames=4\n";
 }
+    void CheckSamplerGrammar()
+    {
+        using namespace material_graph;
+        const std::array<std::string_view, 2> filters{"nearest", "linear"};
+        const std::array<std::string_view, 3> addresses{"repeat", "clamp", "mirror"};
+        const std::array<RHIAddressMode, 3> modes{RHIAddressMode::Wrap, RHIAddressMode::Clamp, RHIAddressMode::Mirror};
+        BindingLayout layout;
+        layout.samplers.resize(1);
+        ResourcePacket packet;
+        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        for (std::size_t minMag = 0; minMag < filters.size(); ++minMag)
+        {
+            for (std::size_t mip = 0; mip < filters.size(); ++mip)
+            {
+                for (std::size_t u = 0; u < addresses.size(); ++u)
+                {
+                    for (std::size_t v = 0; v < addresses.size(); ++v)
+                    {
+                        const auto reference = std::string(filters[minMag]) + "-" + std::string(filters[mip]) + "-" +
+                            std::string(addresses[u]) + "-" + std::string(addresses[v]);
+                        layout.samplers[0].reference = reference;
+                        Check(PrepareResourcesWithUniforms(layout, {}, {}, packet, diagnostics) && packet.samplers.size() == 1 &&
+                            packet.samplers[0].minMag == (minMag ? RHIFilterMode::Linear : RHIFilterMode::Point) &&
+                            packet.samplers[0].mip == (mip ? RHIFilterMode::Linear : RHIFilterMode::Point) &&
+                            packet.samplers[0].addressU == modes[u] && packet.samplers[0].addressW == modes[u] &&
+                            packet.samplers[0].addressV == modes[v], "Sampler grammar preserves all 36 cooked combinations");
+                    }
+                }
+            }
+        }
+        for (const auto reference : {"linear-repeat", "linear-repeat-", "linear-linear-repeat-repeat-"})
+        {
+            layout.samplers[0].reference = reference;
+            Check(PrepareResourcesWithUniforms(layout, {}, {}, packet, diagnostics) &&
+                packet.samplers[0].minMag == RHIFilterMode::Linear && packet.samplers[0].mip == RHIFilterMode::Linear &&
+                packet.samplers[0].addressU == RHIAddressMode::Wrap && packet.samplers[0].addressV == RHIAddressMode::Wrap,
+                "Sampler grammar preserves legacy pairs and trailing delimiter behavior");
+        }
+        for (const auto reference : {"", "linear", "linear-repeat-repeat", "linear--repeat-repeat", "linear-linear-repeat-repeat-extra",
+            "linear-linear-repeat-repeat--", "linear-linear-repeat-repeat-extra-tail", "linear-linear-repeat-border"})
+        {
+            layout.samplers[0].reference = reference;
+            Check(!PrepareResourcesWithUniforms(layout, {}, {}, packet, diagnostics) && packet.samplers.size() == 1 &&
+                packet.samplers[0].minMag == RHIFilterMode::Linear && packet.samplers[0].addressU == RHIAddressMode::Wrap,
+                "Malformed sampler references reject transactionally without replacing accepted state");
+        }
+    }
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -419,6 +467,7 @@ int main(int argc, char** argv)
     {
         if (argc != 2)
             throw std::runtime_error("Expected repository root.");
+        CheckSamplerGrammar();
         Run(std::filesystem::absolute(argv[1]));
         return 0;
     }

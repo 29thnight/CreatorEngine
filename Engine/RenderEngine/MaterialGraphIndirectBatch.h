@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GpuGeometryVisibility.h"
+#include "MaterialGraphTransientBufferPool.h"
 #include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
@@ -16,6 +17,7 @@ struct IndirectMaterialBatch
         std::uint32_t offset{}, count{};
     };
     IRenderDeviceServices* device{};
+    std::shared_ptr<TransientBufferPool> pool;
     std::shared_ptr<const GpuGeometryVisibility::Frame> visibility;
     std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline;
     std::vector<Bucket> buckets;
@@ -30,8 +32,8 @@ struct IndirectMaterialBatch
 
     ~IndirectMaterialBatch()
     {
-        if (device && output.IsValid())
-            device->ReleaseBuffer(output);
+        if (device)
+            ReleaseSceneBuffer(*device, pool, output);
     }
 
     bool Upload(std::span<const std::uint32_t> words, std::span<const std::array<std::uint32_t, 4>> records,
@@ -75,7 +77,7 @@ struct IndirectMaterialBatch
         const std::wstring debugName(name.begin(), name.end());
         desc.debugName = debugName.c_str();
         if (!templates.IsValid() || !commands.IsValid() || !constants.IsValid() ||
-            !device->CreateBuffer(desc, output, error))
+            !CreateSceneBuffer(*device, pool.get(), desc, output, error))
             return false;
         const auto binding = RHIBindingDesc::UavBuffer(output, outputBytes / 4, 4);
         outputTable = device->CreateBindings({&binding, 1});

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/DynamicBitset.h"
 #include "Animator.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AnimatorSystem.h"
@@ -1217,7 +1218,7 @@ bool Animator::ConvertLegacyAvatarMask(AvatarMask& mask)
 	// remains readable through its legacy flags instead of silently losing bones.
 	std::vector<float> weights;
 	weights.reserve(mask.m_BoneMasks.size());
-	std::vector<bool> matched(skeleton->bones.size(), false);
+	ce::dynamic_bitset matched(skeleton->bones.size(), false);
 	for (const BoneMask* boneMask : mask.m_BoneMasks)
 	{
 		if (!boneMask) return false;
@@ -1225,8 +1226,11 @@ bool Animator::ConvertLegacyAvatarMask(AvatarMask& mask)
 			[&](const auto& bone) { return bone.name == boneMask->boneName; });
 		if (found == skeleton->bones.end()) return false;
 		const std::size_t boneIndex = static_cast<std::size_t>(found - skeleton->bones.begin());
-		if (matched[boneIndex]) return false;
-		matched[boneIndex] = true;
+		if (matched.test(boneIndex))
+		{
+			return false;
+		}
+		matched.set(boneIndex, true);
 		weights.push_back(mask.IsBoneEnabled(
 			static_cast<BoneRegion>(boneRegions[boneIndex])) ? 1.f : 0.f);
 	}
@@ -1266,7 +1270,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
 	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
 	Model* model = nullptr;
-	std::vector<bool> animationBools;
+	std::deque<bool> animationBools;
 	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;
 	int aniIndex = 0;
 	// I6-B1 — 클립 오버라이드 표기가 Animator 소유로 이주했다. 새 정본을

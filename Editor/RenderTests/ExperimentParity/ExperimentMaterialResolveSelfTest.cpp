@@ -61,7 +61,7 @@ namespace RenderTest
             std::size_t cookedLookups{};
             std::size_t sourceLookups{};
             std::vector<std::filesystem::path> loadedPaths{};
-            std::vector<bool> loadedCompress{};
+            std::deque<bool> loadedCompress{};
             std::vector<experiment::TextureColorSpace> loadedColorSpaces{};
 
             // cooked 표: 여기 있는 GUID만 cooked 로 해석된다.
@@ -202,7 +202,7 @@ namespace RenderTest
                     "source 조회는 cooked 미해석 texture에만");
                 check.Check(fake.shaderLoads == 1u, "shader 조회는 한 번");
                 check.Check(fake.loadedCompress
-                    == std::vector<bool>{ true, false },
+                    == std::deque<bool>{ true, false },
                     "compress is limited to sRGB base color");
                 check.Check(fake.loadedColorSpaces == std::vector{experiment::TextureColorSpace::Srgb,
                     experiment::TextureColorSpace::Linear}, "W6 source/cooked color space reaches loader");

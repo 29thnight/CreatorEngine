@@ -193,6 +193,11 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             SceneColorInputs commands{host.DeclareLayerWork(*graph, cameraFinal.blendedList).layer, {}};
             commands.material = host.MaterialWork()->GraphInputs(*graph);
             host.DeclareColor(*graph, output, commands, SceneHost::DeclareHdrTarget(*graph, context), ao, map);
+            Check(host.ShadowDrawCount() == 0, "Shadow job counters are empty before recording");
+            for (const auto count : host.ShadowBucketSubmissionCounts())
+            {
+                Check(count == 0, "Shadow bucket job counters are empty before recording");
+            }
             if (c.abort || c.reject)
             {
                 if (c.reject)
@@ -307,6 +312,16 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
 #endif
             {
                 SubmitShadowDecal(device, pool, graph, host, context.frameId, workers, !c.mutate && !c.noPublish);
+                const auto expected = 1u + (c.staticPresent && !result.cache.hit ? 1u : 0u);
+                Check(host.ShadowDrawCount() == expected * 3, "Joined shadow jobs reduce static and dynamic command counts");
+                for (const auto count : host.RecordedShadowMeshletDrawCounts())
+                {
+                    Check(count == expected, "Joined shadow cascade excludes occluder duplicate and cached static work");
+                }
+                for (const auto count : host.ShadowBucketSubmissionCounts())
+                {
+                    Check(count == expected, "Joined shadow jobs reduce native bucket submissions");
+                }
             }
             RHIReadbackImage depths;
             Check(device.MapReadback(depthRead, depths, error), "Shadow correctness depth map " + error);

@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/DynamicBitset.h"
 #include "IRenderDeviceServices.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
@@ -89,7 +90,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
     {
         std::lock_guard lock(mutex_);
         return {anchor_.IsValid() ? uint64_t(capacity_) * RHISparseTileBytes : 0,
-                uint64_t(std::count(occupied_.begin(), occupied_.end(), true)), evictions_, reuses_};
+                uint64_t(occupied_.count()), evictions_, reuses_};
     }
     bool Prepare(const std::shared_ptr<Allocation>& allocation, const std::map<uint32_t, uint32_t>& wanted,
                  std::string& error)
@@ -140,7 +141,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         std::ranges::sort(candidates, [](const auto& a, const auto& b) {
             return a.priority != b.priority ? a.priority < b.priority : a.owner->lastUse < b.owner->lastUse;
         });
-        const uint64_t free = std::count(occupied_.begin(), occupied_.end(), false);
+        const uint64_t free = (occupied_.size() - occupied_.count());
         if (missing > free + reclaim + candidates.size())
         {
             error = "Shared sparse budget exhausted by active pages; no completed eviction candidate";
@@ -185,7 +186,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
             {
                 continue;
             }
-            while (cursor < capacity_ && occupied_[cursor])
+            while (cursor < capacity_ && occupied_.test(cursor))
             {
                 ++cursor;
             }
@@ -197,9 +198,9 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         }
         for (const auto& map : maps)
         {
-            occupied_[map.physicalTile] = true;
-            reuses_ += usedBefore_[map.physicalTile];
-            usedBefore_[map.physicalTile] = true;
+            occupied_.set(map.physicalTile, true);
+            reuses_ += usedBefore_.test(map.physicalTile);
+            usedBefore_.set(map.physicalTile, true);
             target.tiles.emplace(map.virtualTile, map.physicalTile);
         }
         if (!maps.empty())
@@ -220,7 +221,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         {
             return false;
         }
-        occupied_[owner.tiles.at(tile)] = false;
+        occupied_.set(owner.tiles.at(tile), false);
         owner.tiles.erase(tile);
         owner.priorities.erase(tile);
         ++owner.revision;
@@ -235,14 +236,14 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         device_.ReleaseBuffer(allocation.buffer);
         for (const auto& [tile, physical] : allocation.tiles)
         {
-            occupied_[physical] = false;
+            occupied_.set(physical, false);
         }
     }
     IRenderDeviceServices& device_;
     uint32_t capacity_;
     RHIBufferHandle anchor_;
     mutable std::recursive_mutex mutex_;
-    std::vector<bool> occupied_, usedBefore_;
+    ce::dynamic_bitset occupied_, usedBefore_;
     std::vector<std::weak_ptr<Allocation>> allocations_;
     uint64_t clock_{}, evictions_{}, reuses_{};
 };

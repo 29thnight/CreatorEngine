@@ -331,6 +331,17 @@ struct EnhancedLiveFramePacket
     }
 };
 
+// Admission is decided once per packet, before geometry/view preparation.
+// Age alone cannot justify dropping work: its replacement must remove at least
+// one soft-budget interval of latency. Zero/unknown stamps preserve progress.
+inline bool ShouldReplaceStaleLiveFrame(uint64_t source, uint64_t replacement,
+    uint64_t now, uint64_t lastAdmission, uint64_t ageBudget, uint64_t progressInterval)
+{
+    return source != 0 && source <= now && now - source > ageBudget &&
+        replacement > source && replacement <= now && replacement - source > ageBudget &&
+        lastAdmission != 0 && lastAdmission <= now && now - lastAdmission < progressInterval;
+}
+
 struct EnhancedRenderThreadStats
 {
     uint64_t published{ 0 };
@@ -825,6 +836,9 @@ struct EnhancedLiveDebugSnapshot
     double nativeRecordMs{ 0.0 };
     uint64_t nativeRecordSamples{ 0 };
     uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
+    uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
+    uint64_t nativeRecordEstimatedWork{0};
+    bool nativeRecordParallelDeclined{false};
     bool nativeRecordBalanced{false};
     TemporalMeasurementProvenance nativeRecordProvenance;
 

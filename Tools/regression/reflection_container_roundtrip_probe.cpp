@@ -124,7 +124,7 @@ namespace
                 reflgen::field<&Self::m_path>,
                 reflgen::field<&Self::m_vectorInt>,
                 reflgen::field<&Self::m_vectorString>,
-                reflgen::field<&Self::m_vectorBool>,
+                reflgen::field<&Self::m_boolSequence>,
                 reflgen::field<&Self::m_vectorEnum>,
                 reflgen::field<&Self::m_vectorRect>,
                 reflgen::field<&Self::m_vectorColor>,
@@ -149,7 +149,7 @@ namespace
 
         std::vector<int> m_vectorInt{};
         std::vector<std::string> m_vectorString{};
-        std::vector<bool> m_vectorBool{};        // 프록시 원소
+        std::deque<bool> m_boolSequence{};        // bool 값의 직렬화 형식 유지
         std::vector<ProbeKind> m_vectorEnum{};   // 레거시에 갈래가 없던 자리
         std::vector<math::rect> m_vectorRect{};  // 레거시에 갈래가 없던 자리
         std::vector<math::color> m_vectorColor{};
@@ -181,7 +181,7 @@ namespace
 
         f.m_vectorInt = { 3, -1, 42 };
         f.m_vectorString = { "alpha", "beta gamma", "" };
-        f.m_vectorBool = { true, false, true, true };
+        f.m_boolSequence = { true, false, true, true };
         f.m_vectorEnum = { ProbeKind::Gamma, ProbeKind::Alpha };
         f.m_vectorRect = { math::rect{ 1.f, 2.f, 3.f, 4.f },
                            math::rect{ 5.f, 6.f, 7.f, 8.f } };
@@ -333,7 +333,7 @@ int main(int argc, char** argv)
     Check("path", loaded.m_path == authored.m_path);
     Check("vector-int", loaded.m_vectorInt == authored.m_vectorInt);
     Check("vector-string", loaded.m_vectorString == authored.m_vectorString);
-    Check("vector-bool", loaded.m_vectorBool == authored.m_vectorBool);
+    Check("bool-sequence", loaded.m_boolSequence == authored.m_boolSequence);
     Check("vector-enum", loaded.m_vectorEnum == authored.m_vectorEnum);
     Check("vector-nested", loaded.m_vectorNested == authored.m_vectorNested);
     Check("deque", loaded.m_deque == authored.m_deque);

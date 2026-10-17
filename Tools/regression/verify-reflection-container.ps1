@@ -163,6 +163,7 @@ foreach ($current in $configurations) {
         ("Build\Obj\ReflectionContainerContract\x64-{0}" -f $current)
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
     $executable = Join-Path $outputDirectory 'reflection_container_probe.exe'
+    $contractInclude = Join-Path $repoRoot ("Build/Generated/Contracts/x64-{0}" -f $current)
 
     # Debug 와 Release 를 각각 도는 이유는 판정이 최적화나 어설션 제거에 기대지
     # 않는다는 것까지 재기 위해서다(HashingString 게이트와 같은 근거).
@@ -177,8 +178,8 @@ foreach ($current in $configurations) {
     #          이 게이트의 축이 아닌 선재 코드이므로 여기서 고치지 않는다.
     $command = 'call "' + $vcvars + '" >nul && cl.exe ' +
         '/nologo /TP /EHsc /std:c++latest /permissive- /Zc:__cplusplus ' +
-        '/Zc:preprocessor /utf-8 /W4 /WX /wd4828 /wd4189 ' + $configurationArguments + ' ' +
-        '/I"' + $utilityInclude + '" ' +
+        '/Zc:preprocessor /DCE_CONTRACT_STANDALONE /utf-8 /W4 /WX /wd4828 /wd4189 ' + $configurationArguments + ' ' +
+        '/I"' + $utilityInclude + '" /I"' + $contractInclude + '" ' +
         '/Fo:"' + $outputDirectory + '\\" /Fe:"' + $executable + '" "' +
         $probe + '" /link Ole32.lib'
 

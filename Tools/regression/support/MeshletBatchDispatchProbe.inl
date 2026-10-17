@@ -256,16 +256,16 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 const auto expected = bin % 3 == 0 ? (capacity + 1) / 2 : bin % 3 == 1 ? capacity : 0;
                 const auto* list = reinterpret_cast<const uint32_t*>(idImage.data.data()) + bins[bin].firstIndex;
                 Check(list[0] == expected, "Batch independent survivor count bin=" + std::to_string(bin));
-                std::vector<bool> seen(capacity, false);
+                ce::dynamic_bitset seen(capacity, false);
                 for (uint32_t i = 0; i < list[0]; ++i) {
                     const auto id = list[i + 1];
-                    Check(id < capacity && !seen[id] && (bin % 3 != 0 || id % 2 == 0),
+                    Check(id < capacity && !seen.test(id) && (bin % 3 != 0 || id % 2 == 0),
                         "Batch IDs are complete, unique and belong to the selected geometry");
                     if (ordered && i != 0)
                     {
                         Check(list[i] < id, "Dynamic scheduling retains ordered source meshlet IDs");
                     }
-                    seen[id] = true;
+                    seen.set(id, true);
                 }
                 RHIDrawIndexedIndirectArguments result;
                 std::memcpy(&result, argImage.data.data() + bin * sizeof(result), sizeof(result));

@@ -3983,6 +3983,90 @@ void test_sparse_telemetry_attribution()
 	}
 }
 
+void test_counter_lookup_and_compaction()
+{
+    ce::capture_ring ring;
+    ring.configure(3, ce::kDefaultMemoryBudget);
+    ring.set_archive_enabled(true);
+    const auto id = ce::profile_counter_id::physics_bodies;
+    // Interleaved future frames preserve order; repeated exact owners replace
+    // only their value, including legacy zero-owner samples.
+    for (std::uint32_t index = 0; index < 1024; ++index)
+    {
+        const ce::cpu_span_context owner{ 7, index, index % 13 };
+        ring.record_counter(20 + index % 2, { id, static_cast<double>(index), owner });
+    }
+    ring.record_counter(20, { id, -1.0, { 7, 0, 0 } });
+    ring.record_counter(20, { id, 99.0, { 7, 0, 99 } });
+    ring.record_counter(20, { id, 123.0 });
+    ring.record_counter(20, { id, 456.0 });
+    ring.close_frame(20, 100, 200);
+    ring.close_frame(21, 200, 300);
+    const std::size_t bytesBeforeRetirement = ring.memory_bytes();
+    ring.record_counter(20, { id, -2.0, { 7, 0, 0 } });
+    auto capture = ring.freeze({}, ce::capture_environment{ 1000 }, true, 0);
+    const auto* first = capture->find_frame(20);
+    const auto* second = capture->find_frame(21);
+    check(first && second && first->counters.size() == 514 && second->counters.size() == 512,
+        "counter-compaction/size - owner and frame identity survive interleaved future samples");
+    bool ordered = first && second && first->counters.size() == 514 && second->counters.size() == 512;
+    if (ordered)
+    {
+        for (std::size_t index = 0; index < 512; ++index)
+        {
+            ordered = ordered && first->counters[index].cpu.tick == index * 2 &&
+                second->counters[index].cpu.tick == index * 2 + 1;
+        }
+    }
+    check(ordered && first->counters[0].value == -2.0 && first->counters[512].value == 99.0 &&
+        first->counters[512].cpu.task == 99 && first->counters.back().value == 456.0,
+        "counter-compaction/order - late replacement and zero-owner last value retain insertion order");
+    const auto decoded = ce::decode_capture(ce::encode_capture(*capture));
+    check(decoded && (*decoded)->find_frame(20)->counters.size() == 514 &&
+        (*decoded)->find_frame(20)->counters[0].value == -2.0,
+        "counter-compaction/file - compacted owner samples survive serialization");
+    ring.record_counter(22, { id, 1.0 });
+    ring.record_counter(24, { id, 2.0 });
+    ring.close_frame(23, 300, 400); // 22 is skipped, 24 must remain deferred.
+    ring.close_frame(24, 400, 500); // Retires frame 20.
+    ring.record_counter(20, { id, 9.0 });
+    ring.record_counter(22, { id, 9.0 });
+    check_eq(ring.dropped_counters(), std::uint64_t{ 3 },
+        "counter-compaction/loss - skipped deferred, retired, and skipped late samples are counted");
+    auto retired = ring.take_retired_frames();
+    check(retired.size() == 1 && retired[0].engine_frame == 20 && retired[0].counters[0].value == -2.0,
+        "counter-compaction/archive - retirement preserves counter ownership");
+    capture = ring.freeze({}, ce::capture_environment{ 1000 }, true, 0);
+    std::size_t bytes = 0;
+    for (const auto& frame : capture->frames())
+    {
+        bytes += frame.memory_bytes();
+    }
+    check(bytes <= ring.memory_bytes() &&
+        ring.memory_bytes() + retired[0].memory_bytes() == bytesBeforeRetirement + sizeof(ce::profile_counter_sample) &&
+        capture->find_frame(24)->counters[0].value == 2.0,
+        "counter-compaction/budget - retained storage accounting and future values remain correct");
+    ring.clear();
+    for (std::uint32_t index = 0; index < 4097; ++index)
+    {
+        ring.record_counter(30, { id, static_cast<double>(index) });
+    }
+    ring.close_frame(30, 100, 200);
+    capture = ring.freeze({}, ce::capture_environment{ 1000 }, true, 0);
+    check(ring.dropped_counters() == 1 && capture->find_frame(30)->counters.size() == 1 &&
+        capture->find_frame(30)->counters[0].value == 4095.0,
+        "counter-compaction/bound - deferred limit counts overflow and preserves last admitted value");
+    ring.clear();
+    ring.close_frame(20, 100, 200);
+    ring.record_counter(20, { id, 88.0, { 8, 0, 0 } });
+    ring.record_counter(20, { static_cast<ce::profile_counter_id>(0), 1.0 });
+    ring.record_counter(20, { id, std::numeric_limits<double>::infinity() });
+    capture = ring.freeze({}, ce::capture_environment{ 1000 }, true, 0);
+    check(ring.dropped_counters() == 2 && capture->find_frame(20)->counters.size() == 1 &&
+        capture->find_frame(20)->counters[0].value == 88.0,
+        "counter-compaction/clear - reused frame starts fresh and invalid values are rejected");
+}
+
 void test_owned_counters()
 {
     ce::profiler_service service;
@@ -5627,6 +5711,7 @@ int main(int argc, char** argv)
 	test_shutdown_retains_live_storage();
 	test_capture_vocabulary();
 	test_sparse_telemetry_attribution();
+    test_counter_lookup_and_compaction();
 	test_owned_counters();
 	test_counter_registry_and_mask();
 	test_counter_record_start_catches_up();

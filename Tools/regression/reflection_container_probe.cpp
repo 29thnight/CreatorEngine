@@ -12,7 +12,7 @@
 //      path 는 string_view 로 변환되지 않으므로 변환 판정 하나로는 못 막는다.
 //   ② 채우기 수단을 이름으로 고른다 → set 에 push_back 을 부르거나 vector 를
 //      단일 인자 insert 로 채우려 든다(둘 다 없는 함수다).
-//   ③ 원소 참조를 항상 참조로 묶는다 → std::vector<bool> 프록시에서 깨진다.
+//   ③ 값을 반환하는 range 원소를 항상 참조로 묶으면 깨진다.
 //   ④ 원소의 const 여부를 지운다 → std::set 원소에 비-const 훅을 걸어 놓고도
 //      컴파일이 통과하는 것처럼 보이다가 소비 측에서 읽기 어려운 오류로 터진다.
 //
@@ -56,7 +56,7 @@ namespace
     static_assert(SequenceRange<std::deque<int>>);
     static_assert(SequenceRange<std::list<int>>);
     static_assert(SequenceRange<std::array<int, 4>>);
-    static_assert(SequenceRange<std::vector<bool>>);
+    static_assert(SequenceRange<std::deque<bool>>);
     static_assert(SequenceRange<std::vector<Plain>>);
 
     // set 은 key_type 만 있고 mapped_type 이 없다 — 키가 곧 값이라 시퀀스다.
@@ -108,14 +108,18 @@ namespace
     // ── ③ 프록시 원소 / ④ const 원소 ─────────────────────────────────
     static_assert(std::is_same_v<ElementRefT<std::vector<int>>, int&>);
     static_assert(std::is_same_v<ElementRefT<std::vector<std::string>>, std::string&>);
-    // vector<bool> 의 원소 참조는 프록시 prvalue — 참조로 묶으면 깨진다.
-    static_assert(std::is_same_v<ElementRefT<std::vector<bool>>, bool>);
+    // bool 시퀀스의 실제 참조를 보존한다.
+    static_assert(std::is_same_v<ElementRefT<std::deque<bool>>, bool&>);
     static_assert(std::is_same_v<ElementRefT<std::set<int>>, const int&>);
 
     static_assert(ConstElementRange<std::set<int>>);
     static_assert(ConstElementRange<std::unordered_set<std::string>>);
     static_assert(!ConstElementRange<std::vector<int>>);
-    static_assert(!ConstElementRange<std::vector<bool>>);
+    static_assert(!ConstElementRange<std::deque<bool>>);
+
+    using BoolValues = decltype(std::views::iota(0, 4) | std::views::transform([](int value) { return value != 0; }));
+    static_assert(SequenceRange<BoolValues>);
+    static_assert(std::is_same_v<ElementRefT<BoolValues>, bool>);
 
     // ── 원소·키·값 타입 ───────────────────────────────────────────────
     static_assert(std::is_same_v<ValueT<std::vector<std::string>>, std::string>);

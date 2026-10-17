@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/DynamicBitset.h"
 
 #include "../Utility_Framework/StandardLibrary.h"
 
@@ -44,7 +45,7 @@ public:
 		m_parentIndices[index] = kInvalidIndex;
 		m_rootIndices[index] = 0;
 		m_childrenIndices[index].clear();
-		m_occupied[index] = false;
+		m_occupied.set(index, false);
 		++m_revision;
 	}
 
@@ -54,7 +55,7 @@ public:
 		m_parentIndices[index] = parentIndex;
 		m_rootIndices[index] = rootIndex;
 		m_childrenIndices[index].clear();
-		m_occupied[index] = true;
+		m_occupied.set(index, true);
 		++m_revision;
 	}
 
@@ -105,7 +106,7 @@ public:
 
 	bool IsOccupied(size_t index) const
 	{
-		return index < m_occupied.size() && m_occupied[index];
+		return index < m_occupied.size() && m_occupied.test(index);
 	}
 
 	size_t Size() const { return m_parentIndices.size(); }
@@ -130,6 +131,6 @@ private:
 	std::vector<Index> m_parentIndices;
 	std::vector<Index> m_rootIndices;
 	std::vector<std::vector<Index>> m_childrenIndices;
-	std::vector<bool> m_occupied;
+	ce::dynamic_bitset m_occupied;
 	std::uint64_t m_revision{ 1 };   ///< 0 은 "아직 아무것도 못 봤다" 로 남겨 둔다
 };

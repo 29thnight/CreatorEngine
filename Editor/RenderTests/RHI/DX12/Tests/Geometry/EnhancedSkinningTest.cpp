@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Utility_Framework/DynamicBitset.h"
 #include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
@@ -877,10 +878,14 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     outLog += "MESHLET_GPU_PAYLOAD case=" + caseName + " label=" + label + " cascade=" +
                         std::to_string(output.cascade) + " bytes=" + std::to_string(packed.bytes.size()) +
                         " schema=" + std::to_string(actualHeader.schemaVersion) + " profile=" + std::to_string(actualHeader.profileVersion) + " identity=exact\n";
-                    std::vector<bool> survivors(count);
+                    ce::dynamic_bitset survivors(count);
                     for (unsigned i = 0; i < survivorCount; ++i) {
-                        if (ids[i + 1] >= count || survivors[ids[i + 1]]) { outLog += "Invalid/duplicate survivor ID.\n"; return false; }
-                        survivors[ids[i + 1]] = true;
+                        if (ids[i + 1] >= count || survivors.test(ids[i + 1]))
+                        {
+                            outLog += "Invalid/duplicate survivor ID.\n";
+                            return false;
+                        }
+                        survivors.set(ids[i + 1], true);
                     }
                     // The readback contains posed object-space points. Match the
                     // renderer's object -> world -> light-clip transform.
@@ -902,7 +907,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                             outside &= mask;
                         }
                         const bool expected = outside == 0;
-                        required += expected; missing += expected && !survivors[meshlet]; extra += !expected && survivors[meshlet];
+                        required += expected; missing += expected && !survivors.test(meshlet); extra += !expected && survivors.test(meshlet);
                     }
                     outLog += "SHADOW_LIST " + std::string(suite ? "case=" + caseName + " " : "") + "label=" + label +
                         " cascade=" + std::to_string(output.cascade) + " draw=" + std::to_string(outputIndex / 3) +

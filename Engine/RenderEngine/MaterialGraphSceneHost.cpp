@@ -340,8 +340,15 @@ struct SceneHost::FrameInput
     RHITextureHandle environment;
     bool shadow{};
     std::uint32_t shadowExtent{};
-    mutable std::atomic<uint32_t> shadowDrawCount{};
-    mutable std::array<std::atomic<uint32_t>, 3> shadowMeshletDrawCounts{}, shadowBucketSubmissions{};
+    struct alignas(64) ShadowRecordingStats
+    {
+        uint32_t commands{};
+        uint32_t buckets{};
+    };
+    // One writer per slot: C0..C2 static-cache and final dynamic raster jobs.
+    // Readers reduce these slots only after the graph's recording join. Separate
+    // cache lines avoid writes to neighboring cascades sharing a line.
+    mutable std::array<ShadowRecordingStats, 6> shadowRecordingStats{};
     // One writer: final METEOR.Scene.Visibility.HW recording. Consumers read after the
     // graph's recording join and native submission, never while recording.
     mutable std::vector<SceneGeometryRouteAudit::Draw> recordedGeometryRoutes;
@@ -1368,6 +1375,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         }
         device_ = context.resources;
         device_->RegisterUploadTransactionListener(this);
+        bufferPool_ = std::make_shared<TransientBufferPool>(*device_);
     }
     auto candidate = own::make_shared<Frame>();
     candidate->device = device_;
@@ -1474,11 +1482,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
     std::uint32_t owner = 0x80000000u;
     auto geometryTable = std::make_shared<SceneFrameGeometry>();
     geometryTable->device = device_;
+    geometryTable->pool = bufferPool_;
 
     if (!device_->GetMeshShaderCapabilities().meshIndirect)
         return Fail(error, "METEOR Scene requires GPU indirect work; no CPU/direct surface route.");
     for (const auto& draw : candidate->input->Draws())
     {
+        ce::profile_scope drawProfile{ce::marker<"MaterialSceneDrawPrepare">()};
         own::shared_owner<const Program> program;
         own::shared_owner<const RenderBindings> bindings;
         if (!PrepareProgram(context, *draw.material, program, error) ||
@@ -1816,6 +1826,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         }
         candidate->shadowRasterStage.merge = shadowMerge_.GetGeneration();
         auto shadowContext = context;
+        ce::profile_scope shadowProfile{ce::marker<"MaterialSceneShadowPrepare">()};
         shadowContext.width = shadowContext.height = candidate->shadowExtent;
         shadowContext.displayWidth = shadowContext.displayHeight = candidate->shadowExtent;
         const auto& view = candidate->input->View();
@@ -2084,6 +2095,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                 : depth ? "METEOR.Scene.Commands.Depth"
                         : "METEOR.Scene.Commands.Surface";
             batch->device = device_;
+            batch->pool = bufferPool_;
             batch->pipeline = indirectCommands_.GetGeneration();
             auto& draws = cascade ? candidate->shadowDraws : candidate->draws;
             batch->visibility =
@@ -2158,9 +2170,14 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             if (!prepare(false, candidate->visibilityStage.materialCommands) ||
                 !prepare(true, candidate->occluderStage.depthCommands))
                 return false;
-            std::printf("[meteor.material-buckets] commands=%u buckets=%zu cpuInstanceSubmissions=0\n",
-                        candidate->visibilityStage.materialCommands->commandCount,
-                        candidate->visibilityStage.materialCommands->buckets.size());
+            const std::pair shape{candidate->visibilityStage.materialCommands->commandCount,
+                                  candidate->visibilityStage.materialCommands->buckets.size()};
+            if (loggedMaterialBuckets_ != shape)
+            {
+                loggedMaterialBuckets_ = shape;
+                std::printf("[meteor.material-buckets] commands=%u buckets=%zu cpuInstanceSubmissions=0\n",
+                            shape.first, shape.second);
+            }
         }
         const auto needsMaterialTiles = [&](const auto& group) {
             const auto& draw = candidate->draws[group.second.front()];
@@ -2176,6 +2193,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                                             "ScatterMaterialTiles"};
             auto work = std::make_shared<SceneMaterialWork>();
             work->device = device_;
+            work->pool = bufferPool_;
             work->width = context.width;
             work->height = context.height;
             work->recordCount = static_cast<uint32_t>(candidate->geometryStage.geometryTable->records.size());
@@ -2293,6 +2311,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         replay->name = "METEOR.Scene.Commands.Temporal.Layers";
         replay->visibility = candidate->finalCullStage.blendedMeshlets;
         replay->device = device_;
+        replay->pool = bufferPool_;
         replay->pipeline = indirectCommands_.GetGeneration();
         std::vector<uint32_t> replayWords;
         std::vector<std::array<uint32_t, 4>> replayRecords;
@@ -2360,6 +2379,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
     auto indexed = std::make_shared<IndirectMaterialBatch>();
     indexed->name = "METEOR.Scene.Commands.Layer";
     indexed->device = device_;
+    indexed->pool = bufferPool_;
     indexed->pipeline = indirectCommands_.GetGeneration();
     indexed->visibility = candidate->finalCullStage.blendedMeshlets;
     std::vector<uint32_t> indexedWords;
@@ -2715,8 +2735,13 @@ std::array<uint32_t, 3> SceneHost::ShadowBucketSubmissionCounts() const
 {
     std::array<uint32_t, 3> result{};
     if (frame_)
-        for (unsigned cascade = 0; cascade < 3; ++cascade)
-            result[cascade] = frame_->shadowBucketSubmissions[cascade].load(std::memory_order_relaxed);
+    {
+        for (unsigned cascade = 0; cascade < result.size(); ++cascade)
+        {
+            result[cascade] = frame_->shadowRecordingStats[cascade * 2].buckets +
+                              frame_->shadowRecordingStats[cascade * 2 + 1].buckets;
+        }
+    }
     return result;
 }
 
@@ -2739,15 +2764,25 @@ std::array<uint32_t, 2> SceneHost::LayerBucketCounts() const
 
 uint32_t SceneHost::ShadowDrawCount() const
 {
-    return frame_ ? frame_->shadowDrawCount.load(std::memory_order_relaxed) : 0;
+    uint32_t result{};
+    for (const auto count : RecordedShadowMeshletDrawCounts())
+    {
+        result += count;
+    }
+    return result;
 }
 
 std::array<uint32_t, 3> SceneHost::RecordedShadowMeshletDrawCounts() const
 {
     std::array<uint32_t, 3> counts{};
     if (frame_)
+    {
         for (unsigned cascade = 0; cascade < counts.size(); ++cascade)
-            counts[cascade] = frame_->shadowMeshletDrawCounts[cascade].load(std::memory_order_relaxed);
+        {
+            counts[cascade] = frame_->shadowRecordingStats[cascade * 2].commands +
+                              frame_->shadowRecordingStats[cascade * 2 + 1].commands;
+        }
+    }
     return counts;
 }
 
@@ -3399,6 +3434,9 @@ void SceneHost::ShutdownAfterIdle()
     shadowMerge_ = {};
     materialWorkPipelines_ = {};
     geometry_ = {};
+    if (bufferPool_)
+        bufferPool_->Close();
+    bufferPool_.reset();
     device_ = nullptr;
     programDevice_ = nullptr;
     preparations_.clear();

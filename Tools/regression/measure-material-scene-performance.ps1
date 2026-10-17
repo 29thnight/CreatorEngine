@@ -5,10 +5,13 @@ param(
  [ValidatePattern('^[A-Za-z0-9_-]+$')][string]$ModelName='CreatorRobot',
  [switch]$CreateEmptyScene,
  [switch]$KeepRawCaptures,
+ [switch]$UnlimitedPacing,
+ [switch]$PlayMode,
  [int]$WindowWidth=640,
  [int]$WindowHeight=480,
  [double]$UiScale=0,
  [int]$Seconds=8,
+ [ValidateRange(30,600)][int]$ReadyTimeoutSeconds=600,
  [string]$Python='python'
 )
 $ErrorActionPreference='Stop'
@@ -114,13 +117,24 @@ function Save-Recording([string]$Path) {
  if($LASTEXITCODE -ne 0){throw 'Recorded per-frame native-real provenance gate failed'}
 }
 function Measure-Stage([string]$Stage) {
+ if($PlayMode) {
+  Cmd 'scene.save' @("$project/Assets/Scenes/Performance-$Stage.creator")|Out-Null
+  Cmd 'play'|Out-Null
+  $playLimit=[DateTime]::UtcNow.AddSeconds(60)
+  do {
+   $playState=Cmd 'play.state'
+   if([DateTime]::UtcNow -gt $playLimit){throw 'Play mode entry timeout'}
+   if(!$playState.gameStart){Start-Sleep -Milliseconds 100}
+  } until($playState.gameStart)
+  Cmd 'render.pacing' @('status')|ConvertTo-Json -Depth 10|Set-Content "$case/$Stage-play-pacing.json"
+ }
  Cmd 'render.live.fence' @('120')|Out-Null
  Start-Sleep -Seconds 3
  if($Stage -ne 'empty') {
   # Scene placement can finish before material/mesh preparation. Do not start
   # the warm recording with an empty geometry cache and count initial uploads
   # as recurring warm-frame uploads.
-  $limit=[DateTime]::UtcNow.AddSeconds(120)
+  $limit=[DateTime]::UtcNow.AddSeconds($ReadyTimeoutSeconds)
   $previous=$null;$stableSince=$null
   do {
    $warm=Read-LiveMeasurement
@@ -172,9 +186,23 @@ function Measure-Stage([string]$Stage) {
    axis='completed-real-view-renders-not-display-fps';nativeRealProvenanceVerified=$false;
    scope='unrecorded-overhead-diagnostic-only-not-acceptance'}|ConvertTo-Json -Depth 30|Set-Content "$case/$Stage-paused.json"
  Write-Output "MEASURED $Configuration $Label $Stage"
+ if($PlayMode -and $Stage -eq 'empty') {
+  Cmd 'stop'|Out-Null
+  $playLimit=[DateTime]::UtcNow.AddSeconds(60)
+  do {
+   $playState=Cmd 'play.state'
+   if([DateTime]::UtcNow -gt $playLimit){throw 'Play mode exit timeout'}
+   if($playState.gameStart){Start-Sleep -Milliseconds 100}
+  } until(!$playState.gameStart)
+ }
 }
  if($WindowWidth -ne 640 -or $WindowHeight -ne 480) { Cmd 'window.resize' @("$WindowWidth","$WindowHeight")|Out-Null }
  Cmd 'play.foreground_override' @('off')|Out-Null
+ if($UnlimitedPacing) {
+  Cmd 'render.pacing' @('background','0')|Out-Null
+  Cmd 'render.pacing' @('unlimited')|Out-Null
+ }
+ Cmd 'render.pacing' @('status')|ConvertTo-Json -Depth 10|Set-Content "$case/pacing.json"
  if($CreateEmptyScene) {
   Cmd 'scene.new' @('MaterialMeasurement')|Out-Null
   Cmd 'object.create' @('ProbeCamera')|Out-Null
@@ -191,16 +219,19 @@ function Measure-Stage([string]$Stage) {
  $script:nativeGeneration=Set-NativeMeasurement
  Cmd 'window.info'|ConvertTo-Json -Depth 10|Set-Content "$case/window.json"
  Cmd 'render.rtinfo'|ConvertTo-Json -Depth 10|Set-Content "$case/viewport.json"
- @{configuration=$Configuration;validation='off';windowWidth=$WindowWidth;windowHeight=$WindowHeight;uiScale=$UiScale;seconds=$Seconds;runtimeSha256=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;startedUtc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json|Set-Content "$case/measurement.json"
+ @{configuration=$Configuration;validation='off';playMode=[bool]$PlayMode;windowWidth=$WindowWidth;windowHeight=$WindowHeight;uiScale=$UiScale;seconds=$Seconds;readyTimeoutSeconds=$ReadyTimeoutSeconds;runtimeSha256=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;startedUtc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json|Set-Content "$case/measurement.json"
  Measure-Stage 'empty'
  Cmd 'model.loadcached' @("$project/Assets/Models/$ModelName.glb")|Out-Null
  $placement=Cmd 'model.place' @($ModelName)
- if(!$placement.changed -or !$placement.children.Count){throw 'Selected model produced no scene mesh children'}
+ $rootMesh=@($placement.components | Where-Object { $_.type -eq 'MeshRenderer' }).Count -gt 0
+ if(!$placement.changed -or (!$placement.children.Count -and !$rootMesh)){throw 'Selected model produced no scene mesh root or children'}
  $modelStage=if($ModelName -eq 'CreatorRobot'){'robot'}else{'model'}
  Measure-Stage $modelStage
- Cmd 'render.live.capture' @("$case/ModelCapture",'editor','controlled')|Out-Null
+ $captureTarget=if($PlayMode){'game'}else{'editor'}
+ Cmd 'render.live.capture' @("$case/ModelCapture",$captureTarget,'controlled')|Out-Null
  & $Python (Join-Path $PSScriptRoot 'audit-material-measurement.py') $case --output "$case/measurement-audit.json"
  if($LASTEXITCODE -ne 0){throw 'Material recorded-population/foreground audit failed'}
+ if($PlayMode){Cmd 'stop'|Out-Null}
  Cmd 'scene.save' @("$project/Assets/Scenes/Mat9Robot.creator")|Out-Null
  Cmd 'quit'
  if(!$proc.WaitForExit(30000)){throw 'Shutdown timeout'}

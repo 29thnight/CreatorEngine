@@ -783,6 +783,14 @@ $mutations = @(
         Expect = 'owned-counter/merge'
     },
     @{
+        Name   = 'owned-counter-merge-loses-task'
+        File   = 'ProfileCapture.cpp'
+        Old    = 'existing.cpu.task == sample.cpu.task)'
+        New    = 'true)'
+        Expect = 'counter-compaction/size'
+        Why    = 'Distinct task owners in the same session and tick must not overwrite one another'
+    },
+    @{
         Name   = 'owned-counter-file-loses-tick'
         File   = 'ProfileCaptureFile.cpp'
         Old    = 'out.put(sample.cpu.tick);'

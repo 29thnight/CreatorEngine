@@ -104,6 +104,8 @@ class SceneHost final : private IRHIUploadTransactionListener
     void PollPrograms(const EnhancedFrameContext& context);
     bool IsProgramReady(const own::shared_owner<const Generation>& generation, RHIShaderBinary backend) const;
     SceneProgramStats ProgramStats() const;
+    // Shadow statistics are read only after the graph recording join. Each
+    // recording job owns its counters; these accessors reduce the completed jobs.
     // Submitted commands, not a GPU-visible draw count.
     uint32_t ShadowDrawCount() const;
     // Actual indirect submissions: opaque tile packets + ordered Temporal layers.
@@ -299,6 +301,10 @@ class SceneHost final : private IRHIUploadTransactionListener
         std::uint64_t revision{}, temporalRevision{}, frameId{};
     };
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<ShadowHistory>> shadowHistories_;
+    // Last bucket shape written to stdout; the line is printed only when it changes.
+    std::optional<std::pair<std::uint32_t, std::size_t>> loggedMaterialBuckets_;
+    // Per-frame scene buffers return here after their frame retires.
+    std::shared_ptr<TransientBufferPool> bufferPool_;
     struct CameraHistory
     {
         std::shared_ptr<GpuGeometryOcclusion::History> pyramid;

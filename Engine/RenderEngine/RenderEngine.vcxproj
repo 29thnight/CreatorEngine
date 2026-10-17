@@ -972,6 +972,7 @@
     <ClInclude Include="GpuGeometryVisibilityShared.inl" />
     <ClInclude Include="MaterialGraphHybridVisibility.h" />
     <ClInclude Include="MaterialGraphIndirectBatch.h" />
+    <ClInclude Include="MaterialGraphTransientBufferPool.h" />
     <ClInclude Include="MaterialGraphSceneAccess.h" />
     <ClInclude Include="MaterialGraphThinFilmSensitivity.h" />
     <ClInclude Include="MaterialGraphVisibilityContract.h" />

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/DynamicBitset.h"
 #include "PrefabUtility.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "DataSystem.h"
@@ -180,7 +181,7 @@ namespace
 				existingByType[std::string(type->name())].push_back(i);
 		}
 
-		std::vector<bool> kept(originalCount, false);
+		ce::dynamic_bitset kept(originalCount, false);
 		std::unordered_map<std::string, size_t> nextOrdinal;
 
 		for (const Authoring::ReadNode node : newComponents)
@@ -199,7 +200,7 @@ namespace
 			{
 				// 유지: 인스턴스 보존 + 프로퍼티 패치. 이 컴포넌트는 파괴 대상에서 뺀다.
 				const size_t index = indices[ordinal++];
-				kept[index] = true;
+				kept.set(index, true);
 
 				Component* comp = obj.m_components[index].get();
 
@@ -235,7 +236,7 @@ namespace
 		bool executionGraphMembershipChanged = false;
 		for (size_t i = 0; i < originalCount; ++i)
 		{
-			if (kept[i])
+			if (kept.test(i))
 				continue;
 
 			auto comp = obj.m_components[i];

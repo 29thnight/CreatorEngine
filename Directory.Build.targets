@@ -58,6 +58,18 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
+  <!--
+    Debug 구성의 /JMC(내 코드만) 를 끈다. /JMC 는 함수마다 진입 검사 호출을
+    심는데, Debug 플레이 모드 CreatorRobot 측정(2026-10-17)에서 렌더 스레드 자체
+    시간의 13.6%, 배경 텍스처 검증 해시 스레드의 24%가 그 검사 하나였다.
+    디버거의 "내 코드만" 단계 실행은 이 구성에서 더 이상 동작하지 않는다.
+  -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(Configuration)' == 'Debug'">
+    <ClCompile>
+      <SupportJustMyCode>false</SupportJustMyCode>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
   <!-- GCCE has process-wide state in one shared runtime. Keep its import mode
        and layout-affecting diagnostics identical in every native translation
        unit, including static libraries that expose SceneRuntime headers. -->

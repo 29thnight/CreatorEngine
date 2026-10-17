@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/DynamicBitset.h"
 #include "Assets/QuantizedGeometry.h"
 #include "Assets/ModelCpuGeometry.h"
 #include "RHI/RHIShaderSource.h"

@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
 #include <stdint.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -102,7 +103,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     }
     size_t graphicsFrontier = 0, computeFrontier = 0;
     std::vector<QueueSchedule::Wait> waits;
-    std::vector<bool> incoming(m_passes.size(), false), outgoing(m_passes.size(), false);
+    ce::dynamic_bitset incoming(m_passes.size(), false), outgoing(m_passes.size(), false);
     for (const auto& entry : plan.entries)
     {
         const QueueSchedule::Wait* newest = nullptr;
@@ -118,8 +119,8 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         {
             frontier = positions[newest->producer];
             waits.push_back(*newest);
-            incoming[newest->consumer] = true;
-            outgoing[newest->producer] = true;
+            incoming.set(newest->consumer, true);
+            outgoing.set(newest->producer, true);
         }
     }
     plan.waits = std::move(waits);
@@ -133,12 +134,12 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         outError = "Queue signal range is exhausted";
         return false;
     }
-    std::vector<bool> batchEnds(m_passes.size(), false);
+    ce::dynamic_bitset batchEnds(m_passes.size(), false);
     for (size_t index = 0; index < plan.entries.size(); ++index)
     {
-        batchEnds[plan.entries[index].pass] = index + 1 == plan.entries.size() ||
+        batchEnds.set(plan.entries[index].pass, index + 1 == plan.entries.size() ||
             plan.entries[index + 1].queue != plan.entries[index].queue ||
-            outgoing[plan.entries[index].pass] || incoming[plan.entries[index + 1].pass];
+            outgoing.test(plan.entries[index].pass) || incoming.test(plan.entries[index + 1].pass));
     }
     // Specialization consumes this compiled graph even on recording rejection.
     // Reset is required before retry: Execute must never use a queue-specialized
@@ -152,14 +153,14 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             m_executeOrder[index] = plan.entries[index].pass;
         }
         UpdateResourceUses();
-        std::vector<bool> retainedGraphicsTextures(m_resources.size(), false);
+        ce::dynamic_bitset retainedGraphicsTextures(m_resources.size(), false);
         for (size_t index = 0; index < m_resources.size(); ++index)
         {
             const auto& resource = m_resources[index];
             if (resource.used && !resource.IsBuffer())
             {
-                retainedGraphicsTextures[index] = m_deviceServices->DescribeTexture(resource.handle).
-                    retainsExplicitStateOnGraphicsQueue;
+                retainedGraphicsTextures.set(index, m_deviceServices->DescribeTexture(resource.handle).
+                    retainsExplicitStateOnGraphicsQueue);
             }
         }
         const auto rejectComputeUses = [&](const std::vector<RGPassUsage>& usages)
@@ -168,7 +169,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             {
                 if (usage.handle.IsValid() && usage.handle.index < retainedGraphicsTextures.size())
                 {
-                    retainedGraphicsTextures[usage.handle.index] = false;
+                    retainedGraphicsTextures.set(usage.handle.index, false);
                 }
             }
         };
@@ -199,7 +200,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     for (size_t begin = 0; begin < plan.entries.size();)
     {
         size_t end = begin + 1;
-        while (end < plan.entries.size() && !batchEnds[plan.entries[end - 1].pass])
+        while (end < plan.entries.size() && !batchEnds.test(plan.entries[end - 1].pass))
         {
             ++end;
         }

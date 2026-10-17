@@ -1,3 +1,4 @@
+#include "../Utility_Framework/DynamicBitset.h"
 #include "MaterialGraphMeshSurface.h"
 #include "Assets/QuantizedGeometry.h"
 #include "MaterialGraphSceneAccess.h"
@@ -823,7 +824,7 @@ bool MeshSurfacePlan::BuildPartitioned(const EnhancedDrawItem& draw, const Surfa
     const auto* sourceBytes = static_cast<const std::byte*>(source.Geometry().vertexData);
     constexpr auto unused = std::numeric_limits<std::uint32_t>::max();
     std::vector<std::uint32_t> remap(cost.sourceVertices, unused);
-    std::vector<bool> referenced(cost.sourceVertices);
+    ce::dynamic_bitset referenced(cost.sourceVertices);
     std::shared_ptr<MeshSurfaceInput> chunk;
     MeshSurfaceChunk description;
     std::shared_ptr<std::vector<std::uint32_t>> sourceVertices;
@@ -979,9 +980,9 @@ bool MeshSurfacePlan::BuildPartitioned(const EnhancedDrawItem& draw, const Surfa
                 chunk->vertices_.insert(chunk->vertices_.end(), vertex, vertex + geometry.vertexStride);
                 chunk->lods_.push_back(source.lods_[index]);
                 ++cost.points;
-                if (!referenced[index])
+                if (!referenced.test(index))
                 {
-                    referenced[index] = true;
+                    referenced.set(index, true);
                     ++cost.referencedVertices;
                 }
             }

@@ -41,6 +41,7 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $probe = Join-Path $PSScriptRoot 'reflection_container_roundtrip_probe.cpp'
 $utilityInclude = Join-Path $repoRoot 'Engine\Utility_Framework'
+$contractInclude = Join-Path $repoRoot 'Build/Generated/Contracts/x64-Debug'
 $mathInclude = Join-Path $repoRoot 'ThirdParty\Mathematics\include'
 $vcpkgRoot = Join-Path $repoRoot 'vcpkg_installed\x64-windows\x64-windows'
 $vcpkgInclude = Join-Path $vcpkgRoot 'include'
@@ -92,8 +93,8 @@ if (Test-Path -LiteralPath $executable -PathType Leaf) {
 # /wd4828: 엔진 헤더 주석 일부가 CP949 바이트로 남아 있다(별도 이관 대상).
 $command = 'call "' + $vcvars + '" >nul && cl.exe ' +
     '/nologo /TP /EHsc /std:c++latest /permissive- /Zc:__cplusplus ' +
-    '/Zc:preprocessor /utf-8 /W3 /wd4828 /MDd /Od /D_DEBUG ' + $gcce.CompileArguments + ' ' +
-    '/I"' + $utilityInclude + '" /I"' + $mathInclude + '" ' +
+    '/Zc:preprocessor /DCE_CONTRACT_STANDALONE /utf-8 /W3 /wd4828 /MDd /Od /D_DEBUG ' + $gcce.CompileArguments + ' ' +
+    '/I"' + $utilityInclude + '" /I"' + $contractInclude + '" /I"' + $mathInclude + '" ' +
     '/external:I"' + $vcpkgInclude + '" /external:W0 ' +
     '/Fo:"' + $outputDirectory + '\\" /Fe:"' + $executable + '" "' + $probe + '" ' +
     '/link /LIBPATH:"' + $vcpkgLib + '" /LIBPATH:"' + $engineLib + '" ' +

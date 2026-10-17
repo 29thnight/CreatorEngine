@@ -161,6 +161,7 @@ bool SceneHost::VisibilityStage::PrepareVisibility(const FrameInput& frame, cons
     hybrid->name = name;
     hybrid->depthOnly = depthOnly;
     hybrid->geometry = geometry;
+    hybrid->pool = geometry->pool;
     hybrid->visible = list;
     hybrid->records.resize(geometry->records.size());
     for (const auto& draw : frame.draws)

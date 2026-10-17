@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/DynamicBitset.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
@@ -312,6 +313,7 @@ public:
         // 것이 가장 나쁘다.
         bool     parallelDeclined{ false };
         uint32_t totalRecordCost{ 0 };
+        uint64_t estimatedRecordingWork{0}; // Callbacks + declared batches + binding contracts; CPU work hint only.
         uint32_t dependencyWaveCount{0}; // DAG depth in passes, not elapsed GPU time.
         uint32_t recordingJobDispatchCount{0};
         uint32_t recordingWorkerJobCount{0};
@@ -360,6 +362,8 @@ public:
 
     // Opt-in CPU partition hint; GPU order/barriers and the decline threshold
     // are unchanged. A candidate that adds recording waves is rejected.
+    // Versioned graphs also include callback/binding work in parallel admission;
+    // GPU-driven recording is not proportional to the number of draw batches.
     void SetRecordingWorkloadBalance(bool enabled) { RequireQueueIdle(); m_recordingWorkloadBalance = enabled; }
 
     void Reset();
@@ -473,7 +477,7 @@ public:
         RGAccessMode access{ RGAccessMode::LegacyState };
     };
 
-    RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+    RGPassId AddPass(const std::string& name, std::vector<RGPassUsage> usages,
         ExecuteCallback execute, bool hasSideEffect = false);
 
     struct RepeatedPhase
@@ -488,8 +492,8 @@ public:
 
     // 외부 버전은 한 번 발행한다. 내부 단계는 그 핸들을 그대로 쓰며,
     // usage.state는 해당 자원의 첫 단계 상태다. 반복은 같은 인코더에서 직렬 기록한다.
-    RGPassId AddRepeatedPass(const std::string& name, const std::vector<RGPassUsage>& usages,
-        const std::vector<RepeatedPhase>& phases, uint32_t repeatCount,
+    RGPassId AddRepeatedPass(const std::string& name, std::vector<RGPassUsage> usages,
+        std::vector<RepeatedPhase> phases, uint32_t repeatCount,
         RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
 
     /// 여러 커맨드 리스트에 나눠 기록할 수 있는 패스.
@@ -510,7 +514,7 @@ public:
     ///
     /// 조각 수(maxSlices)와는 여전히 다른 값이다. 조각 수는 '얼마나 쪼갤 수
     /// 있나'라 워커 수에 눌리고, 이 값은 '병렬로 갈 만한가'를 정한다.
-    RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+    RGPassId AddSplitPass(const std::string& name, std::vector<RGPassUsage> usages,
         SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
         uint32_t recordCost = 0);
 
@@ -519,9 +523,11 @@ public:
     ///   이미 들고 있으므로 호출부가 같은 값을 도로 넘기지 않는다.
     bool Compile(std::string& outError);
     struct StructuralSchedule;
-    // Source must be a frozen submitted graph; only immutable structural metadata is copied.
+    // Source must be a frozen submitted graph; immutable CPU metadata is shared.
     void InheritStructuralSchedule(const EnhancedRenderGraph& previous);
     void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous);
+    void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous,
+        const std::shared_ptr<const StructuralSchedule>& alternate);
     std::shared_ptr<const StructuralSchedule> SnapshotStructuralSchedule() const;
 
     struct QueueHint
@@ -883,6 +889,9 @@ private:
         std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
     };
 
+    Pass& AppendPass();
+    void ClearPassMetadata(Pass& pass);
+
     struct FinalStateRequirement
     {
         RGHandle handle;
@@ -901,12 +910,12 @@ private:
     RHITransientResourceDesc TransientDescription(const Resource& resource) const;
     // Queue execution specializes the same planner at submission boundaries.
     // Pass states persist inside each batch; boundary plans use COMMON.
-    void PlanBarriers(const std::vector<bool>* batchEnds = nullptr,
+    void PlanBarriers(const ce::dynamic_bitset* batchEnds = nullptr,
         PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr,
-        const std::vector<bool>* retainedGraphicsTextures = nullptr);
+        const ce::dynamic_bitset* retainedGraphicsTextures = nullptr);
     bool ValidateFinalStates(std::string& outError) const;
     bool ValidateRepeatedPasses(std::string& outError) const;
-    void PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite);
+    void PlanRepeatedBarriers(Pass& pass, ce::dynamic_bitset& previousWrite);
 
     /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
     /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
@@ -921,11 +930,17 @@ private:
     std::shared_ptr<RGTransientPool::AliasHeapAccounting> m_aliasHeapAccounting;
     bool m_aliasing{false}, m_extendLifetimes{false};
     bool m_poison{false};
-    std::vector<Pass>     m_passes;
+    // Active declarations are a prefix of retained metadata. Reset releases all
+    // callbacks/handles while keeping the empty containers and their capacities.
+    std::vector<Pass> m_passStorage;
+    std::span<Pass> m_passes;
     std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
     std::shared_ptr<const std::string> m_timingSignature;
+    // Byte offset of each pass's culled field inside m_timingSignature.
+    std::vector<size_t> m_signatureCulledOffsets;
     void BuildTimingSignature();
+    void PatchTimingSignatureReachability();
     GpuPassTimingIdentity TimingIdentity(uint16_t passIndex) const
     {
         return {m_timingSignature, passIndex};
@@ -964,7 +979,7 @@ private:
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;
     std::vector<DiagnosticSnapshot::VersionEdge> m_versionEdges;
-    // One successful structural schedule per graph owner, retained across Reset.
+    // Two immutable structural templates per graph owner, retained across Reset.
     // No native handles, callbacks, allocation plans or barrier states are cached.
 public:
     // Opaque CPU-only snapshot; may outlive GPU retirement of the source graph.
@@ -975,11 +990,12 @@ public:
         std::shared_ptr<const std::string> key;
         std::vector<uint16_t> order, criticalPath;
         std::vector<int32_t> waves;
-        std::vector<bool> culled;
+        ce::dynamic_bitset culled;
         std::vector<DiagnosticSnapshot::VersionEdge> edges;
     };
 private:
-    StructuralSchedule m_structuralSchedule;
+    std::shared_ptr<const StructuralSchedule> m_structuralSchedule;
+    std::shared_ptr<const StructuralSchedule> m_alternateSchedule;
 
     Stats m_stats;
 

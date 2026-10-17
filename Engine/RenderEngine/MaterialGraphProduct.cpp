@@ -1095,26 +1095,42 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
     }
     for (const auto& resource : layout.samplers)
     {
-        std::vector<std::string> parts;
-        std::istringstream input(resource.reference);
-        std::string part;
-        while (std::getline(input, part, '-'))
-            parts.push_back(part);
-        if (parts.size() == 2)
+        std::array<std::string_view, 4> parts{};
+        std::string_view remaining = resource.reference;
+        std::size_t count = 0;
+        // getline does not produce an additional token for a trailing delimiter.
+        while (!remaining.empty() && count < parts.size())
+        {
+            const auto delimiter = remaining.find('-');
+            parts[count++] = remaining.substr(0, delimiter);
+            remaining = delimiter == std::string_view::npos ? std::string_view{} : remaining.substr(delimiter + 1);
+        }
+        if (!remaining.empty())
+        {
+            count = 5;
+        }
+        if (count == 2)
+        {
             parts = {parts[0], parts[0], parts[1], parts[1]};
-        const auto filter = [](const std::string& value) { return value == "linear" || value == "nearest"; };
-        const auto address = [](const std::string& value) {
+            count = 4;
+        }
+        const auto filter = [](std::string_view value) { return value == "linear" || value == "nearest"; };
+        const auto address = [](std::string_view value) {
             return value == "repeat" || value == "clamp" || value == "mirror";
         };
-        if (parts.size() != 4 || !filter(parts[0]) || !filter(parts[1]) || !address(parts[2]) || !address(parts[3]))
+        if (count != 4 || !filter(parts[0]) || !filter(parts[1]) || !address(parts[2]) || !address(parts[3]))
+        {
             return Fail(diagnostics, "product.sampler", "Unsupported material sampler: " + resource.reference,
                         resource.source);
+        }
         while (candidate.samplers.size() <= resource.slot)
+        {
             candidate.samplers.push_back(RHISampler::Point());
+        }
         auto& sampler = candidate.samplers[resource.slot];
         sampler.minMag = parts[0] == "linear" ? RHIFilterMode::Linear : RHIFilterMode::Point;
         sampler.mip = parts[1] == "linear" ? RHIFilterMode::Linear : RHIFilterMode::Point;
-        const auto mode = [](const std::string& value) {
+        const auto mode = [](std::string_view value) {
             return value == "repeat"   ? RHIAddressMode::Wrap
                    : value == "mirror" ? RHIAddressMode::Mirror
                                        : RHIAddressMode::Clamp;

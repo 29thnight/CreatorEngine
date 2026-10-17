@@ -461,6 +461,11 @@ namespace ConsoleCmd
         nativeRecord.Set("recordingWaves", CommandData::Int(snapshot.nativeRecordWaves));
         nativeRecord.Set("jobDispatches", CommandData::Int(snapshot.nativeRecordDispatches));
         nativeRecord.Set("workerJobs", CommandData::Int(snapshot.nativeRecordJobs));
+        nativeRecord.Set("commandTargets", CommandData::Int(snapshot.nativeRecordTargets));
+        nativeRecord.Set("recordUnits", CommandData::Int(snapshot.nativeRecordUnits));
+        nativeRecord.Set("declaredBatchCost", CommandData::Int(snapshot.nativeRecordDeclaredCost));
+        nativeRecord.Set("estimatedCpuWork", CommandData::Int(snapshot.nativeRecordEstimatedWork));
+        nativeRecord.Set("parallelDeclined", CommandData::Bool(snapshot.nativeRecordParallelDeclined));
         nativeRecord.Set("balanced", CommandData::Bool(snapshot.nativeRecordBalanced));
         nativeRecord.Set("samples", CommandData::Int(snapshot.nativeRecordSamples));
         nativeRecord.Set("axis", CommandData::String("native-graph-record-cpu-not-full-frame"));

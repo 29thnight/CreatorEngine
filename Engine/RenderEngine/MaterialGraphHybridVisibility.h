@@ -87,6 +87,7 @@ struct SceneHybridVisibility final
     std::string name;
     bool depthOnly{};
     IRenderDeviceServices* device{};
+    std::shared_ptr<TransientBufferPool> pool;
     std::shared_ptr<const SceneFrameGeometry> geometry;
     std::shared_ptr<const GpuGeometryVisibility::Frame> visible;
     std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 3> compute;
@@ -103,10 +104,8 @@ struct SceneHybridVisibility final
     {
         if (device)
         {
-            if (keys.IsValid())
-                device->ReleaseBuffer(keys);
-            if (routes.IsValid())
-                device->ReleaseBuffer(routes);
+            ReleaseSceneBuffer(*device, pool, keys);
+            ReleaseSceneBuffer(*device, pool, routes);
         }
     }
     uint64_t KeyBytes() const { return uint64_t(width) * height * 8; }
@@ -163,11 +162,11 @@ struct SceneHybridVisibility final
         const std::wstring keyName(std::wstring(name.begin(), name.end()) + L".Keys");
         const std::wstring routeName(std::wstring(name.begin(), name.end()) + L".Routes");
         desc.debugName = keyName.c_str();
-        if (!device->CreateBuffer(desc, keys, error))
+        if (!CreateSceneBuffer(*device, pool.get(), desc, keys, error))
             return false;
         desc.bytes = uint64_t(meshlets) * 4;
         desc.debugName = routeName.c_str();
-        if (!device->CreateBuffer(desc, routes, error))
+        if (!CreateSceneBuffer(*device, pool.get(), desc, routes, error))
             return false;
         std::vector<RHIBindingDesc> v, t;
         for (size_t i = 1; i < geometry->geometry.size(); ++i)

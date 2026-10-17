@@ -97,6 +97,13 @@ namespace Hash
         {
             return (v >> n) | (v << (32 - n));
         }
+#if defined(_MSC_VER)
+        // _rotr 는 /Od 에서도 회전 명령 하나다. 함수 호출로 남는 Rotr 가
+        // Debug 텍스처 검증 해시 시간의 절반을 차지했다.
+#define CE_SHA256_ROTR(v, n) _rotr((v), (n))
+#else
+#define CE_SHA256_ROTR(v, n) Rotr((v), (n))
+#endif
 
         void Transform(const std::uint8_t block[kBlockSize]) noexcept
         {
@@ -130,9 +137,9 @@ namespace Hash
             }
             for (int i = 16; i < 64; ++i)
             {
-                const std::uint32_t s0 = Rotr(w[i - 15], 7) ^ Rotr(w[i - 15], 18)
+                const std::uint32_t s0 = CE_SHA256_ROTR(w[i - 15], 7) ^ CE_SHA256_ROTR(w[i - 15], 18)
                     ^ (w[i - 15] >> 3);
-                const std::uint32_t s1 = Rotr(w[i - 2], 17) ^ Rotr(w[i - 2], 19)
+                const std::uint32_t s1 = CE_SHA256_ROTR(w[i - 2], 17) ^ CE_SHA256_ROTR(w[i - 2], 19)
                     ^ (w[i - 2] >> 10);
                 w[i] = w[i - 16] + s0 + w[i - 7] + s1;
             }
@@ -141,10 +148,10 @@ namespace Hash
             std::uint32_t e = m_h[4], f = m_h[5], g = m_h[6], h = m_h[7];
             for (int i = 0; i < 64; ++i)
             {
-                const std::uint32_t S1 = Rotr(e, 6) ^ Rotr(e, 11) ^ Rotr(e, 25);
+                const std::uint32_t S1 = CE_SHA256_ROTR(e, 6) ^ CE_SHA256_ROTR(e, 11) ^ CE_SHA256_ROTR(e, 25);
                 const std::uint32_t ch = (e & f) ^ (~e & g);
                 const std::uint32_t temp1 = h + S1 + ch + kRound[i] + w[i];
-                const std::uint32_t S0 = Rotr(a, 2) ^ Rotr(a, 13) ^ Rotr(a, 22);
+                const std::uint32_t S0 = CE_SHA256_ROTR(a, 2) ^ CE_SHA256_ROTR(a, 13) ^ CE_SHA256_ROTR(a, 22);
                 const std::uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
                 const std::uint32_t temp2 = S0 + maj;
 
@@ -163,6 +170,7 @@ namespace Hash
         std::size_t   m_bufferUsed{ 0 };
         std::uint64_t m_bitCount{ 0 };
     };
+#undef CE_SHA256_ROTR
 
     // 소문자 16진 64자.
     inline std::string ToHex(const Sha256Digest& digest)

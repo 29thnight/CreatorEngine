@@ -15,10 +15,11 @@ inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler,
     {
         throw std::logic_error("command recording cannot wait from a job worker");
     }
-    job_group group;
-    for (uint32_t target = 0; target < targetCount; ++target)
+    // Share one indexed callback instead of allocating a task vector and one
+    // function wrapper per command target. Completion still releases all
+    // callback captures before wait returns, including on failure.
+    scheduler.submit_indexed(targetCount, [&job](std::size_t target)
     {
-        group.add([&job, target] { job(target); });
-    }
-    scheduler.submit(std::move(group)).wait();
+        job(static_cast<uint32_t>(target));
+    }).wait();
 }

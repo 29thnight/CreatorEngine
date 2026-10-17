@@ -1,4 +1,6 @@
+#include "../../../Utility_Framework/DynamicBitset.h"
 #include <stdint.h>
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../../Utility_Framework/WindowsApartment.h"
 #include <stdio.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -754,6 +756,8 @@ namespace
             // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
             // 그래프가 들고 있다. 승격(펜스 완료) 때 놓으면 풀로 반납된다.
             std::shared_ptr<EnhancedRenderGraph> graph;
+            bool graphCompleted{false};
+            bool graphReusable{false};
         };
         // 카메라 하나가 쓰는 표시 슬롯 묶음. 씬뷰(에디터 카메라)와 게임뷰
         // (게임 카메라)가 서로 다른 카메라를 넘기는데, 슬롯이 한 벌이면 한
@@ -2721,8 +2725,8 @@ namespace
         std::vector<EnhancedDrawItem> graphDraws;
         // Same ordering as graphDraws/SceneDrawInput::sourceIndex. Eligibility
         // remains aligned when optional graph candidates are removed.
-        std::vector<bool> graphShadowEligible;
-        std::vector<bool> graphViewRequired;
+        ce::dynamic_bitset graphShadowEligible;
+        ce::dynamic_bitset graphViewRequired;
         own::shared_owner<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
@@ -2822,6 +2826,9 @@ namespace
         double   lastNativeRecordMs{ 0.0 };
         TemporalMeasurementProvenance nativeRecordProvenance;
         uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
+        uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
+        uint64_t nativeRecordEstimatedWork{0};
+        bool nativeRecordParallelDeclined{false};
         bool nativeRecordBalanced{false};
         double   totalNativeRecordMs{ 0.0 };
         double   maxNativeRecordMs{ 0.0 };
@@ -2835,6 +2842,11 @@ namespace
             nativeRecordWaves = stats.recordingWaveCount;
             nativeRecordDispatches = stats.recordingJobDispatchCount;
             nativeRecordJobs = stats.recordingWorkerJobCount;
+            nativeRecordTargets = stats.recordWorkers;
+            nativeRecordUnits = stats.recordUnits;
+            nativeRecordDeclaredCost = stats.totalRecordCost;
+            nativeRecordEstimatedWork = stats.estimatedRecordingWork;
+            nativeRecordParallelDeclined = stats.parallelDeclined;
             nativeRecordBalanced = stats.recordingBalanced;
             totalNativeRecordMs += milliseconds;
             maxNativeRecordMs = (std::max)(maxNativeRecordMs, milliseconds);
@@ -3009,6 +3021,11 @@ namespace
             debugSnapshot.nativeRecordWaves = nativeRecordWaves;
             debugSnapshot.nativeRecordDispatches = nativeRecordDispatches;
             debugSnapshot.nativeRecordJobs = nativeRecordJobs;
+            debugSnapshot.nativeRecordTargets = nativeRecordTargets;
+            debugSnapshot.nativeRecordUnits = nativeRecordUnits;
+            debugSnapshot.nativeRecordDeclaredCost = nativeRecordDeclaredCost;
+            debugSnapshot.nativeRecordEstimatedWork = nativeRecordEstimatedWork;
+            debugSnapshot.nativeRecordParallelDeclined = nativeRecordParallelDeclined;
             debugSnapshot.nativeRecordBalanced = nativeRecordBalanced;
             debugSnapshot.nativeRecordProvenance = nativeRecordProvenance;
             debugSnapshot.gpuMs = lastGpuMs;
@@ -6547,7 +6564,7 @@ namespace
                     size_t retained = 0;
                     for (size_t i = 0; i < graphDraws.size(); ++i)
                     {
-                        if (!graphShadowEligible[i] && !graphViewRequired[i])
+                        if (!graphShadowEligible.test(i) && !graphViewRequired.test(i))
                         {
                             ++lastCulledDraws;
                             continue;
@@ -6555,8 +6572,8 @@ namespace
                         if (retained != i)
                         {
                             graphDraws[retained] = std::move(graphDraws[i]);
-                            graphShadowEligible[retained] = graphShadowEligible[i];
-                            graphViewRequired[retained] = graphViewRequired[i];
+                            graphShadowEligible.set(retained, graphShadowEligible.test(i));
+                            graphViewRequired.set(retained, graphViewRequired.test(i));
                         }
                         ++retained;
                     }
@@ -6856,16 +6873,32 @@ namespace
             if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink && temporalSink->AcceptsTemporalFrames() &&
                 !dx12.CreateTemporalDisplayTextures(slot.interopToken,view.temporal.frame.renderExtent,
                     view.temporal.frame.displayExtent,slot.temporalResources,outError)) return false;
-            auto nextGraph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
-                kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
-            // Submitted graphs remain immutable for display/FG/GPU consumers.
-            // Copy only structural metadata; never reset or mutate the old graph.
             const bool reuseStructuralSchedule = ReadLivePostFlag("CREATOR_RENDERGRAPH_SCHEDULE_CACHE", true);
-            const auto priorSchedule = view.structuralSchedules[1]
-                ? view.structuralSchedules[1] : view.structuralSchedules[0];
+            std::shared_ptr<EnhancedRenderGraph> nextGraph;
+            if (reuseStructuralSchedule && slot.graph && slot.graphCompleted && slot.graph.use_count() == 1)
+            {
+                if (!slot.graphReusable)
+                {
+                    slot.graph->Reset();
+                }
+                nextGraph = std::move(slot.graph);
+                ce::profile_instant(ce::marker<"RenderGraphStorageReuse">());
+            }
+            else
+            {
+                nextGraph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
+                    kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
+                ce::profile_instant(ce::marker<"RenderGraphStorageBuild">());
+            }
+            // Extra batch/display owners retain their sealed graph. Only an
+            // exclusively owned graph after its GPU completion can be recycled.
             if (reuseStructuralSchedule)
-                nextGraph->InheritStructuralSchedule(priorSchedule);
+            {
+                nextGraph->InheritStructuralSchedule(view.structuralSchedules[0], view.structuralSchedules[1]);
+            }
             slot.graph = std::move(nextGraph);
+            slot.graphCompleted = false;
+            slot.graphReusable = false;
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetQueueExecutionMode(dx12.GetQueueExecutionMode());
             graph.SetMeasurementDomain(capture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal);
@@ -6960,13 +6993,21 @@ namespace
             }
 
             RHIRecordedBatchDesc batchDesc{};
-            if (reuseStructuralSchedule)
             {
-                view.structuralSchedules[1] = std::move(view.structuralSchedules[0]);
-                view.structuralSchedules[0] = graph.GetStats().structuralScheduleReused
-                    ? priorSchedule : graph.SnapshotStructuralSchedule();
+                ce::profile_scope publicationProfile{ce::marker<"RenderGraphSchedulePublish">()};
+                if (reuseStructuralSchedule)
+                {
+                    const auto schedule = graph.SnapshotStructuralSchedule();
+                    // Keep two distinct templates, not two copies of the same
+                    // last frame. Compile matches both exact declaration keys.
+                    if (schedule != view.structuralSchedules[0])
+                    {
+                        view.structuralSchedules[1] = std::move(view.structuralSchedules[0]);
+                        view.structuralSchedules[0] = schedule;
+                    }
+                }
+                else view.structuralSchedules.fill({});
             }
-            else view.structuralSchedules.fill({});
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
             batchDesc.displayToken = slot.interopToken;
@@ -7600,6 +7641,20 @@ namespace
 
                 for (LivePipeline::CameraView& view : p.views)
                 {
+                    const auto recycle = [](LivePipeline::DisplaySlot& slot)
+                    {
+                        if (slot.graph && slot.graphCompleted && !slot.graphReusable && slot.graph.use_count() == 1)
+                        {
+                            slot.graph->Reset();
+                            slot.graphReusable = true;
+                        }
+                    };
+                    // A submission ticket may outlive the first completion poll.
+                    // Revisit completed slots once those extra owners retire.
+                    for (auto& slot : view.slots)
+                    {
+                        recycle(slot);
+                    }
                     while (!view.pendingQueue.empty())
                     {
                         const int slotIndex = view.pendingQueue.front();
@@ -7631,7 +7686,8 @@ namespace
                                 view.slots[slotIndex].completedAgeMs);
                         }
                         view.pendingQueue.erase(view.pendingQueue.begin());
-                        view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
+                        view.slots[slotIndex].graphCompleted = true;
+                        recycle(view.slots[slotIndex]);
                         view.slots[slotIndex].key = {};
 
                         // ★ 검증 레이어를 읽는다. 배선 오류(포맷·상태·디스크립터)는 여기에만
@@ -7980,8 +8036,10 @@ namespace
         // 부족으로 일부 뷰가 생략될 수 있고, TickLive를 재실행하지는 않는다.
         // CPU 준비가 목표 시간을 넘겨도 주기적인 진행 허용으로 기아를 막는다.
         // 이미 제출한 GPU 작업의 취소나 절대적인 표시 지연 상한은 보장하지 않는다.
-        if (renderQueue.empty() || renderThreadStopRequested || renderLastAdmissionNanoseconds == 0 ||
-            now - renderLastAdmissionNanoseconds >= kSceneProgressNanoseconds)
+        if (renderQueue.empty() || renderThreadStopRequested ||
+            !ShouldReplaceStaleLiveFrame(frame.sourceCaptureNanoseconds,
+                renderQueue.back().frame.sourceCaptureNanoseconds, now, renderLastAdmissionNanoseconds,
+                static_cast<uint64_t>(budgetMs * 1000000.0), kSceneProgressNanoseconds))
         {
             return false;
         }
@@ -9550,10 +9608,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         VulkanLivePipeline& p = *state.vulkanPipeline;
         p.frameContext.frameId = frame.frameId;
         p.frameContext.sceneEpoch = frame.sceneEpoch;
-        if (state.ShouldSkipScenePixels(frame))
-        {
-            return;
-        }
         uint32_t totalPending = p.PendingCount();
         LiveStopwatch watch;
         watch.Start();
@@ -9605,10 +9659,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 continue;
             }
 
-            if (state.ShouldSkipScenePixels(frame))
-            {
-                return;
-            }
             std::string error;
             const auto admission = state.AdmitViewImages(p.textureCache,
                 !p.iblGenerated || state.skyBoxDirty, error);
@@ -9834,11 +9884,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     traceProgress("seal.end");
-    if (state.ShouldSkipScenePixels(frame))
-    {
-        return;
-    }
-
     // 뷰 합산 인플라이트. '인플라이트 2 = 링(kFrameCount=3)의 안전 거리'는
     // 제출 총량 기준의 실측이다 — 뷰당 2씩 총 4를 들면 BeginFrame이
     // 얼로케이터 펜스에서 블로킹해 비동기 계약이 깨진다.
@@ -10007,10 +10052,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             continue;
         }
 
-        if (state.ShouldSkipScenePixels(frame))
-        {
-            return;
-        }
         std::string error;
         const auto admission = state.AdmitViewImages(state.dx12.TextureCache(),
             !state.pipeline->iblGenerated || state.skyBoxDirty, error);

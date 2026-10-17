@@ -121,6 +121,7 @@ std::uint32_t GpuGeometryVisibility::Frame::WorkQueueNonemptyPartitions(std::uin
 std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame::BuildShared(
     std::span<const std::shared_ptr<const Frame>> frames)
 {
+    ce::profile_scope profile{ce::marker<"GpuVisibility.SharedBuild">()};
     auto batch = std::make_shared<SharedBatch>();
     const auto& firstFrame = *frames.front();
     batch->device = firstFrame.m_device;
@@ -133,6 +134,22 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     std::vector<math::vector4> worlds;
     std::vector<SharedBatch::ViewData> views;
     std::vector<RHIBindingDesc> vertices, topologies, ids, arguments, first;
+    std::size_t totalBins{};
+    for (const auto& frame : frames)
+    {
+        totalBins += frame->m_binCount;
+    }
+    candidates.reserve(totalBins);
+    bins.reserve(totalBins);
+    worlds.reserve(totalBins * 3u);
+    vertices.reserve(totalBins);
+    topologies.reserve(totalBins);
+    batch->counts.reserve(totalBins);
+    views.reserve(frames.size());
+    batch->pyramids.reserve(frames.size());
+    ids.reserve(kSharedViewCapacity);
+    arguments.reserve(kSharedViewCapacity);
+    first.reserve(kSharedViewCapacity);
     std::uint64_t jobs{};
     for (const auto& frame : frames)
     {

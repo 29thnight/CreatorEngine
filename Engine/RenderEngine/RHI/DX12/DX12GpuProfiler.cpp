@@ -511,22 +511,19 @@ void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
 
     // 스크래치는 멤버다(선언부 주석) — clear 는 용량을 지우지 않는다.
     m_mergeScratch.clear();
+    m_mergeIndex.clear();
     for (const PassSlice& slice : timings.slices)
     {
-        auto found = m_mergeScratch.end();
-        for (auto it = m_mergeScratch.begin(); it != m_mergeScratch.end(); ++it)
+        // 키는 slice.name 을 가리키는 view 다 — 사본을 만들지 않는다.
+        const auto [index, inserted] = m_mergeIndex.try_emplace(std::string_view{ slice.name }, m_mergeScratch.size());
+        if (inserted)
         {
-            if (it->first == slice.name) { found = it; break; }
-        }
-
-        if (found == m_mergeScratch.end())
-        {
-            // 키는 slice.name 을 가리키는 view 다 — 사본을 만들지 않는다.
             m_mergeScratch.emplace_back(std::string_view{ slice.name },
                 MergedSpan{ slice.beginTicks, slice.endTicks, 1, slice.endTicks - slice.beginTicks });
             continue;
         }
 
+        const auto found = m_mergeScratch.begin() + static_cast<std::ptrdiff_t>(index->second);
         found->second.begin = (std::min)(found->second.begin, slice.beginTicks);
         found->second.end = (std::max)(found->second.end, slice.endTicks);
         ++found->second.slices;

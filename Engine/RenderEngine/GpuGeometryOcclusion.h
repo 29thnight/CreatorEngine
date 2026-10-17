@@ -14,6 +14,9 @@ struct EnhancedFrameContext;
 // by submitted frames; importing it creates a new recording-local view.
 class GpuGeometryOcclusion final
 {
+    struct HistoryPool;
+    struct DeclarationLayout;
+
   public:
     static constexpr std::uint32_t kMaximumLevels = 16;
 
@@ -35,6 +38,8 @@ class GpuGeometryOcclusion final
         std::vector<RHITextureHandle> textures;
         std::string name{"METEOR.Camera"};
         std::atomic<bool> recorded{};
+        std::shared_ptr<HistoryPool> pool;
+        RHIResourceState initialState{RHIResourceState::Common};
     };
 
     class Pyramid
@@ -58,6 +63,7 @@ class GpuGeometryOcclusion final
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
 
         ViewKey m_view;
+        std::shared_ptr<const DeclarationLayout> m_declarationLayout;
         std::uint32_t m_levelCount{};
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_build;
         std::weak_ptr<const Pyramid> m_self;
@@ -86,4 +92,8 @@ class GpuGeometryOcclusion final
   private:
     IRenderDeviceServices* m_device{};
     LX::Runtime::ComputePipeline m_build;
+    std::shared_ptr<HistoryPool> m_historyPool;
+    // Bounded CPU-only descriptions. Submitted pyramids retain evicted layouts.
+    std::array<std::shared_ptr<const DeclarationLayout>, 16> m_declarationLayouts;
+    std::size_t m_nextDeclarationLayout{};
 };

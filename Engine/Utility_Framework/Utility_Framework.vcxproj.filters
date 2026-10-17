@@ -324,7 +324,10 @@
     <ClInclude Include="TypeTrait.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="Sha256.h">
+    <ClInclude Include="DynamicBitset.h">
+        <Filter>Core.Container</Filter>
+      </ClInclude>
+      <ClInclude Include="Sha256.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
     <ClInclude Include="WindowsApartment.h">

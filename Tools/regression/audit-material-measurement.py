@@ -6,8 +6,11 @@ No master comparison, product budget, display cadence or latency is accepted her
 import argparse
 import importlib.util
 import json
+import array
+import math
+import sys
 from pathlib import Path
-from base0_artifacts import load_capture, require
+from base0_artifacts import require
 
 spec = importlib.util.spec_from_file_location('material_profile', Path(__file__).with_name('summarize-material-profile.py'))
 profile = importlib.util.module_from_spec(spec)
@@ -20,8 +23,18 @@ def analyze(root):
     for stage in ('empty', model_stage):
         result = profile.analyze(root / (stage + '.ceprof'))
         require(result['nativeRealPerformanceGateEligible'], 'Stage lacks complete native-real recorded provenance')
-        require(len(result['renderGroups']) == 1, 'Mixed view/scene/settings populations in material stage')
-        group = result['renderGroups'][0]
+        groups = result['renderGroups']
+        playing = (root / (stage + '-play-pacing.json')).is_file()
+        if playing:
+            require({g['viewId'] for g in groups}.issubset({1, 2}) and
+                    any(g['viewId'] == 2 for g in groups), 'Missing game view in play capture')
+            signature = lambda g: {k: v for k, v in g.items() if k not in
+                ('viewId', 'realFrameCount', 'cpuRenderSubmitMs', 'cpuSamples', 'gpuPassMs', 'gpuPassSamples')}
+            require(all(signature(g) == signature(groups[0]) for g in groups), 'Mixed play scene/settings')
+            group = next(g for g in groups if g['viewId'] == 2)
+        else:
+            require(len(groups) == 1, 'Mixed view/scene/settings populations in material stage')
+            group = groups[0]
         require(group['cpuSamples'] >= 20, 'Too few native-real CPU render samples')
         live = json.loads((root / (stage + '.json')).read_text(encoding='utf-8-sig'))
         require(live['axis'] == 'completed-real-view-renders-not-display-fps' and
@@ -32,8 +45,9 @@ def analyze(root):
                 require(p['valid'] is True and p['frameKind'] == 'real' and p['generatedOrdinal'] == 0 and
                         p['upscaler'] == p['frameGenerator'] == 'none' and p['spatialMode'] == 'off' and
                         p['deepDvcApplied'] is False and p['resolutionState'] == 'native', 'Non-native stage boundary')
-                require(int(p['viewId']) == group['viewId'] and int(p['sceneEpoch']) == group['sceneEpoch'] and
-                        all(p[field] == group[field] for field in
+                matching = next((g for g in groups if g['viewId'] == int(p['viewId'])), None)
+                require(matching is not None and int(p['sceneEpoch']) == matching['sceneEpoch'] and
+                        all(p[field] == matching[field] for field in
                             ('renderWidth', 'renderHeight', 'displayWidth', 'displayHeight')),
                         'Live boundary does not describe the recorded population')
         require(live['end']['framesRendered'] > live['start']['framesRendered'], 'Stage rendered no new views')
@@ -49,7 +63,19 @@ def analyze(root):
             completedRealViewRendersPerSecond=live['completedRealViewRendersPerSecond'])
     capture = root / 'ModelCapture'
     if not capture.is_dir(): capture = root / 'RobotCapture'
-    manifest, _, pixels = load_capture(capture)
+    manifest = json.loads((capture / 'manifest.json').read_text(encoding='utf-8-sig'))
+    require(manifest['source'] == 'product-live' and manifest['backend'] == 'dx12' and
+            manifest['finite'] and manifest['validationCount'] == 0, 'Invalid live capture')
+    depth = next(a for a in manifest['attachments'] if a['name'] == 'depth')
+    depth_path = (capture / depth['file']).resolve()
+    require(depth_path.parent == capture.resolve(), 'Depth attachment escaped capture')
+    values = array.array('f')
+    values.frombytes(depth_path.read_bytes())
+    if sys.byteorder != 'little':
+        values.byteswap()
+    require(depth['channels'] == 1 and len(values) == manifest['width'] * manifest['height'] and
+            all(math.isfinite(v) for v in values), 'Invalid depth attachment')
+    pixels = {'depth': values}
     require(manifest['draws'], 'Model capture has no submitted geometry')
     foreground = sum(0 < depth < 1 for depth in pixels['depth'])
     require(foreground >= 64, 'Model capture has no visible foreground')

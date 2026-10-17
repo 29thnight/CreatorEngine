@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/DynamicBitset.h"
 #include "CookedModelSubAssetCodec.h"
 #include "CookedAssetCatalog.h"
 #include "../../Assets/ClusterTopologyPage.h"

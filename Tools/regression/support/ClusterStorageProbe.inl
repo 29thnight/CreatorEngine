@@ -29,6 +29,19 @@ void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archi
     const auto gpuPreferred = stream.Prepare(4,right,budget);
     Check(gpuPreferred->groups[0] && !gpuPreferred->groups[1] && stream.GpuFeedbackGroups() == 1,
         "Completed GPU demand takes priority over CPU prefetch under the same physical budget");
+    Stream duplicates(archive, groups);
+    duplicates.Prepare(1, left, budget);
+    const auto duplicateSealed = duplicates.Prepare(2, left, budget);
+    const std::array<uint32_t, 5> repeatedViews{1, 1, 0, 1, 0};
+    Check(duplicates.Prepare(2, repeatedViews, budget) == duplicateSealed,
+        "Repeated view requests keep the sealed current recording immutable");
+    duplicates.SubmitGpuRequests(right);
+    const auto duplicateFeedback = duplicates.Prepare(3, left, budget);
+    Check(duplicateFeedback->groups[1] && !duplicateFeedback->groups[0] && duplicateSealed->groups[0],
+        "Membership mask preserves GPU feedback priority ahead of duplicate pending and CPU view requests");
+    const auto duplicateNext = duplicates.Prepare(4, left, budget);
+    Check(duplicateNext->groups[0] && !duplicateNext->groups[1] && duplicateFeedback->groups[1],
+        "Serviced membership resets next recording without mutating submitted snapshots");
     bool rejected = false;
     try
     {

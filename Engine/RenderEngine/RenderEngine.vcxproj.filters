@@ -1440,6 +1440,9 @@
     <ClInclude Include="MaterialGraphIndirectBatch.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialGraphTransientBufferPool.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
     <ClCompile Include="MaterialGraphMeshSurface.cpp">
       <Filter>Render\MaterialGraph</Filter>
     </ClCompile>

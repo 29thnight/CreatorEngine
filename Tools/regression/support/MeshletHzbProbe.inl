@@ -55,6 +55,8 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     Check(depthPso.IsValid(), "HZB depth fixture pipeline " + error);
     GpuGeometryOcclusion occlusion;
     std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previous;
+    std::set<std::uint32_t> historyTextures;
+    unsigned reusedHistoryTextures{};
     const std::array<std::set<uint32_t>, 8> expected{{{1,2,3,5}, {0,1,2,3,5}, {0,1,2,3,5,6},
         {3,5}, {0,1,2,3,4,5,6}, {1,2,3,5}, {1,2,3,5,6}, {1,2,3,5}}};
     const std::set<uint32_t> all{0,1,2,3,5,6}, occluded{1,2,3,5};
@@ -83,6 +85,33 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid;
         Check(temporal ? occlusion.PrepareHistory(context, matrix, 1, 1, pyramid, error) :
             occlusion.Prepare(context, matrix, pyramid, error), "HZB prepare " + error);
+        if (temporal)
+        {
+            for (const auto texture : pyramid->HistoryOwner()->textures)
+            {
+                reusedHistoryTextures += !historyTextures.insert(texture.id).second;
+                if (previous)
+                {
+                    Check(std::ranges::none_of(previous->HistoryOwner()->textures, [&](auto old) {
+                        return old == texture;
+                    }), "History pool must not overwrite a retained reader");
+                }
+            }
+        }
+        if (test == 0)
+        {
+            // Evict the prepared original's CPU layout before declaring it.
+            // GPU readback below must still match its original odd/even extent.
+            for (unsigned entry = 0; entry < 18; ++entry)
+            {
+                auto changed = context;
+                changed.width += 1u + entry % 3u;
+                std::shared_ptr<const GpuGeometryOcclusion::Pyramid> other;
+                Check(occlusion.Prepare(changed, matrix, other, error,
+                    "HZB.LayoutEviction." + std::to_string(entry)),
+                    "HZB layout cache replacement preserves retained prepared owners: " + error);
+            }
+        }
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history;
         if (temporal && previous) {
             const auto accepted = previous->HistoryOwner()->completion;
@@ -305,6 +334,11 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         std::string validation;
         Check(device.DrainDebugMessages(validation) == 0, "HZB GPU validation " + validation);
         previous = pyramid;
+    }
+    if (temporal)
+    {
+        Check(reusedHistoryTextures > 0, "Completed HZB chains are reused across frames");
+        std::cout << "METEOR_HISTORY_POOL_OK reusedTextures=" << reusedHistoryTextures << " retainedReader=1 validation=0\n";
     }
     previous.reset(); occlusion.ShutdownAfterIdle();
     std::cout << (temporal ? "METEOR_MESHLET_TEMPORAL_OK cases=8 validation=0\n" : "METEOR_MESHLET_HZB_OK cases=8 validation=0\n");

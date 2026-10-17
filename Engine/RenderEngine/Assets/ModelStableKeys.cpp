@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/DynamicBitset.h"
 #include "ModelStableKeys.h"
 #include "AssetIdentityHex.h"
 
@@ -460,7 +461,7 @@ namespace assets
     {
         StableKeyResult result;
         result.assignments.resize(elements.size());
-        std::vector<bool> assigned(elements.size(), false);
+        ce::dynamic_bitset assigned(elements.size(), false);
 
         // kind별 묶음 — 유일성은 kind 안에서만 본다(§2.3 "동일 kind 안에서").
         std::map<SubAssetKind, KindGroup> groups;
@@ -492,14 +493,17 @@ namespace assets
                 result.assignments[ei] = { kind, e.index, StableKeyOrigin::Exporter,
                     std::string(kStableKeyOriginExporter) + e.persistentId,
                     e.binding, e.name, e.fingerprint, false };
-                assigned[ei] = true;
+                assigned.set(ei, true);
             }
 
             // ── 3. semantic(이름) — kind 안에서 유일한 NFC 이름만 ─────────────
             std::map<std::string, std::vector<std::size_t>> byName;
             for (const std::size_t ei : group.elementIndices)
             {
-                if (assigned[ei]) continue;
+                if (assigned.test(ei))
+                {
+                    continue;
+                }
                 const StableKeyElement& e = elements[ei];
                 if (e.name.empty()) continue;
                 if (!IsUsableText(e.name))
@@ -517,7 +521,7 @@ namespace assets
                 const StableKeyElement& e = elements[ei];
                 result.assignments[ei] = { kind, e.index, StableKeyOrigin::Semantic,
                     std::string(kStableKeyOriginName) + name, e.binding, e.name, e.fingerprint, false };
-                assigned[ei] = true;
+                assigned.set(ei, true);
             }
 
             // ── 4. authoring — 지문으로 prior에서 되찾고, 없으면 새로 발급 ──────
@@ -531,7 +535,10 @@ namespace assets
             // "내용이 바뀐 것"인지 "하나 지우고 하나 더한 것"인지 증명할 수 없다.
             std::vector<std::size_t> unbound;
             for (const std::size_t ei : group.elementIndices)
-                if (!assigned[ei]) unbound.push_back(ei);
+                if (!assigned.test(ei))
+                {
+                    unbound.push_back(ei);
+                }
 
             std::map<std::string, std::vector<const ModelSubAssetRecord*>> priorByFingerprint;
             for (const ModelSubAssetRecord& record : prior)
@@ -566,7 +573,7 @@ namespace assets
                     {
                         result.assignments[ei] = { kind, e.index, StableKeyOrigin::Authoring,
                             found->second[k]->stableKey, e.binding, e.name, e.fingerprint, true };
-                        assigned[ei] = true;
+                        assigned.set(ei, true);
                     }
                     else
                     {
@@ -624,7 +631,7 @@ namespace assets
                 }
                 result.assignments[ei] = { kind, e.index, StableKeyOrigin::Authoring,
                     MakeAuthoringStableKey(bytes), e.binding, e.name, e.fingerprint, false };
-                assigned[ei] = true;
+                assigned.set(ei, true);
             }
         }
 
@@ -632,7 +639,10 @@ namespace assets
         std::set<std::pair<SubAssetKind, std::string>> seen;
         for (std::size_t i = 0; i < elements.size(); ++i)
         {
-            if (!assigned[i]) continue;
+            if (!assigned.test(i))
+            {
+                continue;
+            }
             const StableKeyAssignment& a = result.assignments[i];
             if (!seen.emplace(a.kind, a.stableKey).second)
             {
@@ -645,7 +655,10 @@ namespace assets
         std::vector<StableKeyAssignment> compact;
         compact.reserve(elements.size());
         for (std::size_t i = 0; i < elements.size(); ++i)
-            if (assigned[i]) compact.push_back(std::move(result.assignments[i]));
+            if (assigned.test(i))
+            {
+                compact.push_back(std::move(result.assignments[i]));
+            }
         result.assignments = std::move(compact);
         return result;
     }

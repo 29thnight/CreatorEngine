@@ -66,7 +66,8 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
         }
     }
     NormalizeSceneReads(graph, uses);
-    graph.AddPass(name, uses, [frame, commands, depth, cascade, slice, count](const auto& execution) {
+    const auto statisticsSlot = cascade * 2 + (staticCasters ? 0 : 1);
+    graph.AddPass(name, uses, [frame, commands, depth, slice, count, statisticsSlot](const auto& execution) {
         frame->CheckCurrent(execution.graph);
         auto& encoder = *execution.encoder;
         const auto texture = execution.ResolveHandle(depth);
@@ -87,6 +88,8 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
         encoder.BindRenderTargets(targets);
         encoder.SetViewportAndScissor(desc.width, desc.height);
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+        uint32_t recordedBuckets{};
+        uint32_t recordedCommands{};
         for (std::size_t bucket = 0; bucket < commands->buckets.size(); ++bucket)
         {
             const auto& range = commands->buckets[bucket];
@@ -101,10 +104,15 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
             commands->Draw(encoder, bucket);
             if (count)
             {
-                frame->shadowBucketSubmissions[cascade].fetch_add(1, std::memory_order_relaxed);
-                frame->shadowMeshletDrawCounts[cascade].fetch_add(range.count, std::memory_order_relaxed);
-                frame->shadowDrawCount.fetch_add(range.count, std::memory_order_relaxed);
+                ++recordedBuckets;
+                recordedCommands += range.count;
             }
+        }
+        if (count)
+        {
+            auto& statistics = frame->shadowRecordingStats[statisticsSlot];
+            statistics.buckets += recordedBuckets;
+            statistics.commands += recordedCommands;
         }
     });
     return depth;
@@ -231,11 +239,17 @@ SceneShadowResources SceneHost::ShadowFinalCullStage::Declare(const own::shared_
         return {};
     }
     frame->CheckCurrent(&graph);
-    for (unsigned cascade = 0; cascade < 3; ++cascade)
     {
-        pyramids[cascade]->Declare(graph, depths[cascade]);
+        ce::profile_scope profile{ce::marker<"ShadowFinalCull.HzbDeclare">()};
+        for (unsigned cascade = 0; cascade < 3; ++cascade)
+        {
+            pyramids[cascade]->Declare(graph, depths[cascade]);
+        }
     }
-    GpuGeometryVisibility::Frame::DeclareOcclusionBatch(graph, meshlets, pyramids, "METEOR.Shared.ShadowRecovery");
+    {
+        ce::profile_scope profile{ce::marker<"ShadowFinalCull.SharedDeclare">()};
+        GpuGeometryVisibility::Frame::DeclareOcclusionBatch(graph, meshlets, pyramids, "METEOR.Shared.ShadowRecovery");
+    }
     for (unsigned cascade = 0; cascade < 3; ++cascade)
     {
         outputs[cascade] = meshlets[cascade]->GraphVisibleIds(graph);

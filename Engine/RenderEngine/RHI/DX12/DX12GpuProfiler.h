@@ -213,6 +213,8 @@ private:
         uint64_t duration{ 0 };
     };
     std::vector<std::pair<std::string_view, MergedSpan>> m_mergeScratch;
+    // 이름 -> m_mergeScratch 위치. 조각이 수백 개라 선형 탐색이 제곱으로 커졌다.
+    std::unordered_map<std::string_view, std::size_t> m_mergeIndex;
 
     // busy 계산용 스크래치. 조각을 정렬해 훑어야 하는데 원본 순서를 깨면
     // 안 되므로 사본을 둔다.

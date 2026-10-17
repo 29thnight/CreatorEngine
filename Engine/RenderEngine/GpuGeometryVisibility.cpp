@@ -1,4 +1,5 @@
 #include "GpuGeometryVisibility.h"
+#include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphMeshSurface.h"
 
 #include "RHI/RHIShaderSource.h"
@@ -119,6 +120,8 @@ struct GpuGeometryVisibility::BufferPool
     IRenderDeviceServices& device;
     std::mutex mutex;
     std::vector<Entry> free;
+    std::vector<RHIReadback> freeReadbacks;
+    std::uint64_t readbackBytes{};
     std::uint64_t cachedBytes{};
     bool closed{};
     explicit BufferPool(IRenderDeviceServices& value) : device(value) { free.reserve(64); }
@@ -166,6 +169,49 @@ struct GpuGeometryVisibility::BufferPool
             device.ReleaseBuffer(entry.handle);
         free.clear();
         cachedBytes = 0;
+        for (auto readback : freeReadbacks)
+        {
+            device.ReleaseReadback(readback);
+        }
+        freeReadbacks.clear();
+        readbackBytes = 0;
+    }
+    bool AcquireReadback(std::uint64_t bytes, RHIReadback& result, std::string& error)
+    {
+        std::lock_guard lock(mutex);
+        const auto found =
+            std::ranges::find_if(freeReadbacks, [&](const auto& entry) { return entry.sliceBytes == bytes; });
+        if (closed)
+        {
+            return VisibilityFail(error, "Geometry visibility readback pool is closed.");
+        }
+        if (found != freeReadbacks.end())
+        {
+            result = *found;
+            readbackBytes -= bytes;
+            freeReadbacks.erase(found);
+            return true;
+        }
+        ce::profile_scope allocationProfile{ce::marker<"GeometryFeedbackReadbackCreate">()};
+        return device.CreateBufferReadback(bytes, result, error);
+    }
+    void ReturnReadback(RHIReadback readback, bool reusable)
+    {
+        if (!readback.buffer.IsValid())
+        {
+            return;
+        }
+        std::lock_guard lock(mutex);
+        constexpr std::uint64_t budget = 8ull << 20;
+        if (!closed && reusable && freeReadbacks.size() < 128 && readback.sliceBytes <= budget - readbackBytes)
+        {
+            freeReadbacks.push_back(readback);
+            readbackBytes += readback.sliceBytes;
+        }
+        else
+        {
+            device.ReleaseReadback(readback);
+        }
     }
 };
 
@@ -180,10 +226,17 @@ GpuGeometryVisibility::~GpuGeometryVisibility()
 
 GpuGeometryVisibility::Frame::~Frame()
 {
-    if (m_device)
-        for (auto readback : m_streamingFeedback)
-            if (readback.buffer.IsValid())
-                m_device->ReleaseReadback(readback);
+    for (auto readback : m_streamingFeedback)
+    {
+        if (m_bufferPool)
+        {
+            m_bufferPool->ReturnReadback(readback, m_poolReusable.load(std::memory_order_acquire));
+        }
+        else if (m_device && readback.buffer.IsValid())
+        {
+            m_device->ReleaseReadback(readback);
+        }
+    }
     if (m_bufferPool)
     {
         const bool reusable = m_poolReusable.load(std::memory_order_acquire);
@@ -363,6 +416,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage, bool ordered,
     float maxPixelError, uint32_t lodWidth, uint32_t lodHeight)
 {
+    ce::profile_scope profile{ce::marker<"GeometryVisibilityPrepare">()};
     std::vector<Candidate> candidates;
     std::vector<Bin> bins;
     std::uint64_t offset{}, groups{};
@@ -423,7 +477,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     for (std::size_t bin = 0; bin < geometries.size(); ++bin)
     {
         if (geometries[bin]->UsesDirectClusters() &&
-            !m_device->CreateBufferReadback(uint64_t(bins[bin].indexCount) * 4, frame->m_streamingFeedback[bin], error))
+            !m_bufferPool->AcquireReadback(uint64_t(bins[bin].indexCount) * 4, frame->m_streamingFeedback[bin], error))
             return false;
     }
     frame->m_ordered = ordered;
@@ -1053,6 +1107,11 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     }
     std::vector<std::shared_ptr<const Frame>> owners;
     std::vector<EnhancedRenderGraph::RGPassUsage> resetUses, cullUses, finalizeUses;
+    owners.reserve(frames.size());
+    resetUses.reserve(frames.size() * 2u + 1u);
+    finalizeUses.reserve(frames.size() * 2u);
+    cullUses.reserve(static_cast<std::size_t>(totalBins) * 2u +
+        frames.size() * (3u + GpuGeometryOcclusion::kMaximumLevels) + 1u);
     std::set<std::pair<std::uint32_t, std::uint32_t>> geometryReads;
     // Reset -> lane production/consumption -> Finalize share versioned UAV storage.
     // Each step advances both versions, so the graph owns the UAV barriers between them.
@@ -1118,7 +1177,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         }
     }
     const auto reset =
-        graph.AddPass(std::string(passPrefix) + ".Reset", resetUses, [owners, shared](const auto& execution) {
+        graph.AddPass(std::string(passPrefix) + ".Reset", std::move(resetUses), [owners, shared](const auto& execution) {
             for (const auto& owner : owners)
             {
                 owner->CheckCurrent(execution.graph);
@@ -1135,7 +1194,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             }
         });
     const auto cull =
-        graph.AddPass(std::string(passPrefix) + ".Cull", cullUses, [owners, shared](const auto& execution) {
+        graph.AddPass(std::string(passPrefix) + ".Cull", std::move(cullUses), [owners, shared](const auto& execution) {
             for (const auto& owner : owners)
             {
                 owner->CheckCurrent(execution.graph);
@@ -1153,7 +1212,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             }
         });
     const auto finalize =
-        graph.AddPass(std::string(passPrefix) + ".Finalize", finalizeUses, [owners, shared](const auto& execution) {
+        graph.AddPass(std::string(passPrefix) + ".Finalize", std::move(finalizeUses), [owners, shared](const auto& execution) {
             for (const auto& owner : owners)
             {
                 owner->CheckCurrent(execution.graph);
@@ -1214,16 +1273,24 @@ void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback() const
         const auto& descriptors = input->Meshlets().descriptors;
         if (image.ElementCount<uint32_t>() != descriptors.size())
             throw std::runtime_error("Streaming feedback extent mismatch");
-        std::set<uint32_t> groups;
-        for (uint32_t meshlet = 0; meshlet < descriptors.size(); ++meshlet)
+        // Meshlets of one group are adjacent, so skipping repeats keeps the list
+        // short; sort+unique then gives the same ascending set without per-node
+        // allocation.
+        const auto demands = image.Elements<uint32_t>();
+        const auto* meshlets = descriptors.data();
+        const auto meshletCount = descriptors.size();
+        std::vector<uint32_t> requests;
+        for (std::size_t meshlet = 0; meshlet < meshletCount; ++meshlet)
         {
-            const auto demand = image.Elements<uint32_t>()[meshlet];
+            const auto demand = demands[meshlet];
             if (demand > 1)
                 throw std::runtime_error("Invalid GPU streaming demand bit");
-            if (demand)
-                groups.insert(descriptors[meshlet].reserved);
+            const auto group = meshlets[meshlet].reserved;
+            if (demand && (requests.empty() || requests.back() != group))
+                requests.push_back(group);
         }
-        const std::vector<uint32_t> requests(groups.begin(), groups.end());
+        std::ranges::sort(requests);
+        requests.erase(std::ranges::unique(requests).begin(), requests.end());
         input->ClusterStream()->SubmitGpuRequests(requests);
     }
 }

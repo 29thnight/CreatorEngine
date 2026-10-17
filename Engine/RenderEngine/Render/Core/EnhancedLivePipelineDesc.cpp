@@ -212,6 +212,7 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
     const EnhancedFrameContext& context, const LiveFrameBinding& binding,
     const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
 {
+    ce::profile_scope declarationProfile{ce::marker<"RenderGraphDeclare">()};
     for (const LivePassNode& node : m_nodes)
     {
         // 비활성 노드는 통째로 건너뛴다. modifies 슬롯은 값이 그대로 남으므로

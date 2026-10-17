@@ -10,6 +10,7 @@
 #include "RHI/DX12/DX12GpuProfiler.h"
 #include "RHI/DX12/DX12CommandListPool.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "material_ibl_reference.h"
 
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
@@ -1080,39 +1081,18 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     }
 }
 
-void Run(const std::filesystem::path& root)
+void GraphAdmissionTests(RecordingChangeDevice& device)
 {
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
-    const std::array products{Product(root, false), Product(root, true)};
-    const auto table = LoadSheenTable(root / "Tools/blender/fixtures/principled-layered-5.1.1/sheen-ltc.csv");
-    const Environment environmentColors{{{2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}}};
-    const auto image = Image(), cube = Cube(environmentColors);
-    GenerationStore store;
-    experiment::AssetId graph;
-    Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
     std::string error;
-    std::array<own::shared_owner<const Instance>, 2> instances;
-    for (unsigned i = 0; i < 2; ++i)
-    {
-        const auto generation = store.Load(
-            graph,
-            [&](CookedProgram& cooked, std::string&) {
-                cooked = {products[i], WriteMaterialProgramMetadata(products[i].program),
-                          BuildBoundSource(products[i].program)};
-                return true;
-            },
-            true, error);
-        Check(generation && BuildInstance(
-                                generation, {graph, {}, {}},
-                                [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; },
-                                instances[i], error),
-              "Instance " + error);
-    }
-    RecordingChangeDevice device;
-    Check(device.Initialize(64, 64, error), "Native device: " + error);
+    Check(!ShouldReplaceStaleLiveFrame(0, 990, 1000, 950, 50, 250), "Unknown capture stamp preserves progress");
+    Check(!ShouldReplaceStaleLiveFrame(980, 990, 1000, 950, 50, 250), "Fresh selected input is admitted");
+    Check(!ShouldReplaceStaleLiveFrame(800, 820, 1000, 950, 50, 250), "An equally old replacement cannot starve preparation");
+    Check(!ShouldReplaceStaleLiveFrame(800, 850, 1000, 950, 50, 250), "Budget boundary does not discard work");
+    Check(ShouldReplaceStaleLiveFrame(800, 851, 1000, 950, 50, 250), "A materially newer queued packet replaces stale input");
+    Check(!ShouldReplaceStaleLiveFrame(800, 990, 1000, 750, 50, 250), "Progress interval prevents starvation");
+    Check(!ShouldReplaceStaleLiveFrame(800, 990, 1000, 0, 50, 250), "First admission always progresses");
+    Check(!ShouldReplaceStaleLiveFrame(800, 1001, 1000, 950, 50, 250), "Future replacement stamp is not trusted");
+    Check(!ShouldReplaceStaleLiveFrame(800, 790, 1000, 950, 50, 250), "Older queued input never replaces selected input");
     {
         RHIBufferHandle pooled;
         RHIBufferDesc description;
@@ -1172,8 +1152,12 @@ void Run(const std::filesystem::path& root)
                 {
                     EnhancedRenderGraph next(device, mode);
                     auto metadata = cached.SnapshotStructuralSchedule();
+                    Check(metadata && metadata == cached.SnapshotStructuralSchedule(),
+                        "Structural snapshot publication shares the same immutable CPU plan");
                     cached.Reset(); // The submitted graph may retire before the next declaration.
                     next.InheritStructuralSchedule(metadata);
+                    Check(next.SnapshotStructuralSchedule() == metadata,
+                        "Inheritance retains the frozen plan without copying metadata");
                     auto nextInput = next.ImportBuffer(pooled, RHIResourceState::ShaderResource, "Schedule.Buffer");
                     if (mode == RGSchedulingMode::ExplicitVersioned) nextInput = next.Write(nextInput);
                     next.AddPass("Schedule.Write", {{nextInput, RHIResourceState::UnorderedAccess,
@@ -1186,6 +1170,7 @@ void Run(const std::filesystem::path& root)
                 cached.Reset();
                 device.AbortFrame(); // Synthetic state changes inspect plans, not native execution.
             }
+            const auto originalSchedule = cached.SnapshotStructuralSchedule();
             Check(device.BeginFrame(error), "Schedule mutation begin");
             auto changed = cached.ImportBuffer(pooled, RHIResourceState::Common, "Schedule.Buffer");
             if (mode == RGSchedulingMode::ExplicitVersioned) changed = cached.Write(changed);
@@ -1194,6 +1179,24 @@ void Run(const std::filesystem::path& root)
                 [](const auto&) {}, false);
             Check(cached.Compile(error) && !cached.GetStats().structuralScheduleReused &&
                 cached.GetStats().passesExecuted == 1, "Imported writer reachability survives changed root flags without cache hit");
+            const auto changedSchedule = cached.SnapshotStructuralSchedule();
+            Check(changedSchedule && changedSchedule != originalSchedule,
+                "A changed declaration creates a new immutable plan");
+            {
+                EnhancedRenderGraph alternate(device, mode);
+                alternate.InheritStructuralSchedule(changedSchedule, originalSchedule);
+                auto original = alternate.ImportBuffer(pooled, RHIResourceState::Common, "Schedule.Buffer");
+                if (mode == RGSchedulingMode::ExplicitVersioned)
+                {
+                    original = alternate.Write(original);
+                }
+                alternate.AddPass("Schedule.Write", {{original, RHIResourceState::UnorderedAccess,
+                    mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Write}},
+                    [](const auto&) {}, true);
+                Check(alternate.Compile(error) && alternate.GetStats().structuralScheduleReused &&
+                    alternate.SnapshotStructuralSchedule() == originalSchedule,
+                    "An exact alternate key reuses the original plan after another graph compiles a changed contract");
+            }
             cached.Reset();
             device.AbortFrame();
             if (mode == RGSchedulingMode::ExplicitVersioned)
@@ -1226,10 +1229,307 @@ void Run(const std::filesystem::path& root)
             device.AbortFrame();
             device.ReleaseBuffer(second);
         }
+        {
+            Check(device.BeginFrame(error), "Repeated schedule validation begin");
+            EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
+            for (unsigned mutation = 0; mutation < 6; ++mutation)
+            {
+                auto buffer = graph.Write(graph.ImportBuffer(pooled, RHIResourceState::Common, "Repeated.Buffer"));
+                const EnhancedRenderGraph::RGPassUsage write{buffer, RHIResourceState::UnorderedAccess, RGAccessMode::Write};
+                std::vector<EnhancedRenderGraph::RepeatedPhase> phases{{"Initialize", {write}},
+                    {"Consume", {{buffer, RHIResourceState::ShaderResource, RGAccessMode::Read}}}};
+                if (mutation == 2)
+                {
+                    phases[0].usages.push_back(write);
+                }
+                if (mutation == 3)
+                {
+                    phases[1].usages[0].handle.index = RGHandle::kInvalid;
+                }
+                if (mutation == 4)
+                {
+                    phases[1].usages[0].handle.epoch = 0;
+                }
+                const auto id = graph.AddRepeatedPass("Repeated", {write}, phases, 2,
+                    [](const auto&, uint32_t, uint32_t) {}, true);
+                Check(id.IsValid(), "Repeated pass declaration");
+                Check(graph.Compile(error) == (mutation < 2 || mutation == 5),
+                    "Repeated phase validation rejects duplicate/undeclared/stale handles after a cache hit");
+                if (mutation == 1 || mutation == 5)
+                {
+                    Check(graph.GetStats().structuralScheduleReused, "Valid repeated structure retains exact cache identity");
+                }
+                graph.Reset();
+            }
+            device.AbortFrame();
+        }
         device.ReleaseBuffer(pooled);
         std::string messages;
         Check(device.DrainDebugMessages(messages) == 0, "Imported buffer reuse GPU validation: " + messages);
     }
+    {
+        Check(device.BeginFrame(error), "Recycled pass metadata fixture begin");
+        EnhancedRenderGraph graph(device);
+        for (unsigned index = 0; index < 4; ++index)
+        {
+            graph.AddPass("old-unused", {}, [](const auto&) {}, true);
+        }
+        graph.Reset();
+        for (unsigned kind = 0; kind < 2; ++kind)
+        {
+            auto owner = std::make_shared<int>(7);
+            std::weak_ptr<int> released = owner;
+            if (kind == 0)
+            {
+                graph.AddRepeatedPass("old-repeated", {}, {}, 2,
+                    [owner](const auto&, auto, auto) {}, true, 47);
+            }
+            else
+            {
+                graph.AddSplitPass("old-split", {},
+                    [owner](const auto&, auto, auto) {}, 64, true, 53);
+            }
+            owner.reset();
+            Check(!released.expired(), "Declared callback retains its frame owner");
+            const auto epoch = graph.ResourceEpoch();
+            graph.Reset();
+            Check(released.expired() && graph.ResourceEpoch() != epoch,
+                  "Recycled pass releases callback owners and advances resource epoch");
+            graph.AddPass("fresh-normal", {}, [](const auto&) {}, true);
+            Check(graph.Compile(error) && graph.GetStats().passesExecuted == 1,
+                  "Retained pass storage excludes inactive declarations and old callback kind");
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            Check(graph.CaptureDiagnosticSnapshot(snapshot) && snapshot.passes.size() == 1 &&
+                      snapshot.passes[0].name == "fresh-normal" && snapshot.passes[0].maxSlices == 1 &&
+                      snapshot.passes[0].repeatCount == 1 && snapshot.passes[0].phases.empty() &&
+                      snapshot.passes[0].recordCost == 0,
+                  "Recycled normal pass has no split/repeated/cost metadata from the previous declaration");
+            graph.Reset();
+        }
+        device.AbortFrame();
+    }
+
+    {
+        thread_pool recordingThreads;
+        job_scheduler recordingJobs(recordingThreads);
+        recordingJobs.start(4);
+        DX12CommandListPool pool(recordingJobs);
+        Check(pool.Initialize(device, 4, DX12DeviceResources::kFrameCount, error), "CPU recording admission pool");
+        std::array<RHIBufferHandle, 4> buffers{};
+        RHIBufferDesc bufferDescription;
+        bufferDescription.bytes = 64;
+        bufferDescription.allowUnorderedAccess = true;
+        for (auto& buffer : buffers)
+        {
+            Check(device.CreateBuffer(bufferDescription, buffer, error), "CPU recording admission buffer");
+        }
+        const auto owner = std::this_thread::get_id();
+        std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> inherited;
+        for (unsigned iteration = 0; iteration < 12; ++iteration)
+        {
+            const unsigned policy = iteration % 6;
+            Check(device.BeginFrame(error), "CPU recording admission begin");
+            pool.BeginFrame(policy);
+            const auto mode = policy == 5 ? RGSchedulingMode::ExplicitSingleWriter : RGSchedulingMode::ExplicitVersioned;
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, mode);
+            if (mode == RGSchedulingMode::ExplicitVersioned && inherited)
+            {
+                graph->InheritStructuralSchedule(inherited);
+            }
+            graph->SetRecordingWorkloadBalance(policy != 0);
+            graph->SetParallelRecordCostThreshold(policy == 2 ? 100 : policy == 3 ? 0 : 8);
+            std::array<unsigned, 4> calls{};
+            std::array<std::thread::id, 4> callbackThreads{};
+            for (unsigned index = 0; index < buffers.size(); ++index)
+            {
+                auto handle = graph->ImportBuffer(buffers[index], RHIResourceState::Common, "Admission.Buffer");
+                graph->RequireImportedFinalState(handle, RHIResourceState::Common);
+                if (mode == RGSchedulingMode::ExplicitVersioned)
+                {
+                    handle = graph->Write(handle);
+                }
+                const auto pass = graph->AddSplitPass("Admission.Callback", {{handle, RHIResourceState::UnorderedAccess,
+                    RGAccessMode::Write}}, [&, index](const auto&, uint32_t slice, uint32_t slices)
+                {
+                    if (slice != 0 || slices != 1)
+                    {
+                        throw std::runtime_error("Admission fixture must not split its callback");
+                    }
+                    ++calls[index];
+                    callbackThreads[index] = std::this_thread::get_id();
+                }, 1, true, 1);
+                if (policy == 4 && index == 0)
+                {
+                    graph->DeclareRecordingSideEffect(pass);
+                }
+            }
+            Check(graph->Compile(error), "CPU recording admission compile: " + error);
+            if (iteration >= 6 && policy < 4)
+            {
+                Check(graph->GetStats().structuralScheduleReused, "Repeated admission policies preserve exact CPU schedule identity");
+            }
+            if (mode == RGSchedulingMode::ExplicitVersioned && policy != 4)
+            {
+                inherited = graph->SnapshotStructuralSchedule();
+            }
+            RHIRecordedBatchDesc description;
+            description.frameId = iteration + 1;
+            description.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&device);
+            description.lifetimeToken = graph;
+            RHIRecordedBatch batch;
+            Check(graph->RecordParallel(pool, 4, description, batch, error), "CPU recording admission record: " + error);
+            const auto& stats = graph->GetStats();
+            const bool parallel = policy == 1 || policy == 3;
+            Check(stats.recordWorkers == (parallel ? 4u : 1u) && stats.parallelDeclined == !parallel &&
+                      stats.estimatedRecordingWork == 12 && stats.totalRecordCost == 4,
+                  "Binding-aware admission preserves legacy/tiny/single-writer/side-effect policies");
+            bool exact = true;
+            for (unsigned index = 0; index < calls.size(); ++index)
+            {
+                exact = exact && calls[index] == 1 && ((callbackThreads[index] == owner) == (policy == 4));
+            }
+            Check(exact, "Every callback runs once; only explicit CPU side effects stay on owner");
+            RHISubmissionTicket ticket;
+            Check(GetRHISubmissionThread().EnqueueRecordedBatch(&device, device, std::move(batch), ticket, error),
+                  "CPU recording admission enqueue: " + error);
+            Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error),
+                  "CPU recording admission native submission: " + error);
+            device.WaitForGpu();
+        }
+        pool.Shutdown();
+        for (const auto buffer : buffers)
+        {
+            device.ReleaseBuffer(buffer);
+        }
+        std::string messages;
+        Check(device.DrainDebugMessages(messages) == 0, "CPU recording admission GPU validation: " + messages);
+    }
+
+    {
+        thread_pool recordingThreads;
+        job_scheduler recordingJobs(recordingThreads);
+        recordingJobs.start(4);
+        DX12CommandListPool pool(recordingJobs);
+        Check(pool.Initialize(device, 4, DX12DeviceResources::kFrameCount, error), "Recording dependency pool");
+        std::array<RHIBufferHandle, 8> buffers{};
+        RHIBufferDesc description;
+        description.bytes = 64;
+        description.allowUnorderedAccess = true;
+        for (auto& buffer : buffers)
+        {
+            Check(device.CreateBuffer(description, buffer, error), "Recording dependency buffer");
+        }
+        std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>, 2> schedules;
+        for (unsigned iteration = 0; iteration < 4; ++iteration)
+        {
+            const bool independent = iteration % 2 != 0;
+            Check(device.BeginFrame(error), "Recording dependency begin");
+            pool.BeginFrame(iteration);
+            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            graph->SetRecordingWorkloadBalance(true);
+            graph->SetParallelRecordCostThreshold(0);
+            graph->InheritStructuralSchedule(schedules[independent ? 1 : 0] ? schedules[independent ? 1 : 0] :
+                schedules[independent ? 0 : 1]);
+            std::array<RGHandle, 8> handles{};
+            std::array<unsigned, 8> calls{};
+            std::atomic<unsigned> published{0};
+            for (unsigned index = 0; index < handles.size(); ++index)
+            {
+                auto handle = graph->ImportBuffer(buffers[index], RHIResourceState::Common, "Dependency.Buffer");
+                graph->RequireImportedFinalState(handle, RHIResourceState::Common);
+                handles[index] = graph->Write(handle);
+            }
+            for (unsigned index = 0; index + 1 < handles.size(); ++index)
+            {
+                graph->AddSplitPass("Dependency.Producer", {{handles[index], RHIResourceState::UnorderedAccess,
+                    RGAccessMode::Write}}, [&, index](const auto&, uint32_t, uint32_t)
+                {
+                    if (index == 0)
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        published.store(7, std::memory_order_release);
+                    }
+                    ++calls[index];
+                }, 1, true, 1);
+            }
+            const auto consumer = graph->AddPass("Dependency.Consumer", {
+                {handles[0], RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {handles[7], RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [&, independent](const auto&)
+            {
+                if (!independent && published.load(std::memory_order_acquire) != 7)
+                {
+                    throw std::runtime_error("CPU producer was not joined before its dependent callback");
+                }
+                ++calls[7];
+            }, true);
+            if (independent)
+            {
+                graph->DeclareRecordingIndependent(consumer);
+            }
+            Check(graph->Compile(error), "Recording dependency compile: " + error);
+            schedules[independent ? 1 : 0] = graph->SnapshotStructuralSchedule();
+            RHIRecordedBatchDesc batchDescription;
+            batchDescription.frameId = iteration + 1;
+            batchDescription.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&device);
+            batchDescription.lifetimeToken = graph;
+            RHIRecordedBatch batch;
+            Check(graph->RecordParallel(pool, 4, batchDescription, batch, error), "Recording dependency record: " + error);
+            Check(graph->GetStats().recordingWaveCount == (independent ? 1u : 2u),
+                  "Cold/reused recording plans preserve CPU joins and changed independence contracts");
+            Check(std::ranges::all_of(calls, [](unsigned count) { return count == 1; }),
+                  "Critical-path partition records every callback exactly once");
+            RHISubmissionTicket ticket;
+            Check(GetRHISubmissionThread().EnqueueRecordedBatch(&device, device, std::move(batch), ticket, error),
+                  "Recording dependency enqueue: " + error);
+            Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error),
+                  "Recording dependency native submission: " + error);
+            device.WaitForGpu();
+        }
+        pool.Shutdown();
+        for (const auto buffer : buffers)
+        {
+            device.ReleaseBuffer(buffer);
+        }
+        std::string messages;
+        Check(device.DrainDebugMessages(messages) == 0, "Recording dependency GPU validation: " + messages);
+    }
+
+}
+
+void Run(const std::filesystem::path& root)
+{
+    auto* paths = InternalPath::GetInstance();
+    paths->BaseProjectPath = root / "Dynamic_CPP";
+    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
+    paths->AssetAuthoringEnabled = true;
+    const std::array products{Product(root, false), Product(root, true)};
+    const auto table = LoadSheenTable(root / "Tools/blender/fixtures/principled-layered-5.1.1/sheen-ltc.csv");
+    const Environment environmentColors{{{2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}}};
+    const auto image = Image(), cube = Cube(environmentColors);
+    GenerationStore store;
+    experiment::AssetId graph;
+    Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
+    std::string error;
+    std::array<own::shared_owner<const Instance>, 2> instances;
+    for (unsigned i = 0; i < 2; ++i)
+    {
+        const auto generation = store.Load(
+            graph,
+            [&](CookedProgram& cooked, std::string&) {
+                cooked = {products[i], WriteMaterialProgramMetadata(products[i].program),
+                          BuildBoundSource(products[i].program)};
+                return true;
+            },
+            true, error);
+        Check(generation && BuildInstance(
+                                generation, {graph, {}, {}},
+                                [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; },
+                                instances[i], error),
+              "Instance " + error);
+    }
+    RecordingChangeDevice device;
+    Check(device.Initialize(64, 64, error), "Native device: " + error);
+    GraphAdmissionTests(device);
     {
         Check(device.BeginFrame(error), "Culling fixture begin");
         {
@@ -1249,6 +1549,7 @@ void Run(const std::filesystem::path& root)
             cullGraph.Reset();
             Check(cullGraph.Compile(error) && cullGraph.GetStats().passesExecuted == 0,
                   "Reset removes old writer reachability");
+
         }
         device.AbortFrame();
     }
@@ -1743,6 +2044,17 @@ int main(int argc, char** argv)
 {
     try
     {
+        if (argc == 3 && std::string_view(argv[2]) == "--graph-admission-only")
+        {
+            RecordingChangeDevice device;
+            std::string error;
+            Check(device.Initialize(64, 64, error), "Graph admission native device: " + error);
+            GraphAdmissionTests(device);
+            device.Shutdown();
+            std::cout << "RG_GRAPH_ADMISSION_OK checks=" << checks
+                      << " policyCases=9 schedulingModes=3 repeatedNegativeCases=3 validation=0\n";
+            return 0;
+        }
         Check(argc == 2, "Expected repository root");
         Run(std::filesystem::absolute(argv[1]));
         return 0;

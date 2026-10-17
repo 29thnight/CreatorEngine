@@ -10,6 +10,7 @@ struct SceneMaterialWork final
 {
     using Bucket = IndirectMaterialBatch::Bucket;
     IRenderDeviceServices* device{};
+    std::shared_ptr<TransientBufferPool> pool;
     std::shared_ptr<const SceneFrameGeometry> geometry;
     std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 4> pipelines;
     std::vector<Bucket> buckets;
@@ -24,10 +25,11 @@ struct SceneMaterialWork final
     mutable uint64_t graphEpoch{};
     ~SceneMaterialWork()
     {
-        if (device && work.IsValid())
-            device->ReleaseBuffer(work);
-        if (device && arguments.IsValid())
-            device->ReleaseBuffer(arguments);
+        if (device)
+        {
+            ReleaseSceneBuffer(*device, pool, work);
+            ReleaseSceneBuffer(*device, pool, arguments);
+        }
     }
     bool Upload(std::span<const uint32_t> words, std::span<const std::array<uint32_t, 4>> commands,
                 uint32_t argumentBytes, std::string& error)
@@ -55,12 +57,12 @@ struct SceneMaterialWork final
         desc.allowUnorderedAccess = true;
         desc.debugName = L"METEOR.Scene.Material.Tiles";
         if (!templates.IsValid() || !records.IsValid() || !constants.IsValid() ||
-            !device->CreateBuffer(desc, work, error))
+            !CreateSceneBuffer(*device, pool.get(), desc, work, error))
             return false;
         desc.bytes = argumentBytes;
         desc.allowIndirectArguments = true;
         desc.debugName = L"METEOR.Scene.Material.Arguments";
-        if (!device->CreateBuffer(desc, arguments, error))
+        if (!CreateSceneBuffer(*device, pool.get(), desc, arguments, error))
             return false;
         const RHIBindingDesc views[]{RHIBindingDesc::UavBuffer(work, static_cast<uint32_t>(workBytes / 4), 4),
                                      RHIBindingDesc::UavBuffer(arguments, argumentBytes / 4, 4)};
