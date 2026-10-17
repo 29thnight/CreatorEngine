@@ -1731,6 +1731,37 @@ void VerifySceneReadNormalization(RecordingChangeDevice& device)
         Check(std::ranges::equal(uses, expected, sameUsage),
               "Scene reads preserve first order and merge compatible states across small and large pass sets");
     }
+    for (const uint16_t inputCount : {uint16_t{64}, uint16_t{65}})
+    {
+        std::vector<Usage> unique;
+        for (uint16_t index = 0; index < inputCount; ++index)
+        {
+            unique.push_back({RGHandle{uint16_t(100 + index), uint16_t(index % 3), RGResourceKind::Buffer, 31},
+                              index == 2 ? RHIResourceState::UnorderedAccess : RHIResourceState::ShaderResource,
+                              index == 2 ? RGAccessMode::Write : RGAccessMode::Read});
+        }
+        auto uses = unique;
+        NormalizeSceneReads(graph, uses);
+        Check(std::ranges::equal(uses, unique, sameUsage),
+              "Unique scene uses preserve reads and writes at both scratch storage boundaries");
+
+        const auto uniqueCount = size_t(inputCount - 4);
+        const std::vector<Usage> expected(unique.begin(), unique.begin() + uniqueCount);
+        // A,A,B,C,B 순서는 앞쪽 압축이 B의 원래 위치를 덮은 뒤 B를 다시 읽게 한다.
+        // C는 단독 write이며, 마지막 중복까지 최초 순서와 읽기 병합을 유지해야 한다.
+        auto pixelA = expected[0];
+        pixelA.state = RHIResourceState::PixelShaderResource;
+        auto pixelB = expected[1];
+        pixelB.state = RHIResourceState::PixelShaderResource;
+        uses = {pixelA, expected[0], expected[1], expected[2], pixelB};
+        uses.insert(uses.end(), expected.begin() + 3, expected.end());
+        uses.push_back(pixelB);
+        uses.push_back(pixelA);
+        Check(uses.size() == inputCount, "Interleaved scene fixture reaches the exact scratch storage boundary");
+        NormalizeSceneReads(graph, uses);
+        Check(std::ranges::equal(uses, expected, sameUsage),
+              "Interleaved scene reads compact without confusing overwritten source indices or unique writes");
+    }
     const std::vector<Usage> identities{
         {RGHandle{7, 2, RGResourceKind::Texture, 31}, RHIResourceState::ShaderResource, RGAccessMode::Read},
         {RGHandle{7, 3, RGResourceKind::Texture, 31}, RHIResourceState::ShaderResource, RGAccessMode::Read},
@@ -1741,31 +1772,47 @@ void VerifySceneReadNormalization(RecordingChangeDevice& device)
     NormalizeSceneReads(graph, uses);
     Check(std::ranges::equal(uses, identities, sameUsage),
           "Scene reads retain distinct versions, kinds and epochs for graph validation");
-    for (unsigned failure = 0; failure < 2; ++failure)
+    for (const size_t inputCount : {size_t{6}, size_t{65}})
     {
-        auto invalid = identities;
-        auto duplicate = identities.front();
-        if (failure == 0)
+        for (unsigned failure = 0; failure < 3; ++failure)
         {
-            duplicate.access = RGAccessMode::ReadWrite;
+            auto invalid = identities;
+            invalid.front().state = RHIResourceState::PixelShaderResource;
+            invalid.push_back(identities.front());
+            auto duplicate = identities.back();
+            if (failure == 0)
+            {
+                duplicate.access = RGAccessMode::ReadWrite;
+            }
+            else if (failure == 1)
+            {
+                duplicate.state = RHIResourceState::CopySource;
+            }
+            else
+            {
+                invalid[3].state = RHIResourceState::UnorderedAccess;
+                invalid[3].access = RGAccessMode::Write;
+                duplicate.state = RHIResourceState::UnorderedAccess;
+            }
+            while (invalid.size() < inputCount - 1)
+            {
+                invalid.push_back({RGHandle{uint16_t(100 + invalid.size()), 0, RGResourceKind::Texture, 31},
+                                   RHIResourceState::ShaderResource, RGAccessMode::Read});
+            }
+            invalid.push_back(duplicate);
+            const auto original = invalid;
+            bool rejected = false;
+            try
+            {
+                NormalizeSceneReads(graph, invalid);
+            }
+            catch (const std::runtime_error&)
+            {
+                rejected = true;
+            }
+            Check(rejected && std::ranges::equal(invalid, original, sameUsage),
+                  "Late scene access/state conflicts preserve earlier compatible reads without partial compaction");
         }
-        else
-        {
-            duplicate.state = RHIResourceState::CopySource;
-        }
-        invalid.push_back(duplicate);
-        const auto original = invalid;
-        bool rejected = false;
-        try
-        {
-            NormalizeSceneReads(graph, invalid);
-        }
-        catch (const std::runtime_error&)
-        {
-            rejected = true;
-        }
-        Check(rejected && std::ranges::equal(invalid, original, sameUsage),
-              "Scene read normalization rejects conflicting access/state without changing the input");
     }
     EnhancedRenderGraph legacy(device, RGSchedulingMode::DeclarationOrder);
     uses = {identities.front(), identities.front()};

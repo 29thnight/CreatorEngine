@@ -66,6 +66,16 @@ struct RenderBindings
 class RenderBindingCache
 {
   public:
+    struct PreparedPass
+    {
+      private:
+        friend class RenderBindingCache;
+        const RenderBindings* source_{};
+        RHIPipelineLayoutHandle layout_;
+        RHIBindingTable textures_;
+        std::uint64_t recordingId_{}, descriptorVersion_{};
+    };
+
     bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
                  own::shared_owner<const Instance> instance, const PassLayout& layout,
                  own::shared_owner<const RenderBindings>& result, std::string& error,
@@ -83,12 +93,23 @@ class RenderBindingCache
     static bool BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
                          const RenderBindings& source, const PassLayout& layout, std::string& error);
 
+    // immediate 경로는 인코더 획득/자원 참조 기록 전에 준비한다. PreparedPass는
+    // source를 빌리므로 호출자가 BindPreparedPass가 끝날 때까지 원본 packet을
+    // 소유해야 한다. 바인딩은 이 테이블 스냅샷만 쓰며 CreateBindings/재게시를 하지 않는다.
+    static bool PreparePass(IRenderDeviceServices& device, const RenderBindings& source, const PassLayout& layout,
+                            PreparedPass& result, std::string& error);
+    static bool BindPreparedPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                                const RenderBindings& source, const PassLayout& layout,
+                                const PreparedPass& prepared, std::string& error);
+
     // Clear after device idle, before device recreation. Sampler registrations
     // are device-owned; the RHI has no per-table release operation.
     void Clear();
     std::size_t SamplerTableCount() const { return bindlessSamplers_.IsValid() ? 1 : 0; }
 
   private:
+    static void BindPassCommands(RHIEncoder& encoder, RHIBindPoint point, const RenderBindings& source,
+                                 const PassLayout& layout, const PreparedPass& prepared);
     struct CpuDescription
     {
         own::weak_owner<const Instance> instance;

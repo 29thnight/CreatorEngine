@@ -220,10 +220,23 @@ namespace material_graph
         {
             return false;
         }
+        // 머티리얼 테이블 게시도 실패하거나 recording을 교체할 수 있다. candidate가
+        // 소유한 bindings로 첫 자원 참조 전에 준비하고, 아래 기록에서는 확정된
+        // 테이블만 사용한다. 실패하면 기존 result와 제출된 자원 수명은 그대로다.
+        RenderBindingCache::PreparedPass material;
+        if (!RenderBindingCache::PreparePass(device, *candidate->bindings_, candidate->bindings_->layout,
+                                             material, error))
+        {
+            return false;
+        }
+        if (!candidate->IsPreparedForGraph())
+        {
+            return Fail(error, "Surface material table preparation changed recording/descriptors.");
+        }
         auto& encoder = device.GetImmediateEncoder();
         const RHIBufferTransition before{candidate->Buffer(), RHIResourceState::Common, RHIResourceState::UnorderedAccess};
         encoder.ResourceBarriers({{}, {&before, 1}});
-        if (!candidate->RecordCommands(encoder, error))
+        if (!candidate->RecordCommands(encoder, error, &material))
         {
             return false;
         }
@@ -328,7 +341,8 @@ namespace material_graph
                    : RGHandle{};
     }
 
-    bool SurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error) const
+    bool SurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error,
+                                      const RenderBindingCache::PreparedPass* prepared) const
     {
         if (!IsPreparedForGraph() || !RenderBindingCache::Validate(*device_, *bindings_, error) ||
             (recordedStages_.fetch_or(1) & 1) != 0)
@@ -337,7 +351,11 @@ namespace material_graph
             return Fail(error, "Surface recording has stale bindings or has already been recorded.");
         }
         encoder.SetPipeline(RHIBindPoint::Compute, pipeline_->GetHandle());
-        if (!RenderBindingCache::Bind(*device_, encoder, RHIBindPoint::Compute, *bindings_, error))
+        const bool bound = prepared
+                               ? RenderBindingCache::BindPreparedPass(*device_, encoder, RHIBindPoint::Compute,
+                                                                     *bindings_, bindings_->layout, *prepared, error)
+                               : RenderBindingCache::Bind(*device_, encoder, RHIBindPoint::Compute, *bindings_, error);
+        if (!bound)
         {
             recordedStages_.fetch_or(4);
             return false;
