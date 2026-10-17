@@ -369,15 +369,77 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                       prefix + " sibling atomic writers have no false ordering edge");
                 return resolve.compiledIndex;
             };
-            Check(find("METEOR.Scene.Commands.Depth.Build").authoredIndex < find("METEOR.Scene.Occluder.HW").authoredIndex &&
-                find("METEOR.Scene.Commands.Surface.Build").authoredIndex > find("Geometry.Occlusion.0").authoredIndex &&
-                find("METEOR.Scene.Commands.Surface.Build").authoredIndex < find("METEOR.Scene.Visibility.HW").authoredIndex,
-                "Depth/surface command producers stay with their consumer raster stages");
             const auto occluderResolve = stage("METEOR.Scene.Occluder", *occluder);
             const auto finalResolve = stage("METEOR.Scene.Visibility", *hybrid);
-            Check(occluderResolve < find("Geometry.Occlusion.0").compiledIndex &&
-                      find("Geometry.Occlusion.0").compiledIndex < find("METEOR.Scene.Visibility.Classify").compiledIndex,
+            const auto readsTexture = [](const auto& usages, uint32_t resource, uint16_t version) {
+                return std::ranges::any_of(usages, [&](const auto& usage) {
+                    return usage.resource == resource && usage.version == version &&
+                           usage.kind == RGResourceKind::Texture && usage.access == RGAccessMode::Read &&
+                           usage.state == RHIResourceState::ShaderResource;
+                });
+            };
+            const auto hasReadEdge = [&](const auto& producer, const auto& consumer, uint32_t resource,
+                                         uint16_t version) {
+                return std::ranges::any_of(snap.versionEdges, [&](const auto& edge) {
+                    return edge.producer == producer.authoredIndex && edge.consumer == consumer.authoredIndex &&
+                           edge.resource == resource && edge.version == version &&
+                           edge.reason == EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::RAW;
+                });
+            };
+            // 현재 HZB와 다음 이력 HZB는 같은 이름을 쓴다. 정확한 occluder depth
+            // 버전으로 현재 builder를 고르고, 통합 패스 안의 mip 단계를 검사한다.
+            const auto currentHzb = std::ranges::find_if(snap.passes, [&](const auto& pass) {
+                return pass.name == "Geometry.Occlusion.Build" &&
+                       readsTexture(pass.usages, occluderDepth.index, occluderDepth.version);
+            });
+            Check(currentHzb != snap.passes.end(), "Current HZB builder consumes the exact occluder depth version");
+            const auto& hzb = *currentHzb;
+            const auto& recovery = find("METEOR.CameraMeshlet.Recovery.Cull");
+            const auto& finalize = find("METEOR.CameraMeshlet.Recovery.Finalize");
+            const auto& classify = find("METEOR.Scene.Visibility.Classify");
+            Check(!hzb.culled && !recovery.culled && !finalize.culled &&
+                      occluderResolve < hzb.compiledIndex && hzb.compiledIndex < recovery.compiledIndex &&
+                      recovery.compiledIndex < finalize.compiledIndex && finalize.compiledIndex < classify.compiledIndex,
                   "Occluder depth builds the HZB before final culling and classification");
+            Check(hasReadEdge(find("METEOR.Scene.Occluder.Resolve"), hzb, occluderDepth.index, occluderDepth.version) &&
+                      hasReadEdge(finalize, classify, meteorFinalList.list.index, meteorFinalList.list.version),
+                  "Current HZB and hybrid classification retain their exact producer resource dependencies");
+            Check(hzb.repeatCount == 1 &&
+                      hzb.phases.size() == GpuGeometryOcclusion::LevelCount(context.width, context.height),
+                  "Current HZB contains every mip in one serial build");
+            uint32_t sourceResource = occluderDepth.index;
+            auto sourceVersion = occluderDepth.version;
+            for (size_t level = 0; level < hzb.phases.size(); ++level)
+            {
+                const auto& phase = hzb.phases[level];
+                const auto target = std::ranges::find_if(phase.usages, [](const auto& usage) {
+                    return usage.kind == RGResourceKind::Texture && usage.access == RGAccessMode::Write &&
+                           usage.state == RHIResourceState::UnorderedAccess;
+                });
+                Check(phase.name == "Geometry.Occlusion." + std::to_string(level) && phase.usages.size() == 2 &&
+                          target != phase.usages.end() && readsTexture(phase.usages, sourceResource, sourceVersion),
+                      "HZB mip reads the exact preceding depth or mip version");
+                Check(readsTexture(recovery.usages, target->resource, target->version) &&
+                          hasReadEdge(hzb, recovery, target->resource, target->version),
+                      "Final culling consumes every current HZB mip version");
+                if (level != 0)
+                {
+                    Check(std::ranges::any_of(phase.firstBarriers, [&](const auto& barrier) {
+                              return barrier.resource == sourceResource && !barrier.uav && !barrier.afterPass &&
+                                     barrier.before == RHIResourceState::UnorderedAccess &&
+                                     barrier.after == RHIResourceState::ShaderResource;
+                          }),
+                          "HZB mip transitions the previous UAV write before reading it");
+                }
+                sourceResource = target->resource;
+                sourceVersion = target->version;
+            }
+            const auto& depthCommands = find("METEOR.Scene.Commands.Depth.Build");
+            const auto& surfaceCommands = find("METEOR.Scene.Commands.Surface.Build");
+            Check(depthCommands.authoredIndex < find("METEOR.Scene.Occluder.HW").authoredIndex &&
+                      surfaceCommands.authoredIndex > finalize.authoredIndex &&
+                      surfaceCommands.authoredIndex < find("METEOR.Scene.Visibility.HW").authoredIndex,
+                  "Depth/surface command producers stay with their consumer raster stages");
             Check(std::ranges::none_of(snap.passes,
                                        [](const auto& p) { return p.name == "METEOR.Scene.OccluderDepth"; }),
                   "No separate depth-only occluder raster");

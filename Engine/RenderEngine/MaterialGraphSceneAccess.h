@@ -57,21 +57,44 @@ namespace material_graph
                     left.kind == right.kind && left.epoch == right.epoch;
             }
         };
-        // Keep first-use order while looking up the complete logical handle.
-        // A hash collision still compares index/version/kind/epoch exactly.
-        std::unordered_map<RGHandle, size_t, HandleHash, SameHandle> indices;
-        indices.reserve(uses.size());
+        // Keep first-use order without allocating a hash node per resource on
+        // every declaration. Slots own only indices into the local result;
+        // no borrowed handles or frame state survive this call. At most half
+        // the table is occupied, and collisions compare the complete handle.
+        constexpr size_t empty = (std::numeric_limits<size_t>::max)();
+        std::array<size_t, 128> localSlots;
+        std::vector<size_t> overflowSlots;
+        std::span<size_t> slots;
+        if (uses.size() <= localSlots.size() / 2)
+        {
+            slots = localSlots;
+            std::ranges::fill(slots, empty);
+        }
+        else
+        {
+            if (uses.size() > overflowSlots.max_size() / 2)
+            {
+                throw std::length_error("Scene pass has too many resource uses.");
+            }
+            overflowSlots.assign(uses.size() * 2, empty);
+            slots = overflowSlots;
+        }
         std::vector<EnhancedRenderGraph::RGPassUsage> unique;
         unique.reserve(uses.size());
-        for (const auto& use : uses)
+        for (const auto& use : std::span{uses})
         {
-            const auto [entry, inserted] = indices.try_emplace(use.handle, unique.size());
-            if (inserted)
+            size_t slot = HandleHash{}(use.handle) % slots.size();
+            while (slots[slot] != empty && !SameHandle{}(unique.data()[slots[slot]].handle, use.handle))
             {
+                slot = slot + 1 == slots.size() ? 0 : slot + 1;
+            }
+            if (slots[slot] == empty)
+            {
+                slots[slot] = unique.size();
                 unique.push_back(use);
                 continue;
             }
-            auto* found = &unique[entry->second];
+            auto* found = &unique.data()[slots[slot]];
             if (found->access != RGAccessMode::Read || use.access != RGAccessMode::Read)
             {
                 throw std::runtime_error("Scene pass duplicates a writable resource version.");

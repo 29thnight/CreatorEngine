@@ -577,12 +577,13 @@ public:
         QueueSchedule& output, std::string& outError) const;
 
     void DeclareComputeCompatible(RGPassId pass);
-    // Author opt-in: this unsplit callback consumes only immutable prepared CPU
-    // inputs, never another callback's CPU output. Any observation it writes is
-    // private/atomic and read only after the whole recording join. GPU resource
-    // dependencies still control execute order, barriers and list submission;
-    // they do not require a CPU recording join for this consumer. Unannotated
-    // callbacks retain conservative joins. Not a compute-queue declaration.
+    // 작성자 계약: 이 패스의 모든 콜백과 분할 조각은 준비가 끝난 불변 CPU 입력만 읽고,
+    // 다른 콜백의 CPU 출력을 소비하지 않는다. 관측값은 콜백/조각별 전용 저장소나
+    // atomic에 쓰며 전체 기록 합류 뒤에만 읽는다. 분할 자체는 이 계약을 뜻하지 않는다.
+    // GPU 의존성의 실행 순서·배리어·리스트 제출은 유지하지만 이 소비자 때문에
+    // 별도 CPU 합류를 추가하지 않는다. 미선언 콜백은 독립 패스를 경유한 선행
+    // CPU 작업까지 보수적 합류를 유지한다.
+    // compute 큐 호환성 선언과는 별개다.
     void DeclareRecordingIndependent(RGPassId pass);
     // A culling root is not a CPU side effect. This opt-in additionally orders
     // every live pass before/after the callback and prevents parallel recording.

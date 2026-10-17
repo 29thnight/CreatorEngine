@@ -346,7 +346,7 @@ struct SceneHybridVisibility final
         graph.RequireImportedFinalState(graphDispatchArguments, RHIResourceState::Common);
         graphKeys = graph.Write(graphKeys);
         graphRoutes = graph.Write(graphRoutes);
-        graph.AddPass(
+        const auto initializePass = graph.AddPass(
             (name + ".Initialize").c_str(),
             {{graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
              {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
@@ -357,6 +357,9 @@ struct SceneHybridVisibility final
                     static_cast<uint32_t>(
                         ((std::max)(uint64_t(owner->width) * owner->height, uint64_t(owner->meshlets)) + 63) / 64));
             });
+        // 콜백은 준비된 입력과 자기 encoder만 사용한다. GPU 버전/배리어는
+        // 그대로 유지하고, GPU 의존성만을 근거로 한 CPU recording join을 생략한다.
+        graph.DeclareRecordingIndependent(initializePass);
         graphWork = graph.Write(graphWork);
         graphDispatchArguments = graph.Write(graphDispatchArguments);
         std::vector<EnhancedRenderGraph::RGPassUsage> prepareUses{
@@ -364,10 +367,12 @@ struct SceneHybridVisibility final
             {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
             {geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}};
         visible->AddVisibleIdsRead(graph, prepareUses);
-        graph.AddPass((name + ".PrepareClassify").c_str(), prepareUses, [owner](const auto& x) {
-            owner->Bind(*x.encoder, Pipeline::PrepareClassify);
-            x.encoder->Dispatch(1, 1, 1);
-        });
+        const auto preparePass = graph.AddPass(
+            (name + ".PrepareClassify").c_str(), std::move(prepareUses), [owner](const auto& x) {
+                owner->Bind(*x.encoder, Pipeline::PrepareClassify);
+                x.encoder->Dispatch(1, 1, 1);
+            });
+        graph.DeclareRecordingIndependent(preparePass);
         graphKeys = graph.AtomicMin64(graphKeys);
         graphRoutes = graph.Modify(graphRoutes);
         graphWork = graph.Modify(graphWork);
@@ -377,13 +382,15 @@ struct SceneHybridVisibility final
             {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}};
         GeometryReads(graph, uses);
         visible->AddVisibleIdsRead(graph, uses);
-        graph.AddPass((name + ".Classify").c_str(), uses, [owner](const auto& x) {
-            owner->Bind(*x.encoder, Pipeline::Classify);
-            if (!x.encoder->DispatchIndirect(owner->dispatchArguments))
-            {
-                throw std::runtime_error("METEOR classifier indirect dispatch failed.");
-            }
-        });
+        const auto classifyPass = graph.AddPass(
+            (name + ".Classify").c_str(), std::move(uses), [owner](const auto& x) {
+                owner->Bind(*x.encoder, Pipeline::Classify);
+                if (!x.encoder->DispatchIndirect(owner->dispatchArguments))
+                {
+                    throw std::runtime_error("METEOR classifier indirect dispatch failed.");
+                }
+            });
+        graph.DeclareRecordingIndependent(classifyPass);
     }
     void AddRasterUses(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
     {
@@ -399,25 +406,29 @@ struct SceneHybridVisibility final
             throw std::runtime_error("METEOR software raster requires explicit classification.");
         }
         graphDispatchArguments = graph.Modify(graphDispatchArguments);
-        graph.AddPass((name + ".PrepareSoftware").c_str(),
-                      {{graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                       {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}},
-                      [owner](const auto& x) {
-                          owner->Bind(*x.encoder, Pipeline::PrepareSoftware);
-                          x.encoder->Dispatch(1, 1, 1);
-                      });
+        const auto preparePass = graph.AddPass(
+            (name + ".PrepareSoftware").c_str(),
+            {{graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
+             {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}},
+            [owner](const auto& x) {
+                owner->Bind(*x.encoder, Pipeline::PrepareSoftware);
+                x.encoder->Dispatch(1, 1, 1);
+            });
+        graph.DeclareRecordingIndependent(preparePass);
         std::vector<EnhancedRenderGraph::RGPassUsage> uses{
             {graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64},
             {graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
             {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}};
         GeometryReads(graph, uses);
-        graph.AddPass((name + ".SW").c_str(), uses, [owner](const auto& x) {
-            owner->Bind(*x.encoder, Pipeline::Rasterize);
-            if (!x.encoder->DispatchIndirect(owner->dispatchArguments, SoftwareArgumentsOffset))
-            {
-                throw std::runtime_error("METEOR software raster indirect dispatch failed.");
-            }
-        });
+        const auto rasterPass = graph.AddPass(
+            (name + ".SW").c_str(), std::move(uses), [owner](const auto& x) {
+                owner->Bind(*x.encoder, Pipeline::Rasterize);
+                if (!x.encoder->DispatchIndirect(owner->dispatchArguments, SoftwareArgumentsOffset))
+                {
+                    throw std::runtime_error("METEOR software raster indirect dispatch failed.");
+                }
+            });
+        graph.DeclareRecordingIndependent(rasterPass);
     }
     // Occluder stage: the merged atomic keys become the HZB source depth.
     RGHandle DeclareDepthResolve(EnhancedRenderGraph& graph, RGHandle depth,
@@ -427,18 +438,22 @@ struct SceneHybridVisibility final
             throw std::runtime_error("METEOR visibility stage resolves its visibility target too.");
         depth = graph.Write(depth);
         graphDepth = depth;
-        graph.AddPass((name + ".Resolve").c_str(),
-                      {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
-                       {depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
-                      [owner, depth](const auto& x) {
-                          auto& e = *x.encoder;
-                          const auto target = RHIDepthTargetDesc::Depth(x.ResolveHandle(depth), RHIFormat::D32Float);
-                          const auto targets =
-                              owner->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &target);
-                          if (!targets.IsValid())
-                              throw std::runtime_error("METEOR occluder resolve target binding failed.");
-                          owner->DrawResolve(e, targets);
-                      });
+        const auto resolvePass = graph.AddPass(
+            (name + ".Resolve").c_str(),
+            {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
+             {depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
+            [owner, depth](const auto& x) {
+                auto& e = *x.encoder;
+                const auto target = RHIDepthTargetDesc::Depth(x.ResolveHandle(depth), RHIFormat::D32Float);
+                const auto targets =
+                    owner->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &target);
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("METEOR occluder resolve target binding failed.");
+                }
+                owner->DrawResolve(e, targets);
+            });
+        graph.DeclareRecordingIndependent(resolvePass);
         return depth;
     }
     RGHandle ResolvedDepth(const EnhancedRenderGraph& graph) const
@@ -465,20 +480,23 @@ struct SceneHybridVisibility final
         outputs.visibility = graph.Write(outputs.visibility);
         outputs.depth = graph.Write(outputs.depth);
         graphDepth = outputs.depth;
-        graph.AddPass((name + ".Resolve").c_str(),
-                      {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
-                       {outputs.visibility, RHIResourceState::RenderTarget, RGAccessMode::Write},
-                       {outputs.depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
-                      [owner, outputs](const auto& x) {
-                          auto& e = *x.encoder;
-                          const auto depth =
-                              RHIDepthTargetDesc::Depth(x.ResolveHandle(outputs.depth), RHIFormat::D32Float);
-                          const std::array colors{x.ResolveHandle(outputs.visibility)};
-                          const auto targets = owner->device->CreateRenderTargets(colors, &depth);
-                          if (!targets.IsValid())
-                              throw std::runtime_error("METEOR visibility resolve target binding failed.");
-                          owner->DrawResolve(e, targets);
-                      });
+        const auto resolvePass = graph.AddPass(
+            (name + ".Resolve").c_str(),
+            {{graphKeys, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
+             {outputs.visibility, RHIResourceState::RenderTarget, RGAccessMode::Write},
+             {outputs.depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
+            [owner, outputs](const auto& x) {
+                auto& e = *x.encoder;
+                const auto depth = RHIDepthTargetDesc::Depth(x.ResolveHandle(outputs.depth), RHIFormat::D32Float);
+                const std::array colors{x.ResolveHandle(outputs.visibility)};
+                const auto targets = owner->device->CreateRenderTargets(colors, &depth);
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("METEOR visibility resolve target binding failed.");
+                }
+                owner->DrawResolve(e, targets);
+            });
+        graph.DeclareRecordingIndependent(resolvePass);
         return outputs;
     }
 };
