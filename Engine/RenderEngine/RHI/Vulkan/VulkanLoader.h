@@ -123,6 +123,7 @@
     X(vkCmdDrawIndexedIndirect)         \
     X(vkCmdDrawIndirect)                \
     X(vkCmdDispatch)                    \
+    X(vkCmdDispatchIndirect)            \
     X(vkCmdBindVertexBuffers)           \
     X(vkCmdBindVertexBuffers2)          \
     X(vkCmdBindIndexBuffer)             \

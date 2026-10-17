@@ -236,6 +236,14 @@ public:
     virtual bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,
         std::span<const uint32_t>) { return false; }
     virtual void Dispatch(uint32_t x, uint32_t y, uint32_t z) = 0;
+    /// One RHIDispatchIndirectArguments for the currently bound compute pipeline.
+    /// Requires a 4-byte-aligned range, allowIndirectArguments and an explicit
+    /// IndirectArgument graph use. The producer owns dimension bounds and GPU
+    /// lifetime; no CPU count readback. False records no command.
+    virtual bool DispatchIndirect(RHIBufferHandle, uint64_t = 0)
+    {
+        return false;
+    }
     // Native command recording count; unavailable encoders explicitly return the sentinel.
     virtual uint64_t GetComputeDispatchCount() const { return UINT64_MAX; }
 

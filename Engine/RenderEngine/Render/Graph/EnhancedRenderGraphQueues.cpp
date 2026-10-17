@@ -148,10 +148,14 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     PhaseBarrierPlan prologue, epilogue;
     if (plan.usesCompute)
     {
+        // Queue placement may reorder the shared structural schedule. Materialize
+        // only this specialized order; the cached DAG remains immutable.
+        m_executeOrder.resize(plan.entries.size());
         for (size_t index = 0; index < plan.entries.size(); ++index)
         {
             m_executeOrder[index] = plan.entries[index].pass;
         }
+        m_executeOrderOverridden = true;
         UpdateResourceUses();
         ce::dynamic_bitset retainedGraphicsTextures(m_resources.size(), false);
         for (size_t index = 0; index < m_resources.size(); ++index)
@@ -433,7 +437,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             // RG4's contiguous targets preserve list submission order. Dependency
             // waves additionally preserve callback-produced CPU data across jobs.
             std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
-            for (const auto& edge : m_versionEdges)
+            for (const auto& edge : VersionEdges())
             {
                 predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
             }

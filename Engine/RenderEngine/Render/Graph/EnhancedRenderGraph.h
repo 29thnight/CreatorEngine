@@ -279,7 +279,7 @@ public:
 
     struct Stats
     {
-        bool structuralScheduleReused{false}; // State/barrier/allocation plans are rebuilt every frame.
+        bool structuralScheduleReused{false}; // Declarations/DAG/lifetimes reused; native state/barrier/allocation plans remain per frame.
         uint32_t passesDeclared{ 0 };
         uint32_t passesCulled{ 0 };
         uint32_t passesExecuted{ 0 };
@@ -772,7 +772,7 @@ public:
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
     // 검증·진단용. Compile 뒤에 유효하다.
-    const std::vector<uint16_t>& GetExecuteOrder() const { return m_executeOrder; }
+    const std::vector<uint16_t>& GetExecuteOrder() const;
     /// 패스를 여러 커맨드 리스트에 나눠 기록하고 선언 순서의 batch로 밀봉한다.
     ///
     /// ── 왜 이 순서인가 ──
@@ -838,6 +838,8 @@ private:
         RHIResourceState initialState{ RHIResourceState::Common };
         RHIResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
+        bool firstImport{true}; // Full native id (including generation), within this graph only.
+        bool hasAtomicMin64{false};
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
         uint32_t firstUse{ 0xFFFFFFFF };
         uint32_t lastUse{ 0 };
@@ -925,6 +927,10 @@ private:
         uint32_t slice, uint32_t sliceCount) const;
 
     std::vector<Resource> m_resources;
+    // Declaration-local indices. Reset removes every entry, and generation bits
+    // remain part of the key. Duplicate imports keep the original first match.
+    std::unordered_map<uint32_t, uint16_t> m_importedTextures, m_importedBuffers;
+    std::vector<uint16_t> m_atomicResources;
     RGTransientPool* m_transientPool{ nullptr };
     std::vector<std::shared_ptr<RGTransientPool::AliasedGroup>> m_transientHeaps;
     std::shared_ptr<RGTransientPool::AliasHeapAccounting> m_aliasHeapAccounting;
@@ -936,6 +942,7 @@ private:
     std::span<Pass> m_passes;
     std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
+    bool m_executeOrderOverridden{false}; // Queue specialization owns a mutable copy only when it reorders.
     std::shared_ptr<const std::string> m_timingSignature;
     // Byte offset of each pass's culled field inside m_timingSignature.
     std::vector<size_t> m_signatureCulledOffsets;
@@ -987,7 +994,38 @@ public:
     {
     private:
         friend class EnhancedRenderGraph;
+        // Native handles, epochs, callbacks and resource states are deliberately
+        // absent. Current handles are validated while comparing these contracts.
+        struct ResourceDeclaration
+        {
+            RGTextureDesc texture;
+            RGBufferDesc buffer;
+            std::string name;
+            bool imported{false}, bufferKind{false}, firstImport{true};
+            std::vector<Resource::Version> versions;
+            bool used{false};
+            uint32_t firstUse{UINT32_MAX}, lastUse{0};
+        };
+        struct PassDeclaration
+        {
+            std::string name;
+            std::vector<RGPassUsage> usages;
+            std::vector<RepeatedPhase> phases;
+            uint32_t maxSlices{1}, recordCost{0}, repeatCount{1};
+            bool hasSideEffect{false}, computeCompatible{false};
+            bool recordingSideEffect{false}, recordingIndependent{false};
+            bool execute{false}, splitExecute{false}, repeated{false}, repeatedExecute{false};
+        };
+        RGSchedulingMode scheduling{RGSchedulingMode::DeclarationOrder};
+        RGOrderPolicy orderPolicy{RGOrderPolicy::DependencyOrder};
+        RGMeasurementDomain measurementDomain{RGMeasurementDomain::Normal};
+        bool aliasing{false}, extendLifetimes{false}, poison{false};
+        uint32_t dependencyWaveCount{0};
+        std::vector<ResourceDeclaration> resources;
+        std::vector<PassDeclaration> passes;
+        std::vector<FinalStateRequirement> finalStateRequirements;
         std::shared_ptr<const std::string> key;
+        std::shared_ptr<const std::string> timingSignature;
         std::vector<uint16_t> order, criticalPath;
         std::vector<int32_t> waves;
         ce::dynamic_bitset culled;
@@ -996,6 +1034,21 @@ public:
 private:
     std::shared_ptr<const StructuralSchedule> m_structuralSchedule;
     std::shared_ptr<const StructuralSchedule> m_alternateSchedule;
+    std::shared_ptr<const StructuralSchedule> m_activeStructuralSchedule;
+    bool MatchesStructuralSchedule(const StructuralSchedule& schedule) const;
+    void CaptureStructuralDeclarations(StructuralSchedule& schedule) const;
+    const std::vector<int32_t>& DependencyWaves() const
+    {
+        return m_activeStructuralSchedule ? m_activeStructuralSchedule->waves : m_dependencyWaves;
+    }
+    const std::vector<uint16_t>& CriticalPath() const
+    {
+        return m_activeStructuralSchedule ? m_activeStructuralSchedule->criticalPath : m_criticalPath;
+    }
+    const std::vector<DiagnosticSnapshot::VersionEdge>& VersionEdges() const
+    {
+        return m_activeStructuralSchedule ? m_activeStructuralSchedule->edges : m_versionEdges;
+    }
 
     Stats m_stats;
 

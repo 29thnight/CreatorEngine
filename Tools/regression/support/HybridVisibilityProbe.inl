@@ -31,7 +31,8 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     RHIShaderCompileOptions shaderOptions;
     shaderOptions.strictMath = true;
     shaderOptions.bufferInt64Atomics = true;
-    for (const char* entry : {"Initialize", "Classify", "Rasterize", "ResolveVS", "ResolvePS"})
+    for (const char* entry :
+         {"Initialize", "PrepareClassify", "Classify", "PrepareSoftware", "Rasterize", "ResolveVS", "ResolvePS"})
     {
         RHIShaderCompiler::VerifiedShader spirv;
         const auto profile = std::string_view(entry).ends_with("VS")   ? "vs_6_6"
@@ -275,13 +276,74 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(p != snap.passes.end(), "Hybrid pass " + std::string(name));
                 return *p;
             };
-            // Both stages share one producer contract: classify -> HW/SW atomic
-            // siblings -> resolve. The occluder resolve feeds the current HZB.
+            // Both stages produce indirect arguments before consuming them.
+            // The HW/SW atomic siblings merge before resolve, and the occluder
+            // resolve feeds the current HZB.
             const auto stage = [&](const std::string& prefix, const SceneHybridVisibility& owner) {
+                using EdgeReason = EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason;
                 const auto& hw = find(prefix + ".HW");
                 const auto& sw = find(prefix + ".SW");
+                const auto& prepareClassify = find(prefix + ".PrepareClassify");
                 const auto& classify = find(prefix + ".Classify");
+                const auto& prepareSoftware = find(prefix + ".PrepareSoftware");
                 const auto& resolve = find(prefix + ".Resolve");
+                const auto producerConsumer = [&](const EnhancedRenderGraph::DiagnosticPass& producer,
+                                                  const EnhancedRenderGraph::DiagnosticPass& consumer,
+                                                  RGHandle resource, RGAccessMode producerAccess,
+                                                  RHIResourceState consumerState) {
+                    const auto write = std::ranges::find_if(producer.usages, [&](const auto& usage) {
+                        return usage.resource == resource.index && usage.kind == RGResourceKind::Buffer &&
+                               usage.access == producerAccess && usage.state == RHIResourceState::UnorderedAccess;
+                    });
+                    const auto read = std::ranges::find_if(consumer.usages, [&](const auto& usage) {
+                        return usage.resource == resource.index && usage.kind == RGResourceKind::Buffer &&
+                               usage.access == RGAccessMode::Read && usage.state == consumerState;
+                    });
+                    Check(write != producer.usages.end() && read != consumer.usages.end(),
+                          producer.name + " publishes the declared buffer state consumed by " + consumer.name);
+                    Check(!producer.culled && !consumer.culled && producer.compiledIndex >= 0 &&
+                              producer.compiledIndex < consumer.compiledIndex && write->version == read->version,
+                          producer.name + " publishes the exact version before " + consumer.name);
+                    Check(std::ranges::any_of(snap.versionEdges,
+                                              [&](const auto& edge) {
+                                                  return edge.producer == producer.authoredIndex &&
+                                                         edge.consumer == consumer.authoredIndex &&
+                                                         edge.resource == resource.index &&
+                                                         edge.version == read->version && edge.reason == EdgeReason::RAW;
+                                              }),
+                          producer.name + " has a resource dependency to " + consumer.name);
+                    if (consumerState == RHIResourceState::IndirectArgument)
+                    {
+                        Check(std::ranges::any_of(consumer.barriers,
+                                                  [&](const auto& barrier) {
+                                                      return barrier.resource == resource.index && !barrier.afterPass &&
+                                                             !barrier.uav &&
+                                                             barrier.before == RHIResourceState::UnorderedAccess &&
+                                                             barrier.after == RHIResourceState::IndirectArgument;
+                                                  }),
+                              consumer.name + " transitions generated arguments before indirect dispatch");
+                    }
+                    return read->version;
+                };
+                const auto classifyArguments =
+                    producerConsumer(prepareClassify, classify, owner.graphDispatchArguments,
+                                     RGAccessMode::Write, RHIResourceState::IndirectArgument);
+                const auto softwareArguments =
+                    producerConsumer(prepareSoftware, sw, owner.graphDispatchArguments,
+                                     RGAccessMode::ReadWrite, RHIResourceState::IndirectArgument);
+                Check(classifyArguments < softwareArguments && softwareArguments == owner.graphDispatchArguments.version,
+                      prefix + " software dispatch consumes the updated argument version");
+                producerConsumer(classify, prepareSoftware, owner.graphWork, RGAccessMode::ReadWrite,
+                                 RHIResourceState::ShaderResource);
+                producerConsumer(classify, sw, owner.graphWork, RGAccessMode::ReadWrite, RHIResourceState::ShaderResource);
+                Check(std::ranges::any_of(snap.versionEdges,
+                                          [&](const auto& edge) {
+                                              return edge.producer == classify.authoredIndex &&
+                                                     edge.consumer == prepareSoftware.authoredIndex &&
+                                                     edge.resource == owner.graphDispatchArguments.index &&
+                                                     edge.version == classifyArguments && edge.reason == EdgeReason::WAR;
+                                          }),
+                      prefix + " classification consumes arguments before the software producer overwrites them");
                 for (const auto* writer : {&hw, &sw})
                 {
                     Check(classify.compiledIndex < writer->compiledIndex && writer->compiledIndex < resolve.compiledIndex,

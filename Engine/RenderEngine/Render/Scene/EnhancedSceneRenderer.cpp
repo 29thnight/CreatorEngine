@@ -583,6 +583,34 @@ namespace
         return fallback;
     }
 
+    uint32_t LiveGpuTimingInterval()
+    {
+        // 0: no background queries, 1: every submission, N: every Nth per-view
+        // submission (default 8). Captures remain dense. Measured async queue
+        // placement also remains dense unless background queries are disabled.
+        // A fixed buffer keeps reading this A/B control allocation-free.
+        char value[16]{};
+        const DWORD length = GetEnvironmentVariableA("CREATOR_RENDER_GPU_TIMING_INTERVAL", value, sizeof(value));
+        if (length == 0 || length >= sizeof(value))
+        {
+            return 8;
+        }
+        uint32_t interval{};
+        for (DWORD i = 0; i < length; ++i)
+        {
+            if (value[i] < '0' || value[i] > '9')
+            {
+                return 8;
+            }
+            interval = interval * 10 + static_cast<uint32_t>(value[i] - '0');
+            if (interval > 1024)
+            {
+                return 8;
+            }
+        }
+        return interval;
+    }
+
     // (I5-M4). legacy Material을 읽던 SealMaterialTextureBindings는 그 치환으로
     // 소비자가 0이 되어 제거됐다.
 
@@ -787,6 +815,7 @@ namespace
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
             uint64_t         promotionCount{ 0 }; // GPU 완료 뒤 표시로 승격한 횟수
+            uint64_t         gpuTimingSubmissions{ 0 }; // Per-view cadence; neither view can starve the other.
             uint32_t         promotedSlotMask{ 0 }; // 실제 사용한 슬롯 인덱스 집합
 
             // ★ SSGI를 뷰마다 따로 든다 — 라이브 그래프에서 프레임을 넘겨
@@ -6908,7 +6937,7 @@ namespace
                 outError = "Owned queue execution requires transient aliasing OFF.";
                 return false;
             }
-            graph.SetProfiler(dx12.Profiler());
+            graph.SetProfiler(nullptr);
             graph.SetTransientPool(&p.transientPool);
             graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
                 ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
@@ -6935,10 +6964,15 @@ namespace
             {
                 profilerToken.captureGeneration = captureSink.on_begin_capture(sourceEngineFrame);
             }
+            const auto timingInterval = LiveGpuTimingInterval();
+            const auto viewSubmission = view.gpuTimingSubmissions++;
+            const bool collectTimings = capture != nullptr || profilerToken.captureGeneration != 0 ||
+                (timingInterval != 0 && (dx12.GetQueueExecutionMode() == 2 || viewSubmission % timingInterval == 0));
             profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
-                view.key.viewId, profilerToken.captureGeneration, capture != nullptr);
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr, collectTimings);
             profilerToken.sourceEngineFrame = sourceEngineFrame;
             profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
+            graph.SetProfiler(collectTimings ? dx12.Profiler() : nullptr);
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -7719,6 +7753,22 @@ namespace
                         //   이제는 표가 낡았으면 Collect 가 **실패한다.** 그럴듯한 숫자를 내는
                         //   대신 세서 드러낸다 — mismatches 가 0 이 아니면 링이 모자란다는 뜻이고,
                         //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
+                        // GPU retirement is established by this slot's fence,
+                        // independently from whether timestamps were requested.
+                        TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot){
+                            const auto& provenance = view.slots[slotIndex].temporalProvenance;
+                            if (snapshot.viewId == provenance.viewId && snapshot.sceneEpoch == provenance.sceneEpoch)
+                            {
+                                snapshot.renderGpuCompletedFrameId = provenance.realFrameId;
+                            }
+                        });
+                        if (!view.slots[slotIndex].profilerToken.IsValid())
+                        {
+                            finish_gpu_capture(view.slots[slotIndex].profilerToken, false,
+                                "DX12 capture did not reserve GPU query slots");
+                            ++state.framesRendered;
+                            continue;
+                        }
                         ++state.gpuCollects;
 
                         std::vector<EnhancedLiveGpuSlice> slices;
@@ -7736,11 +7786,6 @@ namespace
                             // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
                             state.lastPassTimings = std::move(timings);
                             state.gpuTemporalProvenance = view.slots[slotIndex].temporalProvenance;
-                            TemporalRuntimeControl::Get().PublishRenderer([&](auto& snapshot){
-                                const auto& provenance=view.slots[slotIndex].temporalProvenance;
-                                if(snapshot.viewId==provenance.viewId && snapshot.sceneEpoch==provenance.sceneEpoch)
-                                    snapshot.renderGpuCompletedFrameId=provenance.realFrameId;
-                            });
                             state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
                             state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
                             state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;

@@ -85,6 +85,7 @@ public:
     bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,
         std::span<const uint32_t>) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
+    bool DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     uint64_t GetComputeDispatchCount() const override { return m_computeDispatches; }
 
     bool BeginRasterWithoutAttachments(uint32_t width, uint32_t height) override;

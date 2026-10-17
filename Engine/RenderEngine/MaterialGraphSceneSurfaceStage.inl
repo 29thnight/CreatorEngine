@@ -155,7 +155,8 @@ bool SceneHost::VisibilityStage::PrepareVisibility(const FrameInput& frame, cons
                                                    bool depthOnly,
                                                    const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
                                                    std::shared_ptr<const SceneHybridVisibility>& result,
-                                                   std::string& error)
+                                                   std::string& error,
+                                                   const SceneHybridVisibility* sharedPreparation)
 {
     auto hybrid = std::make_shared<SceneHybridVisibility>();
     hybrid->name = name;
@@ -175,7 +176,7 @@ bool SceneHost::VisibilityStage::PrepareVisibility(const FrameInput& frame, cons
                                                 1u | ((coverage & 2u) ? 0u : 2u) | (draw.doubleSided ? 4u : 0u), 0u,
                                                 0u};
     }
-    if (!hybrid->Prepare(context, frame.input->ViewProjection(), pipelines, error))
+    if (!hybrid->Prepare(context, frame.input->ViewProjection(), pipelines, error, sharedPreparation))
     {
         return false;
     }
@@ -186,7 +187,8 @@ bool SceneHost::VisibilityStage::PrepareVisibility(const FrameInput& frame, cons
 bool SceneHost::VisibilityStage::Prepare(const FrameInput& frame, const EnhancedFrameContext& context,
                                          const std::shared_ptr<const SceneFrameGeometry>& geometry,
                                          const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
-                                         HybridVisibilityPipelines& pipelines, std::string& error)
+                                         HybridVisibilityPipelines& pipelines, std::string& error,
+                                         const SceneHybridVisibility* sharedPreparation)
 {
     if (!std::ranges::any_of(frame.draws, [](const auto& draw) {
             return draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended;
@@ -195,5 +197,5 @@ bool SceneHost::VisibilityStage::Prepare(const FrameInput& frame, const Enhanced
         return true;
     }
     return PrepareVisibility(frame, context, geometry, pipelines, "METEOR.Scene.Visibility", false, list,
-                             hybridVisibility, error);
+                             hybridVisibility, error, sharedPreparation);
 }

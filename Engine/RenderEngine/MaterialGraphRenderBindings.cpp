@@ -77,6 +77,15 @@ bool MatchingSlots(const PassLayout& layout)
     }
     return next <= 64;
 }
+
+bool SameTextureShape(const RHITextureEntry& a, const RHITextureEntry& b)
+{
+    // GetOrUpload is still called in every recording. Native storage/handle
+    // changes are patched below; format changes must repack runtime encodings.
+    return a.format == b.format && a.width == b.width && a.height == b.height &&
+           a.mipLevels == b.mipLevels && a.arraySize == b.arraySize && a.isCube == b.isCube &&
+           a.preparationNeeded == b.preparationNeeded;
+}
 } // namespace
 
 bool CreatePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& material,
@@ -231,7 +240,8 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
     candidate->layout = layout;
     candidate->device = &device;
     candidate->recordingId = recording;
-    std::vector<TextureBinding> uploaded;
+    std::vector<RHITextureEntry> uploaded;
+    uploaded.reserve(candidate->instance->textures.size());
     for (const auto& texture : candidate->instance->textures)
     {
         if (!texture.owner)
@@ -247,26 +257,56 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
             return Fail(error,
                         error.empty() ? "LX material texture upload failed; neutral substitution rejected." : error);
         }
-        uploaded.push_back({texture.slot, entry, texture.owner});
+        uploaded.push_back(entry);
     }
-    std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    const bool prepared = candidate->instance->generation->cooked.product.materialShader
-                              ? PrepareResourcesWithUniforms(layout.material, candidate->instance->uniforms, uploaded,
-                                                             candidate->resources, diagnostics)
-                              : PrepareResources(layout.material, candidate->instance->description.parameters, uploaded,
-                                                 candidate->resources, diagnostics);
-    if (!prepared ||
-        !MatchesInstanceUniforms(layout.material, candidate->resources.uniforms, candidate->instance->uniforms))
+
+    CpuDescription* description{};
+    if (const auto found = descriptions_.find(identity); found != descriptions_.end())
     {
-        return Fail(error, diagnostics.empty() ? "Material instance differs from its reflected uniform layout."
-                                               : diagnostics.front().message);
+        // A representation ID alone is not authority. Both exact instances
+        // must be alive during comparison, including for copied/forged IDs.
+        const auto owner = found->second.instance.lock();
+        if (owner && std::addressof(*owner) == std::addressof(*instance) &&
+            std::ranges::equal(found->second.textureShapes, uploaded, SameTextureShape))
+        {
+            description = &found->second;
+            description->lastUse = ++descriptionClock_;
+            candidate->resources = description->resources;
+            for (std::size_t i = 0; i < uploaded.size(); ++i)
+            {
+                candidate->resources.textures[instance->textures[i].slot].resource = uploaded[i].handle;
+            }
+        }
+    }
+    if (!description)
+    {
+        ce::profile_scope descriptionProfile{ce::marker<"MaterialBindingsCpuDescription">()};
+        std::vector<TextureBinding> bindings;
+        bindings.reserve(uploaded.size());
+        for (std::size_t i = 0; i < uploaded.size(); ++i)
+        {
+            const auto& texture = instance->textures[i];
+            bindings.push_back({texture.slot, uploaded[i], texture.owner});
+        }
+        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        const bool prepared = candidate->instance->generation->cooked.product.materialShader
+                                  ? PrepareResourcesWithUniforms(layout.material, candidate->instance->uniforms,
+                                                                 bindings, candidate->resources, diagnostics)
+                                  : PrepareResources(layout.material, candidate->instance->description.parameters,
+                                                     bindings, candidate->resources, diagnostics);
+        if (!prepared ||
+            !MatchesInstanceUniforms(layout.material, candidate->resources.uniforms, candidate->instance->uniforms))
+        {
+            return Fail(error, diagnostics.empty() ? "Material instance differs from its reflected uniform layout."
+                                                   : diagnostics.front().message);
+        }
     }
 
     // The exact immutable instance already owns every texture dependency.
     // A binding packet borrows that closure through its frame table rather
     // than duplicating texture strong references for every draw/pass.
     candidate->resources.owners.clear();
-    std::array<std::uint32_t, 128> descriptorIndices{};
+    auto descriptorIndices = description ? description->descriptorIndices : std::array<std::uint32_t, 128>{};
     if (layout.samplerSlot)
     {
         // The cooker accepts exactly these 36 filter/address combinations.
@@ -294,20 +334,25 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
             device_ = &device;
         }
         candidate->samplers = bindlessSamplers_;
-        for (const auto& resource : layout.material.samplers)
+        if (!description)
         {
-            const auto& sampler = candidate->resources.samplers[resource.slot];
-            const auto u = std::ranges::find(modes, sampler.addressU) - modes.begin();
-            const auto v = std::ranges::find(modes, sampler.addressV) - modes.begin();
-            if (u == modes.size() || v == modes.size())
-                return Fail(error, "Invalid LX bindless sampler.");
-            descriptorIndices[64 + resource.slot] =
-                static_cast<std::uint32_t>((((sampler.minMag == RHIFilterMode::Linear ? 1 : 0) * 2 +
-                                             (sampler.mip == RHIFilterMode::Linear ? 1 : 0)) *
-                                                3 +
-                                            u) *
-                                               3 +
-                                           v);
+            for (const auto& resource : layout.material.samplers)
+            {
+                const auto& sampler = candidate->resources.samplers[resource.slot];
+                const auto u = std::ranges::find(modes, sampler.addressU) - modes.begin();
+                const auto v = std::ranges::find(modes, sampler.addressV) - modes.begin();
+                if (u == modes.size() || v == modes.size())
+                {
+                    return Fail(error, "Invalid LX bindless sampler.");
+                }
+                descriptorIndices[64 + resource.slot] =
+                    static_cast<std::uint32_t>((((sampler.minMag == RHIFilterMode::Linear ? 1 : 0) * 2 +
+                                                 (sampler.mip == RHIFilterMode::Linear ? 1 : 0)) *
+                                                    3 +
+                                                u) *
+                                                   3 +
+                                               v);
+            }
         }
     }
     if (layout.textureSlot)
@@ -317,16 +362,33 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
         for (const auto& resource : layout.material.textures)
         {
             const auto& desc = candidate->resources.textures[resource.slot];
-            const auto found = std::ranges::find_if(bindless_->descriptions, [&](const auto& existing) {
-                return existing.resource == desc.resource && existing.format == desc.format &&
-                       existing.mostDetailedMip == desc.mostDetailedMip && existing.mipLevels == desc.mipLevels;
-            });
-            const auto index = found - bindless_->descriptions.begin();
-            if (index == BindlessTextureCapacity)
-                return Fail(error, "LX frame exceeds bindless texture capacity; no per-material fallback.");
-            if (found == bindless_->descriptions.end())
+            const BindlessMaterialFrame::TextureKey key{desc.resource.id, desc.format,
+                                                        desc.mostDetailedMip, desc.mipLevels};
+            const auto found = bindless_->textureIndices.find(key);
+            std::uint32_t index{};
+            if (found != bindless_->textureIndices.end())
+            {
+                index = found->second;
+            }
+            else
+            {
+                if (bindless_->descriptions.size() >= BindlessTextureCapacity)
+                {
+                    return Fail(error, "LX frame exceeds bindless texture capacity; no per-material fallback.");
+                }
+                index = static_cast<std::uint32_t>(bindless_->descriptions.size());
                 bindless_->descriptions.push_back(desc);
-            descriptorIndices[resource.slot] = static_cast<std::uint32_t>(index);
+                try
+                {
+                    bindless_->textureIndices.emplace(key, index);
+                }
+                catch (...)
+                {
+                    bindless_->descriptions.pop_back();
+                    throw;
+                }
+            }
+            descriptorIndices[resource.slot] = index;
         }
     }
     if (layout.descriptorIndexSlot)
@@ -346,6 +408,52 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
     }
     device_ = &device;
     candidate->descriptorVersion = device.GetDescriptorVersionToken();
+    if (!description)
+    {
+        CpuDescription cached;
+        cached.instance = instance;
+        cached.resources = candidate->resources;
+        cached.textureShapes = std::move(uploaded);
+        cached.descriptorIndices = descriptorIndices;
+        // Retain only immutable CPU values, never a frame bindless index,
+        // texture registration, upload slice or redundant texture strong pin.
+        for (auto& texture : cached.resources.textures)
+        {
+            texture.resource = {};
+        }
+        for (auto& texture : cached.textureShapes)
+        {
+            texture.handle = {};
+        }
+        std::fill_n(cached.descriptorIndices.begin(), 64, 0u);
+        cached.lastUse = ++descriptionClock_;
+        cached.bytes = sizeof(CpuDescription) + cached.resources.uniforms.capacity() +
+                       cached.resources.textures.capacity() * sizeof(RHIBindingDesc) +
+                       cached.resources.samplers.capacity() * sizeof(RHISamplerDesc) +
+                       cached.textureShapes.capacity() * sizeof(RHITextureEntry);
+        constexpr std::size_t maxDescriptionBytes = 8u << 20;
+        constexpr std::size_t maxDescriptions = 1024;
+        if (const auto found = descriptions_.find(identity); found != descriptions_.end())
+        {
+            descriptionBytes_ -= found->second.bytes;
+            descriptions_.erase(found);
+        }
+        if (cached.bytes <= maxDescriptionBytes)
+        {
+            while (!descriptions_.empty() &&
+                   (descriptions_.size() >= maxDescriptions || descriptionBytes_ + cached.bytes > maxDescriptionBytes))
+            {
+                const auto oldest = std::ranges::min_element(descriptions_, {}, [](const auto& item) {
+                    return item.second.lastUse;
+                });
+                descriptionBytes_ -= oldest->second.bytes;
+                descriptions_.erase(oldest);
+            }
+            const auto charge = cached.bytes;
+            descriptions_.emplace(identity, std::move(cached));
+            descriptionBytes_ += charge;
+        }
+    }
     prepared_[identity].push_back(candidate);
     result = std::move(candidate);
     return true;
@@ -430,6 +538,8 @@ bool RenderBindingCache::Bind(IRenderDeviceServices& device, RHIEncoder& encoder
 void RenderBindingCache::Clear()
 {
     prepared_.clear();
+    descriptions_.clear();
+    descriptionClock_ = descriptionBytes_ = 0;
     bindless_.reset();
     bindlessSamplers_ = {};
     preparedRecording_ = preparedDescriptorVersion_ = 0;

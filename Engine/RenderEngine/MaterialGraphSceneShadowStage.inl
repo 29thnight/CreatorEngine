@@ -67,7 +67,10 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     }
     NormalizeSceneReads(graph, uses);
     const auto statisticsSlot = cascade * 2 + (staticCasters ? 0 : 1);
-    graph.AddPass(name, uses, [frame, commands, depth, slice, count, statisticsSlot](const auto& execution) {
+    const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
+    graph.AddSplitPass(name, std::move(uses),
+        [frame, commands, depth, slice, count, statisticsSlot](const auto& execution,
+                                                            uint32_t recordSlice, uint32_t sliceCount) {
         frame->CheckCurrent(execution.graph);
         auto& encoder = *execution.encoder;
         const auto texture = execution.ResolveHandle(depth);
@@ -90,7 +93,9 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
         uint32_t recordedBuckets{};
         uint32_t recordedCommands{};
-        for (std::size_t bucket = 0; bucket < commands->buckets.size(); ++bucket)
+        const auto first = commands->buckets.size() * recordSlice / sliceCount;
+        const auto last = commands->buckets.size() * (recordSlice + 1) / sliceCount;
+        for (auto bucket = first; bucket < last; ++bucket)
         {
             const auto& range = commands->buckets[bucket];
             const auto& draw = frame->shadowDraws[range.representative];
@@ -110,11 +115,11 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
         }
         if (count)
         {
-            auto& statistics = frame->shadowRecordingStats[statisticsSlot];
+            auto& statistics = frame->shadowRecordingStats[statisticsSlot][recordSlice];
             statistics.buckets += recordedBuckets;
             statistics.commands += recordedCommands;
         }
-    });
+    }, (std::min)(FrameInput::kMaxRasterRecordingSlices, (std::max)(1u, bucketCount)), false, bucketCount);
     return depth;
 }
 

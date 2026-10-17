@@ -13,6 +13,7 @@ namespace material_graph
 struct MeshSurfaceBufferPool;
 struct MeshSurfaceStaticBuffers;
 struct MeshSurfaceStaticCache;
+struct MeshSurfaceRequestCache;
 struct MeshTransformDispatch;
 struct MeshSurfaceCacheStats
 {
@@ -333,6 +334,7 @@ class MeshSurfaceEvaluator
     std::shared_ptr<const LX::Runtime::ComputeGeneration> samplerPipeline_;
     std::shared_ptr<MeshSurfaceBufferPool> bufferPool_;
     std::shared_ptr<MeshSurfaceStaticCache> staticCache_;
+    std::shared_ptr<MeshSurfaceRequestCache> requestCache_;
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformedCache_;
     std::uint64_t transformedBytes_{}, transforms_{}, transformHits_{};
     std::uint64_t cacheRecording_{}, cacheGeneration_{};

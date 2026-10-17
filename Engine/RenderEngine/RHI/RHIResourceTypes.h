@@ -722,6 +722,19 @@ struct RHIIndirectDrawCapabilities
     bool nonIndexedDraw{ false };
 };
 
+/// Native D3D12_DISPATCH_ARGUMENTS / VkDispatchIndirectCommand ABI.
+/// The GPU producer bounds all dimensions; zero work uses a zero X dimension.
+struct RHIDispatchIndirectArguments
+{
+    uint32_t groupCountX{ 0 };
+    uint32_t groupCountY{ 1 };
+    uint32_t groupCountZ{ 1 };
+};
+static_assert(sizeof(RHIDispatchIndirectArguments) == 12);
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountX) == 0);
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountY) == 4);
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountZ) == 8);
+
 /// Native DispatchMesh / VkDrawMeshTasksIndirectCommandEXT ABI. A producer
 /// must bound all dimensions and their product before GPU execution.
 struct RHIDispatchMeshIndirectArguments

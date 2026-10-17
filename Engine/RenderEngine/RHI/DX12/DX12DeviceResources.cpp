@@ -255,7 +255,9 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     m_drawIndirectSignature.Reset();
     m_drawIndexedIndirectSignature.Reset();
     m_dispatchMeshIndirectSignature.Reset();
+    m_dispatchIndirectSignature.Reset();
     m_meshBatchSignatures.clear();
+    m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
     m_lastAdmittedFenceValue = 0;
 
@@ -438,6 +440,18 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         m_drawIndirectSignature.Reset();
         OutputDebugStringA(("[DX12] Nonindexed indirect unavailable: " +
             HrToString(drawIndirectResult) + "\n").c_str());
+    }
+
+    D3D12_INDIRECT_ARGUMENT_DESC dispatchArgument{};
+    dispatchArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+    const D3D12_COMMAND_SIGNATURE_DESC dispatchSignature{
+        sizeof(RHIDispatchIndirectArguments), 1, &dispatchArgument, 0};
+    const HRESULT dispatchIndirectResult = m_device->CreateCommandSignature(
+        &dispatchSignature, nullptr, IID_PPV_ARGS(&m_dispatchIndirectSignature));
+    if (FAILED(dispatchIndirectResult))
+    {
+        outError = "DX12 compute indirect signature creation failed: " + HrToString(dispatchIndirectResult);
+        return false;
     }
 
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
@@ -708,7 +722,9 @@ void DX12DeviceResources::Shutdown()
     m_drawIndirectSignature.Reset();
     m_drawIndexedIndirectSignature.Reset();
     m_dispatchMeshIndirectSignature.Reset();
+    m_dispatchIndirectSignature.Reset();
     m_meshBatchSignatures.clear();
+    m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
     for (auto& lists : m_retiredCommandLists) lists.clear();
     m_immediateEncoder.reset();
@@ -3292,40 +3308,82 @@ bool DX12DeviceResources::DetachSwapChain(std::string& outError)
     return true;
 }
 
-ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(ID3D12RootSignature* rootSignature, std::span<const uint32_t> roots, bool indexed)
+uint64_t DX12DeviceResources::NextMaterialBatchSignatureGeneration()
 {
-    std::lock_guard lock(m_meshBatchSignatureMutex);
-    const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + (indexed ? 36 : 12);
-    std::vector<uint32_t> key(roots.begin(), roots.end());
-    key.push_back(indexed ? 1u : 0u);
-    auto& signature = m_meshBatchSignatures[{rootSignature, key}];
-    if (!signature)
+    static std::atomic<uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+}
+
+ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(
+    ID3D12RootSignature* rootSignature, std::span<const uint32_t> roots, bool indexed)
+{
+    uint64_t slots{}, cbvs{};
+    for (const auto root : roots)
     {
-        std::vector<D3D12_INDIRECT_ARGUMENT_DESC> descriptions;
-        uint64_t seen{};
+        const auto slot = root & 0x7fffffffu;
+        if (slot >= 64 || (slots >> slot))
+        {
+            return nullptr;
+        }
+        const auto bit = uint64_t{1} << slot;
+        slots |= bit;
+        if (root & 0x80000000u)
+        {
+            cbvs |= bit;
+        }
+    }
+    const MaterialBatchSignatureKey key{reinterpret_cast<uintptr_t>(rootSignature), slots, cbvs, indexed};
+    struct RecentSignature
+    {
+        const DX12DeviceResources* device{};
+        uint64_t generation{};
+        MaterialBatchSignatureKey key{};
+        ID3D12CommandSignature* signature{};
+    };
+    // Workers reuse a bounded local front cache without allocating or taking a
+    // shared device lock. Shutdown/Initialize run after recording has joined and
+    // change a globally unique generation before this device is reused. Stale
+    // raw entries are compared only, never dereferenced or retained as owners.
+    thread_local std::array<RecentSignature, 16> recent{};
+    thread_local size_t nextRecent{};
+    for (const auto& entry : recent)
+    {
+        if (entry.device == this && entry.generation == m_meshBatchSignatureGeneration && entry.key == key)
+        {
+            return entry.signature;
+        }
+    }
+
+    std::lock_guard lock(m_meshBatchSignatureMutex);
+    auto found = m_meshBatchSignatures.find(key);
+    if (found == m_meshBatchSignatures.end())
+    {
+        std::array<D3D12_INDIRECT_ARGUMENT_DESC, 66> descriptions{};
+        uint32_t count{};
         for (const auto root : roots)
         {
-            const auto slot = root & 0x7fffffffu;
-            // Native indirect root arguments must be strictly increasing.
-            if (slot >= 64 || (seen >> slot)) return nullptr;
-            seen |= uint64_t{1} << slot;
-            D3D12_INDIRECT_ARGUMENT_DESC desc{};
-            desc.Type = (root & 0x80000000u) ? D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW
-                : D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
-            desc.ConstantBufferView.RootParameterIndex = slot;
-            descriptions.push_back(desc);
+            auto& argument = descriptions[count++];
+            argument.Type = (root & 0x80000000u) ? D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW
+                                                : D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
+            argument.ConstantBufferView.RootParameterIndex = root & 0x7fffffffu;
         }
-        D3D12_INDIRECT_ARGUMENT_DESC dispatch{};
-        if (indexed) {
-            D3D12_INDIRECT_ARGUMENT_DESC indexView{};
-            indexView.Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
-            descriptions.push_back(indexView);
+        if (indexed)
+        {
+            descriptions[count++].Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
         }
-        dispatch.Type = indexed ? D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED : D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
-        descriptions.push_back(dispatch);
-        const D3D12_COMMAND_SIGNATURE_DESC desc{stride, static_cast<UINT>(descriptions.size()), descriptions.data(), 0};
-        if (FAILED(GetDevice()->CreateCommandSignature(&desc, rootSignature,
-            IID_PPV_ARGS(&signature)))) return nullptr;
+        descriptions[count++].Type = indexed ? D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED
+                                             : D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
+        const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + (indexed ? 36 : 12);
+        const D3D12_COMMAND_SIGNATURE_DESC desc{stride, count, descriptions.data(), 0};
+        MaterialBatchSignature value;
+        value.root = rootSignature; // Prevent native root-address reuse inside this generation.
+        if (FAILED(GetDevice()->CreateCommandSignature(&desc, rootSignature, IID_PPV_ARGS(&value.signature))))
+        {
+            return nullptr;
+        }
+        found = m_meshBatchSignatures.emplace(key, std::move(value)).first;
     }
-    return signature.Get();
+    auto* signature = found->second.signature.Get();
+    recent[nextRecent++ % recent.size()] = {this, m_meshBatchSignatureGeneration, key, signature};
+    return signature;
 }

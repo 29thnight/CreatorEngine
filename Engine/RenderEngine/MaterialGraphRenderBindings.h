@@ -34,6 +34,8 @@ struct BindlessMaterialFrame
 {
     std::mutex mutex;
     std::vector<RHIBindingDesc> descriptions;
+    using TextureKey = std::tuple<std::uint32_t, RHIFormat, std::uint32_t, std::uint32_t>;
+    std::map<TextureKey, std::uint32_t> textureIndices;
     RHIBindingTable textures;
     std::size_t publishedSize{};
 };
@@ -58,6 +60,8 @@ struct RenderBindings
 // One render owner per device. Texture cache owns GPU registrations and their
 // fence retirement; the packet retains CPU/program owners through submission.
 // Rebuild packets every recording so texture-cache use tracking stays current.
+// Immutable CPU descriptions survive recordings, with exact weak instance
+// identity and texture-shape checks. They contain no frame/native handles.
 // RenderGraph declares shader reads/transitions; Bind does not change states.
 class RenderBindingCache
 {
@@ -85,10 +89,22 @@ class RenderBindingCache
     std::size_t SamplerTableCount() const { return bindlessSamplers_.IsValid() ? 1 : 0; }
 
   private:
+    struct CpuDescription
+    {
+        own::weak_owner<const Instance> instance;
+        ResourcePacket resources;
+        std::vector<RHITextureEntry> textureShapes;
+        std::array<std::uint32_t, 128> descriptorIndices{};
+        std::uint64_t lastUse{};
+        std::size_t bytes{};
+    };
     IRenderDeviceServices* device_{};
     std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
     std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
     std::shared_ptr<BindlessMaterialFrame> bindless_;
     RHISamplerTable bindlessSamplers_;
+    std::map<InstanceFramePins::Key, CpuDescription> descriptions_;
+    std::uint64_t descriptionClock_{};
+    std::size_t descriptionBytes_{};
 };
 } // namespace material_graph
