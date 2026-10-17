@@ -5,13 +5,8 @@
 #include "ProfileService.h"
 #include "Texture.h"
 
-#include <algorithm>
-#include <chrono>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <crtdbg.h>
-#include <mutex>
-#include <limits>
-#include <unordered_set>
-#include <utility>
 
 #include <Windows.h>
 #include <Psapi.h>

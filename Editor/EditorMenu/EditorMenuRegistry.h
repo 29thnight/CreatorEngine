@@ -30,10 +30,7 @@
 #include "EditorMenuSchema.h"
 #include "EditorMenuSurface.h"
 
-#include <cstddef>
-#include <string_view>
-#include <utility>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

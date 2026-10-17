@@ -5,11 +5,7 @@
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
 #include "StandardMaterialProperty.h"
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <cstring>
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

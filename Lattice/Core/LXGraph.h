@@ -1,15 +1,6 @@
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <iosfwd>
-#include <map>
-#include <memory>
-#include <optional>
-#include <string>
-#include <vector>
-#include <variant>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

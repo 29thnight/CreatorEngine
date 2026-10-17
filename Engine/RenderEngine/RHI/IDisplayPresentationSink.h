@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include "RHIDisplayFrame.h"
 
 // 라이브 표시 결과를 presentation 계층에 여는 백엔드 중립 계약.

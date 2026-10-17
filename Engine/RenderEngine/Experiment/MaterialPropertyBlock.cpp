@@ -4,7 +4,7 @@
 #include "MaterialResolver.h"
 #include "../AssetDepot/MaterialAssetRuntime.h"
 
-#include <algorithm>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

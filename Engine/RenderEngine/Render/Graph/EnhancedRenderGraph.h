@@ -2,14 +2,8 @@
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <functional>
-#include <optional>
-#include <array>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"

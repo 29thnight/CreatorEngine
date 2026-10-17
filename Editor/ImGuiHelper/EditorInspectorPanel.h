@@ -54,7 +54,7 @@
 // — 이름 x 가 아이콘 유무로 흔들리지 않는다. 이 저장소는 아이콘 폰트가 조용히
 // 네모를 그린 적이 있어서, 없을 때 아무것도 안 그리는 쪽이 덜 나쁘다.
 
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::widgets
 {

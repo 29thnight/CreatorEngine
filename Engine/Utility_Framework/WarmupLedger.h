@@ -30,8 +30,7 @@
 // 아직 도달하지 않은 단계도 목록에 있어야 "무엇이 남았는가" 를 답할 수 있으므로,
 // 단계는 컴파일 시점에 닫힌 집합이다.
 
-#include <cstdint>
-#include <cstddef>
+#include "StandardLibrary.h"
 
 namespace engine::warmup
 {

@@ -2,7 +2,7 @@
 
 #include "../Core/LXNodeDefinition.h"
 
-#include <filesystem>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

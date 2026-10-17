@@ -1,9 +1,7 @@
 #include <windows.h>
 #include <evntrace.h>
 #include <evntcons.h>
-#include <cstring>
-#include <iomanip>
-#include <iostream>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 static LONGLONG frequency;
 static bool observedSwitch = false;

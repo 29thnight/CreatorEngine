@@ -9,15 +9,9 @@
 // writer 는 자기 thread_stream 만 만진다. 수집기는 pool 의 sealed 목록을
 // 소비하고 스트림의 원자적 응답 상태만 읽는다. 남의 TLS 나 현재 쓰는 청크를
 // 직접 읽던 옛 경로는 없다.
-#include <atomic>
-#include <climits>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <semaphore>
-#include <string>
-#include <thread>
-#include <vector>
+#include <stdint.h>
+#include <limits.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "ProfileEvent.h"
 

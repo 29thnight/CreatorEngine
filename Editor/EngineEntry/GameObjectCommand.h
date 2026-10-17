@@ -1,7 +1,6 @@
 ﻿#pragma once
 #include "MetaStateCommand.h"
-#include <functional>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "Scene.h"
 #include "ModelSceneInstantiation.h" // MBC9: generation 인스턴스화
 #include "DataSystem.h"

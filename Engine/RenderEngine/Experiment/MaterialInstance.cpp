@@ -1,7 +1,7 @@
 #include "MaterialInstance.h"
 #include "MaterialResolver.h"
 
-#include <algorithm>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

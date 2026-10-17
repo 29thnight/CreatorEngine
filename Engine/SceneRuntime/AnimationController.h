@@ -7,8 +7,7 @@
 #include "AnimatorSystem.h"
 #include "../RenderEngine/LocalPose.h"
 #include <mathematics/matrix4x4.hpp>
-#include <cstdint>
-#include <memory>
+#include "../Utility_Framework/StandardLibrary.h"
 class AniTransition;
 class AvatarMask;
 class Animator;

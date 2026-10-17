@@ -17,12 +17,7 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include <array>
-#include <cstdint>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::inspector
 {

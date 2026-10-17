@@ -41,9 +41,7 @@
 // 신고·관측은 ImGui(Presentation) 스레드, 읽기·리셋은 게임 스레드의 CLI 다.
 // `editor::nav`·`editor::clipping` 과 같은 규약으로 게시본만 잠금으로 가른다.
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct ImRect;
 

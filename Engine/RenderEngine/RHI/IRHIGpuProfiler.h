@@ -1,7 +1,6 @@
 #pragma once
-#include <cstdint>
-#include <memory>
-#include <string>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class RHIEncoder;
 

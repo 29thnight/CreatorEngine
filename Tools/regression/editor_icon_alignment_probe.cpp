@@ -1,6 +1,5 @@
 #include "EditorIconAlignment.h"
-#include <cmath>
-#include <cstdio>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

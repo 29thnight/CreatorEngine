@@ -4,7 +4,7 @@
 #include "MaterialGraphRenderBindings.h"
 #include "LXMaterialPipeline.h"
 
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

@@ -2,9 +2,7 @@
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 
-#include <algorithm>
-#include <sstream>
-#include <stdexcept>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

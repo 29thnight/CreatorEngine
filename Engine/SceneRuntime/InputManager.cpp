@@ -1,7 +1,6 @@
 #include "InputManager.h"
 #include <wrl.h>
-#include <iostream>
-#include <cstdio>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "LogSystem.h"
 
 #pragma comment(lib, "GameInput.lib")

@@ -9,12 +9,7 @@
 #include "Texture.h"
 #include "PathFinder.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // EnhancedSkyBoxPass — Vulkan. 두 백엔드가 공유하는 첫 텍스처 소비 패스다.
 //

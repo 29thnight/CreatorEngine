@@ -2,14 +2,8 @@
 #include "Texture.h"
 #include "MaterialGraphShaderMeta.h"
 
-#include <algorithm>
-#include <bit>
-#include <cmath>
-#include <cstring>
-#include <fstream>
-#include <limits>
-#include <set>
-#include <sstream>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -76,8 +70,7 @@ void Replace(std::string& source, const std::string& from, const std::string& to
 bool IsSrgb(RHIFormat format)
 {
     return format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb ||
-           format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb ||
-           format == RHIFormat::BC7UnormSrgb;
+           format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb || format == RHIFormat::BC7UnormSrgb;
 }
 
 bool IsFloatTextureFormat(RHIFormat format)
@@ -158,34 +151,34 @@ bool Pack(const ParameterBinding& binding, const LX::LXSocketValue& value, std::
     return true;
 }
 
-        bool ValidateTextureEncodings(const BindingLayout& layout, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+bool ValidateTextureEncodings(const BindingLayout& layout, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+{
+    if (layout.textureEncodings.size() != layout.textures.size() || layout.textureEncodings.size() > 112u)
+    {
+        return Fail(diagnostics, "product.textureEncoding", "Texture encoding count differs from material textures.");
+    }
+    std::set<std::uint32_t> slots;
+    std::set<std::uint32_t> offsets;
+    for (const auto& binding : layout.textureEncodings)
+    {
+        if (binding.slot >= 112u || binding.offset % 4u != 0 ||
+            static_cast<std::uint64_t>(binding.offset) + 4u > layout.uniformBytes ||
+            !slots.insert(binding.slot).second || !offsets.insert(binding.offset).second ||
+            std::ranges::count(layout.textures, binding.slot, &LX::LXMaterialResource::slot) != 1)
         {
-            if (layout.textureEncodings.size() != layout.textures.size() || layout.textureEncodings.size() > 112u)
-            {
-                return Fail(diagnostics, "product.textureEncoding", "Texture encoding count differs from material textures.");
-            }
-            std::set<std::uint32_t> slots;
-            std::set<std::uint32_t> offsets;
-            for (const auto& binding : layout.textureEncodings)
-            {
-                if (binding.slot >= 112u || binding.offset % 4u != 0 ||
-                    static_cast<std::uint64_t>(binding.offset) + 4u > layout.uniformBytes ||
-                    !slots.insert(binding.slot).second || !offsets.insert(binding.offset).second ||
-                    std::ranges::count(layout.textures, binding.slot, &LX::LXMaterialResource::slot) != 1)
-                {
-                    return Fail(diagnostics, "product.textureEncoding", "Invalid runtime texture encoding slot or offset.");
-                }
-                for (const auto& parameter : layout.parameters)
-                {
-                    if (binding.offset < static_cast<std::uint64_t>(parameter.offset) + parameter.bytes &&
-                        parameter.offset < static_cast<std::uint64_t>(binding.offset) + 4u)
-                    {
-                        return Fail(diagnostics, "product.textureEncoding", "Runtime texture encoding overlaps a parameter.");
-                    }
-                }
-            }
-            return true;
+            return Fail(diagnostics, "product.textureEncoding", "Invalid runtime texture encoding slot or offset.");
         }
+        for (const auto& parameter : layout.parameters)
+        {
+            if (binding.offset < static_cast<std::uint64_t>(parameter.offset) + parameter.bytes &&
+                parameter.offset < static_cast<std::uint64_t>(binding.offset) + 4u)
+            {
+                return Fail(diagnostics, "product.textureEncoding", "Runtime texture encoding overlaps a parameter.");
+            }
+        }
+    }
+    return true;
+}
 
 constexpr std::uint32_t CookMagic = 0x434D584Cu; // LXMC, little endian
 constexpr std::uint32_t TextLimit = 16u * 1024u * 1024u;
@@ -387,8 +380,8 @@ RHIShaderReflection LayoutReflection(const BindingLayout& layout)
                                  binding.offset, binding.bytes});
         for (const auto& binding : layout.textureEncodings)
         {
-            cb.fields.push_back({TextureEncodingUniformName(binding.slot),
-                {RHIShaderScalarKind::UInt32, 1, 1, 1}, binding.offset, 4u});
+            cb.fields.push_back(
+                {TextureEncodingUniformName(binding.slot), {RHIShaderScalarKind::UInt32, 1, 1, 1}, binding.offset, 4u});
         }
         reflection.resources.push_back(std::move(cb));
     }
@@ -405,7 +398,8 @@ RHIShaderReflection LayoutReflection(const BindingLayout& layout)
     };
     append(layout.textures, true);
     append(layout.samplers, false);
-    if (!layout.textures.empty() || !layout.samplers.empty()) reflection.resources.push_back(DescriptorIndexReflection());
+    if (!layout.textures.empty() || !layout.samplers.empty())
+        reflection.resources.push_back(DescriptorIndexReflection());
     return reflection;
 }
 
@@ -417,8 +411,10 @@ bool BackendStagesComplete(const LX::LXMaterialProgram& program, std::map<RHISha
     bool carried = false;
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
-        if (stages[backend] == 0) continue;
-        if ((stages[backend] & required) != required) return false;
+        if (stages[backend] == 0)
+            continue;
+        if ((stages[backend] & required) != required)
+            return false;
         carried = true;
     }
     return carried;
@@ -577,28 +573,27 @@ std::string BuildBoundSource(const LX::LXMaterialProgram& program)
         prefix = "cbuffer LXDescriptorIndices : register(b15) { uint4 lx_descriptor_indices[32]; };\n";
     for (const bool texture : {true, false})
         if (std::ranges::any_of(program.resources, [texture](const auto& r) {
-            return (r.kind == LX::LXMaterialResourceKind::Texture) == texture;
-        }))
-            prefix += texture
-                ? "Texture2D<float4> lx_texture_table[4096] : register(t16384);\n"
-                : "SamplerState lx_sampler_table[36] : register(s3);\n";
+                return (r.kind == LX::LXMaterialResourceKind::Texture) == texture;
+            }))
+            prefix += texture ? "Texture2D<float4> lx_texture_table[4096] : register(t16384);\n"
+                              : "SamplerState lx_sampler_table[36] : register(s3);\n";
     for (const auto& resource : program.resources)
     {
         const bool texture = resource.kind == LX::LXMaterialResourceKind::Texture;
         const std::string kind = texture ? "t" : "s";
         const auto symbol = Symbol(resource);
         const auto index = resource.slot + (texture ? 0u : 64u);
-        Replace(source, std::string(texture ? "Texture2D<float4> " : "SamplerState ") + symbol +
-            " : register(" + kind + std::to_string(resource.slot) + ", space1);",
-            "\n#define " + symbol + (texture ? " lx_texture_table[" : " lx_sampler_table[") +
-            "lx_descriptor_indices[" + std::to_string(index / 4) + "][" + std::to_string(index % 4) + "]]\n");
+        Replace(source,
+                std::string(texture ? "Texture2D<float4> " : "SamplerState ") + symbol + " : register(" + kind +
+                    std::to_string(resource.slot) + ", space1);",
+                "\n#define " + symbol + (texture ? " lx_texture_table[" : " lx_sampler_table[") +
+                    "lx_descriptor_indices[" + std::to_string(index / 4) + "][" + std::to_string(index % 4) + "]]\n");
     }
     source = prefix + source;
     const bool numeric =
         std::ranges::any_of(program.parameters, [](const auto& parameter) { return Numeric(parameter.type); });
-    const bool textures = std::ranges::any_of(program.resources, [](const auto& resource) {
-        return resource.kind == LX::LXMaterialResourceKind::Texture;
-    });
+    const bool textures = std::ranges::any_of(
+        program.resources, [](const auto& resource) { return resource.kind == LX::LXMaterialResourceKind::Texture; });
     if (numeric || textures)
     {
         source += "\ncbuffer LXMaterialProperties : register(b2)\n{\n";
@@ -625,8 +620,8 @@ std::string BuildBoundSource(const LX::LXMaterialProgram& program)
     {
         if (resource.kind == LX::LXMaterialResourceKind::Texture)
         {
-            source += "    parameters.lx_texture_" + std::to_string(resource.slot) + "_encoding = " +
-                TextureEncodingUniformName(resource.slot) + ";\n";
+            source += "    parameters.lx_texture_" + std::to_string(resource.slot) +
+                      "_encoding = " + TextureEncodingUniformName(resource.slot) + ";\n";
         }
     }
     source += "    return parameters;\n}\n";
@@ -674,7 +669,8 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
             std::set<std::uint32_t> slots;
             for (const auto& logical : program.resources)
             {
-                if ((logical.kind == LX::LXMaterialResourceKind::Texture) != texture) continue;
+                if ((logical.kind == LX::LXMaterialResourceKind::Texture) != texture)
+                    continue;
                 if (logical.slot >= limit || !slots.insert(logical.slot).second)
                     return Fail(diagnostics, "product.resource", "Invalid bindless logical resource slot.");
                 (texture ? candidate.textures : candidate.samplers).push_back(logical);
@@ -713,12 +709,13 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
             return Fail(diagnostics, "product.uniform", "Generated texture encoding has no reflected constant buffer.");
         }
         const auto field = std::ranges::find(uniforms->fields, TextureEncodingUniformName(resource.slot),
-            &RHIShaderFieldReflection::name);
+                                             &RHIShaderFieldReflection::name);
         const RHIShaderValueType type{RHIShaderScalarKind::UInt32, 1, 1, 1};
         if (field == uniforms->fields.end() || field->type != type || field->byteSize != 4u ||
             field->byteOffset % 4u != 0 || static_cast<std::uint64_t>(field->byteOffset) + 4u > candidate.uniformBytes)
         {
-            return Fail(diagnostics, "product.textureEncoding", "Invalid reflected texture encoding field.", resource.source);
+            return Fail(diagnostics, "product.textureEncoding", "Invalid reflected texture encoding field.",
+                        resource.source);
         }
         for (const auto& other : candidate.parameters)
         {
@@ -760,8 +757,8 @@ bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages
         }
         for (const auto& resource : stage->resources)
         {
-            if (resource.name != "LXMaterialProperties" && resource.name != "LXDescriptorIndices" && !resource.name.starts_with("lx_texture_") &&
-                !resource.name.starts_with("lx_sampler_"))
+            if (resource.name != "LXMaterialProperties" && resource.name != "LXDescriptorIndices" &&
+                !resource.name.starts_with("lx_texture_") && !resource.name.starts_with("lx_sampler_"))
             {
                 continue;
             }
@@ -812,7 +809,7 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
         unsigned stage = target.profile.starts_with("vs_")   ? 1u
                          : target.profile.starts_with("ps_") ? 2u
                          : target.profile.starts_with("ms_") ? 8u
-                               : target.profile.starts_with("cs_") ? 4u
+                         : target.profile.starts_with("cs_") ? 4u
                                                              : 0u;
         if (stage == 0)
             return Fail(diagnostics, "product.target", "Unknown stage in a material specialization.");
@@ -889,23 +886,27 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
     if (!hasLayout)
         return Fail(diagnostics, "product.uniform", "Verified material has no consuming shader stage.");
     result = std::move(candidate);
-    if (materialReflections) *materialReflections = std::move(mergedReflections);
+    if (materialReflections)
+        *materialReflections = std::move(mergedReflections);
     return true;
 }
 
-bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary backend,
-    std::string_view vertex, std::string_view pixel, LX::Runtime::GraphicsShaderDescription& result,
-    std::string& error)
+bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary backend, std::string_view vertex,
+                            std::string_view pixel, LX::Runtime::GraphicsShaderDescription& result, std::string& error)
 {
     if (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV)
-    { error = "LX graphics identity requires a supported backend."; return false; }
+    {
+        error = "LX graphics identity requires a supported backend.";
+        return false;
+    }
     const auto select = [&](std::string_view entry, std::string_view stage) -> const CompileTarget* {
         const CompileTarget* found = nullptr;
         for (const auto& target : product.targets)
             if (target.binary == backend && target.profile.starts_with(stage) &&
                 (entry.empty() || target.entry == entry))
             {
-                if (found) return nullptr;
+                if (found)
+                    return nullptr;
                 found = &target;
             }
         return found;
@@ -913,21 +914,30 @@ bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary back
     const auto* vs = select(vertex, "vs_");
     const auto* ps = select(pixel, "ps_");
     if (!vs || !ps || product.program.semanticKey.empty())
-    { error = "LX graphics stages or sealed program identity are missing or ambiguous."; return false; }
+    {
+        error = "LX graphics stages or sealed program identity are missing or ambiguous.";
+        return false;
+    }
     const auto binary = backend == RHIShaderBinary::Dxil ? "dxil" : "spirv";
     for (const auto* target : {vs, ps})
         if (!std::ranges::any_of(product.shaders, [&](const auto& artifact) {
-            return artifact.backend == binary && artifact.entryPoint == target->entry && !artifact.bytecode.empty();
-        }))
-        { error = "LX graphics stage has no owned cooked bytecode."; return false; }
+                return artifact.backend == binary && artifact.entryPoint == target->entry && !artifact.bytecode.empty();
+            }))
+        {
+            error = "LX graphics stage has no owned cooked bytecode.";
+            return false;
+        }
     LX::Runtime::GraphicsShaderDescription candidate;
     candidate.shader = product.materialShader;
     auto& id = candidate.compile;
     id.backend = backend;
-    id.vertexEntry = vs->entry; id.vertexProfile = vs->profile;
-    id.pixelEntry = ps->entry; id.pixelProfile = ps->profile;
+    id.vertexEntry = vs->entry;
+    id.vertexProfile = vs->profile;
+    id.pixelEntry = ps->entry;
+    id.pixelProfile = ps->profile;
     id.sealedProgramIdentity = product.program.semanticKey;
-    if (candidate.shader) id.source = candidate.shader->meta.source.generic_string();
+    if (candidate.shader)
+        id.source = candidate.shader->meta.source.generic_string();
     // Physical include roots need not exist in the Player; their fingerprints
     // and the actual compile flags remain in the verified sealed identity.
     if (product.program.semanticKey.ends_with(SceneHostIdentity))
@@ -943,17 +953,23 @@ bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary back
     return true;
 }
 
-bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend,
-    std::string_view entry, LX::Runtime::ComputeShaderDescription& result, std::string& error)
+bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend, std::string_view entry,
+                           LX::Runtime::ComputeShaderDescription& result, std::string& error)
 {
     if (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV)
-    { error = "LX compute identity requires a supported backend."; return false; }
+    {
+        error = "LX compute identity requires a supported backend.";
+        return false;
+    }
     const CompileTarget* stage = nullptr;
     for (const auto& target : product.targets)
-        if (target.binary == backend && target.profile.starts_with("cs_") &&
-            (entry.empty() || target.entry == entry))
+        if (target.binary == backend && target.profile.starts_with("cs_") && (entry.empty() || target.entry == entry))
         {
-            if (stage) { error = "LX compute stage is ambiguous."; return false; }
+            if (stage)
+            {
+                error = "LX compute stage is ambiguous.";
+                return false;
+            }
             stage = &target;
         }
     const auto binary = backend == RHIShaderBinary::Dxil ? "dxil" : "spirv";
@@ -961,13 +977,19 @@ bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backe
         !std::ranges::any_of(product.shaders, [&](const auto& artifact) {
             return artifact.backend == binary && artifact.entryPoint == stage->entry && !artifact.bytecode.empty();
         }))
-    { error = "LX compute stage or sealed bytecode identity is missing."; return false; }
+    {
+        error = "LX compute stage or sealed bytecode identity is missing.";
+        return false;
+    }
     LX::Runtime::ComputeShaderDescription candidate;
     candidate.shader = product.materialShader;
     auto& id = candidate.compile;
-    id.backend = backend; id.entry = stage->entry; id.profile = stage->profile;
+    id.backend = backend;
+    id.entry = stage->entry;
+    id.profile = stage->profile;
     id.sealedProgramIdentity = product.program.semanticKey;
-    if (candidate.shader) id.source = candidate.shader->meta.source.generic_string();
+    if (candidate.shader)
+        id.source = candidate.shader->meta.source.generic_string();
     if (product.program.semanticKey.ends_with(SceneHostIdentity))
     {
         id.options.strictMath = id.options.fineDerivatives = true;
@@ -1021,8 +1043,8 @@ bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOver
 }
 
 bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,
-                      std::span<const TextureBinding> textures, ResourcePacket& result,
-                      std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                                  std::span<const TextureBinding> textures, ResourcePacket& result,
+                                  std::vector<LX::LXMaterialDiagnostic>& diagnostics)
 {
     if (uniforms.size() != layout.uniformBytes || uniforms.size() > 65536)
         return Fail(diagnostics, "product.uniform", "Prepared common material uniform block has an invalid size.");
@@ -1055,10 +1077,12 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
         const auto encoding = std::ranges::find(layout.textureEncodings, resource.slot, &TextureEncodingBinding::slot);
         if (encoding == layout.textureEncodings.end())
         {
-            return Fail(diagnostics, "product.textureEncoding", "Missing runtime texture encoding binding.", resource.source);
+            return Fail(diagnostics, "product.textureEncoding", "Missing runtime texture encoding binding.",
+                        resource.source);
         }
-        const auto value = static_cast<std::uint32_t>(found->texture.format == RHIFormat::BC5Unorm
-            ? TextureSampleEncoding::BC5Normal : TextureSampleEncoding::Rgba);
+        const auto value =
+            static_cast<std::uint32_t>(found->texture.format == RHIFormat::BC5Unorm ? TextureSampleEncoding::BC5Normal
+                                                                                    : TextureSampleEncoding::Rgba);
         std::memcpy(candidate.uniforms.data() + encoding->offset, &value, sizeof(value));
         while (candidate.textures.size() <= resource.slot)
             candidate.textures.push_back(RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
@@ -1074,8 +1098,10 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
         std::vector<std::string> parts;
         std::istringstream input(resource.reference);
         std::string part;
-        while (std::getline(input, part, '-')) parts.push_back(part);
-        if (parts.size() == 2) parts = {parts[0], parts[0], parts[1], parts[1]};
+        while (std::getline(input, part, '-'))
+            parts.push_back(part);
+        if (parts.size() == 2)
+            parts = {parts[0], parts[0], parts[1], parts[1]};
         const auto filter = [](const std::string& value) { return value == "linear" || value == "nearest"; };
         const auto address = [](const std::string& value) {
             return value == "repeat" || value == "clamp" || value == "mirror";
@@ -1089,7 +1115,9 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
         sampler.minMag = parts[0] == "linear" ? RHIFilterMode::Linear : RHIFilterMode::Point;
         sampler.mip = parts[1] == "linear" ? RHIFilterMode::Linear : RHIFilterMode::Point;
         const auto mode = [](const std::string& value) {
-            return value == "repeat" ? RHIAddressMode::Wrap : value == "mirror" ? RHIAddressMode::Mirror : RHIAddressMode::Clamp;
+            return value == "repeat"   ? RHIAddressMode::Wrap
+                   : value == "mirror" ? RHIAddressMode::Mirror
+                                       : RHIAddressMode::Clamp;
         };
         sampler.addressU = sampler.addressW = mode(parts[2]);
         sampler.addressV = mode(parts[3]);
@@ -1183,16 +1211,18 @@ bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, st
         GeneratedMaterialShader restored;
         if (shader.cookedContract.empty() || shader.cookedContract.size() > 1024u * 1024u ||
             !RestoreMaterialShaderMeta(product, shader.meta.guid, shader.document, shader.source, restored, error,
-                shader.cookedContract) ||
+                                       shader.cookedContract) ||
             restored.layout != shader.layout)
         {
-            if (error.empty()) error = "Generated material binding differs from the verified product layout.";
+            if (error.empty())
+                error = "Generated material binding differs from the verified product layout.";
             return false;
         }
         Text(bytes, shader.meta.guid.ToString());
         Text(bytes, shader.document);
         Text(bytes, shader.source);
-        Block(bytes, {reinterpret_cast<const std::uint8_t*>(shader.cookedContract.data()), shader.cookedContract.size()});
+        Block(bytes,
+              {reinterpret_cast<const std::uint8_t*>(shader.cookedContract.data()), shader.cookedContract.size()});
     }
     Wide(bytes, Checksum(bytes));
     result = std::move(bytes);
@@ -1314,7 +1344,7 @@ bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget
     std::span<const std::uint8_t> contract;
     if (!reader.Word(generated) || generated > 1 ||
         (generated && (!reader.Text(graphGuid, 36) || !reader.Text(document, 1024u * 1024u) || !reader.Text(source) ||
-            !reader.Block(contract, 1024u * 1024u))))
+                       !reader.Block(contract, 1024u * 1024u))))
         return invalid();
     if (!reader.Empty() || !ValidateProduct(product, budget, error) ||
         candidate.boundSource != BuildBoundSource(program) ||
@@ -1323,8 +1353,10 @@ bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget
     if (generated)
     {
         GeneratedMaterialShader shader;
-        if (contract.empty() || !RestoreMaterialShaderMeta(product, FileGuid{graphGuid}, document, source, shader, error,
-                {reinterpret_cast<const std::byte*>(contract.data()), contract.size()})) return false;
+        if (contract.empty() ||
+            !RestoreMaterialShaderMeta(product, FileGuid{graphGuid}, document, source, shader, error,
+                                       {reinterpret_cast<const std::byte*>(contract.data()), contract.size()}))
+            return false;
         product.materialShader = own::make_shared<const GeneratedMaterialShader>(std::move(shader));
     }
     result = std::move(candidate);

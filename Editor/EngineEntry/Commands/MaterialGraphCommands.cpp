@@ -10,10 +10,7 @@
 #include "DataSystem.h"
 #include "MaterialGraphWindow.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <sstream>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace ConsoleCmd
 {

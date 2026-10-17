@@ -9,8 +9,7 @@
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h" // I5-D5c5
 
-#include <algorithm>
-#include <cstring>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace ExperimentMaterialSealing
 {

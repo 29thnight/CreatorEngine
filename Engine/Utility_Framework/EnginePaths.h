@@ -2,9 +2,7 @@
 
 #include <Windows.h>
 
-#include <array>
-#include <cwchar>
-#include <filesystem>
+#include "StandardLibrary.h"
 
 // Fully resolved roots supplied by the process host. Runtime code derives only
 // subdirectories from these values and never decides whether it is Editor or Player.

@@ -4,9 +4,8 @@
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 
-#include <cstddef>
-#include <type_traits>
-#include <vector>
+#include <stddef.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 

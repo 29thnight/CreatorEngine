@@ -6,15 +6,12 @@
 #if defined(_WIN32)
 #include "Experiment/Cooked/PakAudioClipByteSource.h"
 #else
-#include <csignal>
+#include <errno.h>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <sys/wait.h>
 #endif
 
-#include <chrono>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
-#include <thread>
 
 namespace
 {

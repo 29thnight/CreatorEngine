@@ -2,9 +2,7 @@
 
 #include "ImGui.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

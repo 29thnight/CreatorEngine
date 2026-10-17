@@ -2,10 +2,7 @@
 
 #include "LXGraph.h"
 
-#include <cstdint>
-#include <optional>
-#include <string>
-#include <variant>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

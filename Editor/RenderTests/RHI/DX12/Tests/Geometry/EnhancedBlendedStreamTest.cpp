@@ -11,10 +11,7 @@
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Mesh.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

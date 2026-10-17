@@ -1,10 +1,7 @@
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
-#include <vector>
+#include <stddef.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

@@ -1,9 +1,7 @@
 #pragma once
 #include <mathematics/matrix4x4.hpp>
 #include "../../FrameCameraSnapshot.h"
-#include <array>
-#include <algorithm>
-#include <cmath>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace shadow_math
 {

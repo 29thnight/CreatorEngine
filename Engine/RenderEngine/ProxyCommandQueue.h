@@ -2,17 +2,10 @@
 #include "Core.Minimal.h"
 #include "AnimationPaletteArena.h"
 #include "ProxyCommand.h"
-#include "concurrent_queue.h"
-#include <deque>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <span>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#include "../Utility_Framework/ConcurrentQueue.h"
+#include "../Utility_Framework/StandardLibrary.h"
 
-using namespace concurrency;
+
 
 class RenderScene;
 
@@ -20,7 +13,7 @@ class ProxyCommandQueueController : public Singleton<ProxyCommandQueueController
 {
 private:
 	friend class Singleton;
-	using ImplProxyCommandQueue = concurrent_queue<ProxyCommand>;
+	using ImplProxyCommandQueue = ce::concurrent_queue<ProxyCommand>;
 
 private:
 	ProxyCommandQueueController() = default;

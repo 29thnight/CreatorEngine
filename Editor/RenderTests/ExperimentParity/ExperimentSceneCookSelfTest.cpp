@@ -7,16 +7,8 @@
 #include "AuthoringNodeEquality.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <chrono>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <process.h>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
 
 namespace RenderTest
 {

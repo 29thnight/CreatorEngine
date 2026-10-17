@@ -3,7 +3,7 @@
 #include "MaterialGraphProduct.h"
 #include "ShaderMeta.h"
 
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -12,7 +12,8 @@ struct SceneShaderSet
     BindingLayout layout;
     RHIShaderCompiler::VerifiedShader vertex, gbuffer, visibility, color, lookup0, lookup1, temporalVertex, temporal;
     RHIShaderCompiler::VerifiedShader mesh, visibilityMesh, reconstructMesh, shadowMesh;
-    RHIShaderCompiler::VerifiedShader shadowVertex, shadow, subsurface, refraction, volume, runtimeEffects0, runtimeEffects1;
+    RHIShaderCompiler::VerifiedShader shadowVertex, shadow, subsurface, refraction, volume, runtimeEffects0,
+        runtimeEffects1;
 };
 
 // No backend means both. AssetCooker always cooks both; the editor compiles only

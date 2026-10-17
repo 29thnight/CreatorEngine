@@ -1,9 +1,7 @@
 #pragma once
 #include "TypeDefinition.h"
 #include "MemoryPool.h"
-#include <concepts>
-#include <vector>
-#include <list>
+#include "StandardLibrary.h"
 
 template<typename T>
 concept Pointer =

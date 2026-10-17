@@ -1,7 +1,6 @@
 #include "NullAudioBackend.h"
 
-#include <algorithm>
-#include <cmath>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
 namespace wave

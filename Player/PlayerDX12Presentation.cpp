@@ -5,9 +5,9 @@
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/RHIShaderCompiler.h"
 
-#include <array>
-#include <cstdio>
-#include <limits>
+#include <stdint.h>
+#include <stdio.h>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 namespace Player

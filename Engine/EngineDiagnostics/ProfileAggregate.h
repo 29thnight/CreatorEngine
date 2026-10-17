@@ -18,9 +18,7 @@
 //   먼저 들어간다). 그래서 목록을 그대로 읽으면 안쪽부터 나온다. 같은 스레드
 //   안에서 (시작 tick 오름차순, depth 오름차순)으로 세우면 전위 순회가 되고,
 //   그 뒤에는 depth 만으로 부모를 찾을 수 있다.
-#include <cstdint>
-#include <span>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "ProfileCapture.h"
 

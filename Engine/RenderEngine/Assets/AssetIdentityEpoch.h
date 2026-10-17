@@ -18,11 +18,7 @@
 
 #include "AssetIdentityProfile.h"
 
-#include <cstdint>
-#include <filesystem>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

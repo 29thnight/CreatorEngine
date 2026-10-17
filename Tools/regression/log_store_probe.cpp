@@ -4,16 +4,8 @@
 #include "MenuBarWindow.h"
 #include "OutputLogView.h"
 #include <spdlog/logger.h>
-#include <atomic>
-#include <barrier>
-#include <chrono>
-#include <cstdio>
-#include <fstream>
-#include <deque>
-#include <iterator>
-#include <map>
-#include <unordered_map>
-#include <thread>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

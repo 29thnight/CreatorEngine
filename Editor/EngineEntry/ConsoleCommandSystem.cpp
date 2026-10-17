@@ -83,7 +83,7 @@
 #include "AuthoringParsedDocument.h"
 #include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -125,34 +125,16 @@
 #include <psapi.h> // MBC11: peak working set
 #pragma comment(lib, "Psapi.lib")
 #include <crtdbg.h>
-#include <algorithm>
-#include <atomic>
-#include <cctype>
-#include <limits>
-#include <random>
-#include <optional>
-#include <stdexcept>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <DbgHelp.h>
 #pragma comment(lib, "dbghelp.lib")
 
 #include <DXProgrammableCapture.h>
-#include <chrono>
 #include <dxgidebug.h>
 #include <wrl/client.h>
-#include <algorithm>
-#include <cstring>
-#include <cstdio>
-#include <fstream>
-#include <functional>
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
-#include <unordered_set>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
 
 namespace
 {
@@ -508,7 +490,7 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
     {
         // 스크립트로 돌리는 실행에서는 크래시 때 대화상자를 띄우지 않는다 —
         // 답할 사람이 없어 그대로 멈춰 있다가 덤프도 없이 죽는다.
-        CoreWindow::SetUnattended(true);
+        WindowsCoreWindow::SetUnattended(true);
         SuppressCrtDialogs();
 
         EnsureConsole();

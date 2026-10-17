@@ -1,8 +1,5 @@
 #include "ProfileCaptureFile.h"
-#include <iomanip>
-#include <iostream>
-#include <string_view>
-#include <algorithm>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

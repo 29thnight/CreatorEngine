@@ -1,6 +1,6 @@
 #pragma once
-#include <span>
-#include <cstdint>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "RHIResourceTypes.h"
 

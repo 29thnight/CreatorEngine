@@ -1,6 +1,6 @@
 #include "LXMaterialOperators.h"
 
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

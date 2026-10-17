@@ -1,10 +1,7 @@
 #include "DxCaptureService.h"
 #include "DxCaptureSubmission.h"
 
-#include <chrono>
-#include <exception>
-#include <limits>
-#include <utility>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #if CE_DX_TIMING_CAPTURE && !CE_SHIPPING
 #ifndef NOMINMAX

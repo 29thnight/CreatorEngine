@@ -17,16 +17,9 @@
 #include "../../Render/Graph/EnhancedGpuMeasurementHistory.h"
 #include "PathFinder.h"
 
-#include <cstdio>
-#include <array>
-#include <algorithm>
-#include <cstdlib>
-#include <cstring>
-#include <exception>
-#include <sstream>
-#include <optional>
-#include <utility>
-#include <vector>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 namespace

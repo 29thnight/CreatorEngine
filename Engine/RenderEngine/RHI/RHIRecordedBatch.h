@@ -2,11 +2,7 @@
 #include "RHIResourceTypes.h"
 #include "../../EngineDiagnostics/DxCaptureSubmission.h"
 
-#include <cstdint>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class IRHIParallelCommandPool;
 class RHISubmissionThread;

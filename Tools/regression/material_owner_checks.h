@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Engine/Utility_Framework/Ownership.h"
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace material_graph_test
 {

@@ -1,7 +1,7 @@
 #include "XeSSUpscaler.h"
 
-#include <cmath>
-#include <utility>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #if defined(_WIN32) && (CREATOR_ENABLE_XESS_SDK || CREATOR_ENABLE_XESS_VULKAN_SDK)
 #include <xess/xess.h>

@@ -1,5 +1,5 @@
 #pragma once
-#include <memory>
+#include "StandardLibrary.h"
 
 // SerializationPlan D3-a-3 — 저작 문서의 **소유권** 타입.
 //

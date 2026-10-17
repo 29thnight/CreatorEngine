@@ -5,11 +5,7 @@
 #include "CookedTexture.h"
 #include "TextureImportSettings.h"
 
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <fstream>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #ifdef _WIN32
 #include <Windows.h>
 #endif

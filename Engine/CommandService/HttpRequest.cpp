@@ -1,7 +1,6 @@
 #include "HttpRequest.h"
 
-#include <algorithm>
-#include <cctype>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

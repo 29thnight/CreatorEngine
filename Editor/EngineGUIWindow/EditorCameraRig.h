@@ -1,8 +1,7 @@
 #pragma once
 
 #include "Camera.h"
-#include <cstdint>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct EnhancedLiveDisplayTexture;
 

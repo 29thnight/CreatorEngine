@@ -1,5 +1,5 @@
 #pragma once
-#include <chrono>
+#include "StandardLibrary.h"
 
 class Benchmark final
 {

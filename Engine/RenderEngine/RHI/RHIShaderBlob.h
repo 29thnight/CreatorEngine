@@ -1,9 +1,5 @@
 #pragma once
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <utility>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // 컴파일된 셰이더 바이트코드 — 백엔드 중립 (V5).
 //

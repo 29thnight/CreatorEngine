@@ -1,21 +1,8 @@
 // Phase 22 exact-production-source regression entry point.
 // Deterministic fixtures and pre-cutover contracts retained from 86f7efd.
 // Device-free PCM rendering and logical Null backend are reported separately.
-#include <algorithm>
-#include <array>
-#include <chrono>
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
-#include <memory>
-#include <string>
-#include <thread>
-#include <utility>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "Audio/AudioHost.h"
 #include "Audio/AudioRuntime.h"
@@ -24,8 +11,6 @@
 #include "Audio/NullAudioBackend.h"
 #include "Audio/VoiceTable.h"
 #include "Audio/PlaybackService.h"
-#include <limits>
-#include <atomic>
 #include "Assets/AudioClipSourceMetadata.h"
 #include "audio_fixture_decoder.h"
 namespace

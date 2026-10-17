@@ -1,12 +1,7 @@
 #include "ProfileAggregate.h"
 #include "ProfileAggregateBaseline.h"
 
-#include <algorithm>
-#include <chrono>
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace profile_aggregate_benchmark
 {

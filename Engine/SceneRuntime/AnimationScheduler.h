@@ -1,11 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/matrix4x4.hpp>
-#include <thread>
-#include <memory>
-#include <atomic>
-#include <cstdint>
-#include <mutex>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class RenderScene;
 class Animator;

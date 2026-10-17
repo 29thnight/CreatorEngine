@@ -1,8 +1,6 @@
 #include "LXMaterialIR.h"
 
-#include <algorithm>
-#include <charconv>
-#include <set>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

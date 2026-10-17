@@ -1,5 +1,5 @@
 #pragma once
-#include <string>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 namespace RenderTest
 {
     // Isolated commandlet only: creates fixtures and replaces its active scene.

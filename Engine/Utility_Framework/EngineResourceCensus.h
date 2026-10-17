@@ -1,9 +1,5 @@
 ﻿#pragma once
-#include <array>
-#include <atomic>
-#include <cstdint>
-#include <string>
-#include <string_view>
+#include "StandardLibrary.h"
 
 // 엔진이 직접 세는 리소스 카운터.
 //

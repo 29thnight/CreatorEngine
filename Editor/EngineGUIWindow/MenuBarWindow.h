@@ -3,8 +3,7 @@
 #include "Windows/EditorWindowBody.h"
 #include "OutputLogWindow.h"
 
-#include <vector>
-#include <mutex>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct EditorTitleBarLayout;
 

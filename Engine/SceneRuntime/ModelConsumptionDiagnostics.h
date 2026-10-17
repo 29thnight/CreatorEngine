@@ -10,9 +10,7 @@
 // 계수는 프로세스 수명 동안 단조 증가한다(리셋 없음 — 리셋도 상태 변경이다). 게이트는
 // 절대값이 아니라 시나리오 안의 기대 하한/상한으로 판정한다.
 
-#include <cstdint>
-#include <string>
-#include <string_view>
+#include "../Utility_Framework/StandardLibrary.h"
 
 struct ModelConsumptionSnapshot final
 {

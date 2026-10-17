@@ -1,8 +1,7 @@
 #pragma once
 #include "RHIHandle.h"
 
-#include <cstddef>
-#include <span>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // 리소스 상태 — 백엔드 중립 (PHASE 3-1 재정의, V3).
 //

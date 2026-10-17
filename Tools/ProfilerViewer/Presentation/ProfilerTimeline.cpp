@@ -11,13 +11,7 @@
 //   코어 프로브가 물고 있어서, 여기서는 그 결과를 픽셀로 옮기기만 한다.
 #include "ProfilerView.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <unordered_set>
-#include <memory>
-#include <unordered_map>
-#include <utility>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ImGui.h"
 #include "EditorIcons.h"

@@ -1,7 +1,6 @@
 #pragma once
 #include "../Physics/PhysicsCharacter.h"
-#include <algorithm>
-#include <cmath>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

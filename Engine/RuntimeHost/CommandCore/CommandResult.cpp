@@ -1,6 +1,6 @@
 #include "CommandResult.h"
 
-#include <algorithm>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace CommandCore
 {

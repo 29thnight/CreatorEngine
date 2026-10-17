@@ -1,6 +1,6 @@
 #include "CommandParser.h"
 
-#include <atomic>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace CommandCore
 {

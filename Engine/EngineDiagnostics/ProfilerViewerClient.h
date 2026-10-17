@@ -1,10 +1,6 @@
 #pragma once
 
-#include <filesystem>
-#include <expected>
-#include <memory>
-#include <span>
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "DxCaptureService.h"
 #include "ProfileService.h"

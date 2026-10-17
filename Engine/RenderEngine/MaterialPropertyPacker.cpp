@@ -1,8 +1,5 @@
 #include "MaterialPropertyPacker.h"
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <variant>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace MaterialPropertyPacker
 {

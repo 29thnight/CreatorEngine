@@ -2,13 +2,7 @@
 // asks the renderer or process for live state while drawing.
 #include "ProfilerView.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <memory>
-#include <optional>
-#include <utility>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ImGui.h"
 #include "ProfileCapture.h"

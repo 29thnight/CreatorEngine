@@ -4,11 +4,7 @@
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
-#include <algorithm>
-#include <array>
-#include <cstring>
-#include <string>
-#include <vector>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -13,10 +13,8 @@
 #include "ImGui.h"
 #include "ProfileScope.h"
 
-#include <cfloat>
-#include <cstdint>
-#include <string>
-#include <vector>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

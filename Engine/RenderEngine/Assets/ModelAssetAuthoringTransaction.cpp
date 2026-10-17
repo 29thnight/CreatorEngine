@@ -6,6 +6,7 @@
 #include "ModelSidecarV2.h"
 #include "ModelMaterialGraph.h"
 #include "ModelSourcePreparation.h"
+#include "ModelGenerationStreaming.h"
 #include "../Experiment/Cooked/CookSupport.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/Cooked/TextureCookProducer.h"
@@ -16,19 +17,8 @@
 
 #include <Windows.h>
 
-#include <algorithm>
-#include <cctype>
-#include <chrono>
-#include <fstream>
-#include <limits>
-#include <map>
-#include <mutex>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include <process.h>
-#include <ranges>
-#include <set>
-#include <span>
-#include <string_view>
-#include <utility>
 
 namespace assets
 {
@@ -662,7 +652,7 @@ namespace assets
             Authoring::WriteDocument document;
             const Authoring::WriteNode root = document.Root();
             root.SetMap();
-            root.Child("schemaVersion").SetScalar(1u);
+            root.Child("schemaVersion").SetScalar(2u);
             root.Child("identityProfile").SetScalar(sidecar.identityProfile);
             root.Child("identityEpoch").SetScalar(sidecar.identityEpoch);
             root.Child("assetId").SetScalar(Uuid::ToString(sidecar.assetId));
@@ -671,7 +661,7 @@ namespace assets
             root.Child("sidecarFingerprint").SetScalar(sidecarFingerprint);
             const Authoring::WriteNode model = root.Child("modelArtifact");
             model.SetMap();
-            model.Child("path").SetScalar("model.cemc");
+            model.Child("path").SetScalar("metadata.cemc");
             model.Child("fingerprint").SetScalar(modelFingerprint);
 
             const Authoring::WriteNode entries = root.Child("subAssets");
@@ -716,7 +706,7 @@ namespace assets
             }
             const Authoring::ReadNode root = document.Root();
             const Authoring::ReadNode model = root["modelArtifact"];
-            const bool valid = root["schemaVersion"].As(0u) == 1u
+            const bool valid = root["schemaVersion"].As(0u) == 2u
                 && root["identityProfile"].AsString() == sidecar.identityProfile
                 && root["identityEpoch"].AsString() == sidecar.identityEpoch
                 && root["assetId"].AsString() == Uuid::ToString(sidecar.assetId)
@@ -724,7 +714,7 @@ namespace assets
                 && root["sourceFingerprint"].AsString() == sidecar.sourceFingerprint
                 && root["sidecarFingerprint"].AsString() == sidecarFingerprint
                 && model && model.IsMap()
-                && model["path"].AsString() == "model.cemc"
+                && model["path"].AsString() == "metadata.cemc"
                 && model["fingerprint"].AsString() == modelFingerprint
                 && root["subAssets"].IsSequence()
                 && root["subAssets"].Size() == sidecar.subAssets.size();
@@ -1079,18 +1069,31 @@ namespace assets
             }
         }
         markPhase("meshlets");
-        const ck::CookedWriteResult cooked = ck::Write(draft);
-        if (!cooked.Succeeded())
-        {
-            Mbc3AddIssue(result, "cooked.write", cooked.issues.empty()
-                ? "CEMC writer가 artifact를 만들지 못했다."
-                : cooked.issues.front().message);
-            return result;
-        }
-        const std::string modelFingerprint = Mbc3Fingerprint(cooked.bytes);
         const std::string sidecarFingerprint = Mbc3Fingerprint(sidecarText);
-        const std::string generationRecord = Mbc3WriteGenerationRecord(
-            sidecar, sidecarFingerprint, modelFingerprint, textures);
+        generation_streaming::Bundle streaming;
+        try
+        {
+            std::vector<Uuid::Uuid16> meshIds, materialIds; Uuid::Uuid16 skeletonId{};
+            for (const auto& entry : sidecar.subAssets)
+            {
+                if (entry.kind == SubAssetKind::Mesh) meshIds.push_back(entry.assetId);
+                else if (entry.kind == SubAssetKind::Material) materialIds.push_back(entry.assetId);
+                else if (entry.kind == SubAssetKind::Skeleton) skeletonId = entry.assetId;
+            }
+            streaming = generation_streaming::Build(draft,meshIds,materialIds,skeletonId,generation,geometrySettings.createMeshCollider);
+        }
+        catch (const std::exception& error)
+        { Mbc3AddIssue(result,"streaming.cook",error.what()); return result; }
+        std::string generationRecord = Mbc3WriteGenerationRecord(
+            sidecar, sidecarFingerprint, streaming.metadataFingerprint, textures);
+        {
+            std::string error; auto document = Authoring::WriteDocument::ParseText(generationRecord,&error);
+            if (!document) { Mbc3AddIssue(result,"streaming.record",error); return result; }
+            auto value = document->Root().Child("streaming"); value.SetMap();
+            value.Child("manifestFingerprint").SetScalar(streaming.manifestFingerprint);
+            value.Child("metadataFingerprint").SetScalar(streaming.metadataFingerprint);
+            generationRecord = document->Dump();
+        }
 
         const std::string modelIdText = Uuid::ToString(sidecar.assetId);
         const std::filesystem::path finalParent = generationRoot / modelIdText;
@@ -1137,8 +1140,15 @@ namespace assets
         }
 
         markPhase("cook+textures+record");
+        for (const auto& file : streaming.files)
+        {
+            const auto path = cleanup.stage / file.path;
+            std::filesystem::create_directories(path.parent_path(),error);
+            std::vector<std::byte> restored;
+            if (error || !Mbc3WriteBytes(path,file.bytes,failure) || !Mbc3ReadBytes(path,restored) || restored != file.bytes)
+            { Mbc3AddIssue(result,"streaming.stage",failure); return result; }
+        }
         if (!Mbc3WriteText(cleanup.stage / "sidecar.meta", sidecarText, failure)
-            || !Mbc3WriteBytes(cleanup.stage / "model.cemc", cooked.bytes, failure)
             || !Mbc3WriteText(cleanup.stage / "generation.asset",
                 generationRecord, failure))
         {
@@ -1186,12 +1196,12 @@ namespace assets
         std::vector<std::byte> stagedModel;
         experiment::ModelDraft restoredDraft;
         std::vector<experiment::ModelLoadIssue> modelIssues;
-        if (!Mbc3ReadBytes(cleanup.stage / "model.cemc", stagedModel)
-            || Mbc3Fingerprint(stagedModel) != modelFingerprint
+        if (!Mbc3ReadBytes(cleanup.stage / "metadata.cemc", stagedModel)
+            || Mbc3Fingerprint(stagedModel) != streaming.metadataFingerprint
             || !ck::Read(stagedModel, restoredDraft, modelIssues)
             || !modelIssues.empty()
             || restoredDraft.metadata.assetId.value != sidecar.assetId
-            || restoredDraft.meshes.size() != draft.meshes.size()
+            || !restoredDraft.meshes.empty()
             || restoredDraft.materials.size() != draft.materials.size()
             || restoredDraft.skeleton.has_value() != draft.skeleton.has_value()
             || (restoredDraft.skeleton && draft.skeleton
@@ -1219,7 +1229,7 @@ namespace assets
         std::string stagedRecord;
         if (!Mbc3ReadText(cleanup.stage / "generation.asset", stagedRecord)
             || !Mbc3VerifyGenerationRecord(stagedRecord, sidecar,
-                sidecarFingerprint, modelFingerprint, failure))
+                sidecarFingerprint, streaming.metadataFingerprint, failure))
         {
             Mbc3AddIssue(result, "stage.verify-record", std::move(failure));
             return result;

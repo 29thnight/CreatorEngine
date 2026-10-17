@@ -22,8 +22,7 @@
 //      배율을 내리면 소스가 캔버스보다 작아지는데, 그때 crop 은 그림을 작게
 //      그리고 가장자리를 검게 남긴다.
 #include "imgui.h"
-#include <algorithm>
-#include <cmath>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

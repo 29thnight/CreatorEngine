@@ -2,12 +2,7 @@
 
 #include "MaterialGraphRuntime.h"
 
-#include <cstddef>
-#include <limits>
-#include <map>
-#include <mutex>
-#include <tuple>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

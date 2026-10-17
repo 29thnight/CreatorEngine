@@ -1,7 +1,5 @@
 #pragma once
-#include <array>
-#include <cstdint>
-#include <vector>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"

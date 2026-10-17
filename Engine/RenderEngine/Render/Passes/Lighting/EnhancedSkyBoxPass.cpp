@@ -5,9 +5,7 @@
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 
-#include <cstring>
-#include <string>
-#include <vector>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace

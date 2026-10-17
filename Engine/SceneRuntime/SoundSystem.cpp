@@ -6,7 +6,7 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "Transform.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void SoundSystem::Bind(Scene& scene, wave::PlaybackService* playback, AssetResolver resolver)
 {

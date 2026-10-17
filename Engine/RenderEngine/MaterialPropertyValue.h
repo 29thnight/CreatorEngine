@@ -1,9 +1,7 @@
 #pragma once
 #include "Reflection.hpp"
 #include "TypeTrait.h"
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <mathematics/vector2.hpp>
 
 // Material의 디스크 정본은 ShaderMeta GUID와 이름 기반 논리 값이다. GPU byte

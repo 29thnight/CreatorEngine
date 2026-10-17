@@ -2,7 +2,7 @@
 
 #include "Experiment/ModelData.h"
 
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Material;
 struct ShaderMeta;

@@ -3,9 +3,7 @@
 #include "../Experiment/Import/FbxImporter.h"
 #include "../Experiment/Import/GltfImporter.h"
 
-#include <algorithm>
-#include <set>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

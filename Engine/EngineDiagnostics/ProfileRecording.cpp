@@ -1,21 +1,6 @@
 #include "ProfileCaptureFile.h"
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <bit>
-#include <bitset>
-#include <chrono>
-#include <cmath>
-#include <condition_variable>
-#include <cstring>
-#include <deque>
-#include <fstream>
-#include <limits>
-#include <mutex>
-#include <thread>
-#include <utility>
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX

@@ -42,7 +42,7 @@
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "AuthoringReadNode.h" // D3-b-2b-1b
-#include <limits>
+#include "StandardLibrary.h"
 #include "ReflectionMeta.h"
 #include "ReflectionContainer.h" // range 일반화 — is_vector_v 를 대신하는 형상 판정
 #include <mathematics/color.hpp>

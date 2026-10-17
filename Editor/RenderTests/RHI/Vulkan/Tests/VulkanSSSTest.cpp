@@ -9,11 +9,7 @@
 #include "Render/Passes/Lighting/EnhancedSSSPass.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <string>
-#include <vector>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

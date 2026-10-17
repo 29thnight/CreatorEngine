@@ -20,9 +20,7 @@
 
 #include "EditorWindowSurface.h"
 
-#include <string_view>
-#include <tuple>
-#include <type_traits>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

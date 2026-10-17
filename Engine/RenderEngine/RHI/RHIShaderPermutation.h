@@ -1,10 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 struct RHIShaderPermutationKey
 {

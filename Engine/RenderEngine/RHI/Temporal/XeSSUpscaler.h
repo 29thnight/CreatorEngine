@@ -3,8 +3,8 @@
 #include "XeSSSdkPrivate.h"
 #include "../../Render/Temporal/ITemporalUpscaler.h"
 
-#include <functional>
-#include <memory>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 struct ID3D12Device;
 struct ID3D12Resource;

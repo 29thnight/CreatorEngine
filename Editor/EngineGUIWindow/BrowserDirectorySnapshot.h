@@ -33,11 +33,7 @@
 // 캐시는 정책을 모른다. 지원 확장자 · 검색 · 유형 필터 · 정렬은 창이 소유한다
 // (W2-B 의 몫이다). 여기가 주는 것은 **디스크를 만지지 않고 얻는 목록**뿐이다.
 
-#include <cstdint>
-#include <filesystem>
-#include <string>
-#include <system_error>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

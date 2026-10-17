@@ -3,12 +3,8 @@
 #include "PhysicsBodyComponent.h"
 #include "Scene.h"
 #include "Transform.h"
-#include <array>
-#include <cstdio>
-#include <optional>
-#include <ranges>
-#include <stdexcept>
-#include <vector>
+#include <stdio.h>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Player
 {

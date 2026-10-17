@@ -4,8 +4,7 @@
 #include "AuthoringReadNode.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 
-#include <algorithm>
-#include <map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace material_cook
 {

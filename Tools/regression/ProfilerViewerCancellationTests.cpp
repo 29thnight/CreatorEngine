@@ -1,15 +1,8 @@
 // Source fixture only: NOT built or executed during this change.
 #include "ProfileCaptureFile.h"
 
-#include <chrono>
-#include <cstdio>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
-#include <stop_token>
-#include <string>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace profiler_viewer_cancellation_tests
 {

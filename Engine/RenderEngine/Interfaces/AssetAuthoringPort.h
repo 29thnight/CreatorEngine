@@ -4,10 +4,7 @@
 #include "TypeTrait.h"
 #include "../Texture.h"
 
-#include <cstddef>
-#include <span>
-#include <string>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // Runtime Terrain은 저작 파일 형식을 알지 않는다. PresentationThread가 살아 있는
 // component를 읽을 수 있는 구간에서 이 값 스냅샷을 만든 뒤 Editor Host에 넘긴다.

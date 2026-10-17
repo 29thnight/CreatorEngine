@@ -1,14 +1,6 @@
 #include "LXMaterialCompiler.h"
 
-#include <algorithm>
-#include <charconv>
-#include <cmath>
-#include <iomanip>
-#include <limits>
-#include <regex>
-#include <set>
-#include <sstream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

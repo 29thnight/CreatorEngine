@@ -1,7 +1,5 @@
 #pragma once
-#include <concepts>
-#include <cstddef>
-#include <unordered_map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 타입 단위 인스펙터 아이콘 지정 (PHASE 21 W2-I4).
 //

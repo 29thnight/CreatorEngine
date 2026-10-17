@@ -4,11 +4,7 @@
 #include "../../Utility_Framework/ContentAbi.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 
-#include <algorithm>
-#include <limits>
-#include <set>
-#include <sstream>
-#include <stdexcept>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

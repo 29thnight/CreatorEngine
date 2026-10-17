@@ -2,8 +2,7 @@
 
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 
-#include <algorithm>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

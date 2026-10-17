@@ -4,11 +4,8 @@
 #include "PathFinder.h"
 #include "../RHIGraphicsPipelineRequest.h"
 
-#include <algorithm>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <stdexcept>
+#include <limits.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 struct DX12PSOManager::PendingCompile
 {

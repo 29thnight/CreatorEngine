@@ -7,13 +7,7 @@
 
 #include "EditorWindowRegistry.h"
 
-#include <algorithm>
-#include <cstddef>
-#include <mutex>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

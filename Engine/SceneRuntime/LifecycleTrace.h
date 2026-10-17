@@ -1,9 +1,5 @@
 #pragma once
-#include <atomic>
-#include <cstdint>
-#include <cstring>
-#include <string>
-#include <typeinfo>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Component;
 

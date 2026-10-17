@@ -6,8 +6,7 @@
 #include "Transform.h"
 #include "LogSystem.h"
 #include "AuthoringNodeViewAccess.h"
-#include <cmath>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 using namespace ce::physics;
 

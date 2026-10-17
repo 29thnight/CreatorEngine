@@ -5,8 +5,7 @@
 #include "ComponentFactory.h"
 #include "PrefabUtility.h"
 #include "SceneManager.h"
-#include <algorithm>
-#include <unordered_map>
+#include "../Utility_Framework/StandardLibrary.h"
 // (E) 원 씬 컬렉션/이벤트에서 안전하게 분리하기 위해 컴포넌트 타입 참조 추가
 #include "Scene.h"
 #include "LightComponent.h"

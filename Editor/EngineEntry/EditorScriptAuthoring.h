@@ -1,8 +1,7 @@
 #pragma once
 #include "CommandCore/CommandResult.h"
 #include "EntityHandle.h"
-#include <string>
-#include <filesystem>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace EditorScriptAuthoring
 {

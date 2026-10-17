@@ -3,9 +3,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <Windows.h>
-#include <cstdlib>
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int wmain(int argc,wchar_t** argv)
 {

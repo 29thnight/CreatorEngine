@@ -369,7 +369,9 @@
     <ClCompile Include="Experiment\Import\VertexWelding.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
-    <ClCompile Include="GpuGeometryOcclusion.cpp" />
+    <ClCompile Include="GpuGeometryOcclusion.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\MeshLodBuilder.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -623,7 +625,9 @@
     <ClInclude Include="AssetDepot\LegacyResourceCache.h" />
     <ClInclude Include="AssetDepot\LegacyResourceCharges.h" />
     <ClInclude Include="TextureFramePins.h" />
-    <ClInclude Include="MaterialGraphInstancePins.h" />
+    <ClInclude Include="MaterialGraphInstancePins.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
     <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
     <ClInclude Include="AssetDepot\AssetSetActivation.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
@@ -791,9 +795,11 @@
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexWelding.h">
-      <Filter>Resources\Model\Experiment\Import</Filter>
+      <Filter>Experiment\Import</Filter>
     </ClInclude>
-    <ClInclude Include="GpuGeometryOcclusion.h" />
+    <ClInclude Include="GpuGeometryOcclusion.h">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
     <ClInclude Include="Experiment\MeshLodData.h">
       <Filter>Resources\Model\Experiment</Filter>
@@ -808,13 +814,13 @@
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexCacheOptimization.h">
-      <Filter>Resources\Model\Experiment\Import</Filter>
+      <Filter>Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedModelFormat.h">
-      <Filter>Resources\Model\Experiment\Cooked</Filter>
+      <Filter>Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Cooked\CookedModelCodec.h">
-      <Filter>Resources\Model\Experiment\Cooked</Filter>
+      <Filter>Experiment\Cooked</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\AssetIdentity.h">
       <Filter>Resources\Model\Experiment</Filter>
@@ -1143,6 +1149,9 @@
     <ClInclude Include="RHI\RHIResourceTypes.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHISharedSparsePagePool.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\RHIShaderCompiler.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
@@ -1231,22 +1240,22 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MaterialGraphSceneCompiler.cpp">
-      <Filter>Resources</Filter>
+      <Filter>Render\MaterialGraph</Filter>
     </ClCompile>
     <ClCompile Include="MaterialGraphSceneRuntimeEffects.cpp">
-      <Filter>Resources</Filter>
+      <Filter>Render\MaterialGraph</Filter>
     </ClCompile>
     <ClInclude Include="MaterialGraphSceneRuntimeEffects.h">
-      <Filter>Resources</Filter>
+      <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
     <ClCompile Include="MaterialGraphShaderMeta.cpp">
-      <Filter>Resources</Filter>
+      <Filter>Render\MaterialGraph</Filter>
     </ClCompile>
     <ClInclude Include="MaterialGraphSceneCompiler.h">
-      <Filter>Resources</Filter>
+      <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
     <ClInclude Include="MaterialGraphShaderMeta.h">
-      <Filter>Resources</Filter>
+      <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
     <ClInclude Include="LXMaterialRuntime.h">
       <Filter>Resources</Filter>
@@ -1301,5 +1310,357 @@
   <ItemGroup>
     <ClCompile Include="RHI\Temporal\AntiLag2DX12Adapter.cpp"><Filter>RHI\Temporal</Filter></ClCompile>
     <ClInclude Include="RHI\Temporal\AntiLag2DX12Adapter.h"><Filter>RHI\Temporal</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="AssetDepot">
+      <UniqueIdentifier>{7F73D5AE-FC35-402D-A66F-F51055ADEB99}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assets">
+      <UniqueIdentifier>{B1777969-2EE8-4DB3-A244-0C25EF9D30A8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Experiment">
+      <UniqueIdentifier>{A7234C6B-47FC-42AC-BCA8-8F801E5E4981}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Experiment\Cooked">
+      <UniqueIdentifier>{8697585A-4772-491C-81ED-126F8D0CBD69}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Experiment\Import">
+      <UniqueIdentifier>{9A3D005C-2063-4587-A578-6539DDB8FEB0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Lattice">
+      <UniqueIdentifier>{9C5F9F17-EFEF-4058-AB76-121E020E74F6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Lattice\Core">
+      <UniqueIdentifier>{11518AC1-8AAE-4225-968C-EFE6FF707D4C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Lattice\Material">
+      <UniqueIdentifier>{D0245FA9-30CA-47F8-93E7-5B44838168A5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\MaterialGraph">
+      <UniqueIdentifier>{78E1E24B-EF24-4313-BFAA-0AA565D0D705}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render\MaterialGraph\SceneStages">
+      <UniqueIdentifier>{A9AD4321-0208-4C92-AD25-21A909729BCD}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Lattice\Core\LXGraph.cpp">
+      <Filter>Lattice\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Core\LXNodeDefinition.cpp">
+      <Filter>Lattice\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialCompiler.cpp">
+      <Filter>Lattice\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialGraph.cpp">
+      <Filter>Lattice\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialIR.cpp">
+      <Filter>Lattice\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialNodes.cpp">
+      <Filter>Lattice\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialOperators.cpp">
+      <Filter>Lattice\Material</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\RuntimeBootstrap.cpp">
+      <Filter>AssetDepot</Filter>
+    </ClCompile>
+    <ClInclude Include="AssetDepot\RuntimeBootstrap.h">
+      <Filter>AssetDepot</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\ClusterStreaming.h">
+      <Filter>Assets</Filter>
+    </ClInclude>
+    <ClCompile Include="Assets\CookedEnvironment.cpp">
+      <Filter>Assets</Filter>
+    </ClCompile>
+    <ClInclude Include="Assets\CookedEnvironment.h">
+      <Filter>Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\MeshletCompression.h">
+      <Filter>Assets</Filter>
+    </ClInclude>
+    <ClCompile Include="Assets\ModelAnimationSampler.cpp">
+      <Filter>Assets</Filter>
+    </ClCompile>
+    <ClInclude Include="Assets\ModelAnimationSampler.h">
+      <Filter>Assets</Filter>
+    </ClInclude>
+    <ClCompile Include="Assets\ModelMaterialGraph.cpp">
+      <Filter>Assets</Filter>
+    </ClCompile>
+    <ClInclude Include="Assets\ModelMaterialGraph.h">
+      <Filter>Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\QuantizedGeometry.h">
+      <Filter>Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="ClipSamplingCursor.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\AnimationClipMetrics.h">
+      <Filter>Experiment</Filter>
+    </ClInclude>
+    <ClCompile Include="Experiment\Cooked\CookedMaterialProgram.cpp">
+      <Filter>Experiment\Cooked</Filter>
+    </ClCompile>
+    <ClInclude Include="Experiment\Cooked\CookedMaterialProgram.h">
+      <Filter>Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClCompile Include="Experiment\PoseSampler.cpp">
+      <Filter>Experiment</Filter>
+    </ClCompile>
+    <ClInclude Include="Experiment\PoseSampler.h">
+      <Filter>Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuGeometryVisibilityShared.inl">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="LocalPose.h">
+      <Filter></Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphFrameGeometry.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphGeometryContract.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphHybridVisibility.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphIblBake.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphIblBake.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphIndirectBatch.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphMeshSurface.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphMeshSurface.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphProduct.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphProduct.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphRasterSurface.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphRasterSurface.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphRenderBindings.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphRenderBindings.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphRuntime.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphRuntime.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneAccess.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneCoverage.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneEffectStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneFinalCullStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneFirstCullStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneGeometryStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneHistoryStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSceneHost.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneHost.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSceneInput.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneInput.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneLayerStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSceneLookup.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneLookup.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneOccluderStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSceneRefraction.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneRefraction.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneShadowStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneStages.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSceneSubsurface.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneSubsurface.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneSurfaceStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneTemporalStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSceneVolume.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneVolume.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneVolumeStage.inl">
+      <Filter>Render\MaterialGraph\SceneStages</Filter>
+    </ClInclude>
+    <ClCompile Include="MaterialGraphSurfaceBatch.cpp">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSurfaceBatch.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphThinFilmSensitivity.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphVisibilityContract.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphWork.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshletSparseStorage.inl">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshletStreamingTopology.inl">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedDrawIdentity.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedDrawSealLedger.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedMaterialSealHash.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Graph\EnhancedMaterialSealIdentity.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp">
+      <Filter>Render\Graph</Filter>
+    </ClCompile>
+    <ClInclude Include="Render\Graph\PackedBoneMatrix.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Graph\ShadowCasterBounds.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Graph\ShadowMath.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\AuthoredMaterialDigest.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\EnhancedCameraReplayInput.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\EnhancedDrawReplayInput.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\EnhancedLatticeReplayInput.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12Format.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12PipelineLayoutTranslate.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12QueueBatchAdapter.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12QueueRecorder.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClCompile Include="RHI\DX12\DX12QueueService.cpp">
+      <Filter>RHI\DX12</Filter>
+    </ClCompile>
+    <ClInclude Include="RHI\DX12\DX12QueueService.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12ResourceTable.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIFormat.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIHandle.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIPipelineLayout.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIPipelineState.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIQueueContract.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIQueueRecorder.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIResourceState.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIShaderBlob.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIShaderVerifiedCache.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHITransientHeap.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
+    <ClCompile Include="RHI\RHIValidationLedger.cpp">
+      <Filter>RHI</Filter>
+    </ClCompile>
+    <ClInclude Include="RHI\RHIValidationLedger.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

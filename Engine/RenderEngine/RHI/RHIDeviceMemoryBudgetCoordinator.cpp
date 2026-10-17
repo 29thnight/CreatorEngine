@@ -1,7 +1,6 @@
 #include "RHIDeviceMemoryBudgetCoordinator.h"
 
-#include <algorithm>
-#include <limits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 RHIDeviceMemoryBudgetCoordinator::RHIDeviceMemoryBudgetCoordinator(
     const RHIDeviceMemoryBudgetCoordinatorConfig& config)

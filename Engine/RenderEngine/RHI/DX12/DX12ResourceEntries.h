@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <d3d12.h>
 #include <dxgiformat.h>
 

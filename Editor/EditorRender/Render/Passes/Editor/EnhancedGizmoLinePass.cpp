@@ -2,10 +2,8 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
 
-#include <cstddef>
-#include <cmath>
-#include <cstring>
-#include <string>
+#include <stddef.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 
 namespace

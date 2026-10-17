@@ -3,7 +3,7 @@
 #include "Texture.h"
 #include "AssetDepot/TextureAssetRuntime.h"
 
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Neutral storage shared by the strict cooked reader and the authoring adapter.
 // The Editor-only derived object retains SDK pixels in their original allocation.

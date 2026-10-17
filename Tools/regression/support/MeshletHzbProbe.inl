@@ -137,7 +137,7 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         RHIBufferHandle pointBuffer, ids, args;
         RHIBufferDesc bufferDesc; bufferDesc.bytes = sizeof(points);
         Check(device.CreateBuffer(bufferDesc, pointBuffer, error), "HZB point buffer");
-        bufferDesc.allowUnorderedAccess = true; bufferDesc.bytes = 64 * 4;
+        bufferDesc.allowUnorderedAccess = true; bufferDesc.bytes = 512 * 4;
         Check(device.CreateBuffer(bufferDesc, ids, error), "HZB ID buffer");
         bufferDesc.bytes = sizeof(RHIDrawIndexedIndirectArguments);
         Check(device.CreateBuffer(bufferDesc, args, error), "HZB argument buffer");
@@ -148,7 +148,9 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         const std::array<math::vector4, 3> world{math::vector4(1, 0, 0, 0), math::vector4(0, 1, 0, 0), math::vector4(0, 0, 1, 0)};
         const auto worldUpload = upload(world.data(), sizeof(world));
         std::array<uint32_t, 48> constants{};
-        constants[24] = constants[25] = constants[27] = 1;
+        constants[24] = constants[25] = 1;
+        constants[27] = bin.indexCount;
+        constants[26] = GpuGeometryVisibility::kWaveWorkQueue;
         // Shader constants store columns, while matrix.m is row-major.
         for (unsigned c = 0; c < 4; ++c) for (unsigned r = 0; r < 4; ++r)
             std::memcpy(&constants[28 + c * 4 + r], &matrix.m[r][c], 4);
@@ -156,10 +158,10 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         constants[46] = pyramid->LevelCount(); constants[47] = test == 4 ? 0 : 1;
         if (temporal) constants[47] = 1;
         const auto uniform = device.UploadConstants(constants.data(), sizeof(constants));
-        const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(ids, 64, 4),
+        const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(ids, 512, 4),
             RHIBindingDesc::UavBuffer(args, 1, sizeof(RHIDrawIndexedIndirectArguments))};
         const auto outputTable = device.CreateBindings(outputs);
-        const auto vertex = RHIBindingDesc::SrvBuffer(pointBuffer, 21, sizeof(SurfacePoint));
+        const auto vertex = RHIBindingDesc::SrvBuffer(pointBuffer, 105, MeshSurfaceBatch::GeometryViewStride);
         const auto topo = RHIBindingDesc::SrvBuffer(topology.buffer, uint32_t(topology.size / 4), 0, uint32_t(topology.offset / 4));
         const auto vertexTable = device.CreateBindings({&vertex, 1}), topologyTable = device.CreateBindings({&topo, 1});
         EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
@@ -190,14 +192,14 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         RGHandle firstWrite, firstArgWrite;
         RHIReadback firstReadback;
         if (temporal) {
-            bufferDesc.bytes = 64 * 4;
+            bufferDesc.bytes = 512 * 4;
             Check(device.CreateBuffer(bufferDesc, firstIds, error), "Temporal first IDs");
             bufferDesc.bytes = sizeof(RHIDrawIndexedIndirectArguments);
             Check(device.CreateBuffer(bufferDesc, firstArgs, error), "Temporal first args");
             Check(device.CreateBufferReadback(64 * 4, firstReadback, error), "Temporal first readback");
             firstWrite = graph.Write(graph.ImportBuffer(firstIds, RHIResourceState::Common, "Temporal.FirstIDs"));
             firstArgWrite = graph.Write(graph.ImportBuffer(firstArgs, RHIResourceState::Common, "Temporal.FirstArgs"));
-            const RHIBindingDesc firstOutputs[]{RHIBindingDesc::UavBuffer(firstIds, 64, 4),
+            const RHIBindingDesc firstOutputs[]{RHIBindingDesc::UavBuffer(firstIds, 512, 4),
                 RHIBindingDesc::UavBuffer(firstArgs, 1, sizeof(RHIDrawIndexedIndirectArguments))};
             const auto firstTable = device.CreateBindings(firstOutputs);
             // Cold start uses the production frustum kernel and source classification.

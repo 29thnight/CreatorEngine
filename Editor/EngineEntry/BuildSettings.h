@@ -3,8 +3,7 @@
 #include "RenderBackend.h"
 #include "TemporalProductSettings.h"
 
-#include <string>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct BuildSettings
 {

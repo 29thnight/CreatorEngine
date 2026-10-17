@@ -1,10 +1,5 @@
 #pragma once
-#include <chrono>
-#include <array>
-#include <cstdint>
-#include <cstddef>
-#include <string>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "AnimTaskList.h"
 
 // Opt-in, owner-thread sample spanning animation update and proxy publication.

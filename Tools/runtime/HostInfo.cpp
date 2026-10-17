@@ -1,9 +1,10 @@
+#include <yvals.h> // Read MSVC's actual iterator ABI setting; modules do not export macros.
 #include "HostAbi.h"
 #include "../../Engine/Utility_Framework/ScriptApiVersion.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"
 #include "../../Engine/Utility_Framework/EngineDistributionIdentity.h"
 #include "../../Engine/Utility_Framework/ContentAbi.h"
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 extern "C" __declspec(dllexport) const CreatorHostInfoV1* __cdecl CreatorHostGetInfoV1()
 {

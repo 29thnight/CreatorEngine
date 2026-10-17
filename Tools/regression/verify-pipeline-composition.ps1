@@ -201,7 +201,7 @@ try {
     $valid = [int]$data.valid; $ready = [int]$data.ready
     $nodes = @($data.nodes | ForEach-Object {
         [pscustomobject]@{ Name = $_.name; State = if (-not $_.conditional) { 'always' } elseif ($_.active) { 'active' } else { 'inactive' }
-            Reads = @($_.reads); Writes = @($_.writes) }
+            Reads = @($_.reads); Writes = @($_.writes); Modifies = @($_.modifies) }
     })
 
     # ── 무의미성 방지 1: 측정이 실제로 나왔는가 ──
@@ -224,8 +224,10 @@ try {
     # METEOR.Scene geometry, cull, shadow, surface, color, light tile and blended nodes.
     # 2026-10-14: Cull was split into Cull.First, Occluder and Cull.Final.
     $requiredRuntime = @('METEOR.Scene.Geometry','METEOR.Scene.Cull.First','METEOR.Scene.Occluder',
-        'METEOR.Scene.Cull.Final','METEOR.Scene.Shadow',
-        'METEOR.Scene.Surface','METEOR.Scene.Color','METEOR.Scene.LightTiles','METEOR.Scene.Blended',
+        'METEOR.Scene.Cull.Final','METEOR.Shadow.StaticCache','METEOR.Shadow.Cull.First',
+        'METEOR.Shadow.Occluder','METEOR.Shadow.Cull.Final','METEOR.Shadow.Raster','METEOR.Shadow.History',
+        'METEOR.Scene.Visibility','METEOR.Scene.MaterialWork','METEOR.Scene.SurfaceResolve','METEOR.Scene.Decal',
+        'METEOR.Scene.Color','METEOR.Scene.LightTiles','METEOR.Scene.Blended',
         'PostChain','UI','live_present')
     foreach ($name in $requiredRuntime) {
         if (-not ($nodes | Where-Object { $_.Name -eq $name })) {
@@ -241,7 +243,12 @@ try {
         @{ Node = 'METEOR.Scene.Cull.First'; Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('METEOR.Scene.Cull.FirstList') }
         @{ Node = 'METEOR.Scene.Occluder';   Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Cull.FirstList'); Writes = @('METEOR.Scene.Occluder.Depth') }
         @{ Node = 'METEOR.Scene.Cull.Final'; Reads = @('METEOR.Scene.Geometry.Table','METEOR.Scene.Occluder.Depth'); Writes = @('METEOR.Scene.Cull.FinalList','METEOR.Scene.Cull.BlendedList') }
-        @{ Node = 'METEOR.Scene.Shadow';     Reads = @('METEOR.Scene.Geometry.Table');                               Writes = @('Shadow.Map') }
+        @{Node='METEOR.Shadow.StaticCache'; Reads=@('METEOR.Scene.Geometry.Table'); Writes=@('METEOR.Shadow.Static.Depths')}
+        @{Node='METEOR.Shadow.Cull.First'; Reads=@('METEOR.Scene.Geometry.Table'); Writes=@('METEOR.Shadow.Cull.FirstLists')}
+        @{Node='METEOR.Shadow.Occluder'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Shadow.Static.Depths','METEOR.Shadow.Cull.FirstLists'); Writes=@('METEOR.Shadow.Occluder.Depths')}
+        @{Node='METEOR.Shadow.Cull.Final'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Shadow.Occluder.Depths'); Writes=@('METEOR.Shadow.Cull.FinalLists')}
+        @{Node='METEOR.Shadow.Raster'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Shadow.Static.Depths','METEOR.Shadow.Cull.FinalLists'); Writes=@('Shadow.Map')}
+        @{Node='METEOR.Shadow.History'; Reads=@('Shadow.Map'); Writes=@()}
     )
     foreach ($row in $meteorContract) {
         $node = $nodes | Where-Object { $_.Name -eq $row.Node }
@@ -249,7 +256,7 @@ try {
             throw "METEOR 단계 계약 불일치: $($row.Node) reads=[$(@($node.Reads) -join ',')] writes=[$(@($node.Writes) -join ',')]"
         }
     }
-    foreach ($cull in @($nodes | Where-Object { $_.Name -like 'METEOR.Scene.Cull.*' })) {
+    foreach ($cull in @($nodes | Where-Object { ($_.Name -like 'METEOR.Scene.Cull.*' -or $_.Name -like 'METEOR.Shadow.Cull.*') })) {
         if (@($cull.Reads + $cull.Writes | Where-Object { $_ -like 'METEOR.Scene.Commands.*' }).Count) {
             throw "Culling must publish lists only: $($cull.Name)"
         }
@@ -257,13 +264,15 @@ try {
     # Cross-node commands and material work must be named graph-resource slots.
     $commandContracts = @(
         @{Node='METEOR.Scene.LayerWork'; Reads=@('METEOR.Scene.Cull.BlendedList'); Writes=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended')}
-        @{ Node='METEOR.Scene.Surface'; Reads=@('METEOR.Scene.Cull.FinalList'); Writes=@('METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments') }
+        @{ Node='METEOR.Scene.Visibility'; Reads=@('METEOR.Scene.Cull.FinalList'); Writes=@('GBuffer.Depth','METEOR.Scene.Visibility') }
+        @{ Node='METEOR.Scene.MaterialWork'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Scene.Visibility'); Writes=@('METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments') }
+        @{ Node='METEOR.Scene.SurfaceResolve'; Reads=@('GBuffer.Depth','METEOR.Scene.Visibility','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments'); Writes=@('GBuffer.Diffuse','GBuffer.MetalRough','GBuffer.Normal','GBuffer.Emissive','GBuffer.Bitmask') }
         @{ Node='METEOR.Scene.Color'; Reads=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments'); Writes=@() }
         @{ Node='METEOR.Scene.Blended'; Reads=@('METEOR.Scene.Commands.Layer','METEOR.Scene.Commands.Blended'); Writes=@() }
     )
     $commandContracts += @(
         @{Node='Temporal.Inputs'; Reads=@('METEOR.Scene.Visibility','METEOR.Scene.Material.Tiles','METEOR.Scene.Material.Arguments','METEOR.Scene.Cull.BlendedList'); Writes=@()}
-        @{Node='METEOR.Scene.Surface'; Reads=@(); Writes=@('METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal')}
+        @{Node='METEOR.Scene.Decal'; Reads=@('GBuffer.Depth','GBuffer.Bitmask'); Writes=@('METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal')}
         @{Node='METEOR.Scene.Color'; Reads=@('METEOR.Scene.Geometry.Table','METEOR.Scene.Visibility','METEOR.Scene.Decal.BaseDiffuse','METEOR.Scene.Decal.BaseOrm','METEOR.Scene.Decal.BaseNormal'); Writes=@()}
     )
     foreach ($row in $commandContracts) {
@@ -275,6 +284,31 @@ try {
             if (@($node.Writes) -notcontains $slot) { throw "$($row.Node) missing command producer slot: $slot" }
         }
     }
+    if (@($nodes.Name) -contains 'METEOR.Scene.Surface') {
+        throw 'The combined Surface node must not coexist with its independent producers'
+    }
+    $surfaceOrder = @('METEOR.Scene.Visibility','METEOR.Scene.MaterialWork','METEOR.Scene.SurfaceResolve','METEOR.Scene.Decal')
+    $previousIndex = -1
+    foreach ($name in $surfaceOrder) {
+        $index = [array]::IndexOf(@($nodes.Name), $name)
+        if ($index -le $previousIndex) { throw "Surface producer order is invalid: $name" }
+        $previousIndex = $index
+    }
+    $decal = $nodes | Where-Object { $_.Name -eq 'METEOR.Scene.Decal' }
+    if ((@($decal.Modifies) -join ',') -ne 'GBuffer.Diffuse,GBuffer.MetalRough,GBuffer.Normal') {
+        throw 'Decal must modify the three published surface versions'
+    }
+    if (@($nodes.Name) -contains 'METEOR.Scene.Shadow') {
+        throw 'The combined Shadow node must not coexist with independent shadow stages'
+    }
+    $shadowOrder = @('METEOR.Shadow.StaticCache','METEOR.Shadow.Cull.First','METEOR.Shadow.Occluder',
+        'METEOR.Shadow.Cull.Final','METEOR.Shadow.Raster','METEOR.Shadow.History')
+    $previousIndex = -1
+    foreach ($name in $shadowOrder) {
+        $index = [array]::IndexOf(@($nodes.Name), $name)
+        if ($index -le $previousIndex) { throw "Shadow producer order is invalid: $name" }
+        $previousIndex = $index
+    }
     $volume = $nodes | Where-Object { $_.Name -eq 'METEOR.Scene.Volume' }
     if (@($volume.Reads | Where-Object { $_ -like 'METEOR.Scene.Commands.*' }).Count) {
         throw 'METEOR.Scene.Volume must not consume raster command slots'
@@ -283,7 +317,7 @@ try {
     if (@($color.Reads) -contains 'METEOR.Scene.Commands.Surface') {
         throw 'METEOR.Scene.Color reconstructs opaque work and must not consume surface raster commands'
     }
-    $meteorNodes = @($nodes | Where-Object { $_.Name -like 'METEOR.Scene.*' })
+    $meteorNodes = @($nodes | Where-Object { $_.Name -like 'METEOR.*' })
     $silent = @($meteorNodes | Where-Object { -not $_.Reads.Count -and -not $_.Writes.Count })
     if ($silent.Count) {
         throw "슬롯 없는 METEOR 노드: $(@($silent.Name) -join ', ') — 숨은 선언 순서 결합"

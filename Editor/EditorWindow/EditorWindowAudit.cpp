@@ -10,7 +10,7 @@
 #include "Windows/EditorWindowBody.h"
 #include "EditorWindowNames.h"
 
-#include <algorithm>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

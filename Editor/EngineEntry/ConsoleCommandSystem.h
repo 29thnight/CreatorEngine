@@ -1,18 +1,8 @@
 #pragma once
 #include "CommandCore/CommandResult.h"
 
-#include <atomic>
-#include <cstdio>
-#include <chrono>
-#include <cstdint>
-#include <deque>
-#include <functional>
-#include <future>
-#include <optional>
-#include <mutex>
-#include <string>
-#include <thread>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 class ConsoleCommandSystem;
 

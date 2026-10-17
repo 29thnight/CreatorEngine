@@ -1,6 +1,7 @@
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [string]$EngineDistribution = '',
+    [switch]$Shipping,
     [ValidateRange(180, 1200)][int]$SmokeTimeoutSeconds = 600
 )
 
@@ -11,7 +12,8 @@ $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $output = Join-Path $repo 'Build/Obj/MaterialProductProbe'
 $cookRoot = [IO.File]::ReadAllText((Join-Path $output "scene-cook-$Configuration-root.txt")).Trim()
-$caseRoot = Join-Path $output ("ScenePkg-$Configuration-" + [Guid]::NewGuid().ToString('N'))
+$variant = if ($Shipping) { "$Configuration-Shipping" } else { $Configuration }
+$caseRoot = Join-Path $output ("ScenePkg-$variant-" + [Guid]::NewGuid().ToString('N'))
 $sourceFiles = @(
     (Get-Content (Join-Path $output 'scene-cook-source-hashes.json') -Raw | ConvertFrom-Json).path
     Get-ChildItem (Join-Path $repo 'Player'), (Join-Path $repo 'BuildTool') -Recurse -File |
@@ -82,8 +84,10 @@ $scene = Join-Path $assets 'Scenes/LX_CookFixture.creator'
 [IO.File]::WriteAllText($scene, $sceneText)
 'guid: 66666666-6666-4666-8666-666666666666' | Set-Content "$scene.meta" -Encoding utf8
 $tool = Join-Path $repo "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"
+[string[]]$shippingArguments = @()
+if ($Shipping) { $shippingArguments = @('--shipping') }
 if ([string]::IsNullOrWhiteSpace($EngineDistribution)) {
-    $publish = @(& $tool publish-engine --repository $repo --config $Configuration --output-root (Join-Path $caseRoot 'Engine') --no-pointer 2>&1)
+    $publish = @(& $tool publish-engine --repository $repo --config $Configuration --output-root (Join-Path $caseRoot 'Engine') --no-pointer @shippingArguments 2>&1)
     $publishExit = $LASTEXITCODE
     $publish | Set-Content (Join-Path $caseRoot 'engine.log') -Encoding utf8
     if ($publishExit -ne 0) { throw "Engine distribution failed: $($publish -join "`n")" }
@@ -101,7 +105,7 @@ try {
     $package = @(& $tool package-game --repository $repo --engine-distribution $distribution --project $project `
         --config $Configuration --stage-root (Join-Path $caseRoot 'Stage') --startup-scene LX_CookFixture.creator `
         --render-backend dx12 --smoke-offscreen --smoke-frames 120 --smoke-promotions 120 --smoke-timeout-sec $SmokeTimeoutSeconds `
-        --log-path (Join-Path $caseRoot 'package-live.log') 2>&1)
+        --log-path (Join-Path $caseRoot 'package-live.log') @shippingArguments 2>&1)
     $packageExit = $LASTEXITCODE
 } finally {
     $env:CREATOR_DX12_VALIDATION = $previousValidation
@@ -111,11 +115,28 @@ if ($packageExit -ne 0) { throw "Automatic material package/Player failed: $($pa
 $pointer = Get-Content (Join-Path $caseRoot 'Stage/Project.current.json') -Raw | ConvertFrom-Json
 $packageRoot = Join-Path $caseRoot "Stage/$($pointer.releaseDirectory)"
 $manifest = Get-Content (Join-Path $packageRoot 'package-manifest.json') -Raw | ConvertFrom-Json
-if ($manifest.verification -ne 'passed' -or $manifest.cook.byFolder.MaterialPrograms -ne 3 -or
+if ($manifest.shipping -ne [bool]$Shipping -or $manifest.verification -ne 'passed' -or $manifest.cook.byFolder.MaterialPrograms -ne 3 -or
     $manifest.cook.byFolder.Materials -ne 1 -or $manifest.cook.SourceCounts.'--shadergraph' -ne 3 -or
     $manifest.smoke.textParserCalls -ne 0 -or $manifest.smoke.cookedSceneDocuments -lt 1 -or
     !($package -match '\[meteor.scene.program\] source=cooked graph=11111111-1111-4111-8111-111111111111 ready=[1-9]\d* sceneCompiles=0')) {
     throw 'Published package is missing the real cooked Scene material readiness evidence.'
+}
+if ($manifest.cook.byFolder.Textures -lt 1 -or $manifest.cook.SourceCounts.'--texture' -lt 1 -or
+    $manifest.cook.ModelCount -lt 1) {
+    throw 'Package did not cook independent textures and a model generation.'
+}
+if (@($manifest.runtimeEntries | Where-Object path -Match '(?i)(directxtex|stb_image)').Count -ne 0) {
+    throw 'Runtime package contains an image processing codec.'
+}
+if (@($manifest.entries | Where-Object path -Match '(?i)\.(png|jpg|jpeg|hdr|dds|tga|bmp|exr|psd|pic|pnm)$').Count -ne 0) {
+    throw 'Source image bytes remain in the cooked Player package.'
+}
+if ($Shipping) {
+    $playerRuntime = Join-Path $packageRoot 'Player.runtime.dll'
+    $shippingRuntime = Join-Path $repo "Bin/x64-$Configuration-Shipping/Player/Player.runtime.dll"
+    if ((Get-FileHash $playerRuntime).Hash -ne (Get-FileHash $shippingRuntime).Hash) {
+        throw 'Package Player runtime does not match the Shipping binary.'
+    }
 }
 # Runtime and PAK bytes must still match the manifest after the Player run.
 foreach ($entry in $manifest.runtimeEntries) {
@@ -126,10 +147,10 @@ foreach ($entry in $manifest.runtimeEntries) {
 if ((Get-FileHash (Join-Path $packageRoot 'GameAssets.pak') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.pakFileSha256) {
     throw 'Player modified the package.'
 }
-$caseRoot | Set-Content (Join-Path $output "scene-package-$Configuration-root.txt") -Encoding utf8
+$caseRoot | Set-Content (Join-Path $output "scene-package-$variant-root.txt") -Encoding utf8
 foreach ($entry in $sourceSnapshot) {
     if ((Get-FileHash -LiteralPath $entry.path -Algorithm SHA256).Hash -ne $entry.hash) { throw "Package source changed: $($entry.path)" }
 }
 $sourceSnapshot | ConvertTo-Json | Set-Content (Join-Path $caseRoot 'source-hashes.json') -Encoding utf8
-"LX_MATERIAL_SCENE_PACKAGE_OK configuration=$Configuration programs=3 materials=1 frames=$($manifest.smoke.gameThreadFrames) display=$($manifest.smoke.displayFrame) promotions=$($manifest.smoke.promotions) sceneCompiles=0 textParserCalls=0 payloadPreserved=true sources=$($sourceSnapshot.Count) drift=0"
+"LX_MATERIAL_SCENE_PACKAGE_OK configuration=$variant programs=3 materials=1 frames=$($manifest.smoke.gameThreadFrames) display=$($manifest.smoke.displayFrame) promotions=$($manifest.smoke.promotions) sceneCompiles=0 textParserCalls=0 payloadPreserved=true sources=$($sourceSnapshot.Count) drift=0"
 exit 0

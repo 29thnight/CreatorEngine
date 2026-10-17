@@ -1,9 +1,9 @@
-#pragma once
+﻿#pragma once
 #include "resource.h"
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "Core.Minimal.h"
 #include "EditorMain.h"
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Core
 {
@@ -13,12 +13,12 @@ namespace Core
 		App() = default;
 		~App() = default;
 		//App Func
-		void Initialize(CoreWindow& coreWindow);
+		void Initialize(WindowsCoreWindow& coreWindow, CoreWindow& window);
 		void Finalize();
-		void SetWindow(CoreWindow& coreWindow);
-        void RegisterHandler(CoreWindow& coreWindow);
+		void SetWindow(WindowsCoreWindow& coreWindow);
+        void RegisterHandler(WindowsCoreWindow& coreWindow);
 		void Load();
-		void Run();
+		void Run(CoreWindow& window);
 		//Window Event Func
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);

@@ -11,12 +11,7 @@
 #include "ShaderMetaReflection.h"
 #include "ShaderPermutationDomain.h"
 
-#include <algorithm>
-#include <array>
-#include <filesystem>
-#include <exception>
-#include <sstream>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -1,10 +1,5 @@
 #pragma once
-#include <cstdint>
-#include <functional>
-#include <mutex>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // 화면 크기를 따라가는 리소스의 계약 (PHASE 3-2 / 7 교차).
 //

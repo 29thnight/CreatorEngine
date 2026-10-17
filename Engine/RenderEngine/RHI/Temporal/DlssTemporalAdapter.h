@@ -5,9 +5,8 @@
 #include "../../Render/Temporal/ITemporalFrameGenerator.h"
 #include "../../Render/Temporal/SpatialPostEffects.h"
 
-#include <functional>
-#include <memory>
-#include <string>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 struct ID3D12Device;
 struct ID3D12Resource;

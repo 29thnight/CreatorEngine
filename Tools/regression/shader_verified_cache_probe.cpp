@@ -1,11 +1,7 @@
 #include "RHIShaderCompiler.h"
 #include "RHIShaderVerifiedCache.h"
 #include "PathFinder.h"
-#include <fstream>
-#include <iostream>
-#include <thread>
-#include <atomic>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 using Verified = RHIShaderCompiler::VerifiedShader;
 static void Check(bool value,const char* name){if(!value)throw std::runtime_error(name);std::cout<<"CHECK "<<name<<'\n';}

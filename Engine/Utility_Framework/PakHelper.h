@@ -2,16 +2,10 @@
 #include "EnginePaths.h"
 #include "PathFinder.h"
 #include "LogSystem.h"
-#include <source_location>
+#include <stdio.h>
+#include "StandardLibrary.h"
 #include "Paklib.hpp"
 
-#include <cwctype>
-#include <cstdio>
-#include <filesystem>
-#include <set>
-#include <string>
-#include <string_view>
-#include <system_error>
 
 namespace
 {

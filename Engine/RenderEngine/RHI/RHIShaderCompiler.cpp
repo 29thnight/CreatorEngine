@@ -10,25 +10,7 @@
 #include <slang.h>
 #include <slang-com-ptr.h>
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <cctype>
-#include <condition_variable>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <ranges>
-#include <sstream>
-#include <thread>
-#include <tuple>
-#include <utility>
-#include <unordered_map>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {
@@ -445,11 +427,33 @@ namespace
         return file.eof();
     }
 
+    HMODULE LoadCompilerLibrary(const std::filesystem::path& path)
+    {
+        // The Windows loader can exceed MAX_PATH while resolving dependencies
+        // even when the DLL path itself is shorter. Keep the bundled location,
+        // but use the same extended absolute path policy as the native launcher.
+        std::error_code error;
+        auto absolute = std::filesystem::absolute(path, error);
+        if (error)
+        {
+            return nullptr;
+        }
+        const auto value = absolute.lexically_normal().make_preferred().wstring();
+        if (value.starts_with(L"\\\\?\\"))
+        {
+            return LoadLibraryW(value.c_str());
+        }
+        const auto extended = value.starts_with(L"\\\\")
+            ? L"\\\\?\\UNC\\" + value.substr(2)
+            : L"\\\\?\\" + value;
+        return LoadLibraryW(extended.c_str());
+    }
+
     bool TryLoadSlangPath(SlangRuntime& runtime, const std::filesystem::path& path)
     {
         std::error_code ec;
         if (path.empty() || !std::filesystem::is_regular_file(path, ec)) return false;
-        runtime.module = LoadLibraryW(path.c_str());
+        runtime.module = LoadCompilerLibrary(path);
         if (nullptr == runtime.module) return false;
         runtime.modulePath = std::filesystem::weakly_canonical(path, ec);
         if (ec) runtime.modulePath = path.lexically_normal();
@@ -486,13 +490,13 @@ namespace
         const std::filesystem::path compilerDirectory = runtime.modulePath.parent_path();
         const std::filesystem::path dxilPath = compilerDirectory / "dxil.dll";
         const std::filesystem::path dxcPath = compilerDirectory / "dxcompiler.dll";
-        runtime.dxilModule = LoadLibraryW(dxilPath.c_str());
+        runtime.dxilModule = LoadCompilerLibrary(dxilPath);
         if (nullptr == runtime.dxilModule)
         {
             runtime.loadError = "고정 Slang 번들의 dxil.dll을 로드하지 못했다";
             return;
         }
-        runtime.dxcModule = LoadLibraryW(dxcPath.c_str());
+        runtime.dxcModule = LoadCompilerLibrary(dxcPath);
         if (nullptr == runtime.dxcModule)
         {
             runtime.loadError = "고정 Slang 번들의 dxcompiler.dll을 로드하지 못했다";

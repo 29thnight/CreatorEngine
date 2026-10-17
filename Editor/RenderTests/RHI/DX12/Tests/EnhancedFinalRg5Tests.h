@@ -5,7 +5,8 @@
 #include "Render/Passes/Editor/EnhancedWireFramePass.h"
 #include "Render/Passes/Editor/EnhancedGizmoIconPass.h"
 #include "Render/Passes/Editor/EnhancedGizmoLinePass.h"
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

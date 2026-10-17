@@ -2,14 +2,7 @@
 
 #include "Sha256.h"
 
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <string_view>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

@@ -4,8 +4,10 @@
 #define CREATOR_ENABLE_DLSS_STREAMLINE 0
 #endif
 
-#include <cassert>
-#include <cstdio>
+#include "../../../Utility_Framework/Contract.h"
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #if CREATOR_ENABLE_DLSS_STREAMLINE && defined(_WIN32)
 #ifndef NOMINMAX
@@ -28,12 +30,6 @@
 #include <sl_deepdvc.h>
 #include <sl_security.h>
 
-#include <atomic>
-#include <cmath>
-#include <filesystem>
-#include <iterator>
-#include <mutex>
-#include <unordered_map>
 
 static_assert(SL_VERSION_MAJOR == 2 && SL_VERSION_MINOR == 14 && SL_VERSION_PATCH == 1,
     "CreatorEngine DLSS adapter requires the pinned Streamline 2.14.1 SDK");
@@ -437,7 +433,12 @@ DlssTemporalAdapter::~DlssTemporalAdapter()
 {
     // GPU idleness and external COM proxy lifetime cannot be inferred here.
     // A violated explicit shutdown contract must not unload live proxy vtables.
-    assert(!m_implementation->module && "Explicit DLSS shutdown and proxy release are required");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>(
+                (!m_implementation->module && "Explicit DLSS shutdown and proxy release are required"));
+        },
+        "!m_implementation->module && \"Explicit DLSS shutdown and proxy release are required\"");
     if (m_implementation->module) (void)m_implementation.release();
 }
 

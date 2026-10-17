@@ -1,7 +1,6 @@
 #include "ModelConsumptionDiagnostics.h"
 
-#include <atomic>
-#include <mutex>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

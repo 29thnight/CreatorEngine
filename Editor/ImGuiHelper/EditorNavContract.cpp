@@ -2,9 +2,7 @@
 
 #include "ImGui.h"
 
-#include <algorithm>
-#include <deque>
-#include <mutex>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::nav
 {

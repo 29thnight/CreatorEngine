@@ -1,5 +1,5 @@
 #pragma once
-#include <concepts>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 인스펙터 값 타입 커스텀 드로어 확장점 (PHASE 21 W2-I).
 //

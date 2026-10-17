@@ -1,6 +1,5 @@
 #pragma once
-#include <cstddef>
-#include <cstdint>
+#include "StandardLibrary.h"
 
 // SerializationPlan D3-a-4 — 저작 노드의 **읽기 전용 뷰**.
 //

@@ -8,11 +8,7 @@
 #include <Windows.h>
 #include <bcrypt.h>
 
-#include <algorithm>
-#include <cstdio>
-#include <fstream>
-#include <limits>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "bcrypt.lib")
 

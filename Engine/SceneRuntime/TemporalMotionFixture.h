@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 
 enum class TemporalMotionFixtureState : std::uint8_t
 {

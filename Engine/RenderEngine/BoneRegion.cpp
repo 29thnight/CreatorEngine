@@ -1,7 +1,6 @@
 #include "BoneRegion.h"
 
-#include <algorithm>
-#include <cctype>
+#include "../Utility_Framework/StandardLibrary.h"
 
 std::string ToLower(std::string boneName)
 {

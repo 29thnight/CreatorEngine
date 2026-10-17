@@ -24,8 +24,7 @@
 
 #include "JsonValue.h"
 
-#include <cstdint>
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

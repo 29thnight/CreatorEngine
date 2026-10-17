@@ -1,11 +1,6 @@
 #include "VertexWelding.h"
 
-#include <chrono>
-#include <cstring>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {

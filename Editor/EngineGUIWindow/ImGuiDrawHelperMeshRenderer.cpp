@@ -25,15 +25,9 @@
 #include "ExternUI.h"
 #include "EditorPropertyRow.h"
 #include "imgui_stdlib.h"
-#include <cstdio>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "PathFinder.h"
-#include <filesystem>
-#include <string_view>
 #include <d3d11shader.h>
-#include <algorithm>
-#include <cstring>
-#include <functional>
-#include <span>
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
@@ -408,8 +402,8 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
                 char counts[128]{};
                 std::snprintf(
                     counts, sizeof(counts), "%zu · Indices %zu · mask 0x%X",
-                    static_cast<std::size_t>(mesh.vertexStride ? mesh.vertexBytes.size() / mesh.vertexStride : 0u),
-                    mesh.indices.size(), mesh.vertexAttributeMask);
+                    static_cast<std::size_t>(mesh.streamDescriptor ? mesh.streamDescriptor->vertexCount : mesh.vertexStride ? mesh.vertexBytes.size() / mesh.vertexStride : 0u),
+                    static_cast<std::size_t>(mesh.streamDescriptor ? mesh.streamDescriptor->indexCount : mesh.indices.size()), mesh.vertexAttributeMask);
                 ReadOnlyLine(sheet, "Vertices", counts);
             }
         }

@@ -3,7 +3,7 @@
 #include "MaterialAssetSetCodec.h"
 #include "CookedCodeMaterial.h"
 
-#include <optional>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

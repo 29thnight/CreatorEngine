@@ -24,10 +24,12 @@
     <OutDir>$(LauncherOutputDir)</OutDir>
     <IntDir>$(SolutionDir)Build\Obj\RuntimeLauncher\$(Platform)-$(EngineConfigKey)\$(LauncherName)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
+    <!-- The independent static-CRT launcher needs its own matching std module. -->
+    <BuildStlModules>true</BuildStlModules>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp23</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level4</WarningLevel>

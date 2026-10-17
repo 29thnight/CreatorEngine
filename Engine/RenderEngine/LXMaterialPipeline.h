@@ -4,7 +4,8 @@
 #include "RHI/RHIGraphicsPipelineRequest.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
-#include <algorithm>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace LX::Runtime
 {

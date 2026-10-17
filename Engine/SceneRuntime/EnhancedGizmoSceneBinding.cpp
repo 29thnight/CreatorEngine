@@ -20,9 +20,7 @@ namespace
 #include <mathematics/scalar.hpp>
 #include <mathematics/transform.hpp>
 
-#include <algorithm>
-#include <cmath>
-#include <memory>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

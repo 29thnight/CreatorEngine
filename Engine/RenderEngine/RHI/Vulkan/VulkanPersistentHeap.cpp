@@ -3,7 +3,8 @@
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
 
-#include <algorithm>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 using namespace VulkanApi;
 

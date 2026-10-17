@@ -9,10 +9,7 @@
 #include "RHI/RHIEncoder.h"
 
 #include <d3dcompiler.h>
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")

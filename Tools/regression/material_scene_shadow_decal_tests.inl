@@ -183,7 +183,14 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
         if (!executed) { std::string diagnostic; device.DrainDebugMessages(diagnostic); std::cerr << diagnostic << std::endl; }
         Check(executed, "Shadow/Decal sequential " + error);
     }
-    Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error), "Shadow/Decal submit");
+    const bool submitted = device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error);
+    if (!submitted)
+    {
+        std::string diagnostic;
+        device.DrainDebugMessages(diagnostic);
+        std::cerr << error << '\n' << diagnostic << std::endl;
+    }
+    Check(submitted, "Shadow/Decal submit " + error);
     if (!workers)
     {
         completion = {device.GetLastSignaledFenceValue()};

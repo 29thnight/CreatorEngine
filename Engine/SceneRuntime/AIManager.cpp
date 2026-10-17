@@ -6,31 +6,8 @@
 #include "MeshRenderer.h"
 #include "Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 //#include <execution>
-
-BlackBoard* AIManager::CreateBlackBoard(const std::string& aiName)
-{
-	// 블랙보드가 이미 존재하는지 확인
-	if (m_blackBoardFind.find(aiName) != m_blackBoardFind.end())
-		return m_blackBoardFind[aiName];
-
-	auto it = m_blackBoards.emplace();
-	auto* bb = &(*it);
-	m_blackBoardFind.emplace(aiName, bb);
-
-	return bb;
-}
-
-void AIManager::RemoveBlackBoard(const std::string& aiName)
-{
-	auto it = m_blackBoardFind.find(aiName);
-	if (it != m_blackBoardFind.end())
-	{
-		std::erase_if(m_blackBoards, [&](const BlackBoard& bb) { return &bb == it->second; });
-		m_blackBoardFind.erase(it);
-	}
-}
 
 std::shared_ptr<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float deltaSeconds,
     const std::optional<math::bounding_frustum>& cameraFrustum)
@@ -193,14 +170,14 @@ void AIManager::RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponen
         return true;
     });
     const uint64_t registrationId = m_nextAIRegistrationId++;
-    auto registration = m_aiComponentMap.emplace(AIRegistration{handle, aiComponent, registrationId});
+    m_aiComponentMap.push_back(AIRegistration{handle, aiComponent, registrationId});
     try
     {
         m_aiRegistrationsById.emplace(registrationId, aiComponent);
     }
     catch (...)
     {
-        m_aiComponentMap.erase(registration);
+        m_aiComponentMap.pop_back();
         throw;
     }
 }

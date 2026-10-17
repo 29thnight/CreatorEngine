@@ -1,11 +1,7 @@
 #include "ProfilerViewerClient.h"
 #include "ProfilerViewerTransport.h"
 
-#include <atomic>
-#include <chrono>
-#include <mutex>
-#include <future>
-#include <thread>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "Advapi32.lib")
 

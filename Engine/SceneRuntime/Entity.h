@@ -1,7 +1,7 @@
 #pragma once
 #include "Object.h"
 #include "SceneGC.h"
-#include <mutex>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "AuthoringDocument.h"
 #include "AuthoringNodeView.h"
 #include "Component.h"
@@ -10,7 +10,6 @@
 #include "GameObjectIndex.h"
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
-#include <vector>
 #include "../Utility_Framework/LayerTypes.h"
 
 class Scene;

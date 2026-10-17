@@ -4,6 +4,7 @@
 #include "VertexLayout.h"
 #include "MeshletData.h"
 #include "MeshLodData.h"
+#include "../Assets/MeshletCompression.h"
 #include "../Assets/TextureCoordinates.h"
 #include "../Assets/TextureSampler.h"
 
@@ -14,20 +15,9 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 
-#include <array>
-#include <compare>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <filesystem>
-#include <limits>
+#include <stddef.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include "../../Utility_Framework/Ownership.h"
-#include <optional>
-#include <span>
-#include <string>
-#include <type_traits>
-#include <variant>
-#include <vector>
 
 namespace AssetDepot
 {
@@ -388,6 +378,7 @@ namespace experiment
 		// Authored coarse topology plus complete cluster replacement hierarchy.
         // Empty means intentionally disabled/non-reducible, never a decoder fallback.
 		MeshLodChain coarseLods{};
+        std::shared_ptr<const assets::cluster::Archive> clusterArchive{};
 	};
 
 	// parent 하나만 hierarchy 정본이다. children/count 중복 저장을 없앴고,

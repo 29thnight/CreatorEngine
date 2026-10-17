@@ -9,7 +9,7 @@
 // d3d11.h도 직접 include하지 않는다 — T4로 이 파일에 DX11 타입이 남지 않았고,
 // Texture.h가 전이로 끌어오던 것마저 축 A가 걷었다.
 
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
     RHIAssetEvictionPass* evictionPass)

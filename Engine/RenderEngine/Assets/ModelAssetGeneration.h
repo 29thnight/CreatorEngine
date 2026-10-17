@@ -23,17 +23,12 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <limits>
-#include <map>
-#include <mutex>
-#include <optional>
-#include <span>
-#include <string>
-#include <variant>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
+
+namespace assets::cluster
+{
+    struct Archive;
+}
 
 namespace assets
 {
@@ -174,6 +169,8 @@ namespace assets
         math::aabb bounds{};
         experiment::MeshletPayload meshlets{};
         experiment::MeshLodChain coarseLods{};
+        std::shared_ptr<const cluster::Archive> clusterArchive{};
+          own::shared_owner<const ModelMeshDescriptor> streamDescriptor{};
     };
 
     struct ModelTextureSubresource final

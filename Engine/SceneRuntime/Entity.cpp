@@ -13,7 +13,7 @@
 #include "PrefabUtility.h"
 #include "ScriptObjectRegistry.h"
 #include "ComponentFactory.h"
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 Entity::Entity() : Object("Entity"), m_index(0)
 {

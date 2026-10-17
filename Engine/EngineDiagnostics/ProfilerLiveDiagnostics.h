@@ -2,14 +2,8 @@
 
 #include "ProfilerRenderingDiagnostics.h"
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <compare>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Value-only wire model. Addresses are labels from the target, never handles
 // that the viewer can dereference or send back as a read request.

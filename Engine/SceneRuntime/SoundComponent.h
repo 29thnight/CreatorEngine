@@ -2,9 +2,7 @@
 #include "Component.h"
 #include "SoundDefinition.h"
 #include "Audio/PlaybackService.h"
-#include <chrono>
-#include <mutex>
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Value snapshot used by Inspector. Serialized component field names stay unchanged.
 struct SoundComponentSettings final

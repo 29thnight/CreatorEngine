@@ -3,8 +3,7 @@
 #include <mathematics/rect.hpp>
 #include "Component.h"      // Component 클래스 포함
 #include "AnchorPreset.h"
-#include <cstdint>
-#include <string_view>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Unity의 RectTransform과 유사한 동작을 하는 UI용 트랜스폼 컴포넌트입니다.
 //

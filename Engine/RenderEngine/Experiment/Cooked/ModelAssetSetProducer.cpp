@@ -1,3 +1,4 @@
+#include "../../Assets/ModelCpuGeometry.h"
 #include "ModelAssetSetProducer.h"
 #include "CookSupport.h"
 #include "MaterialAssetSetCodec.h"
@@ -10,12 +11,7 @@
 #include "../Import/MeshletBuilder.h"
 #include "../Import/MeshLodBuilder.h"
 
-#include <algorithm>
-#include <map>
-#include <fstream>
-#include <set>
-#include <stdexcept>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -469,6 +465,8 @@ namespace experiment::cooked
                     product.schemaVersion = kModelGeometryArtifactVersion;
                     product.extension = ".cege";
                     RequireSource(WriteModelGeometryArtifact(geometry, product.artifactBytes, failure), failure);
+                    product.cpuGeometryBytes = assets::cpu_geometry::Encode(geometry.mesh.vertices.AttributeMask(),
+                        static_cast<uint32_t>(geometry.mesh.vertices.size()),geometry.mesh.vertices.Bytes(),geometry.mesh.indices);
                 }
                 else if (selection.kind == CookedAssetKind::AnimationClip)
                 {

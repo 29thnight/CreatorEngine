@@ -2,13 +2,8 @@
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #include "../../Engine/EngineDiagnostics/ProfileService.h"
 
-#include <array>
-#include <cassert>
-#include <chrono>
-#include <cstring>
-#include <fstream>
-#include <type_traits>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Contract.h"
 
 namespace profiler_render_measurement_tests
 {
@@ -105,7 +100,11 @@ namespace profiler_render_measurement_tests
         p.render_height = p.display_height = 1080;
         p.native_gate_active = true;
         p.spatial_provenance_available = true;
-        assert(result.valid());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((result.valid()));
+            },
+            "result.valid()");
         return result;
     }
 
@@ -143,7 +142,11 @@ namespace profiler_render_measurement_tests
         p.status = 10;
         p.fault_mode = 8;
         p.identity_valid = true;
-        assert(value.valid());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((value.valid()));
+            },
+            "value.valid()");
         return value;
     }
 
@@ -174,7 +177,11 @@ namespace profiler_render_measurement_tests
         wire a, b;
         ce::encode_render_measurement(a, left);
         ce::encode_render_measurement(b, right);
-        assert(a.bytes.size() == ce::kRenderMeasurementWireBytes && a.bytes == b.bytes);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((a.bytes.size() == ce::kRenderMeasurementWireBytes && a.bytes == b.bytes));
+            },
+            "a.bytes.size() == ce::kRenderMeasurementWireBytes && a.bytes == b.bytes");
     }
 
     // Independently authored old layouts, not a new encoder with the header relabeled.
@@ -254,7 +261,11 @@ namespace profiler_render_measurement_tests
         {
             footer.put(field);
         }
-        assert(footer.bytes.size() == 101);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((footer.bytes.size() == 101));
+            },
+            "footer.bytes.size() == 101");
         record(output, 3, 2, footer.bytes);
         return output.bytes;
     }
@@ -263,32 +274,64 @@ namespace profiler_render_measurement_tests
     {
         std::ofstream output(path, std::ios::binary | std::ios::trunc);
         output.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-        assert(output.good());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((output.good()));
+            },
+            "output.good()");
     }
 
     void codec_and_legacy()
     {
         const auto original = capture(3);
         const auto encoded = ce::encode_capture_bounded(*original, 1024 * 1024);
-        assert(encoded);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((encoded));
+            },
+            "encoded");
         const auto decoded = ce::decode_capture_bounded(*encoded, 1024 * 1024);
-        assert(decoded && (*decoded)->frame_count() == 3);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((decoded && (*decoded)->frame_count() == 3));
+            },
+            "decoded && (*decoded)->frame_count() == 3");
         for (std::size_t index = 0; index < 3; ++index)
         {
             const auto& frame = (*decoded)->frames()[index];
-            assert(frame.render_measurements.size() == 3);
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((frame.render_measurements.size() == 3));
+                },
+                "frame.render_measurements.size() == 3");
             same(original->frames()[index].render_measurements[0], frame.render_measurements[0]);
             same(original->frames()[index].render_measurements[1], frame.render_measurements[1]);
             same(original->frames()[index].render_measurements[2], frame.render_measurements[2]);
-            assert(frame.render_measurement_for(frame.events[0]) != nullptr);
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((frame.render_measurement_for(frame.events[0]) != nullptr));
+                },
+                "frame.render_measurement_for(frame.events[0]) != nullptr");
         }
-        assert(!ce::encode_capture_bounded(*original, encoded->size() - 1));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((!ce::encode_capture_bounded(*original, encoded->size() - 1)));
+            },
+            "!ce::encode_capture_bounded(*original, encoded->size() - 1)");
         for (std::uint32_t version : { 1u, 2u })
         {
             const auto legacy = ce::decode_capture(old_snapshot(version, true));
-            assert(legacy && (*legacy)->frames()[0].render_measurements.empty());
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((legacy && (*legacy)->frames()[0].render_measurements.empty()));
+                },
+                "legacy && (*legacy)->frames()[0].render_measurements.empty()");
             const auto resaved = ce::decode_capture(ce::encode_capture(**legacy));
-            assert(resaved && (*resaved)->frames()[0].render_measurements.empty());
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((resaved && (*resaved)->frames()[0].render_measurements.empty()));
+                },
+                "resaved && (*resaved)->frames()[0].render_measurements.empty()");
         }
         auto value = sample(1, ce::profile_render_axis::gpu_pass);
         wire bytes;
@@ -297,18 +340,34 @@ namespace profiler_render_measurement_tests
         {
             reader input{ std::span(bytes.bytes).first(cut) };
             ce::profile_render_measurement rejected;
-            assert(!ce::decode_render_measurement(input, rejected));
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((!ce::decode_render_measurement(input, rejected)));
+                },
+                "!ce::decode_render_measurement(input, rejected)");
         }
         bytes.bytes[97] = std::byte{ 2 }; // spatial availability is an exact Boolean.
         reader invalid{ bytes.bytes };
-        assert(!ce::decode_render_measurement(invalid, value));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((!ce::decode_render_measurement(invalid, value)));
+            },
+            "!ce::decode_render_measurement(invalid, value)");
         value = sample(1, ce::profile_render_axis::gpu_pass);
         value.provenance.frame_kind = 2;
         value.provenance.frame_generator = 1;
         value.provenance.generated_ordinal = 1;
-        assert(value.valid() && !value.provenance.native_quality_eligible());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((value.valid() && !value.provenance.native_quality_eligible()));
+            },
+            "value.valid() && !value.provenance.native_quality_eligible()");
         value.provenance.spatial_provenance_available = false;
-        assert(!value.provenance.native_quality_eligible());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((!value.provenance.native_quality_eligible()));
+            },
+            "!value.provenance.native_quality_eligible()");
         // Fault-contaminated producer rows intentionally use the existing
         // unknown vocabulary; re-encoding cannot restore native eligibility.
         value = sample(1, ce::profile_render_axis::cpu_render_submit);
@@ -320,34 +379,66 @@ namespace profiler_render_measurement_tests
         ce::encode_render_measurement(unknownBytes, value);
         reader unknownInput{ unknownBytes.bytes };
         ce::profile_render_measurement unknown;
-        assert(ce::decode_render_measurement(unknownInput, unknown));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((ce::decode_render_measurement(unknownInput, unknown)));
+            },
+            "ce::decode_render_measurement(unknownInput, unknown)");
         same(value, unknown);
-        assert(unknown.provenance.frame_kind == 0 && !unknown.provenance.native_quality_eligible());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((unknown.provenance.frame_kind == 0 && !unknown.provenance.native_quality_eligible()));
+            },
+            "unknown.provenance.frame_kind == 0 && !unknown.provenance.native_quality_eligible()");
         wire presenterBytes;
         const auto observed = presenter(9, 100);
         ce::encode_render_measurement(presenterBytes, observed);
-        assert(presenterBytes.bytes.size() == 100);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((presenterBytes.bytes.size() == 100));
+            },
+            "presenterBytes.bytes.size() == 100");
         reader presenterInput{ presenterBytes.bytes };
         ce::profile_render_measurement reopened;
-        assert(ce::decode_render_measurement(presenterInput, reopened, true));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((ce::decode_render_measurement(presenterInput, reopened, true)));
+            },
+            "ce::decode_render_measurement(presenterInput, reopened, true)");
         same(observed, reopened);
         reader legacyPresenterInput{ presenterBytes.bytes };
-        assert(!ce::decode_render_measurement(legacyPresenterInput, reopened, false));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((!ce::decode_render_measurement(legacyPresenterInput, reopened, false)));
+            },
+            "!ce::decode_render_measurement(legacyPresenterInput, reopened, false)");
         for (std::size_t cut = 0; cut < presenterBytes.bytes.size(); ++cut)
         {
             reader truncated{ std::span(presenterBytes.bytes).first(cut) };
-            assert(!ce::decode_render_measurement(truncated, reopened, true));
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((!ce::decode_render_measurement(truncated, reopened, true)));
+                },
+                "!ce::decode_render_measurement(truncated, reopened, true)");
         }
         presenterBytes.bytes.back() = std::byte{1};
         reader badReserved{ presenterBytes.bytes };
-        assert(!ce::decode_render_measurement(badReserved, reopened, true));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((!ce::decode_render_measurement(badReserved, reopened, true)));
+            },
+            "!ce::decode_render_measurement(badReserved, reopened, true)");
     }
 
     void streaming_and_selected_windows()
     {
         const auto directory = std::filesystem::temp_directory_path() /
             ("ceprof-render-fixture-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-        assert(std::filesystem::create_directory(directory));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((std::filesystem::create_directory(directory)));
+            },
+            "std::filesystem::create_directory(directory)");
         struct cleanup
         {
             std::filesystem::path directory;
@@ -360,33 +451,71 @@ namespace profiler_render_measurement_tests
         const auto original = capture(705);
         const auto streamPath = directory / "continuous7.ceprof";
         auto writer = ce::continuous_capture_writer::start(streamPath);
-        assert(writer && (*writer)->append_final(original));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((writer && (*writer)->append_final(original)));
+            },
+            "writer && (*writer)->append_final(original)");
         (*writer)->request_finalize(true, 0);
         (*writer)->wait();
-        assert((*writer)->status().state == ce::recording_state::finalized);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>(((*writer)->status().state == ce::recording_state::finalized));
+            },
+            "(*writer)->status().state == ce::recording_state::finalized");
         writer->reset();
         const auto streaming = ce::open_capture_recording(streamPath);
-        assert(streaming && (*streaming)->frame_count() == 705 && (*streaming)->complete());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((streaming && (*streaming)->frame_count() == 705 && (*streaming)->complete()));
+            },
+            "streaming && (*streaming)->frame_count() == 705 && (*streaming)->complete()");
         const auto tail = ce::load_capture(streamPath);
-        assert(tail && (*tail)->frame_count() == 600 && (*tail)->frames().front().engine_frame == 106);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>(
+                    (tail && (*tail)->frame_count() == 600 && (*tail)->frames().front().engine_frame == 106));
+            },
+            "tail && (*tail)->frame_count() == 600 && (*tail)->frames().front().engine_frame == 106");
         const auto first = (*streaming)->load_range(0, 1);
-        assert(first && (*first)->frames()[0].engine_frame == 1);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((first && (*first)->frames()[0].engine_frame == 1));
+            },
+            "first && (*first)->frames()[0].engine_frame == 1");
         same(original->frames()[0].render_measurements[1], (*first)->frames()[0].render_measurements[1]);
         same(original->frames()[0].render_measurements[2], (*first)->frames()[0].render_measurements[2]);
         same(original->frames()[704].render_measurements[2], (*tail)->frames().back().render_measurements[2]);
         const auto snapshotPath = directory / "snapshot6.ceprof";
         write_file(snapshotPath, ce::encode_capture(*original));
         const auto snapshot = ce::open_capture_recording(snapshotPath);
-        assert(snapshot && (*snapshot)->frame_count() == 705);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((snapshot && (*snapshot)->frame_count() == 705));
+            },
+            "snapshot && (*snapshot)->frame_count() == 705");
         const auto selection = (*snapshot)->load_range(601, 3);
-        assert(selection && (*selection)->frames()[0].engine_frame == 602);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((selection && (*selection)->frames()[0].engine_frame == 602));
+            },
+            "selection && (*selection)->frames()[0].engine_frame == 602");
         same(original->frames()[601].render_measurements[1], (*selection)->frames()[0].render_measurements[1]);
         same(original->frames()[601].render_measurements[2], (*selection)->frames()[0].render_measurements[2]);
-        assert(!(*snapshot)->load_range(601, 3, 1));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((!(*snapshot)->load_range(601, 3, 1)));
+            },
+            "!(*snapshot)->load_range(601, 3, 1)");
         const auto oldPath = directory / "continuous3.ceprof";
         write_file(oldPath, old_stream());
         const auto legacy = ce::load_capture(oldPath);
-        assert(legacy && (*legacy)->frame_count() == 1 && (*legacy)->frames()[0].render_measurements.empty());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>(
+                    (legacy && (*legacy)->frame_count() == 1 && (*legacy)->frames()[0].render_measurements.empty()));
+            },
+            "legacy && (*legacy)->frame_count() == 1 && (*legacy)->frames()[0].render_measurements.empty()");
     }
 
     void producer_and_late_frame_ownership()
@@ -411,20 +540,40 @@ namespace profiler_render_measurement_tests
         ring.close_frame(11, 11000, 12000);
         ring.close_frame(12, 12000, 13000);
         const auto frozen = ring.freeze({}, { 1000000 }, true, 0);
-        assert(frozen->find_frame(11)->render_measurements.size() == 1);
-        assert(frozen->find_frame(12)->render_measurements.empty());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((frozen->find_frame(11)->render_measurements.size() == 1));
+            },
+            "frozen->find_frame(11)->render_measurements.size() == 1");
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((frozen->find_frame(12)->render_measurements.empty()));
+            },
+            "frozen->find_frame(12)->render_measurements.empty()");
         same(value, frozen->find_frame(11)->render_measurements[0]);
-        assert(frozen->find_frame(11)->memory_bytes() >= sizeof(ce::profile_render_measurement));
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((frozen->find_frame(11)->memory_bytes() >= sizeof(ce::profile_render_measurement)));
+            },
+            "frozen->find_frame(11)->memory_bytes() >= sizeof(ce::profile_render_measurement)");
         auto duplicate = *frozen->find_frame(11);
         duplicate.render_measurements.push_back(value);
-        assert(duplicate.render_measurement_for(duplicate.events[0]) == nullptr);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((duplicate.render_measurement_for(duplicate.events[0]) == nullptr));
+            },
+            "duplicate.render_measurement_for(duplicate.events[0]) == nullptr");
         // A newer sample cannot mutate the already frozen capture or relabel an
         // evicted owner frame. Its absence is explicitly counted as source loss.
         ring.close_frame(13, 13000, 14000);
         stream.write_render_measurement(value, 7);
         stream.publish_frame();
         ring.ingest(pool->take_sealed(), pool, 7, 14000);
-        assert(ring.late_spans_dropped() != 0 && ring.dropped_events() != 0);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((ring.late_spans_dropped() != 0 && ring.dropped_events() != 0));
+            },
+            "ring.late_spans_dropped() != 0 && ring.dropped_events() != 0");
         same(value, frozen->find_frame(11)->render_measurements[0]);
     }
 
@@ -441,17 +590,33 @@ namespace profiler_render_measurement_tests
         stream.publish_frame();
         // The only bounded page is sealed, not silently replaced/expanded.
         stream.write_presenter_return(presenter(41, 901), 7);
-        assert(stream.dropped_events() != 0);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((stream.dropped_events() != 0));
+            },
+            "stream.dropped_events() != 0");
         ring.ingest(pool->take_sealed(), pool, 7, 41000);
         ring.close_frame(41, 41000, 42000);
         auto frozen = ring.freeze({}, {1000000}, true, 0);
-        assert(frozen->find_frame(41)->render_measurements.size() == 1);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((frozen->find_frame(41)->render_measurements.size() == 1));
+            },
+            "frozen->find_frame(41)->render_measurements.size() == 1");
         same(observed, frozen->find_frame(41)->render_measurements[0]);
-        assert(observed.presenter.real_frame_id != observed.engine_frame);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((observed.presenter.real_frame_id != observed.engine_frame));
+            },
+            "observed.presenter.real_frame_id != observed.engine_frame");
         stream.request_freeze(42000);
         stream.write_presenter_return(presenter(42, 902), 7);
         stream.publish_frame();
-        assert(pool->take_sealed() == nullptr); // No CPU admission after Stop.
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((pool->take_sealed() == nullptr));
+            },
+            "pool->take_sealed() == nullptr"); // No CPU admission after Stop.
     }
 
     void zero_frame_multiple_views_and_submissions()
@@ -464,22 +629,39 @@ namespace profiler_render_measurement_tests
         const auto repeated = sample(0, ce::profile_render_axis::gpu_pass, 7, 103);
         for (const auto& value : { first, second, repeated })
         {
-            assert(value.provenance.publication_frame_id != value.engine_frame);
-            assert(value.provenance.real_frame_id != value.engine_frame);
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((value.provenance.publication_frame_id != value.engine_frame));
+                },
+                "value.provenance.publication_frame_id != value.engine_frame");
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((value.provenance.real_frame_id != value.engine_frame));
+                },
+                "value.provenance.real_frame_id != value.engine_frame");
             frame.render_measurements.push_back(value);
             frame.events.push_back(event(value));
         }
         for (std::size_t index = 0; index < frame.events.size(); ++index)
         {
             const auto* found = frame.render_measurement_for(frame.events[index]);
-            assert(found);
+            ::ce::contracts::enforce_that(
+                [&]() -> bool {
+                    return static_cast<bool>((found));
+                },
+                "found");
             same(frame.render_measurements[index], *found);
         }
         const ce::capture_session original({ frame },
             { { "GPU", 0, 0, ce::track_kind::gpu_graphics, 0 } },
             { {}, { "GPU.Pass", "", 0, ce::marker_kind::gpu_span } }, { 1000000 }, true, 0);
         const auto reopened = ce::decode_capture(ce::encode_capture(original));
-        assert(reopened && (*reopened)->find_frame(0) && (*reopened)->find_frame(0)->render_measurements.size() == 3);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>(
+                    (reopened && (*reopened)->find_frame(0) && (*reopened)->find_frame(0)->render_measurements.size() == 3));
+            },
+            "reopened && (*reopened)->find_frame(0) && (*reopened)->find_frame(0)->render_measurements.size() == 3");
         same(repeated, (*reopened)->find_frame(0)->render_measurements[2]);
 
         // Full-width IDs may share legacy 16/32-bit event keys. Such a join
@@ -487,9 +669,17 @@ namespace profiler_render_measurement_tests
         auto collision = first;
         collision.provenance.view_id += 0x10000;
         collision.submission_id += 0x100000000ull;
-        assert(collision.valid());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((collision.valid()));
+            },
+            "collision.valid()");
         frame.render_measurements.push_back(collision);
-        assert(frame.render_measurement_for(frame.events[0]) == nullptr);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((frame.render_measurement_for(frame.events[0]) == nullptr));
+            },
+            "frame.render_measurement_for(frame.events[0]) == nullptr");
     }
 }
 
@@ -516,16 +706,28 @@ int main()
         service.pause();
         service.wait_until_idle();
         const auto captured = service.capture();
-        assert(captured && captured->complete());
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((captured && captured->complete()));
+            },
+            "captured && captured->complete()");
         unsigned count = 0;
         for (const auto& frame : captured->frames())
             for (const auto& sample : frame.render_measurements)
                 if (sample.axis == ce::profile_render_axis::cpu_presenter_return)
                 {
-                    assert(frame.engine_frame == 26 && sample.presenter.sequence == 2);
+                    ::ce::contracts::enforce_that(
+                        [&]() -> bool {
+                            return static_cast<bool>((frame.engine_frame == 26 && sample.presenter.sequence == 2));
+                        },
+                        "frame.engine_frame == 26 && sample.presenter.sequence == 2");
                     ++count;
                 }
-        assert(count == 1);
+        ::ce::contracts::enforce_that(
+            [&]() -> bool {
+                return static_cast<bool>((count == 1));
+            },
+            "count == 1");
         service.shutdown();
     }
     profiler_render_measurement_tests::codec_and_legacy();

@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cmath>
-#include <cstdint>
-#include <string>
+#include "StandardLibrary.h"
 
 // Portable project intent. Device capabilities, native runtime directories and
 // application credentials/SDK bootstrap identity never belong in this asset.

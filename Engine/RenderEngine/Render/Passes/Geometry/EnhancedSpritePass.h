@@ -1,11 +1,9 @@
 #pragma once
 #include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
-#include <cstdint>
-#include <array>
+#include <stddef.h>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include <mathematics/color.hpp>
-#include <memory>
-#include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../../GpuGeometryVisibility.h"

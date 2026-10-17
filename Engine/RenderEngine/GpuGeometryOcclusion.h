@@ -6,12 +6,7 @@
 
 #include <mathematics/matrix4x4.hpp>
 
-#include <array>
-#include <atomic>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 struct EnhancedFrameContext;
 
@@ -19,7 +14,7 @@ struct EnhancedFrameContext;
 // by submitted frames; importing it creates a new recording-local view.
 class GpuGeometryOcclusion final
 {
-public:
+  public:
     static constexpr std::uint32_t kMaximumLevels = 16;
 
     struct ViewKey
@@ -38,25 +33,27 @@ public:
         ViewKey source;
         std::uint64_t viewId{}, revision{}, completion{};
         std::vector<RHITextureHandle> textures;
+        std::string name{"METEOR.Camera"};
         std::atomic<bool> recorded{};
     };
 
     class Pyramid
     {
-    public:
+      public:
         // depth is an earlier, same-view D32Float RG2 version, cleared to 1.
         // Repeating this exact declaration is harmless; changing its producer
         // depth version or graph is an error. Consumers must not feed it back.
         void Declare(EnhancedRenderGraph& graph, RGHandle depth) const;
         void RequireView(const ViewKey& view) const;
-        void AddReadUsages(EnhancedRenderGraph& graph,
-            std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
+        void AddReadUsages(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
         RHIBindingTable Bindings(const EnhancedRenderGraph::ExecuteContext& execution) const;
+        std::array<RHIBindingDesc, kMaximumLevels> BindingInputs(
+            const EnhancedRenderGraph::ExecuteContext& execution) const;
         std::uint32_t LevelCount() const { return m_levelCount; }
         const std::shared_ptr<History>& HistoryOwner() const { return m_history; }
         void ImportHistory(EnhancedRenderGraph& graph) const;
 
-    private:
+      private:
         friend class GpuGeometryOcclusion;
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
 
@@ -70,20 +67,23 @@ public:
         mutable std::vector<RGHandle> m_levels;
         std::shared_ptr<History> m_history;
         bool m_historyReader{};
+        std::string m_name{"Geometry.Occlusion"};
     };
 
     static ViewKey CaptureView(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection);
     static std::uint32_t LevelCount(std::uint32_t width, std::uint32_t height);
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
-        std::shared_ptr<const Pyramid>& result, std::string& error);
-    bool PrepareHistory(const EnhancedFrameContext& context, const math::matrix4x4& projection,
-        std::uint64_t viewId, std::uint64_t revision,
-        std::shared_ptr<const Pyramid>& result, std::string& error);
+                 std::shared_ptr<const Pyramid>& result, std::string& error,
+                 const std::string& name = "Geometry.Occlusion");
+    bool PrepareHistory(const EnhancedFrameContext& context, const math::matrix4x4& projection, std::uint64_t viewId,
+                        std::uint64_t revision, std::shared_ptr<const Pyramid>& result, std::string& error,
+                        const std::string& name = "Geometry.Occlusion");
     static std::shared_ptr<const Pyramid> ReadHistory(const EnhancedFrameContext& context,
-        const math::matrix4x4& projection, const std::shared_ptr<History>& history);
+                                                      const math::matrix4x4& projection,
+                                                      const std::shared_ptr<History>& history);
     void ShutdownAfterIdle();
 
-private:
+  private:
     IRenderDeviceServices* m_device{};
     LX::Runtime::ComputePipeline m_build;
 };

@@ -5,10 +5,7 @@
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // IBL 생성 체인 자가 검증 (PHASE 3-6).
 //

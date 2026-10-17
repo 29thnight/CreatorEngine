@@ -7,15 +7,9 @@
 #include "AuthoringReadNode.h"
 #include "AuthoringWriteNode.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cassert>
-#include <charconv>
-#include <cmath>
-#include <limits>
-#include <set>
-#include <stdexcept>
-#include <type_traits>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Contract.h"
 
 namespace material_graph
 {
@@ -844,7 +838,11 @@ namespace material_graph
 
     void GenerationStore::DetachAll(RetiredEntries& retired) noexcept
     {
-        assert(retired.entries_.empty());
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((retired.entries_.empty()));
+            },
+            "retired.entries_.empty()");
         std::lock_guard lock(mutex_);
         retired.entries_.swap(entries_);
         retainedBytes_ = 0;

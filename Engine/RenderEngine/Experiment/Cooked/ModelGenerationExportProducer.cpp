@@ -10,10 +10,7 @@
 #include "AuthoringWriteNode.h"
 #include "Sha256.h"
 
-#include <algorithm>
-#include <fstream>
-#include <iterator>
-#include <system_error>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

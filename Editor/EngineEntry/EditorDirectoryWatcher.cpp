@@ -8,17 +8,8 @@
 #endif
 #include <Windows.h>
 
-#include <algorithm>
-#include <chrono>
-#include <cstddef>
-#include <iterator>
-#include <limits>
-#include <mutex>
-#include <optional>
-#include <string>
-#include <thread>
-#include <utility>
-#include <vector>
+#include <stddef.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -4,16 +4,7 @@
 #include "TypeTrait.h"
 #include "Ownership.h"
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <variant>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace Authoring
 {

@@ -4,7 +4,7 @@
 #include "EditorTheme.h"
 #include "EditorPropertyRow.h"
 
-#include <array>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"
 

@@ -19,11 +19,7 @@
 //
 // 상태는 h[8]과 64바이트 블록 버퍼뿐이다. Finish 뒤에는 다시 쓰지 않는다.
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <string>
+#include "StandardLibrary.h"
 
 namespace Hash
 {

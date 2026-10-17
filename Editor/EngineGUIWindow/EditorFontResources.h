@@ -31,11 +31,7 @@
 // 선택 폰트(작은 글씨용)는 비어 있어도 된다. `PushFont(nullptr, 0.0f)` 이
 // "지금 폰트를 그대로" 라서(imgui.h:516) 호출자가 분기하지 않아도 안전하다.
 
-#include <span>
-#include <filesystem>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct ImFont;
 

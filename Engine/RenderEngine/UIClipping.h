@@ -1,7 +1,6 @@
 #pragma once
 
-#include <algorithm>
-#include <cmath>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // UI 클리핑 계산 (PHASE 3-6에서 공유로 뺐다).
 //

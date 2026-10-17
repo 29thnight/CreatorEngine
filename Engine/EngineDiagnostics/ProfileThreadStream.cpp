@@ -1,8 +1,8 @@
 #include "ProfileThreadStream.h"
 
-#include <algorithm>
-#include <new>
-#include <utility>
+#include <stdint.h>
+#include <limits.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce
 {

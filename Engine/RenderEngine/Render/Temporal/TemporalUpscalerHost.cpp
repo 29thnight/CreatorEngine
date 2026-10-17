@@ -6,8 +6,8 @@
 #include "../../RHI/Temporal/Fsr/FsrBackendVulkan.h"
 #include "../../RHI/Temporal/DlssTemporalAdapter.h"
 #include "../../RHI/Temporal/XeSSUpscaler.h"
-#include <atomic>
-#include <array>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

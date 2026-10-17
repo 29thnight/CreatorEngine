@@ -1,8 +1,10 @@
+#include "Assets/ModelCpuGeometryPayload.h"
+#include "../Utility_Framework/WindowsApartment.h"
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
 #include "Experiment/Cooked/CookedTexture.h"
 #include "Experiment/Cooked/MaterialAssetSetCodec.h"
-#include <cassert>
+#include "../Utility_Framework/Contract.h"
 #include "AssetDepot/LegacyResourceCharges.h"
 
 #include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1 (MBC9: ExperimentModelMigration.cpp에서 이주)
@@ -18,11 +20,9 @@
 #include "FontAsset.h"
 #include "Sha256.h"
 #include "../EngineDiagnostics/ProfileScope.h"
-#include <fstream> // I7-C1: manifest 읽기
-#include <unordered_set>
-#include <future>
-#include <ppltasks.h>
-#include <ppl.h>
+#include "../Utility_Framework/StandardLibrary.h"
+
+
 #include "AuthoringBase64.h"
 #include "Benchmark.hpp"
 // SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
@@ -46,19 +46,6 @@
 #include "Assets/ModelSidecarV2.h"
 #include "RHI/RHIFormat.h" // MBC7: generation embedded texture 포맷
 
-#include <algorithm>
-#include <iomanip>
-#include <array>
-#include <cctype>
-#include <chrono>
-#include <istream>
-#include <limits>
-#include <memory>
-#include <utility>
-#include <optional>
-#include <ostream>
-#include <sstream>
-#include <stdexcept>
 #include <Windows.h>
 
 // 검색 함수
@@ -134,24 +121,16 @@ namespace
     class AssetDecoderApartment
     {
     public:
-        AssetDecoderApartment() : m_result(CoInitializeEx(nullptr, COINIT_MULTITHREADED))
+        AssetDecoderApartment()
         {
-            if (FAILED(m_result) && m_result != RPC_E_CHANGED_MODE)
+            if (FAILED(m_scope.result))
             {
-                throw std::runtime_error("Asset image decoder COM initialization failed.");
+                throw std::runtime_error("Asset image decoder apartment initialization failed.");
             }
         }
-        ~AssetDecoderApartment()
-        {
-            if (SUCCEEDED(m_result))
-            {
-                CoUninitialize();
-            }
-        }
-        AssetDecoderApartment(const AssetDecoderApartment&) = delete;
-        AssetDecoderApartment& operator=(const AssetDecoderApartment&) = delete;
+
     private:
-        HRESULT m_result;
+        ce::platform::windows::apartment_scope m_scope{ ce::platform::windows::apartment_model::current_or_mta };
     };
 
 	std::string Lowercase(std::string value)
@@ -869,7 +848,7 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
         }
     }
     using MeshRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelMeshDescriptor>>;
-    using GeometryRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelGeometryPayload>>;
+    using GeometryRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload>>;
     using MaterialRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<Material>>;
     std::vector<MeshRequest> meshes;
     std::vector<GeometryRequest> geometry;
@@ -2498,7 +2477,11 @@ DataSystem::SceneAssetHandoff::~SceneAssetHandoff()
     if (m_system)
     {
         std::lock_guard lock(m_system->m_assetPreparationMutex);
-        assert(m_system->m_assetRootHandoffs != 0u);
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((m_system->m_assetRootHandoffs != 0u));
+            },
+            "m_system->m_assetRootHandoffs != 0u");
         --m_system->m_assetRootHandoffs;
     }
 }
@@ -3251,7 +3234,12 @@ DataSystem::SnapshotModelGenerationTextures() const
 
 void DataSystem::StageLegacyCacheRetirementLocked(LegacyCacheRetirement& retired)
 {
-    assert(retired.preparationPins.empty() && retired.scenePins.empty() && retired.bundlePins.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>(
+                (retired.preparationPins.empty() && retired.scenePins.empty() && retired.bundlePins.empty()));
+        },
+        "retired.preparationPins.empty() && retired.scenePins.empty() && retired.bundlePins.empty()");
     // Reserve everything before taking cancellation pins. On failure the caller's
     // staged storage unwinds only after its outer guards, leaving live state intact.
     retired.preparationPins.reserve(m_assetPreparations.size());
@@ -3284,11 +3272,20 @@ void DataSystem::DetachLegacyCachesLocked(LegacyCacheRetirement& retired) noexce
 {
     // Every map shell and strong cancellation pin already exists. This phase
     // swaps only into empty caller-owned storage and never destroys retired owners.
-    assert(retired.fonts.empty() && retired.materials.empty() && retired.authoredMaterials.empty()
-        && retired.textures.empty() && retired.uiTextures.empty() && retired.spriteSheets.empty()
-        && retired.modelTextures.empty() && retired.modelTextureOwners.empty()
-        && retired.shaderSlots.empty() && retired.shaderSlotsByGuid.empty() && retired.shaderFreeSlots.empty()
-        && retired.preparations.empty() && retired.scenes.empty() && retired.bundles.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>(
+                (retired.fonts.empty() && retired.materials.empty() && retired.authoredMaterials.empty() &&
+                 retired.textures.empty() && retired.uiTextures.empty() && retired.spriteSheets.empty() &&
+                 retired.modelTextures.empty() && retired.modelTextureOwners.empty() && retired.shaderSlots.empty() &&
+                 retired.shaderSlotsByGuid.empty() && retired.shaderFreeSlots.empty() && retired.preparations.empty() &&
+                 retired.scenes.empty() && retired.bundles.empty()));
+        },
+        "retired.fonts.empty() && retired.materials.empty() && retired.authoredMaterials.empty() && "
+        "retired.textures.empty() && retired.uiTextures.empty() && retired.spriteSheets.empty() && "
+        "retired.modelTextures.empty() && retired.modelTextureOwners.empty() && retired.shaderSlots.empty() && "
+        "retired.shaderSlotsByGuid.empty() && retired.shaderFreeSlots.empty() && retired.preparations.empty() && "
+        "retired.scenes.empty() && retired.bundles.empty()");
     {
         std::lock_guard lock(m_fontMutex);
         m_fonts.swap(retired.fonts);
@@ -7114,9 +7111,25 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
             const bool cookedGraph = cooked && sourcePath.extension() == ".shadergraph" &&
                 cooked->kind == experiment::cooked::CookedAssetKind::MaterialProgram &&
                 cooked->formatVersion == material_graph::CookedProgramVersion;
+            // A CECT identity names the offline source, not a required runtime
+            // file. Its replacement must exist with the manifest size; payload
+            // format and digest validation remain at typed acquisition.
+            bool cookedTexture = false;
+            if (cooked && cooked->kind == experiment::cooked::CookedAssetKind::Texture
+                && cooked->formatVersion == experiment::cooked::kTextureArtifactVersion)
+            {
+                const auto artifactPath = catalog->ResolveArtifactPath(source.assetId);
+                std::error_code artifactError;
+                cookedTexture = file::is_regular_file(artifactPath, artifactError) && !artifactError;
+                if (cookedTexture)
+                {
+                    const auto artifactSize = file::file_size(artifactPath, artifactError);
+                    cookedTexture = !artifactError && artifactSize == cooked->byteSize;
+                }
+            }
 			std::error_code sourceError;
 			if (sourcePath.empty()
-				|| (!cookedGraph && (!file::is_regular_file(sourcePath, sourceError) || sourceError)))
+				|| (!cookedGraph && !cookedTexture && (!file::is_regular_file(sourcePath, sourceError) || sourceError)))
 			{
 				outError = "CEMF source asset이 package에 없다: "
 					+ source.sourcePath;

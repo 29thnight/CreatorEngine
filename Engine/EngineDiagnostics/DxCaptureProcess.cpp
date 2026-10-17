@@ -3,8 +3,7 @@
 
 #include <bcrypt.h>
 
-#include <atomic>
-#include <thread>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "Advapi32.lib")
 #pragma comment(lib, "Bcrypt.lib")

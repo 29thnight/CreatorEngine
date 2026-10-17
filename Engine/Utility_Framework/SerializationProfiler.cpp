@@ -1,6 +1,6 @@
 #include "SerializationProfiler.h"
 
-#include <chrono>
+#include "StandardLibrary.h"
 
 namespace
 {

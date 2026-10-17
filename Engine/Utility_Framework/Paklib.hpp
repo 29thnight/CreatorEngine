@@ -32,26 +32,8 @@
 
 #pragma once
 #include "ArtifactStoreGuard.h"
-#include <cstdint>
-#include <algorithm>
-#include <limits>
-#include <vector>
-#include <string>
-#include <string_view>
-#include <optional>
-#include <span>
-#include <filesystem>
-#include <fstream>
-#include <array>
-#include <variant>
-#include <unordered_map>
-#include <stdexcept>
-#include <cassert>
-#include <cstdio>
-#include <cstring>
-#include <memory>
-#include <mutex>
-#include <ranges>
+#include <stdio.h>
+#include "StandardLibrary.h"
 #include <share.h>
 
 #pragma warning(disable : 4996)

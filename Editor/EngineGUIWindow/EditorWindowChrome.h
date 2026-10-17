@@ -2,9 +2,7 @@
 
 #include <Windows.h>
 
-#include <atomic>
-#include <optional>
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Client-space geometry shared by menu rendering and native caption hit testing.
 struct EditorTitleBarLayout

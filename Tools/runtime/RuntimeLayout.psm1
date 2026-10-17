@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Get-EngineFileHash([string]$Path) {
@@ -30,7 +30,7 @@ function Assert-EngineChildPath([string]$Path, [string]$Root) {
 }
 
 # Read imports directly: deployment/validation does not require dumpbin or Visual Studio.
-function Get-EnginePeImports([string]$Path) {
+function Get-EnginePeImports([string]$Path, [switch]$Detailed) {
     $data = [IO.File]::ReadAllBytes($Path)
     function U16([int]$at) { [BitConverter]::ToUInt16($data, $at) }
     function U32([int]$at) { [BitConverter]::ToUInt32($data, $at) }
@@ -60,17 +60,21 @@ function Get-EnginePeImports([string]$Path) {
         [Text.Encoding]::ASCII.GetString($data, $at, $end - $at)
     }
     $imports = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $details = [Collections.Generic.List[object]]::new()
     foreach ($table in @(@{ index = 1; stride = 20; name = 12 }, @{ index = 13; stride = 32; name = 4 })) {
         $rva = U32 ($directory + 8 * $table.index)
         if ($rva -eq 0) { continue }
         $at = Offset $rva
         while ((U32 ($at + $table.name)) -ne 0) {
             if ($table.index -eq 13 -and ((U32 $at) -band 1) -eq 0) { throw "VA delay imports are unsupported: $Path" }
-            [void]$imports.Add((CString (Offset (U32 ($at + $table.name)))))
+            $importName = CString (Offset (U32 ($at + $table.name)))
+            [void]$imports.Add($importName)
+            $details.Add([pscustomobject]@{ name = $importName; delayLoaded = ($table.index -eq 13) })
             $at += $table.stride
         }
     }
-    @($imports | Sort-Object)
+    if ($Detailed) { @($details | Sort-Object name, delayLoaded) }
+    else { @($imports | Sort-Object) }
 }
 
 function Get-EngineEntries([string]$Root, [string[]]$Paths) {

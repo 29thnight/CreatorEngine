@@ -29,13 +29,7 @@ namespace EditorImGuiTexture
 #include "Entity.h"
 #include "TypeTrait.h"
 #include "InputManager.h"
-#include <algorithm>
-#include <any>
-#include <span>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 using namespace TypeTrait;
 namespace Meta

@@ -10,9 +10,7 @@
 #include "Entity.h"
 #include "UITickSystem.h"
 #include "FontAsset.h"
-#include <algorithm>
-#include <cmath>
-#include <utility>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

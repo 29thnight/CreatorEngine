@@ -1,5 +1,5 @@
 #pragma once
-#include <atomic>
+#include "StandardLibrary.h"
 #include <immintrin.h> // For _mm_pause
 
 template <typename T>

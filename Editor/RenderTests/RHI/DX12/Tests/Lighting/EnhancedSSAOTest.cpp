@@ -7,10 +7,8 @@
 #include "RHI/RHIEncoder.h"
 #include "RHI/RHIShaderCompiler.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <cstddef>
+#include <stddef.h>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -3,17 +3,8 @@
 #include "AudioSourceValidation.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <chrono>
-#include <cmath>
-#include <cstring>
-#include <deque>
-#include <limits>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
+#include <stdio.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #if defined(WAVE_AUDIO_PROBE)
 #include "../../../Tools/regression/audio_fixture_decoder.h"

@@ -4,11 +4,9 @@
 #include "../../Engine/EngineDiagnostics/ProfilerLiveDiagnostics.h"
 #include "../../Engine/EngineDiagnostics/ProfilerViewerProtocol.h"
 
-#include <cstdio>
-#include <limits>
-#include <memory>
-#include <map>
-#include <vector>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace live_diagnostics_tests
 {

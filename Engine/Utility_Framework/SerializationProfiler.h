@@ -1,8 +1,5 @@
 #pragma once
-#include <array>
-#include <atomic>
-#include <cstdint>
-#include <string_view>
+#include "StandardLibrary.h"
 
 // SerializationPlan D0 — 직렬화 기준선 계측의 정본.
 //

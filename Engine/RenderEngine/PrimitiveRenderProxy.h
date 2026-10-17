@@ -24,7 +24,7 @@
 #include "FoliageInstance.h"
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 enum class PrimitiveProxyType
 {

@@ -3,14 +3,8 @@
 #include "ProfilerViewerClient.h"
 #include "ImGui.h"
 
-#include <algorithm>
-#include <cinttypes>
-#include <cmath>
-#include <limits>
-#include <atomic>
-#include <exception>
-#include <memory>
-#include <utility>
+#include <inttypes.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

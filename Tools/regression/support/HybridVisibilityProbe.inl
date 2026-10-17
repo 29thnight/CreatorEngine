@@ -200,16 +200,36 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(rejected([&] { host.DeclareLayerWork(*graph, wrongLayerList); }),
                 "Layer work rejects a foreign list before producing commands");
             const auto meteorLayerWork = host.DeclareLayerWork(*graph, meteorFinalList.blendedList);
-            Check(rejected([&] { host.DeclareGBuffer(*graph, {meteorFirstList.list, {}}, targets.GetOutputs()); }),
-                  "Surface rejects a list other than the final culling list");
+            Check(rejected([&] { host.DeclareVisibility(*graph, {meteorFirstList.list, {}}, targets.GetOutputs()); }),
+                  "Visibility rejects a list other than the final culling list");
             auto wrongFinalList = meteorFinalList;
             ++wrongFinalList.list.version;
-            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongFinalList, targets.GetOutputs()); }),
-                  "Surface rejects a first-stage list substituted for final visibility");
+            Check(rejected([&] { host.DeclareVisibility(*graph, wrongFinalList, targets.GetOutputs()); }),
+                  "Visibility rejects a different final-list version");
             wrongFinalList.list = {};
-            Check(rejected([&] { host.DeclareGBuffer(*graph, wrongFinalList, targets.GetOutputs()); }),
-                  "Surface rejects missing final visibility before declaring passes");
-            const auto output = host.DeclareGBuffer(*graph, meteorFinalList, targets.GetOutputs());
+            Check(rejected([&] { host.DeclareVisibility(*graph, wrongFinalList, targets.GetOutputs()); }),
+                  "Visibility rejects missing final visibility before declaring passes");
+            const auto visibility = host.DeclareVisibility(*graph, meteorFinalList, targets.GetOutputs());
+            auto wrongVisibility = visibility.visibility;
+            ++wrongVisibility.version;
+            Check(rejected([&] { host.DeclareMaterialWork(*graph, meteorGeometry, wrongVisibility); }),
+                  "MaterialWork rejects an unpublished visibility version");
+            Check(rejected([&] { host.DeclareSurfaceResolve(*graph, meteorGeometry, visibility, {}); }),
+                  "SurfaceResolve cannot implicitly declare its missing material producer");
+            const auto materialWork = host.DeclareMaterialWork(*graph, meteorGeometry, visibility.visibility);
+            auto wrongMaterialWork = materialWork;
+            ++wrongMaterialWork[0].version;
+            Check(rejected([&] { host.DeclareSurfaceResolve(*graph, meteorGeometry, visibility, wrongMaterialWork); }),
+                  "SurfaceResolve rejects unpublished material tile versions");
+            auto wrongSurface = visibility;
+            wrongSurface.visibility = wrongVisibility;
+            Check(rejected([&] { host.DeclareSurfaceResolve(*graph, meteorGeometry, wrongSurface, materialWork); }),
+                  "SurfaceResolve rejects an unpublished visibility version");
+            wrongSurface = visibility;
+            ++wrongSurface.depth.version;
+            Check(rejected([&] { host.DeclareSurfaceResolve(*graph, meteorGeometry, wrongSurface, materialWork); }),
+                  "SurfaceResolve rejects an unpublished depth version");
+            const auto output = host.DeclareSurfaceResolve(*graph, meteorGeometry, visibility, materialWork);
             host.DeclareHistory(*graph, output.depth);
             const auto hybrid = host.HybridVisibility();
             const auto occluder = host.OccluderVisibility();

@@ -2,8 +2,7 @@
 
 #include <Windows.h>
 #include <shellapi.h>
-#include <string>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 EditorPlatform& EditorPlatform::Get() noexcept
 {

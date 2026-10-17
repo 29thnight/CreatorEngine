@@ -10,15 +10,8 @@
 #include <DxTimingCaptureLibrary/EtwException.h>
 #include <DxTimingCaptureLibrary/EtwProviders.h>
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <cstddef>
-#include <cstring>
-#include <limits>
-#include <stdexcept>
-#include <string>
-#include <thread>
+#include <stddef.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace ce::dx_capture
 {

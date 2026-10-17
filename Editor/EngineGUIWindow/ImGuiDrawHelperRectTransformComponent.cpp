@@ -2,8 +2,7 @@
 #include "RectTransformComponent.h"
 #include "EditorPropertyRow.h"
 
-#include <cmath>
-#include <cstdio>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 프리셋 표는 RectTransformComponent가 소유한다. 여기에 사본을 두었더니 값이
 // 갈라졌고, 양쪽 모두 스트레치 6종이 3종으로 뭉개져 있었다(분석 문서 F-6).

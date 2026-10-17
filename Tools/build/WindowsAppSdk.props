@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <CreatorWindowsAppSdkPropsImported>true</CreatorWindowsAppSdkPropsImported>
+    <CreatorCppWinRTVersion>3.0.260818.1</CreatorCppWinRTVersion>
+    <CreatorWindowsAppSdkVersion>1.7.260224002</CreatorWindowsAppSdkVersion>
+    <_CreatorNuGetCache Condition="'$(NuGetPackageRoot)' != ''">$(NuGetPackageRoot)</_CreatorNuGetCache>
+    <_CreatorNuGetCache Condition="'$(_CreatorNuGetCache)' == ''">$(UserProfile)\.nuget\packages\</_CreatorNuGetCache>
+    <_CreatorNuGetCache>$([MSBuild]::EnsureTrailingSlash('$(_CreatorNuGetCache)'))</_CreatorNuGetCache>
+    <CreatorCppWinRTPackageRoot Condition="'$(CreatorCppWinRTPackageRoot)' == '' and Exists('$(SolutionDir)packages\Microsoft.Windows.CppWinRT.$(CreatorCppWinRTVersion)')">$(SolutionDir)packages\Microsoft.Windows.CppWinRT.$(CreatorCppWinRTVersion)\</CreatorCppWinRTPackageRoot>
+    <CreatorCppWinRTPackageRoot Condition="'$(CreatorCppWinRTPackageRoot)' == ''">$(_CreatorNuGetCache)microsoft.windows.cppwinrt\$(CreatorCppWinRTVersion)\</CreatorCppWinRTPackageRoot>
+    <CreatorWindowsAppSdkPackageRoot Condition="'$(CreatorWindowsAppSdkPackageRoot)' == '' and Exists('$(SolutionDir)packages\Microsoft.WindowsAppSDK.$(CreatorWindowsAppSdkVersion)')">$(SolutionDir)packages\Microsoft.WindowsAppSDK.$(CreatorWindowsAppSdkVersion)\</CreatorWindowsAppSdkPackageRoot>
+    <CreatorWindowsAppSdkPackageRoot Condition="'$(CreatorWindowsAppSdkPackageRoot)' == ''">$(_CreatorNuGetCache)microsoft.windowsappsdk\$(CreatorWindowsAppSdkVersion)\</CreatorWindowsAppSdkPackageRoot>
+    <CreatorCppWinRTPackageRoot>$([MSBuild]::EnsureTrailingSlash('$(CreatorCppWinRTPackageRoot)'))</CreatorCppWinRTPackageRoot>
+    <CreatorWindowsAppSdkPackageRoot>$([MSBuild]::EnsureTrailingSlash('$(CreatorWindowsAppSdkPackageRoot)'))</CreatorWindowsAppSdkPackageRoot>
+    <_CreatorWindowsArchitecture Condition="'$(Platform)' == 'Win32'">x86</_CreatorWindowsArchitecture>
+    <_CreatorWindowsArchitecture Condition="'$(Platform)' == 'x64'">x64</_CreatorWindowsArchitecture>
+    <CreatorWindowsAppSdkBootstrapLibrary>$(CreatorWindowsAppSdkPackageRoot)lib\win10-$(_CreatorWindowsArchitecture)\Microsoft.WindowsAppRuntime.Bootstrap.lib</CreatorWindowsAppSdkBootstrapLibrary>
+    <CreatorWindowsAppSdkBootstrapDll>$(CreatorWindowsAppSdkPackageRoot)runtimes\win-$(_CreatorWindowsArchitecture)\native\Microsoft.WindowsAppRuntime.Bootstrap.dll</CreatorWindowsAppSdkBootstrapDll>
+  </PropertyGroup>
+</Project>

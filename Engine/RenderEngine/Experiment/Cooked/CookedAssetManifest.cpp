@@ -9,15 +9,7 @@
 #include "../../../Utility_Framework/Sha256.h"
 #endif
 
-#include <algorithm>
-#include <cstring>
-#include <limits>
-#include <map>
-#include <numeric>
-#include <set>
-#include <tuple>
-#include <unordered_set>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #if defined(_WIN32)
 #pragma comment(lib, "bcrypt.lib")

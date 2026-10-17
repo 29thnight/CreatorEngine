@@ -11,12 +11,7 @@
 #include "FileDialog.h"
 #include "PathFinder.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
-#include <algorithm>
-#include <filesystem>
-#include <string>
-#include <type_traits>
-#include <sstream>
-#include <unordered_set>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::path& source)
 {

@@ -16,12 +16,7 @@
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
 
-#include <algorithm>
-#include <array>
-#include <cstdio>
-#include <filesystem>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

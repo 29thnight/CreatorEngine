@@ -2,9 +2,7 @@
 
 #include "LXGraph.h"
 
-#include <map>
-#include <set>
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

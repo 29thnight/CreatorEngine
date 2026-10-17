@@ -3,7 +3,7 @@
 #include "../Graph/EnhancedMaterialSealIdentity.h"
 #include "../../Experiment/ModelData.h"
 
-#include <variant>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // W8 — 저작 정본(base + 인스턴스 override를 합성한 값 스냅샷)의 값 digest.
 //

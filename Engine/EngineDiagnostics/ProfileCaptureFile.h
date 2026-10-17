@@ -23,15 +23,7 @@
 //   패딩과 배치가 곧 파일 형식이 되는데, 그 구조체는 "크기가 바뀌면 이 줄을
 //   고쳐라" 는 static_assert 를 달고 있다 — 레코드를 넓히는 순간 모든 옛 파일이
 //   **조용히 틀린 값으로** 읽힌다. 필드별로 쓰면 넓혀도 옛 파일은 옛 뜻 그대로다.
-#include <cstddef>
-#include <cstdint>
-#include <expected>
-#include <filesystem>
-#include <span>
-#include <memory>
-#include <optional>
-#include <stop_token>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "ProfileCapture.h"
 

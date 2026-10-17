@@ -1,7 +1,7 @@
 // Cooked hierarchy -> production GPU lists -> HW/SW visibility -> material and
 // Temporal recovery. Expected pixels use authored triangle topology, not shader code.
 void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
-    ProbeTextures& textures, ProbePool& pool, const own::shared_owner<const Instance>& sourceMaterial)
+    ProbeTextures& textures, ProbePool& pool, const own::shared_owner<const Instance>& sourceMaterial, bool streamingTest = false)
 {
     const auto material=SceneCooked(sourceMaterial);
     std::string error;
@@ -68,9 +68,9 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     const bool wrote=experiment::cooked::WriteModelGeometryArtifact(artifact,encoded,error);
     Check(wrote,"Hierarchy artifact write "+error);
     experiment::cooked::ModelGeometryArtifact decoded;
-    Check(experiment::cooked::ReadModelGeometryArtifact(encoded,decoded,error)&&decoded.mesh.coarseLods.groups==chain.groups,"Hierarchy artifact roundtrip "+error);
-    auto old=encoded;const uint32_t oldVersion=3;std::memcpy(old.data()+4,&oldVersion,4);
-    Check(!experiment::cooked::ReadModelGeometryArtifact(old,decoded,error),"Old geometry schema is rejected");
+    Check(experiment::cooked::ExpandModelGeometryPages(encoded,decoded,error)&&decoded.mesh.coarseLods.groups==chain.groups&&decoded.mesh.indices == authored.indices && decoded.mesh.vertices.Bytes().size() == authored.vertices.Bytes().size(),"Hierarchy artifact roundtrip "+error);
+    auto old=encoded;const uint32_t oldVersion=5;std::memcpy(old.data()+4,&oldVersion,4);
+    Check(!experiment::cooked::ExpandModelGeometryPages(old,decoded,error),"Old geometry schema is rejected");
     // Exact serialized DAG/header costs are per chunk, never per cluster.
     {
         auto draw=geometry.draw;draw.modelMeshView=cooked;
@@ -79,14 +79,21 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         Check(MeshSurfacePlan::BuildForScene(draw,v,b,plan,error),"DAG budget fixture "+error);
         Check(plan->Chunks().size()==1,"DAG budget fixture is a single chunk");
         uint64_t topology{};for(const auto& d:plan->Source()->Meshlets().descriptors)
-            topology+=sizeof(experiment::MeshletDescriptor)+d.vertexCount*8ull+d.triangleCount*7ull;
-        const uint64_t expected=topology+sizeof(RHIMeshletBufferHeader)+plan->Source()->Hierarchy().GpuBytes()+sizeof(PackedBoneMatrix)+
-            plan->Cost().points*(stride+sizeof(float)+sizeof(SurfacePoint)+sizeof(IblBakePoint)+sizeof(IblBakeSample))+plan->Cost().triangles*12ull;
+            topology+=sizeof(experiment::MeshletDescriptor)+d.vertexCount*8ull+d.triangleCount*7ull+
+                plan->Source()->ClusterArchive()->PacketBytes(d.clusterId)+20;
+        const uint64_t expected=chain.groups.size()*4+192+assets::quantized::HeaderBytes+topology+sizeof(RHIMeshletBufferHeader)+plan->Source()->Hierarchy().GpuBytes()+sizeof(PackedBoneMatrix)+
+            plan->Cost().points*(8+stride+sizeof(float)+sizeof(SurfacePoint)+sizeof(IblBakePoint)+sizeof(IblBakeSample))+plan->Cost().triangles*12ull;
         Check(plan->Cost().gpuPayloadBytes==expected,"DAG payload charged once per chunk");
         b.maxGpuPayloadBytes=expected;
         Check(MeshSurfacePlan::BuildForScene(draw,v,b,plan,error),"Exact DAG GPU budget accepted");
         --b.maxGpuPayloadBytes;
         Check(!MeshSurfacePlan::BuildForScene(draw,v,b,plan,error),"One byte below DAG GPU budget rejected");
+    }
+    std::optional<ColdGeometryFixture> coldGeometry;
+    if (streamingTest)
+    {
+        coldGeometry.emplace(MakeColdGeometryFixture(artifact, *cooked.sourceDescriptor));
+        Check(cookedMeshes.AdoptStream(coldGeometry->descriptor, cooked, error), "Cold fixture adoption " + error);
     }
     SceneHost host;
     EnhancedFrameContext context;context.resources=&device;context.rootSignatures=&roots;context.psoManager=&pipelines;
@@ -94,7 +101,8 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     FrameCameraSnapshot camera;camera.view=camera.projection=math::matrix4x4::identity();camera.projection.m[2][2]=.05f;
     camera.eyePosition={0,0,-2};context.camera=&camera;
     WaitSceneProgram(host,context,material->generation);
-    unsigned frames{},pixelChecks{},transitionChecks{},mixedFrames{};
+    unsigned frames{},pixelChecks{},transitionChecks{},mixedFrames{},sharedQueueReads{},fallbackFrames{},evictionFrames{};
+    std::vector<uint32_t> previousResident;
     std::vector<float> thresholds;for(const auto& g:chain.groups)if(g.lodIndex&&g.geometricError>0)thresholds.push_back(g.geometricError);
     std::sort(thresholds.begin(),thresholds.end());
     Check(thresholds.size()>2 && thresholds.front()<thresholds.back(),"Fixture has different spatial errors");
@@ -104,7 +112,12 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     for(uint32_t chunkSize:{64u,1u<<20}) {
         own::shared_owner<const SceneViewInput> previous;
         math::matrix4x4 oldWorld=math::matrix4x4::identity(),oldProjection=camera.projection;
-        for(unsigned step=0;step<8;++step) {
+        std::vector<std::uint32_t> shadowGolden;
+        std::vector<RHIBufferHandle> sparseBuffers;
+        for (unsigned iteration = 0; iteration < 16; ++iteration)
+        {
+            const unsigned step = iteration / 2;
+            const unsigned repeat = iteration % 2;
             Drain drain{device};context.frameId=28000+frames;
             camera.projection=math::matrix4x4::identity();camera.projection.m[2][2]=.05f;
             if(step>=6){camera.projection.m[0][0]=camera.projection.m[1][1]=5;camera.projection.m[2][2]=1.001f;camera.projection.m[2][3]=1;camera.projection.m[3][2]=-.1001f;camera.projection.m[3][3]=0;}
@@ -114,7 +127,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             draw.worldMatrix=math::matrix4x4::identity();draw.worldMatrix.m[0][0]=step==3?-.8f:1.f;
             draw.worldMatrix.m[1][1]=step==3?1.2f:1.f;
             if(step==5)for(unsigned i=0;i<3;++i)draw.worldMatrix.m[i][i]=.5f;draw.worldMatrix.m[3][0]=step*.015f;draw.worldMatrix.m[3][2]=5.f;
-            SceneInputView view{context.frameId,context.sceneEpoch,998+chunkSize,1,32,32,camera};view.temporalFrame.reset=step==0;
+            SceneInputView view{context.frameId,context.sceneEpoch,998+chunkSize,1,32,32,camera};view.temporalFrame.reset=iteration==0;
             auto& tc=view.temporalFrame.camera;tc.valid=true;tc.orthographicProjection=step<6;tc.aspectRatio=1;
             tc.viewMatrix=std::bit_cast<std::array<float,16>>(camera.view);
             tc.projectionMatrix=tc.cameraViewToClip=std::bit_cast<std::array<float,16>>(camera.projection);
@@ -130,7 +143,21 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             if(step==0){auto bad=budget;bad.geometryMaxPixelError=std::numeric_limits<float>::quiet_NaN();own::shared_owner<const SceneViewInput> rejected;Check(!SealScene(view,{&draw,1},bad,rejected,error),"Nonfinite LOD error budget is rejected before GPU preparation");}
             const bool sealed=SealScene(view,{&draw,1},budget,input,error,previous?&*previous:nullptr);
             Check(sealed,"Cluster scene seal "+error);
+            if (streamingTest)
+            {
+                const auto& plan = input->Draws()[0].geometry;
+                Check(plan->Source()->StreamedTopology() && !plan->Source()->Geometry().vertexData &&
+                          !plan->Source()->Geometry().indexData && plan->Source()->PackedVertices().empty() &&
+                          plan->Source()->Meshlets().vertexRemap.empty() &&
+                          std::ranges::all_of(plan->Chunks(), [](const auto& chunk) {
+                              return chunk.input->StreamedTopology() && !chunk.input->Geometry().vertexData &&
+                                     !chunk.input->Geometry().indexData && chunk.input->PackedVertices().empty() &&
+                                     chunk.input->Meshlets().vertexRemap.empty() && chunk.input->Meshlets().triangleIndices.empty();
+                          }), "Cold render partition has no CPU vertex/index/connectivity payload");
+                Check(!coldGeometry->backing->rejectedBulk, "Rendering never requests the deferred CPU body");
+            }
             Check(device.BeginFrame(error),"Cluster begin");textures.BeginFrame(context.frameId);
+            host.PollPrograms(context);
             Check(host.PrepareResidency(context,input,error),"Cluster residency "+error);
             auto graph=std::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned,RGOrderPolicy::DependencyOrder);
             const unsigned workers=chunkSize==64?4:0;
@@ -139,14 +166,127 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             for(auto& projection:shadow.lightViewProjection)projection=camera.projection;
             shadow.lightViewProjection[0]=math::matrix4x4::identity();shadow.lightViewProjection[0].m[2][2]=.05f;shadow.lightViewProjection[0].m[3][2]=-.2499f; // Guard crosses the near plane; finest group required.
             shadow.lightViewProjection[2].m[3][0]=step>=6?30:3; // Independently culled light frustum.
-            const bool prepared=host.Prepare(context,input,{},{},{},shadow,{},error,0);
+            SceneHostBudget hostBudget;
+            if (streamingTest)
+            {
+                const auto archive = input->Draws()[0].geometry->Source()->ClusterArchive();
+                const auto& root = chain.groups.back();
+                uint64_t rootBytes{}, largestPage{};
+                for (uint32_t page = 0; page < archive->packets.size(); ++page)
+                {
+                    largestPage = std::max(largestPage, archive->PacketBytes(page));
+                }
+                for (uint32_t i = 0; i < root.meshletCount; ++i)
+                {
+                    rootBytes += (archive->PacketBytes(root.firstMeshlet + i) + 15) & ~uint64_t(15);
+                }
+                uint64_t allTiles{};
+                for (uint32_t page = 0; page < archive->packets.size(); ++page)
+                    allTiles += (archive->PacketBytes(page) + 15) & ~uint64_t(15);
+                hostBudget.clusterStreaming.residentBytes = iteration < 4 || iteration == 8 || iteration == 9 ? rootBytes : allTiles;
+                hostBudget.clusterStreaming.uploadBytes = iteration == 4 || iteration == 5 ? largestPage : archive->Bytes();
+            }
+            const bool prepared=host.Prepare(context,input,{},{},{},shadow,hostBudget,error,0);
             Check(prepared,"Cluster prepare "+error);
             const auto table=host.FrameGeometry();
+            const auto resident = table->geometry[1]->ClusterResidency();
+            Check(table->geometry[1]->UsesDirectClusters() && resident, "Scene consumes resident cluster packets directly");
+            Check(resident->residencyAlignment == 16, "Production residency charges packed packet bytes");
+            for (std::size_t i = 1; i < table->geometry.size(); ++i)
+            {
+                Check(device.IsSparseBuffer(table->geometry[i]->Meshlets().buffer),
+                    "Every production geometry partition consumes a native Reserved Resource");
+                const auto& sealed = *table->geometry[i]->Input();
+                if (sealed.StreamedTopology())
+                {
+                    shared_storage_probe::SparseClusterPayload packed;
+                    RHIModelMeshletUpload packedTopology;
+                    shared_storage_probe::PackStreamedMeshletGpuPayload(packedTopology, sealed);
+                    shared_storage_probe::AppendClusterTopology(packedTopology, sealed, *resident, &packed);
+                    Check(device.Resolve(table->geometry[i]->Meshlets().buffer)->GetDesc().Width == packed.virtualBytes,
+                          "Production virtual extent equals deterministic packed topology");
+                    for (size_t packetIndex = 1; packetIndex < packed.packets.size(); ++packetIndex)
+                    {
+                        const auto& before = packed.packets[packetIndex - 1];
+                        const auto& after = packed.packets[packetIndex];
+                        Check(after.offset >= before.offset + before.bytes->size() && after.offset % 16 == 0,
+                              "Packed packets retain aligned nonoverlapping virtual addresses");
+                    }
+                }
+                if (iteration == 0) sparseBuffers.push_back(table->geometry[i]->Meshlets().buffer);
+                else Check(sparseBuffers.at(i - 1) == table->geometry[i]->Meshlets().buffer,
+                    "Camera motion, refinement and eviction retain the partition's reserved GPU buffer");
+                if (iteration > 0)
+                    Check(table->geometry[i]->Input()->ClusterStream()->GpuFeedbackGroups() > 0,
+                        "Completed camera/shadow GPU page feedback reaches the streaming controller");
+                Check(table->geometry[i]->BufferBytes() < table->geometry[i]->Count() * sizeof(SurfacePoint),
+                    "Scene retains a small pose packet rather than expanded SurfacePoint vertices");
+                Check(table->geometry[i]->ClusterResidency()->groups == resident->groups, "All partitions share one residency cut");
+            }
+            const bool sameResident = previousResident == resident->groups;
+            if (std::ranges::any_of(resident->groups, [](auto value) { return value == 0; }))
+            {
+                ++fallbackFrames;
+            }
+            if (resident->evictions)
+            {
+                ++evictionFrames;
+            }
+            const auto shadowCache = host.CurrentShadowCacheStats();
+            Check(shadowCache.staticCasters > 0 && shadowCache.dynamicCasters == 0,
+                "Rigid opaque shadow fixtures use the static-depth path");
+            Check(shadowCache.hit == (repeat != 0 && (!streamingTest || sameResident)),
+                "Unchanged repeat reuses completed static depth; changed world/LOD/projection invalidates it");
+            for (unsigned cascade = 0; cascade < 3; ++cascade)
+            {
+                const auto firstWork = host.ShadowFirstMeshletWork(cascade);
+                Check(firstWork && firstWork->UsesHistory() == (iteration != 0),
+                    "Shadow first stage consumes only completed same-view history after the initial reset");
+            }
             const auto geo=host.DeclareGeometry(*graph);
             RGTextureDesc shadowDesc;shadowDesc.width=shadowDesc.height=32;shadowDesc.arraySize=3;shadowDesc.format=RHIFormat::D32Float;shadowDesc.allowDepthStencil=true;
             const auto shadowMap=graph->Write(graph->CreateTexture(shadowDesc));
             graph->AddPass("Probe.Cluster.ShadowClear",{{shadowMap,RHIResourceState::DepthWrite,RGAccessMode::Write}},[&device,shadowMap](const auto& e){for(uint32_t c=0;c<3;++c){const auto d=RHIDepthTargetDesc::DepthSlice(e.ResolveHandle(shadowMap),RHIFormat::D32Float,c);const auto t=device.CreateRenderTargets(std::span<const RHITextureHandle>{},&d);e.encoder->BindRenderTargets(t);e.encoder->ClearDepthTarget(t,1.f);}});
-            const auto shadowOutput=host.DeclareShadow(*graph,geo,shadowMap);
+            const auto cacheDepths = host.DeclareShadowStaticCache(*graph, geo);
+            const auto shadowFirst = host.DeclareShadowFirstCull(*graph, geo);
+            const auto rejectsShadowInput = [](const auto& operation)
+            {
+                try
+                {
+                    operation();
+                }
+                catch (const std::runtime_error&)
+                {
+                    return true;
+                }
+                return false;
+            };
+            auto wrongShadowFirst = shadowFirst;
+            ++wrongShadowFirst[1].version;
+            Check(rejectsShadowInput([&] { host.DeclareShadowOccluder(*graph, geo, cacheDepths, wrongShadowFirst); }),
+                "Shadow occluder rejects the wrong cascade-list version");
+            Check(rejectsShadowInput([&] { host.DeclareShadowFinalCull(*graph, geo, {}); }),
+                "Shadow recovery cannot create a missing occluder producer");
+            const auto shadowOccluders = host.DeclareShadowOccluder(*graph, geo, cacheDepths, shadowFirst);
+            auto wrongShadowDepth = shadowOccluders;
+            ++wrongShadowDepth[2].version;
+            Check(rejectsShadowInput([&] { host.DeclareShadowFinalCull(*graph, geo, wrongShadowDepth); }),
+                "Shadow recovery rejects a foreign current-depth version");
+            const auto shadowFinal = host.DeclareShadowFinalCull(*graph, geo, shadowOccluders);
+            Check(rejectsShadowInput([&] { host.DeclareShadowHistory(*graph, shadowMap); }),
+                "Shadow history cannot capture the map before final raster");
+            const auto shadowOutput = host.DeclareShadowRaster(*graph, geo, cacheDepths, shadowFinal, shadowMap);
+            host.DeclareShadowHistory(*graph, shadowOutput);
+            RHIReadback shadowPixels;
+            Check(device.CreateReadback(32, 32, RHIFormat::D32Float, 3, shadowPixels, error), "Shadow cache pixels");
+            graph->AddPass("Probe.ShadowCache.Pixels", {{shadowOutput, RHIResourceState::CopySource, RGAccessMode::Read}},
+                [shadowOutput, shadowPixels](const auto& execution)
+                {
+                    for (unsigned cascade = 0; cascade < 3; ++cascade)
+                    {
+                        execution.encoder->CopyToReadback(shadowPixels, execution.ResolveHandle(shadowOutput), cascade, cascade);
+                    }
+                }, true);
             const auto first=host.DeclareFirstCull(*graph,geo);
             const auto occ=host.DeclareOccluder(*graph,geo,first);const auto final=host.DeclareFinalCull(*graph,geo,occ);
             SceneSurfaceTargets surface;surface.Declare(*graph,context);const auto output=host.DeclareGBuffer(*graph,final,surface.GetOutputs());
@@ -175,7 +315,82 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                 Check(device.CreateBufferReadback((f->MeshletOutputOffset(last)+table->geometry.back()->MeshletCount()*2+1)*4,shadowLists[cascade],error),"Shadow LOD readback");
                 graph->AddPass("Probe.Cluster.ShadowList",{{f->GraphVisibleIds(*graph),RHIResourceState::CopySource,RGAccessMode::Read}},[f,r=shadowLists[cascade]](const auto&e){e.encoder->CopyBufferToReadback(r,f->VisibleIdBuffer());},true);
             }
+            std::vector<std::pair<std::shared_ptr<const GpuGeometryVisibility::Frame>, RHIReadback>> queueReads;
+            const auto readQueue = [&](const std::shared_ptr<const GpuGeometryVisibility::Frame>& queueWork)
+            {
+                Check(queueWork && queueWork->WorkQueueTaskCount() != 0, "Production queue has sealed work");
+                RHIReadback queueRead;
+                Check(device.CreateBufferReadback((GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots) * sizeof(std::uint32_t), queueRead, error), "Production queue header");
+                queueReads.emplace_back(queueWork, queueRead);
+                graph->AddPass("Probe.ProductionQueue.Header",
+                    {{queueWork->GraphWorkQueue(*graph), RHIResourceState::CopySource, RGAccessMode::Read}},
+                    [queueWork, queueRead](const auto& execution)
+                    {
+                        execution.encoder->CopyBufferToReadback(queueRead, queueWork->WorkQueueBuffer(), queueWork->WorkQueueByteOffset());
+                    }, true);
+            };
+            readQueue(work);
+            for (unsigned cascade = 0; cascade < 3; ++cascade)
+            {
+                readQueue(host.ShadowFirstMeshletWork(cascade));
+                const auto finalWork = std::ranges::find(shadowWork, cascade, &SceneHost::ShadowMeshletOutput::cascade);
+                Check(finalWork != shadowWork.end(), "Production shadow queue exists");
+                readQueue(finalWork->frame);
+            }
             SubmitShadowDecal(device,pool,graph,host,context.frameId,workers,true);
+            for (auto& [queueWork, queueRead] : queueReads)
+            {
+                RHIReadbackImage queueImage;
+                Check(device.MapReadback(queueRead, queueImage, error), "Production queue header map");
+                const auto header = queueImage.Elements<std::uint32_t>();
+                Check(queueImage.ElementCount<std::uint32_t>() == GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots &&
+                    header[0] == queueWork->WorkQueueTaskCount() && header[1] == header[0] && header[2] == 0 && header[3] != 0 && header[6] == queueWork->WorkQueuePartitionCount() && header[11] > 0 && header[11] <= 64 && header[9] == GpuGeometryVisibility::kWorkRingSlots,
+                    "SceneHost camera/shadow queues claimed and completed every task without invalid records");
+                Check(header[5] == header[0] + header[7] && header[4] == header[1] + header[8] && header[4] % header[11] == 0,
+                    "Production lane-batched head/tail reservation accounting");
+                Check(header[12] == 0 && header[13] == 0 && header[14] == 0,
+                    "Queue count, producer leases and consumer leases quiesced");
+                Check(header[10] == queueWork->WorkQueueNonemptyPartitions(header[11]), "Production initial partition coverage");
+                if (queueWork->WorkQueueViewCount() > 1)
+                {
+                    Check(queueWork->WorkQueueViewCount() == 3 || queueWork->WorkQueueViewCount() == 4,
+                        "Production shares three cascades or camera plus three cascades");
+                    ++sharedQueueReads;
+                }
+                for (unsigned slot = 0; slot < GpuGeometryVisibility::kWorkRingSlots; ++slot)
+                {
+                    Check(header[GpuGeometryVisibility::kWorkRingHeaderWords + slot] == 0, "Production ring drained every slot");
+                }
+                device.ReleaseReadback(queueRead);
+            }
+
+            RHIReadbackImage shadowImage;
+            Check(device.MapReadback(shadowPixels, shadowImage, error), "Shadow cache pixel map");
+            if (!repeat || (streamingTest && !sameResident))
+            {
+                shadowGolden.clear();
+            }
+            std::size_t pixelIndex{};
+            for (unsigned cascade = 0; cascade < 3; ++cascade)
+            {
+                for (unsigned y = 0; y < 32; ++y)
+                {
+                    for (unsigned x = 0; x < 32; ++x)
+                    {
+                        const auto bits = std::bit_cast<std::uint32_t>(float(shadowImage.At(x, y, 0, cascade)));
+                        if (!repeat || (streamingTest && !sameResident))
+                        {
+                            shadowGolden.push_back(bits);
+                        }
+                        else
+                        {
+                            Check(shadowGolden.at(pixelIndex) == bits, "Cold/warm static-cache shadow depths are bit identical");
+                        }
+                        ++pixelIndex;
+                    }
+                }
+            }
+            device.ReleaseReadback(shadowPixels);
             RHIReadbackImage lists;Check(device.MapReadback(ids,lists,error),"Cluster list map");
             const double scale=std::sqrt(double(draw.worldMatrix.m[0][0])*draw.worldMatrix.m[0][0]+double(draw.worldMatrix.m[1][1])*draw.worldMatrix.m[1][1]+double(draw.worldMatrix.m[2][2])*draw.worldMatrix.m[2][2]);
             const auto project=[](const math::vector3& p,const math::matrix4x4& world,const math::matrix4x4& projection) {
@@ -193,7 +408,9 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     const double radius=g.sphere[3]*scale,lowW=center[3]-radius*norms[3];
                     double derivativeSquared{};
                     if(lowW>0 && center[2]-radius*norms[2]>0)for(unsigned c=0;c<2;++c){const double d=(norms[c]*(std::abs(center[3])+radius*norms[3])+norms[3]*(std::abs(center[c])+radius*norms[c]))/(lowW*lowW)*16;derivativeSquared+=d*d;}
-                    const bool accepts=lowW>0&&center[2]-radius*norms[2]>0&&budget>0&&g.geometricError*std::sqrt(derivativeSquared)*scale<=budget;
+                    const bool unavailableChildren = g.childGroup != UINT32_MAX &&
+                        (!resident->groups[g.childGroup] || !resident->groups[g.secondChild]);
+                    const bool accepts=unavailableChildren || (lowW>0&&center[2]-radius*norms[2]>0&&budget>0&&g.geometricError*std::sqrt(derivativeSquared)*scale<=budget);
                     if(g.childGroup==UINT32_MAX || accepts)selected.insert(n);
                     else {self(self,g.childGroup);self(self,g.secondChild);}
                 };visit(visit,uint32_t(chain.groups.size()-1));return selected;
@@ -249,10 +466,22 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                 ++pixelChecks;if(step)++transitionChecks;
             }
             for(auto r:reads)device.ReleaseReadback(r);device.ReleaseReadback(ids);
+            previousResident = resident->groups;
             previous=std::move(input);oldWorld=draw.worldMatrix;oldProjection=camera.projection;++frames;
         }
     }
+    Check(sharedQueueReads == frames * 6u, "Every shadow first/final view uses its shared batch queue");
+    std::cout << "METEOR_STREAMING_FEEDBACK_OK frames=" << frames << " sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0\n";
+    std::cout << "METEOR_PRODUCTION_SHARED_QUEUE_OK headers=" << frames * 7u << " cameraFrames=" << frames << " shadowFrames=" << frames << " sharedReads=" << sharedQueueReads << " validation=0\n";
     host.ShutdownAfterIdle();
+    if (streamingTest)
+    {
+        Check(fallbackFrames >= 12 && evictionFrames >= 2, "GPU root fallback and eviction exercised across both partition modes");
+        std::cout << "METEOR_CLUSTER_STREAMING_OK frames=" << frames << " fallbackFrames=" << fallbackFrames
+            << " evictionFrames=" << evictionFrames << " pixels=" << pixelChecks << " validation=0\n";
+        Check(!coldGeometry->backing->rejectedBulk, "Completed cold GPU rendering never reads the original CPU body");
+        std::cout << "METEOR_COLD_RENDER_OK frames=" << frames << " rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0\n";
+    }
     Check(mixedFrames>=2,"GPU selects different spatial LODs in one draw across both partitions");
     Check(pixelChecks>100&&transitionChecks>100,"Cluster topology and transition oracle coverage");
     std::cout<<"METEOR_CLUSTER_LOD_OK frames="<<frames<<" partitions=2 malformed=9 pixels="<<pixelChecks<<" transitions="<<transitionChecks<<" mixedFrames="<<mixedFrames<<" validation=0\n";

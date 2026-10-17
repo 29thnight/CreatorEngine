@@ -1,4 +1,4 @@
-#include "App.h"
+﻿#include "App.h"
 #include "Resource.h"
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
@@ -9,7 +9,7 @@
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "DataSystem.h"
 #include "Material.h"
 #include "MaterialGraphWindow.h"
@@ -30,8 +30,8 @@
 #include "ReflectionRegister.h"
 #include "ComponentFactory.h"
 #include <imgui_impl_win32.h>
-#include <ppltasks.h>
-#include <ppl.h>
+
+
 #include "InputActionManager.h"
 #include "EngineBootstrap.h"
 #include "EngineLaunchConfig.h"
@@ -43,9 +43,8 @@
 #include "SceneManager.h"
 #include "TimeSystem.h"
 #include <shellapi.h>
-#include <chrono>
-#include <cstdio>
-#include <thread>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
@@ -89,7 +88,7 @@ std::filesystem::path EditorPathArgument(const wchar_t* option)
 
 	/// 이 실행이 사람을 위한 것인가, 하네스를 위한 것인가.
 	///
-	/// `CoreWindow::IsUnattended()`는 답이 될 수 없다 — 그 값을 세우는
+	/// `WindowsCoreWindow::IsUnattended()`는 답이 될 수 없다 — 그 값을 세우는
 	/// `ConsoleCommandSystem::InitializeFromCommandLine`이 창을 띄운 **뒤**에
 	/// 돌기 때문이다. 부팅 예열은 그보다 앞에서 판정해야 하므로 명령줄을
 	/// 직접 본다. 목록은 ConsoleCommandSystem의 인자 해석과 같은 다섯이다.
@@ -257,7 +256,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	return EngineBootstrap::Run<Core::App>(hInstance, MakeEditorLaunchConfig());
 }
 
-void Core::App::Initialize(CoreWindow& coreWindow)
+void Core::App::Initialize(WindowsCoreWindow& coreWindow, CoreWindow& window)
 {
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
@@ -293,7 +292,7 @@ void Core::App::Initialize(CoreWindow& coreWindow)
     RegisterHandler(coreWindow);
 	BootProgress::Step(L"Creating editor host", L"Preparing the main editor session");
 	Load();
-	Run();
+	Run(window);
 }
 
 void Core::App::Finalize()
@@ -346,7 +345,7 @@ void Core::App::Finalize()
 //   창 자체는 CoreWindow가 소유하고, 필요한 쪽이 GetForCurrentInstance()로
 //   묻는다. 디바이스가 창을 들고 있을 이유는 처음부터 없었다.
 
-void Core::App::RegisterHandler(CoreWindow& coreWindow)
+void Core::App::RegisterHandler(WindowsCoreWindow& coreWindow)
 {
     coreWindow.RegisterHandler(WM_INPUT,		this, &App::ProcessRawInput);
 	coreWindow.RegisterHandler(WM_SIZE,			this, &App::HandleResizeEvent);
@@ -586,9 +585,9 @@ bool Core::App::WarmUpFirstRenderedFrame()
     }
 }
 
-void Core::App::Run()
+void Core::App::Run(CoreWindow& window)
 {
-	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
+	WindowsCoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
         // Establish the immutable command owner before Initialize starts PT.
         (void)ConsoleCommandSystem::Get();
@@ -627,7 +626,7 @@ void Core::App::Run()
         Debug::PrintLog(spdlog::level::info, "[BootWarmup] Editor visibility gate passed");
         if (!EditorSmokeOffscreen())
         {
-            CoreWindow::GetForCurrentInstance()->Show();
+            WindowsCoreWindow::GetForCurrentInstance()->Show();
         }
         // 예열 장부: 여기까지가 "창이 뜬다" 이고, 계획서가 재 온 긴 구간은
 		// 이 **뒤**에 있다(2026-09-14 실측: 창 1.7s, 씬뷰 첫 그림 18.5s).
@@ -635,8 +634,8 @@ void Core::App::Run()
 
 		// 초기화가 끝난 뒤 CLI를 연다. 그래야 명령이 완성된 엔진 위에서 실행된다.
 		ConsoleCommandSystem::Get().InitializeFromCommandLine();
-	})
-	.Then([&]
+	});
+	window.Then([&]
 	{
 		if (m_windowClosed) return;
 		// Watcher I/O thread가 게시한 asset 변경은 GT 프레임 경계에서만 적용한다.
@@ -658,6 +657,7 @@ void Core::App::Run()
 		if (cli.IsQuitRequested())
 		{
 			Debug::PrintLog(spdlog::level::debug, "[SHUTDOWN] CLI quit 요청 — 종료 시작");
+			std::printf("[SHUTDOWN] CLI quit received\n");
 			m_windowClosed = true;
 			PostQuitMessage(0);
         }
@@ -669,6 +669,7 @@ LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	// 종료의 발원지를 로그에 남긴다. 부팅 리팩토링 검증 중 "누가 종료를
 	// 시작했나"를 몰라 한참 헤맸다 — WM_CLOSE 수신과 CLI quit을 구분한다.
 	Debug::PrintLog(spdlog::level::debug, "[SHUTDOWN] WM_CLOSE 수신 — 종료 시작");
+	std::printf("[SHUTDOWN] WM_CLOSE received\n");
 	m_windowClosed = true;
 	PostQuitMessage(0);
 	return 0;
@@ -761,7 +762,7 @@ LRESULT Core::App::HandleMaximizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 LRESULT Core::App::HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
 	WNDCLASS wcSetting = { sizeof(WNDCLASS) };
-	wcSetting.lpfnWndProc = CoreWindow::WndProc;
+	wcSetting.lpfnWndProc = WindowsCoreWindow::WndProc;
 
 	return 0;
 }

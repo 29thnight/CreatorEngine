@@ -4,6 +4,7 @@
 #include "Animator.h"
 #include "BoneComponent.h"
 #include "DataSystem.h"
+#include "../RenderEngine/Assets/ModelCpuGeometryPayload.h"
 #include "Entity.h"
 #include "ExperimentMaterialMigration.h"
 #include "Material.h"
@@ -15,11 +16,7 @@
 #include "Assets/ModelAssetGeneration.h"
 #include "Experiment/ModelData.h"
 
-#include <algorithm>
-#include <limits>
-#include <map>
-#include <unordered_map>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ModelSceneInstantiation
 {
@@ -180,8 +177,11 @@ namespace ModelSceneInstantiation
                     continue;
 
                 const auto& mesh = meshes[meshIndex];
-                auto source = ce::physics::BuildModelCollisionMesh(mesh.vertexBytes, mesh.indices,
-                    mesh.vertexAttributeMask, mesh.vertexStride, mesh.vertexLayoutHash);
+                if (!mesh.streamDescriptor) return reject();
+                std::string error;
+                auto cpu = assets::LoadModelCpuGeometry(*mesh.streamDescriptor,error);
+                if (!cpu) return reject();
+                auto source = ce::physics::BuildModelCollisionMesh(cpu->geometry);
                 if (!source)
                     return reject();
 
@@ -419,9 +419,7 @@ namespace ModelSceneInstantiation
                 {
                     return reject();
                 }
-                const auto& mesh = geometry->mesh;
-                auto collision = ce::physics::BuildModelCollisionMesh(mesh.vertexBytes, mesh.indices,
-                    mesh.vertexAttributeMask, mesh.vertexStride, mesh.vertexLayoutHash);
+                auto collision = ce::physics::BuildModelCollisionMesh(geometry->geometry);
                 if (!collision)
                 {
                     return reject();

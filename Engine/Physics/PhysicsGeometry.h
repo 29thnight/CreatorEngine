@@ -4,11 +4,7 @@
 #include "PhysicsTypes.h"
 #include <mathematics/vector3.hpp>
 #include <mathematics/quaternion.hpp>
-#include <memory>
-#include <span>
-#include <variant>
-#include <utility>
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

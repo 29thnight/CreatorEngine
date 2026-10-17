@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce
 {

@@ -1,10 +1,9 @@
-#include <optional>
-#include <atomic>
-#include <charconv>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ProjectLayerSettingsCodec.h"
 #include "EditorAssetDatabase.h"
+#include "ConditionalAssetPublish.h"
 #include "EditorScriptAuthoring.h"
 #include "TextureSourceProcessing.h"
 #include "Assets/ModelMaterialGraph.h"
@@ -44,23 +43,11 @@
 #include "Experiment/Cooked/CookedCodeMaterial.h"
 #include "Experiment/Cooked/CookedShaderMeta.h"
 #include "AuthoringCookedDocument.h"
-#include <chrono>
-#include <cstdio>
 
 #include <efsw/efsw.hpp>
 #include <DirectXTex.h>
 #include <wincodec.h>
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <fstream>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <map>
-#include <regex>
-#include <unordered_set>
 
 namespace
 {
@@ -768,6 +755,23 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 			return false;
 		}
 
+        // Restore interrupted conditional saves before missing-source cleanup can
+        // remove their GUID sidecars. The watcher is not running yet.
+        for (const auto& entry : file::recursive_directory_iterator(m_root))
+        {
+            const auto name = entry.path().native();
+            if (name.ends_with(Editor::AuthoringPublish::recoverySuffix) && !entry.is_symlink())
+            {
+                const file::path destination(name.substr(0,
+                    name.size() - Editor::AuthoringPublish::recoverySuffix.size()));
+                std::string failure;
+                if (!Editor::AuthoringPublish::Recover(destination, failure))
+                {
+                    Debug::PrintLog(spdlog::level::err, failure);
+                    return false;
+                }
+            }
+        }
 		ScanAndCleanupInvalidMeta();
 		PruneUnusableTextureGenerations();
 		ScanAndRegisterMeta();
@@ -1054,7 +1058,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         }));
     }
 
-    bool SaveImportMetadata(const file::path& requestedSource, std::string_view payload, std::string& failure)
+    bool SaveImportMetadata(const file::path& requestedSource, std::string_view payload, std::string& failure,
+        const std::string* expectedDisk = nullptr)
     {
         std::lock_guard lock(m_authoringMutex);
         std::error_code error;
@@ -1076,9 +1081,13 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             failure = "Import settings must retain the existing asset GUID and project path";
             return false;
         }
-        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(payload.data(), payload.size())), PublishEncoding::Text))
+        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(payload.data(), payload.size())),
+            PublishEncoding::Text, expectedDisk, &failure))
         {
-            failure = "Could not save import metadata";
+            if (failure.empty())
+            {
+                failure = "Could not save import metadata";
+            }
             return false;
         }
         HandleModified(sidecar);
@@ -1086,13 +1095,18 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         return true;
     }
 
-    bool SaveAutomaticRenderProfilePayload(const file::path& path, std::string_view payload, std::string& error)
+    bool SaveAutomaticRenderProfilePayload(const file::path& path, std::string_view payload, std::string& error,
+        const std::string* expectedDisk = nullptr)
     {
         std::lock_guard lock(m_authoringMutex);
         if (m_stopping || !IsPathInside(path, m_root)
-            || !WriteBinaryFileLocked(path, std::as_bytes(std::span(payload.data(), payload.size())), PublishEncoding::Text))
+            || !WriteBinaryFileLocked(path, std::as_bytes(std::span(payload.data(), payload.size())),
+                PublishEncoding::Text, expectedDisk, &error))
         {
-            error = "Render profile save failed; current settings are retained.";
+            if (error.empty())
+            {
+                error = "Render profile save failed; current settings are retained.";
+            }
             return false;
         }
         HandleModified(path);
@@ -1102,11 +1116,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     struct AutomaticSave
     {
         std::string expectedDisk;
-        std::function<bool(std::string&)> write;
+        std::function<bool(const std::string&, std::string&)> write;
         std::chrono::steady_clock::time_point changedAt;
     };
 
-    void QueueAutomaticSave(const file::path& path, std::function<bool(std::string&)> write)
+    void QueueAutomaticSave(const file::path& path, std::function<bool(const std::string&, std::string&)> write)
     {
         std::lock_guard lock(m_automaticSaveMutex);
         const auto key = path.lexically_normal();
@@ -1157,7 +1171,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             {
                 try
                 {
-                    if (save.write(error))
+                    if (save.write(save.expectedDisk, error))
                     {
                         continue;
                     }
@@ -1580,7 +1594,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     };
 
     bool SetTextureImportSettingsAndReimport(const file::path& requestedSource,
-        const experiment::cooked::TextureImportSettings& settings, std::string& failure)
+        const experiment::cooked::TextureImportSettings& settings, std::string& failure,
+        const std::string* expectedDisk = nullptr)
     {
         failure.clear();
         if (!experiment::cooked::ValidateTextureImportSettings(settings, failure))
@@ -1604,16 +1619,41 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             return false;
         }
         auto document = Authoring::WriteDocument::ParseFile(sidecar, &failure);
-        if (!document || !document->Root().Read().IsMap() || !LoadGuidFromMeta(sidecar).IsRandomV4())
+        if (!document)
+        {
+            if (failure.empty())
+            {
+                failure = "Could not read texture sidecar";
+            }
+            return false;
+        }
+        const auto root = document->Root().Read();
+        if (!root.IsMap())
+        {
+            failure = "Texture sidecar must contain a mapping";
+            return false;
+        }
+        auto identity = root["assetId"];
+        if (!identity || !identity.IsScalar())
+        {
+            identity = root["guid"];
+        }
+        Uuid::Uuid16 parsedIdentity;
+        if (!identity || !identity.IsScalar() || !Uuid::TryParse(identity.AsString(), parsedIdentity)
+            || !FileGuid(parsedIdentity).IsRandomV4())
         {
             failure = "Texture sidecar must have a valid canonical UUIDv4 identity";
             return false;
         }
         EditorAssetDatabase::WriteTextureImportSettings(document->Root(), settings);
         const auto text = document->Dump();
-        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(text.data(), text.size())), PublishEncoding::Text))
+        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(text.data(), text.size())),
+            PublishEncoding::Text, expectedDisk, &failure))
         {
-            failure = "Could not publish texture import settings";
+            if (failure.empty())
+            {
+                failure = "Could not publish texture import settings";
+            }
             return false;
         }
         return QueueTextureReimportLocked(source, failure, true);
@@ -3266,7 +3306,8 @@ private:
 
 	bool WriteBinaryFileLocked(const file::path& destination,
 		std::span<const std::byte> bytes,
-		PublishEncoding encoding = PublishEncoding::Binary)
+		PublishEncoding encoding = PublishEncoding::Binary,
+        const std::string* expectedDisk = nullptr, std::string* failure = nullptr)
 	{
 		if (destination.empty() || bytes.empty() ||
 			bytes.size() > static_cast<size_t>(
@@ -3311,6 +3352,22 @@ private:
 			return false;
 		}
 
+        if (expectedDisk)
+        {
+            std::string publishFailure;
+            const bool published = Editor::AuthoringPublish::Publish(destination, temporary,
+                *expectedDisk, publishFailure);
+            if (!published)
+            {
+                if (failure)
+                {
+                    *failure = std::move(publishFailure);
+                }
+                std::printf("[AUTOSAVE_CONFLICT] conditional edit rejected path=%s\n", destination.string().c_str());
+                file::remove(temporary, error);
+            }
+            return published;
+        }
 		if (!::MoveFileExW(temporary.c_str(), destination.c_str(),
 			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
 		{
@@ -4644,9 +4701,9 @@ void EditorAssetDatabase::QueueAutomaticImportMetadata(const file::path& source,
 {
     if (m_impl)
     {
-        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, payload = std::move(payload)](std::string& error)
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, payload = std::move(payload)](const std::string& expectedDisk, std::string& error)
         {
-            return impl->SaveImportMetadata(source, payload, error);
+            return impl->SaveImportMetadata(source, payload, error, &expectedDisk);
         });
     }
 }
@@ -4656,9 +4713,9 @@ void EditorAssetDatabase::QueueAutomaticTextureSettings(const file::path& source
 {
     if (m_impl)
     {
-        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, settings](std::string& error)
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, settings](const std::string& expectedDisk, std::string& error)
         {
-            return impl->SetTextureImportSettingsAndReimport(source, settings, error);
+            return impl->SetTextureImportSettingsAndReimport(source, settings, error, &expectedDisk);
         });
     }
 }
@@ -4668,9 +4725,9 @@ void EditorAssetDatabase::QueueAutomaticRenderProfile(FileGuid guid, const Scene
     const auto path = DataSystems->GetFilePath(guid);
     if (m_impl && !path.empty())
     {
-        m_impl->QueueAutomaticSave(path, [impl = m_impl.get(), path, payload = Meta::SerializeDocument(const_cast<SceneRenderProfile*>(&profile)).Dump()](std::string& error)
+        m_impl->QueueAutomaticSave(path, [impl = m_impl.get(), path, payload = Meta::SerializeDocument(const_cast<SceneRenderProfile*>(&profile)).Dump()](const std::string& expectedDisk, std::string& error)
         {
-            return impl->SaveAutomaticRenderProfilePayload(path, payload, error);
+            return impl->SaveAutomaticRenderProfilePayload(path, payload, error, &expectedDisk);
         });
     }
 }

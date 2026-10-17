@@ -1,13 +1,6 @@
 #include "LXStyle.h"
 
-#include <atomic>
-#include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <limits>
-#include <sstream>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <Windows.h>
 
 namespace LX

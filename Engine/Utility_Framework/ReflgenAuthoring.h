@@ -18,13 +18,7 @@
 #include <reflgen/serial/reader.h>
 #include <reflgen/serial/writer.h>
 
-#include <cstddef>
-#include <cstdint>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "StandardLibrary.h"
 
 namespace Authoring
 {

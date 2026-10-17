@@ -1,8 +1,8 @@
 ﻿#pragma once
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "PlayerMain.h"
 
-#include <memory>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 
 // 게임 플레이어의 앱 셸 (BuildPipelinePlan B0-2) — 창을 세우고, 프레젠트
 // 소유권을 정하고, 메인 루프를 건다. 에디터의 Core::App에서 진행 창 ·
@@ -12,16 +12,16 @@ namespace Player
 	class App
 	{
 	public:
-		void Initialize(CoreWindow& coreWindow);
+		void Initialize(WindowsCoreWindow& coreWindow, CoreWindow& window);
 		void Finalize();
 
 	private:
 		// SetWindow가 여기 있었다 (2026-08-10) — 프레젠트 소유권을 못박고
 		// DX11 DeviceResources에 창을 붙이던 자리다. 그 디바이스가 사라져
 		// 남은 일은 셸 설정 한 줄뿐이라 Initialize로 접었다.
-		void RegisterHandler(CoreWindow& coreWindow);
+		void RegisterHandler(WindowsCoreWindow& coreWindow);
 		void Load();
-		void Run();
+		void Run(CoreWindow& window);
 
 		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
 		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);

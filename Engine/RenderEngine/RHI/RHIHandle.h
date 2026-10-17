@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // 리소스 핸들 — 백엔드 중립 (PHASE 3-1 재정의, V2).
 //

@@ -19,8 +19,7 @@
 #include "LightRenderProxy.h"
 #include "Canvas.h"
 #include "RectTransformComponent.h"
-#include <algorithm>
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 
 own::shared_owner<TextureFramePins> RenderScene::TakePreparedTextureImagePins()
 {

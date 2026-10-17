@@ -2,8 +2,7 @@
 #include "RHI/ScreenSizedResource.h"
 #include "Entity.h"
 #include "Scene.h"
-#include <iterator>
-#include <unordered_set>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 생성자
 RectTransformComponent::RectTransformComponent()

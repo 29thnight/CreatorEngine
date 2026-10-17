@@ -83,7 +83,11 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
 </style>
 </head>
 <body>
+
+
 <main>
+<section class="summary" id="shared-pool-update"><strong>2026-10-17 공유 물리 풀·전역 페이지 정책·packing·증분 전송</strong><p>자산별 고정 가상 주소와 장치별 공유 64 MiB 물리 heap을 연결했다. 완료·비참조 캐시의 선택 페이지부터 전역 우선순위/최근 사용 순서로 퇴거하며 활성 페이지는 보호한다. 패킷은 16바이트 정렬로 packing하고 유지된 패킷을 건너뛰며 메타데이터 변경 구간·신규/재매핑 패킷만 전송한다. Debug/Release 5모드·Editor 통합·39노드 배선 검증을 통과했다. 최종 결과와 잔여 범위는 <a href="LiveRenderWiring20261012.html#validation-current">현재 검증</a>을 따른다. 성능 측정은 하지 않았다. 아래 기존 비교와 수용 기록은 각 작성 시점의 이력이다.</p></section>
+
 <header class="hero">
   <div class="kicker">Analysis · 2026-10-11</div>
   <h1>RE ENGINE 메시렛 파이프라인과 CreatorEngine 지오메트리 경로 비교</h1>
@@ -91,6 +95,8 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
   비교 대상: <code>GpuMeshletVisibility</code>, <code>GpuGeometryOcclusion</code>, <code>GpuGeometryVisibility</code>,
   <code>EnhancedGBufferPass</code>, <code>EnhancedShadowPass</code>, <code>MaterialGraphSceneHost</code>, <code>Experiment/MeshletData.h</code>, <code>Experiment/MeshLodData.h</code>.</p>
 </header>
+<section class="summary" id="current-wave-update"><details><summary>이전 기록: 2026-10-16 CEGE9 저장·소비자 전환</summary><strong>2026-10-16 현재 구현 · SceneHost 39 / CEGE9</strong><p>아래 본문은 10월 11일의 역사적 비교다. 현재는 GPU ring·JOB_COUNT·준비된 뷰 공유, 그림자 2단계 컬링·정적 캐시, 속성별 양자화·GPU 직접 복원, Reserved Resource 풀·GPU 요구·장치 VRAM 성장 예산·메타데이터 콜드 로드와 Editor 소비자 전환을 연결했다. 후속 5·6단계는 CEGE의 원본 본문과 Editor generation의 model.cemc를 제거하고 구형 CEGE/generation 리더·비활성 collider 작업 연결을 정리한다. CEGE9는 메타데이터와 QMC2 페이지만 저장하며 정확한 충돌 위치·인덱스는 별도 CECP로 지연 소비한다. schema 2 generation은 기하 배열 없는 metadata.cemc를 읽는다. shader 39 / GPU schema 6은 유지한다. 최신 빌드·정확성 결과는 <a href="LiveRenderWiring20261012.html#validation-current">현재 검증</a>과 <a href="LiveRenderWiring20261012.html#geometry-consumers">소비자 정책</a>을 따른다. 자산 간 물리 타일 재분배·대규모 스트레스·RE 비공개 인코딩 동일성·Vulkan·성능 수용은 별도다. 성능 측정은 하지 않았다.</p></details></section>
+
 
 <section class="summary">
   <strong>요약</strong>

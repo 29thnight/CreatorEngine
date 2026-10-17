@@ -14,8 +14,7 @@
 #include "Scene.h"
 #include "Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
-#include <random>
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 struct FoliageComponent::AssetBinding
 {

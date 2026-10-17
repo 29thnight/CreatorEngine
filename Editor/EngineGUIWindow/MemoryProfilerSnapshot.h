@@ -1,10 +1,6 @@
 #pragma once
 
-#include <atomic>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "ProfilerLiveDiagnostics.h"
 
 // On-demand memory snapshots. The presentation thread only requests and reads;

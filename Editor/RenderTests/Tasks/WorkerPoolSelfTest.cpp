@@ -2,16 +2,9 @@
 #include "Tasks/WorkerPoolSelfTest.h"
 #include "DataSystem.h"
 #include "AssetDepot/LegacyResourceCache.h"
-#include <map>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "JobScheduler.h"
 #include "FoliageComponent.h"
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <fstream>
-#include <mutex>
-#include <stdexcept>
-#include <thread>
 
 namespace RenderTest
 {

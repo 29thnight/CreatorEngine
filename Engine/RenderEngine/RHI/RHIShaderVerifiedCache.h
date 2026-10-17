@@ -2,8 +2,7 @@
 
 #include "RHIShaderBlob.h"
 #include "RHIShaderReflection.h"
-#include <span>
-#include <type_traits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // Value-only, bounded serialization of one linked program's bytecode/layout.
 // The file envelope binds this payload to its dependency/compiler request key.

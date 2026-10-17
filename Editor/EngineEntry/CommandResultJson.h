@@ -24,8 +24,8 @@
 
 #include "../../Engine/CommandService/JsonValue.h"
 
-#include <cstdint>
-#include <string>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace EditorCommandJson
 {

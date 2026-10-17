@@ -13,10 +13,7 @@
 #include "EditorIconAlignment.h"
 #include "EditorTextFallback.h"
 
-#include <filesystem>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::fonts
 {

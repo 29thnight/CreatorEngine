@@ -22,11 +22,7 @@
 // 상한을 파서 바깥의 호출자가 기억해야 하면 언젠가 잊는다. `HttpLimits` 를
 // 인자로 받게 해서 잊을 수 없게 한다.
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

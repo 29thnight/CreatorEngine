@@ -5,13 +5,7 @@
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 #include "../MaterialGraphRuntime.h"
 
-#include <compare>
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <optional>
-#include <string>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace AssetDepot
 {

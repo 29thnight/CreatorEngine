@@ -1,4 +1,5 @@
 #include "PreparationWorker.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "ViewerArguments.h"
 #include "ViewerWindowChrome.h"
 #include "ProfilerViewerResources.h"
@@ -18,15 +19,7 @@
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
-#include <algorithm>
-#include <array>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <stdexcept>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -804,7 +797,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
                     L"ProfilerViewer: invalid arguments", MB_OK | MB_ICONERROR);
         return 2;
     }
-    const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::sta };
+    const HRESULT com = apartmentScope.result;
     int result = 1;
     try
     {
@@ -820,10 +814,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
     catch (...)
     {
         MessageBoxW(nullptr, L"ProfilerViewer stopped after an unexpected host initialization or rendering failure.", L"ProfilerViewer", MB_OK | MB_ICONERROR);
-    }
-    if (SUCCEEDED(com))
-    {
-        CoUninitialize();
     }
     return result;
 }

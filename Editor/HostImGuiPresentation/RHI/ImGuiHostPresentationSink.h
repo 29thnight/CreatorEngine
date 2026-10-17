@@ -6,8 +6,7 @@
 
 #include "IImGuiHost.h"
 #include "RHI/IDisplayPresentationSink.h"
-#include <functional>
-#include <utility>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Editor의 IImGuiHost를 Core의 표시 sink 계약 뒤로 위임한다.
 // Player는 native RHI 표시 경로를 사용하며 이 어댑터를 설치하지 않는다.

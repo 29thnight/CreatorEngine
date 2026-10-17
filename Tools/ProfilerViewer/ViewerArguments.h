@@ -2,12 +2,7 @@
 
 #include "ProfilerViewerProtocol.h"
 
-#include <algorithm>
-#include <filesystem>
-#include <limits>
-#include <span>
-#include <string>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer
 {

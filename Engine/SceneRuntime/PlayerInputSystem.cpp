@@ -2,7 +2,7 @@
 #include "PlayerInput.h"
 #include "Entity.h"
 #include "LifecycleTrace.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void PlayerInputSystem::Register(PlayerInputComponent* component)
 {

@@ -3,7 +3,7 @@
 #include "../Experiment/Cooked/CookedAssetManifest.h"
 #include "../Assets/AssetIdentityProfile.h"
 
-#include <type_traits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 class Material;

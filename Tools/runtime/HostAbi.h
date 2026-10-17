@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Borrowed arguments only. No engine objects, allocations or exceptions cross this ABI.
 struct CreatorHostInfoV1

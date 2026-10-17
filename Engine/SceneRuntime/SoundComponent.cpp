@@ -3,7 +3,7 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "Transform.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 SoundSystem* SoundComponent::System() const
 {

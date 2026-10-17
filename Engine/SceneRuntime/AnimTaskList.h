@@ -1,13 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <cstddef>
-#include <algorithm>
-#include <cmath>
-#include <limits>
-#include <stdexcept>
-#include <type_traits>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace animation
 {

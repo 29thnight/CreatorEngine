@@ -1,11 +1,6 @@
 #pragma once
 #include "Delegate.h"
-#include <atomic>
-#include <cstddef>
-#include <cstdint>
-#include <optional>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 // Editor의 play-mode 정책 소유자 (E3-2 · PHASE 21 W5).
 //
 // 재생 진입/이탈에서 **에디터만** 신경 쓰는 일을 여기서 한다. Core의

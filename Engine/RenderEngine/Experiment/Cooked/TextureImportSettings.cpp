@@ -1,12 +1,7 @@
 #include "TextureImportSettings.h"
 #include "AuthoringParsedDocument.h"
 
-#include <charconv>
-#include <cmath>
-#include <exception>
-#include <initializer_list>
-#include <set>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

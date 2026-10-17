@@ -129,8 +129,8 @@ struct SceneHybridVisibility final
         width = context.width;
         height = context.height;
         meshlets = (geometry->nextPrimitiveAddress - 1) / 128;
-        if (name.empty() || !device->GetAtomicCapabilities().bufferInt64Min || !visible || !meshlets || !width || !height ||
-            uint64_t(width) * height > UINT32_MAX || geometry->records.size() > 4097 ||
+        if (name.empty() || !device->GetAtomicCapabilities().bufferInt64Min || !visible || !meshlets || !width ||
+            !height || uint64_t(width) * height > UINT32_MAX || geometry->records.size() > 4097 ||
             records.size() != geometry->records.size())
         {
             error = "METEOR hybrid visibility requires atomic64, bounded frame geometry and GPU culling; no fallback.";
@@ -174,7 +174,8 @@ struct SceneHybridVisibility final
         {
             const auto& g = geometry->geometry[i];
             const auto topology = g->Meshlets();
-            v.push_back(RHIBindingDesc::SrvBuffer(g->Buffer(), g->Count(), sizeof(SurfacePoint)));
+            v.push_back(RHIBindingDesc::SrvBuffer(g->Buffer(), g->GeometryViewElements(),
+                                                  MeshSurfaceBatch::GeometryViewStride));
             t.push_back(RHIBindingDesc::SrvBuffer(topology.buffer, static_cast<uint32_t>(topology.size / 4), 0,
                                                   static_cast<uint32_t>(topology.offset / 4)));
         }

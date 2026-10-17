@@ -10,12 +10,7 @@
 #include "Render/Passes/PostProcess/EnhancedPostChainPass.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdio>
-#include <string>
-#include <utility>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

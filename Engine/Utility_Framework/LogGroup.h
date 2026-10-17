@@ -1,9 +1,7 @@
 // LogGroup.h
 #pragma once
 #include "LogEntry.h"
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include "StandardLibrary.h"
 
 // One log identity. Repeats collapse by identity, never by similarity: the
 // payload is compared byte for byte and nothing is normalised away, so

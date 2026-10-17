@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 // 자동 생성 — 손으로 고치지 말 것.
 // 재생성: pwsh scripts/build_vk_shaders.ps1

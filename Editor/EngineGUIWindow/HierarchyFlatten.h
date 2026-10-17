@@ -51,10 +51,7 @@
 
 #include "ImGui.h"
 
-#include <cstdint>
-#include <string>
-#include <unordered_set>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 class Scene;
 class Entity;

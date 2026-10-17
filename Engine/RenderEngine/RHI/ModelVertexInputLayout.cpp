@@ -1,11 +1,6 @@
 #include "ModelVertexInputLayout.h"
 
-#include <algorithm>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <string_view>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace ModelVertexInput
 {

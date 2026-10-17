@@ -5,11 +5,8 @@
 #if !CE_SHIPPING
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #endif
-#include <array>
-#include <cstdlib>
-#include <iostream>
-#include <thread>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 using namespace ce::physics;
 

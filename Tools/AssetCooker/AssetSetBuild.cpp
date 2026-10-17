@@ -14,20 +14,9 @@
 #include "Experiment/Cooked/CookedShaderMeta.h"
 #include "Experiment/Cooked/MaterialAssetSetProducer.h"
 #include "Assets/AssetIdentityProfile.h"
+#include "Assets/ModelCpuGeometry.h"
 
-#include <algorithm>
-#include <charconv>
-#include <chrono>
-#include <fstream>
-#include <initializer_list>
-#include <iostream>
-#include <iterator>
-#include <map>
-#include <set>
-#include <span>
-#include <stdexcept>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -45,7 +34,7 @@ namespace AssetCooking
         constexpr std::size_t kMaxEdges = 262144u;
         // Bump for producer/decoder behavior or normalization changes.
         constexpr std::string_view kTextureImporterVersion = "texture-gpu-ready-v2";
-        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v4";
+        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v5";
         constexpr std::string_view kShaderMetaImporterVersion = "shadermeta-source-document-v1";
         constexpr std::string_view kMaterialImporterVersion = "lattice-material-source-document-v1";
         constexpr std::string_view kMaterialProgramImporterVersion = "lattice-source-verified-program-v1";
@@ -758,7 +747,7 @@ namespace AssetCooking
             {
                 ck::ModelGeometryArtifact value;
                 std::vector<std::string> warnings;
-                valid = extension == ".cege" && ck::ReadModelGeometryArtifact(bytes, value, failure, &warnings);
+                valid = extension == ".cege" && ck::ExpandModelGeometryPages(bytes, value, failure, &warnings);
                 if (valid && !warnings.empty())
                 {
                     failure = warnings.front();
@@ -894,6 +883,7 @@ namespace AssetCooking
         struct PreparedArtifact final
         {
             std::vector<std::byte> bytes{};
+            std::vector<std::byte> cpuGeometryBytes{};
             std::string extension{};
             std::string inputDigest{};
             std::string importKey{};
@@ -903,7 +893,7 @@ namespace AssetCooking
             std::uint32_t schema{};
         };
 
-        constexpr std::string_view kImportReceiptVersion = "asset-set-import-receipt-v2";
+        constexpr std::string_view kImportReceiptVersion = "asset-set-import-receipt-v3";
         constexpr std::size_t kMaxReceiptBytes = 64u * 1024u * 1024u;
 
         // Length framing, including every string, makes source-authored path
@@ -1212,6 +1202,16 @@ namespace AssetCooking
                             if (value.bytes.size() != size || Hash(value.bytes) != digest)
                                 Fail("Import receipt CAS blob hash/size mismatch: " + blob.string());
                             ValidatePayload(value.bytes, authored.asset, authored.dependencies, value.extension, value.representation, value.schema);
+                            if (selection.kind == ck::CookedAssetKind::Mesh)
+                            {
+                                uint32_t prefix{}; ck::ModelGeometryStreamMetadata metadata; std::string error;
+                                if (!ck::ModelGeometryStreamPrefixSize(std::span(value.bytes).first(12),value.bytes.size(),prefix,error) ||
+                                    !ck::ReadModelGeometryStreamMetadata(std::span(value.bytes).first(prefix),value.bytes.size(),metadata,error)) Fail(error);
+                                value.cpuGeometryBytes = Read(cache / assets::cpu_geometry::Path(metadata.cpuGeometrySha256));
+                                ck::Sha256Digest hash{};
+                                if (value.cpuGeometryBytes.size() != metadata.cpuGeometryBytes ||
+                                    !ck::ComputeSha256(value.cpuGeometryBytes,hash,error) || hash != metadata.cpuGeometrySha256) Fail("CPU artifact cache integrity");
+                            }
                             restored.emplace(selection.key, std::move(value));
                         }
                     }
@@ -1271,6 +1271,15 @@ namespace AssetCooking
                 ReceiptText(receipt.bytes, value.extension);
                 ReceiptText(receipt.bytes, value.textureRecipe);
                 ReceiptText(receipt.bytes, value.inputDigest);
+                if (selection.kind == ck::CookedAssetKind::Mesh)
+                {
+                    ck::Sha256Digest digest{}; std::string error;
+                    if (!ck::ComputeSha256(value.cpuGeometryBytes,digest,error)) Fail(error);
+                    const auto cpuPath = cache / assets::cpu_geometry::Path(digest);
+                    std::filesystem::create_directories(cpuPath.parent_path());
+                    if (std::filesystem::exists(cpuPath)) { if (Read(cpuPath) != value.cpuGeometryBytes) Fail("CPU CAS collision"); }
+                    else WriteNew(cpuPath,value.cpuGeometryBytes);
+                }
                 ReceiptText(receipt.bytes, Hash(value.bytes));
                 ReceiptNumber(receipt.bytes, value.bytes.size());
             }
@@ -1391,6 +1400,7 @@ namespace AssetCooking
             }
             PreparedArtifact value;
             value.bytes = std::move(product.artifactBytes);
+
             value.extension = ".shadermeta";
             value.inputDigest = Hash("source=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) +
                 "\nshader=" + Hash(shaderInput) + "\nshaderMeta=" + Hash(shaderMetaInput) + "\n");
@@ -1480,6 +1490,7 @@ namespace AssetCooking
             }
             PreparedArtifact value;
             value.bytes = std::move(product.artifactBytes);
+
             value.extension = product.extension;
             // Hash path tokens separately so source-authored newlines cannot
             // make two role/path inventories ambiguous.
@@ -1590,6 +1601,7 @@ namespace AssetCooking
                     ck::kCookedTextureSchemaVersion);
                 PreparedArtifact value;
                 value.bytes = std::move(product.artifactBytes);
+
                 value.extension = ".cetex";
                 value.inputDigest = Hash("source=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) +
                     "\nsettings=" + product.importRecipe + "\n");
@@ -1659,8 +1671,10 @@ namespace AssetCooking
                     }
                     PreparedArtifact value;
                     value.bytes = std::move(product.artifactBytes);
+
                     value.extension = product.extension;
                     value.inputDigest = Hash(std::as_bytes(std::span(cooked.sourceInputsSha256)));
+                    value.cpuGeometryBytes = std::move(product.cpuGeometryBytes);
                     value.importer = kModelImporterVersion;
                     value.textureRecipe = std::move(product.textureImportRecipe);
                     value.representation = product.representation;
@@ -1702,7 +1716,7 @@ namespace AssetCooking
                 else if (authored.asset.kind == ck::CookedAssetKind::Mesh)
                 {
                     ck::ModelGeometryArtifact geometry;
-                    if (!ck::ReadModelGeometryArtifact(result.at(identity).bytes, geometry, failure))
+                    if (!ck::ExpandModelGeometryPages(result.at(identity).bytes, geometry, failure))
                     {
                         Fail("Prepared geometry validation failed: " + failure);
                     }
@@ -1729,7 +1743,8 @@ namespace AssetCooking
                     ck::SkeletonArtifact skeleton;
                     if (found == result.end() || definition.sources.at(key).asset.kind != ck::CookedAssetKind::Skeleton ||
                         !ck::ReadSkeletonArtifact(found->second.bytes, skeleton, failure) ||
-                        !ck::ValidateModelGeometryBinding(geometry, skeleton, failure))
+                        ![&] { ck::Sha256Digest binding{}; return ck::ComputeSkinBindingDigest(skeleton.skeleton,binding,failure) &&
+                            geometry.requiredBoneCount == skeleton.skeleton.bones.size() && geometry.requiredSkinBindingSha256 == binding; }())
                     {
                         Fail("Selected geometry/skeleton full binding failed: " + authored.source + ": " + failure);
                     }
@@ -1753,7 +1768,7 @@ namespace AssetCooking
                         const auto found = result.find(key);
                         ck::ModelGeometryArtifact geometry;
                         if (found == result.end() || definition.sources.at(key).asset.kind != ck::CookedAssetKind::Mesh ||
-                            !ck::ReadModelGeometryArtifact(found->second.bytes, geometry, failure) ||
+                            !ck::ExpandModelGeometryPages(found->second.bytes, geometry, failure) ||
                             !ck::ValidateModelMeshSummary(summary, geometry, failure))
                         {
                             Fail("Selected model/mesh summary mismatch: " + authored.source + ": " + failure);
@@ -1932,7 +1947,16 @@ namespace AssetCooking
                     "textureEncoding=CECT2\ntextureSettings=" + product.textureRecipe +
                     "\nimportKey=" + importKey + "\nextension=" + product.extension +
                     "\nselectedInput=" + artifactInput + "\nselection=" + Label(identity) + "\n");
-                const auto relative = "Derived/AssetBlobs/" + Hash(compatibility) + "/" + digest + product.extension;
+                std::string metadataDirectory;
+                if (authored.asset.kind == ck::CookedAssetKind::Mesh)
+                {
+                    ck::Sha256Digest metadataHash{};
+                    std::string metadataFailure;
+                    if (!ck::ModelGeometryStreamMetadataDigest(product.bytes, metadataHash, metadataFailure))
+                        Fail("Mesh streaming metadata digest failed: " + metadataFailure);
+                    metadataDirectory = ck::ModelGeometryStreamDirectory(metadataHash) + "/";
+                }
+                const auto relative = "Derived/AssetBlobs/" + Hash(compatibility) + "/" + metadataDirectory + digest + product.extension;
                 const auto record = "buildKey=" + buildKey + "\ncontentSha256=" + digest +
                     "\nbyteSize=" + std::to_string(product.bytes.size()) + "\nartifactPath=" + relative + "\n";
                 const auto recordPath = cache / "BuildKeys" / (buildKey + ".txt");
@@ -1944,7 +1968,9 @@ namespace AssetCooking
                         Fail("Immutable build-key record differs from source cook: " + recordPath.string());
                     }
                 }
-                const auto cachedBlob = cache / std::filesystem::u8path(relative);
+                // Import receipts address the whole-content cache. Only the
+                // published locator adds the independently authenticated prefix.
+                const auto cachedBlob = cache / std::filesystem::u8path(BlobPath(definition, authored, product, digest));
                 const bool cached = std::filesystem::exists(cachedBlob);
                 if (cached)
                 {
@@ -1992,6 +2018,24 @@ namespace AssetCooking
                     // Output owns independent immutable files, so cache GC cannot break a release.
                     std::filesystem::copy_file(cachedBlob, outputBlob);
                     VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension, product.representation, product.schema);
+                    if (authored.asset.kind == ck::CookedAssetKind::Mesh)
+                    {
+                        std::string cpuFailure;
+                        const auto& cpu = product.cpuGeometryBytes;
+                        if (cpu.empty()) Fail("Exact CPU geometry was not produced independently");
+                        ck::AssetBlobRecord cpuBlob;
+                        if (!ck::ComputeSha256(cpu, cpuBlob.contentSha256, cpuFailure)) Fail(cpuFailure);
+                        cpuBlob.byteSize = cpu.size(); cpuBlob.kind = ck::CookedAssetKind::CollisionGeometry;
+                        cpuBlob.representation = 2; cpuBlob.schemaVersion = 1;
+                        cpuBlob.targetPlatform = definition.targetPlatform; cpuBlob.targetAbi = definition.targetAbi;
+                        cpuBlob.artifactPath = assets::cpu_geometry::Path(cpuBlob.contentSha256);
+                        if (std::ranges::none_of(manifest.blobs, [&](const auto& item) { return item.artifactPath == cpuBlob.artifactPath; }))
+                        {
+                            const auto cpuPath = candidate / cpuBlob.artifactPath;
+                            std::filesystem::create_directories(cpuPath.parent_path()); WriteNew(cpuPath, cpu);
+                            manifest.blobs.push_back(std::move(cpuBlob));
+                        }
+                    }
                     if (cached)
                     {
                         ++result.reusedBlobs;

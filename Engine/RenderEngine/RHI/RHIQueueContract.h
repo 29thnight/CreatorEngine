@@ -1,9 +1,6 @@
 #pragma once
-#include <cstdint>
-#include <cstddef>
-#include <limits>
-#include <memory>
-#include <string>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 enum class RHIQueueKind : uint8_t
 {

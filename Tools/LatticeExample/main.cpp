@@ -1,4 +1,5 @@
 #include "../../Lattice/Core/LXGraph.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "../../Lattice/Core/LXDocument.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../../Lattice/ImGui/LXCanvas.h"
@@ -16,23 +17,10 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
-#include <algorithm>
-#include <array>
-#include <cassert>
-#include <cctype>
-#include <cmath>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Contract.h"
 #include <crtdbg.h>
-#include <filesystem>
-#include <fstream>
-#include <initializer_list>
-#include <iostream>
-#include <iterator>
-#include <limits>
-#include <map>
-#include <optional>
-#include <string>
-#include <utility>
-#include <vector>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
@@ -320,8 +308,8 @@ bool CaptureBackBuffer(const std::string& path)
         }
     }
 
-    const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    const bool mustUninitialize = SUCCEEDED(comResult);
+    const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::current_or_mta };
+    const HRESULT comResult = apartmentScope.result;
     ComPtr<IWICImagingFactory> factory;
     ComPtr<IWICStream> stream;
     ComPtr<IWICBitmapEncoder> encoder;
@@ -330,9 +318,9 @@ bool CaptureBackBuffer(const std::string& path)
     bool saved = false;
     do
     {
-        if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE)
+        if (FAILED(comResult))
         {
-            succeeded(comResult, "CoInitializeEx");
+            succeeded(comResult, "Apartment initialization");
             break;
         }
         if (!succeeded(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
@@ -378,10 +366,6 @@ bool CaptureBackBuffer(const std::string& path)
     stream.Reset();
     factory.Reset();
     gContext->Unmap(staging.Get(), 0);
-    if (mustUninitialize)
-    {
-        CoUninitialize();
-    }
     return saved;
 }
 LRESULT WINAPI WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1375,7 +1359,11 @@ bool DrawGroupSocketDefault(LX::LXGroupSocket& socket)
 void DrawGroupEditor(GroupEditorState& editor, LX::LXDocument& parent, const LX::LXStyleSheet& windowStyles,
                      const LX::LXNodeItemRegistry& items)
 {
-    assert(editor.draft);
+    ::ce::contracts::enforce_that(
+        [&]() -> bool {
+            return static_cast<bool>((editor.draft));
+        },
+        "editor.draft");
     LX::LXDocument& draft = *editor.draft;
     LX::LXGraph& body = draft.GraphForCanvas();
     LX::Id inputBoundary = 0;
@@ -5252,7 +5240,11 @@ bool SelfTest()
 void DrawUI(LX::LXGraph& graph, LX::CanvasState& canvas, LX::LXStyleSheet& styles, const LX::LXNodeItemRegistry& items,
             const std::string& file, ExamplePage* page, LX::LXDocument* document, GroupEditorState* groupEditor)
 {
-    assert(!document || &graph == &document->GraphForCanvas());
+    ::ce::contracts::enforce_that(
+        [&]() -> bool {
+            return static_cast<bool>((!document || &graph == &document->GraphForCanvas()));
+        },
+        "!document || &graph == &document->GraphForCanvas()");
     const auto createNode = [&](const LX::NodeSpec& spec, float x, float y) {
         return document ? document->Execute(LX::LXCreateNodeSpec{spec, x, y}, document->Revision()).created
                         : graph.AddNode(spec, x, y);

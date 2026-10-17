@@ -2,16 +2,11 @@
 
 #include "Core.Minimal.h"
 #include "Ownership.h"
-#include "concurrent_queue.h"
+#include "../../Engine/Utility_Framework/ConcurrentQueue.h"
 #include "Windows/EditorWindowBody.h"
 #include "EditorEntityIcons.h"
 
-#include <array>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 class ImFont;
 class Material;
@@ -90,7 +85,7 @@ private:
 	void LoadPresentationResources();
 	void ReleasePresentationResources() noexcept;
 
-	concurrency::concurrent_queue<file::path> m_textureImportQueue;
+	ce::concurrent_queue<file::path> m_textureImportQueue;
 	std::vector<file::path> m_pendingTexturePaths;
 	int m_selectedTextureKind{};
 

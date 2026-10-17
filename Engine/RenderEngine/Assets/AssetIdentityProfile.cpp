@@ -7,8 +7,7 @@
 
 #include <Windows.h>
 
-#include <cstring>
-#include <limits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "normaliz.lib")
 

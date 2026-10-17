@@ -5,14 +5,7 @@
 #include <dxgi1_6.h>
 #include <wrl/client.h>
 
-#include <cstdint>
-#include <algorithm>
-#include <cstring>
-#include <limits>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace MaterialProbe
 {

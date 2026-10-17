@@ -4,16 +4,7 @@
 #include <commctrl.h>
 #include <commdlg.h>
 #include <TlHelp32.h>
-#include <algorithm>
-#include <atomic>
-#include <cstdlib>
-#include <cwchar>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
-#include <sstream>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "CrashReporter.h"
 #include "../../Engine/Utility_Framework/CrashReportProtocol.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"

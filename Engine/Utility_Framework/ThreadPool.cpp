@@ -1,13 +1,6 @@
 #include "ThreadPool.h"
 #include <enkiTS/TaskScheduler.h>
-#include <algorithm>
-#include <atomic>
-#include <condition_variable>
-#include <limits>
-#include <future>
-#include <stdexcept>
-#include <thread>
-#include <utility>
+#include "StandardLibrary.h"
 #pragma comment(lib, "enkiTS.lib")
 
 namespace

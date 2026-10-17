@@ -1,6 +1,6 @@
 ﻿#include "ProjectLayerSettings.h"
 #include "SceneManager.h"
-#include <limits>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
 #include "TemporalMotionFixture.h"
@@ -30,10 +30,6 @@
 #include "InputActionManager.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
-#include <algorithm>
-#include <stdexcept>
-#include <unordered_map>
-#include <unordered_set>
 #include "Component.h"
 #include "TimeSystem.h"
 #include "GpuDiagnostics.h"
@@ -709,11 +705,6 @@ void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
     }
 
     {
-        ce::profile_scope _profile{ ce::marker<"YieldNull">() };
-        m_activeScene.load()->YieldNull();
-    }
-
-    {
         ce::profile_scope _profile{ ce::marker<"InternalAnimationUpdateEvent">() };
         InternalAnimationUpdateEvent.Broadcast(animationDeltaSecond);
     }
@@ -743,7 +734,6 @@ void SceneManager::EndOfFrame()
 {
     {
         ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
-    	CoroutineManagers->yield_WaitForEndOfFrame();
         endOfFrameEvent.Broadcast();
     }
 

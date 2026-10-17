@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "DxCaptureProtocol.h"
 

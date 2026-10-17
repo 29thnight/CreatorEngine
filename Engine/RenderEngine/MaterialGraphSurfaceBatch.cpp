@@ -1,12 +1,7 @@
 #include "MaterialGraphSurfaceBatch.h"
 #include "MaterialGraphMeshSurface.h"
 
-#include <algorithm>
-#include <bit>
-#include <cmath>
-#include <cstring>
-#include <fstream>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

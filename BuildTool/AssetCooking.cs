@@ -10,6 +10,7 @@ internal sealed record CookResult(int ArtifactCount, int CompanionCount, long Ar
     public int LegacyTextureNameRefs { get; set; }
     public int LegacyModelCookCaches { get; set; }
     public Dictionary<string, int> SourceCounts { get; set; } = new();
+    public string[] TextureSourcePaths { get; set; } = [];
 }
 internal sealed record DocumentResult(int DocumentCount, long DocumentBytes, string Format);
 internal static class AssetCooking
@@ -93,10 +94,12 @@ internal static class AssetCooking
             arguments.AddRange(["--texture-identity-root", Paths.Canonical(textureIdentityRoot, true)]);
         }
         var counts = new Dictionary<string, int>();
+        var textureSources = Array.Empty<string>();
         foreach (var (option, extensions) in new (string, string[])[] { ("--model", [".fbx", ".glb", ".gltf"]), ("--texture", [".png", ".jpg", ".jpeg", ".hdr", ".dds"]), ("--shadermeta", [".shadermeta"]), ("--shadergraph", [".shadergraph"]), ("--material", [".asset"]), ("--scene", [".creator", ".prefab"]) })
         {
             if (bootstrap && option != "--scene") continue;
             var sources = all.Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()) && !stale.Contains(p)).ToArray(); counts[option] = sources.Length;
+            if (option == "--texture") textureSources = sources;
             foreach (var source in sources) { arguments.Add(option); arguments.Add(source); }
         }
         // Audio sources are discovered by the cooker's GUID sidecar scan.
@@ -116,6 +119,7 @@ internal static class AssetCooking
         int Metric(string name) { var match = Regex.Match(summary.Value, name + @"=(\d+)"); return match.Success ? int.Parse(match.Groups[1].Value) : throw new BuildException($"Cook summary missing {name}."); }
         var result = Validate(output, Metric("artifactPaths"), bootstrap);
         result.ModelCount = models.Length; result.SourceCounts = counts; result.LegacyModelCookCaches = stale.Count; result.LegacyTextureNameRefs = Metric("legacyTextureNameRefs");
+        result.TextureSourcePaths = textureSources.Select(source => Paths.Relative(assets, source)).ToArray();
         return result;
     }
     public static async Task<DocumentResult> Documents(BuildContext context, string cooker, string root, string terrainSourceRoot = "")

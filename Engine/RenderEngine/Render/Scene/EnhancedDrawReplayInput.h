@@ -62,6 +62,7 @@ struct EnhancedDrawReplayInput
         }
         number(mesh.vertexBytes); number(mesh.vertexStride);
         number(mesh.vertexAttributeMask); number(mesh.vertexLayoutHash); number(mesh.indexCount);
+        if (mesh.handle.domain == assets::ModelMeshDomain::Granular) return hash;
         mix({static_cast<const uint8_t*>(mesh.vertexData), static_cast<size_t>(mesh.vertexBytes)});
         mix({reinterpret_cast<const uint8_t*>(mesh.indexData), size_t(mesh.indexCount) * sizeof(uint32_t)});
         return hash;
@@ -196,7 +197,7 @@ struct EnhancedDrawReplayInput
             for (const auto& item : items)
             {
                 byteSize+=116+size_t(item.boneCount)*64;
-                if (!item.modelMeshView.IsComplete() || item.boneCount>kMaxBones
+                if (!item.modelMeshView.IsSceneComplete() || item.boneCount>kMaxBones
                     || (item.boneCount && !item.bonePalette) || byteSize>kMaxBytes || candidate.draws.size()>=kMaxDraws)
                 { error="draw replay requires complete owned geometry and bounded pose"; return false; }
                 Draw draw;

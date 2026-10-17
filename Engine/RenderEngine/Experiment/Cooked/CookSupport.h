@@ -2,10 +2,7 @@
 
 #include "../AssetIdentity.h"
 
-#include <cstddef>
-#include <filesystem>
-#include <string>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

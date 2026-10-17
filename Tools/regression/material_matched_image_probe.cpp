@@ -2,9 +2,7 @@
 #define main MaterialRasterProbeMain
 #include "material_raster_surface_probe.cpp"
 #undef main
-#include <numeric>
-#include <iomanip>
-#include <map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <DirectXPackedVector.h>
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "Assets/CookedEnvironment.h"

@@ -2,15 +2,8 @@
 
 #include "CollisionGeometrySource.h"
 #include "ProjectLayerSettings.h"
-#include <functional>
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <mathematics/views.hpp>
-#include <algorithm>
-#include <cmath>
-#include <new>
-#include <ranges>
-#include <vector>
-#include <charconv>
 
 enum class PhysicsShapeKind : std::uint8_t
 {

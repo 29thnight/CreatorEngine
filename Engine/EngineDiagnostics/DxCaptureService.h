@@ -1,13 +1,6 @@
 #pragma once
 
-#include <atomic>
-#include <condition_variable>
-#include <cstdint>
-#include <filesystem>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "DxCaptureFile.h"
 #include "DxCaptureProcess.h"

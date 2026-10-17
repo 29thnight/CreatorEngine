@@ -1,11 +1,7 @@
 #pragma once
 #include "AuthoringReadNode.h"
 
-#include <cstddef>
-#include <filesystem>
-#include <span>
-#include <string>
-#include <string_view>
+#include "StandardLibrary.h"
 
 // SerializationPlan D3-b-L — **파싱 결과를 소유하는** 홀더.
 //

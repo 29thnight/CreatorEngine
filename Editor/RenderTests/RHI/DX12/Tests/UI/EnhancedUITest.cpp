@@ -9,10 +9,7 @@
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // UI 패스 자가 검증 (PHASE 3-6).
 //

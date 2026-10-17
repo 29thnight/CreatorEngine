@@ -1,7 +1,6 @@
 #include "../../Engine/Utility_Framework/Paklib.hpp"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.h"
-#include <iostream>
-#include <map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

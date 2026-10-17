@@ -1,6 +1,6 @@
 #include "PoseSampler.h"
 
-#include <cstddef>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 // RenderTests ExperimentPoseSampler.cpp에서 이동(I5-D4e-1 승격) — 산술 무변경.

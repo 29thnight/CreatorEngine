@@ -1,5 +1,7 @@
-#include <cstdlib>
-#include <cstdio>
+#include <stdint.h>
+#include "../../../Utility_Framework/WindowsApartment.h"
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include "../Graph/ShadowCasterBounds.h"
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedTemporalViewState.h"
@@ -66,29 +68,7 @@
 // ★ <d3d11_1.h> include가 여기 있었다 (E, 2026-08-09).
 //   공유 텍스처를 DX11에서 열어 SRV를 만들던 자리를 D4에서 걷은 뒤로 이
 //   파일에 DX11 타입이 하나도 남지 않았다.
-#include <algorithm>
-#include <cstdlib>
-#include <cstdio>
-#include <cmath>
-#include <vector>
-#include <unordered_set>
-#include <mutex>
-#include <array>
-#include <limits>
-#include <map>
-#include <cassert>
-#include <thread>
-#include <deque>
-#include <condition_variable>
-#include <chrono>
-#include <string_view>
-#include <type_traits>
-#include <exception>
-#include <stdexcept>
-#include <utility>
-#include <unordered_map>
-#include <set>
-#include <fstream>
+#include "../../../Utility_Framework/Contract.h"
 #include <wrl/wrappers/corewrappers.h>
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
@@ -556,6 +536,22 @@ namespace
         outputs.depth      = blackboard.Get(LiveSlots::kGBufferDepth);
         outputs.visibility = blackboard.Get(LiveSlots::kVisibility);
         return outputs;
+    }
+
+    material_graph::SceneShadowResources GatherShadowResources(const LiveBlackboard& board, const char* slot)
+    {
+        const auto handles = board.GetList(slot);
+        if (handles.size() != 3)
+        {
+            throw std::runtime_error("Shadow cascade slots must publish exactly three handles.");
+        }
+        return {handles[0], handles[1], handles[2]};
+    }
+
+    void PublishShadowResources(LiveBlackboard& board, const char* slot,
+        const material_graph::SceneShadowResources& handles)
+    {
+        board.SetList(slot, std::vector<RGHandle>(handles.begin(), handles.end()));
     }
 
     SceneSurfaceTargets::Outputs GatherMaterialSurface(const LiveBlackboard& blackboard)
@@ -3575,8 +3571,8 @@ namespace
             // 변환·컬링은 소비자의 부수 효과가 아니라 자기 노드다. 단계 사이의
             // 계약은 블랙보드 슬롯이다: 각 단계가 발행한 그래프 핸들을 다음 단계가
             // 그대로 받고, SceneHost는 다른 핸들이나 누락을 예외로 거부한다.
-            //   Geometry → Cull.First → Occluder → Cull.Final → Surface
-            //   Geometry → Shadow (그림자 컬링·명령은 그림자 노드가 소유)
+            //   Geometry → Cull.First → Occluder → Cull.Final → Visibility → MaterialWork → SurfaceResolve → Decal
+            //   Geometry → Shadow.StaticCache / Cull.First → Occluder → Cull.Final → Raster → History
             // 래스터는 Cull 노드에 두지 않는다. 명령 생성기는 입력이 확정되는 노드에 둔다.
             {
                 LivePassNode node;
@@ -3647,80 +3643,181 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
-            // ── 2 · 래스터: 그림자 ──
+            // Shadow data flow is independent of camera visibility. Static depth
+            // never contains dynamic-occluder rejection; both cull stages use light space.
             {
                 LivePassNode node;
-                node.name = "METEOR.Scene.Shadow";
+                node.name = "METEOR.Shadow.StaticCache";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
                 node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
                 node.prepare = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
                 {
                     return p.shadow.PrepareGraphFrame(ctx, error);
                 };
-                node.reads = { LiveSlots::kMeteorGeometry };
-                node.writes = { LiveSlots::kShadowMap };
+                node.reads = {LiveSlots::kMeteorGeometry};
+                node.writes = {LiveSlots::kShadowStaticDepths};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    PublishShadowResources(bb, LiveSlots::kShadowStaticDepths,
+                        p.graphMaterials.DeclareShadowStaticCache(graph, bb.Get(LiveSlots::kMeteorGeometry)));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Shadow.Cull.First";
+                node.reads = {LiveSlots::kMeteorGeometry};
+                node.writes = {LiveSlots::kShadowFirstLists};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    PublishShadowResources(bb, LiveSlots::kShadowFirstLists,
+                        p.graphMaterials.DeclareShadowFirstCull(graph, bb.Get(LiveSlots::kMeteorGeometry)));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Shadow.Occluder";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowStaticDepths, LiveSlots::kShadowFirstLists};
+                node.writes = {LiveSlots::kShadowOccluderDepths};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    PublishShadowResources(bb, LiveSlots::kShadowOccluderDepths,
+                        p.graphMaterials.DeclareShadowOccluder(graph, bb.Get(LiveSlots::kMeteorGeometry),
+                            GatherShadowResources(bb, LiveSlots::kShadowStaticDepths),
+                            GatherShadowResources(bb, LiveSlots::kShadowFirstLists)));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Shadow.Cull.Final";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowOccluderDepths};
+                node.writes = {LiveSlots::kShadowFinalLists};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    PublishShadowResources(bb, LiveSlots::kShadowFinalLists,
+                        p.graphMaterials.DeclareShadowFinalCull(graph, bb.Get(LiveSlots::kMeteorGeometry),
+                            GatherShadowResources(bb, LiveSlots::kShadowOccluderDepths)));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Shadow.Raster";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowStaticDepths, LiveSlots::kShadowFinalLists};
+                node.writes = {LiveSlots::kShadowMap};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.shadow.DeclareGraphTargets(graph, ctx);
-                    bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadow(graph,
-                        bb.Get(LiveSlots::kMeteorGeometry), p.shadow.GetShadowMap()));
+                    bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadowRaster(graph,
+                        bb.Get(LiveSlots::kMeteorGeometry), GatherShadowResources(bb, LiveSlots::kShadowStaticDepths),
+                        GatherShadowResources(bb, LiveSlots::kShadowFinalLists), p.shadow.GetShadowMap()));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Shadow.History";
+                node.reads = {LiveSlots::kShadowMap};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    p.graphMaterials.DeclareShadowHistory(graph, bb.Get(LiveSlots::kShadowMap));
                 };
                 p.desc.AddNode(std::move(node));
             }
 
-            // ── 2 · 래스터: 표면 ──
-            //
-            // 타깃 생성·클리어, 표면 래스터, 데칼까지 같은 GBuffer 6장의 한
-            // 단계다. 데칼은 새 타깃 없이 확산·노멀·ORM에 덧칠하고, 색 단계가
-            // 그 기준값을 쓰도록 입력을 등록한다. 데칼이 없으면 데칼 패스는
-            // 아무것도 선언하지 않는다.
+            // Visibility owns depth/IDs, MaterialWork owns tile jobs, SurfaceResolve
+            // owns material targets, and Decal publishes the modified surface versions.
             {
                 LivePassNode node;
-                node.name = "METEOR.Scene.Surface";
+                node.name = "METEOR.Scene.Visibility";
+                node.reads = {LiveSlots::kMeteorFinalList};
+                node.writes = {LiveSlots::kGBufferDepth, LiveSlots::kVisibility};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.gbuffer.DeclareVisibility(graph, ctx);
+                    const auto outputs = p.graphMaterials.DeclareVisibility(graph,
+                        {bb.Get(LiveSlots::kMeteorFinalList), {}}, p.gbuffer.GetOutputs());
+                    bb.Set(LiveSlots::kGBufferDepth, outputs.depth);
+                    bb.Set(LiveSlots::kVisibility, outputs.visibility);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.MaterialWork";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kVisibility};
+                node.writes = {LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    const auto material = p.graphMaterials.DeclareMaterialWork(graph,
+                        bb.Get(LiveSlots::kMeteorGeometry), bb.Get(LiveSlots::kVisibility));
+                    bb.Set(LiveSlots::kMeteorMaterialTiles, material[0]);
+                    bb.Set(LiveSlots::kMeteorMaterialArguments, material[1]);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.SurfaceResolve";
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
+                    LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments};
+                node.writes = {LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kGBufferNormal, LiveSlots::kGBufferEmissive, LiveSlots::kGBufferBitmask};
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                {
+                    p.gbuffer.DeclareSurface(graph, ctx, bb.Get(LiveSlots::kGBufferDepth), bb.Get(LiveSlots::kVisibility));
+                    const auto outputs = p.graphMaterials.DeclareSurfaceResolve(graph,
+                        bb.Get(LiveSlots::kMeteorGeometry), p.gbuffer.GetOutputs(),
+                        {bb.Get(LiveSlots::kMeteorMaterialTiles), bb.Get(LiveSlots::kMeteorMaterialArguments)});
+                    bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
+                    bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
+                    bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
+                    bb.Set(LiveSlots::kGBufferEmissive, outputs.emissive);
+                    bb.Set(LiveSlots::kGBufferBitmask, outputs.bitmask);
+                };
+                p.desc.AddNode(std::move(node));
+            }
+            {
+                LivePassNode node;
+                node.name = "METEOR.Scene.Decal";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.decal; };
-                // 데칼 PrepareFrame이 텍스처를 올리고 배치를 짜므로 이번
-                // 프레임 목록이 그 앞에 들어가야 한다.
-                node.prepare = [this, &p](const EnhancedFrameContext& ctx,
-                    std::string& err, uint32_t) -> bool
+                node.prepare = [this, &p](const EnhancedFrameContext& ctx, std::string& err, uint32_t) -> bool
                 {
                     p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
                     return p.decal.PrepareFrame(ctx, err);
                 };
-                node.reads = { LiveSlots::kMeteorFinalList };
-                node.writes = {
-                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
-                    LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
-                    LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
-                    LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments,
-                    LiveSlots::kDecalBaseDiffuse, LiveSlots::kDecalBaseOrm, LiveSlots::kDecalBaseNormal,
-                };
+                node.reads = {LiveSlots::kGBufferDepth, LiveSlots::kGBufferBitmask};
+                node.modifies = {LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough, LiveSlots::kGBufferNormal};
+                node.writes = {LiveSlots::kDecalBaseDiffuse, LiveSlots::kDecalBaseOrm, LiveSlots::kDecalBaseNormal};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.gbuffer.Declare(graph, ctx);
-                    auto outputs = p.graphMaterials.DeclareGBuffer(graph, {bb.Get(LiveSlots::kMeteorFinalList), {}},
-                        p.gbuffer.GetOutputs());
-                    const auto material = p.graphMaterials.MaterialWork();
-                    const auto workInputs = material ? material->GraphInputs(graph) : std::array<RGHandle,2>{};
-                    bb.Set(LiveSlots::kMeteorMaterialTiles, workInputs[0]);
-                    bb.Set(LiveSlots::kMeteorMaterialArguments, workInputs[1]);
-                    p.decal.SetInputs(outputs);
+                    SceneSurfaceTargets::Outputs inputs{};
+                    inputs.diffuse = bb.Get(LiveSlots::kGBufferDiffuse);
+                    inputs.metalRough = bb.Get(LiveSlots::kGBufferMetalRough);
+                    inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
+                    inputs.bitmask = bb.Get(LiveSlots::kGBufferBitmask);
+                    inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
+                    p.decal.SetInputs(inputs);
                     p.decal.Declare(graph, ctx);
-                    const auto decalOutputs = p.decal.GetOutputs();
-                    outputs.diffuse = decalOutputs.diffuse;
-                    outputs.normal = decalOutputs.normal;
-                    outputs.metalRough = decalOutputs.metalRough;
-                    bb.Set(LiveSlots::kDecalBaseDiffuse, decalOutputs.decalBaseline[0]);
-                    bb.Set(LiveSlots::kDecalBaseOrm, decalOutputs.decalBaseline[1]);
-                    bb.Set(LiveSlots::kDecalBaseNormal, decalOutputs.decalBaseline[2]);
-                    bb.Set(LiveSlots::kGBufferDiffuse,    outputs.diffuse);
+                    const auto outputs = p.decal.GetOutputs();
+                    bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
-                    bb.Set(LiveSlots::kGBufferNormal,     outputs.normal);
-                    bb.Set(LiveSlots::kGBufferEmissive,   outputs.emissive);
-                    bb.Set(LiveSlots::kGBufferBitmask,    outputs.bitmask);
-                    bb.Set(LiveSlots::kGBufferDepth,      outputs.depth);
-                    bb.Set(LiveSlots::kVisibility, outputs.visibility);
+                    bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
+                    bb.Set(LiveSlots::kDecalBaseDiffuse, outputs.decalBaseline[0]);
+                    bb.Set(LiveSlots::kDecalBaseOrm, outputs.decalBaseline[1]);
+                    bb.Set(LiveSlots::kDecalBaseNormal, outputs.decalBaseline[2]);
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -4782,7 +4879,7 @@ namespace
             error.clear();
             geometryFramePins.entries.clear();
             const auto admit = [&](const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor,
-                bool cpuConsumer)
+                bool cpuConsumer, bool streamedConsumer)
             {
                 const auto handle = assets::MakeModelMeshHandle(*descriptor);
                 if (!handle.IsValid())
@@ -4790,6 +4887,8 @@ namespace
                     error = "Invalid granular mesh descriptor identity.";
                     return false;
                 }
+                if (streamedConsumer && backend == EnhancedLiveBackend::DX12 && descriptor->streamMetadata)
+                    return true;
                 const bool resident = backend == EnhancedLiveBackend::DX12
                     ? pipeline && dx12.MeshCache().FindModel(handle).IsValid()
                     : vulkanPipeline && vulkanPipeline->meshCache.FindModel(handle).IsValid();
@@ -4848,7 +4947,8 @@ namespace
                 }
                 if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
                 {
-                    if (!admit(mesh->m_meshDescriptor, mesh->m_graphMaterialSource || mesh->m_isAnimationEnabled))
+                    if (!admit(mesh->m_meshDescriptor, mesh->m_graphMaterialSource || mesh->m_isAnimationEnabled,
+                               static_cast<bool>(mesh->m_graphMaterialSource)))
                     {
                         return false;
                     }
@@ -4862,7 +4962,8 @@ namespace
                         const auto& type = foliage->m_foliageTypes[index];
                         const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
                         if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty()
-                            && !admit(type.m_meshDescriptor, static_cast<bool>(type.m_graphMaterialSource)))
+                            && !admit(type.m_meshDescriptor, static_cast<bool>(type.m_graphMaterialSource),
+                                      static_cast<bool>(type.m_graphMaterialSource)))
                         {
                             return false;
                         }
@@ -5181,8 +5282,9 @@ namespace
                     {
                         return;
                     }
-                    pooled.modelPinIndex = pinIndex;
-                    bounds = generation->Meshes()[proxy->m_modelMeshIndex].bounds;
+                    const auto& mesh = generation->Meshes()[proxy->m_modelMeshIndex];
+                    pooled.modelPinIndex = mesh.streamDescriptor ? pinMesh(mesh.streamDescriptor) : pinIndex;
+                    bounds = mesh.bounds;
                 }
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
                 pooled.item.temporalObjectId = static_cast<uint64_t>(proxy->m_instancedID);
@@ -5264,8 +5366,9 @@ namespace
                         {
                             continue;
                         }
-                        pooled.modelPinIndex = pinIndex;
-                        bounds = generation->Meshes()[type.m_modelMeshIndex].bounds;
+                        const auto& mesh = generation->Meshes()[type.m_modelMeshIndex];
+                        pooled.modelPinIndex = mesh.streamDescriptor ? pinMesh(mesh.streamDescriptor) : pinIndex;
+                        bounds = mesh.bounds;
                     }
                     pooled.item.worldMatrix = source.worldMatrix;
                     pooled.item.temporalObjectId = static_cast<uint64_t>(proxy->m_instancedID);
@@ -7944,7 +8047,8 @@ namespace
         {
             renderThread = std::thread([this]
             {
-                const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+                const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+                const HRESULT comResult = apartmentScope.result;
                 {
                     std::lock_guard<std::mutex> startLock(renderQueueMutex);
                     renderThreadStartFailed = FAILED(comResult);
@@ -8267,7 +8371,6 @@ namespace
                         EnhancedSceneRenderer::MutableRenderThreadHooks();
                     if (hooks.OnStop) hooks.OnStop();
                 }
-                CoUninitialize();
             });
         }
         catch (const std::exception& exception)
@@ -8760,8 +8863,12 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     const std::thread::id currentThread = std::this_thread::get_id();
     if (state.frameProducerThread == std::thread::id{})
         state.frameProducerThread = currentThread;
-    assert(state.frameProducerThread == currentThread &&
-        "BuildLiveFramePacket must stay on the game-thread producer");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((state.frameProducerThread == currentThread &&
+                                      "BuildLiveFramePacket must stay on the game-thread producer"));
+        },
+        "state.frameProducerThread == currentThread && \"BuildLiveFramePacket must stay on the game-thread producer\"");
 
     EnhancedLiveFramePacket frame{};
     frame.temporalFixture = SnapshotTemporalFixtureStep();
@@ -9218,10 +9325,19 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     const std::thread::id currentThread = std::this_thread::get_id();
     if (state.frameConsumerThread == std::thread::id{})
         state.frameConsumerThread = currentThread;
-    assert(state.frameConsumerThread == currentThread &&
-        "TickLive consumer changed threads without an ownership handoff");
-    assert(frame.frameId > state.consumedFrameId &&
-        "RenderFramePacket must be consumed exactly once in publication order");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((state.frameConsumerThread == currentThread &&
+                                      "TickLive consumer changed threads without an ownership handoff"));
+        },
+        "state.frameConsumerThread == currentThread && \"TickLive consumer changed threads without an ownership handoff\"");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((frame.frameId > state.consumedFrameId &&
+                                      "RenderFramePacket must be consumed exactly once in publication order"));
+        },
+        "frame.frameId > state.consumedFrameId && \"RenderFramePacket must be consumed exactly once in publication "
+        "order\"");
     const auto traceProgress = [&](const char* phase) {
         static const bool enabled = [] { const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE"); return value && std::string_view(value) == "1"; }();
         if (enabled && frame.frameId <= 3)

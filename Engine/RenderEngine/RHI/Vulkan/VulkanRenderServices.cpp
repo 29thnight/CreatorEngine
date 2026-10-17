@@ -7,13 +7,8 @@
 #include "../../Mesh.h"
 #include "../../Texture.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstring>
-#include <map>
-#include <unordered_map>
-#include <vector>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 using namespace VulkanApi;
 

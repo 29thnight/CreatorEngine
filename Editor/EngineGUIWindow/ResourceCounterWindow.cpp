@@ -9,7 +9,7 @@
 #include "ClrHost.h"
 #include "EditorIcons.h"
 #include "ProfileScope.h"
-#include <array>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

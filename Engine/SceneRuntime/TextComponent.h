@@ -9,8 +9,7 @@
 #include "IRenderable.h"
 #include "Canvas.h"
 #include "UIComponent.h"
-#include <memory>
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class FontAsset;
 struct TextLayout;

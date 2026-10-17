@@ -32,9 +32,8 @@ struct PhysicsShapeDefinition;
 #include "EditorPropertyRow.h"   // 공통 배치 계약 (W2-I2)
 #include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf·EncodeMapKey 재사용
 #include "InspectorControl.h"    // 접힘 머리 펼침(W2-I3 자극)
-#include <cstddef>
-#include <algorithm> // iter_swap — 임의 접근이 없는 컨테이너의 재배열
-#include <iterator>  // prev·next·begin
+#include <stddef.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 static_assert(std::is_standard_layout_v<math::vector2>);
 static_assert(std::is_standard_layout_v<math::vector3>);

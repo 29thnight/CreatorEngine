@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 struct RHIAssetEvictionConfig
 {

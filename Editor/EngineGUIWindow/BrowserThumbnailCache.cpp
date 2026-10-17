@@ -5,15 +5,7 @@
 #include "TextureImage.h"
 #include "JobScheduler.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cctype>
-#include <cstring>
-#include <fstream>
-#include <memory>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

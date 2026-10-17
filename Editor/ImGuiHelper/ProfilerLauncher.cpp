@@ -4,10 +4,7 @@
 #include "ProfilerViewerProcess.h"
 #include "ImGui.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cmath>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

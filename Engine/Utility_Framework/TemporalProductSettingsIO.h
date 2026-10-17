@@ -3,10 +3,7 @@
 #include "TemporalProductSettings.h"
 #include "AuthoringReadNode.h"
 #include "AuthoringWriteNode.h"
-#include <type_traits>
-#include <utility>
-#include <array>
-#include <string_view>
+#include "StandardLibrary.h"
 
 namespace TemporalProductSettingsIO
 {

@@ -2,23 +2,23 @@
 
 #include "../ModelData.h"
 
-#include <string>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {
-    // Call only after conversion, welding, tangent splitting, skin packing, and
-    // cache/fetch reordering have finalized Mesh::vertices and Mesh::indices.
-    // Replaces only outPayload; failure clears it and retains all indexed data.
-    [[nodiscard]] bool BuildMeshlets(const Mesh& mesh, MeshletPayload& outPayload,
-        std::string& diagnostic, const MeshletBuildSettings& settings = {});
+// Call only after conversion, welding, tangent splitting, skin packing, and
+// cache/fetch reordering have finalized Mesh::vertices and Mesh::indices.
+// Replaces only outPayload; failure clears it and retains all indexed data.
+[[nodiscard]] bool BuildMeshlets(const Mesh& mesh, MeshletPayload& outPayload, std::string& diagnostic,
+                                 const MeshletBuildSettings& settings = {});
 
-    // Empty authoring geometry can have no clusters. Scene admission requires
-    // current cooked meshlets. Malformed/stale payloads require reimport/recook.
-    [[nodiscard]] bool ValidateMeshlets(const Mesh& mesh, const MeshletPayload& payload,
-        std::string& diagnostic, const MeshletBuildSettings& expectedSettings = {});
+// Empty authoring geometry can have no clusters. Scene admission requires
+// current cooked meshlets. Malformed/stale payloads require reimport/recook.
+[[nodiscard]] bool ValidateMeshlets(const Mesh& mesh, const MeshletPayload& payload, std::string& diagnostic,
+                                    const MeshletBuildSettings& expectedSettings = {});
 
-    // SHA-256 of the final packed geometry, layout and all builder settings.
-    // Names, GUIDs, filesystem paths and modification times are deliberately absent.
-    [[nodiscard]] MeshletGeometryDigest ComputeMeshletGeometryDigest(const Mesh& mesh,
-        const MeshletBuildSettings& settings = {}) noexcept;
-}
+// SHA-256 of the final packed geometry, layout and all builder settings.
+// Names, GUIDs, filesystem paths and modification times are deliberately absent.
+[[nodiscard]] MeshletGeometryDigest ComputeMeshletGeometryDigest(const Mesh& mesh,
+                                                                 const MeshletBuildSettings& settings = {}) noexcept;
+} // namespace experiment::importer

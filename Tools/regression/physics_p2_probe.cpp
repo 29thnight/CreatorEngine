@@ -4,13 +4,8 @@
 #include "../../Engine/EngineDiagnostics/ProfileService.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
-#include <array>
-#include <cmath>
-#include <cstdlib>
-#include <iostream>
-#include <ranges>
-#include <thread>
-#include <vector>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 using namespace ce::physics;
 

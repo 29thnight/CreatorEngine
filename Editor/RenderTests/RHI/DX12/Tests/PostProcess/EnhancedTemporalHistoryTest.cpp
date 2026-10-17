@@ -3,7 +3,7 @@
 #include "Render/Scene/EnhancedTemporalViewState.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Camera.h"
-#include <cmath>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Production Begin/Commit contract on a real DX12 device and SDK contexts.
 // Commit is driven by this test; no SDK dispatch, pixels or live submission is

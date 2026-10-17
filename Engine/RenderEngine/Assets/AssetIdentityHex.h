@@ -2,12 +2,7 @@
 // 소문자 16진 표기 — 신원 계층(epoch seed·authoring key·fingerprint)의 유일한 바이트
 // 표기다. 대문자·접두 `0x`·공백은 받지 않는다(표기가 둘이면 언젠가 비교가 어긋난다).
 
-#include <cstddef>
-#include <cstdint>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

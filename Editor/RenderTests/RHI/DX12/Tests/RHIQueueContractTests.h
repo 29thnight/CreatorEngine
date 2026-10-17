@@ -1,6 +1,7 @@
 #pragma once
 #include "RHI/RHIQueueContract.h"
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

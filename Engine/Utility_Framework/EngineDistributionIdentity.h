@@ -2,8 +2,7 @@
 #include "EngineRuntimePaths.h"
 #include "EngineVersion.h"
 #include "EngineMetadataFile.h"
-#include <fstream>
-#include <string>
+#include "StandardLibrary.h"
 
 struct EngineDistributionIdentity
 {

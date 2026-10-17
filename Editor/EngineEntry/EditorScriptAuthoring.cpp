@@ -10,13 +10,7 @@
 #include "Entity.h"
 #include "PathFinder.h"
 #include <Windows.h>
-#include <array>
-#include <fstream>
-#include <mutex>
-#include <utility>
-#include <vector>
-#include <chrono>
-#include <map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace EditorScriptAuthoring
 {

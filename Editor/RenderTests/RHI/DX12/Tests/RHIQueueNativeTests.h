@@ -1,9 +1,8 @@
 #pragma once
 #include "RHIQueueContractTests.h"
 #include "RHI/DX12/DX12DeviceResources.h"
-#include <chrono>
-#include <thread>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 bool DX12Test::RunQueueNativeTest(std::string& outLog)
 {

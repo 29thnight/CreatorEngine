@@ -1,8 +1,5 @@
 #pragma once
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "../../Utility_Framework/Uuid.h"
 

@@ -1,6 +1,5 @@
 #pragma once
-#include <cstdint>
-#include <string>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // DX12 RHI self-test·benchmark 표면 (E5 항목 2).
 //

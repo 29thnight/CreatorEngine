@@ -1,17 +1,11 @@
 #include "CookedTexture.h"
+#include "../../../Utility_Framework/WindowsApartment.h"
 
 #include <d3d11.h>
 #include <DirectXTex.h>
 #include <objbase.h>
 
-#include <algorithm>
-#include <bit>
-#include <cmath>
-#include <cstring>
-#include <exception>
-#include <limits>
-#include <string_view>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -459,18 +453,8 @@ namespace experiment::cooked
             failure = message;
             return false;
         };
-        struct TextureCookerApartment final
-        {
-            HRESULT result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
-            ~TextureCookerApartment()
-            {
-                if (SUCCEEDED(result))
-                {
-                    CoUninitialize();
-                }
-            }
-        } apartment;
-        if (FAILED(apartment.result) && apartment.result != RPC_E_CHANGED_MODE)
+        const ce::platform::windows::apartment_scope apartment{ ce::platform::windows::apartment_model::current_or_mta };
+        if (FAILED(apartment.result))
         {
             return fail("Texture cooker could not initialize COM for source decoding.");
         }

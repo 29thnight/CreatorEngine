@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <string>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

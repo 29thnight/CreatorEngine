@@ -7,10 +7,8 @@
 #include "EditorIcons.h"
 #include "ImGui.h"
 
-#include <algorithm>
-#include <cfloat>
-#include <cstdio>
-#include <vector>
+#include <float.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

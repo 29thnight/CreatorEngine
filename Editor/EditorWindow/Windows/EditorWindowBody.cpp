@@ -5,10 +5,7 @@
 
 #include "EditorWindowBody.h"
 
-#include <cstdint>
-#include <string_view>
-#include <utility>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::windows
 {

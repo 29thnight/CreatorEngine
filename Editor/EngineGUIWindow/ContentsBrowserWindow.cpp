@@ -18,10 +18,8 @@
 #include "EditorIcons.h"
 #include "EditorAssetDragPayload.h"
 #include "SoundGraphEditor.h"
-#include <algorithm>
-#include <cstring>
-#include <fstream>
-#include <mutex>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <imgui_internal.h>
 
 std::string						ContentsBrowserWindow::selectedFileName{};

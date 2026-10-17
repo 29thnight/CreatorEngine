@@ -8,6 +8,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ContractProbeConfiguration.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $core = Join-Path $repo 'Engine/EngineDiagnostics'
 $vcvars = 'C:/Program Files/Microsoft Visual Studio/18/Community/VC/Auxiliary/Build/vcvars64.bat'
@@ -33,10 +34,12 @@ foreach ($build in @('shipping', 'development')) {
     $exe = Join-Path $out 'profile_overhead_probe.exe'
     $shipping = if ($build -eq 'shipping') { 1 } else { 0 }
     $quoted = ($sources | ForEach-Object { '"' + $_ + '"' }) -join ' '
+    $contractProbe = New-ContractProbeConfiguration -Configuration 'Release' -OutputDirectory $out
     $command = 'call "' + $vcvars + '" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /W4 /WX ' +
         '/MD /O2 /DNDEBUG /DCE_SHIPPING=' + $shipping + ' /I"' + $core +
         '" /Fo"' + $out + '/" /Fd"' + (Join-Path $out 'probe.pdb') +
         '" /Fe"' + $exe + '" ' + $quoted
+    $command += $contractProbe.CommandLine
     $buildLog = & $env:ComSpec /d /s /c $command 2>&1
     $buildLog | Set-Content -LiteralPath (Join-Path $out 'build.log') -Encoding UTF8
     if ($LASTEXITCODE -ne 0) { throw "$build overhead probe build failed: $out/build.log" }

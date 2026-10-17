@@ -2,11 +2,8 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "Render/Graph/EnhancedGpuMeasurementHistory.h"
 #include "RHI/DX12/DX12DeviceResources.h"
-#include <stdexcept>
-#include <algorithm>
-#include <memory>
-#include <vector>
-#include <optional>
+#include <stdint.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 bool DX12Test::RunQueueScheduleTest(std::string& outLog)
 {

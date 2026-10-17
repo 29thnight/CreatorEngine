@@ -2,8 +2,7 @@
 #include "PhysicsTypes.h"
 #include "PhysicsGeometry.h"
 #include "PhysicsStep.h"
-#include <memory>
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <mathematics/vector3.hpp>
 
 namespace ce::physics

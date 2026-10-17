@@ -4,10 +4,7 @@
 #include "AuthoringParseTelemetry.h"
 #include "AuthoringRymlErrorPolicy.h"
 
-#include <atomic>
-#include <fstream>
-#include <mutex>
-#include <sstream>
+#include "StandardLibrary.h"
 
 namespace Authoring
 {

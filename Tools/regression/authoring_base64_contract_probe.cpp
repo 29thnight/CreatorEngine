@@ -1,10 +1,6 @@
 #include "AuthoringBase64.h"
 
-#include <array>
-#include <cstdint>
-#include <cstdio>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

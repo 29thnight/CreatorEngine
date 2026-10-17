@@ -5,11 +5,7 @@
 #include "../../Engine/RenderEngine/ClipSamplingCursor.h"
 #include <mathematics/transform.hpp>
 
-#include <cstdlib>
-#include <cstdint>
-#include <iostream>
-#include <limits>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

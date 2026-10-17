@@ -1,6 +1,6 @@
 #pragma once
 #include "PhysicsStep.h"
-#include <bit>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

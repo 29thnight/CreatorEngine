@@ -19,10 +19,7 @@
 #include "EnhancedRenderPass.h"
 #include "../../Mesh.h"
 
-#include <cstddef>
-#include <map>
-#include <span>
-#include <string>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace enhanced_draw
 {

@@ -5,8 +5,7 @@
 #include "ShaderMetaReflection.h"
 #include "../Utility_Framework/Ownership.h"
 
-#include <memory>
-#include <span>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace AssetDepot
 {

@@ -8,16 +8,8 @@ namespace wave
 }
 #include "Delegate.h"
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <cstdint>
-#include <future>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
 
 class Scene;
 class CharacterMovementComponent;

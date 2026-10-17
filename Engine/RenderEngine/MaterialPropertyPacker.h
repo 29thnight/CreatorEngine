@@ -2,11 +2,7 @@
 #include "MaterialPropertyValue.h"
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // CB 패킹 정본. Material 상태를 읽지 않는다 — ShaderMeta 계약(ShaderPropertyDesc·
 // ShaderMetaPropertyBinding)과 논리 값만 받아 bytes를 만든다. 값 조회는 호출자

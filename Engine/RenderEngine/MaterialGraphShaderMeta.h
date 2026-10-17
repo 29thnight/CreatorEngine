@@ -4,7 +4,7 @@
 #include "ShaderMetaReflection.h"
 #include "LXMaterialRuntime.h"
 
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

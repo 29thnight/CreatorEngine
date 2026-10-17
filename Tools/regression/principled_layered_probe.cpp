@@ -1,12 +1,7 @@
 #include "material_probe_compiler.h"
 #include "principled_layered_reference.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <complex>
-#include <iomanip>
-#include <limits>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

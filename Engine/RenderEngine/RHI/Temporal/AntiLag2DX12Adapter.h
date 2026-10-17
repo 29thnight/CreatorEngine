@@ -1,6 +1,6 @@
 #pragma once
 #include "../../Render/Temporal/TemporalReconstruction.h"
-#include <memory>
+#include "../../../Utility_Framework/StandardLibrary.h"
 struct ID3D12Device;
 struct IDXGISwapChain;
 // Optional official Anti-Lag2 v2.0.0a source header. No bundled driver/DLL load.

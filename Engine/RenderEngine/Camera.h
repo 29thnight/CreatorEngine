@@ -9,8 +9,7 @@
 #include <mathematics/frustum.hpp>
 #include <mathematics/quaternion.hpp>
 #include <mathematics/vector2.hpp>
-#include <optional>
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 // ID3D11DeviceContext·ID3D11Buffer 전방 선언이 여기 있었다 (E, 2026-08-09).
 // 뷰/투영/캐스케이드 상수 버퍼와 UpdateBuffer 삼형제가 D4에서 사라졌다.
 // 카메라 한 대의 값 상태. 소유권·활성 뷰 선택·렌더 슬롯 배정은 이 타입의

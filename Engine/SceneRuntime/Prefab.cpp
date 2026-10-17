@@ -6,8 +6,7 @@
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "Scene.h"
-#include <unordered_map>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 구파일 승격 공유 헬퍼(레인 2, SceneGraphRedesignPlan §5 예외 4) — 정의는
 // SceneManager.cpp에 있다(그쪽 파일 상단 주석 참고). 헤더를 새로 두지 않기

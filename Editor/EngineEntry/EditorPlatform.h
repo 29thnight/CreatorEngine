@@ -1,8 +1,6 @@
 #pragma once
 
-#include <filesystem>
-#include <functional>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Windows shell integration owned by the Editor host.
 // Runtime/Core code must not depend on this service.

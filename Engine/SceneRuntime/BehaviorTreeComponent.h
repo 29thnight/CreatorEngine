@@ -3,7 +3,7 @@
 #include "IAIComponent.h"
 #include "AIManager.h"
 #include "ClrHost.h"
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 using namespace BT;
 

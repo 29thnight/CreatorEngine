@@ -1,4 +1,5 @@
 ﻿#include "EditorModelPlacement.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "EditorModelCollisionGeometry.h"
 
 #include "DataSystem.h"
@@ -12,14 +13,7 @@
 #include "EditorWindowNames.h"
 #include "Windows/EditorToolboxWindows.h"
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <chrono>
-#include <mutex>
-#include <span>
-#include <utility>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Editor
 {
@@ -175,9 +169,10 @@ namespace Editor
             request->ready.store(true, std::memory_order_release);
             return;
         }
-        // The shared pool does not promise a COM apartment; balance this job's
-        // initialization without changing a shared worker's name or priority.
-        const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        // The shared pool requires an explicit apartment scope for COM/WinRT jobs.
+        // Keep it local without changing a shared worker's name or priority.
+        const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+        const HRESULT com = apartmentScope.result;
         const auto prepareStart = std::chrono::steady_clock::now();
         try
         {
@@ -240,10 +235,6 @@ namespace Editor
         catch (...)
         {
             request->error = "Unexpected model preparation failure";
-        }
-        if (SUCCEEDED(com))
-        {
-            CoUninitialize();
         }
         request->prepareMs = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - prepareStart).count();

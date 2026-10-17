@@ -2,7 +2,7 @@
 #include "LifecycleTrace.h"
 #include "LightComponent.h"
 #include "Entity.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void LightSystem::Register(LightComponent* light)
 {

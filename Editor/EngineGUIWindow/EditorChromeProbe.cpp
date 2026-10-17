@@ -32,12 +32,7 @@
 
 #include "ImGui.h"
 
-#include <chrono>
-#include <cmath>
-#include <cstdint>
-#include <filesystem>
-#include <system_error>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

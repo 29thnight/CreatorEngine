@@ -2,9 +2,7 @@
 
 #include "SoundGraph.h"
 
-#include <cstddef>
-#include <span>
-#include <string_view>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

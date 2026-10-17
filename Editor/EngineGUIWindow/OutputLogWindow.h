@@ -13,8 +13,7 @@
 
 #include "OutputLogView.h"
 
-#include <cstdint>
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct ImFont;
 

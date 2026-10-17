@@ -2,9 +2,8 @@
 #include "Component.h"
 #include "ReflectionRegister.h"
 
-#include <cstdio>
-#include <mutex>
-#include <vector>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace Lifecycle
 {

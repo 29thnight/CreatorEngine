@@ -9,7 +9,7 @@
 //
 // 4단계가 이것을 게이트에 잇는다. 그때 변이로 이빨을 증명한다.
 
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

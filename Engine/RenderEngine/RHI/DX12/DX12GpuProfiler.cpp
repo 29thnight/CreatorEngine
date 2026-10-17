@@ -1,9 +1,7 @@
 #include "DX12GpuProfiler.h"
 #include "DX12Encoder.h"
 
-#include <algorithm>
-#include <sstream>
-#include <string>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

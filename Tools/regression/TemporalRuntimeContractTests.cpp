@@ -2,10 +2,8 @@
 // Does not claim SDK/hardware/pixel acceptance.
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalReconstruction.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
-#include <array>
-#include <cmath>
-#include <cstdio>
-#include <limits>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

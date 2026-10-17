@@ -1,6 +1,6 @@
 #include <Windows.h>
-#include <cstdio>
-#include <exception>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "HostAbi.h"
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int);

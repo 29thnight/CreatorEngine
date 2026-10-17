@@ -5,13 +5,7 @@
 #include "../../Utility_Framework/Ownership.h"
 #include "TypeTrait.h"
 
-#include <cstdint>
-#include <filesystem>
-#include <functional>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 struct ShaderMeta;
 struct ShaderKeywordAxis;

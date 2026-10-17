@@ -2,8 +2,7 @@
 
 #include "../../Utility_Framework/PathFinder.h"
 
-#include <fstream>
-#include <sstream>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 std::filesystem::path RHIShaderSource::Resolve(std::string_view name)
 {

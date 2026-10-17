@@ -1,10 +1,5 @@
 #pragma once
-#include <cstdint>
-#include <array>
-#include <functional>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -59,6 +54,10 @@ namespace LiveSlots
 
     /// METEOR 단계 계약. 각 단계가 발행한 그래프 핸들을 다음 단계가 그대로 받는다.
     /// 그리기 없는 프레임은 무효 핸들을 발행한다.
+    inline constexpr const char* kShadowStaticDepths = "METEOR.Shadow.Static.Depths";
+    inline constexpr const char* kShadowFirstLists = "METEOR.Shadow.Cull.FirstLists";
+    inline constexpr const char* kShadowOccluderDepths = "METEOR.Shadow.Occluder.Depths";
+    inline constexpr const char* kShadowFinalLists = "METEOR.Shadow.Cull.FinalLists";
     inline constexpr const char* kMeteorGeometry = "METEOR.Scene.Geometry.Table";
     inline constexpr const char* kMeteorFirstList = "METEOR.Scene.Cull.FirstList";
     inline constexpr const char* kMeteorOccluderDepth = "METEOR.Scene.Occluder.Depth";

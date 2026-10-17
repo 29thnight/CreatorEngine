@@ -11,10 +11,7 @@
 #include "../RenderEngine/Assets/ModelAnimationPayload.h"
 #include "../RenderEngine/Assets/ModelMeshDescriptor.h"
 #include "../RenderEngine/Assets/ModelSkeletonPayload.h"
-#include <algorithm>
-#include <cstring>
-#include <limits>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 ScriptObjectRegistry& ScriptObjectRegistry::Get()
 {

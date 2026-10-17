@@ -7,22 +7,9 @@
 #include <physx/characterkinematic/PxControllerManager.h>
 #include <physx/characterkinematic/PxCapsuleController.h>
 #pragma comment(lib, "PhysXCharacterKinematic_static_64.lib")
-#include <algorithm>
-#include <atomic>
-#include <cmath>
-#include <condition_variable>
-#include <concepts>
-#include <cstdio>
-#include <cstdlib>
-#include <string_view>
-#include <format>
-#include <limits>
-#include <mutex>
-#include <ranges>
-#include <thread>
-#include <vector>
-#include <array>
-#include <mdspan>
+#include <stdint.h>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <mathematics/views.hpp>
 #if defined(_WIN32)
 #ifndef NOMINMAX

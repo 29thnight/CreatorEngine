@@ -9,8 +9,7 @@
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include "UITickSystem.h"
-#include <algorithm>
-#include <cmath>
+#include "../Utility_Framework/StandardLibrary.h"
 
 Canvas::Canvas()
 {

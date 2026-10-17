@@ -5,7 +5,7 @@
 #include "MaterialGraphMeshSurface.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 
-#include <atomic>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

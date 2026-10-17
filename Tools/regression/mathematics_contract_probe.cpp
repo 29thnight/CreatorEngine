@@ -5,11 +5,9 @@
 #include "TransformStore.h"
 #include "TweenManager.h"
 
-#include <array>
-#include <cmath>
-#include <cstddef>
-#include <cstdio>
-#include <type_traits>
+#include <stddef.h>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace {
 

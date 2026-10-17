@@ -12,10 +12,7 @@
 #include "EditorWindowSurface.h"
 #include "Windows/EditorWindowBody.h"
 
-#include <string>
-#include <utility>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

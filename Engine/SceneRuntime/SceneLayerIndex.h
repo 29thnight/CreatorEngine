@@ -2,8 +2,7 @@
 
 #include "EntityHandle.h"
 #include "../Utility_Framework/LayerCatalog.h"
-#include <array>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Scene owns this index and resolves returned handles; no Entity pointers are retained.
 class SceneLayerIndex final

@@ -3,13 +3,8 @@
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Graph/EnhancedRenderGraph.h"
-#include <algorithm>
-#include <array>
-#include <cstdint>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"

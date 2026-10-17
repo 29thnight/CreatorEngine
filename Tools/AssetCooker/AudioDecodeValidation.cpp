@@ -3,12 +3,8 @@
 #include "Assets/AudioClipSourceMetadata.h"
 #include "../../Engine/SceneRuntime/Audio/AudioSourceValidation.h"
 
-#include <algorithm>
-#include <array>
-#include <fstream>
-#include <limits>
-#include <span>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // AssetCooker is a separate executable. This is its sole miniaudio
 // implementation TU; the runtime has its own private miniaudio implementation.

@@ -8,10 +8,7 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <array>
-#include <string_view>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

@@ -27,11 +27,8 @@
 //   · 닫히지 않은 따옴표는 **오류**다. 예전에는 조용히 통과했다.
 //   · 빈 따옴표 `""` 는 "값을 비웠다"는 뜻의 토큰 하나다.
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <stdio.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace CommandCore
 {

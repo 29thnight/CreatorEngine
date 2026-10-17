@@ -1,9 +1,7 @@
 // LogEntry.h
 #pragma once
 #include <spdlog/common.h>
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include "StandardLibrary.h"
 
 // Own the source strings: spdlog::source_loc only borrows its character buffers.
 // A zero line means that the producer did not supply a source location.

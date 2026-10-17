@@ -1,10 +1,6 @@
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <span>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer
 {

@@ -1,9 +1,6 @@
 #pragma once
 
-#include <algorithm>
-#include <cstddef>
-#include <span>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace Animation
 {

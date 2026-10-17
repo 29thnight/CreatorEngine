@@ -4,11 +4,7 @@
 #include "RenderPassSettings.h"
 #include "TemporalProductSettings.h"
 
-#include <mutex>
-#include <cmath>
-#include <cstdint>
-#include <string>
-#include <utility>
+#include "StandardLibrary.h"
 
 struct AnimationBudgetSettings final
 {

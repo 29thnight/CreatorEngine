@@ -6,12 +6,7 @@
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
 
-#include <cstddef>
-#include <cstdint>
-#include <stdexcept>
-#include <string>
-#include <string_view>
-#include <utility>
+#include "StandardLibrary.h"
 
 // SerializationPlan D3-b-4 — 저작 읽기 경계의 단일 ryml backend.
 //

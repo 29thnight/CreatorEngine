@@ -2,9 +2,8 @@
 #include "BaseTypeDef.h"
 #include <Unknwnbase.h>
 #include <combaseapi.h>
-#include <typeindex>
-#include <filesystem>
-#include <execution>
+#include <stdio.h>
+#include "StandardLibrary.h"
 
 namespace file = std::filesystem;
 #pragma warning(disable: 26819)

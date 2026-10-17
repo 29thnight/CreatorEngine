@@ -169,6 +169,9 @@ internal static class GamePackager
             var documents = bootstrap == null ? await AssetCooking.Documents(context, cooker, merged)
                 : bootstrap.Report["documents"]!.Deserialize<DocumentResult>(Metadata.Format)
                     ?? throw new BuildException("Bootstrap runtime document inventory missing.");
+            // Terrain/runtime document compilation still needs authoring images.
+            // Remove only successfully cooked sources after that compilation.
+            if (!prebuiltContent) PackageInputs.RemoveCookedTextureSources(merged, cook!.TextureSourcePaths);
             var entries = Metadata.Entries(merged, Paths.Files(merged).Where(p => !PackageInputs.Excluded(p)).Select(p => Paths.Relative(merged, p)));
             if (entries.Length == 0) throw new BuildException("Package content is empty.");
             var contentDigest = Metadata.Digest(entries); var distributionDigest = Metadata.Digest(runtimeEntries.Append(new("GameAssets.logical", 0, contentDigest)));

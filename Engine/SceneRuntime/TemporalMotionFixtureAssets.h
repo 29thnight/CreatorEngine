@@ -3,9 +3,7 @@
 #include "../RenderEngine/AssetDepot/AssetLink.h"
 #include "../RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
 
-#include <filesystem>
-#include <string>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 struct TemporalMotionFixtureAssetOptions final
 {

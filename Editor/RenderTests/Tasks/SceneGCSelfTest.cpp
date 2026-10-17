@@ -7,14 +7,7 @@
 #include "ScriptObjectRegistry.h"
 #include "JobScheduler.h"
 
-#include <algorithm>
-#include <atomic>
-#include <chrono>
-#include <future>
-#include <memory>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

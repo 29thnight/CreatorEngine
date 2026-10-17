@@ -20,14 +20,7 @@
 #include "SceneManager.h"
 #include "ScriptComponent.h"
 #include "Socket.h"
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdint>
-#include <cstring>
-#include <stdexcept>
-#include <thread>
-#include <unordered_map>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 namespace RenderTest

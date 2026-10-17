@@ -1,11 +1,7 @@
 #include "EditorTextFallback.h"
 #include "EditorIconAlignment.h"
-#include <array>
-#include <cmath>
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <crtdbg.h>
-#include <cstdlib>
 
 int main(int argc, char** argv)
 {

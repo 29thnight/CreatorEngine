@@ -18,18 +18,7 @@
 #include "AssetDepot/LegacyResourceCache.h"
 #include "AssetDepot/ModelAssetRuntime.h"
 #include "AssetDepot/MaterialAssetRuntime.h"
-#include <array>
-#include <atomic>
-#include <cstddef>
-#include <iosfwd>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <span>
-#include <unordered_set>
-#include <utility>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 template <typename T>
 using DataContainer = std::unordered_map<std::string, asset_cache_detail::Entry<T>>;
@@ -749,7 +738,7 @@ private:
     ModelPreparation PrepareModelAssetFromSnapshot(AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
         own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch,
         assets::ModelColliderPreparationPolicy colliderPolicy = assets::ModelColliderPreparationPolicy::CookedDefault);
-    AssetDepot::AssetRequest<assets::ModelGeometryPayload> RequestModelColliderGeometry(
+    AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload> RequestModelColliderGeometry(
         experiment::cooked::ResolvedAssetEntry resolved,
         AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> descriptor, std::uint64_t epoch,
         assets::ModelColliderPreparationPolicy colliderPolicy);

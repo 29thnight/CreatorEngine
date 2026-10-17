@@ -1,10 +1,8 @@
 ﻿#include "ScenePhysicsSimulation.h"
 #include "../Physics/PhysicsTestHooks.h"
 #include "../EngineDiagnostics/ProfileScope.h"
-#include <cmath>
-#include <algorithm>
-#include <limits>
-#include <ranges>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 using namespace ce::physics;
 

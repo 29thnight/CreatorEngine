@@ -2,8 +2,8 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
 
-#include <algorithm>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 using namespace VulkanApi;
 

@@ -1,8 +1,7 @@
 #pragma once
 
 #include "CollisionGeometryCodec.h"
-#include <filesystem>
-#include <fstream>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

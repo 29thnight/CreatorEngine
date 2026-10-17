@@ -1,10 +1,7 @@
 #include "ProfileReader.h"
 
-#include <algorithm>
-#include <atomic>
-#include <map>
-#include <mutex>
-#include <optional>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // reader는 UI가, 실행 중인 작업은 실행기가 소유한다. 작업에는 공유 상태와
 // 불변 입력만 넘기고 reader나 ImGui 객체를 참조하지 않는다.

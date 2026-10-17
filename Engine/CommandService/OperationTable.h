@@ -17,11 +17,7 @@
 
 #include "JsonValue.h"
 
-#include <cstdint>
-#include <deque>
-#include <mutex>
-#include <string>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

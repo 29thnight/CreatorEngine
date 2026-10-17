@@ -19,9 +19,8 @@
 // 이식 시 남는 델타는 `WSAStartup`/`WSACleanup` · `SOCKET` 대 `int` ·
 // `closesocket` 대 `close` · `WSAGetLastError` 대 `errno` 정도다.
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
+#include <errno.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

@@ -5,10 +5,7 @@
 
 #include "RHI/RHIDisplayFrame.h"
 #include "Texture.h"
-#include <functional>
-#include <memory>
-#include <cstdint>
-#include <string>
+#include "../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 
 // 사용자 텍스처 descriptor는 마지막 표시 이후 충분히 오래 사용되지 않을 때

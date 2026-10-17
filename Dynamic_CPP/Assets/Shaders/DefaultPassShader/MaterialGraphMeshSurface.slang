@@ -1,6 +1,7 @@
 #include "Includes/MaterialGraphSurfacePoint.slang"
 #include "Includes/MaterialEvaluation.slang"
 #include "Includes/PackedBones.slang"
+#include "Includes/QuantizedGeometry.slang"
 
 struct LXTransformJob
 {
@@ -37,19 +38,19 @@ void LXTransformMesh(uint3 groupId : SV_GroupID, uint3 threadId : SV_GroupThread
     const LXTransformJob job = lx_meshJobs[group.x];
     const uint vertex = group.y + threadId.x;
     if (vertex >= job.countStrideMaskBones.x) return;
-    const uint base = job.inputOffsets.x + vertex * job.countStrideMaskBones.y;
-    float3 position = asfloat(lx_meshInputs.Load3(base + job.offsets0.x));
-    const float3 normal = asfloat(lx_meshInputs.Load3(base + job.offsets0.y));
-    const float2 uv = asfloat(lx_meshInputs.Load2(base + job.offsets0.z));
-    const float4 tangent = asfloat(lx_meshInputs.Load4(base + job.offsets1.x));
+    const uint base = job.inputOffsets.x;
+    float3 position = LXGeometry3(lx_meshInputs, base, vertex, job.offsets0.x);
+    const float3 normal = LXGeometry3(lx_meshInputs, base, vertex, job.offsets0.y);
+    const float2 uv = LXGeometry2(lx_meshInputs, base, vertex, job.offsets0.z);
+    const float4 tangent = LXGeometry4(lx_meshInputs, base, vertex, job.offsets1.x);
     const float3 bitangent = cross(normal, tangent.xyz) * tangent.w;
     float3x3 frameTransform = (float3x3)job.world;
     if (job.countStrideMaskBones.w != 0)
     {
-        const float4 weights = asfloat(lx_meshInputs.Load4(base + job.offsets1.w));
+        const float4 weights = LXGeometry4(lx_meshInputs, base, vertex, job.offsets1.w);
         if (weights.x > 0.0)
         {
-            const uint packedIndices = lx_meshInputs.Load(base + job.offsets1.z);
+            const uint packedIndices = LXGeometryWord(lx_meshInputs, base, vertex, job.offsets1.z);
             const uint4 indices = (packedIndices >> uint4(0, 8, 16, 24)) & 255u;
             float4x4 skin = weights.x * UnpackBone(LXLoadTransformBone(job.inputOffsets.y, indices.x));
             [unroll]

@@ -1,4 +1,5 @@
 #include "ProjectLayerSettingsIO.h"
+#include "../Engine/Utility_Framework/WindowsApartment.h"
 #include "PlayerMain.h"
 #include "PlayerDdolProbe.h"
 
@@ -12,8 +13,7 @@
 #include "PlayerPresentation.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ClrHost.h"
-#include "CoreWindow.h"
-#include "Core.Coroutine.h"
+#include "WindowsCoreWindow.h"
 #include "DataSystem.h"
 #include "EngineBootstrap.h"
 #include "InputManager.h"
@@ -42,23 +42,18 @@
 #include "ProfileService.h"
 #endif
 
-#include <cstdio>
-#include <algorithm>
-#include <chrono>
-#include <cstdlib>
+#include <stdio.h>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 // 스모크 판정 마커("Scene loaded:")를 여기서 찍는다(E3-6). 전이 include에 기대지
 // 않는다 — 이 저장소는 그 함정으로 비유니티 빌드가 두 번 깨졌다.
-#include <iostream>
 // 파이프라인 노드 목록을 줄 단위로 쪼갠다(E4 게이트).
-#include <sstream>
-#include <stdexcept>
 
 namespace
 {
 	/// 창 핸들. 디바이스가 아니라 창이 창을 안다(2026-08-10).
 	HWND PlayerWindowHandle()
 	{
-		auto* window = CoreWindow::GetForCurrentInstance();
+		auto* window = WindowsCoreWindow::GetForCurrentInstance();
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
 
@@ -462,7 +457,8 @@ void Player::PlayerMain::StopPresentationThread()
 
 void Player::PlayerMain::PresentationThreadMain()
 {
-	const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+	const HRESULT comResult = apartmentScope.result;
 	{
 		std::lock_guard<std::mutex> lock(m_presentationMutex);
 		m_presentationThreadStartFailed = FAILED(comResult);
@@ -528,7 +524,6 @@ void Player::PlayerMain::PresentationThreadMain()
         PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
     }
 
-	CoUninitialize();
 }
 
 void Player::PlayerMain::NotifyDisplayAvailable()
@@ -716,7 +711,6 @@ void Player::PlayerMain::Update()
 	// 전용 RenderThread는 밀봉된 packet/delta만 소비하므로 씬 구조 변경을 위해
 	// 세울 필요가 없다. 이 함수가 끝난 뒤 PlayerApp이 새 frame을 발행한다.
 	SceneManagers->ApplyPendingSceneStructureChange();
-	CoroutineManagers->yield_OnRender();
 	SceneManagers->DisableOrEnable();
 	SceneManagers->EndOfFrame();
 	SceneManagers->CollectManagedAtFrameBoundary();

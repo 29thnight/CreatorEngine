@@ -4,7 +4,7 @@
 #include "../../RenderTests/ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "../../RenderTests/ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 
-#include <exception>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace EditorCommandlets
 {

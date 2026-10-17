@@ -3,8 +3,7 @@
 #include "CameraComponent.h"
 #include "Entity.h"
 #include "Scene.h"
-#include <algorithm>
-#include <limits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void CameraComponent::OnAddedToScene()
 {

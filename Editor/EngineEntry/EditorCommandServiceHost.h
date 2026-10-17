@@ -10,7 +10,7 @@
 // 전부 여기서 한다. 서비스는 그 두 타입을 모른다. LC8 의 Player 는 같은
 // 인터페이스에 자기 어댑터를 끼운다.
 
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace EditorCommandService
 {

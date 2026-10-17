@@ -3,11 +3,7 @@
 #include "../../Graph/ShadowCasterBounds.h"
 
 #include <mathematics/transform.hpp>
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <span>
-#include <stdexcept>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
 {

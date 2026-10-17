@@ -6,10 +6,7 @@
 #include "Texture.h"
 #include "PathFinder.h"
 
-#include <cstdio>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 텍스처 코덱 경계 — DX12/Vulkan 업로드 A/B 다이제스트 대조.
 //

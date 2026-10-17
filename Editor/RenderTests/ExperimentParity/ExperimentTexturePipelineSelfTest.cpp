@@ -1,4 +1,5 @@
 #include "ExperimentParity/ExperimentTexturePipelineSelfTest.h"
+#include "../../../Engine/Utility_Framework/WindowsApartment.h"
 
 #include "Experiment/Cooked/CookedTexture.h"
 #include "Experiment/Cooked/CookedTerrain.h"
@@ -8,16 +9,8 @@
 #include <DirectXTex.h>
 #include <objbase.h>
 
-#include <algorithm>
-#include <array>
-#include <bit>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <cstring>
-#include <span>
-#include <string>
-#include <vector>
+#include <stdint.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -215,19 +208,13 @@ namespace RenderTest
         outLog += "  PHASE 12 texture pipeline byte/quality contracts\n";
         TexturePipelineChecker check{ outLog };
         std::string failure;
-        struct TexturePipelineApartment final
-        {
-            HRESULT result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
-            ~TexturePipelineApartment()
-            {
-                if (SUCCEEDED(result))
-                {
-                    CoUninitialize();
-                }
-            }
-        } apartment;
-        check.Check(SUCCEEDED(apartment.result) || apartment.result == RPC_E_CHANGED_MODE,
+        const ce::platform::windows::apartment_scope apartment{ ce::platform::windows::apartment_model::current_or_mta };
+        check.Check(SUCCEEDED(apartment.result),
             "source-codec test COM initialization succeeds");
+        if (FAILED(apartment.result))
+        {
+            return false;
+        }
         auto authoredImage = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 2u, 2u, 1u, 1u);
         const auto authoredTexture = Texture::CreateSharedFromCookedImage(
             "AuthoredPolicy", std::move(authoredImage), ck::CookedTextureInfo{ false, true });

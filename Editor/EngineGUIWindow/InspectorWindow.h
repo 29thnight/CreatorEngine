@@ -5,7 +5,7 @@
 #include "CurvePoint.h"
 #include "EditorPropertyRow.h" // 배치 계약 (W2-I2)
 #include "EntityHandle.h"
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "EditorComponentCatalog.h"
 
 class Entity;

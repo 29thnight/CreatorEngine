@@ -1,10 +1,6 @@
 #include "EditorPanelCost.h"
 
-#include <algorithm>
-#include <chrono>
-#include <mutex>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

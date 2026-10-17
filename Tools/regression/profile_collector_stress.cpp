@@ -1,13 +1,7 @@
 // Long-running collector boundary probe. One process owns all intentionally
 // abandoned streams and exits after checking that shutdown did not race a writer.
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <functional>
-#include <thread>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ProfileScope.h"
 #include "ProfileService.h"

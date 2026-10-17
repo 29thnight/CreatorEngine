@@ -3,9 +3,7 @@
 #include "SceneManager.h"
 #include "EditorProjectLayerSettings.h"
 #include "ReflectionUndo.h"
-#include <algorithm>
-#include <cstdio>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace EditorProjectOperations
 {

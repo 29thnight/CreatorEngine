@@ -1,8 +1,7 @@
 #include "EnhancedTemporalInputsPass.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../RHI/RHIEncoder.h"
-#include <bit>
-#include <stdexcept>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 bool EnhancedTemporalInputsPass::Initialize(const EnhancedFrameContext& context, std::string& error)
 {

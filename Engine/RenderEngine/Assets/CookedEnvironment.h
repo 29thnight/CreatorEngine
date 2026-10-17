@@ -1,9 +1,7 @@
 #pragma once
 #include "../TextureImage.h"
 #include "Sha256.h"
-#include <array>
-#include <filesystem>
-#include <string>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

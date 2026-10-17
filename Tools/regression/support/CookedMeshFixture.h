@@ -8,12 +8,7 @@
 #include "Experiment/Import/MeshLodBuilder.h"
 #include "RHI/IRenderDeviceServices.h"
 
-#include <algorithm>
-#include <cstdint>
-#include <deque>
-#include <span>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // METEOR Scene draws only granular geometry with current cooked meshlets. Test
 // fixtures author meshes as loose vertex/index views; CookMeshFixture copies
@@ -195,6 +190,14 @@ public:
         return true;
     }
 
+    bool AdoptStream(own::shared_owner<assets::ModelMeshDescriptor> descriptor, RHIModelMeshView& view, std::string& error)
+    {
+        CookedMeshFixture entry; entry.descriptor = std::move(descriptor);
+        if (!entry.descriptor || !BuildRHIModelMeshView(*entry.descriptor, entry.view) || !entry.view.StreamMetadata())
+        { error = "Cold fixture lost its exact streamed descriptor identity"; return false; }
+        view = entry.view; m_meshes.push_back(std::move(entry)); return true;
+    }
+
     // Pins each cooked mesh that a draw references, once. Loose and foreign
     // views are left out, so the seal still rejects them.
     template <class Draws>
@@ -212,7 +215,7 @@ public:
             if (mesh == m_meshes.end())
                 continue;
             descriptors.meshes.push_back(mesh->descriptor);
-            geometry.entries.push_back({mesh->view.handle, mesh->payload});
+            if (mesh->payload) geometry.entries.push_back({mesh->view.handle, mesh->payload});
         }
     }
 

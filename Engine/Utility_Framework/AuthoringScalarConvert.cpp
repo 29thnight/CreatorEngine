@@ -1,10 +1,6 @@
 #include "AuthoringScalarConvert.h"
 
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <limits>
-#include <sstream>
+#include "StandardLibrary.h"
 
 namespace Authoring::Scalar
 {

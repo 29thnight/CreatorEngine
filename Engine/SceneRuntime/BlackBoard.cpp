@@ -5,7 +5,7 @@
 #include "SceneManager.h"
 #include "Interfaces/AssetAuthoringPort.h"
 
-#include <sstream>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Windows.h>
-#include <cstdint>
+#include "StandardLibrary.h"
 
 // Shared only by the crashed runtime and its launcher in --crash-reporter mode.
 // The launcher checks size/version before reading any payload from the mapping.

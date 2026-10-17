@@ -5,8 +5,8 @@
 #include "MaterialGraphSceneInput.h"
 #include "RHI/ModelVertexInputLayout.h"
 
-#include <cstring>
-#include <string>
+#include <stddef.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 
 namespace

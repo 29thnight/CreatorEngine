@@ -7,9 +7,7 @@
 #include <d3d12.h>
 #include <dxgi1_4.h>
 #include <wrl/client.h>
-#include <cstdint>
-#include <string>
-#include <unordered_map>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 /// DEFAULT buffer용 ID3D12Heap + placed resource adapter.
 /// resource object는 Allocation이 소유하고, heap block은 resource를 먼저 놓은 뒤

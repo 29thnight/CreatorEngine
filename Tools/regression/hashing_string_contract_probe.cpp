@@ -32,15 +32,8 @@
 
 #include "HashingString.h"
 
-#include <cstdio>
-#include <cstring>
-#include <map>
-#include <string>
-#include <string_view>
-#include <type_traits>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace {
 

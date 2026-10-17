@@ -5,8 +5,7 @@
 #include "EntityHandle.h"
 #include "SceneGC.h"
 #include <mathematics/vector3.hpp>
-#include <memory>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 class GizmoRenderer;
 class Entity;

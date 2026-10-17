@@ -7,13 +7,7 @@
 // 누락 계수(DroppedNames)는 이 설계에서 **개념 자체가 없다**.
 //
 // 층 B(STL 표기, snake_case) — CodingConventions §4·§5.4.
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce
 {

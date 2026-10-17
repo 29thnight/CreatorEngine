@@ -3,11 +3,7 @@
 #include "RHI/IDisplayPresentationSink.h"
 
 #include <Windows.h>
-#include <atomic>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Player
 {

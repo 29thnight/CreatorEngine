@@ -1,6 +1,5 @@
 #pragma once
-#include <string>
-#include <filesystem>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Authoring { class WriteNode; }
 extern void DrawYamlNodeEditor(Authoring::WriteNode node,

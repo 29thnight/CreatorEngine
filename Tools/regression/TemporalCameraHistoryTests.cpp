@@ -2,7 +2,8 @@
 // Link the production Camera implementation and its ordinary RenderEngine
 // dependencies. This checks the producer/predicate contract, not SDK pixels.
 #include "../../Engine/RenderEngine/Camera.h"
-#include <cstdio>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

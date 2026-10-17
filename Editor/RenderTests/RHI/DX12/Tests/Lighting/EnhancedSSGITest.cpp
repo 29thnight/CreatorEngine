@@ -9,9 +9,7 @@
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Render/Passes/Lighting/EnhancedSSGIShaders.h"
 #include "RHI/RHIShaderCompiler.h"
-#include <algorithm>
-#include <cmath>
-#include <sstream>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 namespace

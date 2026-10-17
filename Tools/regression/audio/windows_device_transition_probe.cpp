@@ -2,10 +2,8 @@
 #include "../audio_voice_contract_probe.cpp"
 #undef main
 
-#include <chrono>
-#include <cstdio>
-#include <fstream>
-#include <thread>
+#include <stdio.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

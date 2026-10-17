@@ -1,6 +1,6 @@
 #pragma once
 #include "../RHIQueueRecorder.h"
-#include <algorithm>
+#include "../../../Utility_Framework/StandardLibrary.h"
 class DX12DeviceResources;
 
 class DX12QueueRecorder final : public IRHIQueueRecorder

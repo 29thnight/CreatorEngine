@@ -1,4 +1,5 @@
 // Source-only opt-in Windows regression harness. NOT built or run in this change.
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 // Compile this translation unit INSTEAD OF AssetSetBuild.cpp and link the
 // AssetCooker native dependencies plus the offline TextureCooker.cpp object;
 // RenderEngine.lib deliberately contains no image SDK cooker. Including this
@@ -230,9 +231,9 @@ assets:
 
 int main()
 {
-    const auto com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+    const HRESULT com = apartmentScope.result;
     if (FAILED(com)) return 1;
-    struct ComScope final { ~ComScope() { CoUninitialize(); } } comScope;
     const auto work = std::filesystem::temp_directory_path() /
         ("asset-set-receipt-probe-" + std::to_string(GetCurrentProcessId()) + "-" +
             std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));

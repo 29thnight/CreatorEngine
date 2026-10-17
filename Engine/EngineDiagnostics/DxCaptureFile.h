@@ -1,12 +1,7 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <expected>
-#include <filesystem>
-#include <memory>
-#include <span>
-#include <vector>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "DxCaptureProtocol.h"
 

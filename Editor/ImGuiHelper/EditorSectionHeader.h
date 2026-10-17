@@ -37,7 +37,7 @@
 // 경로를 "된다" 고 적을 수는 없다. 필요해지면 `BeginDisabled` 로 감싸는
 // 한 겹이다.
 
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::widgets
 {

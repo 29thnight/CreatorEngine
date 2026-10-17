@@ -41,7 +41,8 @@
 #include "EditorChromeSnapshot.h"   // PHASE 21 W0: editor.dock/theme/layout
 #include "EditorThemeSelfTest.h"
 
-#include <span>
+#include <stdio.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RegisterEditorMenuManual.h"
 #include "CommandSupport.h"
 
@@ -126,7 +127,7 @@
 #include "AuthoringParsedDocument.h"
 #include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -160,32 +161,12 @@
 #include <Windows.h>
 #include <psapi.h> // MBC11: peak working set
 #include <crtdbg.h>
-#include <algorithm>
-#include <atomic>
-#include <cctype>
-#include <limits>
-#include <random>
-#include <stdexcept>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <DbgHelp.h>
 #include <DXProgrammableCapture.h>
-#include <chrono>
 #include <dxgidebug.h>
 #include <wrl/client.h>
-#include <algorithm>
-#include <cstring>
-#include <cstdlib>
-#include <cstdio>
-#include <fstream>
-#include <functional>
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
-#include <unordered_set>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
 
 namespace ConsoleCmd
 {
@@ -547,7 +528,7 @@ namespace ConsoleCmd
 
         // Resize the host window even when it is hidden for an offscreen probe.
         // Active/visible window lookup loses that window and can select a dialog.
-        const auto* window = CoreWindow::GetForCurrentInstance();
+        const auto* window = WindowsCoreWindow::GetForCurrentInstance();
         const HWND hwnd = window ? window->GetHandle() : nullptr;
         if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return PreconditionFailed("window.unavailable", "No editor window"); }
 
@@ -606,7 +587,7 @@ namespace ConsoleCmd
         data.Set("height", CommandData::Int(clientH));
         // The screen-size bus follows the rendered viewport. Retain its legacy
         // fields and report the actual host client rect separately for restore.
-        const auto* window = CoreWindow::GetForCurrentInstance();
+        const auto* window = WindowsCoreWindow::GetForCurrentInstance();
         RECT hostClient{};
         const bool hostKnown = window && ::GetClientRect(window->GetHandle(), &hostClient);
         data.Set("hostClientKnown", CommandData::Bool(hostKnown));

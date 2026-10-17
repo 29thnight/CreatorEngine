@@ -1,8 +1,8 @@
 
 #include "DX12PersistentHeap.h"
 
-#include <algorithm>
-#include <sstream>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

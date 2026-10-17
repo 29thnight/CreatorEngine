@@ -3,7 +3,7 @@
 #include "PlaybackService.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 
-#include <array>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

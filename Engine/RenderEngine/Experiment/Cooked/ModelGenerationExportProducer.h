@@ -19,12 +19,7 @@
 
 #include "CookedAssetManifest.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

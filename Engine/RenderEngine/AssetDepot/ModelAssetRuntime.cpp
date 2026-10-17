@@ -1,16 +1,10 @@
+#include "../Assets/ModelCpuGeometryPayload.h"
 #include "ModelAssetRuntime.h"
 #include "../DataSystem.h"
 #include "../Assets/ModelAnimationSampler.h"
 
-#include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <stdexcept>
-#include <exception>
-#include <limits>
-#include <set>
-#include <type_traits>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Contract.h"
 
 namespace
 {
@@ -115,22 +109,8 @@ namespace
     }
 
     template<class T, class Visit>
-    void VisitModelFlights(const own::shared_owner<AssetDepot::ModelAssetWork<T>>& tail, const Visit& visit)
-    {
-        auto work = tail;
-        while (work)
-        {
-            visit(work);
-            if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
-            {
-                work = work->dependencies.predecessor;
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
+    void VisitModelFlights(const own::shared_owner<AssetDepot::ModelAssetWork<T>>& work, const Visit& visit)
+    { if (work) visit(work); }
 
     bool SupportedModelRepresentation(const model_cooked::ResolvedAssetEntry& resolved)
     {
@@ -475,9 +455,43 @@ namespace
         std::string& failure)
     {
         model_cooked::ModelGeometryArtifact decoded;
-        if (!model_cooked::ReadModelGeometryArtifact(bytes, decoded, failure))
+        if (!model_cooked::ExpandModelGeometryPages(bytes, decoded, failure))
         {
             return {};
+        }
+        if (decoded.mesh.clusterArchive && resolved.byteSource)
+        {
+            auto archive = std::make_shared<assets::cluster::Archive>(*decoded.mesh.clusterArchive);
+            std::vector<model_cooked::Sha256Digest> hashes;
+            for (const auto& packet : archive->packets)
+            {
+                model_cooked::Sha256Digest hash{};
+                if (!model_cooked::ComputeSha256(packet, hash, failure))
+                {
+                    return {};
+                }
+                hashes.push_back(hash);
+            }
+            archive->pageReader = [source = resolved.byteSource, path = resolved.blob.artifactPath,
+                offsets = archive->fileOffsets, sizes = archive->packetSizes, hashes = std::move(hashes)](uint32_t page) {
+                assets::quantized::Require(page < offsets.size() && page < sizes.size(), "Cluster artifact page range");
+                std::vector<std::byte> packet(sizes[page]);
+                std::string error;
+                model_cooked::Sha256Digest hash{};
+                if (!source->ReadAt(path, offsets[page], packet, error) ||
+                    !model_cooked::ComputeSha256(packet, hash, error) || hash != hashes[page])
+                {
+                    throw std::runtime_error("Cluster artifact page read/hash failed: " + error);
+                }
+                return packet;
+            };
+            // Exact captured loose/pak backing remains owned by pageReader.
+            // Only admitted pages retain compressed CPU bytes after decoding.
+            for (auto& packet : archive->packets)
+            {
+                std::vector<std::byte>().swap(packet);
+            }
+            decoded.mesh.clusterArchive = std::move(archive);
         }
         auto result = own::make_shared<assets::ModelGeometryPayload>();
         result->key = GeometryKey(resolved);
@@ -495,6 +509,7 @@ namespace
         mesh.bounds = decoded.mesh.bounds;
         mesh.meshlets = std::move(decoded.mesh.meshlets);
         mesh.coarseLods = std::move(decoded.mesh.coarseLods);
+        mesh.clusterArchive = std::move(decoded.mesh.clusterArchive);
         result->meshletSummary = MeshletSummary(mesh.meshlets);
         for (std::size_t index = 0u; index < mesh.coarseLods.levels.size(); ++index)
         {
@@ -515,6 +530,19 @@ namespace
             charge = AddModelCharge(charge, lod.indices.capacity() * sizeof(std::uint32_t));
             charge = AddModelCharge(charge, MeshletDynamicCharge(lod.meshlets));
         }
+        if (mesh.clusterArchive)
+        {
+            const auto& archive = *mesh.clusterArchive;
+            charge = AddModelCharge(charge, sizeof(assets::cluster::Archive));
+            charge = AddModelCharge(charge, archive.packets.capacity() * (sizeof(std::vector<std::byte>) + sizeof(model_cooked::Sha256Digest)));
+            charge = AddModelCharge(charge, archive.fileOffsets.capacity() * sizeof(uint64_t));
+            charge = AddModelCharge(charge, archive.packetSizes.capacity() * sizeof(uint32_t));
+            charge = AddModelCharge(charge, (archive.grid.origin.capacity() + archive.grid.step.capacity()) * sizeof(float));
+            for (const auto& packet : archive.packets)
+            {
+                charge = AddModelCharge(charge, packet.capacity());
+            }
+        }
         result->decodedBytes = charge;
         return result;
     }
@@ -528,62 +556,9 @@ namespace
             static_cast<std::uint32_t>(meshlets.primitiveRemap.size()), meshlets.lod0, MeshletLocalBounds(meshlets) };
     }
 
-    own::shared_owner<const assets::ModelMeshDescriptor> DescribeModelGeometry(
-        model_cooked::ResolvedAssetEntry resolved,
-        const assets::ModelGeometryPayload& geometry,
-        own::shared_owner<const assets::ModelSkeletonPayload> skeleton,
-        Error& error, std::string& failure)
-    {
-        if (!geometry.byteSource || geometry.key != GeometryKey(resolved))
-        {
-            error = Error::IntegrityFailed;
-            failure = "Mesh descriptor and compatible raw decode identities differ.";
-            return {};
-        }
-        // Logical identity/closure stay on this descriptor. Canonical content
-        // backing is copied as a matched locator/source pair, already captured
-        // and SHA-verified by the joined raw read. Never mix source A with path B.
-        // This joins reads as well as decode for same- or cross-source aliases.
-        resolved.blob.artifactPath = geometry.artifactPath;
-        resolved.byteSource = geometry.byteSource;
-        const bool skinned = assets::Has(geometry.mesh.vertexAttributeMask, assets::VertexAttribute::BoneIndices);
-        if ((!skinned && (!HasNoHardDependencies(resolved) || skeleton))
-            || (skinned && (!skeleton || !ValidateClipDependency(resolved, skeleton->origin)
-                || geometry.requiredBoneCount != skeleton->skeleton.bones.size()
-                || geometry.requiredSkinBindingSha256 != skeleton->skinBindingSha256)))
-        {
-            error = Error::DependencyFailed;
-            failure = "Mesh hard dependency does not match its exact full skin binding.";
-            return {};
-        }
-        auto result = own::make_shared<assets::ModelMeshDescriptor>();
-        result->origin = std::move(resolved);
-        result->geometryKey = geometry.key;
-        result->meshId = result->origin.entry.asset.key.assetId.value;
-        const auto& mesh = geometry.mesh;
-        result->vertexAttributeMask = mesh.vertexAttributeMask;
-        result->vertexStride = mesh.vertexStride;
-        result->vertexLayoutHash = mesh.vertexLayoutHash;
-        result->vertexCount = static_cast<std::uint32_t>(mesh.vertexBytes.size() / mesh.vertexStride);
-        result->indexCount = static_cast<std::uint32_t>(mesh.indices.size());
-        result->bounds = mesh.bounds;
-        result->skinned = skinned;
-        result->requiredBoneCount = geometry.requiredBoneCount;
-        result->requiredSkinBindingSha256 = geometry.requiredSkinBindingSha256;
-        result->skeleton = std::move(skeleton);
-        result->meshlets = geometry.meshletSummary;
-        result->lodSettings = mesh.coarseLods.settings;
-        result->lodGeometryDigest = mesh.coarseLods.geometryDigest;
-        result->coarseLodCount = static_cast<std::uint32_t>(mesh.coarseLods.levels.size());
-        for (std::size_t index = 0u; index < mesh.coarseLods.levels.size(); ++index)
-        {
-            result->coarseLods[index] = geometry.lodSummaries[index];
-        }
-        auto charge = AddModelCharge(sizeof(assets::ModelMeshDescriptor), ModelOriginDynamicCharge(result->origin));
-        charge = AddModelCharge(charge, result->geometryKey.targetPlatform.capacity());
-        result->metadataBytes = AddModelCharge(charge, result->geometryKey.targetAbi.capacity());
-        return result;
-    }
+
+
+    #include "ModelStreamDescriptor.inl"
 
     own::shared_owner<const assets::ModelAnimationDescriptor> DecodeModelDescriptor(
         const model_cooked::ResolvedAssetEntry& resolved, std::span<const std::byte> bytes,
@@ -721,7 +696,11 @@ namespace
             if (retired)
             {
                 // Caller stages capacity before changing publication/budget.
-                assert(retired->size() < retired->capacity());
+                ::ce::contracts::assert_that(
+                    [&]() -> bool {
+                        return static_cast<bool>((retired->size() < retired->capacity()));
+                    },
+                    "retired->size() < retired->capacity()");
                 retired->push_back(std::move(oldest->second.retained));
             }
             else
@@ -984,128 +963,70 @@ AssetDepot::AssetRequest<T> DataSystem::RequestResolvedModelAssetAsync(
     return request;
 }
 
-AssetDepot::AssetRequest<assets::ModelGeometryPayload> DataSystem::RequestModelColliderGeometry(
+AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload> DataSystem::RequestModelColliderGeometry(
     model_cooked::ResolvedAssetEntry resolved,
     AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> descriptor, std::uint64_t epoch,
     assets::ModelColliderPreparationPolicy colliderPolicy)
 {
-    using Payload = assets::ModelGeometryPayload;
+    using Payload = assets::ModelCpuGeometryPayload;
     auto consumer = own::make_shared<AssetDepot::AssetRequestState<Payload>>(m_assetRequestCounters);
     AssetDepot::AssetRequest<Payload> request(consumer);
-    own::shared_owner<AssetDepot::ModelAssetWork<Payload>> work;
-    const auto knownRoot = descriptor.Snapshot();
-    std::lock_guard lock(m_assetPreparationMutex);
-    const auto fail = [&](Status status, Error error)
-    {
-        NotifyModelConsumer(consumer, status, error, {});
-        return request;
+    const auto finish = [consumer](Status status, Error error, own::shared_owner<const Payload> payload, std::string message = {}) {
+        std::lock_guard lock(consumer->mutex);
+        if (consumer->status != Status::Pending) return;
+        consumer->asset = std::move(payload); consumer->error = error; consumer->message = std::move(message);
+        consumer->SetTerminalLocked(status);
     };
-    if (m_assetPreparationStopping)
-    {
-        return fail(Status::Cancelled, Error::ShuttingDown);
-    }
-    if (m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch ||
-        resolved.resolverRevision != m_assetDepotRevision)
-    {
-        return fail(Status::Stale, Error::RevisionChanged);
-    }
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping) { finish(Status::Cancelled,Error::ShuttingDown,{}); return request; }
+    if (epoch != m_assetPreparationEpoch || m_assetInvalidationDepth || resolved.resolverRevision != m_assetDepotRevision)
+    { finish(Status::Stale,Error::RevisionChanged,{}); return request; }
     if (!SupportedModelRepresentation(resolved) || resolved.entry.asset.kind != model_cooked::CookedAssetKind::Mesh)
-    {
-        return fail(Status::Failed, Error::UnsupportedRepresentation);
-    }
+    { finish(Status::Failed,Error::UnsupportedRepresentation,{}); return request; }
     if (colliderPolicy == assets::ModelColliderPreparationPolicy::Disabled)
-    {
-        return fail(Status::Cancelled, Error::None);
-    }
-    if (knownRoot.status == Status::Ready && knownRoot.asset)
-    {
-        if (knownRoot.asset->origin.resolverRevision != resolved.resolverRevision)
-        {
-            return fail(Status::Stale, Error::RevisionChanged);
-        }
-        if (!assets::ShouldPrepareModelCollider(colliderPolicy, knownRoot.asset->summary.createMeshCollider) ||
-            !knownRoot.asset->Instantiates(resolved.entry.asset.key.assetId))
-        {
-            // Resident root metadata can decline the optional request before
-            // even creating a flight or pinning an existing geometry payload.
-            return fail(Status::Cancelled, Error::None);
-        }
-    }
-    try
-    {
-        if (m_modelAssets.nextRequestId == (std::numeric_limits<std::uint64_t>::max)())
-        {
-            return fail(Status::Failed, Error::SubmissionFailed);
-        }
-        work = own::make_shared<AssetDepot::ModelAssetWork<Payload>>();
-        work->key = ModelKey<Payload>(resolved, true);
-        work->resolved = std::move(resolved);
-        work->epoch = epoch;
-        work->requestId = m_modelAssets.nextRequestId++;
-        work->dependencies.colliderOnly = true;
-        work->dependencies.colliderDescriptor = std::move(descriptor);
-        work->dependencies.colliderMesh = work->resolved.entry.asset.key.assetId;
-        work->dependencies.colliderPolicy = colliderPolicy;
-        work->dependencies.colliderConsumers.emplace_back(consumer);
-        std::vector<job_handle> dependencies;
-        const auto rootCompletion = work->dependencies.colliderDescriptor.Completion();
-        if (rootCompletion.valid())
-        {
-            dependencies.push_back(rootCompletion);
-        }
-        auto& cache = m_modelAssets.geometry;
-        cache.works.emplace_back(work);
-        auto& entry = cache.entries[work->key];
-        if (entry.inFlight)
-        {
-            // Different model roots must keep distinct decisions and fixed
-            // tokens. Serialize their conditional flights by content key and
-            // keep the predecessor result for a zero-budget positive handoff.
-            work->dependencies.predecessor = entry.inFlight;
-            if (entry.inFlight->completion.valid())
-            {
-                dependencies.push_back(entry.inFlight->completion);
-            }
-        }
-        entry.inFlight = work;
-        entry.lastUse = ++m_modelAssets.clock;
-        ModelSubmissionScope submitting(work->requestId);
+    { finish(Status::Cancelled,Error::None,{}); return request; }
+    job_group jobs;
+    jobs.add([this,consumer,finish,resolved = std::move(resolved),descriptor,epoch,colliderPolicy]() mutable {
         try
         {
-            job_group jobs;
-            jobs.add([this, work]() { RunModelAssetWork(work); });
-            jobs.on_complete([this, work](std::exception_ptr failure)
-            {
-                const auto finish = [&]()
-                {
-                    CompleteModelAssetWorkLocked(work, Status::Failed,
-                        failure ? Error::SubmissionFailed : Error::DecodeFailed);
-                };
-                if (ModelSubmittingRequestId == work->requestId)
-                {
-                    finish();
-                }
-                else
-                {
-                    std::lock_guard completionLock(m_assetPreparationMutex);
-                    finish();
-                }
-            });
-            work->completion = SubmitAssetWorkLocked(std::move(jobs), dependencies, true);
+            { std::lock_guard lock(consumer->mutex); if (consumer->status != Status::Pending) return; }
+            const auto root = descriptor.Snapshot();
+            if (root.status != Status::Ready || !root.asset) { finish(Status::Failed,Error::DependencyFailed,{},root.message); return; }
+            if (root.asset->origin.resolverRevision != resolved.resolverRevision)
+            { finish(Status::Stale,Error::RevisionChanged,{}); return; }
+            if (!assets::ShouldPrepareModelCollider(colliderPolicy,root.asset->summary.createMeshCollider) ||
+                !root.asset->Instantiates(resolved.entry.asset.key.assetId))
+            { finish(Status::Cancelled,Error::None,{}); return; }
+            std::shared_ptr<const model_cooked::ModelGeometryStreamMetadata> metadata; std::string error;
+            if (!model_cooked::LoadModelGeometryStreamMetadata(resolved,metadata,error) || !metadata->cpuReader)
+            { finish(Status::Failed,Error::IntegrityFailed,{},error); return; }
+            auto result = own::make_shared<Payload>(); result->key = GeometryKey(resolved);
+            const auto bytes = metadata->cpuReader();
+            if (!assets::cpu_geometry::Decode(bytes,result->geometry,error) ||
+                result->geometry.positions.size() != metadata->vertexCount || result->geometry.indices.size() != metadata->counts[0].indexCount)
+            { finish(Status::Failed,Error::DecodeFailed,{},error); return; }
+            std::lock_guard publication(m_assetPreparationMutex);
+            if (m_assetPreparationStopping) { finish(Status::Cancelled,Error::ShuttingDown,{}); return; }
+            if (epoch != m_assetPreparationEpoch || m_assetInvalidationDepth || result->key != GeometryKey(resolved) ||
+                resolved.resolverRevision != m_assetDepotRevision)
+            { finish(Status::Stale,Error::RevisionChanged,{}); return; }
+            finish(Status::Ready,Error::None,std::move(result));
         }
-        catch (...)
-        {
-            CompleteModelAssetWorkLocked(work, Status::Failed, Error::SubmissionFailed);
-        }
-        consumer->completion = work->completion;
-    }
-    catch (...)
+        catch (const std::exception& error) { finish(Status::Failed,Error::ReadFailed,{},error.what()); }
+    });
+    jobs.on_complete([finish](std::exception_ptr failure) {
+        if (failure) finish(Status::Failed,Error::SubmissionFailed,{},"Exact CPU geometry work failed");
+    });
+    try
     {
-        return fail(Status::Failed, Error::SubmissionFailed);
+        const auto dependency = descriptor.Completion();
+        const std::array dependencies{dependency};
+        auto completion = SubmitAssetWorkLocked(std::move(jobs),dependency.valid() ? std::span<const job_handle>(dependencies) : std::span<const job_handle>{},true);
+        std::lock_guard stateLock(consumer->mutex); consumer->completion = std::move(completion);
     }
+    catch (...) { finish(Status::Failed,Error::SubmissionFailed,{}); }
     return request;
 }
-
 template<class T>
 own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWorkLocked(
     const model_cooked::ResolvedAssetEntry& resolved,
@@ -1121,28 +1042,7 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
     if (previous != cache.entries.end() && previous->second.inFlight)
     {
         previous->second.lastUse = ++m_modelAssets.clock;
-        if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
-        {
-            // A queued conditional gate need not delay an ordinary consumer
-            // when an earlier flight has already published compatible data.
-            if (previous->second.retained || !previous->second.live.expired())
-            {
-                // Allocate/register before a weak upgrade, which could become
-                // the last resident owner while another thread drops its pin.
-                auto ready = own::make_shared<AssetDepot::ModelAssetWork<T>>();
-                ready->key = key;
-                cache.works.emplace_back(ready);
-                ready->asset = previous->second.retained ? previous->second.retained : previous->second.live.lock();
-                if (ready->asset)
-                {
-                    ready->status = Status::Ready;
-                    return ready;
-                }
-            }
-            // This is ordinary descriptor/payload demand, never an optional
-            // collider subscriber. Admission and the skip decision share a lock.
-            previous->second.inFlight->dependencies.ordinaryDemand = true;
-        }
+
         return previous->second.inFlight;
     }
     auto work = own::make_shared<AssetDepot::ModelAssetWork<T>>();
@@ -1182,17 +1082,6 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
                 {
                     dependencies.push_back(work->dependencies.skeletonWork->completion);
                 }
-            }
-        }
-        if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
-        {
-            // Accepted compatible raw work survives current-link invalidation. Each
-            // bound descriptor still revalidates its own revision before publishing.
-            work->dependencies.geometryWork = StartModelAssetWorkLocked<assets::ModelGeometryPayload>(
-                resolved, {}, true, epoch, {});
-            if (work->dependencies.geometryWork->completion.valid())
-            {
-                dependencies.push_back(work->dependencies.geometryWork->completion);
             }
         }
         if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>
@@ -1262,60 +1151,13 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         own::shared_owner<const assets::ModelSkeletonPayload> skeleton;
         own::shared_owner<const assets::ModelSkeletonStorage> skeletonStorage;
         own::shared_owner<const assets::ModelAnimationStorage> animationStorage;
-        own::shared_owner<const assets::ModelGeometryPayload> geometry;
-        own::shared_owner<AssetDepot::ModelAssetWork<assets::ModelGeometryPayload>> predecessor;
-        AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> colliderRequest;
-        AssetDepot::AssetRequestSnapshot<assets::ModelAnimationDescriptor> colliderRoot;
         {
             std::lock_guard lock(m_assetPreparationMutex);
             if (work->status != Status::Pending)
             {
                 return;
             }
-            if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
-            {
-                auto& demand = work->dependencies;
-                if (demand.colliderOnly)
-                {
-                    colliderRequest = std::move(demand.colliderDescriptor);
-                    colliderRoot = colliderRequest.Snapshot();
-                    demand.colliderGateEvaluated = true;
-                    demand.colliderRequired = colliderRoot.status == Status::Ready && colliderRoot.asset &&
-                        assets::ShouldPrepareModelCollider(
-                            demand.colliderPolicy, colliderRoot.asset->summary.createMeshCollider) &&
-                        colliderRoot.asset->Instantiates(demand.colliderMesh);
-                    // All predecessor callbacks are complete. A queued later
-                    // gate owns the handoff chain, including across a false
-                    // intermediate gate. The tail releases it outside the lock.
-                    predecessor = demand.predecessor;
-                    const auto entry = m_modelAssets.geometry.entries.find(work->key);
-                    if (entry != m_modelAssets.geometry.entries.end() && entry->second.inFlight &&
-                        entry->second.inFlight->requestId == work->requestId)
-                    {
-                        predecessor = std::move(demand.predecessor);
-                    }
-                    if (!demand.ordinaryDemand && !demand.colliderRequired)
-                    {
-                        CompleteModelAssetWorkLocked(work, Status::Cancelled, Error::None);
-                        return;
-                    }
-                    VisitModelFlights(predecessor, [&](const auto& earlier)
-                    {
-                        if (!geometry && earlier->status == Status::Ready)
-                        {
-                            geometry = earlier->asset;
-                        }
-                    });
-                    if (!geometry)
-                    {
-                        const auto found = m_modelAssets.geometry.entries.find(work->key);
-                        if (found != m_modelAssets.geometry.entries.end())
-                        {
-                            geometry = found->second.retained ? found->second.retained : found->second.live.lock();
-                        }
-                    }
-                }
-            }
+
             if (m_assetPreparationStopping
                 || (!work->key.exactGeneration && (m_assetInvalidationDepth != 0u
                     || work->epoch != m_assetPreparationEpoch)))
@@ -1364,18 +1206,7 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
                     animationStorage = dependency->asset;
                 }
             }
-            if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
-            {
-                const auto& dependency = work->dependencies.geometryWork;
-                if (!dependency || dependency->status != Status::Ready || !dependency->asset)
-                {
-                    CompleteModelAssetWorkLocked(work, Status::Failed,
-                        dependency ? dependency->error : Error::DependencyFailed,
-                        dependency ? dependency->message : std::string{});
-                    return;
-                }
-                geometry = dependency->asset;
-            }
+
         }
         std::string failure;
         Error error = Error::None;
@@ -1384,25 +1215,15 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         own::shared_owner<const T> candidate;
         if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
         {
-            candidate = DescribeModelGeometry(work->resolved, *geometry, std::move(skeleton), error, failure);
+            candidate = DecodeModelStreamDescriptor(work->resolved, std::move(skeleton), error, failure, &work->inputStagingBytes);
         }
         else if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
         {
-            if (geometry)
-            {
-                candidate = geometry;
-            }
-            else
-            {
-                ModelStagingCharge inputStaging(work->inputStagingBytes);
-                std::vector<std::byte> bytes;
-                auto resolved = work->resolved;
-                error = ReadModelBytes(resolved, bytes, failure, inputStaging);
-                if (error == Error::None)
-                {
-                    candidate = DecodeModelGeometry(resolved, bytes, failure);
-                }
-            }
+            ModelStagingCharge inputStaging(work->inputStagingBytes);
+            std::vector<std::byte> bytes;
+            auto resolved = work->resolved;
+            error = ReadModelBytes(resolved, bytes, failure, inputStaging);
+            if (error == Error::None) candidate = DecodeModelGeometry(resolved,bytes,failure);
         }
         else if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>)
         {
@@ -1451,9 +1272,8 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         }
         else if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
         {
-            // A collider predecessor/resident handoff reuses an existing owner;
-            // it did not allocate a new candidate and is not decode staging.
-            decodeStaging.Set(!geometry && candidate ? candidate->ByteSize() : 0u);
+            // Expanded current pages are charged until publication.
+            decodeStaging.Set(candidate ? candidate->ByteSize() : 0u);
         }
         std::lock_guard lock(m_assetPreparationMutex);
         CompleteModelAssetWorkLocked(work, error == Error::None ? Status::Ready : Status::Failed,
@@ -1543,25 +1363,7 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
         auto& entry = found->second;
         if (entry.inFlight->requestId == work->requestId)
         {
-            if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
-            {
-                // Inline submission/dependency failure can terminalize a tail
-                // before an older accepted flight. Restore that flight instead
-                // of orphaning its ordinary consumers or marking it stale.
-                own::shared_owner<AssetDepot::ModelAssetWork<T>> pending;
-                VisitModelFlights(work->dependencies.predecessor, [&](const auto& earlier)
-                {
-                    if (!pending && earlier->status == Status::Pending)
-                    {
-                        pending = earlier;
-                    }
-                });
-                entry.inFlight = std::move(pending);
-            }
-            else
-            {
-                entry.inFlight.reset();
-            }
+            entry.inFlight.reset();
         }
         if (asset)
         {
@@ -1586,27 +1388,7 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
         }
     }
     work->consumers.clear();
-    if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
-    {
-        for (const auto& weak : work->dependencies.colliderConsumers)
-        {
-            if (const auto consumer = weak.lock())
-            {
-                if (work->dependencies.colliderGateEvaluated && !work->dependencies.colliderRequired &&
-                    status != Status::Stale && !(status == Status::Cancelled && error == Error::ShuttingDown))
-                {
-                    // A false policy/unused mesh does not pin an ordinary
-                    // descriptor consumer's decoded result merely by joining.
-                    NotifyModelConsumer(consumer, Status::Cancelled, Error::None, {});
-                }
-                else
-                {
-                    NotifyModelConsumer(consumer, status, error, work->message, asset);
-                }
-            }
-        }
-        work->dependencies.colliderConsumers.clear();
-    }
+
     if (retainCandidate)
     {
         TrimModelCache(cache, &work->retiredAssets);
@@ -1831,12 +1613,21 @@ void DataSystem::TrimModelAssetsLocked()
 
 void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEntries& retired)
 {
-    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty()
-        && retired.meshes.empty() && retired.geometry.empty()
-        && retired.skeletonStorage.empty() && retired.animationStorage.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.descriptors.empty() && retired.skeletons.empty() &&
+                                      retired.animations.empty() && retired.meshes.empty() && retired.geometry.empty() &&
+                                      retired.skeletonStorage.empty() && retired.animationStorage.empty()));
+        },
+        "retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty() && retired.meshes.empty() "
+        "&& retired.geometry.empty() && retired.skeletonStorage.empty() && retired.animationStorage.empty()");
     const auto stage = [&](const auto& cache, auto& consumers)
     {
-        assert(consumers.empty());
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((consumers.empty()));
+            },
+            "consumers.empty()");
         std::size_t count{};
         const auto visitConsumers = [&](const auto& flight, const auto& visit)
         {
@@ -1844,14 +1635,7 @@ void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEn
             {
                 visit(weak);
             }
-            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(cache)>,
-                AssetDepot::ModelAssetCache<assets::ModelGeometryPayload>>)
-            {
-                for (const auto& weak : flight->dependencies.colliderConsumers)
-                {
-                    visit(weak);
-                }
-            }
+
         };
         for (const auto& [key, entry] : cache.entries)
         {
@@ -1905,9 +1689,14 @@ void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEn
 
 void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntries& retired) noexcept
 {
-    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty()
-        && retired.meshes.empty() && retired.geometry.empty()
-        && retired.skeletonStorage.empty() && retired.animationStorage.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.descriptors.empty() && retired.skeletons.empty() &&
+                                      retired.animations.empty() && retired.meshes.empty() && retired.geometry.empty() &&
+                                      retired.skeletonStorage.empty() && retired.animationStorage.empty()));
+        },
+        "retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty() && retired.meshes.empty() "
+        "&& retired.geometry.empty() && retired.skeletonStorage.empty() && retired.animationStorage.empty()");
     const auto status = m_assetPreparationStopping ? Status::Cancelled : Status::Stale;
     const auto error = m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged;
     const auto invalidate = [&](auto& cache, auto& detached, const auto& consumers)
@@ -2125,3 +1914,24 @@ INSTANTIATE_MODEL_ASSET(assets::ModelMeshDescriptor)
 template AssetDepot::AssetRequest<assets::ModelGeometryPayload> DataSystem::RequestResolvedModelAssetAsync(
     experiment::cooked::ResolvedAssetEntry, own::shared_owner<const experiment::cooked::CookedAssetCatalog>,
     bool, std::uint64_t, experiment::cooked::ResolvedAssetEntry);
+
+namespace assets
+{
+own::shared_owner<const ModelMeshDescriptor> LoadModelStreamDescriptor(
+    experiment::cooked::ResolvedAssetEntry resolved,
+    own::shared_owner<const ModelSkeletonPayload> skeleton, std::string& failure)
+{
+    Error error{}; std::atomic<std::size_t> staging{};
+    return DecodeModelStreamDescriptor(std::move(resolved), std::move(skeleton), error, failure, &staging);
+}
+own::shared_owner<const ModelSkeletonPayload> LoadModelStreamSkeleton(
+    experiment::cooked::ResolvedAssetEntry resolved, std::string& failure)
+{
+    std::atomic<std::size_t> observed{}; ModelStagingCharge staging(observed);
+    std::vector<std::byte> bytes;
+    if (ReadModelBytes(resolved, bytes, failure, staging) != Error::None) return {};
+    const auto storage = DecodeModelSkeleton(resolved, bytes, failure, staging);
+    if (!storage) return {};
+    return own::make_shared<ModelSkeletonPayload>(storage, std::move(resolved), storage->decodedBytes);
+}
+}

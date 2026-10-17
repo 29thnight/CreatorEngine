@@ -5,16 +5,8 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <limits>
-#include <locale>
-#include <set>
-#include <sstream>
-#include <stdexcept>
-#include <tuple>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -26,9 +18,19 @@ std::string Quote(std::string_view text)
     std::string out = "\"";
     for (unsigned char c : text)
     {
-        if (c == '\"' || c == '\\') { out += '\\'; out += static_cast<char>(c); }
-        else if (c < 32) { out += "\\u00"; out += hex[c >> 4]; out += hex[c & 15]; }
-        else out += static_cast<char>(c);
+        if (c == '\"' || c == '\\')
+        {
+            out += '\\';
+            out += static_cast<char>(c);
+        }
+        else if (c < 32)
+        {
+            out += "\\u00";
+            out += hex[c >> 4];
+            out += hex[c & 15];
+        }
+        else
+            out += static_cast<char>(c);
     }
     return out + '\"';
 }
@@ -42,9 +44,12 @@ const char* ColorSpace(LX::LXColorSpace value)
 {
     switch (value)
     {
-    case LX::LXColorSpace::Data: return "data";
-    case LX::LXColorSpace::Linear: return "linear";
-    case LX::LXColorSpace::SRGB: return "srgb";
+    case LX::LXColorSpace::Data:
+        return "data";
+    case LX::LXColorSpace::Linear:
+        return "linear";
+    case LX::LXColorSpace::SRGB:
+        return "srgb";
     }
     throw std::runtime_error("Unknown Graph color space");
 }
@@ -52,30 +57,42 @@ const char* ColorSpace(LX::LXColorSpace value)
 void Float(std::ostream& out, double value)
 {
     const float narrowed = static_cast<float>(value);
-    if (!std::isfinite(narrowed)) throw std::runtime_error("Graph default exceeds finite float32 range");
+    if (!std::isfinite(narrowed))
+        throw std::runtime_error("Graph default exceeds finite float32 range");
     out << narrowed;
 }
 
 void Default(std::ostream& out, const LX::LXMaterialParameter& p)
 {
-    if (!LX::IsSocketValueValid(p.type, p.value)) throw std::runtime_error("Invalid Graph parameter default");
-    if (p.type == LX::PinType::Bool) out << (std::get<bool>(p.value) ? "true" : "false");
+    if (!LX::IsSocketValueValid(p.type, p.value))
+        throw std::runtime_error("Invalid Graph parameter default");
+    if (p.type == LX::PinType::Bool)
+        out << (std::get<bool>(p.value) ? "true" : "false");
     else if (p.type == LX::PinType::Int)
     {
         const auto value = std::get<std::int64_t>(p.value);
-        if (value < INT32_MIN || value > INT32_MAX) throw std::runtime_error("Graph integer exceeds int32 range");
+        if (value < INT32_MIN || value > INT32_MAX)
+            throw std::runtime_error("Graph integer exceeds int32 range");
         out << value;
     }
-    else if (p.type == LX::PinType::Float) Float(out, std::get<double>(p.value));
+    else if (p.type == LX::PinType::Float)
+        Float(out, std::get<double>(p.value));
     else
     {
         const auto array = [&out](const auto& values) {
             out << '[';
-            for (std::size_t i = 0; i < values.size(); ++i) { if (i) out << ','; Float(out, values[i]); }
+            for (std::size_t i = 0; i < values.size(); ++i)
+            {
+                if (i)
+                    out << ',';
+                Float(out, values[i]);
+            }
             out << ']';
         };
-        if (p.type == LX::PinType::Color) array(std::get<std::array<double, 4>>(p.value));
-        else array(std::get<std::array<double, 3>>(p.value));
+        if (p.type == LX::PinType::Color)
+            array(std::get<std::array<double, 4>>(p.value));
+        else
+            array(std::get<std::array<double, 3>>(p.value));
     }
 }
 
@@ -85,8 +102,8 @@ const LX::LXMaterialParameter* Parameter(const LX::LXMaterialProgram& program, L
     return found == program.parameters.end() ? nullptr : &*found;
 }
 
-std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
-    std::string_view sourceDigest, std::string_view generation, std::span<const ShaderPassDesc> passes)
+std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid, std::string_view sourceDigest,
+                     std::string_view generation, std::span<const ShaderPassDesc> passes)
 {
     std::ostringstream out;
     out.imbue(std::locale::classic());
@@ -96,24 +113,42 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
     bool comma = false;
     for (const auto& p : program.parameters)
     {
-        if (p.type == LX::PinType::Texture || p.type == LX::PinType::Sampler) continue;
+        if (p.type == LX::PinType::Texture || p.type == LX::PinType::Sampler)
+            continue;
         const char* type = nullptr;
         const char* semantic = "value";
         switch (p.type)
         {
-        case LX::PinType::Float: type = "float"; break;
-        case LX::PinType::Int: type = "int"; break;
-        case LX::PinType::Bool: type = "bool"; break;
-        case LX::PinType::Vector: type = "float3"; semantic = "vector"; break;
-        case LX::PinType::Normal: type = "float3"; semantic = "normal"; break;
-        case LX::PinType::Color: type = "float4"; semantic = "color"; break;
-        default: throw std::runtime_error("Unsupported Graph property type");
+        case LX::PinType::Float:
+            type = "float";
+            break;
+        case LX::PinType::Int:
+            type = "int";
+            break;
+        case LX::PinType::Bool:
+            type = "bool";
+            break;
+        case LX::PinType::Vector:
+            type = "float3";
+            semantic = "vector";
+            break;
+        case LX::PinType::Normal:
+            type = "float3";
+            semantic = "normal";
+            break;
+        case LX::PinType::Color:
+            type = "float4";
+            semantic = "color";
+            break;
+        default:
+            throw std::runtime_error("Unsupported Graph property type");
         }
-        if (comma) out << ',';
+        if (comma)
+            out << ',';
         comma = true;
         out << "{\"name\":" << Quote("lx_bound_p" + std::to_string(p.id))
-            << ",\"label\":" << Quote(p.name.empty() ? p.identifier : p.name)
-            << ",\"type\":" << Quote(type) << ",\"default\":";
+            << ",\"label\":" << Quote(p.name.empty() ? p.identifier : p.name) << ",\"type\":" << Quote(type)
+            << ",\"default\":";
         Default(out, p);
         out << ",\"parameterId\":" << p.id << ",\"semantic\":" << Quote(semantic)
             << ",\"colorSpace\":" << Quote(ColorSpace(p.colorSpace))
@@ -121,40 +156,61 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
     }
     for (const auto& resource : program.resources)
     {
-        if (resource.kind != LX::LXMaterialResourceKind::Texture) continue;
+        if (resource.kind != LX::LXMaterialResourceKind::Texture)
+            continue;
         const auto* p = Parameter(program, resource.parameter);
         if (resource.parameter && (!p || p->type != LX::PinType::Texture))
             throw std::runtime_error("Graph texture parameter identity is missing");
-        if (comma) out << ',';
+        if (comma)
+            out << ',';
         comma = true;
         const auto name = "lx_texture_" + std::to_string(resource.slot);
         out << "{\"name\":" << Quote(name) << ",\"label\":" << Quote(p ? p->name : name)
             << ",\"type\":\"texture2d\",\"default\":" << Quote(resource.reference)
-            << ",\"parameterId\":" << resource.parameter << ",\"semantic\":\"texture\",\"colorSpace\":"
-            << Quote(ColorSpace(resource.colorSpace)) << ",\"exposed\":" << (p && p->exposed ? "true" : "false") << '}';
+            << ",\"parameterId\":" << resource.parameter
+            << ",\"semantic\":\"texture\",\"colorSpace\":" << Quote(ColorSpace(resource.colorSpace))
+            << ",\"exposed\":" << (p && p->exposed ? "true" : "false") << '}';
     }
     out << "],\"passes\":[";
     comma = false;
     for (const auto& pass : passes)
     {
-        if (comma) out << ',';
+        if (comma)
+            out << ',';
         comma = true;
         out << "{\"name\":" << Quote(pass.name);
         for (const auto& [name, stage] : {std::pair{"vs", pass.vertex}, {"ps", pass.pixel}, {"cs", pass.compute}})
-            if (stage) out << ',' << Quote(name) << ":{\"entry\":" << Quote(stage->entry) << '}';
+            if (stage)
+                out << ',' << Quote(name) << ":{\"entry\":" << Quote(stage->entry) << '}';
         const auto& s = pass.state;
         if (!pass.IsCompute())
         {
-            const auto depth = s.depthTest == RHICompareOp::None ? "off" :
-                s.depthTest == RHICompareOp::Less ? "less" : s.depthTest == RHICompareOp::LessEqual ? "lessEqual" : "invalid";
+            const auto depth = s.depthTest == RHICompareOp::None        ? "off"
+                               : s.depthTest == RHICompareOp::Less      ? "less"
+                               : s.depthTest == RHICompareOp::LessEqual ? "lessEqual"
+                                                                        : "invalid";
             out << ",\"state\":{\"fill\":" << Quote(s.fillMode == RHIFillMode::Solid ? "solid" : "wireframe")
-                << ",\"cull\":" << Quote(s.cullMode == RHICullMode::None ? "none" : s.cullMode == RHICullMode::Front ? "front" : "back")
-                << ",\"blend\":" << Quote(s.blendMode == ShaderBlendMode::Off ? "off" : s.blendMode == ShaderBlendMode::Alpha ? "alpha" : "additive")
+                << ",\"cull\":"
+                << Quote(s.cullMode == RHICullMode::None    ? "none"
+                         : s.cullMode == RHICullMode::Front ? "front"
+                                                            : "back")
+                << ",\"blend\":"
+                << Quote(s.blendMode == ShaderBlendMode::Off     ? "off"
+                         : s.blendMode == ShaderBlendMode::Alpha ? "alpha"
+                                                                 : "additive")
                 << ",\"depthWrite\":" << (s.depthWrite ? "true" : "false") << ",\"depthTest\":" << Quote(depth)
-                << ",\"topology\":" << Quote(s.topologyType == RHITopologyType::Triangle ? "triangle" : s.topologyType == RHITopologyType::Line ? "line" : "point") << '}';
+                << ",\"topology\":"
+                << Quote(s.topologyType == RHITopologyType::Triangle ? "triangle"
+                         : s.topologyType == RHITopologyType::Line   ? "line"
+                                                                     : "point")
+                << '}';
         }
-        out << ",\"queue\":" << Quote(pass.queue == ShaderPassQueue::Opaque ? "opaque" :
-            pass.queue == ShaderPassQueue::Transparent ? "transparent" : pass.queue == ShaderPassQueue::Shadow ? "shadow" : "compute") << '}';
+        out << ",\"queue\":"
+            << Quote(pass.queue == ShaderPassQueue::Opaque        ? "opaque"
+                     : pass.queue == ShaderPassQueue::Transparent ? "transparent"
+                     : pass.queue == ShaderPassQueue::Shadow      ? "shadow"
+                                                                  : "compute")
+            << '}';
     }
     out << "],\"generatedMaterial\":{\"graph\":" << Quote(graphGuid.ToString())
         << ",\"adapter\":" << ShaderGeneratedMaterial::kAdapterVersion << ",\"generation\":" << Quote(generation)
@@ -164,11 +220,13 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
     comma = false;
     for (const auto& resource : program.resources)
     {
-        if (resource.kind != LX::LXMaterialResourceKind::Sampler) continue;
+        if (resource.kind != LX::LXMaterialResourceKind::Sampler)
+            continue;
         const auto* p = Parameter(program, resource.parameter);
         if (resource.parameter && (!p || p->type != LX::PinType::Sampler))
             throw std::runtime_error("Graph sampler parameter identity is missing");
-        if (comma) out << ',';
+        if (comma)
+            out << ',';
         comma = true;
         out << "{\"name\":" << Quote("lx_sampler_" + std::to_string(resource.slot))
             << ",\"description\":" << Quote(resource.reference) << ",\"parameterId\":" << resource.parameter
@@ -178,67 +236,69 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid,
     return out.str();
 }
 
-        bool ResolveGeneratedBindings(const LX::LXMaterialProgram& program, const ShaderMeta& meta,
-            std::span<const RHIShaderReflection> reflections, ShaderMetaBindingLayout& result, std::string& error)
+bool ResolveGeneratedBindings(const LX::LXMaterialProgram& program, const ShaderMeta& meta,
+                              std::span<const RHIShaderReflection> reflections, ShaderMetaBindingLayout& result,
+                              std::string& error)
+{
+    ShaderMetaBindingLayout candidate;
+    std::vector<const RHIShaderReflection*> stages;
+    for (const auto& reflection : reflections)
+    {
+        stages.push_back(&reflection);
+    }
+    RHIShaderReflection merged;
+    BindingLayout bindings;
+    Budget reflectedBudget;
+    reflectedBudget.textures = 112;
+    reflectedBudget.samplers = 125;
+    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    if (!MergeMaterialReflections(stages, merged, diagnostics) ||
+        !ResolveBindings(program, merged, reflectedBudget, bindings, diagnostics))
+    {
+        error = diagnostics.empty() ? "Invalid generated internal binding layout." : diagnostics.front().message;
+        return false;
+    }
+    // Authoring properties describe logical texture slots. Validate the
+    // physical bindless ABI above before projecting those slots for the
+    // property packer; this projection is never a runtime root layout.
+    auto logicalReflections = std::vector<RHIShaderReflection>(reflections.begin(), reflections.end());
+    for (auto& reflection : logicalReflections)
+    {
+        std::erase_if(reflection.resources, [](const auto& resource) {
+            return resource.name == "lx_texture_table" || resource.name == "lx_sampler_table" ||
+                   resource.name == "LXDescriptorIndices";
+        });
+        for (const auto& logical : bindings.textures)
         {
-            ShaderMetaBindingLayout candidate;
-            std::vector<const RHIShaderReflection*> stages;
-            for (const auto& reflection : reflections)
-            {
-                stages.push_back(&reflection);
-            }
-            RHIShaderReflection merged;
-            BindingLayout bindings;
-            Budget reflectedBudget;
-            reflectedBudget.textures = 112;
-            reflectedBudget.samplers = 125;
-            std::vector<LX::LXMaterialDiagnostic> diagnostics;
-            if (!MergeMaterialReflections(stages, merged, diagnostics) ||
-                !ResolveBindings(program, merged, reflectedBudget, bindings, diagnostics))
-            {
-                error = diagnostics.empty() ? "Invalid generated internal binding layout." : diagnostics.front().message;
-                return false;
-            }
-            // Authoring properties describe logical texture slots. Validate the
-            // physical bindless ABI above before projecting those slots for the
-            // property packer; this projection is never a runtime root layout.
-            auto logicalReflections = std::vector<RHIShaderReflection>(reflections.begin(), reflections.end());
-            for (auto& reflection : logicalReflections)
-            {
-                std::erase_if(reflection.resources, [](const auto& resource) {
-                    return resource.name == "lx_texture_table" || resource.name == "lx_sampler_table" ||
-                        resource.name == "LXDescriptorIndices";
-                });
-                for (const auto& logical : bindings.textures)
-                {
-                    RHIShaderResourceReflection resource;
-                    resource.name = "lx_texture_" + std::to_string(logical.slot);
-                    resource.kind = RHIShaderResourceKind::Texture;
-                    resource.registerIndex = TextureRegister + logical.slot;
-                    reflection.resources.push_back(std::move(resource));
-                }
-                for (const auto& logical : bindings.samplers)
-                {
-                    RHIShaderResourceReflection resource;
-                    resource.name = "lx_sampler_" + std::to_string(logical.slot);
-                    resource.kind = RHIShaderResourceKind::Sampler;
-                    resource.registerIndex = SamplerRegister + logical.slot;
-                    reflection.resources.push_back(std::move(resource));
-                }
-            }
-            if (!ShaderMetaReflection::Resolve(meta, logicalReflections, candidate, error)) return false;
-            // Encoding uniforms are private runtime fields. A texture-only graph still
-            // needs the common packer to allocate the entire validated constant buffer.
-            if (bindings.uniformBytes != 0)
-            {
-                candidate.constantBufferName = "LXMaterialProperties";
-                candidate.constantBufferRegister = UniformRegister;
-                candidate.constantBufferSpace = 0;
-                candidate.constantBufferByteSize = bindings.uniformBytes;
-            }
-            result = std::move(candidate);
-            return true;
+            RHIShaderResourceReflection resource;
+            resource.name = "lx_texture_" + std::to_string(logical.slot);
+            resource.kind = RHIShaderResourceKind::Texture;
+            resource.registerIndex = TextureRegister + logical.slot;
+            reflection.resources.push_back(std::move(resource));
         }
+        for (const auto& logical : bindings.samplers)
+        {
+            RHIShaderResourceReflection resource;
+            resource.name = "lx_sampler_" + std::to_string(logical.slot);
+            resource.kind = RHIShaderResourceKind::Sampler;
+            resource.registerIndex = SamplerRegister + logical.slot;
+            reflection.resources.push_back(std::move(resource));
+        }
+    }
+    if (!ShaderMetaReflection::Resolve(meta, logicalReflections, candidate, error))
+        return false;
+    // Encoding uniforms are private runtime fields. A texture-only graph still
+    // needs the common packer to allocate the entire validated constant buffer.
+    if (bindings.uniformBytes != 0)
+    {
+        candidate.constantBufferName = "LXMaterialProperties";
+        candidate.constantBufferRegister = UniformRegister;
+        candidate.constantBufferSpace = 0;
+        candidate.constantBufferByteSize = bindings.uniformBytes;
+    }
+    result = std::move(candidate);
+    return true;
+}
 
 bool Write(const std::filesystem::path& path, std::string_view text)
 {
@@ -251,17 +311,17 @@ bool Write(const std::filesystem::path& path, std::string_view text)
 bool Matches(const std::filesystem::path& path, std::string_view expected)
 {
     std::error_code error;
-    if (std::filesystem::file_size(path, error) != expected.size() || error) return false;
+    if (std::filesystem::file_size(path, error) != expected.size() || error)
+        return false;
     std::ifstream file(path, std::ios::binary);
     const std::string text{std::istreambuf_iterator<char>(file), {}};
     return file && text == expected;
 }
 } // namespace
 
-bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid graphGuid,
-    std::string_view source, std::span<const ShaderPassDesc> passes,
-    std::span<const RHIShaderReflection> reflections, const std::filesystem::path& root,
-    GeneratedMaterialShader& result, std::string& error)
+bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid graphGuid, std::string_view source,
+                               std::span<const ShaderPassDesc> passes, std::span<const RHIShaderReflection> reflections,
+                               const std::filesystem::path& root, GeneratedMaterialShader& result, std::string& error)
 {
     std::filesystem::path staging;
     try
@@ -272,7 +332,8 @@ bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid gr
         const auto seed = Document(program, graphGuid, hash, "", passes);
         const auto generation = Digest(std::to_string(program.semanticKey.size()) + ':' + program.semanticKey + seed);
         const auto document = Document(program, graphGuid, hash, generation, passes);
-        if (document.size() > 1024u * 1024u) throw std::runtime_error("Generated ShaderMeta exceeds 1MiB");
+        if (document.size() > 1024u * 1024u)
+            throw std::runtime_error("Generated ShaderMeta exceeds 1MiB");
         const auto directory = root / generation;
         GeneratedMaterialShader candidate;
         candidate.document = document;
@@ -284,13 +345,14 @@ bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid gr
         const auto validate = [&](const std::filesystem::path& folder) {
             candidate.metaPath = folder / "material.shadermeta";
             return ShaderMetaLoader::LoadFile(candidate.metaPath, graphGuid, candidate.meta, error) &&
-                ResolveGeneratedBindings(program, candidate.meta, reflections, candidate.layout, error);
+                   ResolveGeneratedBindings(program, candidate.meta, reflections, candidate.layout, error);
         };
         if (std::filesystem::exists(directory))
         {
             if (!Matches(directory / "material.shadermeta", document) || !Matches(directory / "material.slang", source))
                 throw std::runtime_error("Immutable generated material pair was changed");
-            if (!validate(directory)) return false;
+            if (!validate(directory))
+                return false;
         }
         else
         {
@@ -298,13 +360,15 @@ bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid gr
             std::filesystem::create_directories(staging);
             if (!Write(staging / "material.slang", source) || !Write(staging / "material.shadermeta", document))
                 throw std::runtime_error("Generated material pair write failed");
-            if (!validate(staging)) throw std::runtime_error(error);
+            if (!validate(staging))
+                throw std::runtime_error(error);
             std::error_code renameError;
             std::filesystem::rename(staging, directory, renameError);
             if (renameError)
             {
                 // Another producer may have published the exact generation.
-                if (!Matches(directory / "material.shadermeta", document) || !Matches(directory / "material.slang", source))
+                if (!Matches(directory / "material.shadermeta", document) ||
+                    !Matches(directory / "material.slang", source))
                     throw std::runtime_error("Generated material pair publication failed: " + renameError.message());
                 std::filesystem::remove_all(staging);
             }
@@ -319,14 +383,18 @@ bool PublishMaterialShaderMeta(const LX::LXMaterialProgram& program, FileGuid gr
     catch (const std::exception& exception)
     {
         error = exception.what();
-        if (!staging.empty()) { std::error_code ignored; std::filesystem::remove_all(staging, ignored); }
+        if (!staging.empty())
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(staging, ignored);
+        }
         return false;
     }
 }
 
-bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGuid,
-    std::string_view document, std::string_view source,
-    GeneratedMaterialShader& result, std::string& error, std::span<const std::byte> cookedContract)
+bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGuid, std::string_view document,
+                               std::string_view source, GeneratedMaterialShader& result, std::string& error,
+                               std::span<const std::byte> cookedContract)
 {
     try
     {
@@ -352,7 +420,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
         std::vector<ShaderMaterialSampler> samplers;
         for (const auto& p : program.parameters)
         {
-            if (p.type == LX::PinType::Texture || p.type == LX::PinType::Sampler) continue;
+            if (p.type == LX::PinType::Texture || p.type == LX::PinType::Sampler)
+                continue;
             ShaderPropertyDesc property;
             property.name = "lx_bound_p" + std::to_string(p.id);
             property.label = p.name.empty() ? p.identifier : p.name;
@@ -363,30 +432,36 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             {
             case LX::PinType::Float:
                 property.type = ShaderPropertyType::Float;
-                property.defaultValue = static_cast<float>(std::get<double>(p.value)); break;
+                property.defaultValue = static_cast<float>(std::get<double>(p.value));
+                break;
             case LX::PinType::Int:
                 property.type = ShaderPropertyType::Int;
-                property.defaultValue = static_cast<std::int32_t>(std::get<std::int64_t>(p.value)); break;
+                property.defaultValue = static_cast<std::int32_t>(std::get<std::int64_t>(p.value));
+                break;
             case LX::PinType::Bool:
                 property.type = ShaderPropertyType::Bool;
-                property.defaultValue = std::get<bool>(p.value); break;
-            case LX::PinType::Vector: case LX::PinType::Normal:
-            {
+                property.defaultValue = std::get<bool>(p.value);
+                break;
+            case LX::PinType::Vector:
+            case LX::PinType::Normal: {
                 property.type = ShaderPropertyType::Float3;
                 property.semantic = p.type == LX::PinType::Normal ? "normal" : "vector";
                 const auto& value = std::get<std::array<double, 3>>(p.value);
-                property.defaultValue = std::array<float, 3>{static_cast<float>(value[0]),
-                    static_cast<float>(value[1]), static_cast<float>(value[2])}; break;
+                property.defaultValue = std::array<float, 3>{static_cast<float>(value[0]), static_cast<float>(value[1]),
+                                                             static_cast<float>(value[2])};
+                break;
             }
-            case LX::PinType::Color:
-            {
+            case LX::PinType::Color: {
                 property.type = ShaderPropertyType::Float4;
                 property.semantic = "color";
                 const auto& value = std::get<std::array<double, 4>>(p.value);
-                property.defaultValue = std::array<float, 4>{static_cast<float>(value[0]),
-                    static_cast<float>(value[1]), static_cast<float>(value[2]), static_cast<float>(value[3])}; break;
+                property.defaultValue =
+                    std::array<float, 4>{static_cast<float>(value[0]), static_cast<float>(value[1]),
+                                         static_cast<float>(value[2]), static_cast<float>(value[3])};
+                break;
             }
-            default: throw std::runtime_error("Unsupported generated property");
+            default:
+                throw std::runtime_error("Unsupported generated property");
             }
             properties.push_back(std::move(property));
         }
@@ -396,7 +471,7 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             if (resource.kind == LX::LXMaterialResourceKind::Sampler)
             {
                 samplers.push_back({"lx_sampler_" + std::to_string(resource.slot), resource.reference,
-                    resource.parameter, p && p->exposed});
+                                    resource.parameter, p && p->exposed});
                 continue;
             }
             ShaderPropertyDesc property;
@@ -411,7 +486,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             properties.push_back(std::move(property));
         }
         if (candidate.meta.name != "LXMaterial" || candidate.meta.source != "material.slang" ||
-            !candidate.meta.keywords.empty() || candidate.meta.properties != properties || generated.samplers != samplers)
+            !candidate.meta.keywords.empty() || candidate.meta.properties != properties ||
+            generated.samplers != samplers)
             throw std::runtime_error("Generated typed contract differs from its verified program");
 
         // Every declared stage must have verified bytecode in each backend the
@@ -425,8 +501,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             compiled.emplace(target.binary, target.entry, target.profile.substr(0, 3));
         }
         for (const auto& pass : candidate.meta.passes)
-            for (const auto& [stage, profile] : {std::pair{pass.vertex, "vs_"},
-                {pass.pixel, "ps_"}, {pass.compute, "cs_"}})
+            for (const auto& [stage, profile] :
+                 {std::pair{pass.vertex, "vs_"}, {pass.pixel, "ps_"}, {pass.compute, "cs_"}})
                 if (stage)
                     for (const auto backend : carried)
                         declared.emplace(backend, stage->entry, profile);
@@ -442,14 +518,16 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
                 {
                     continue;
                 }
-                const char* meshEntry = pass.vertex->entry == "LXSceneVS" ? "LXSceneMS"
-                    : pass.vertex->entry == "LXSceneShadowVS" ? "LXSceneShadowMS" : nullptr;
+                const char* meshEntry = pass.vertex->entry == "LXSceneVS"         ? "LXSceneMS"
+                                        : pass.vertex->entry == "LXSceneShadowVS" ? "LXSceneShadowMS"
+                                                                                  : nullptr;
                 if (meshEntry)
                 {
                     for (const auto backend : carried)
                     {
                         declared.emplace(backend, meshEntry, "ms_");
-                        if (pass.vertex->entry == "LXSceneVS") {
+                        if (pass.vertex->entry == "LXSceneVS")
+                        {
                             declared.emplace(backend, "LXSceneReconstructMS", "ms_");
                             declared.emplace(backend, "LXSceneVisibilityMS", "ms_");
                         }
@@ -457,7 +535,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
                 }
             }
         }
-        if (declared != compiled) throw std::runtime_error("Generated passes differ from verified backend stages");
+        if (declared != compiled)
+            throw std::runtime_error("Generated passes differ from verified backend stages");
 
         RHIShaderReflection reflection;
         RHIShaderResourceReflection uniforms;
@@ -473,19 +552,30 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             field.byteSize = binding.bytes;
             switch (binding.parameter.type)
             {
-            case LX::PinType::Bool: field.type.scalar = RHIShaderScalarKind::Bool; break;
-            case LX::PinType::Int: field.type.scalar = RHIShaderScalarKind::Int32; break;
-            case LX::PinType::Vector: case LX::PinType::Normal: field.type.columns = 3; break;
-            case LX::PinType::Color: field.type.columns = 4; break;
-            case LX::PinType::Float: break;
-            default: throw std::runtime_error("Invalid generated uniform type");
+            case LX::PinType::Bool:
+                field.type.scalar = RHIShaderScalarKind::Bool;
+                break;
+            case LX::PinType::Int:
+                field.type.scalar = RHIShaderScalarKind::Int32;
+                break;
+            case LX::PinType::Vector:
+            case LX::PinType::Normal:
+                field.type.columns = 3;
+                break;
+            case LX::PinType::Color:
+                field.type.columns = 4;
+                break;
+            case LX::PinType::Float:
+                break;
+            default:
+                throw std::runtime_error("Invalid generated uniform type");
             }
             uniforms.fields.push_back(std::move(field));
         }
         for (const auto& binding : product.layout.textureEncodings)
         {
-            uniforms.fields.push_back({TextureEncodingUniformName(binding.slot),
-                {RHIShaderScalarKind::UInt32, 1, 1, 1}, binding.offset, 4u});
+            uniforms.fields.push_back(
+                {TextureEncodingUniformName(binding.slot), {RHIShaderScalarKind::UInt32, 1, 1, 1}, binding.offset, 4u});
         }
         if (!uniforms.fields.empty())
         {
@@ -509,7 +599,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             sampler.arrayElements = BindlessSamplerCapacity;
             reflection.resources.push_back(std::move(sampler));
         }
-        if (!program.resources.empty()) reflection.resources.push_back(DescriptorIndexReflection());
+        if (!program.resources.empty())
+            reflection.resources.push_back(DescriptorIndexReflection());
         if (!ResolveGeneratedBindings(program, candidate.meta, std::span(&reflection, 1), candidate.layout, error))
         {
             return false;
@@ -521,6 +612,10 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
         error.clear();
         return true;
     }
-    catch (const std::exception& exception) { error = exception.what(); return false; }
+    catch (const std::exception& exception)
+    {
+        error = exception.what();
+        return false;
+    }
 }
 } // namespace material_graph

@@ -1,7 +1,7 @@
 #pragma once
 #include "EngineRuntimePaths.h"
 #include "EngineMetadataFile.h"
-#include <fstream>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct EditorEngineDistribution
 {

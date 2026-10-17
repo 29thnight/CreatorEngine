@@ -1,6 +1,5 @@
 #pragma once
-#include <vector>
-#include <functional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class CameraComponent;
 

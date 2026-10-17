@@ -1,11 +1,8 @@
 #include "CookedTerrain.h"
 #include "CookedTexture.h"
 
-#include <bit>
-#include <cmath>
-#include <cstring>
-#include <exception>
-#include <limits>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

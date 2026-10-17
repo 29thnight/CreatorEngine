@@ -2,8 +2,7 @@
 
 #include <mathematics/quaternion.hpp>
 #include <mathematics/vector3.hpp>
-#include <algorithm>
-#include <cmath>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace animation
 {

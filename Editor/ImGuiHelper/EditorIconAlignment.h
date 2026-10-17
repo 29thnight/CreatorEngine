@@ -2,7 +2,7 @@
 
 #include "EditorIcons.h"
 #include <imgui.h>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::fonts
 {

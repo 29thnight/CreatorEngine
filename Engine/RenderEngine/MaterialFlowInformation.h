@@ -3,7 +3,8 @@
 #include "Core.Minimal.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
-#include <cstddef>
+#include <stddef.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 cbuffer [[reflgen::reflect]] MaterialFlowInformation
 {

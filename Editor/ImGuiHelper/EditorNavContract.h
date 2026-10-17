@@ -59,9 +59,7 @@
 struct ImRect;
 typedef unsigned int ImGuiID;
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::nav
 {

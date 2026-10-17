@@ -1,8 +1,5 @@
 #include "JobScheduler.h"
-#include <algorithm>
-#include <condition_variable>
-#include <exception>
-#include <stdexcept>
+#include "StandardLibrary.h"
 
 namespace
 {

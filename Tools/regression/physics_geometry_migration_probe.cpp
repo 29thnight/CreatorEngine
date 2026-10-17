@@ -1,8 +1,6 @@
 #include "../../Engine/SceneRuntime/CollisionGeometryCodec.h"
 #include "../../Engine/Physics/PhysicsScene.h"
-#include <fstream>
-#include <iostream>
-#include <iterator>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

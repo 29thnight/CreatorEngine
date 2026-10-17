@@ -4,8 +4,9 @@
 #include "../../MaterialGraphRuntime.h"
 #include "../../Texture.h"
 #include "../../TextureFramePins.h"
-#include <map>
-#include <set>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // Lattice instance slice only. Resolve an exact current immutable program and
 // texture closure; store typed parameter IDs/values, never uniform byte offsets.

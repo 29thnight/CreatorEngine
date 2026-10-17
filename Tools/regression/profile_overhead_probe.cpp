@@ -5,16 +5,8 @@
 #endif
 #include <windows.h>
 
-#include <algorithm>
-#include <atomic>
-#include <chrono>
-#include <cmath>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <string_view>
-#include <thread>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ProfileScope.h"
 #include "ProfileService.h"

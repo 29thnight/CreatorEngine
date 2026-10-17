@@ -5,6 +5,7 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'ArtifactRetention.ps1')
 Assert-ArtifactCapacity $Work
+. (Join-Path $PSScriptRoot 'ContractProbeConfiguration.ps1')
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out=Join-Path ([IO.Path]::GetFullPath($Work)) "native-$Config"
 [IO.Directory]::CreateDirectory($out)|Out-Null
@@ -12,6 +13,8 @@ $out=Join-Path ([IO.Path]::GetFullPath($Work)) "native-$Config"
 $flags=@('/nologo','/std:c++latest','/EHsc','/utf-8','/DNOMINMAX','/UNDEBUG')
 $flags+=('/I'+(Join-Path $repo 'Engine/Utility_Framework'))
 $flags+=if($Config -eq 'Debug'){@('/Od','/MDd','/Zi')}else{@('/O2','/MD')}
+$contractProbe = New-ContractProbeConfiguration -Configuration $Config -OutputDirectory $out
+$flags += $contractProbe.Arguments
 $cases=@(
  @{name='display-diagnostics';sources=@('Tools/regression/ProfilerRenderingDiagnosticsTests.cpp','Engine/EngineDiagnostics/ProfilerRenderingDiagnostics.cpp');libs=@()},
  @{name='temporal-provenance';sources=@('Tools/regression/TemporalMeasurementProvenanceTests.cpp','Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.cpp');libs=@()},

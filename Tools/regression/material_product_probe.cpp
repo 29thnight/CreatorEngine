@@ -12,10 +12,9 @@
 #include "material_probe_gpu.h"
 #include "material_runtime_tests.h"
 
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
+#include <stdint.h>
+#include <limits.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

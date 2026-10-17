@@ -2,11 +2,7 @@
 
 #include "../../RHI/RHIHandle.h"
 
-#include <array>
-#include <cstdint>
-#include <span>
-#include <memory>
-#include <string>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // Shared TU/FG values. Native resources, SDK contexts and command objects live
 // only under RHI/Temporal. A supported adapter is not an active product feature.

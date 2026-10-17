@@ -8,15 +8,7 @@
 #include "DataSystem.h"
 #include "ReflectionTypedYml.h"
 
-#include <cstring>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <sstream>
-#include <stdexcept>
-#include <type_traits>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace reflgen::generated
 {

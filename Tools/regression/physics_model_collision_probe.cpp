@@ -1,9 +1,6 @@
 #include "../../Engine/SceneRuntime/ModelCollisionGeometry.h"
 #include "../../Editor/EngineEntry/EditorModelCollisionAsset.h"
-#include <iostream>
-#include <fstream>
-#include <limits>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

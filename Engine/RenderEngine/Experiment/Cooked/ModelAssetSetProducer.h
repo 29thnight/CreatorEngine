@@ -1,8 +1,7 @@
 #pragma once
 
 #include "CookedModelSubAssetCodec.h"
-#include <filesystem>
-#include <functional>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -24,6 +23,7 @@ namespace experiment::cooked
     {
         TypedAssetReference asset{};
         std::vector<std::byte> artifactBytes{};
+        std::vector<std::byte> cpuGeometryBytes{};
         std::vector<AssetDependency> dependencies{};
         std::uint32_t representation{};
         std::uint32_t schemaVersion{};

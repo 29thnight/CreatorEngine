@@ -1,16 +1,7 @@
 #pragma once
 #include "Ownership.h"
-#include <typeinfo>
-#include <typeindex>
-#include <string_view>
-#include <unordered_map>
-#include <set>
-#include <memory>
-#include <vector>
-#include <utility>
-#include <cassert>
-#include <stdexcept>
-#include <type_traits>
+#include "StandardLibrary.h"
+#include "Contract.h"
 // FileGuid의 실체가 여기 있다. boost/uuid를 걷어낸 자리다 — 왜 걷었고
 // 무엇으로 동일성을 확인했는지는 Uuid.h 머리에 적었다.
 #include "Uuid.h"
@@ -387,7 +378,13 @@ namespace TypeTrait
 			}
 
 			const uint32_t index = static_cast<uint32_t>(table.size());
-			assert(index < kMaxTypes && "ComponentTypeIndex: 마스크 비트(64종)를 넘겼다 - uint64 하나로는 더 못 들어간다");
+			::ce::contracts::assert_that(
+                [&]() -> bool {
+                    return static_cast<bool>(
+                        (index < kMaxTypes && "ComponentTypeIndex: 마스크 비트(64종)를 넘겼다 - uint64 하나로는 더 못 들어간다"));
+                },
+                "index < kMaxTypes && \"ComponentTypeIndex: \ub9c8\uc2a4\ud06c \ube44\ud2b8(64\uc885)\ub97c \ub118\uacbc\ub2e4 - "
+                "uint64 \ud558\ub098\ub85c\ub294 \ub354 \ubabb \ub4e4\uc5b4\uac04\ub2e4\"");
 			table.emplace(typeID, index);
 			return index;
 		}

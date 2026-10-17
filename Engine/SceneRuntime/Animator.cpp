@@ -18,23 +18,31 @@
 #include "../RenderEngine/Assets/ModelAnimationDescriptor.h"
 #include "../RenderEngine/Assets/ModelAnimationPayload.h"
 #include "../RenderEngine/Assets/ModelMeshDescriptor.h"
-#include <algorithm>
-#include <cassert>
-#include <iterator>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Contract.h"
 
 Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}
 
 AnimInstance& Animator::GetInstance() noexcept
 {
     AnimInstance* instance = AnimatorSystems->ResolveInstance(m_instance);
-    assert(instance);
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((instance));
+        },
+        "instance");
     return *instance;
 }
 
 const AnimInstance& Animator::GetInstance() const noexcept
 {
     const AnimInstance* instance = AnimatorSystems->ResolveInstance(m_instance);
-    assert(instance);
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((instance));
+        },
+        "instance");
     return *instance;
 }
 
@@ -42,9 +50,21 @@ Animator::~Animator()
 {
     // These containers/handles were retired on the owner thread. Sweeping
     // must never reach AnimatorSystem, SceneManager or CLR callbacks.
-    assert(m_instance.slot == UINT32_MAX);
-    assert(m_animationControllers.empty());
-    assert(socketvec.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((m_instance.slot == UINT32_MAX));
+        },
+        "m_instance.slot == UINT32_MAX");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((m_animationControllers.empty()));
+        },
+        "m_animationControllers.empty()");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((socketvec.empty()));
+        },
+        "socketvec.empty()");
     for (auto* parameter : Parameters)
     {
         delete parameter;

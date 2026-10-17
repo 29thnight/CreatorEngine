@@ -6,9 +6,7 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <exception>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

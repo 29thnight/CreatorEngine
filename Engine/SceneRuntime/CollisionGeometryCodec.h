@@ -1,8 +1,7 @@
 #pragma once
 
 #include "CollisionGeometrySource.h"
-#include <bit>
-#include <new>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

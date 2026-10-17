@@ -1,5 +1,5 @@
-#include <algorithm>
-#include <stdexcept>
+﻿#include <stdio.h>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 #include "PlayerApp.h"
 #include "PlayerCommands.h"
 
@@ -19,9 +19,6 @@
 
 #include <shellapi.h>
 
-#include <cstdio>
-#include <array>
-#include <filesystem>
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -306,7 +303,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	return finalExitCode;
 }
 
-void Player::App::Initialize(CoreWindow& coreWindow)
+void Player::App::Initialize(WindowsCoreWindow& coreWindow, CoreWindow& window)
 {
 	m_hWnd = coreWindow.GetHandle();
 
@@ -315,7 +312,7 @@ void Player::App::Initialize(CoreWindow& coreWindow)
 
 	RegisterHandler(coreWindow);
 	Load();
-	Run();
+	Run(window);
 }
 
 void Player::App::Finalize()
@@ -331,7 +328,7 @@ void Player::App::Finalize()
 	GpuDiagnostics::ReportLiveObjects();
 }
 
-void Player::App::RegisterHandler(CoreWindow& coreWindow)
+void Player::App::RegisterHandler(WindowsCoreWindow& coreWindow)
 {
 	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
@@ -345,14 +342,14 @@ void Player::App::Load()
 	}
 }
 
-void Player::App::Run()
+void Player::App::Run(CoreWindow& window)
 {
-	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
+	WindowsCoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
 		m_main->Initialize();
 		InputManagement->Initialize(m_hWnd);
-	})
-	.Then([&]
+	});
+	window.Then([&]
 	{
 		m_main->Update();
         if (m_main->GetTemporalRealFrameId() == 0) return;

@@ -1,8 +1,7 @@
 #include "EditorLayoutPreset.h"
 #include "EditorWindowNames.h"
 
-#include <algorithm>
-#include <array>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

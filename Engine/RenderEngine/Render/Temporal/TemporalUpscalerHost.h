@@ -1,7 +1,7 @@
 #pragma once
 #include "ITemporalUpscaler.h"
 #include "TemporalRuntimeControl.h"
-#include <memory>
+#include "../../../Utility_Framework/StandardLibrary.h"
 class IRHIDeviceResources;
 
 // A settings acknowledgement is not a reconstruction reconfiguration. Reflex,

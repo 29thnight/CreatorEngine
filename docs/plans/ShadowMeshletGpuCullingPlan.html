@@ -76,15 +76,29 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
 </style>
 </head>
 <body>
+
+
 <main>
+<section class="summary" id="shared-pool-update"><strong>2026-10-17 공유 물리 풀·전역 페이지 정책·packing·증분 전송</strong><p>자산별 고정 가상 주소와 장치별 공유 64 MiB 물리 heap을 연결했다. 완료·비참조 캐시의 선택 페이지부터 전역 우선순위/최근 사용 순서로 퇴거하며 활성 페이지는 보호한다. 패킷은 16바이트 정렬로 packing하고 유지된 패킷을 건너뛰며 메타데이터 변경 구간·신규/재매핑 패킷만 전송한다. Debug/Release 5모드·Editor 통합·39노드 배선 검증을 통과했다. 최종 결과와 잔여 범위는 <a href="../analysis/LiveRenderWiring20261012.html#validation-current">현재 검증</a>을 따른다. 성능 측정은 하지 않았다. 아래 기존 비교와 수용 기록은 각 작성 시점의 이력이다.</p></section>
+
 <header class="hero">
-  <div class="kicker">Plan · 2026-10-11 · 상태: DX12 compute 구현·선택 정확도 통과 · 성능 이득 미수용</div>
+  <div class="kicker">Plan · 2026-10-16 · 상태: 방향광 2단계·정적 캐시 D/R 선택 정확성 보강 통과</div>
   <h1>1단계 — 그림자 메시렛 GPU 컬링 구현 계획</h1>
   <p class="meta">배경: <a href="../analysis/ReEngineMeshletComparison20261011.html">RE ENGINE 메시렛 비교</a> ·
   <a href="../analysis/ReEngineMeshletGraphFeasibility20261011.html">렌더 그래프 적합성</a>의 단계 제안 중 STEP 1.
   대상 코드: <code>EnhancedShadowPass</code>, <code>GpuMeshletVisibility</code>, <code>GpuGeometryVisibility</code>,
   <code>MaterialGraphSceneHost</code>, <code>Includes/MaterialGraphSceneHost.slang</code>, <code>GeometryMeshletVisibility.slang</code>, <code>GeometryVisibility.slang</code>.</p>
 </header>
+<div class="card"><h3>2026-10-16 · 방향광 2단계 컬링·정적 캐시 — DX12 Debug 빌드·정확성 검증</h3>
+<p><b>현재 CEGE9 저장·소비 경로:</b> Editor 임포트/재임포트는 metadata.cemc와 인증된 CEGE9/QMC2를 게시한다. CEGE 원본 본문·generation model.cemc와 구형 리더, 비활성 raw collider 작업 연결은 제거했다. 그림자·정적 캐시는 CPU 원본 없이 descriptor 신원을 사용하고, 정확한 충돌 위치·인덱스는 CECP를 필요할 때 읽는다. shader 39 / GPU schema 6은 유지한다. <a href="../analysis/LiveRenderWiring20261012.html#validation-current">최신 검증</a> · <a href="../analysis/LiveRenderWiring20261012.html#geometry-consumers">소비자 정책</a>.</p>
+<p><b>이전 CEGE7 · SceneHost 39:</b> Reserved Resource 타일 풀, 완료된 GPU LOD 요구, 장치 공통 VRAM 성장 예산과 CEGE7 메타데이터 전용 콜드 로드를 연결했다. D/R 콜드 스트리밍·저장소·그림자 정확성, 실제 DataSystem 지연 원본 요청 및 Editor 600초 준비·확장 GPU 목록/페이로드 각 144건을 통과했다. 콜드 경로의 정적 캐시 식별은 빈 CPU 배열 대신 검증된 기하 digest를 사용한다. 아래 SceneHost 36 및 과거 큐/그림자 결과는 이전 기록이며 현재 증거와 구별한다. 성능 측정은 하지 않았다. <a href="../analysis/LiveRenderWiring20261012.html#validation-current">현재 검증 상태</a>.</p>
+<p><code>METEOR.Shadow.StaticCache / Cull.First / Occluder / Cull.Final / Raster / History</code> 여섯 노드를 등록했다. 이전 완료 HZB 1차 판정 → 정적+1차 동적 깊이 → 현재 HZB 복구 → 최종 합집합을 구현했다. 캐시는 비변형 불투명 기하의 정확한 입력 일치 때만 재사용하고, 이동/재임포트/광원 투영/해상도 변화는 전체 갱신한다. Masked·skinned는 동적이다. 적격 rigid의 이동은 캐시 전체 무효화 방식이며 별도 mobility·증분 atlas는 구현하지 않았다.</p>
+<p>캐시와 이력은 승인 제출·GPU 완료 후 사용하며, 최신 미완료 제출 때문에 이전 완료 결과를 버리지 않는다. 기본 512 MiB GPU 캐시 예산, 64 MiB CPU 키 상한, 8뷰 lookup 제한과 제출별 소유권을 둔다. 새 depth min-merge 셰이더는 실제 GPU 검사에서 컴파일·실행했다. 아래 과거 기록과 이번 작업본의 결과는 구분한다.</p>
+<p><b>Surface/그림자 분리 당시 검증:</b> 렌더러·전용 프로브·Editor x64 Debug 빌드 통과. 명시적 여섯 생산자와 잘못된 버전/생산자 누락 거부, 32프레임 캐시 최초 생성·재사용의 3장 깊이 비트 일치, 월드/LOD/광원 변경 무효화와 완료 이력 사용을 통과했다. 그림자 51프레임·데칼 114프레임 픽셀 회귀, Editor 확장 목록 144개·GPU 페이로드 144개, RenderGraph·실제 빈/모델 장면 출력과 39노드 배선도 통과했다. GPU validation 문제 0; GBV 1044 간접 명령 추적 범위 제한 알림은 보존했다.</p>
+<p>검사 코드의 오래된 combined-shadow 로그 조건, 오브젝트 공간 정점에 월드 변환을 누락한 CPU 목록 기준, Surface Clear 생산자 수를 수정했다. 최초 실패 결과는 보존하고 Editor 전체 재검사는 sourceStable=true·정상 종료로 통과했다. 분리 당시 근거: <code>Artifacts/render-wiring-validation-20261016/scope-verdict.json</code>과 <code>Probes-01/corrected-marker-verdict.json</code>, <code>Probes-02</code>, <code>Editor-02/verdict.json</code>, <code>Pipeline-01/results.jsonl</code>.</p>
+<p><b>공통 GPU 큐 작업 수·뷰 공유:</b> 16분할 초기 배정·lane별 ring에서 JOB_COUNT를 게시 시 증가/회수 시 감소시킨다. 입력 소진·생산 lease·각 wave의 자체 처리 완료를 함께 확인하며 전체 메시릿 완료 누계는 진단값이다. 준비된 카메라+그림자 3뷰의 1차, 그림자 3뷰 복구, static cache miss 3뷰는 각각 별도 256슬롯/1,088바이트 공유 UAV 한 개를 사용한다. 뷰별 행렬·HZB·목록·간접 인자는 유지하며 graph·recording 간 공유는 하지 않는다. DX12 Debug 빌드, ring 48/고정 기준 8사례, 총량 힌트 0의 8사례, 생산 header 224회 중 공유 관측 192회, Editor GPU 목록/페이로드 각 144개·장면 픽셀·39노드 검사를 통과했다. 개발 중 소비 유휴 종료 대기의 hang을 수정했고 실패 로그를 보존했다. 성능 측정은 하지 않았다. 공개 RE의 JOB_COUNT 연산에 대응하며 비공개 전체 스케줄러나 뷰 공유 범위의 동등성은 주장하지 않는다. 근거: <code>Artifacts/gpu-shared-queue-20261016/scope-verdict.json</code>. <a href="../analysis/LiveRenderWiring20261012.html#gpu-distribution">현재 작업 분배 구조</a></p>
+<p><b>2026-10-16 Editor 준비 게이트 수정 후 재검증:</b> .cege 6·GPU schema 5를 유지하고 SceneHost 36으로 재쿠킹한다. 공통 기하 SRV를 16바이트 행으로 읽어 본 행렬의 80바이트 정점 경유 반복 gather를 제거했다. 그림자·카메라·혼합 가시성 바인딩과 구형 정점 복원도 맞췄다. 새 프로젝트 첫 실행의 기존 600초 준비 게이트와 확장 Editor GPU 목록/페이로드 각 144건, D/R 선택 8모드의 그림자 정확성·스트리밍·호환 경로를 통과했다. 기존 그림자 수용 범위를 확대하지 않으며 성능은 미측정이다. <a href="../../Artifacts/editor-ready-fix-20261016/scope-verdict.json">최신 근거</a>.</p><p><b>2026-10-16 그림자 정확성 보강:</b> 제품 소스를 바꾸지 않고 DX12 Debug/Release에서 새 검사 각 134프레임(장치당 67, 장치 정상 재생성 후 반복)을 통과했다. 두 뷰의 불투명 static/alpha-tested dynamic 가림→현재 HZB 복구, 3장 독립 CPU 깊이 정답, static 삭제/추가·변경된 쿠킹 기하·음수 스케일·해상도/reset·cold/warm을 검사했다. 실제 native GPU fence가 미완료인 동안 다음 기록 준비·이전 완료 캐시/이력 유지·새 기록 abort·기존 GPU 리드백/재사용을 D/R 합계 4회 확인했다. 별도의 완료 통지 지연, 미제출/abort/backend generation 제출 거절과 게시 차단, 한 바이트 부족/정확한 GPU 캐시 예산 경계도 통과했다. C1 깊이를 GPU에서 지운 출력 누락 변이 8건은 독립 정답이 거부하고 정상 대조군은 통과했다. 셰이더 ID 누락이나 Editor 재임포트 UI 왕복 검사로 확대하지 않는다. 기존 그림자 51·데칼 114·LOD 32프레임 회귀도 D/R 통과했고 최신 Editor Debug 빌드·39노드 검사도 통과했다. 성능은 미측정이다. <a href="../../Artifacts/shadow-correctness-20261016/scope-verdict.json">범위·원본·소스 신원</a>.</p><p><b>보강 게이트 통과 / 추가 확장:</b> 위 선택 사례의 혼합 가림·복구·캐시 전환·제출 거절/abort·실제 GPU 미완료·두 뷰·장치 정상 재생성·GPU 바이트 예산 검사를 잔여로 다시 세지 않는다. 일반 장면/스킨드 독립 정답, 강제 장치 손실·제출 실행 시작 뒤 실패, CPU 키 64 MiB·8뷰 퇴거 스트레스는 별도 확장이다. Release 전체 Editor 통합·Vulkan, point/spot·증분 atlas·비동기 배치와 성능 수용도 별도다. <a href="../analysis/LiveRenderWiring20261012.html#validation-current">최신 검증 표</a></p></div>
+
 
 <section class="callout">
   <p class="big">현재 범위: LX 그림자 경로의 DX12 검증과 compute 사전 컬링 구현</p>

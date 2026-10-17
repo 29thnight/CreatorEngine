@@ -1,11 +1,11 @@
-#include <set>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "MeshRenderer.h"
 #include "AuthoringParsedDocument.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "ReflectionYml.h"
 #include "DataSystem.h"
 #include "ProfileScope.h"
-#include <optional>
 #include "Entity.h"
 #include "Material.h"
 #include "SceneManager.h"
@@ -18,8 +18,6 @@
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC7: typed 정본
 #include <mathematics/transform.hpp>
 
-#include <algorithm>
-#include <limits>
 #include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 계수(무조건 stdout 출력 제거)
 
 // The last observed values distinguish a fresh instance edit from an authored
@@ -1307,6 +1305,8 @@ assets::ModelMeshHandle MeshRenderer::GetModelMeshHandle() const
 	{
 		return {};
 	}
+    if (const auto& descriptor = m_modelGeneration->Meshes()[m_modelMeshIndex].streamDescriptor)
+        return assets::MakeModelMeshHandle(*descriptor);
 	return { m_modelGeneration->Identity().modelId,
 		m_modelGeneration->Meshes()[m_modelMeshIndex].meshId,
 		m_modelGeneration->Identity().generation };

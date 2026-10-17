@@ -29,14 +29,7 @@
 // 와 무관해야 하고, 무관해야 독립적으로 컴파일해 재어 볼 수 있다. <ranges> 를
 // 여기 가두는 것도 같은 값이다 — TypeTrait.h 는 이 헤더를 물지 않는다(그쪽은
 // Core.Minimal 을 타고 수백 TU 로 퍼진다).
-#include <concepts>
-#include <cstddef>
-#include <filesystem>
-#include <ranges>
-#include <string>
-#include <string_view>
-#include <type_traits>
-#include <utility>
+#include "StandardLibrary.h"
 
 namespace meta::container
 {

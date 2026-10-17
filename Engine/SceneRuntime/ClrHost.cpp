@@ -1,4 +1,5 @@
 #include "EngineRuntimePaths.h"
+#include "../Utility_Framework/TimeSystem.h"
 #include "ScriptApiVersion.h"
 #include "ClrHost.h"
 #include "ProfileScope.h"
@@ -9,8 +10,8 @@
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "ScriptPhysicsABI.h"
-#include <array>
-#include <thread>
+#include <stddef.h>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "Transform.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -37,8 +38,6 @@
 #include <hostfxr.h>
 
 #include <windows.h>
-#include <cstring>
-#include <cstddef>
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
 // 헤더·lib·DLL은 ThirdParty\DotNetHost\에 고정한 사본이고, 경로는 EngineOutput.props의

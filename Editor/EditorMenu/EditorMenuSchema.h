@@ -43,11 +43,7 @@
 
 #include "EditorMenuSurface.h"
 
-#include <array>
-#include <cstddef>
-#include <string_view>
-#include <tuple>
-#include <type_traits>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {
