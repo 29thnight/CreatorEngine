@@ -250,9 +250,27 @@ struct SceneHost::ShadowCache
     IRenderDeviceServices* device{};
     std::array<RHITextureHandle, 3> depths{};
     std::vector<std::byte> key;
+    std::vector<std::weak_ptr<const MeshSurfaceInput>> geometryIdentities;
     std::uint64_t frameId{}, completion{}, bytes{};
     std::uint32_t extent{};
     std::atomic<unsigned> recordedMask{};
+    bool MatchesGeometry(std::span<const std::weak_ptr<const MeshSurfaceInput>> identities) const
+    {
+        if (geometryIdentities.size() != identities.size())
+        {
+            return false;
+        }
+        for (std::size_t index = 0; index < identities.size(); ++index)
+        {
+            const auto previous = geometryIdentities[index].lock();
+            const auto current = identities[index].lock();
+            if (!previous || previous != current || previous.owner_before(current) || current.owner_before(previous))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
     ~ShadowCache()
     {
         if (device)
@@ -1849,16 +1867,29 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         }
         std::erase_if(shadowCaches_, [&](const auto& entry) { return entry.first.first != view.sceneEpoch; });
         std::erase_if(shadowHistories_, [&](const auto& entry) { return entry.first.first != view.sceneEpoch; });
-        // Equality compares the exact serialized inputs; no hash-only cache hit.
+        // 현재 view/world/residency는 값으로 비교하고, 봉인된 partition은 약한 소유 신원으로 비교한다.
+        // 원본 geometry 바이트를 매 프레임 복사하지 않으며 hash-only hit도 허용하지 않는다.
         std::vector<std::byte> key;
+        std::vector<std::weak_ptr<const MeshSurfaceInput>> geometryIdentities;
+        geometryIdentities.reserve(candidate->input->Draws().size());
+        constexpr std::uint64_t maxKeyBytes = 64ull << 20;
+        std::uint64_t keyBytes{};
         bool keyOverflow{};
-        const auto appendBytes = [&](std::span<const std::byte> bytes) {
-            if (bytes.size() > (64ull << 20) - key.size())
+        const auto accountBytes = [&](std::uint64_t bytes) {
+            if (bytes > maxKeyBytes - keyBytes)
             {
                 keyOverflow = true;
-                return;
+                keyBytes = maxKeyBytes;
+                return false;
             }
-            key.insert(key.end(), bytes.begin(), bytes.end());
+            keyBytes += bytes;
+            return true;
+        };
+        const auto appendBytes = [&](std::span<const std::byte> bytes) {
+            if (accountBytes(bytes.size()))
+            {
+                key.insert(key.end(), bytes.begin(), bytes.end());
+            }
         };
         const auto append = [&](const auto& value) {
             const auto bytes = std::as_bytes(std::span{&value, std::size_t{1}});
@@ -1867,6 +1898,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         const auto appendRange = [&](const auto& range) {
             append(range.size());
             appendBytes(std::as_bytes(std::span{range.data(), range.size()}));
+        };
+        const auto account = [&](const auto& value) {
+            accountBytes(sizeof(value));
+        };
+        const auto accountRange = [&](const auto& range) {
+            account(range.size());
+            accountBytes(std::as_bytes(std::span{range.data(), range.size()}).size());
         };
         append(view.sceneEpoch);
         append(view.viewId);
@@ -1895,9 +1933,11 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             append(inputDraw.temporalIncarnation);
             append(inputDraw.temporalInstanceId);
             append(draw.geometryRecord);
+            append(candidate->geometryStage.geometryTable->records[draw.geometryRecord].chunkIndex);
             append(draw.doubleSided);
             append(draw.geometry->ObjectToWorld());
             append(draw.geometry->UsesDirectClusters());
+            append(bool(draw.geometry->ClusterResidency()));
             if (const auto& resident = draw.geometry->ClusterResidency())
             {
                 appendRange(resident->groups);
@@ -1905,37 +1945,44 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                 appendRange(grid.origin);
                 appendRange(grid.step);
             }
-            // Include the sealed chunk bytes, topology and hierarchy. A reused model
-            // identity cannot hide changed import payload or a different partition.
-            const auto& mesh = draw.geometry->Input()->Geometry();
-            append(mesh.vertexAttributeMask);
-            append(mesh.vertexStride);
-            append(mesh.vertexLayoutHash);
-            append(mesh.vertexBytes);
-            const auto* vertices = static_cast<const std::byte*>(mesh.vertexData);
-            const bool streamedTopology = draw.geometry->Input()->StreamedTopology();
-            append(streamedTopology);
-            if (!streamedTopology) appendBytes({vertices, mesh.vertexBytes});
-            append(mesh.indexCount);
-            const auto* indices = reinterpret_cast<const std::byte*>(mesh.indexData);
-            if (!streamedTopology) appendBytes({indices, std::size_t(mesh.indexCount) * sizeof(std::uint32_t)});
-            const auto& meshlets = draw.geometry->Input()->Meshlets();
-            // Cold topology has logical extents but no CPU arrays.
-            append(meshlets.geometryDigest);
-            append(meshlets.settings);
-            append(meshlets.lod0);
-            appendRange(meshlets.descriptors);
-            appendRange(meshlets.vertexRemap);
-            appendRange(meshlets.triangleIndices);
-            appendRange(meshlets.primitiveRemap);
-            appendRange(draw.geometry->Input()->SourceVertexIds());
-            const auto& hierarchy = draw.geometry->Input()->Hierarchy();
-            append(hierarchy.rootGroup);
-            append(hierarchy.groupCount);
-            for (const auto& group : hierarchy.groups)
+            // root source는 generation/LOD/layout/chunk budget까지 확정된 불변 partition의 신원이다.
+            // weak token은 CPU/GPU payload를 보유하지 않고 만료/재봉인 시 기존 depth를 재사용하지 않는다.
+            if (!accountBytes(sizeof(std::weak_ptr<const MeshSurfaceInput>)))
             {
-                append(group);
+                return Fail(error, "Shadow static-cache identity exceeds its 64 MiB bound.");
             }
+            geometryIdentities.push_back(inputDraw.geometry->SceneTopologyIdentity());
+            // 복사하던 geometry의 논리 바이트 상한은 계속 검사한다. streamed topology의 비어 있는
+            // CPU 배열은 읽지 않으며 크기만 계산한다.
+            const auto& mesh = draw.geometry->Input()->Geometry();
+            account(mesh.vertexAttributeMask);
+            account(mesh.vertexStride);
+            account(mesh.vertexLayoutHash);
+            account(mesh.vertexBytes);
+            const bool streamedTopology = draw.geometry->Input()->StreamedTopology();
+            account(streamedTopology);
+            if (!streamedTopology)
+            {
+                accountBytes(mesh.vertexBytes);
+            }
+            account(mesh.indexCount);
+            if (!streamedTopology)
+            {
+                accountBytes(std::uint64_t(mesh.indexCount) * sizeof(std::uint32_t));
+            }
+            const auto& meshlets = draw.geometry->Input()->Meshlets();
+            account(meshlets.geometryDigest);
+            account(meshlets.settings);
+            account(meshlets.lod0);
+            accountRange(meshlets.descriptors);
+            accountRange(meshlets.vertexRemap);
+            accountRange(meshlets.triangleIndices);
+            accountRange(meshlets.primitiveRemap);
+            accountRange(draw.geometry->Input()->SourceVertexIds());
+            const auto& hierarchy = draw.geometry->Input()->Hierarchy();
+            account(hierarchy.rootGroup);
+            account(hierarchy.groupCount);
+            accountBytes(std::as_bytes(std::span{hierarchy.groups.data(), hierarchy.groups.size()}).size());
             if (keyOverflow)
             {
                 return Fail(error, "Shadow static-cache identity exceeds its 64 MiB bound.");
@@ -1957,7 +2004,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         for (const auto& item : cached)
         {
             if (!reset && item->device == device_ && item->completion && item->completion <= completed &&
-                item->frameId < context.frameId && item->key == key)
+                item->frameId < context.frameId && item->key == key && item->MatchesGeometry(geometryIdentities))
             {
                 candidate->shadowCacheStage.cache = item;
                 candidate->shadowCacheStage.hit = true;
@@ -1985,6 +2032,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             cache->bytes = bytes;
             cache->frameId = context.frameId;
             cache->key = std::move(key);
+            cache->geometryIdentities = std::move(geometryIdentities);
             for (auto& depth : cache->depths)
             {
                 RHITextureDesc desc;

@@ -4,6 +4,7 @@
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
 #include <stdint.h>
+#include <initializer_list>
 #include "../../../Utility_Framework/StandardLibrary.h"
 
 #include "../../RHI/IRHIGpuProfiler.h"
@@ -479,6 +480,10 @@ public:
 
     RGPassId AddPass(const std::string& name, std::vector<RGPassUsage> usages,
         ExecuteCallback execute, bool hasSideEffect = false);
+    // 중괄호 목록은 그래프가 소유한 저장 공간으로 바로 복사한다.
+    // 반환 전에 복사를 끝내므로 임시 배열의 참조가 다음 기록까지 남지 않는다.
+    RGPassId AddPass(const std::string& name, std::initializer_list<RGPassUsage> usages,
+        ExecuteCallback execute, bool hasSideEffect = false);
 
     struct RepeatedPhase
     {
@@ -893,6 +898,7 @@ private:
     };
 
     Pass& AppendPass();
+    RGPassId InitializePass(const std::string& name, bool hasSideEffect);
     void ClearPassMetadata(Pass& pass);
 
     struct FinalStateRequirement
@@ -927,7 +933,11 @@ private:
     void RecordPassBody(const ExecuteContext& context, const Pass& pass,
         uint32_t slice, uint32_t sliceCount) const;
 
-    std::vector<Resource> m_resources;
+    Resource& AppendResource();
+    // Pass처럼 완료된 기록 사이에 메타데이터 컨테이너를 유지한다.
+    // 활성 구간만 현재 핸들·상태·버전 선언을 포함한다.
+    std::vector<Resource> m_resourceStorage;
+    std::span<Resource> m_resources;
     // Declaration-local indices. Reset removes every entry, and generation bits
     // remain part of the key. Duplicate imports keep the original first match.
     std::unordered_map<uint32_t, uint16_t> m_importedTextures, m_importedBuffers;

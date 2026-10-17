@@ -497,6 +497,10 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
         std::shared_ptr<const MeshSurfacePlan> same;
         Check(MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, {}, same, error) && large->Matches(*same),
               "Deterministic partition identity");
+        const auto releasedIdentity = same->SceneTopologyIdentity();
+        Check(!releasedIdentity.expired(), "A sealed partition publishes a live topology identity");
+        same.reset();
+        Check(releasedIdentity.expired(), "A retained topology token does not keep uncached geometry alive");
         std::vector<float> sceneLods(geometry.lods.size(), 0.f);
         std::shared_ptr<const MeshSurfacePlan> sceneFirst, sceneNext;
         const auto looseDraw = geometry.draw;
@@ -517,6 +521,11 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
               "Scene partition pose rebind: " + error);
         Check(sceneNext->SharesSceneTopology(*sceneFirst),
               "Temporal previous pose can reuse the same immutable topology after camera/object movement");
+        const auto firstIdentity = sceneFirst->SceneTopologyIdentity();
+        const auto nextIdentity = sceneNext->SceneTopologyIdentity();
+        Check(firstIdentity.lock() == nextIdentity.lock() && !firstIdentity.owner_before(nextIdentity) &&
+                  !nextIdentity.owner_before(firstIdentity),
+              "Static shadow identity follows immutable topology across current world and view rebinding");
         Check(sceneNext->Cost().points == sceneFirst->Cost().points &&
                   sceneNext->Chunks().size() == sceneFirst->Chunks().size() &&
                   sceneNext->Source()->Geometry().vertexData == sceneFirst->Source()->Geometry().vertexData &&
@@ -545,7 +554,16 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
               "Raster partition is independent of the IBL compute point limit");
         Check(!rasterPlan->SharesSceneTopology(*sceneFirst),
               "Temporal previous pose must rebuild when the chunk topology changes");
+        const auto repartitionedIdentity = rasterPlan->SceneTopologyIdentity();
+        Check(firstIdentity.lock() != repartitionedIdentity.lock() &&
+                  (firstIdentity.owner_before(repartitionedIdentity) ||
+                   repartitionedIdentity.owner_before(firstIdentity)),
+              "A different partition cannot reuse shadow depth through the same asset identity");
         VerifyPartition(geometry, *rasterPlan, rasterBudget.maxChunkPoints);
+        sceneFirst.reset();
+        Check(!firstIdentity.expired(), "A current rebound plan still owns its immutable topology");
+        sceneNext.reset();
+        Check(firstIdentity.expired(), "An evicted partition expires after its last frame owner is released");
         Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, rasterBudget, same, error),
               "IBL batch retains its original compute point limit");
         geometry.lods = originalLods;
@@ -1180,9 +1198,156 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     }
 }
 
+void VerifyResourceMetadataReuse(RecordingChangeDevice& device)
+{
+    std::string error;
+    RHIBufferDesc bufferDesc;
+    bufferDesc.bytes = 64;
+    RHIBufferHandle importedBuffer;
+    Check(device.CreateBuffer(bufferDesc, importedBuffer, error), "Resource reuse fixture buffer");
+    RHITextureDesc textureDesc;
+    textureDesc.width = textureDesc.height = 4;
+    textureDesc.format = RHIFormat::RGBA8Unorm;
+    RHITextureHandle importedTexture;
+    Check(device.CreateTexture(textureDesc, importedTexture, error), "Resource reuse fixture texture");
+    {
+        EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
+        std::array<RHIResourceState, 2> oldWritebacks{
+            RHIResourceState::PixelShaderResource, RHIResourceState::PixelShaderResource};
+        // 초기 저장 공간을 넘긴 뒤 활성 구간을 줄이고 다시 늘려, 같은 자리의 종류와 소유권을 바꾼다.
+        const std::array<uint32_t, 5> counts{513, 1, 257, 514, 4};
+        for (uint32_t iteration = 0; iteration < counts.size(); ++iteration)
+        {
+            Drain drain{device};
+            Check(device.BeginFrame(error), "Resource reuse frame begin");
+            const uint32_t count = counts[iteration];
+            const uint32_t liveCount = (std::min)(count, uint32_t{4});
+            std::vector<RGHandle> handles;
+            std::vector<unsigned> kinds;
+            handles.reserve(count);
+            kinds.reserve(count);
+            std::array<unsigned, 4> calls{};
+            for (uint32_t index = 0; index < count; ++index)
+            {
+                const unsigned kind = index < liveCount ? (index + iteration) % 4 :
+                    ((index + iteration) % 2 ? 1u : 3u);
+                const auto name = "Reuse.Resource." + std::to_string(iteration) + "." + std::to_string(index);
+                RGHandle handle;
+                if (kind == 0)
+                {
+                    handle = graph.ImportBuffer(importedBuffer, RHIResourceState::Common, name,
+                        iteration == 0 ? &oldWritebacks[0] : nullptr);
+                }
+                else if (kind == 2)
+                {
+                    handle = graph.ImportTexture(importedTexture, RHIResourceState::Common, name,
+                        iteration == 0 ? &oldWritebacks[1] : nullptr);
+                }
+                else if (kind == 1)
+                {
+                    RGTextureDesc desc;
+                    desc.width = desc.height = 4;
+                    desc.name = name;
+                    handle = graph.CreateTexture(desc);
+                }
+                else
+                {
+                    RGBufferDesc desc;
+                    desc.bytes = 64;
+                    desc.name = name;
+                    handle = graph.CreateBuffer(desc);
+                }
+                Check(handle.IsValid() && handle.index == index, "Resource prefix survives storage growth");
+                if (index < liveCount)
+                {
+                    handle = graph.Write(handle);
+                    if (kind == 0 || kind == 2)
+                    {
+                        graph.RequireImportedFinalState(handle, RHIResourceState::Common);
+                    }
+                    const bool buffer = kind == 0 || kind == 3;
+                    const auto execute = [handle, buffer, index, &calls](const auto& context) {
+                        ++calls[index];
+                        Check(context.ResolveHandle(handle).IsValid() == !buffer &&
+                                  context.graph->ResolveBufferHandle(handle).IsValid() == buffer,
+                              "Recycled resource resolves only its current texture or buffer kind");
+                    };
+                    const auto passName = "Reuse.Write." + std::to_string(index);
+                    if (iteration % 2 == 0)
+                    {
+                        const std::initializer_list<EnhancedRenderGraph::RGPassUsage> localUses{
+                            {handle, RHIResourceState::CopyDest, RGAccessMode::Write}};
+                        graph.AddPass(passName, localUses, execute, true);
+                    }
+                    else
+                    {
+                        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                            {handle, RHIResourceState::CopyDest, RGAccessMode::Write}};
+                        graph.AddPass(passName, std::move(uses), execute, true);
+                    }
+                }
+                handles.push_back(handle);
+                kinds.push_back(kind);
+            }
+            Check(graph.Compile(error), "Resource reuse compile after local usage lifetime ends: " + error);
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            Check(graph.CaptureDiagnosticSnapshot(snapshot) && snapshot.resources.size() == count &&
+                      snapshot.passes.size() == liveCount,
+                  "Only current resource and pass prefixes enter the compiled snapshot");
+            for (uint32_t index = 0; index < count; ++index)
+            {
+                const bool imported = kinds[index] == 0 || kinds[index] == 2;
+                const bool buffer = kinds[index] == 0 || kinds[index] == 3;
+                const auto& resource = snapshot.resources[index];
+                Check(resource.name == "Reuse.Resource." + std::to_string(iteration) + "." + std::to_string(index) &&
+                          resource.imported == imported && resource.buffer == buffer &&
+                          resource.used == (index < liveCount) &&
+                          resource.versionCount == (index < liveCount ? (imported ? 2u : 1u) : 0u),
+                      "Recycled resource has current identity, ownership, reachability and version chain");
+                if (index < liveCount)
+                {
+                    const auto& usages = snapshot.passes[index].usages;
+                    Check(usages.size() == 1 && usages[0].resource == index &&
+                              usages[0].version == handles[index].version && usages[0].kind == handles[index].kind &&
+                              usages[0].state == RHIResourceState::CopyDest && usages[0].access == RGAccessMode::Write,
+                          "Initializer-list and vector declarations own the exact current usage");
+                }
+            }
+            Check(graph.Execute(error), "Resource reuse records current handles: " + error);
+            Check(oldWritebacks[0] == RHIResourceState::PixelShaderResource &&
+                      oldWritebacks[1] == RHIResourceState::PixelShaderResource,
+                  "Compile and recording cannot publish imported state before submission acceptance");
+            Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error),
+                  "Resource reuse submission");
+            device.WaitForGpu();
+            Check(std::ranges::all_of(std::span{calls}.first(liveCount), [](unsigned call) { return call == 1; }),
+                  "Every current resource callback executes exactly once");
+            const auto expectedWriteback = iteration == 0 ? RHIResourceState::Common :
+                RHIResourceState::PixelShaderResource;
+            Check(oldWritebacks[0] == expectedWriteback && oldWritebacks[1] == expectedWriteback,
+                  "Recycled resource slots never write back through a previous frame pointer");
+            const auto epoch = graph.ResourceEpoch();
+            graph.Reset();
+            EnhancedRenderGraph::ExecuteContext context;
+            context.graph = &graph;
+            Check(graph.ResourceEpoch() != epoch && !graph.FindImportedBuffer(importedBuffer).IsValid() &&
+                      !graph.FindImportedTexture(importedTexture).IsValid() &&
+                      !graph.ResolveBufferHandle(handles.front()).IsValid() &&
+                      !context.ResolveHandle(handles.front()).IsValid(),
+                  "Reset clears physical import lookup and invalidates every previous resource epoch");
+            oldWritebacks.fill(RHIResourceState::PixelShaderResource);
+        }
+    }
+    device.ReleaseTexture(importedTexture);
+    device.ReleaseBuffer(importedBuffer);
+    std::string messages;
+    Check(device.DrainDebugMessages(messages) == 0, "Resource metadata reuse GPU validation: " + messages);
+}
+
 void GraphAdmissionTests(RecordingChangeDevice& device)
 {
     std::string error;
+    VerifyResourceMetadataReuse(device);
     Check(!ShouldReplaceStaleLiveFrame(0, 990, 1000, 950, 50, 250), "Unknown capture stamp preserves progress");
     Check(!ShouldReplaceStaleLiveFrame(980, 990, 1000, 950, 50, 250), "Fresh selected input is admitted");
     Check(!ShouldReplaceStaleLiveFrame(800, 820, 1000, 950, 50, 250), "An equally old replacement cannot starve preparation");

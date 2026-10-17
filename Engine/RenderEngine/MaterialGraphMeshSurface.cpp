@@ -1116,6 +1116,17 @@ bool MeshSurfacePlan::SharesSceneTopology(const MeshSurfacePlan& other) const
     return root(this) == root(&other);
 }
 
+std::weak_ptr<const MeshSurfaceInput> MeshSurfacePlan::SceneTopologyIdentity() const
+{
+    const auto* root = this;
+    while (root->staticOwner_)
+    {
+        root = root->staticOwner_.get();
+    }
+    // source는 partition 생성마다 새로 봉인된다. 재생성/eviction은 보수적인 cache miss다.
+    return root->source_;
+}
+
 bool MeshSurfacePlan::BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
                                     const MeshSurfacePlanBudget& budget, std::shared_ptr<const MeshSurfacePlan>& result,
                                     std::string& error)

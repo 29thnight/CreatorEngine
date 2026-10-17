@@ -118,7 +118,14 @@ void EnhancedRenderGraph::Reset()
     m_queueDiagnostics = {};
     m_measurementDomain = RGMeasurementDomain::Normal;
     m_queueExecutionMode = 0;
-    m_resources.clear();
+    // 현재 native 자원을 해제한 뒤 모든 필드를 비운다. Resource와 버전 vector의 수명을 유지해
+    // 다음 선언에서 checked-iterator proxy까지 다시 생성하는 비용을 피한다.
+    const Resource emptyResource{};
+    for (auto& resource : m_resources)
+    {
+        resource = emptyResource;
+    }
+    m_resources = {};
     m_importedTextures.clear();
     m_importedBuffers.clear();
     m_atomicResources.clear();
@@ -208,6 +215,17 @@ bool EnhancedRenderGraph::CheckDeclarationCapacity(std::size_t count, uint16_t l
     return true;
 }
 
+EnhancedRenderGraph::Resource& EnhancedRenderGraph::AppendResource()
+{
+    const auto index = m_resources.size();
+    if (index == m_resourceStorage.size())
+    {
+        m_resourceStorage.emplace_back();
+    }
+    m_resources = std::span{m_resourceStorage}.first(index + 1);
+    return m_resources[index];
+}
+
 RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
@@ -220,7 +238,7 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
         return {};
     }
 
-    auto& entry = m_resources.emplace_back();
+    auto& entry = AppendResource();
     entry.buffer = resource;
     entry.bufferKind = true;
     entry.state = currentState;
@@ -248,7 +266,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
         return {};
     }
 
-    auto& entry = m_resources.emplace_back();
+    auto& entry = AppendResource();
     entry.handle = resource;
     entry.state = currentState;
     entry.writeback = stateWriteback;
@@ -270,7 +288,7 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
     {
         return {};
     }
-    auto& entry = m_resources.emplace_back();
+    auto& entry = AppendResource();
     entry.desc = desc;
     entry.state = RHIResourceState::Common;
     entry.imported = false;
@@ -290,7 +308,7 @@ RGHandle EnhancedRenderGraph::CreateBuffer(const RGBufferDesc& desc)
     {
         return {};
     }
-    auto& entry = m_resources.emplace_back();
+    auto& entry = AppendResource();
     entry.bufferDesc = desc;
     entry.bufferKind = true;
     entry.name = desc.name;
@@ -526,8 +544,7 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     pass.repeated = false;
 }
 
-RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
-    std::vector<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
+RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSideEffect)
 {
     RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
@@ -538,13 +555,39 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     // constructs every checked-iterator proxy again in a Debug build.
     auto& pass = AppendPass();
     pass.name = name;
-    pass.usages = std::move(usages);
-    pass.execute = std::move(execute);
     pass.hasSideEffect = hasSideEffect;
 
     RGPassId id{};
     id.index = static_cast<uint16_t>(m_passes.size() - 1);
     m_compiled = false;
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
+    std::vector<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
+{
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.usages = std::move(usages);
+    pass.execute = std::move(execute);
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
+    std::initializer_list<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
+{
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.usages.assign(usages.begin(), usages.end());
+    pass.execute = std::move(execute);
     return id;
 }
 
@@ -571,22 +614,16 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     std::vector<RGPassUsage> usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
-    RequireQueueIdle();
-    if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
     {
         return {};
     }
-    auto& pass = AppendPass();
-    pass.name = name;
+    auto& pass = m_passes[id.index];
     pass.usages = std::move(usages);
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
-    pass.hasSideEffect = hasSideEffect;
     pass.recordCost = recordCost;
-
-    RGPassId id{};
-    id.index = static_cast<uint16_t>(m_passes.size() - 1);
-    m_compiled = false;
     return id;
 }
 
@@ -1457,7 +1494,7 @@ EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSche
     // checked-iterator proxies in Debug. These are initial capacities, not limits.
     // The METEOR scene graph alone records ~190 passes; 128 forced one full
     // relocation of every Pass per frame.
-    m_resources.reserve(512);
+    m_resourceStorage.reserve(512);
     m_passStorage.reserve(512);
     m_executeOrder.reserve(512);
     m_resourceEpoch = NextResourceEpoch();

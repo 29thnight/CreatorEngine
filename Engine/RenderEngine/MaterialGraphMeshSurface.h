@@ -163,6 +163,8 @@ class MeshSurfacePlan
     const MeshSurfacePlanCost& Cost() const { return cost_; }
     bool Matches(const MeshSurfacePlan& other) const;
     bool SharesSceneTopology(const MeshSurfacePlan& other) const;
+    // 불변 partition의 약한 신원이다. pose/frame과 GPU 자원의 수명을 연장하지 않는다.
+    std::weak_ptr<const MeshSurfaceInput> SceneTopologyIdentity() const;
 
   private:
     MeshSurfacePlan() = default;
