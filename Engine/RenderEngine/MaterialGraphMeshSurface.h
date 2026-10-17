@@ -255,7 +255,6 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
   private:
     friend class MeshSurfaceEvaluator;
     MeshSurfaceBatch() = default;
-    bool RecordCommands(RHIEncoder& encoder, std::string& error) const;
     static bool PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
                                 std::shared_ptr<MeshTransformDispatch>& result, std::string& error);
     static bool RecordDispatch(RHIEncoder& encoder, std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,

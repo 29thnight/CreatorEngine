@@ -1450,10 +1450,19 @@ bool MeshSurfaceEvaluator::Record(IRenderDeviceServices& device, std::shared_ptr
     {
         return false;
     }
+    // Upload/descriptor allocation may submit a command-list prefix and rotate
+    // its encoder. Reject that recording change before any command references
+    // this candidate: failure must not release a submitted GPU resource.
+    const std::shared_ptr<const MeshSurfaceBatch> batches[]{candidate};
+    std::shared_ptr<MeshTransformDispatch> dispatch;
+    if (!MeshSurfaceBatch::PrepareDispatch(batches, dispatch, error))
+    {
+        return false;
+    }
     auto& encoder = device.GetImmediateEncoder();
     const RHIBufferTransition before{candidate->buffer_, RHIResourceState::Common, RHIResourceState::UnorderedAccess};
     encoder.ResourceBarriers({{}, {&before, 1}});
-    if (!candidate->RecordCommands(encoder, error))
+    if (!MeshSurfaceBatch::RecordDispatch(encoder, batches, *dispatch, error))
     {
         return false;
     }
@@ -1791,16 +1800,6 @@ bool MeshSurfaceBatch::RecordDispatch(RHIEncoder& encoder,
                      static_cast<unsigned long long>(ce::profiler_service::now()));
     error.clear();
     return true;
-}
-
-bool MeshSurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error) const
-{
-    const auto owner = self_.lock();
-    if (!owner)
-        return Fail(error, "METEOR transform requires a retained owner.");
-    const std::shared_ptr<const MeshSurfaceBatch> batches[]{owner};
-    std::shared_ptr<MeshTransformDispatch> dispatch;
-    return PrepareDispatch(batches, dispatch, error) && RecordDispatch(encoder, batches, *dispatch, error);
 }
 
 bool MeshSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const

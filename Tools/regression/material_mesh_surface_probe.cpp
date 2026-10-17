@@ -679,15 +679,40 @@ class RecordingChangeDevice final : public DX12DeviceResources
 {
   public:
     bool flushOnUpload{};
+    unsigned flushUploadCountdown{};
+    bool flushOnBindings{};
+    bool failBindings{};
+    unsigned injectedPrefixSubmissions{};
     RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override
     {
-        if (flushOnUpload)
+        if (flushOnUpload || (flushUploadCountdown && --flushUploadCountdown == 0))
         {
             flushOnUpload = false;
-            std::string error;
-            Check(FlushCommandList(error), "Injected native prefix submission: " + error);
+            FlushPrefix();
         }
         return DX12DeviceResources::AllocateUpload(request);
+    }
+    RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descriptions) override
+    {
+        if (flushOnBindings)
+        {
+            flushOnBindings = false;
+            FlushPrefix();
+        }
+        if (failBindings)
+        {
+            failBindings = false;
+            return {};
+        }
+        return DX12DeviceResources::CreateBindings(descriptions);
+    }
+
+  private:
+    void FlushPrefix()
+    {
+        std::string error;
+        Check(FlushCommandList(error), "Injected native prefix submission: " + error);
+        ++injectedPrefixSubmissions;
     }
 };
 
@@ -2314,15 +2339,57 @@ void Run(const std::filesystem::path& root)
         Check(device.DrainDebugMessages(messages) == 0, "GPU failure-path validation: " + messages);
         geometry = GeometryFixture(assets::kCoreVertexAttributes, 0);
         Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, sealed, error), "Prefix source seal");
-        Check(device.BeginFrame(error), "Prefix transform begin");
         std::shared_ptr<const MeshSurfaceBatch> prefixMesh;
-        Check(meshEvaluator.Record(device, sealed, prefixMesh, error), "Prefix retained mesh");
-        auto preservedMesh = prefixMesh;
-        device.flushOnUpload = true;
-        Check(!meshEvaluator.Record(device, sealed, prefixMesh, error) && prefixMesh == preservedMesh,
-              "Allocation prefix submission cannot mix mesh upload recordings");
-        device.AbortFrame();
-        device.WaitForGpu();
+        // Each allocation can submit the old recording. A failed candidate must
+        // never enter that submitted prefix, even through a resource barrier.
+        for (unsigned failure = 1; failure <= 6; ++failure)
+        {
+            Check(device.BeginFrame(error), "Prefix transform begin");
+            Check(meshEvaluator.Record(device, sealed, prefixMesh, error), "Prefix retained mesh");
+            const auto preservedMesh = prefixMesh;
+            const auto recordingBefore = device.GetCurrentUploadRecordingId();
+            const auto submissionsBefore = device.injectedPrefixSubmissions;
+            device.flushUploadCountdown = failure <= 4 ? failure : 0;
+            device.flushOnBindings = failure == 5;
+            device.failBindings = failure == 6;
+            Check(!meshEvaluator.Record(device, sealed, prefixMesh, error) && prefixMesh == preservedMesh,
+                  "Allocation failure preserves the previous mesh result");
+            Check(error.find("allocation changed recording/descriptors") != std::string::npos,
+                  "Failed transform reports its allocation transaction");
+            Check(device.flushUploadCountdown == 0 && !device.flushOnBindings && !device.failBindings,
+                  "Requested transform allocation failure was exercised");
+            Check(device.injectedPrefixSubmissions == submissionsBefore + (failure <= 5 ? 1 : 0) &&
+                      (device.GetCurrentUploadRecordingId() != recordingBefore) == (failure <= 5),
+                  "Prefix injection submits and rotates exactly the expected recording");
+            Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Injected prefix native submit");
+            // Retry on the current encoder, without waiting for the prefix GPU.
+            // Both successful owners remain alive until their submissions finish.
+            Check(meshEvaluator.Record(device, sealed, prefixMesh, error), "Prefix failure retry");
+            auto& retryEncoder = device.GetImmediateEncoder();
+            const RHIBufferTransition toCopy{prefixMesh->Buffer(), RHIResourceState::ShaderResource,
+                                            RHIResourceState::CopySource};
+            retryEncoder.ResourceBarriers({{}, {&toCopy, 1}});
+            retryEncoder.CopyBufferToReadback(readbacks[0], prefixMesh->Buffer());
+            Check(device.EndFrame(error), "Prefix retry submit");
+            Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Prefix retry native submit");
+            device.WaitForGpu();
+            RHIReadbackImage retryReadback;
+            Check(device.MapReadback(readbacks[0], retryReadback, error), "Prefix retry readback");
+            Check(prefixMesh->ValidateReadback({retryReadback.Elements<SurfacePoint>(), kPoints}, error),
+                  "Prefix retry produces accepted transformed points");
+            for (unsigned point = 0; point < kPoints; ++point)
+            {
+                const auto actual = std::bit_cast<std::array<float, 20>>(retryReadback.Elements<SurfacePoint>()[point]);
+                const auto expected = std::bit_cast<std::array<float, 20>>(WorldReference(geometry, point));
+                for (unsigned component = 0; component < actual.size(); ++component)
+                {
+                    Near(actual[component], expected[component], "Prefix retry CPU/GPU scalar reference");
+                }
+            }
+            Check(device.DrainDebugMessages(messages) == 0, "Prefix transform GPU validation: " + messages);
+        }
+        std::cout << "MESH_PREFIX_LIFETIME_OK cases=6 uploadFlushes=4 bindingFlushes=1 bindingFailures=1 "
+                     "retries=6 preserved=6 validation=0\n";
         Check(device.BeginFrame(error), "Prefix bake begin");
         textures.BeginFrame(++frames);
         Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
