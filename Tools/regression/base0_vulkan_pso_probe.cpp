@@ -2,10 +2,7 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
-#include <chrono>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

@@ -7,14 +7,7 @@
 #include "EditorChromeSnapshot.h"
 #include "EditorWindowRegistry.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cmath>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <mutex>
-#include <unordered_map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

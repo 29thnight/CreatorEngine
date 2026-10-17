@@ -6,12 +6,7 @@
 #include "../../Utility_Framework/JobScheduler.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 
-#include <compare>
-#include <cstddef>
-#include <cstdint>
-#include <map>
-#include <string>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 

@@ -4,16 +4,9 @@
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 #include "../RHISubmissionThread.h"
-#include <atomic>
-#include <algorithm>
-#include <chrono>
-#include <climits>
-#include <exception>
-#include <stdexcept>
-#include <utility>
-#include <mutex>
-#include <thread>
-#include <vector>
+#include <stdint.h>
+#include <limits.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 using Microsoft::WRL::ComPtr;

@@ -1,10 +1,8 @@
 #pragma once
 #include "LogStore.h"
 #include "Benchmark.hpp"
-#include <iostream>
+#include "StandardLibrary.h"
 #include <spdlog/sinks/base_sink.h>
-#include <memory>
-#include <mutex>
 
 class LogSink : public spdlog::sinks::base_sink<std::mutex>
 {

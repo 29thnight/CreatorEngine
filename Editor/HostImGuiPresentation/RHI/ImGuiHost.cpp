@@ -10,10 +10,7 @@
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <Windows.h>
-#include <algorithm>
-#include <cstdio>
-#include <memory>
-#include <utility>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

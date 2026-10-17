@@ -2,7 +2,7 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 #include "RHI/RHIFormat.h"
-#include <cstdint>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/color.hpp>
 #include <wrl/client.h>
 

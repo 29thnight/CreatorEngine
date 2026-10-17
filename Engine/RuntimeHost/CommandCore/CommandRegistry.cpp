@@ -1,7 +1,6 @@
 #include "CommandRegistry.h"
 
-#include <algorithm>
-#include <map>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace CommandCore
 {

@@ -14,11 +14,7 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include <memory>
-#include <span>
-#include <unordered_map>
-#include <vector>
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;

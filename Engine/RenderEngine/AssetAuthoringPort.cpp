@@ -1,8 +1,6 @@
 #include "Interfaces/AssetAuthoringPort.h"
 
-#include <atomic>
-#include <mutex>
-#include <shared_mutex>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

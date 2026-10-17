@@ -3,14 +3,9 @@
 
 #include <spdlog/sinks/msvc_sink.h>
 
-#include <algorithm>
-#include <chrono>
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <ctime>
-#include <exception>
-#include <vector>
+#include <float.h>
+#include <stdio.h>
+#include "StandardLibrary.h"
 
 #include <Windows.h>
 
@@ -53,7 +48,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
             // 조용히 지나가면 '로그에 CRASH 줄은 있는데 .dmp는 없다'가 되고,
             // 나중에 그 이유를 알 방법이 없어진다. 미등록 자체를 사건으로 남긴다.
             std::fputs("[크래시] 덤프 기록자가 등록되지 않아 .dmp를 남기지 못했다"
-                " (EngineBootstrap에서 CoreWindow::SetDumpType이 불렸는지 확인할 것).\n", stdout);
+                " (EngineBootstrap에서 WindowsCoreWindow::SetDumpType이 불렸는지 확인할 것).\n", stdout);
             std::fflush(stdout);
 
             if (g_logSystemAlive.load(std::memory_order_acquire))

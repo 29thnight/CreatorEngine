@@ -17,14 +17,7 @@
 #include "Entity.h"
 #include "../../ThirdParty/ImViewGuizmo/MathematicsAdapter.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <memory>
-#include <vector>
-#include <cstdint>
-#include <cstring>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

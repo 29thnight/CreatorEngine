@@ -1,6 +1,6 @@
 #include "AssetIdentityRegistry.h"
 
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

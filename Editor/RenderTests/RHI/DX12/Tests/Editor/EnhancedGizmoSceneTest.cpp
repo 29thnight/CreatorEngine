@@ -24,10 +24,7 @@
 #include "Texture.h"
 #include "../Utility_Framework/PathFinder.h"
 
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Gizmo 계열 씬 연결 검증 (PHASE 3-6, Gizmo 계열 5차 슬라이스).
 //

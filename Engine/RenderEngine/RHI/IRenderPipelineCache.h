@@ -1,6 +1,5 @@
 #pragma once
-#include <cstdint>
-#include <string>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "RHIHandle.h"
 #include "RHIPipelineLayout.h"

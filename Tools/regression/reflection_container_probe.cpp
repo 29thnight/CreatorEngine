@@ -34,19 +34,7 @@
 #include "ReflectionContainer.h"
 #include "TypeTrait.h"
 
-#include <array>
-#include <cstdio>
-#include <deque>
-#include <filesystem>
-#include <list>
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 using namespace meta::container;
 

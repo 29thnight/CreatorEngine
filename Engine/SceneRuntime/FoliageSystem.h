@@ -1,6 +1,6 @@
 #pragma once
 #include "ClassProperty.h"
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class FoliageComponent;
 

@@ -2,8 +2,7 @@
 #include "TemporalReconstruction.h"
 #include "SpatialPostEffects.h"
 #include "TemporalProductSettings.h"
-#include <mutex>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // Commands submit intent. Only a live renderer/presenter publishes observations;
 // requesting a provider never manufactures support, activation or GPU completion.

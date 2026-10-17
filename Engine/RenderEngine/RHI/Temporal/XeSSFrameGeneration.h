@@ -3,7 +3,7 @@
 #include "XeSSUpscaler.h"
 #include "../../Render/Temporal/ITemporalFrameGenerator.h"
 
-#include <functional>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 struct ID3D12CommandQueue;
 struct ID3D12CommandList;

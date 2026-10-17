@@ -1,11 +1,6 @@
 #pragma once
 
-#include <atomic>
-#include <cstdint>
-#include <filesystem>
-#include <functional>
-#include <memory>
-#include <system_error>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // Editor-owned recursive directory notification source.
 //

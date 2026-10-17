@@ -5,10 +5,7 @@
 // 없다. 화면이 숫자를 만들면 그 숫자를 검사할 자리가 화면뿐이 된다.
 #include "ProfilerView.h"
 
-#include <cstdio>
-#include <algorithm>
-#include <cctype>
-#include <cstring>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ImGui.h"
 #include "ProfileMarker.h"

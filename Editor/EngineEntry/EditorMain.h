@@ -19,14 +19,7 @@ namespace wave
 #include "MenuBarWindow.h"
 #include "EditorPlayModeController.h"
 
-#include <atomic>
-#include <array>
-#include <condition_variable>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Editor
 {
@@ -48,7 +41,7 @@ namespace Editor
 	//
 	// ── 무엇이 바뀌었나 ──
 	//
-	// 창은 CoreWindow 싱글턴에서 온다. 디바이스는 없다 — 씬은
+	// 창은 WindowsCoreWindow 싱글턴에서 온다. 디바이스는 없다 — 씬은
 	// EnhancedSceneRenderer(DX12)가, 화면 출력은 ImGui DX12 셸이 소유한다.
 	// 이 클래스가 하는 일은 셋뿐이다: 부팅 순서, 프레임 루프, 종료 순서.
 	//

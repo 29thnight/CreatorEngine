@@ -1,4 +1,5 @@
 #include "UIManager.h"
+#include "../Utility_Framework/TimeSystem.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Canvas.h"
@@ -9,7 +10,7 @@
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include "RHI/ScreenSizedResource.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -2,7 +2,7 @@
 
 #include "CollisionGeometryCodec.h"
 #include "../Physics/PhysicsScene.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

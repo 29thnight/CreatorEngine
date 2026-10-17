@@ -1,6 +1,6 @@
 #include "ShaderMetaReflection.h"
 
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

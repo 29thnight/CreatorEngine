@@ -5,12 +5,7 @@
 #include <GameInput.h>
 #include "ImGui.h"
 
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <chrono>
-#include <cstdio>
-#include <cmath>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 #pragma comment(lib, "GameInput.lib")

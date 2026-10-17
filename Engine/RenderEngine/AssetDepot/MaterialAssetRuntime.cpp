@@ -8,12 +8,8 @@
 #include "../ExperimentMaterialMigration.h"
 #include "LegacyResourceCharges.h"
 
-#include <algorithm>
-#include <cassert>
-#include <exception>
-#include <limits>
-#include <stdexcept>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Contract.h"
 
 namespace
 {
@@ -266,7 +262,11 @@ namespace
             {
                 break;
             }
-            assert(retired.size() < retired.capacity());
+            ::ce::contracts::assert_that(
+                [&]() -> bool {
+                    return static_cast<bool>((retired.size() < retired.capacity()));
+                },
+                "retired.size() < retired.capacity()");
             state.shaderMetaRetainedChargeBytes -= oldest->second.retainedCharge;
             oldest->second.retainedCharge = 0u;
             retired.push_back(std::move(oldest->second.retained));
@@ -581,7 +581,11 @@ void DataSystem::CompleteShaderMetaAssetWorkLocked(
             if (retainCandidate)
             {
                 // A new decode was admitted only after a resident miss.
-                assert(!entry.retained && entry.retainedCharge == 0u);
+                ::ce::contracts::assert_that(
+                    [&]() -> bool {
+                        return static_cast<bool>((!entry.retained && entry.retainedCharge == 0u));
+                    },
+                    "!entry.retained && entry.retainedCharge == 0u");
                 entry.retained = asset;
                 entry.retainedCharge = charge;
                 m_materialAssets.shaderMetaRetainedChargeBytes += charge;
@@ -820,7 +824,11 @@ namespace
             {
                 break;
             }
-            assert(retired.size() < retired.capacity());
+            ::ce::contracts::assert_that(
+                [&]() -> bool {
+                    return static_cast<bool>((retired.size() < retired.capacity()));
+                },
+                "retired.size() < retired.capacity()");
             cache.retainedChargeBytes -= oldest->second.retainedCharge;
             oldest->second.retainedCharge = 0u;
             retired.push_back(std::move(oldest->second.retained));
@@ -833,7 +841,11 @@ namespace
     void StageMaterialPipelineConsumers(const AssetDepot::MaterialPipelineAssetCache<T>& cache,
         std::vector<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers)
     {
-        assert(consumers.empty());
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((consumers.empty()));
+            },
+            "consumers.empty()");
         std::size_t count{};
         for (const auto& [key, entry] : cache.entries)
         {
@@ -868,7 +880,11 @@ namespace
         const std::vector<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers,
         Status status, Error error) noexcept
     {
-        assert(retired.empty());
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((retired.empty()));
+            },
+            "retired.empty()");
         static_assert(noexcept(retired.swap(cache.entries)));
         retired.swap(cache.entries);
         cache.retainedChargeBytes = 0u;
@@ -978,8 +994,16 @@ namespace
 
 void DataSystem::StageMaterialAssetRetirementLocked(AssetDepot::MaterialAssetRetiredEntries& retired)
 {
-    assert(retired.shaderMetadata.empty() && retired.shaderMetaConsumers.empty());
-    assert(retired.programs.empty() && retired.materials.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.shaderMetadata.empty() && retired.shaderMetaConsumers.empty()));
+        },
+        "retired.shaderMetadata.empty() && retired.shaderMetaConsumers.empty()");
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.programs.empty() && retired.materials.empty()));
+        },
+        "retired.programs.empty() && retired.materials.empty()");
     StageMaterialPipelineConsumers(m_materialAssets.programs, retired.programConsumers);
     StageMaterialPipelineConsumers(m_materialAssets.materials, retired.materialConsumers);
     StageMaterialPipelineConsumers(m_materialAssets.codePrograms, retired.codeProgramConsumers);
@@ -1014,7 +1038,11 @@ void DataSystem::StageMaterialAssetRetirementLocked(AssetDepot::MaterialAssetRet
 
 void DataSystem::InvalidateMaterialAssetsLocked(AssetDepot::MaterialAssetRetiredEntries& retired) noexcept
 {
-    assert(retired.shaderMetadata.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.shaderMetadata.empty()));
+        },
+        "retired.shaderMetadata.empty()");
     static_assert(noexcept(retired.shaderMetadata.swap(m_materialAssets.shaderMetadata)));
     retired.shaderMetadata.swap(m_materialAssets.shaderMetadata);
     m_materialAssets.shaderMetaRetainedChargeBytes = 0u;
@@ -1914,7 +1942,11 @@ void DataSystem::CompleteMaterialPipelineAssetWorkLocked(
             entry.lastUse = NextMaterialPipelineUse(cache);
             if (retainCandidate)
             {
-                assert(!entry.retained && entry.retainedCharge == 0u);
+                ::ce::contracts::assert_that(
+                    [&]() -> bool {
+                        return static_cast<bool>((!entry.retained && entry.retainedCharge == 0u));
+                    },
+                    "!entry.retained && entry.retainedCharge == 0u");
                 entry.retained = asset;
                 entry.retainedCharge = charge;
                 cache.retainedChargeBytes += charge;

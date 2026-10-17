@@ -214,6 +214,22 @@ internal static class PackageInputs
         }
     }
 
+    public static void RemoveCookedTextureSources(string merged, IEnumerable<string> relativeSources)
+    {
+        var assets = Paths.Child(merged, "Assets");
+        foreach (var relative in relativeSources)
+        {
+            var file = Paths.Child(assets, relative);
+            if (!File.Exists(file)) throw new BuildException($"Cooked texture source missing from package input: {relative}");
+            File.Delete(file);
+            if (File.Exists(file + ".meta"))
+            {
+                Paths.AssertChild(file + ".meta", assets);
+                File.Delete(file + ".meta");
+            }
+        }
+    }
+
     public static void RemoveAudioSources(string merged)
     {
         var assets = Paths.Child(merged, "Assets");

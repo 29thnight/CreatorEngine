@@ -1,8 +1,7 @@
 #pragma once
 #include "Component.h"
 #include "Audio/ListenerState.h"
-#include <mutex>
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Listening is independent of rendering cameras. Enable one active listener per world.
 class [[reflgen::reflect]] AudioListenerComponent

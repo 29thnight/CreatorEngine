@@ -6,8 +6,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "MaterialGraphThinFilmSensitivity.h"
 #include "PathFinder.h"
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

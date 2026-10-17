@@ -1,10 +1,8 @@
 #pragma once
 #include <mathematics/vector3.hpp>
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include <cstdint>
-#include <atomic>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
-#include <type_traits>
 
 struct [[reflgen::reflect]] FoliageInstance
 {

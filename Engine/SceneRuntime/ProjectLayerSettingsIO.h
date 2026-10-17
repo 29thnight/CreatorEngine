@@ -1,8 +1,7 @@
 #pragma once
 
 #include "ProjectLayerSettingsCodec.h"
-#include <filesystem>
-#include <fstream>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class ProjectLayerSettingsIO final
 {

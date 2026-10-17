@@ -4,7 +4,7 @@
 #include <mathematics/scalar.hpp>
 #include <mathematics/transform.hpp>
 
-#include <cmath>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

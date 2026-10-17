@@ -2,7 +2,7 @@
 
 #include "EngineMode.h"
 #include "EnginePaths.h"
-#include "WindowDesc.h"
+#include "WindowsWindow.h"
 #include "RuntimeSettings.h"
 
 // Process-level composition data. The Editor and Player entry points build this value;
@@ -26,5 +26,5 @@ struct EngineLaunchConfig
     EnginePaths paths{};
     RuntimeContentPrepare prepareRuntimeContent{};
     HostSettingsInitialize initializeHostSettings{};
-    WindowDesc window{};
+    WindowsWindowDesc window{};
 };

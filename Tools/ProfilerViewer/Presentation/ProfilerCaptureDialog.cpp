@@ -9,8 +9,7 @@
 #include "ImGui.h"
 #include "ProfilerView.h"
 
-#include <array>
-#include <string>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

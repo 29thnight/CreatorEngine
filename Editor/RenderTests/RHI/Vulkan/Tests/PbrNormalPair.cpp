@@ -4,11 +4,7 @@
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
 
-#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <vector>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // PBR-W1 — normal-map 저작 유무가 **실장면 프레임**에서 단일 정본으로 도달하는가.
 //

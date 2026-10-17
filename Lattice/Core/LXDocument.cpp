@@ -1,9 +1,7 @@
 #include "LXDocument.h"
 #include "LXNodeDefinition.h"
 
-#include <atomic>
-#include <type_traits>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

@@ -1,15 +1,10 @@
 #include "ProfileService.h"
-#include <chrono>
-#include <cmath>
-#include <cstdio>
-#include <new>
-#include <thread>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include <Windows.h>
 #include <psapi.h>
 
-#include <algorithm>
-#include <utility>
 
 // 유니티 빌드 때문에 익명 네임스페이스를 쓰지 않는다(계획서 §14).
 namespace ce::detail::profile_service_impl

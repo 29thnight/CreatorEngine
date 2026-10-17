@@ -2,7 +2,7 @@
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
 #include "../../DX12/DX12DeviceResources.h"
 #include "../../DX12/DX12Encoder.h"
-#include <exception>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

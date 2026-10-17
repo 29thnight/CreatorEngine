@@ -1,11 +1,8 @@
 #include "EnhancedLivePipelineDesc.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
-#include <algorithm>
-#include <cstdio>
-#include <cstdlib>
-#include <initializer_list>
-#include <unordered_set>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

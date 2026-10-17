@@ -1,10 +1,7 @@
 #include "ProfilerRenderingDiagnostics.h"
 #include "ProfileRenderMeasurement.h"
 
-#include <bit>
-#include <cmath>
-#include <concepts>
-#include <utility>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer::diagnostics
 {

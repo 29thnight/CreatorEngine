@@ -4,9 +4,8 @@
 #include "../../RHI/DX12/DX12DeviceResources.h"
 #include "../../RHI/DX12/DX12Encoder.h"
 #include "../../RHI/Temporal/DlssTemporalAdapter.h"
-#include <algorithm>
-#include <atomic>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

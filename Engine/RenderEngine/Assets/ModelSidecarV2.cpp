@@ -7,11 +7,7 @@
 #include "AuthoringWriteNode.h"
 #include "Sha256.h"
 
-#include <algorithm>
-#include <charconv>
-#include <optional>
-#include <set>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

@@ -23,11 +23,7 @@
 #include "TypeTrait.h"
 #include <reflgen/runtime/registry.h>
 #include "../SceneRuntime/SceneGC.h"
-#include <memory>
-#include <span>
-#include <stdexcept>
-#include <string>
-#include <string_view>
+#include "StandardLibrary.h"
 
 namespace Meta
 {

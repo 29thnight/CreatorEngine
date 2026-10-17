@@ -1,6 +1,5 @@
 #include "EditorComponentCatalog.h"
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main()
 {

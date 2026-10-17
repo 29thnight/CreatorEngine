@@ -7,11 +7,7 @@
 #include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <cstring>
-#include <limits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 static std::string Utf8Encode(const std::wstring& wstr)
 {

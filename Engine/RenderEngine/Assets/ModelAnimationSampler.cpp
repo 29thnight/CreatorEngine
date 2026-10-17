@@ -2,8 +2,7 @@
 
 #include <mathematics/transform.hpp>
 
-#include <algorithm>
-#include <cmath>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets::animation
 {

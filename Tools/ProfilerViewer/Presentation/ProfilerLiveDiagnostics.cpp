@@ -2,10 +2,7 @@
 #include "ProfilerView.h"
 #include "ImGui.h"
 
-#include <atomic>
-#include <chrono>
-#include <string>
-#include <utility>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

@@ -4,15 +4,8 @@
 #include "Texture.h"
 #include "Interfaces/Navigation.h"
 
-#include <array>
-#include <cmath>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <limits>
-#include <memory>
-#include <string>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

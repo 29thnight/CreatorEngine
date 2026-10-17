@@ -6,9 +6,8 @@
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include "../RHIResourceTypes.h"
 
-#include <cstdint>
-#include <string>
-#include <unordered_map>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 /// VkDeviceMemory segment + vkBindBufferMemory adapter.
 class VulkanPersistentHeap

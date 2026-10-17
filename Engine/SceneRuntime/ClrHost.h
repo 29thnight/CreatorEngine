@@ -553,7 +553,7 @@ private:
 
 	// AI 틱 큐. 담는 쪽이 잡 스레드라 플래그로 보호한다(위 주석 참고).
 	std::vector<ScriptAITick> m_aiTicks;
-	std::atomic_flag m_aiTickFlag = ATOMIC_FLAG_INIT;
+	std::atomic_flag m_aiTickFlag{};
 	std::vector<ScriptMessage> m_scriptMessages;
 	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
 	CreateFn     m_fnCreateComponent{ nullptr };

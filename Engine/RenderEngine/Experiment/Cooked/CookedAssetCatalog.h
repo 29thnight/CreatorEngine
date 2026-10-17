@@ -5,13 +5,7 @@
 #include "../../AssetDepot/AssetMountId.h"
 #include "../../../Utility_Framework/Ownership.h"
 
-#include <cstddef>
-#include <filesystem>
-#include <map>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

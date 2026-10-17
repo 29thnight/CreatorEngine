@@ -3,11 +3,7 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
 
-#include <algorithm>
-#include <cctype>
-#include <string_view>
-#include <system_error>
-#include <variant>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {

@@ -1,6 +1,6 @@
 #pragma once
 #include "RHIResourceTypes.h"
-#include <memory>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // Backend owns the native heap. Graph retains it until every placed resource
 // has been released after GPU completion. Imported/history resources never enter.

@@ -8,10 +8,7 @@
 // ★ 여기에는 자료를 접는 코드가 없다. 접는 일은 전부 코어가 한다
 //   (ProfileAggregate/ProfileReader) — 그래야 완료조건을 화면 없이 잰다.
 //   이 층은 이미 접힌 것을 그리기만 한다.
-#include <cstdint>
-#include <filesystem>
-#include <functional>
-#include <optional>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ProfileReader.h"
 

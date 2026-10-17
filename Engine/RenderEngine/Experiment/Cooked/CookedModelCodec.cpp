@@ -2,534 +2,503 @@
 #include "../Import/MeshletBuilder.h"
 #include "../Import/MeshLodBuilder.h"
 
-#include <limits>
-#include <new>
-#include <stdexcept>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
-#include <algorithm>
-#include <cstdio>
-#include <cstring>
-#include <unordered_map>
-#include <utility>
 
 namespace experiment::cooked
 {
-    namespace
+namespace
+{
+// ── 쓰기 쪽 도구 ────────────────────────────────────────────────
+
+// 이름을 모아 두는 테이블. 같은 문자열은 한 번만 담는다 — 뼈/노드
+// 이름은 실제로 잘 겹친다(mixamorig 계열).
+class StringTable final
+{
+  public:
+    [[nodiscard]] StringRef Add(std::string_view text)
     {
-        // ── 쓰기 쪽 도구 ────────────────────────────────────────────────
+        if (text.empty())
+            return StringRef{0u, 0u};
 
-        // 이름을 모아 두는 테이블. 같은 문자열은 한 번만 담는다 — 뼈/노드
-        // 이름은 실제로 잘 겹친다(mixamorig 계열).
-        class StringTable final
+        const auto found = lookup_.find(std::string(text));
+        if (found != lookup_.end())
+            return found->second;
+
+        const StringRef ref{static_cast<std::uint32_t>(bytes_.size()), static_cast<std::uint32_t>(text.size())};
+        bytes_.insert(bytes_.end(), text.begin(), text.end());
+        lookup_.emplace(std::string(text), ref);
+        return ref;
+    }
+
+    [[nodiscard]] const std::vector<char>& Bytes() const noexcept { return bytes_; }
+
+  private:
+    std::vector<char> bytes_{};
+    std::unordered_map<std::string, StringRef> lookup_{};
+};
+
+// std::filesystem::path 는 u8 로 왕복한다. `.string()` 은 Windows 에서
+// 현재 로캘로 좁히기 때문에 한글 경로에서 손실되거나 던진다.
+[[nodiscard]] std::string PathToUtf8(const std::filesystem::path& path)
+{
+    const std::u8string value = path.u8string();
+    return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+}
+
+[[nodiscard]] std::filesystem::path Utf8ToPath(std::string_view text)
+{
+    if (text.empty())
+        return {};
+    const std::u8string value(reinterpret_cast<const char8_t*>(text.data()), text.size());
+    return std::filesystem::path(value);
+}
+
+// 섹션 하나를 만드는 동안 바이트를 모으는 곳.
+class ByteWriter final
+{
+  public:
+    void Raw(const void* data, std::size_t size)
+    {
+        if (0 == size)
+            return;
+        const auto* first = static_cast<const std::byte*>(data);
+        bytes_.insert(bytes_.end(), first, first + size);
+    }
+
+    template<typename T>
+    void Pod(const T& value)
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        Raw(&value, sizeof(T));
+    }
+
+    template<typename T>
+    void PodArray(const std::vector<T>& values)
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        Raw(values.data(), values.size() * sizeof(T));
+    }
+
+    [[nodiscard]] const std::vector<std::byte>& Bytes() const noexcept { return bytes_; }
+    [[nodiscard]] std::size_t Size() const noexcept { return bytes_.size(); }
+
+  private:
+    std::vector<std::byte> bytes_{};
+};
+
+[[nodiscard]] std::uint64_t AlignUp(std::uint64_t value) noexcept
+{
+    const std::uint64_t mask = kSectionAlignment - 1u;
+    return (value + mask) & ~mask;
+}
+
+// ── 읽기 쪽 도구 ────────────────────────────────────────────────
+
+// 가변 길이 섹션(재질)을 훑는 커서. **모든 읽기가 경계를 검사한다** —
+// 캐시는 잘리거나 손상될 수 있고, 그때 경계를 안 보면 조용히 남의
+// 메모리를 읽는다. 실패는 플래그로 남기고 뒤 읽기는 전부 무해해진다.
+class ByteCursor final
+{
+  public:
+    explicit ByteCursor(std::span<const std::byte> bytes) noexcept : bytes_(bytes) {}
+
+    [[nodiscard]] bool Ok() const noexcept { return ok_; }
+    [[nodiscard]] bool AtEnd() const noexcept { return offset_ >= bytes_.size(); }
+
+    template<typename T>
+    [[nodiscard]] T Pod() noexcept
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        T value{};
+        if (!ok_ || offset_ + sizeof(T) > bytes_.size())
         {
-        public:
-            [[nodiscard]] StringRef Add(std::string_view text)
-            {
-                if (text.empty()) return StringRef{ 0u, 0u };
-
-                const auto found = lookup_.find(std::string(text));
-                if (found != lookup_.end()) return found->second;
-
-                const StringRef ref{
-                    static_cast<std::uint32_t>(bytes_.size()),
-                    static_cast<std::uint32_t>(text.size()) };
-                bytes_.insert(bytes_.end(), text.begin(), text.end());
-                lookup_.emplace(std::string(text), ref);
-                return ref;
-            }
-
-            [[nodiscard]] const std::vector<char>& Bytes() const noexcept { return bytes_; }
-
-        private:
-            std::vector<char> bytes_{};
-            std::unordered_map<std::string, StringRef> lookup_{};
-        };
-
-        // std::filesystem::path 는 u8 로 왕복한다. `.string()` 은 Windows 에서
-        // 현재 로캘로 좁히기 때문에 한글 경로에서 손실되거나 던진다.
-        [[nodiscard]] std::string PathToUtf8(const std::filesystem::path& path)
-        {
-            const std::u8string value = path.u8string();
-            return std::string(reinterpret_cast<const char*>(value.data()), value.size());
+            ok_ = false;
+            return value;
         }
+        std::memcpy(&value, bytes_.data() + offset_, sizeof(T));
+        offset_ += sizeof(T);
+        return value;
+    }
 
-        [[nodiscard]] std::filesystem::path Utf8ToPath(std::string_view text)
+    template<typename T>
+    bool Array(std::uint32_t count, std::vector<T>& values)
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        if (!ok_ || offset_ > bytes_.size() || count > (bytes_.size() - offset_) / sizeof(T))
         {
-            if (text.empty()) return {};
-            const std::u8string value(
-                reinterpret_cast<const char8_t*>(text.data()), text.size());
-            return std::filesystem::path(value);
+            ok_ = false;
+            return false;
         }
-
-        // 섹션 하나를 만드는 동안 바이트를 모으는 곳.
-        class ByteWriter final
+        try
         {
-        public:
-            void Raw(const void* data, std::size_t size)
-            {
-                if (0 == size) return;
-                const auto* first = static_cast<const std::byte*>(data);
-                bytes_.insert(bytes_.end(), first, first + size);
-            }
-
-            template <typename T>
-            void Pod(const T& value)
-            {
-                static_assert(std::is_trivially_copyable_v<T>);
-                Raw(&value, sizeof(T));
-            }
-
-            template <typename T>
-            void PodArray(const std::vector<T>& values)
-            {
-                static_assert(std::is_trivially_copyable_v<T>);
-                Raw(values.data(), values.size() * sizeof(T));
-            }
-
-            [[nodiscard]] const std::vector<std::byte>& Bytes() const noexcept { return bytes_; }
-            [[nodiscard]] std::size_t Size() const noexcept { return bytes_.size(); }
-
-        private:
-            std::vector<std::byte> bytes_{};
-        };
-
-        [[nodiscard]] std::uint64_t AlignUp(std::uint64_t value) noexcept
-        {
-            const std::uint64_t mask = kSectionAlignment - 1u;
-            return (value + mask) & ~mask;
+            values.resize(count);
         }
-
-        // ── 읽기 쪽 도구 ────────────────────────────────────────────────
-
-        // 가변 길이 섹션(재질)을 훑는 커서. **모든 읽기가 경계를 검사한다** —
-        // 캐시는 잘리거나 손상될 수 있고, 그때 경계를 안 보면 조용히 남의
-        // 메모리를 읽는다. 실패는 플래그로 남기고 뒤 읽기는 전부 무해해진다.
-        class ByteCursor final
+        catch (const std::bad_alloc&)
         {
-        public:
-            explicit ByteCursor(std::span<const std::byte> bytes) noexcept
-                : bytes_(bytes) {}
-
-            [[nodiscard]] bool Ok() const noexcept { return ok_; }
-            [[nodiscard]] bool AtEnd() const noexcept { return offset_ >= bytes_.size(); }
-
-            template <typename T>
-            [[nodiscard]] T Pod() noexcept
-            {
-                static_assert(std::is_trivially_copyable_v<T>);
-                T value{};
-                if (!ok_ || offset_ + sizeof(T) > bytes_.size()) { ok_ = false; return value; }
-                std::memcpy(&value, bytes_.data() + offset_, sizeof(T));
-                offset_ += sizeof(T);
-                return value;
-            }
-
-            template <typename T>
-            bool Array(std::uint32_t count, std::vector<T>& values)
-            {
-                static_assert(std::is_trivially_copyable_v<T>);
-                if (!ok_ || offset_ > bytes_.size() || count > (bytes_.size() - offset_) / sizeof(T))
-                {
-                    ok_ = false;
-                    return false;
-                }
-                try
-                {
-                    values.resize(count);
-                }
-                catch (const std::bad_alloc&)
-                {
-                    ok_ = false;
-                    return false;
-                }
-                catch (const std::length_error&)
-                {
-                    ok_ = false;
-                    return false;
-                }
-                const std::size_t size = static_cast<std::size_t>(count) * sizeof(T);
-                if (size != 0u)
-                {
-                    std::memcpy(values.data(), bytes_.data() + offset_, size);
-                }
-                offset_ += size;
-                return true;
-            }
-
-        private:
-            std::span<const std::byte> bytes_{};
-            std::size_t offset_{};
-            bool ok_{ true };
-        };
-
-        void Reject(std::vector<ModelLoadIssue>& issues,
-            std::string context, std::string message)
-        {
-            issues.push_back(ModelLoadIssue{
-                // ★ Warning 이다. 캐시 거부는 정상 폴백이지 실패가 아니다.
-                //   Error 로 내면 진짜 실패를 찾을 때 잡음이 된다.
-                ModelLoadIssueSeverity::Warning,
-                ModelLoadIssueCode::CookedPayloadRejected,
-                std::move(context), std::move(message) });
+            ok_ = false;
+            return false;
         }
-
-        // 섹션 하나를 원소 배열로 본다. bytes 가 elementCount * sizeof(T) 와
-        // 정확히 맞지 않으면 거부한다 — 딱 맞지 않는데 읽으면 끝이 잘린다.
-        template <typename T>
-        [[nodiscard]] bool ViewArray(std::span<const std::byte> file,
-            const SectionEntry& entry, std::span<const T>& out,
-            std::vector<ModelLoadIssue>& issues, const char* what)
+        catch (const std::length_error&)
         {
-            if (entry.offset > file.size() || entry.bytes > file.size() - entry.offset)
-            {
-                Reject(issues, what, "섹션이 파일 밖을 가리킨다 — 잘렸거나 손상됐다.");
-                return false;
-            }
-            if ((reinterpret_cast<std::uintptr_t>(file.data()) + entry.offset) % alignof(T) != 0u
-                || entry.bytes != static_cast<std::uint64_t>(entry.elementCount) * sizeof(T))
-            {
-                Reject(issues, what, "섹션 크기가 원소 수와 맞지 않는다.");
-                return false;
-            }
-            out = std::span<const T>(
-                reinterpret_cast<const T*>(file.data() + entry.offset),
-                entry.elementCount);
-            return true;
+            ok_ = false;
+            return false;
         }
-
-        // [begin, count) 가 블록 안인가. 범위 참조는 전부 이걸 통과해야 한다 —
-        // 굽는 쪽이 맞게 써도 파일이 손상되면 여기로 들어온다.
-        [[nodiscard]] bool InRange(std::uint32_t begin, std::uint32_t count,
-            std::size_t size) noexcept
+        const std::size_t size = static_cast<std::size_t>(count) * sizeof(T);
+        if (size != 0u)
         {
-            return static_cast<std::uint64_t>(begin) + count <= size;
+            std::memcpy(values.data(), bytes_.data() + offset_, size);
         }
+        offset_ += size;
+        return true;
+    }
 
-        void RejectWrite(std::vector<ModelLoadIssue>& issues,
-            ModelLoadIssueCode code, std::string context, std::string message)
+  private:
+    std::span<const std::byte> bytes_{};
+    std::size_t offset_{};
+    bool ok_{true};
+};
+
+void Reject(std::vector<ModelLoadIssue>& issues, std::string context, std::string message)
+{
+    issues.push_back(ModelLoadIssue{// ★ Warning 이다. 캐시 거부는 정상 폴백이지 실패가 아니다.
+                                    //   Error 로 내면 진짜 실패를 찾을 때 잡음이 된다.
+                                    ModelLoadIssueSeverity::Warning, ModelLoadIssueCode::CookedPayloadRejected,
+                                    std::move(context), std::move(message)});
+}
+
+// 섹션 하나를 원소 배열로 본다. bytes 가 elementCount * sizeof(T) 와
+// 정확히 맞지 않으면 거부한다 — 딱 맞지 않는데 읽으면 끝이 잘린다.
+template<typename T>
+[[nodiscard]] bool ViewArray(std::span<const std::byte> file, const SectionEntry& entry, std::span<const T>& out,
+                             std::vector<ModelLoadIssue>& issues, const char* what)
+{
+    if (entry.offset > file.size() || entry.bytes > file.size() - entry.offset)
+    {
+        Reject(issues, what, "섹션이 파일 밖을 가리킨다 — 잘렸거나 손상됐다.");
+        return false;
+    }
+    if ((reinterpret_cast<std::uintptr_t>(file.data()) + entry.offset) % alignof(T) != 0u ||
+        entry.bytes != static_cast<std::uint64_t>(entry.elementCount) * sizeof(T))
+    {
+        Reject(issues, what, "섹션 크기가 원소 수와 맞지 않는다.");
+        return false;
+    }
+    out = std::span<const T>(reinterpret_cast<const T*>(file.data() + entry.offset), entry.elementCount);
+    return true;
+}
+
+// [begin, count) 가 블록 안인가. 범위 참조는 전부 이걸 통과해야 한다 —
+// 굽는 쪽이 맞게 써도 파일이 손상되면 여기로 들어온다.
+[[nodiscard]] bool InRange(std::uint32_t begin, std::uint32_t count, std::size_t size) noexcept
+{
+    return static_cast<std::uint64_t>(begin) + count <= size;
+}
+
+void RejectWrite(std::vector<ModelLoadIssue>& issues, ModelLoadIssueCode code, std::string context, std::string message)
+{
+    issues.push_back(ModelLoadIssue{ModelLoadIssueSeverity::Error, code, std::move(context), std::move(message)});
+}
+
+[[nodiscard]] bool ValidateCookedAssetReferences(const ModelDraft& draft, std::vector<ModelLoadIssue>& issues)
+{
+    std::vector<AssetId> ownedIdentities;
+    if (!draft.metadata.assetId.IsValid())
+    {
+        RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity, "metadata.assetId",
+                    "nil model AssetId는 cooked payload로 게시할 수 없다.");
+    }
+    else
+    {
+        ownedIdentities.push_back(draft.metadata.assetId);
+    }
+
+    for (std::size_t materialIndex = 0; materialIndex < draft.materials.size(); ++materialIndex)
+    {
+        const Material& material = draft.materials[materialIndex];
+        const std::string context = "materials[" + std::to_string(materialIndex) + "]";
+        if (!material.assetId.IsValid())
         {
-            issues.push_back(ModelLoadIssue{ ModelLoadIssueSeverity::Error,
-                code, std::move(context), std::move(message) });
-        }
-
-        [[nodiscard]] bool ValidateCookedAssetReferences(const ModelDraft& draft,
-            std::vector<ModelLoadIssue>& issues)
-        {
-            std::vector<AssetId> ownedIdentities;
-            if (!draft.metadata.assetId.IsValid())
-            {
-                RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
-                    "metadata.assetId", "nil model AssetId는 cooked payload로 게시할 수 없다.");
-            }
-            else
-            {
-                ownedIdentities.push_back(draft.metadata.assetId);
-            }
-
-            for (std::size_t materialIndex = 0;
-                materialIndex < draft.materials.size(); ++materialIndex)
-            {
-                const Material& material = draft.materials[materialIndex];
-                const std::string context =
-                    "materials[" + std::to_string(materialIndex) + "]";
-                if (!material.assetId.IsValid())
-                {
-                    RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
-                        context + ".assetId",
+            RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity, context + ".assetId",
                         "nil material AssetId는 cooked payload로 게시할 수 없다.");
-                }
-                else if (std::ranges::find(ownedIdentities, material.assetId)
-                    != ownedIdentities.end())
-                {
-                    RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
-                        context + ".assetId",
+        }
+        else if (std::ranges::find(ownedIdentities, material.assetId) != ownedIdentities.end())
+        {
+            RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity, context + ".assetId",
                         "model/material owned AssetId가 payload 안에서 충돌한다.");
-                }
-                else
-                {
-                    ownedIdentities.push_back(material.assetId);
-                }
+        }
+        else
+        {
+            ownedIdentities.push_back(material.assetId);
+        }
 
-                if (!material.shaderAssetId.IsValid())
-                {
-                    RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity,
-                        context + ".shaderAssetId",
+        if (!material.shaderAssetId.IsValid())
+        {
+            RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity, context + ".shaderAssetId",
                         "nil ShaderMeta AssetId는 cooked payload로 게시할 수 없다.");
-                }
+        }
 
-                for (std::size_t propertyIndex = 0;
-                    propertyIndex < material.properties.size(); ++propertyIndex)
-                {
-                    const auto* texture = std::get_if<TextureReference>(
-                        &material.properties[propertyIndex].value);
-                    if (texture && !texture->assetId.IsValid())
-                    {
-                        RejectWrite(issues, ModelLoadIssueCode::InvalidTextureReference,
-                            context + ".properties[" + std::to_string(propertyIndex)
-                                + "].textureAssetId",
+        for (std::size_t propertyIndex = 0; propertyIndex < material.properties.size(); ++propertyIndex)
+        {
+            const auto* texture = std::get_if<TextureReference>(&material.properties[propertyIndex].value);
+            if (texture && !texture->assetId.IsValid())
+            {
+                RejectWrite(issues, ModelLoadIssueCode::InvalidTextureReference,
+                            context + ".properties[" + std::to_string(propertyIndex) + "].textureAssetId",
                             "cooked texture reference는 fallback path가 아니라 AssetId가 필요하다.");
-                    }
-                }
             }
-            return issues.empty();
+        }
+    }
+    return issues.empty();
+}
+} // namespace
+
+// ════════════════════════════════════════════════════════════════════
+// 쓰기
+// ════════════════════════════════════════════════════════════════════
+
+CookedWriteResult Write(const ModelDraft& draft)
+{
+    CookedWriteResult result;
+    if (!ValidateCookedAssetReferences(draft, result.issues))
+        return result;
+
+    StringTable strings;
+
+    // ── 노드 ────────────────────────────────────────────────────────
+    std::vector<CookedNode> nodes;
+    std::vector<std::uint32_t> nodeMeshes;
+    nodes.reserve(draft.nodes.size());
+    for (const ModelNode& node : draft.nodes)
+    {
+        CookedNode cooked{};
+        cooked.name = strings.Add(node.name);
+        cooked.parent = node.parent.Value();
+        cooked.meshBegin = static_cast<std::uint32_t>(nodeMeshes.size());
+        cooked.meshCount = static_cast<std::uint32_t>(node.meshes.size());
+        cooked.localTransform = node.localTransform;
+        for (const MeshIndex mesh : node.meshes)
+            nodeMeshes.push_back(mesh.Value());
+        nodes.push_back(cooked);
+    }
+
+    // ── 메시 ────────────────────────────────────────────────────────
+    std::vector<CookedMesh> meshes;
+    std::vector<std::byte> vertexBytes;
+    std::vector<std::uint32_t> indices;
+    std::vector<CookedMeshletMesh> meshletMeshes;
+    std::vector<MeshletDescriptor> meshletDescriptors;
+    std::vector<std::uint32_t> meshletVertices;
+    std::vector<std::uint8_t> meshletTriangles;
+    std::vector<std::uint32_t> meshletPrimitives;
+    VertexAttributeMask vertexAttributeMaskUnion = 0;
+    std::uint32_t maxVertexStride = 0;
+    meshes.reserve(draft.meshes.size());
+    {
+        std::size_t vertexByteTotal = 0, indexTotal = 0;
+        for (const Mesh& mesh : draft.meshes)
+        {
+            vertexByteTotal += mesh.vertices.ByteSize();
+            indexTotal += mesh.indices.size();
+        }
+        vertexBytes.reserve(vertexByteTotal);
+        indices.reserve(indexTotal);
+    }
+    for (const Mesh& mesh : draft.meshes)
+    {
+        std::string meshletFailure;
+        if (!importer::ValidateMeshlets(mesh, mesh.meshlets, meshletFailure))
+        {
+            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "meshlets." + mesh.name, meshletFailure);
+            return result;
+        }
+        const auto fits = [](std::size_t current, std::size_t added) {
+            const auto limit = (std::numeric_limits<std::uint32_t>::max)();
+            return current <= limit && added <= limit - current;
+        };
+        if (!fits(meshletDescriptors.size(), mesh.meshlets.descriptors.size()) ||
+            !fits(meshletVertices.size(), mesh.meshlets.vertexRemap.size()) ||
+            !fits(meshletTriangles.size(), mesh.meshlets.triangleIndices.size()) ||
+            !fits(meshletPrimitives.size(), mesh.meshlets.primitiveRemap.size()))
+        {
+            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "meshlets." + mesh.name,
+                        "Meshlet section exceeds uint32 address range.");
+            return result;
+        }
+        CookedMeshletMesh acceleration{};
+        acceleration.settings = mesh.meshlets.settings;
+        acceleration.geometryDigest = mesh.meshlets.geometryDigest;
+        acceleration.descriptorBegin = static_cast<std::uint32_t>(meshletDescriptors.size());
+        acceleration.descriptorCount = static_cast<std::uint32_t>(mesh.meshlets.descriptors.size());
+        acceleration.vertexBegin = static_cast<std::uint32_t>(meshletVertices.size());
+        acceleration.vertexCount = static_cast<std::uint32_t>(mesh.meshlets.vertexRemap.size());
+        acceleration.triangleBegin = static_cast<std::uint32_t>(meshletTriangles.size());
+        acceleration.triangleCount = static_cast<std::uint32_t>(mesh.meshlets.triangleIndices.size());
+        acceleration.primitiveBegin = static_cast<std::uint32_t>(meshletPrimitives.size());
+        acceleration.primitiveCount = static_cast<std::uint32_t>(mesh.meshlets.primitiveRemap.size());
+        acceleration.lod0 = mesh.meshlets.lod0;
+        meshletMeshes.push_back(acceleration);
+        meshletDescriptors.insert(meshletDescriptors.end(), mesh.meshlets.descriptors.begin(),
+                                  mesh.meshlets.descriptors.end());
+        meshletVertices.insert(meshletVertices.end(), mesh.meshlets.vertexRemap.begin(),
+                               mesh.meshlets.vertexRemap.end());
+        meshletTriangles.insert(meshletTriangles.end(), mesh.meshlets.triangleIndices.begin(),
+                                mesh.meshlets.triangleIndices.end());
+        meshletPrimitives.insert(meshletPrimitives.end(), mesh.meshlets.primitiveRemap.begin(),
+                                 mesh.meshlets.primitiveRemap.end());
+
+        CookedMesh cooked{};
+        cooked.name = strings.Add(mesh.name);
+        cooked.material = mesh.material.Value();
+        cooked.vertexByteBegin = static_cast<std::uint32_t>(vertexBytes.size());
+        cooked.vertexCount = static_cast<std::uint32_t>(mesh.vertices.size());
+        cooked.vertexStride = mesh.vertices.Stride();
+        cooked.vertexAttributeMask = mesh.vertices.AttributeMask();
+        cooked.indexBegin = static_cast<std::uint32_t>(indices.size());
+        cooked.indexCount = static_cast<std::uint32_t>(mesh.indices.size());
+        cooked.bounds = mesh.bounds;
+        const std::span<const std::byte> packed = mesh.vertices.Bytes();
+        vertexBytes.insert(vertexBytes.end(), packed.begin(), packed.end());
+        indices.insert(indices.end(), mesh.indices.begin(), mesh.indices.end());
+        vertexAttributeMaskUnion |= cooked.vertexAttributeMask;
+        maxVertexStride = (std::max)(maxVertexStride, cooked.vertexStride);
+        meshes.push_back(cooked);
+    }
+
+    ByteWriter coarseLods;
+    if (draft.meshes.size() > (std::numeric_limits<std::uint32_t>::max)())
+    {
+        RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods", "Too many model meshes.");
+        return result;
+    }
+    coarseLods.Pod(static_cast<std::uint32_t>(draft.meshes.size()));
+    for (const Mesh& mesh : draft.meshes)
+    {
+        std::string failure;
+        if (!importer::ValidateMeshLods(mesh, mesh.coarseLods, failure))
+        {
+            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods." + mesh.name, failure);
+            return result;
+        }
+        const MeshLodChain& chain = mesh.coarseLods;
+        coarseLods.Pod(
+            CookedLodMesh{chain.settings, chain.geometryDigest, static_cast<std::uint32_t>(chain.levels.size())});
+        coarseLods.Pod(static_cast<uint32_t>(chain.groups.size()));
+        coarseLods.PodArray(chain.groups);
+        for (const MeshLodLevel& level : chain.levels)
+        {
+            const MeshletPayload& payload = level.meshlets;
+            coarseLods.Pod(CookedLodLevel{level.geometricError, static_cast<std::uint32_t>(level.indices.size()),
+                                          payload.settings, payload.geometryDigest,
+                                          static_cast<std::uint32_t>(payload.descriptors.size()),
+                                          static_cast<std::uint32_t>(payload.vertexRemap.size()),
+                                          static_cast<std::uint32_t>(payload.triangleIndices.size()),
+                                          static_cast<std::uint32_t>(payload.primitiveRemap.size()), payload.lod0});
+            coarseLods.PodArray(level.indices);
+            coarseLods.PodArray(payload.descriptors);
+            coarseLods.PodArray(payload.vertexRemap);
+            coarseLods.PodArray(payload.triangleIndices);
+            coarseLods.PodArray(payload.primitiveRemap);
+        }
+    }
+    if (coarseLods.Size() > (std::numeric_limits<std::uint32_t>::max)())
+    {
+        RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods", "LOD section exceeds uint32 range.");
+        return result;
+    }
+
+    // ── 스켈레톤 · 클립 · 키 ────────────────────────────────────────
+    std::vector<CookedBone> bones;
+    std::vector<CookedClip> clips;
+    std::vector<CookedChannel> channels;
+    std::vector<TranslationKey> translations;
+    std::vector<RotationKey> rotations;
+    std::vector<ScaleKey> scales;
+    CookedSkeletonHeader skeletonHeader{};
+
+    if (draft.skeleton.has_value())
+    {
+        const Skeleton& skeleton = *draft.skeleton;
+        skeletonHeader.present = 1u;
+        skeletonHeader.rootBone = skeleton.rootBone.Value();
+        skeletonHeader.rootTransform = skeleton.rootTransform;
+        skeletonHeader.globalInverseTransform = skeleton.globalInverseTransform;
+
+        bones.reserve(skeleton.bones.size());
+        for (const Bone& bone : skeleton.bones)
+        {
+            CookedBone cooked{};
+            cooked.name = strings.Add(bone.name);
+            cooked.parent = bone.parent.Value();
+            cooked.inverseBindMatrix = bone.inverseBindMatrix;
+            bones.push_back(cooked);
+        }
+
+        clips.reserve(skeleton.clips.size());
+        for (const AnimationClip& clip : skeleton.clips)
+        {
+            CookedClip cookedClip{};
+            cookedClip.name = strings.Add(clip.name);
+            cookedClip.durationTicks = clip.durationTicks;
+            cookedClip.ticksPerSecond = clip.ticksPerSecond;
+            cookedClip.looping = clip.looping ? 1u : 0u;
+            cookedClip.channelBegin = static_cast<std::uint32_t>(channels.size());
+            cookedClip.channelCount = static_cast<std::uint32_t>(clip.channels.size());
+
+            for (const AnimationChannel& channel : clip.channels)
+            {
+                CookedChannel cookedChannel{};
+                cookedChannel.bone = channel.bone.Value();
+                cookedChannel.translationInterpolation = static_cast<std::uint8_t>(channel.translationInterpolation);
+                cookedChannel.rotationInterpolation = static_cast<std::uint8_t>(channel.rotationInterpolation);
+                cookedChannel.scaleInterpolation = static_cast<std::uint8_t>(channel.scaleInterpolation);
+
+                cookedChannel.translationBegin = static_cast<std::uint32_t>(translations.size());
+                cookedChannel.translationCount = static_cast<std::uint32_t>(channel.translations.size());
+                translations.insert(translations.end(), channel.translations.begin(), channel.translations.end());
+
+                cookedChannel.rotationBegin = static_cast<std::uint32_t>(rotations.size());
+                cookedChannel.rotationCount = static_cast<std::uint32_t>(channel.rotations.size());
+                rotations.insert(rotations.end(), channel.rotations.begin(), channel.rotations.end());
+
+                cookedChannel.scaleBegin = static_cast<std::uint32_t>(scales.size());
+                cookedChannel.scaleCount = static_cast<std::uint32_t>(channel.scales.size());
+                scales.insert(scales.end(), channel.scales.begin(), channel.scales.end());
+
+                channels.push_back(cookedChannel);
+            }
+            clips.push_back(cookedClip);
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // 쓰기
-    // ════════════════════════════════════════════════════════════════════
-
-    CookedWriteResult Write(const ModelDraft& draft)
+    // ── 애니메이터 ──────────────────────────────────────────────────
+    CookedAnimator animator{};
+    if (draft.animator.has_value())
     {
-        CookedWriteResult result;
-        if (!ValidateCookedAssetReferences(draft, result.issues)) return result;
+        animator.present = 1u;
+        animator.defaultClip = draft.animator->defaultClip.Value();
+        animator.motionAssetId = draft.animator->motionAssetId.value;
+    }
 
-        StringTable strings;
+    // ── 재질 (가변 길이) ────────────────────────────────────────────
+    // 개수가 자산당 2~6개라 속도와 무관하다. 그래서 POD 배열로 펴는 대신
+    // 커서 방식으로 단순하게 둔다 — 여기까지 펴면 코드만 늘고 얻는 게 없다.
+    ByteWriter materialBytes;
+    for (const Material& material : draft.materials)
+    {
+        materialBytes.Pod(material.assetId.value);
+        materialBytes.Pod(material.shaderAssetId.value);
+        materialBytes.Pod(strings.Add(material.name));
+        materialBytes.Pod(static_cast<std::uint8_t>(material.blendMode));
 
-        // ── 노드 ────────────────────────────────────────────────────────
-        std::vector<CookedNode> nodes;
-        std::vector<std::uint32_t> nodeMeshes;
-        nodes.reserve(draft.nodes.size());
-        for (const ModelNode& node : draft.nodes)
+        materialBytes.Pod(static_cast<std::uint32_t>(material.properties.size()));
+        for (const MaterialProperty& property : material.properties)
         {
-            CookedNode cooked{};
-            cooked.name = strings.Add(node.name);
-            cooked.parent = node.parent.Value();
-            cooked.meshBegin = static_cast<std::uint32_t>(nodeMeshes.size());
-            cooked.meshCount = static_cast<std::uint32_t>(node.meshes.size());
-            cooked.localTransform = node.localTransform;
-            for (const MeshIndex mesh : node.meshes) nodeMeshes.push_back(mesh.Value());
-            nodes.push_back(cooked);
-        }
-
-        // ── 메시 ────────────────────────────────────────────────────────
-        std::vector<CookedMesh> meshes;
-        std::vector<std::byte> vertexBytes;
-        std::vector<std::uint32_t> indices;
-        std::vector<CookedMeshletMesh> meshletMeshes;
-        std::vector<MeshletDescriptor> meshletDescriptors;
-        std::vector<std::uint32_t> meshletVertices;
-        std::vector<std::uint8_t> meshletTriangles;
-        std::vector<std::uint32_t> meshletPrimitives;
-        VertexAttributeMask vertexAttributeMaskUnion = 0;
-        std::uint32_t maxVertexStride = 0;
-        meshes.reserve(draft.meshes.size());
-        {
-            std::size_t vertexByteTotal = 0, indexTotal = 0;
-            for (const Mesh& mesh : draft.meshes)
-            {
-                vertexByteTotal += mesh.vertices.ByteSize();
-                indexTotal += mesh.indices.size();
-            }
-            vertexBytes.reserve(vertexByteTotal);
-            indices.reserve(indexTotal);
-        }
-        for (const Mesh& mesh : draft.meshes)
-        {
-            std::string meshletFailure;
-            if (!importer::ValidateMeshlets(mesh, mesh.meshlets, meshletFailure))
-            {
-                RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh,
-                    "meshlets." + mesh.name, meshletFailure);
-                return result;
-            }
-            const auto fits = [](std::size_t current, std::size_t added)
-            {
-                const auto limit = (std::numeric_limits<std::uint32_t>::max)();
-                return current <= limit && added <= limit - current;
-            };
-            if (!fits(meshletDescriptors.size(), mesh.meshlets.descriptors.size())
-                || !fits(meshletVertices.size(), mesh.meshlets.vertexRemap.size())
-                || !fits(meshletTriangles.size(), mesh.meshlets.triangleIndices.size())
-                || !fits(meshletPrimitives.size(), mesh.meshlets.primitiveRemap.size()))
-            {
-                RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh,
-                    "meshlets." + mesh.name, "Meshlet section exceeds uint32 address range.");
-                return result;
-            }
-            CookedMeshletMesh acceleration{};
-            acceleration.settings = mesh.meshlets.settings;
-            acceleration.geometryDigest = mesh.meshlets.geometryDigest;
-            acceleration.descriptorBegin = static_cast<std::uint32_t>(meshletDescriptors.size());
-            acceleration.descriptorCount = static_cast<std::uint32_t>(mesh.meshlets.descriptors.size());
-            acceleration.vertexBegin = static_cast<std::uint32_t>(meshletVertices.size());
-            acceleration.vertexCount = static_cast<std::uint32_t>(mesh.meshlets.vertexRemap.size());
-            acceleration.triangleBegin = static_cast<std::uint32_t>(meshletTriangles.size());
-            acceleration.triangleCount = static_cast<std::uint32_t>(mesh.meshlets.triangleIndices.size());
-            acceleration.primitiveBegin = static_cast<std::uint32_t>(meshletPrimitives.size());
-            acceleration.primitiveCount = static_cast<std::uint32_t>(mesh.meshlets.primitiveRemap.size());
-            acceleration.lod0 = mesh.meshlets.lod0;
-            meshletMeshes.push_back(acceleration);
-            meshletDescriptors.insert(meshletDescriptors.end(),
-                mesh.meshlets.descriptors.begin(), mesh.meshlets.descriptors.end());
-            meshletVertices.insert(meshletVertices.end(),
-                mesh.meshlets.vertexRemap.begin(), mesh.meshlets.vertexRemap.end());
-            meshletTriangles.insert(meshletTriangles.end(),
-                mesh.meshlets.triangleIndices.begin(), mesh.meshlets.triangleIndices.end());
-            meshletPrimitives.insert(meshletPrimitives.end(),
-                mesh.meshlets.primitiveRemap.begin(), mesh.meshlets.primitiveRemap.end());
-
-            CookedMesh cooked{};
-            cooked.name = strings.Add(mesh.name);
-            cooked.material = mesh.material.Value();
-            cooked.vertexByteBegin = static_cast<std::uint32_t>(vertexBytes.size());
-            cooked.vertexCount = static_cast<std::uint32_t>(mesh.vertices.size());
-            cooked.vertexStride = mesh.vertices.Stride();
-            cooked.vertexAttributeMask = mesh.vertices.AttributeMask();
-            cooked.indexBegin = static_cast<std::uint32_t>(indices.size());
-            cooked.indexCount = static_cast<std::uint32_t>(mesh.indices.size());
-            cooked.bounds = mesh.bounds;
-            const std::span<const std::byte> packed = mesh.vertices.Bytes();
-            vertexBytes.insert(vertexBytes.end(), packed.begin(), packed.end());
-            indices.insert(indices.end(), mesh.indices.begin(), mesh.indices.end());
-            vertexAttributeMaskUnion |= cooked.vertexAttributeMask;
-            maxVertexStride = (std::max)(maxVertexStride, cooked.vertexStride);
-            meshes.push_back(cooked);
-        }
-
-        ByteWriter coarseLods;
-        if (draft.meshes.size() > (std::numeric_limits<std::uint32_t>::max)())
-        {
-            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods", "Too many model meshes.");
-            return result;
-        }
-        coarseLods.Pod(static_cast<std::uint32_t>(draft.meshes.size()));
-        for (const Mesh& mesh : draft.meshes)
-        {
-            std::string failure;
-            if (!importer::ValidateMeshLods(mesh, mesh.coarseLods, failure))
-            {
-                RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods." + mesh.name, failure);
-                return result;
-            }
-            const MeshLodChain& chain = mesh.coarseLods;
-            coarseLods.Pod(CookedLodMesh{chain.settings, chain.geometryDigest,
-                static_cast<std::uint32_t>(chain.levels.size())});
-            coarseLods.Pod(static_cast<uint32_t>(chain.groups.size()));
-            coarseLods.PodArray(chain.groups);
-            for (const MeshLodLevel& level : chain.levels)
-            {
-                const MeshletPayload& payload = level.meshlets;
-                coarseLods.Pod(CookedLodLevel{level.geometricError, static_cast<std::uint32_t>(level.indices.size()),
-                    payload.settings, payload.geometryDigest, static_cast<std::uint32_t>(payload.descriptors.size()),
-                    static_cast<std::uint32_t>(payload.vertexRemap.size()),
-                    static_cast<std::uint32_t>(payload.triangleIndices.size()),
-                    static_cast<std::uint32_t>(payload.primitiveRemap.size()), payload.lod0});
-                coarseLods.PodArray(level.indices);
-                coarseLods.PodArray(payload.descriptors);
-                coarseLods.PodArray(payload.vertexRemap);
-                coarseLods.PodArray(payload.triangleIndices);
-                coarseLods.PodArray(payload.primitiveRemap);
-            }
-        }
-        if (coarseLods.Size() > (std::numeric_limits<std::uint32_t>::max)())
-        {
-            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods", "LOD section exceeds uint32 range.");
-            return result;
-        }
-
-        // ── 스켈레톤 · 클립 · 키 ────────────────────────────────────────
-        std::vector<CookedBone> bones;
-        std::vector<CookedClip> clips;
-        std::vector<CookedChannel> channels;
-        std::vector<TranslationKey> translations;
-        std::vector<RotationKey> rotations;
-        std::vector<ScaleKey> scales;
-        CookedSkeletonHeader skeletonHeader{};
-
-        if (draft.skeleton.has_value())
-        {
-            const Skeleton& skeleton = *draft.skeleton;
-            skeletonHeader.present = 1u;
-            skeletonHeader.rootBone = skeleton.rootBone.Value();
-            skeletonHeader.rootTransform = skeleton.rootTransform;
-            skeletonHeader.globalInverseTransform = skeleton.globalInverseTransform;
-
-            bones.reserve(skeleton.bones.size());
-            for (const Bone& bone : skeleton.bones)
-            {
-                CookedBone cooked{};
-                cooked.name = strings.Add(bone.name);
-                cooked.parent = bone.parent.Value();
-                cooked.inverseBindMatrix = bone.inverseBindMatrix;
-                bones.push_back(cooked);
-            }
-
-            clips.reserve(skeleton.clips.size());
-            for (const AnimationClip& clip : skeleton.clips)
-            {
-                CookedClip cookedClip{};
-                cookedClip.name = strings.Add(clip.name);
-                cookedClip.durationTicks = clip.durationTicks;
-                cookedClip.ticksPerSecond = clip.ticksPerSecond;
-                cookedClip.looping = clip.looping ? 1u : 0u;
-                cookedClip.channelBegin = static_cast<std::uint32_t>(channels.size());
-                cookedClip.channelCount = static_cast<std::uint32_t>(clip.channels.size());
-
-                for (const AnimationChannel& channel : clip.channels)
-                {
-                    CookedChannel cookedChannel{};
-                    cookedChannel.bone = channel.bone.Value();
-                    cookedChannel.translationInterpolation =
-                        static_cast<std::uint8_t>(channel.translationInterpolation);
-                    cookedChannel.rotationInterpolation =
-                        static_cast<std::uint8_t>(channel.rotationInterpolation);
-                    cookedChannel.scaleInterpolation =
-                        static_cast<std::uint8_t>(channel.scaleInterpolation);
-
-                    cookedChannel.translationBegin =
-                        static_cast<std::uint32_t>(translations.size());
-                    cookedChannel.translationCount =
-                        static_cast<std::uint32_t>(channel.translations.size());
-                    translations.insert(translations.end(),
-                        channel.translations.begin(), channel.translations.end());
-
-                    cookedChannel.rotationBegin =
-                        static_cast<std::uint32_t>(rotations.size());
-                    cookedChannel.rotationCount =
-                        static_cast<std::uint32_t>(channel.rotations.size());
-                    rotations.insert(rotations.end(),
-                        channel.rotations.begin(), channel.rotations.end());
-
-                    cookedChannel.scaleBegin = static_cast<std::uint32_t>(scales.size());
-                    cookedChannel.scaleCount =
-                        static_cast<std::uint32_t>(channel.scales.size());
-                    scales.insert(scales.end(),
-                        channel.scales.begin(), channel.scales.end());
-
-                    channels.push_back(cookedChannel);
-                }
-                clips.push_back(cookedClip);
-            }
-        }
-
-        // ── 애니메이터 ──────────────────────────────────────────────────
-        CookedAnimator animator{};
-        if (draft.animator.has_value())
-        {
-            animator.present = 1u;
-            animator.defaultClip = draft.animator->defaultClip.Value();
-            animator.motionAssetId = draft.animator->motionAssetId.value;
-        }
-
-        // ── 재질 (가변 길이) ────────────────────────────────────────────
-        // 개수가 자산당 2~6개라 속도와 무관하다. 그래서 POD 배열로 펴는 대신
-        // 커서 방식으로 단순하게 둔다 — 여기까지 펴면 코드만 늘고 얻는 게 없다.
-        ByteWriter materialBytes;
-        for (const Material& material : draft.materials)
-        {
-            materialBytes.Pod(material.assetId.value);
-            materialBytes.Pod(material.shaderAssetId.value);
-            materialBytes.Pod(strings.Add(material.name));
-            materialBytes.Pod(static_cast<std::uint8_t>(material.blendMode));
-
-            materialBytes.Pod(static_cast<std::uint32_t>(material.properties.size()));
-            for (const MaterialProperty& property : material.properties)
-            {
-                materialBytes.Pod(strings.Add(property.name));
-                materialBytes.Pod(static_cast<std::uint8_t>(property.value.index()));
-                std::visit([&](const auto& value)
-                {
+            materialBytes.Pod(strings.Add(property.name));
+            materialBytes.Pod(static_cast<std::uint8_t>(property.value.index()));
+            std::visit(
+                [&](const auto& value) {
                     using T = std::decay_t<decltype(value)>;
                     if constexpr (std::is_same_v<T, std::string>)
                     {
@@ -554,809 +523,790 @@ namespace experiment::cooked
                     {
                         materialBytes.Pod(value);
                     }
-                }, property.value);
-            }
-
-            materialBytes.Pod(static_cast<std::uint32_t>(material.keywords.size()));
-            for (const std::string& keyword : material.keywords)
-                materialBytes.Pod(strings.Add(keyword));
-
-            materialBytes.Pod(static_cast<std::uint32_t>(material.keywordSelections.size()));
-            for (const std::uint16_t selection : material.keywordSelections)
-                materialBytes.Pod(selection);
+                },
+                property.value);
         }
 
-        // ── 메타데이터 ──────────────────────────────────────────────────
-        // ★ 문자열 테이블을 확정하기 전 마지막으로 담는다. 이 뒤에 Add 를 부르면
-        //   테이블이 커져서 이미 계산한 오프셋이 어긋난다.
-        CookedMetadata metadata{};
-        metadata.assetId = draft.metadata.assetId.value;
-        metadata.name = strings.Add(draft.metadata.name);
-        metadata.sourcePath = strings.Add(PathToUtf8(draft.metadata.sourcePath));
-        metadata.cookedPath = strings.Add(PathToUtf8(draft.metadata.cookedPath));
-        metadata.sourceWriteTimeTicks = static_cast<std::int64_t>(
-            draft.metadata.sourceWriteTime.time_since_epoch().count());
-        metadata.payloadKind = static_cast<std::uint8_t>(draft.metadata.payloadKind);
+        materialBytes.Pod(static_cast<std::uint32_t>(material.keywords.size()));
+        for (const std::string& keyword : material.keywords)
+            materialBytes.Pod(strings.Add(keyword));
 
-        // ── 섹션 조립 ───────────────────────────────────────────────────
-        struct PendingSection final
-        {
-            SectionKind kind{};
-            std::uint32_t elementCount{};
-            const void* data{};
-            std::uint64_t bytes{};
-        };
-
-        const std::vector<PendingSection> pending{
-            { SectionKind::Strings,  static_cast<std::uint32_t>(strings.Bytes().size()),
-              strings.Bytes().data(), strings.Bytes().size() },
-            { SectionKind::Metadata, 1u, &metadata, sizeof(metadata) },
-            { SectionKind::Nodes, static_cast<std::uint32_t>(nodes.size()),
-              nodes.data(), nodes.size() * sizeof(CookedNode) },
-            { SectionKind::NodeMeshes, static_cast<std::uint32_t>(nodeMeshes.size()),
-              nodeMeshes.data(), nodeMeshes.size() * sizeof(std::uint32_t) },
-            { SectionKind::Meshes, static_cast<std::uint32_t>(meshes.size()),
-              meshes.data(), meshes.size() * sizeof(CookedMesh) },
-            { SectionKind::Vertices, static_cast<std::uint32_t>(vertexBytes.size()),
-              vertexBytes.data(), vertexBytes.size() },
-            { SectionKind::Indices, static_cast<std::uint32_t>(indices.size()),
-              indices.data(), indices.size() * sizeof(std::uint32_t) },
-            { SectionKind::Materials, static_cast<std::uint32_t>(draft.materials.size()),
-              materialBytes.Bytes().data(), materialBytes.Size() },
-            { SectionKind::Bones, static_cast<std::uint32_t>(bones.size()),
-              bones.data(), bones.size() * sizeof(CookedBone) },
-            { SectionKind::Clips, static_cast<std::uint32_t>(clips.size()),
-              clips.data(), clips.size() * sizeof(CookedClip) },
-            { SectionKind::Channels, static_cast<std::uint32_t>(channels.size()),
-              channels.data(), channels.size() * sizeof(CookedChannel) },
-            { SectionKind::TranslationKeys, static_cast<std::uint32_t>(translations.size()),
-              translations.data(), translations.size() * sizeof(TranslationKey) },
-            { SectionKind::RotationKeys, static_cast<std::uint32_t>(rotations.size()),
-              rotations.data(), rotations.size() * sizeof(RotationKey) },
-            { SectionKind::ScaleKeys, static_cast<std::uint32_t>(scales.size()),
-              scales.data(), scales.size() * sizeof(ScaleKey) },
-            { SectionKind::Skeleton, 1u, &skeletonHeader, sizeof(skeletonHeader) },
-            { SectionKind::Animator, 1u, &animator, sizeof(animator) },
-            { SectionKind::MeshletMeshes, static_cast<std::uint32_t>(meshletMeshes.size()),
-              meshletMeshes.data(), meshletMeshes.size() * sizeof(CookedMeshletMesh) },
-            { SectionKind::MeshletDescriptors, static_cast<std::uint32_t>(meshletDescriptors.size()),
-              meshletDescriptors.data(), meshletDescriptors.size() * sizeof(MeshletDescriptor) },
-            { SectionKind::MeshletVertices, static_cast<std::uint32_t>(meshletVertices.size()),
-              meshletVertices.data(), meshletVertices.size() * sizeof(std::uint32_t) },
-            { SectionKind::MeshletTriangles, static_cast<std::uint32_t>(meshletTriangles.size()),
-              meshletTriangles.data(), meshletTriangles.size() },
-            { SectionKind::MeshletPrimitives, static_cast<std::uint32_t>(meshletPrimitives.size()),
-              meshletPrimitives.data(), meshletPrimitives.size() * sizeof(std::uint32_t) },
-            { SectionKind::CoarseLods, static_cast<std::uint32_t>(coarseLods.Size()),
-              coarseLods.Bytes().data(), coarseLods.Size() },
-        };
-
-        const std::uint64_t tableBytes = pending.size() * sizeof(SectionEntry);
-        std::uint64_t cursor = AlignUp(sizeof(FileHeader) + tableBytes);
-
-        std::vector<SectionEntry> table;
-        table.reserve(pending.size());
-        for (const PendingSection& section : pending)
-        {
-            SectionEntry entry{};
-            entry.kind = static_cast<std::uint32_t>(section.kind);
-            entry.elementCount = section.elementCount;
-            entry.offset = cursor;
-            entry.bytes = section.bytes;
-            table.push_back(entry);
-            cursor = AlignUp(cursor + section.bytes);
-        }
-
-        FileHeader header{};
-        header.vertexLayoutTableHash = VertexLayoutTableHash();
-        header.maxVertexStride = maxVertexStride;
-        header.vertexAttributeMaskUnion = vertexAttributeMaskUnion;
-        header.fileBytes = cursor;
-        header.sectionCount = static_cast<std::uint32_t>(pending.size());
-
-        std::vector<std::byte> file(static_cast<std::size_t>(cursor), std::byte{});
-        std::memcpy(file.data(), &header, sizeof(header));
-        std::memcpy(file.data() + sizeof(header), table.data(),
-            static_cast<std::size_t>(tableBytes));
-        for (std::size_t i = 0; i < pending.size(); ++i)
-        {
-            if (0 == pending[i].bytes) continue;
-            std::memcpy(file.data() + table[i].offset, pending[i].data,
-                static_cast<std::size_t>(pending[i].bytes));
-        }
-        result.bytes = std::move(file);
-        return result;
+        materialBytes.Pod(static_cast<std::uint32_t>(material.keywordSelections.size()));
+        for (const std::uint16_t selection : material.keywordSelections)
+            materialBytes.Pod(selection);
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // 읽기
-    // ════════════════════════════════════════════════════════════════════
+    // ── 메타데이터 ──────────────────────────────────────────────────
+    // ★ 문자열 테이블을 확정하기 전 마지막으로 담는다. 이 뒤에 Add 를 부르면
+    //   테이블이 커져서 이미 계산한 오프셋이 어긋난다.
+    CookedMetadata metadata{};
+    metadata.assetId = draft.metadata.assetId.value;
+    metadata.name = strings.Add(draft.metadata.name);
+    metadata.sourcePath = strings.Add(PathToUtf8(draft.metadata.sourcePath));
+    metadata.cookedPath = strings.Add(PathToUtf8(draft.metadata.cookedPath));
+    metadata.sourceWriteTimeTicks =
+        static_cast<std::int64_t>(draft.metadata.sourceWriteTime.time_since_epoch().count());
+    metadata.payloadKind = static_cast<std::uint8_t>(draft.metadata.payloadKind);
 
-    bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft,
-        std::vector<ModelLoadIssue>& issues)
+    // ── 섹션 조립 ───────────────────────────────────────────────────
+    struct PendingSection final
     {
-        outDraft = ModelDraft{};
-        ModelDraft decoded{};
+        SectionKind kind{};
+        std::uint32_t elementCount{};
+        const void* data{};
+        std::uint64_t bytes{};
+    };
 
-        if (bytes.size() < sizeof(FileHeader))
-        {
-            Reject(issues, "header", "파일이 헤더보다 짧다.");
-            return false;
-        }
+    const std::vector<PendingSection> pending{
+        {SectionKind::Strings, static_cast<std::uint32_t>(strings.Bytes().size()), strings.Bytes().data(),
+         strings.Bytes().size()},
+        {SectionKind::Metadata, 1u, &metadata, sizeof(metadata)},
+        {SectionKind::Nodes, static_cast<std::uint32_t>(nodes.size()), nodes.data(), nodes.size() * sizeof(CookedNode)},
+        {SectionKind::NodeMeshes, static_cast<std::uint32_t>(nodeMeshes.size()), nodeMeshes.data(),
+         nodeMeshes.size() * sizeof(std::uint32_t)},
+        {SectionKind::Meshes, static_cast<std::uint32_t>(meshes.size()), meshes.data(),
+         meshes.size() * sizeof(CookedMesh)},
+        {SectionKind::Vertices, static_cast<std::uint32_t>(vertexBytes.size()), vertexBytes.data(), vertexBytes.size()},
+        {SectionKind::Indices, static_cast<std::uint32_t>(indices.size()), indices.data(),
+         indices.size() * sizeof(std::uint32_t)},
+        {SectionKind::Materials, static_cast<std::uint32_t>(draft.materials.size()), materialBytes.Bytes().data(),
+         materialBytes.Size()},
+        {SectionKind::Bones, static_cast<std::uint32_t>(bones.size()), bones.data(), bones.size() * sizeof(CookedBone)},
+        {SectionKind::Clips, static_cast<std::uint32_t>(clips.size()), clips.data(), clips.size() * sizeof(CookedClip)},
+        {SectionKind::Channels, static_cast<std::uint32_t>(channels.size()), channels.data(),
+         channels.size() * sizeof(CookedChannel)},
+        {SectionKind::TranslationKeys, static_cast<std::uint32_t>(translations.size()), translations.data(),
+         translations.size() * sizeof(TranslationKey)},
+        {SectionKind::RotationKeys, static_cast<std::uint32_t>(rotations.size()), rotations.data(),
+         rotations.size() * sizeof(RotationKey)},
+        {SectionKind::ScaleKeys, static_cast<std::uint32_t>(scales.size()), scales.data(),
+         scales.size() * sizeof(ScaleKey)},
+        {SectionKind::Skeleton, 1u, &skeletonHeader, sizeof(skeletonHeader)},
+        {SectionKind::Animator, 1u, &animator, sizeof(animator)},
+        {SectionKind::MeshletMeshes, static_cast<std::uint32_t>(meshletMeshes.size()), meshletMeshes.data(),
+         meshletMeshes.size() * sizeof(CookedMeshletMesh)},
+        {SectionKind::MeshletDescriptors, static_cast<std::uint32_t>(meshletDescriptors.size()),
+         meshletDescriptors.data(), meshletDescriptors.size() * sizeof(MeshletDescriptor)},
+        {SectionKind::MeshletVertices, static_cast<std::uint32_t>(meshletVertices.size()), meshletVertices.data(),
+         meshletVertices.size() * sizeof(std::uint32_t)},
+        {SectionKind::MeshletTriangles, static_cast<std::uint32_t>(meshletTriangles.size()), meshletTriangles.data(),
+         meshletTriangles.size()},
+        {SectionKind::MeshletPrimitives, static_cast<std::uint32_t>(meshletPrimitives.size()), meshletPrimitives.data(),
+         meshletPrimitives.size() * sizeof(std::uint32_t)},
+        {SectionKind::CoarseLods, static_cast<std::uint32_t>(coarseLods.Size()), coarseLods.Bytes().data(),
+         coarseLods.Size()},
+    };
 
-        FileHeader header{};
-        std::memcpy(&header, bytes.data(), sizeof(header));
+    const std::uint64_t tableBytes = pending.size() * sizeof(SectionEntry);
+    std::uint64_t cursor = AlignUp(sizeof(FileHeader) + tableBytes);
 
-        if (kMagic != header.magic)
-        {
-            Reject(issues, "header", "매직이 다르다 — 쿠킹 파일이 아니다.");
-            return false;
-        }
-        if (kFormatVersion != header.formatVersion)
-        {
-            Reject(issues, "header", "포맷 버전 " + std::to_string(header.formatVersion)
-                + " != " + std::to_string(kFormatVersion) + " — 재임포트 필요.");
-            return false;
-        }
-        // ★ 이 검사가 이 포맷의 존재 이유 절반이다. legacy 는 이게 없어서
-        //   레이아웃이 바뀌면 조용히 오독했다.
-        if (VertexLayoutTableHash() != header.vertexLayoutTableHash)
-        {
-            Reject(issues, "header", "정점 레이아웃 표 해시 불일치 — 재임포트 필요.");
-            return false;
-        }
-        if ((header.vertexAttributeMaskUnion & ~kAllVertexAttributes) != 0)
-        {
-            Reject(issues, "header", "정점 속성 union에 모르는 비트가 있다.");
-            return false;
-        }
-        if (header.maxVertexStride > StrideOf(kAllVertexAttributes))
-        {
-            Reject(issues, "header", "최대 정점 stride가 기술표 범위를 넘는다.");
-            return false;
-        }
-        if (header.fileBytes != bytes.size())
-        {
-            Reject(issues, "header", "파일 크기가 헤더와 다르다 — 잘렸거나 덧붙었다.");
-            return false;
-        }
-
-        const std::uint64_t tableBytes =
-            static_cast<std::uint64_t>(header.sectionCount) * sizeof(SectionEntry);
-        if (sizeof(FileHeader) + tableBytes > bytes.size())
-        {
-            Reject(issues, "header", "섹션 표가 파일 밖을 넘어간다.");
-            return false;
-        }
-
-        std::vector<SectionEntry> table(header.sectionCount);
-        if (header.sectionCount)
-        {
-            std::memcpy(table.data(), bytes.data() + sizeof(FileHeader),
-                static_cast<std::size_t>(tableBytes));
-        }
-
-        // ★ 없는 섹션을 0개로 읽지 않는다. 그러면 손상된 파일이 "빈 모델"로
-        //   통과해 버린다 — 이 저장소가 이미 겪은 거짓 통과 양식이다.
-        std::vector<const SectionEntry*> byKind(
-            static_cast<std::size_t>(SectionKind::Count), nullptr);
-        const auto requiredSections = static_cast<std::uint32_t>(SectionKind::MeshletMeshes);
-        const auto meshletSectionEnd = static_cast<std::uint32_t>(SectionKind::CoarseLods);
-        const auto allowedSections = static_cast<std::uint32_t>(SectionKind::Count);
-        for (const SectionEntry& entry : table)
-        {
-            if (entry.kind >= allowedSections)
-            {
-                Reject(issues, "sections", "모르는 섹션 종류 "
-                    + std::to_string(entry.kind) + " — 상위 버전 파일이다.");
-                return false;
-            }
-            if (byKind[entry.kind] != nullptr)
-            {
-                Reject(issues, "sections", "Duplicate section kind.");
-                return false;
-            }
-            byKind[entry.kind] = &entry;
-        }
-        for (std::uint32_t kind = 0; kind < requiredSections;
-            ++kind)
-        {
-            if (!byKind[kind])
-            {
-                Reject(issues, "sections",
-                    "섹션 " + std::to_string(kind) + " 이 없다 — 파일이 불완전하다.");
-                return false;
-            }
-        }
-
-        const auto section = [&](SectionKind kind) -> const SectionEntry&
-        {
-            return *byKind[static_cast<std::size_t>(kind)];
-        };
-
-        std::span<const char> stringBytes;
-        std::span<const CookedNode> nodes;
-        std::span<const std::uint32_t> nodeMeshes;
-        std::span<const CookedMesh> meshes;
-        std::span<const std::byte> vertexBytes;
-        std::span<const std::uint32_t> indices;
-        std::span<const CookedBone> bones;
-        std::span<const CookedClip> clips;
-        std::span<const CookedChannel> channels;
-        std::span<const TranslationKey> translations;
-        std::span<const RotationKey> rotations;
-        std::span<const ScaleKey> scales;
-        std::span<const CookedSkeletonHeader> skeletonHeaders;
-        std::span<const CookedAnimator> animators;
-        std::span<const CookedMetadata> metadatas;
-
-        if (!ViewArray(bytes, section(SectionKind::Strings), stringBytes, issues, "strings")
-            || !ViewArray(bytes, section(SectionKind::Metadata), metadatas, issues, "metadata")
-            || !ViewArray(bytes, section(SectionKind::Nodes), nodes, issues, "nodes")
-            || !ViewArray(bytes, section(SectionKind::NodeMeshes), nodeMeshes, issues, "nodeMeshes")
-            || !ViewArray(bytes, section(SectionKind::Meshes), meshes, issues, "meshes")
-            || !ViewArray(bytes, section(SectionKind::Vertices), vertexBytes, issues, "vertices")
-            || !ViewArray(bytes, section(SectionKind::Indices), indices, issues, "indices")
-            || !ViewArray(bytes, section(SectionKind::Bones), bones, issues, "bones")
-            || !ViewArray(bytes, section(SectionKind::Clips), clips, issues, "clips")
-            || !ViewArray(bytes, section(SectionKind::Channels), channels, issues, "channels")
-            || !ViewArray(bytes, section(SectionKind::TranslationKeys), translations, issues, "translationKeys")
-            || !ViewArray(bytes, section(SectionKind::RotationKeys), rotations, issues, "rotationKeys")
-            || !ViewArray(bytes, section(SectionKind::ScaleKeys), scales, issues, "scaleKeys")
-            || !ViewArray(bytes, section(SectionKind::Skeleton), skeletonHeaders, issues, "skeleton")
-            || !ViewArray(bytes, section(SectionKind::Animator), animators, issues, "animator"))
-        {
-            return false;
-        }
-
-        if (1 != metadatas.size() || 1 != skeletonHeaders.size() || 1 != animators.size())
-        {
-            Reject(issues, "sections", "단일 레코드 섹션의 원소 수가 1이 아니다.");
-            return false;
-        }
-
-        bool stringFailed = false;
-        const auto readString = [&](StringRef ref) -> std::string
-        {
-            if (0 == ref.length) return {};
-            if (static_cast<std::uint64_t>(ref.offset) + ref.length > stringBytes.size())
-            {
-                stringFailed = true;
-                return {};
-            }
-            return std::string(stringBytes.data() + ref.offset, ref.length);
-        };
-
-        // ── 메타데이터 ──────────────────────────────────────────────────
-        const CookedMetadata& metadata = metadatas[0];
-        decoded.metadata.assetId.value = metadata.assetId;
-        decoded.metadata.name = readString(metadata.name);
-        decoded.metadata.sourcePath = Utf8ToPath(readString(metadata.sourcePath));
-        decoded.metadata.cookedPath = Utf8ToPath(readString(metadata.cookedPath));
-        decoded.metadata.sourceWriteTime = std::filesystem::file_time_type(
-            std::filesystem::file_time_type::duration(metadata.sourceWriteTimeTicks));
-        decoded.metadata.payloadKind = ModelPayloadKind::Cooked;
-
-        // ── 노드 ────────────────────────────────────────────────────────
-        decoded.nodes.resize(nodes.size());
-        for (std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            const CookedNode& source = nodes[i];
-            ModelNode& node = decoded.nodes[i];
-            node.name = readString(source.name);
-            node.parent = NodeIndex(source.parent);
-            node.localTransform = source.localTransform;
-            if (!InRange(source.meshBegin, source.meshCount, nodeMeshes.size()))
-            {
-                Reject(issues, "nodes", "노드 메시 범위가 블록 밖이다.");
-                return false;
-            }
-            node.meshes.resize(source.meshCount);
-            for (std::uint32_t m = 0; m < source.meshCount; ++m)
-                node.meshes[m] = MeshIndex(nodeMeshes[source.meshBegin + m]);
-        }
-
-        // ── 메시 ────────────────────────────────────────────────────────
-        decoded.meshes.resize(meshes.size());
-        VertexAttributeMask actualMaskUnion = 0;
-        std::uint32_t actualMaxStride = 0;
-        for (std::size_t i = 0; i < meshes.size(); ++i)
-        {
-            const CookedMesh& source = meshes[i];
-            Mesh& mesh = decoded.meshes[i];
-            mesh.name = readString(source.name);
-            mesh.material = MaterialIndex(source.material);
-            mesh.bounds = source.bounds;
-
-            if (!VertexBuffer::IsSupportedLayout(source.vertexAttributeMask)
-                || source.vertexStride != StrideOf(source.vertexAttributeMask))
-            {
-                Reject(issues, "meshes", "메시의 정점 mask/stride 계약이 어긋났다.");
-                return false;
-            }
-            const std::uint64_t vertexByteCount =
-                static_cast<std::uint64_t>(source.vertexCount) * source.vertexStride;
-            if (source.vertexByteBegin > vertexBytes.size()
-                || vertexByteCount > vertexBytes.size() - source.vertexByteBegin
-                || !InRange(source.indexBegin, source.indexCount, indices.size()))
-            {
-                Reject(issues, "meshes", "메시의 정점/인덱스 범위가 블록 밖이다.");
-                return false;
-            }
-            // ★ 정점은 mesh별 stride를 유지한 packed 블록 그대로 한 번에 복사한다.
-            const auto packed = vertexBytes.subspan(source.vertexByteBegin,
-                static_cast<std::size_t>(vertexByteCount));
-            if (!mesh.vertices.AssignPacked(source.vertexAttributeMask,
-                source.vertexCount, packed))
-            {
-                Reject(issues, "meshes", "packed 정점 블록을 구성하지 못했다.");
-                return false;
-            }
-            mesh.indices.assign(indices.begin() + source.indexBegin,
-                indices.begin() + source.indexBegin + source.indexCount);
-            actualMaskUnion |= source.vertexAttributeMask;
-            actualMaxStride = (std::max)(actualMaxStride, source.vertexStride);
-        }
-        if (actualMaskUnion != header.vertexAttributeMaskUnion
-            || actualMaxStride != header.maxVertexStride)
-        {
-            Reject(issues, "header", "정점 mask union/max stride가 mesh 레코드와 다르다.");
-            return false;
-        }
-
-        // Optional meshlet acceleration is validated separately from indexed geometry.
-        // Generation SHA verification remains the caller's responsibility and is unchanged.
-        {
-            std::span<const CookedMeshletMesh> acceleration;
-            std::span<const MeshletDescriptor> descriptors;
-            std::span<const std::uint32_t> vertices;
-            std::span<const std::uint8_t> triangles;
-            std::span<const std::uint32_t> primitives;
-            bool complete = true;
-            for (std::uint32_t kind = requiredSections; kind < meshletSectionEnd; ++kind)
-            {
-                if (byKind[kind] == nullptr)
-                {
-                    complete = false;
-                }
-            }
-            if (!complete)
-            {
-                Reject(issues, "meshlets", "Missing optional meshlet sections; force reimport/recook required.");
-            }
-            else if (ViewArray(bytes, section(SectionKind::MeshletMeshes), acceleration, issues, "meshlets.meshes")
-                && ViewArray(bytes, section(SectionKind::MeshletDescriptors), descriptors, issues, "meshlets.descriptors")
-                && ViewArray(bytes, section(SectionKind::MeshletVertices), vertices, issues, "meshlets.vertices")
-                && ViewArray(bytes, section(SectionKind::MeshletTriangles), triangles, issues, "meshlets.triangles")
-                && ViewArray(bytes, section(SectionKind::MeshletPrimitives), primitives, issues, "meshlets.primitives"))
-            {
-                // Each optional stream is a partition, not an arbitrary collection
-                // of aliases. Validate it before allocating per-mesh copies so a
-                // small hostile file cannot amplify into mesh-count times its size.
-                std::uint64_t descriptorEnd = 0, vertexEnd = 0, triangleEnd = 0, primitiveEnd = 0;
-                bool rangesValid = acceleration.size() == decoded.meshes.size();
-                for (const CookedMeshletMesh& source : acceleration)
-                {
-                    if (source.descriptorBegin != descriptorEnd || source.vertexBegin != vertexEnd
-                        || source.triangleBegin != triangleEnd || source.primitiveBegin != primitiveEnd
-                        || !InRange(source.descriptorBegin, source.descriptorCount, descriptors.size())
-                        || !InRange(source.vertexBegin, source.vertexCount, vertices.size())
-                        || !InRange(source.triangleBegin, source.triangleCount, triangles.size())
-                        || !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
-                    {
-                        rangesValid = false;
-                        break;
-                    }
-                    descriptorEnd += source.descriptorCount;
-                    vertexEnd += source.vertexCount;
-                    triangleEnd += source.triangleCount;
-                    primitiveEnd += source.primitiveCount;
-                }
-                rangesValid = rangesValid && descriptorEnd == descriptors.size()
-                    && vertexEnd == vertices.size() && triangleEnd == triangles.size()
-                    && primitiveEnd == primitives.size();
-                if (!rangesValid)
-                {
-                    Reject(issues, "meshlets", "Meshlet mesh count or stream partition is invalid; force reimport/recook required.");
-                }
-                else
-                {
-                    for (std::size_t i = 0; i < acceleration.size(); ++i)
-                    {
-                        const CookedMeshletMesh& source = acceleration[i];
-                        Mesh& mesh = decoded.meshes[i];
-                        if (!InRange(source.descriptorBegin, source.descriptorCount, descriptors.size())
-                            || !InRange(source.vertexBegin, source.vertexCount, vertices.size())
-                            || !InRange(source.triangleBegin, source.triangleCount, triangles.size())
-                            || !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
-                        {
-                            Reject(issues, "meshlets." + mesh.name,
-                                "Meshlet stream range is invalid; force reimport/recook required.");
-                            continue;
-                        }
-                        const bool empty = source.descriptorCount == 0u && source.vertexCount == 0u
-                            && source.triangleCount == 0u && source.primitiveCount == 0u;
-                        if (!empty && (source.descriptorCount > mesh.indices.size() / 3u
-                            || source.vertexCount > mesh.indices.size()
-                            || source.triangleCount != mesh.indices.size()
-                            || source.primitiveCount != mesh.indices.size() / 3u))
-                        {
-                            Reject(issues, "meshlets." + mesh.name,
-                                "Meshlet stream counts do not match indexed topology; force reimport/recook required.");
-                            continue;
-                        }
-                        MeshletPayload& payload = mesh.meshlets;
-                        payload.settings = source.settings;
-                        payload.geometryDigest = source.geometryDigest;
-                        payload.lod0 = source.lod0;
-                        const auto copyRange = [](auto& out, auto values, std::uint32_t begin, std::uint32_t count)
-                        {
-                            const auto range = values.subspan(begin, count);
-                            out.assign(range.begin(), range.end());
-                        };
-                        copyRange(payload.descriptors, descriptors, source.descriptorBegin, source.descriptorCount);
-                        copyRange(payload.vertexRemap, vertices, source.vertexBegin, source.vertexCount);
-                        copyRange(payload.triangleIndices, triangles, source.triangleBegin, source.triangleCount);
-                        copyRange(payload.primitiveRemap, primitives, source.primitiveBegin, source.primitiveCount);
-                        std::string failure;
-                        if (!importer::ValidateMeshlets(mesh, payload, failure))
-                        {
-                            payload = {};
-                            Reject(issues, "meshlets." + mesh.name,
-                                failure + "; force reimport/recook required.");
-                        }
-                    }
-                }
-            }
-        }
-
-        if (!issues.empty()) return false; // Cooked METEOR topology is mandatory.
-
-        {
-            std::span<const std::byte> lodBytes;
-            bool valid = byKind[static_cast<std::uint32_t>(SectionKind::CoarseLods)] != nullptr;
-            std::string failure = "Missing or malformed optional coarse LOD data";
-            if (valid)
-            {
-                valid = ViewArray(bytes, section(SectionKind::CoarseLods), lodBytes, issues, "lods");
-            }
-            if (valid)
-            {
-                ByteCursor cursor(lodBytes);
-                valid = cursor.Pod<std::uint32_t>() == decoded.meshes.size() && cursor.Ok();
-                for (Mesh& mesh : decoded.meshes)
-                {
-                    if (!valid)
-                    {
-                        break;
-                    }
-                    const auto header = cursor.Pod<CookedLodMesh>();
-                    valid = cursor.Ok() && header.levelCount <= kMeshLodMaxLevels;
-                    if (!valid)
-                    {
-                        break;
-                    }
-                    MeshLodChain& chain = mesh.coarseLods;
-                    chain.settings = header.settings;
-                    chain.geometryDigest = header.geometryDigest;
-                    chain.levels.resize(header.levelCount);
-                    const auto groupCount = cursor.Pod<uint32_t>();
-                    valid = cursor.Ok() && groupCount <= kMeshClusterMaxGroups && cursor.Array(groupCount, chain.groups);
-                    if (!valid) break;
-                    for (MeshLodLevel& level : chain.levels)
-                    {
-                        const auto record = cursor.Pod<CookedLodLevel>();
-                        valid = cursor.Ok() && record.indexCount != 0u && record.indexCount % 3u == 0u
-                            && record.indexCount <= mesh.indices.size()
-                            && record.descriptorCount != 0u && record.descriptorCount <= record.indexCount / 3u
-                            && record.vertexCount <= record.indexCount
-                            && record.triangleCount == record.indexCount
-                            && record.primitiveCount == record.indexCount / 3u;
-                        if (!valid)
-                        {
-                            break;
-                        }
-                        level.geometricError = record.geometricError;
-                        level.meshlets.settings = record.meshletSettings;
-                        level.meshlets.geometryDigest = record.meshletDigest;
-                        level.meshlets.lod0 = record.lod0;
-                        valid = cursor.Array(record.indexCount, level.indices)
-                            && cursor.Array(record.descriptorCount, level.meshlets.descriptors)
-                            && cursor.Array(record.vertexCount, level.meshlets.vertexRemap)
-                            && cursor.Array(record.triangleCount, level.meshlets.triangleIndices)
-                            && cursor.Array(record.primitiveCount, level.meshlets.primitiveRemap);
-                        if (!valid)
-                        {
-                            break;
-                        }
-                    }
-                    if (valid)
-                    {
-                        valid = importer::ValidateMeshLods(mesh, chain, failure);
-                    }
-                }
-                valid = valid && cursor.Ok() && cursor.AtEnd();
-            }
-            if (!valid)
-            {
-                for (Mesh& mesh : decoded.meshes)
-                {
-                    mesh.coarseLods = {};
-                }
-                Reject(issues, "lods", failure + "; force reimport/recook required.");
-            }
-        }
-
-        // ── 스켈레톤 ────────────────────────────────────────────────────
-        const CookedSkeletonHeader& skeletonHeader = skeletonHeaders[0];
-        if (skeletonHeader.present)
-        {
-            Skeleton skeleton{};
-            skeleton.rootBone = BoneIndex(skeletonHeader.rootBone);
-            skeleton.rootTransform = skeletonHeader.rootTransform;
-            skeleton.globalInverseTransform = skeletonHeader.globalInverseTransform;
-
-            skeleton.bones.resize(bones.size());
-            for (std::size_t i = 0; i < bones.size(); ++i)
-            {
-                skeleton.bones[i].name = readString(bones[i].name);
-                skeleton.bones[i].parent = BoneIndex(bones[i].parent);
-                skeleton.bones[i].inverseBindMatrix = bones[i].inverseBindMatrix;
-            }
-
-            skeleton.clips.resize(clips.size());
-            for (std::size_t c = 0; c < clips.size(); ++c)
-            {
-                const CookedClip& sourceClip = clips[c];
-                AnimationClip& clip = skeleton.clips[c];
-                clip.name = readString(sourceClip.name);
-                clip.durationTicks = sourceClip.durationTicks;
-                clip.ticksPerSecond = sourceClip.ticksPerSecond;
-                clip.looping = 0 != sourceClip.looping;
-
-                if (!InRange(sourceClip.channelBegin, sourceClip.channelCount,
-                    channels.size()))
-                {
-                    Reject(issues, "clips", "클립의 채널 범위가 블록 밖이다.");
-                    return false;
-                }
-                clip.channels.resize(sourceClip.channelCount);
-                for (std::uint32_t n = 0; n < sourceClip.channelCount; ++n)
-                {
-                    const CookedChannel& sourceChannel =
-                        channels[sourceClip.channelBegin + n];
-                    AnimationChannel& channel = clip.channels[n];
-                    channel.bone = BoneIndex(sourceChannel.bone);
-                    channel.translationInterpolation = static_cast<InterpolationMode>(
-                        sourceChannel.translationInterpolation);
-                    channel.rotationInterpolation = static_cast<InterpolationMode>(
-                        sourceChannel.rotationInterpolation);
-                    channel.scaleInterpolation = static_cast<InterpolationMode>(
-                        sourceChannel.scaleInterpolation);
-
-                    if (!InRange(sourceChannel.translationBegin,
-                            sourceChannel.translationCount, translations.size())
-                        || !InRange(sourceChannel.rotationBegin,
-                            sourceChannel.rotationCount, rotations.size())
-                        || !InRange(sourceChannel.scaleBegin,
-                            sourceChannel.scaleCount, scales.size()))
-                    {
-                        Reject(issues, "channels", "채널의 키 범위가 블록 밖이다.");
-                        return false;
-                    }
-
-                    // ★ 이 세 줄이 legacy 가 시간의 80% 를 쓰던 자리다.
-                    //   표현이 같으니 키마다 도는 루프가 아예 없다.
-                    channel.translations.assign(
-                        translations.begin() + sourceChannel.translationBegin,
-                        translations.begin() + sourceChannel.translationBegin
-                            + sourceChannel.translationCount);
-                    channel.rotations.assign(
-                        rotations.begin() + sourceChannel.rotationBegin,
-                        rotations.begin() + sourceChannel.rotationBegin
-                            + sourceChannel.rotationCount);
-                    channel.scales.assign(
-                        scales.begin() + sourceChannel.scaleBegin,
-                        scales.begin() + sourceChannel.scaleBegin
-                            + sourceChannel.scaleCount);
-                }
-            }
-            decoded.skeleton = std::move(skeleton);
-        }
-        else if (!bones.empty() || !clips.empty())
-        {
-            Reject(issues, "skeleton", "스켈레톤이 없다는데 뼈/클립이 있다.");
-            return false;
-        }
-
-        // ── 애니메이터 ──────────────────────────────────────────────────
-        const CookedAnimator& animator = animators[0];
-        if (animator.present)
-        {
-            AnimatorData data{};
-            data.motionAssetId.value = animator.motionAssetId;
-            data.defaultClip = AnimationClipIndex(animator.defaultClip);
-            decoded.animator = data;
-        }
-
-        // ── 재질 ────────────────────────────────────────────────────────
-        {
-            const SectionEntry& entry = section(SectionKind::Materials);
-            if (entry.offset > bytes.size() || entry.bytes > bytes.size() - entry.offset)
-            {
-                Reject(issues, "materials", "재질 섹션이 파일 밖을 가리킨다.");
-                return false;
-            }
-            ByteCursor cursor(bytes.subspan(
-                static_cast<std::size_t>(entry.offset),
-                static_cast<std::size_t>(entry.bytes)));
-
-            decoded.materials.resize(entry.elementCount);
-            for (std::uint32_t i = 0; i < entry.elementCount; ++i)
-            {
-                Material& material = decoded.materials[i];
-                material.assetId.value = cursor.Pod<Uuid::Uuid16>();
-                material.shaderAssetId.value = cursor.Pod<Uuid::Uuid16>();
-                material.name = readString(cursor.Pod<StringRef>());
-                material.blendMode =
-                    static_cast<MaterialBlendMode>(cursor.Pod<std::uint8_t>());
-                if (material.blendMode != MaterialBlendMode::Opaque
-                    && material.blendMode != MaterialBlendMode::Transparent
-                    && material.blendMode != MaterialBlendMode::Masked)
-                {
-                    Reject(issues, "materials", "Unknown material alpha mode.");
-                    return false;
-                }
-
-
-                const std::uint32_t propertyCount = cursor.Pod<std::uint32_t>();
-                if (!cursor.Ok()) break;
-                material.properties.resize(propertyCount);
-                for (std::uint32_t p = 0; p < propertyCount && cursor.Ok(); ++p)
-                {
-                    MaterialProperty& property = material.properties[p];
-                    property.name = readString(cursor.Pod<StringRef>());
-                    const std::uint8_t typeIndex = cursor.Pod<std::uint8_t>();
-                    switch (typeIndex)
-                    {
-                    case 0: property.value = 0 != cursor.Pod<std::uint8_t>(); break;
-                    case 1: property.value = cursor.Pod<std::int32_t>(); break;
-                    case 2: property.value = cursor.Pod<std::uint32_t>(); break;
-                    case 3: property.value = cursor.Pod<float>(); break;
-                    case 4: property.value = cursor.Pod<math::vector2>(); break;
-                    case 5: property.value = cursor.Pod<math::vector3>(); break;
-                    case 6: property.value = cursor.Pod<math::vector4>(); break;
-                    case 7: property.value = readString(cursor.Pod<StringRef>()); break;
-                    case 8:
-                    {
-                        TextureReference reference{};
-                        reference.assetId.value = cursor.Pod<Uuid::Uuid16>();
-                        reference.logicalName = readString(cursor.Pod<StringRef>());
-                        reference.fallbackPath =
-                            Utf8ToPath(readString(cursor.Pod<StringRef>()));
-                        reference.colorSpace =
-                            static_cast<TextureColorSpace>(cursor.Pod<std::uint8_t>());
-                        reference.coordinates.set = cursor.Pod<std::uint32_t>();
-                        reference.coordinates.offset = cursor.Pod<std::array<float, 2>>();
-                        reference.coordinates.scale = cursor.Pod<std::array<float, 2>>();
-                        reference.coordinates.rotation = cursor.Pod<float>();
-                        reference.sampler.minMag =
-                            static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
-                        reference.sampler.mip =
-                            static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
-                        reference.sampler.addressU =
-                            static_cast<RHIAddressMode>(cursor.Pod<std::uint8_t>());
-                        reference.sampler.addressV =
-                            static_cast<RHIAddressMode>(cursor.Pod<std::uint8_t>());
-                        property.value = std::move(reference);
-                        break;
-                    }
-                    default:
-                        Reject(issues, "materials",
-                            "모르는 property 타입 " + std::to_string(typeIndex) + ".");
-                        return false;
-                    }
-                }
-
-                const std::uint32_t keywordCount = cursor.Pod<std::uint32_t>();
-                if (!cursor.Ok()) break;
-                material.keywords.resize(keywordCount);
-                for (std::uint32_t k = 0; k < keywordCount && cursor.Ok(); ++k)
-                    material.keywords[k] = readString(cursor.Pod<StringRef>());
-
-                const std::uint32_t selectionCount = cursor.Pod<std::uint32_t>();
-                if (!cursor.Ok()) break;
-                material.keywordSelections.resize(selectionCount);
-                for (std::uint32_t k = 0; k < selectionCount && cursor.Ok(); ++k)
-                    material.keywordSelections[k] = cursor.Pod<std::uint16_t>();
-            }
-
-            if (!cursor.Ok())
-            {
-                Reject(issues, "materials", "재질 섹션이 도중에 끝났다.");
-                return false;
-            }
-        }
-
-        // ★ 문자열 참조 실패는 마지막에 한 번에 본다. 중간에 던지지 않는 이유는
-        //   손상된 파일에서 어디까지 읽혔는지가 아니라 **거부했다는 사실**만
-        //   중요하기 때문이다.
-        if (stringFailed)
-        {
-            Reject(issues, "strings", "문자열 참조가 테이블 밖을 가리킨다.");
-            return false;
-        }
-        if (!issues.empty()) return false; // No LOD0/indexed recovery.
-        outDraft = std::move(decoded);
-        return true;
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // 디코더
-    // ════════════════════════════════════════════════════════════════════
-
-    ModelDecodeResult CookedModelDecoder::Decode(const ModelLoadRequest& request)
+    std::vector<SectionEntry> table;
+    table.reserve(pending.size());
+    for (const PendingSection& section : pending)
     {
-        ModelDecodeResult result{};
-
-        if (request.cookedPath.empty())
-        {
-            // 경로를 **유추하지 않는다**. legacy 는 쓰기·읽기·판정이 세 군데로
-            // 갈라져 있고 그중 판정만 다른 곳을 봐서, Assets/Models/ 밖의 모델은
-            // 쿠킹이 있어도 못 쓴다. 그 함정을 물려받지 않는다.
-            Reject(result.issues, "request", "cookedPath 가 비어 있다.");
-            return result;
-        }
-
-        std::error_code errorCode;
-        const auto size = std::filesystem::file_size(request.cookedPath, errorCode);
-        if (errorCode)
-        {
-            Reject(result.issues, "file", "쿠킹 파일을 열 수 없다: "
-                + request.cookedPath.filename().string());
-            return result;
-        }
-
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
-        {
-            // ★ std::ifstream 을 쓰지 않는다. 실측(Gunner 1.85MB, 30회 최솟값):
-            //
-            //     ifstream 1회 read   1.123ms
-            //     fopen/fread         0.159ms   ← 7.1배 빠르다
-            //     ReadFile 1회        0.161ms   (같다 — Windows API 를 쓸 이유가 없다)
-            //
-            //   처음엔 ifstream 으로 짰고, 그 상태에서 쿠킹 로드 2.827ms 중
-            //   1.762ms 가 파일 읽기였다(파싱은 0.318ms 뿐이었다). 포맷을 아무리
-            //   잘 만들어도 읽는 수단이 병목이면 소용이 없다.
-            //
-            // ★ 경로는 반드시 wide 로 연다. std::fopen 은 narrow 만 받아서
-            //   한글 경로에서 조용히 실패한다.
-            std::FILE* file = nullptr;
-#if defined(_WIN32)
-            // _s 변형을 쓴다 — MSVC 가 비-_s 를 C4996 으로 막는데, 여기서
-            // 경고를 끄면 이 TU 의 다른 실수까지 같이 숨는다.
-            if (0 != ::_wfopen_s(&file, request.cookedPath.c_str(), L"rb")) file = nullptr;
-#else
-            file = std::fopen(request.cookedPath.c_str(), "rb");
-#endif
-            if (!file)
-            {
-                Reject(result.issues, "file", "쿠킹 파일 열기 실패.");
-                return result;
-            }
-            const std::size_t got = std::fread(bytes.data(), 1, bytes.size(), file);
-            std::fclose(file);
-            if (got != bytes.size())
-            {
-                Reject(result.issues, "file", "쿠킹 파일을 끝까지 읽지 못했다.");
-                return result;
-            }
-        }
-
-        ModelDraft draft{};
-        if (!Read(bytes, draft, result.issues)) return result;
-
-        result.draft = std::move(draft);
-        return result;
+        SectionEntry entry{};
+        entry.kind = static_cast<std::uint32_t>(section.kind);
+        entry.elementCount = section.elementCount;
+        entry.offset = cursor;
+        entry.bytes = section.bytes;
+        table.push_back(entry);
+        cursor = AlignUp(cursor + section.bytes);
     }
+
+    FileHeader header{};
+    header.vertexLayoutTableHash = VertexLayoutTableHash();
+    header.maxVertexStride = maxVertexStride;
+    header.vertexAttributeMaskUnion = vertexAttributeMaskUnion;
+    header.fileBytes = cursor;
+    header.sectionCount = static_cast<std::uint32_t>(pending.size());
+
+    std::vector<std::byte> file(static_cast<std::size_t>(cursor), std::byte{});
+    std::memcpy(file.data(), &header, sizeof(header));
+    std::memcpy(file.data() + sizeof(header), table.data(), static_cast<std::size_t>(tableBytes));
+    for (std::size_t i = 0; i < pending.size(); ++i)
+    {
+        if (0 == pending[i].bytes)
+            continue;
+        std::memcpy(file.data() + table[i].offset, pending[i].data, static_cast<std::size_t>(pending[i].bytes));
+    }
+    result.bytes = std::move(file);
+    return result;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// 읽기
+// ════════════════════════════════════════════════════════════════════
+
+bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<ModelLoadIssue>& issues)
+{
+    outDraft = ModelDraft{};
+    ModelDraft decoded{};
+
+    if (bytes.size() < sizeof(FileHeader))
+    {
+        Reject(issues, "header", "파일이 헤더보다 짧다.");
+        return false;
+    }
+
+    FileHeader header{};
+    std::memcpy(&header, bytes.data(), sizeof(header));
+
+    if (kMagic != header.magic)
+    {
+        Reject(issues, "header", "매직이 다르다 — 쿠킹 파일이 아니다.");
+        return false;
+    }
+    if (kFormatVersion != header.formatVersion)
+    {
+        Reject(issues, "header",
+               "포맷 버전 " + std::to_string(header.formatVersion) + " != " + std::to_string(kFormatVersion) +
+                   " — 재임포트 필요.");
+        return false;
+    }
+    // ★ 이 검사가 이 포맷의 존재 이유 절반이다. legacy 는 이게 없어서
+    //   레이아웃이 바뀌면 조용히 오독했다.
+    if (VertexLayoutTableHash() != header.vertexLayoutTableHash)
+    {
+        Reject(issues, "header", "정점 레이아웃 표 해시 불일치 — 재임포트 필요.");
+        return false;
+    }
+    if ((header.vertexAttributeMaskUnion & ~kAllVertexAttributes) != 0)
+    {
+        Reject(issues, "header", "정점 속성 union에 모르는 비트가 있다.");
+        return false;
+    }
+    if (header.maxVertexStride > StrideOf(kAllVertexAttributes))
+    {
+        Reject(issues, "header", "최대 정점 stride가 기술표 범위를 넘는다.");
+        return false;
+    }
+    if (header.fileBytes != bytes.size())
+    {
+        Reject(issues, "header", "파일 크기가 헤더와 다르다 — 잘렸거나 덧붙었다.");
+        return false;
+    }
+
+    const std::uint64_t tableBytes = static_cast<std::uint64_t>(header.sectionCount) * sizeof(SectionEntry);
+    if (sizeof(FileHeader) + tableBytes > bytes.size())
+    {
+        Reject(issues, "header", "섹션 표가 파일 밖을 넘어간다.");
+        return false;
+    }
+
+    std::vector<SectionEntry> table(header.sectionCount);
+    if (header.sectionCount)
+    {
+        std::memcpy(table.data(), bytes.data() + sizeof(FileHeader), static_cast<std::size_t>(tableBytes));
+    }
+
+    // ★ 없는 섹션을 0개로 읽지 않는다. 그러면 손상된 파일이 "빈 모델"로
+    //   통과해 버린다 — 이 저장소가 이미 겪은 거짓 통과 양식이다.
+    std::vector<const SectionEntry*> byKind(static_cast<std::size_t>(SectionKind::Count), nullptr);
+    const auto requiredSections = static_cast<std::uint32_t>(SectionKind::MeshletMeshes);
+    const auto meshletSectionEnd = static_cast<std::uint32_t>(SectionKind::CoarseLods);
+    const auto allowedSections = static_cast<std::uint32_t>(SectionKind::Count);
+    for (const SectionEntry& entry : table)
+    {
+        if (entry.kind >= allowedSections)
+        {
+            Reject(issues, "sections", "모르는 섹션 종류 " + std::to_string(entry.kind) + " — 상위 버전 파일이다.");
+            return false;
+        }
+        if (byKind[entry.kind] != nullptr)
+        {
+            Reject(issues, "sections", "Duplicate section kind.");
+            return false;
+        }
+        byKind[entry.kind] = &entry;
+    }
+    for (std::uint32_t kind = 0; kind < requiredSections; ++kind)
+    {
+        if (!byKind[kind])
+        {
+            Reject(issues, "sections", "섹션 " + std::to_string(kind) + " 이 없다 — 파일이 불완전하다.");
+            return false;
+        }
+    }
+
+    const auto section = [&](SectionKind kind) -> const SectionEntry& {
+        return *byKind[static_cast<std::size_t>(kind)];
+    };
+
+    std::span<const char> stringBytes;
+    std::span<const CookedNode> nodes;
+    std::span<const std::uint32_t> nodeMeshes;
+    std::span<const CookedMesh> meshes;
+    std::span<const std::byte> vertexBytes;
+    std::span<const std::uint32_t> indices;
+    std::span<const CookedBone> bones;
+    std::span<const CookedClip> clips;
+    std::span<const CookedChannel> channels;
+    std::span<const TranslationKey> translations;
+    std::span<const RotationKey> rotations;
+    std::span<const ScaleKey> scales;
+    std::span<const CookedSkeletonHeader> skeletonHeaders;
+    std::span<const CookedAnimator> animators;
+    std::span<const CookedMetadata> metadatas;
+
+    if (!ViewArray(bytes, section(SectionKind::Strings), stringBytes, issues, "strings") ||
+        !ViewArray(bytes, section(SectionKind::Metadata), metadatas, issues, "metadata") ||
+        !ViewArray(bytes, section(SectionKind::Nodes), nodes, issues, "nodes") ||
+        !ViewArray(bytes, section(SectionKind::NodeMeshes), nodeMeshes, issues, "nodeMeshes") ||
+        !ViewArray(bytes, section(SectionKind::Meshes), meshes, issues, "meshes") ||
+        !ViewArray(bytes, section(SectionKind::Vertices), vertexBytes, issues, "vertices") ||
+        !ViewArray(bytes, section(SectionKind::Indices), indices, issues, "indices") ||
+        !ViewArray(bytes, section(SectionKind::Bones), bones, issues, "bones") ||
+        !ViewArray(bytes, section(SectionKind::Clips), clips, issues, "clips") ||
+        !ViewArray(bytes, section(SectionKind::Channels), channels, issues, "channels") ||
+        !ViewArray(bytes, section(SectionKind::TranslationKeys), translations, issues, "translationKeys") ||
+        !ViewArray(bytes, section(SectionKind::RotationKeys), rotations, issues, "rotationKeys") ||
+        !ViewArray(bytes, section(SectionKind::ScaleKeys), scales, issues, "scaleKeys") ||
+        !ViewArray(bytes, section(SectionKind::Skeleton), skeletonHeaders, issues, "skeleton") ||
+        !ViewArray(bytes, section(SectionKind::Animator), animators, issues, "animator"))
+    {
+        return false;
+    }
+
+    if (1 != metadatas.size() || 1 != skeletonHeaders.size() || 1 != animators.size())
+    {
+        Reject(issues, "sections", "단일 레코드 섹션의 원소 수가 1이 아니다.");
+        return false;
+    }
+
+    bool stringFailed = false;
+    const auto readString = [&](StringRef ref) -> std::string {
+        if (0 == ref.length)
+            return {};
+        if (static_cast<std::uint64_t>(ref.offset) + ref.length > stringBytes.size())
+        {
+            stringFailed = true;
+            return {};
+        }
+        return std::string(stringBytes.data() + ref.offset, ref.length);
+    };
+
+    // ── 메타데이터 ──────────────────────────────────────────────────
+    const CookedMetadata& metadata = metadatas[0];
+    decoded.metadata.assetId.value = metadata.assetId;
+    decoded.metadata.name = readString(metadata.name);
+    decoded.metadata.sourcePath = Utf8ToPath(readString(metadata.sourcePath));
+    decoded.metadata.cookedPath = Utf8ToPath(readString(metadata.cookedPath));
+    decoded.metadata.sourceWriteTime =
+        std::filesystem::file_time_type(std::filesystem::file_time_type::duration(metadata.sourceWriteTimeTicks));
+    decoded.metadata.payloadKind = ModelPayloadKind::Cooked;
+
+    // ── 노드 ────────────────────────────────────────────────────────
+    decoded.nodes.resize(nodes.size());
+    for (std::size_t i = 0; i < nodes.size(); ++i)
+    {
+        const CookedNode& source = nodes[i];
+        ModelNode& node = decoded.nodes[i];
+        node.name = readString(source.name);
+        node.parent = NodeIndex(source.parent);
+        node.localTransform = source.localTransform;
+        if (!InRange(source.meshBegin, source.meshCount, nodeMeshes.size()))
+        {
+            Reject(issues, "nodes", "노드 메시 범위가 블록 밖이다.");
+            return false;
+        }
+        node.meshes.resize(source.meshCount);
+        for (std::uint32_t m = 0; m < source.meshCount; ++m)
+            node.meshes[m] = MeshIndex(nodeMeshes[source.meshBegin + m]);
+    }
+
+    // ── 메시 ────────────────────────────────────────────────────────
+    decoded.meshes.resize(meshes.size());
+    VertexAttributeMask actualMaskUnion = 0;
+    std::uint32_t actualMaxStride = 0;
+    for (std::size_t i = 0; i < meshes.size(); ++i)
+    {
+        const CookedMesh& source = meshes[i];
+        Mesh& mesh = decoded.meshes[i];
+        mesh.name = readString(source.name);
+        mesh.material = MaterialIndex(source.material);
+        mesh.bounds = source.bounds;
+
+        if (!VertexBuffer::IsSupportedLayout(source.vertexAttributeMask) ||
+            source.vertexStride != StrideOf(source.vertexAttributeMask))
+        {
+            Reject(issues, "meshes", "메시의 정점 mask/stride 계약이 어긋났다.");
+            return false;
+        }
+        const std::uint64_t vertexByteCount = static_cast<std::uint64_t>(source.vertexCount) * source.vertexStride;
+        if (source.vertexByteBegin > vertexBytes.size() ||
+            vertexByteCount > vertexBytes.size() - source.vertexByteBegin ||
+            !InRange(source.indexBegin, source.indexCount, indices.size()))
+        {
+            Reject(issues, "meshes", "메시의 정점/인덱스 범위가 블록 밖이다.");
+            return false;
+        }
+        // ★ 정점은 mesh별 stride를 유지한 packed 블록 그대로 한 번에 복사한다.
+        const auto packed = vertexBytes.subspan(source.vertexByteBegin, static_cast<std::size_t>(vertexByteCount));
+        if (!mesh.vertices.AssignPacked(source.vertexAttributeMask, source.vertexCount, packed))
+        {
+            Reject(issues, "meshes", "packed 정점 블록을 구성하지 못했다.");
+            return false;
+        }
+        mesh.indices.assign(indices.begin() + source.indexBegin,
+                            indices.begin() + source.indexBegin + source.indexCount);
+        actualMaskUnion |= source.vertexAttributeMask;
+        actualMaxStride = (std::max)(actualMaxStride, source.vertexStride);
+    }
+    if (actualMaskUnion != header.vertexAttributeMaskUnion || actualMaxStride != header.maxVertexStride)
+    {
+        Reject(issues, "header", "정점 mask union/max stride가 mesh 레코드와 다르다.");
+        return false;
+    }
+
+    // Optional meshlet acceleration is validated separately from indexed geometry.
+    // Generation SHA verification remains the caller's responsibility and is unchanged.
+    {
+        std::span<const CookedMeshletMesh> acceleration;
+        std::span<const MeshletDescriptor> descriptors;
+        std::span<const std::uint32_t> vertices;
+        std::span<const std::uint8_t> triangles;
+        std::span<const std::uint32_t> primitives;
+        bool complete = true;
+        for (std::uint32_t kind = requiredSections; kind < meshletSectionEnd; ++kind)
+        {
+            if (byKind[kind] == nullptr)
+            {
+                complete = false;
+            }
+        }
+        if (!complete)
+        {
+            Reject(issues, "meshlets", "Missing optional meshlet sections; force reimport/recook required.");
+        }
+        else if (ViewArray(bytes, section(SectionKind::MeshletMeshes), acceleration, issues, "meshlets.meshes") &&
+                 ViewArray(bytes, section(SectionKind::MeshletDescriptors), descriptors, issues,
+                           "meshlets.descriptors") &&
+                 ViewArray(bytes, section(SectionKind::MeshletVertices), vertices, issues, "meshlets.vertices") &&
+                 ViewArray(bytes, section(SectionKind::MeshletTriangles), triangles, issues, "meshlets.triangles") &&
+                 ViewArray(bytes, section(SectionKind::MeshletPrimitives), primitives, issues, "meshlets.primitives"))
+        {
+            // Each optional stream is a partition, not an arbitrary collection
+            // of aliases. Validate it before allocating per-mesh copies so a
+            // small hostile file cannot amplify into mesh-count times its size.
+            std::uint64_t descriptorEnd = 0, vertexEnd = 0, triangleEnd = 0, primitiveEnd = 0;
+            bool rangesValid = acceleration.size() == decoded.meshes.size();
+            for (const CookedMeshletMesh& source : acceleration)
+            {
+                if (source.descriptorBegin != descriptorEnd || source.vertexBegin != vertexEnd ||
+                    source.triangleBegin != triangleEnd || source.primitiveBegin != primitiveEnd ||
+                    !InRange(source.descriptorBegin, source.descriptorCount, descriptors.size()) ||
+                    !InRange(source.vertexBegin, source.vertexCount, vertices.size()) ||
+                    !InRange(source.triangleBegin, source.triangleCount, triangles.size()) ||
+                    !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
+                {
+                    rangesValid = false;
+                    break;
+                }
+                descriptorEnd += source.descriptorCount;
+                vertexEnd += source.vertexCount;
+                triangleEnd += source.triangleCount;
+                primitiveEnd += source.primitiveCount;
+            }
+            rangesValid = rangesValid && descriptorEnd == descriptors.size() && vertexEnd == vertices.size() &&
+                          triangleEnd == triangles.size() && primitiveEnd == primitives.size();
+            if (!rangesValid)
+            {
+                Reject(issues, "meshlets",
+                       "Meshlet mesh count or stream partition is invalid; force reimport/recook required.");
+            }
+            else
+            {
+                for (std::size_t i = 0; i < acceleration.size(); ++i)
+                {
+                    const CookedMeshletMesh& source = acceleration[i];
+                    Mesh& mesh = decoded.meshes[i];
+                    if (!InRange(source.descriptorBegin, source.descriptorCount, descriptors.size()) ||
+                        !InRange(source.vertexBegin, source.vertexCount, vertices.size()) ||
+                        !InRange(source.triangleBegin, source.triangleCount, triangles.size()) ||
+                        !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
+                    {
+                        Reject(issues, "meshlets." + mesh.name,
+                               "Meshlet stream range is invalid; force reimport/recook required.");
+                        continue;
+                    }
+                    const bool empty = source.descriptorCount == 0u && source.vertexCount == 0u &&
+                                       source.triangleCount == 0u && source.primitiveCount == 0u;
+                    if (!empty &&
+                        (source.descriptorCount > mesh.indices.size() / 3u ||
+                         source.vertexCount > mesh.indices.size() || source.triangleCount != mesh.indices.size() ||
+                         source.primitiveCount != mesh.indices.size() / 3u))
+                    {
+                        Reject(issues, "meshlets." + mesh.name,
+                               "Meshlet stream counts do not match indexed topology; force reimport/recook required.");
+                        continue;
+                    }
+                    MeshletPayload& payload = mesh.meshlets;
+                    payload.settings = source.settings;
+                    payload.geometryDigest = source.geometryDigest;
+                    payload.lod0 = source.lod0;
+                    const auto copyRange = [](auto& out, auto values, std::uint32_t begin, std::uint32_t count) {
+                        const auto range = values.subspan(begin, count);
+                        out.assign(range.begin(), range.end());
+                    };
+                    copyRange(payload.descriptors, descriptors, source.descriptorBegin, source.descriptorCount);
+                    copyRange(payload.vertexRemap, vertices, source.vertexBegin, source.vertexCount);
+                    copyRange(payload.triangleIndices, triangles, source.triangleBegin, source.triangleCount);
+                    copyRange(payload.primitiveRemap, primitives, source.primitiveBegin, source.primitiveCount);
+                    std::string failure;
+                    if (!importer::ValidateMeshlets(mesh, payload, failure))
+                    {
+                        payload = {};
+                        Reject(issues, "meshlets." + mesh.name, failure + "; force reimport/recook required.");
+                    }
+                }
+            }
+        }
+    }
+
+    if (!issues.empty())
+        return false; // Cooked METEOR topology is mandatory.
+
+    {
+        std::span<const std::byte> lodBytes;
+        bool valid = byKind[static_cast<std::uint32_t>(SectionKind::CoarseLods)] != nullptr;
+        std::string failure = "Missing or malformed optional coarse LOD data";
+        if (valid)
+        {
+            valid = ViewArray(bytes, section(SectionKind::CoarseLods), lodBytes, issues, "lods");
+        }
+        if (valid)
+        {
+            ByteCursor cursor(lodBytes);
+            valid = cursor.Pod<std::uint32_t>() == decoded.meshes.size() && cursor.Ok();
+            for (Mesh& mesh : decoded.meshes)
+            {
+                if (!valid)
+                {
+                    break;
+                }
+                const auto header = cursor.Pod<CookedLodMesh>();
+                valid = cursor.Ok() && header.levelCount <= kMeshLodMaxLevels;
+                if (!valid)
+                {
+                    break;
+                }
+                MeshLodChain& chain = mesh.coarseLods;
+                chain.settings = header.settings;
+                chain.geometryDigest = header.geometryDigest;
+                chain.levels.resize(header.levelCount);
+                const auto groupCount = cursor.Pod<uint32_t>();
+                valid = cursor.Ok() && groupCount <= kMeshClusterMaxGroups && cursor.Array(groupCount, chain.groups);
+                if (!valid)
+                    break;
+                for (MeshLodLevel& level : chain.levels)
+                {
+                    const auto record = cursor.Pod<CookedLodLevel>();
+                    valid = cursor.Ok() && record.indexCount != 0u && record.indexCount % 3u == 0u &&
+                            record.indexCount <= mesh.indices.size() && record.descriptorCount != 0u &&
+                            record.descriptorCount <= record.indexCount / 3u &&
+                            record.vertexCount <= record.indexCount && record.triangleCount == record.indexCount &&
+                            record.primitiveCount == record.indexCount / 3u;
+                    if (!valid)
+                    {
+                        break;
+                    }
+                    level.geometricError = record.geometricError;
+                    level.meshlets.settings = record.meshletSettings;
+                    level.meshlets.geometryDigest = record.meshletDigest;
+                    level.meshlets.lod0 = record.lod0;
+                    valid = cursor.Array(record.indexCount, level.indices) &&
+                            cursor.Array(record.descriptorCount, level.meshlets.descriptors) &&
+                            cursor.Array(record.vertexCount, level.meshlets.vertexRemap) &&
+                            cursor.Array(record.triangleCount, level.meshlets.triangleIndices) &&
+                            cursor.Array(record.primitiveCount, level.meshlets.primitiveRemap);
+                    if (!valid)
+                    {
+                        break;
+                    }
+                }
+                if (valid)
+                {
+                    valid = importer::ValidateMeshLods(mesh, chain, failure);
+                }
+            }
+            valid = valid && cursor.Ok() && cursor.AtEnd();
+        }
+        if (!valid)
+        {
+            for (Mesh& mesh : decoded.meshes)
+            {
+                mesh.coarseLods = {};
+            }
+            Reject(issues, "lods", failure + "; force reimport/recook required.");
+        }
+    }
+
+    // ── 스켈레톤 ────────────────────────────────────────────────────
+    const CookedSkeletonHeader& skeletonHeader = skeletonHeaders[0];
+    if (skeletonHeader.present)
+    {
+        Skeleton skeleton{};
+        skeleton.rootBone = BoneIndex(skeletonHeader.rootBone);
+        skeleton.rootTransform = skeletonHeader.rootTransform;
+        skeleton.globalInverseTransform = skeletonHeader.globalInverseTransform;
+
+        skeleton.bones.resize(bones.size());
+        for (std::size_t i = 0; i < bones.size(); ++i)
+        {
+            skeleton.bones[i].name = readString(bones[i].name);
+            skeleton.bones[i].parent = BoneIndex(bones[i].parent);
+            skeleton.bones[i].inverseBindMatrix = bones[i].inverseBindMatrix;
+        }
+
+        skeleton.clips.resize(clips.size());
+        for (std::size_t c = 0; c < clips.size(); ++c)
+        {
+            const CookedClip& sourceClip = clips[c];
+            AnimationClip& clip = skeleton.clips[c];
+            clip.name = readString(sourceClip.name);
+            clip.durationTicks = sourceClip.durationTicks;
+            clip.ticksPerSecond = sourceClip.ticksPerSecond;
+            clip.looping = 0 != sourceClip.looping;
+
+            if (!InRange(sourceClip.channelBegin, sourceClip.channelCount, channels.size()))
+            {
+                Reject(issues, "clips", "클립의 채널 범위가 블록 밖이다.");
+                return false;
+            }
+            clip.channels.resize(sourceClip.channelCount);
+            for (std::uint32_t n = 0; n < sourceClip.channelCount; ++n)
+            {
+                const CookedChannel& sourceChannel = channels[sourceClip.channelBegin + n];
+                AnimationChannel& channel = clip.channels[n];
+                channel.bone = BoneIndex(sourceChannel.bone);
+                channel.translationInterpolation =
+                    static_cast<InterpolationMode>(sourceChannel.translationInterpolation);
+                channel.rotationInterpolation = static_cast<InterpolationMode>(sourceChannel.rotationInterpolation);
+                channel.scaleInterpolation = static_cast<InterpolationMode>(sourceChannel.scaleInterpolation);
+
+                if (!InRange(sourceChannel.translationBegin, sourceChannel.translationCount, translations.size()) ||
+                    !InRange(sourceChannel.rotationBegin, sourceChannel.rotationCount, rotations.size()) ||
+                    !InRange(sourceChannel.scaleBegin, sourceChannel.scaleCount, scales.size()))
+                {
+                    Reject(issues, "channels", "채널의 키 범위가 블록 밖이다.");
+                    return false;
+                }
+
+                // ★ 이 세 줄이 legacy 가 시간의 80% 를 쓰던 자리다.
+                //   표현이 같으니 키마다 도는 루프가 아예 없다.
+                channel.translations.assign(translations.begin() + sourceChannel.translationBegin,
+                                            translations.begin() + sourceChannel.translationBegin +
+                                                sourceChannel.translationCount);
+                channel.rotations.assign(rotations.begin() + sourceChannel.rotationBegin,
+                                         rotations.begin() + sourceChannel.rotationBegin + sourceChannel.rotationCount);
+                channel.scales.assign(scales.begin() + sourceChannel.scaleBegin,
+                                      scales.begin() + sourceChannel.scaleBegin + sourceChannel.scaleCount);
+            }
+        }
+        decoded.skeleton = std::move(skeleton);
+    }
+    else if (!bones.empty() || !clips.empty())
+    {
+        Reject(issues, "skeleton", "스켈레톤이 없다는데 뼈/클립이 있다.");
+        return false;
+    }
+
+    // ── 애니메이터 ──────────────────────────────────────────────────
+    const CookedAnimator& animator = animators[0];
+    if (animator.present)
+    {
+        AnimatorData data{};
+        data.motionAssetId.value = animator.motionAssetId;
+        data.defaultClip = AnimationClipIndex(animator.defaultClip);
+        decoded.animator = data;
+    }
+
+    // ── 재질 ────────────────────────────────────────────────────────
+    {
+        const SectionEntry& entry = section(SectionKind::Materials);
+        if (entry.offset > bytes.size() || entry.bytes > bytes.size() - entry.offset)
+        {
+            Reject(issues, "materials", "재질 섹션이 파일 밖을 가리킨다.");
+            return false;
+        }
+        ByteCursor cursor(bytes.subspan(static_cast<std::size_t>(entry.offset), static_cast<std::size_t>(entry.bytes)));
+
+        decoded.materials.resize(entry.elementCount);
+        for (std::uint32_t i = 0; i < entry.elementCount; ++i)
+        {
+            Material& material = decoded.materials[i];
+            material.assetId.value = cursor.Pod<Uuid::Uuid16>();
+            material.shaderAssetId.value = cursor.Pod<Uuid::Uuid16>();
+            material.name = readString(cursor.Pod<StringRef>());
+            material.blendMode = static_cast<MaterialBlendMode>(cursor.Pod<std::uint8_t>());
+            if (material.blendMode != MaterialBlendMode::Opaque &&
+                material.blendMode != MaterialBlendMode::Transparent && material.blendMode != MaterialBlendMode::Masked)
+            {
+                Reject(issues, "materials", "Unknown material alpha mode.");
+                return false;
+            }
+
+            const std::uint32_t propertyCount = cursor.Pod<std::uint32_t>();
+            if (!cursor.Ok())
+                break;
+            material.properties.resize(propertyCount);
+            for (std::uint32_t p = 0; p < propertyCount && cursor.Ok(); ++p)
+            {
+                MaterialProperty& property = material.properties[p];
+                property.name = readString(cursor.Pod<StringRef>());
+                const std::uint8_t typeIndex = cursor.Pod<std::uint8_t>();
+                switch (typeIndex)
+                {
+                case 0:
+                    property.value = 0 != cursor.Pod<std::uint8_t>();
+                    break;
+                case 1:
+                    property.value = cursor.Pod<std::int32_t>();
+                    break;
+                case 2:
+                    property.value = cursor.Pod<std::uint32_t>();
+                    break;
+                case 3:
+                    property.value = cursor.Pod<float>();
+                    break;
+                case 4:
+                    property.value = cursor.Pod<math::vector2>();
+                    break;
+                case 5:
+                    property.value = cursor.Pod<math::vector3>();
+                    break;
+                case 6:
+                    property.value = cursor.Pod<math::vector4>();
+                    break;
+                case 7:
+                    property.value = readString(cursor.Pod<StringRef>());
+                    break;
+                case 8: {
+                    TextureReference reference{};
+                    reference.assetId.value = cursor.Pod<Uuid::Uuid16>();
+                    reference.logicalName = readString(cursor.Pod<StringRef>());
+                    reference.fallbackPath = Utf8ToPath(readString(cursor.Pod<StringRef>()));
+                    reference.colorSpace = static_cast<TextureColorSpace>(cursor.Pod<std::uint8_t>());
+                    reference.coordinates.set = cursor.Pod<std::uint32_t>();
+                    reference.coordinates.offset = cursor.Pod<std::array<float, 2>>();
+                    reference.coordinates.scale = cursor.Pod<std::array<float, 2>>();
+                    reference.coordinates.rotation = cursor.Pod<float>();
+                    reference.sampler.minMag = static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
+                    reference.sampler.mip = static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
+                    reference.sampler.addressU = static_cast<RHIAddressMode>(cursor.Pod<std::uint8_t>());
+                    reference.sampler.addressV = static_cast<RHIAddressMode>(cursor.Pod<std::uint8_t>());
+                    property.value = std::move(reference);
+                    break;
+                }
+                default:
+                    Reject(issues, "materials", "모르는 property 타입 " + std::to_string(typeIndex) + ".");
+                    return false;
+                }
+            }
+
+            const std::uint32_t keywordCount = cursor.Pod<std::uint32_t>();
+            if (!cursor.Ok())
+                break;
+            material.keywords.resize(keywordCount);
+            for (std::uint32_t k = 0; k < keywordCount && cursor.Ok(); ++k)
+                material.keywords[k] = readString(cursor.Pod<StringRef>());
+
+            const std::uint32_t selectionCount = cursor.Pod<std::uint32_t>();
+            if (!cursor.Ok())
+                break;
+            material.keywordSelections.resize(selectionCount);
+            for (std::uint32_t k = 0; k < selectionCount && cursor.Ok(); ++k)
+                material.keywordSelections[k] = cursor.Pod<std::uint16_t>();
+        }
+
+        if (!cursor.Ok())
+        {
+            Reject(issues, "materials", "재질 섹션이 도중에 끝났다.");
+            return false;
+        }
+    }
+
+    // ★ 문자열 참조 실패는 마지막에 한 번에 본다. 중간에 던지지 않는 이유는
+    //   손상된 파일에서 어디까지 읽혔는지가 아니라 **거부했다는 사실**만
+    //   중요하기 때문이다.
+    if (stringFailed)
+    {
+        Reject(issues, "strings", "문자열 참조가 테이블 밖을 가리킨다.");
+        return false;
+    }
+    if (!issues.empty())
+        return false; // No LOD0/indexed recovery.
+    outDraft = std::move(decoded);
+    return true;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 디코더
+// ════════════════════════════════════════════════════════════════════
+
+ModelDecodeResult CookedModelDecoder::Decode(const ModelLoadRequest& request)
+{
+    ModelDecodeResult result{};
+
+    if (request.cookedPath.empty())
+    {
+        // 경로를 **유추하지 않는다**. legacy 는 쓰기·읽기·판정이 세 군데로
+        // 갈라져 있고 그중 판정만 다른 곳을 봐서, Assets/Models/ 밖의 모델은
+        // 쿠킹이 있어도 못 쓴다. 그 함정을 물려받지 않는다.
+        Reject(result.issues, "request", "cookedPath 가 비어 있다.");
+        return result;
+    }
+
+    std::error_code errorCode;
+    const auto size = std::filesystem::file_size(request.cookedPath, errorCode);
+    if (errorCode)
+    {
+        Reject(result.issues, "file", "쿠킹 파일을 열 수 없다: " + request.cookedPath.filename().string());
+        return result;
+    }
+
+    std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+    {
+        // ★ std::ifstream 을 쓰지 않는다. 실측(Gunner 1.85MB, 30회 최솟값):
+        //
+        //     ifstream 1회 read   1.123ms
+        //     fopen/fread         0.159ms   ← 7.1배 빠르다
+        //     ReadFile 1회        0.161ms   (같다 — Windows API 를 쓸 이유가 없다)
+        //
+        //   처음엔 ifstream 으로 짰고, 그 상태에서 쿠킹 로드 2.827ms 중
+        //   1.762ms 가 파일 읽기였다(파싱은 0.318ms 뿐이었다). 포맷을 아무리
+        //   잘 만들어도 읽는 수단이 병목이면 소용이 없다.
+        //
+        // ★ 경로는 반드시 wide 로 연다. std::fopen 은 narrow 만 받아서
+        //   한글 경로에서 조용히 실패한다.
+        std::FILE* file = nullptr;
+#if defined(_WIN32)
+        // _s 변형을 쓴다 — MSVC 가 비-_s 를 C4996 으로 막는데, 여기서
+        // 경고를 끄면 이 TU 의 다른 실수까지 같이 숨는다.
+        if (0 != ::_wfopen_s(&file, request.cookedPath.c_str(), L"rb"))
+            file = nullptr;
+#else
+        file = std::fopen(request.cookedPath.c_str(), "rb");
+#endif
+        if (!file)
+        {
+            Reject(result.issues, "file", "쿠킹 파일 열기 실패.");
+            return result;
+        }
+        const std::size_t got = std::fread(bytes.data(), 1, bytes.size(), file);
+        std::fclose(file);
+        if (got != bytes.size())
+        {
+            Reject(result.issues, "file", "쿠킹 파일을 끝까지 읽지 못했다.");
+            return result;
+        }
+    }
+
+    ModelDraft draft{};
+    if (!Read(bytes, draft, result.issues))
+        return result;
+
+    result.draft = std::move(draft);
+    return result;
+}
+} // namespace experiment::cooked

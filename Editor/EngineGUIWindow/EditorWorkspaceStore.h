@@ -2,7 +2,7 @@
 #include "EditorWorkspaceFile.h"
 #include "EditorLayoutPreset.h"
 #include "EditorWindowRegistry.h"
-#include <chrono>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

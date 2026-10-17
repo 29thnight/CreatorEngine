@@ -2,12 +2,7 @@
 #include "../../Lattice/Material/LXMaterialIR.h"
 #include "../../Lattice/Material/LXMaterialCompiler.h"
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <regex>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <Windows.h>
 
 namespace

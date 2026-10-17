@@ -2,12 +2,7 @@
 #include "../../Utility_Framework/ContentAbi.h"
 #include "../Assets/AssetIdentityProfile.h"
 
-#include <algorithm>
-#include <charconv>
-#include <map>
-#include <set>
-#include <sstream>
-#include <stdexcept>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

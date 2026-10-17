@@ -7,89 +7,88 @@
 #include "RHI/IRenderTextureCache.h"
 #include "RHI/RHIEncoder.h"
 
-#include <optional>
-#include <mutex>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {
-    struct PassLayout
-    {
-        RHIPipelineLayoutHandle handle;
-        BindingLayout material;
-        std::uint32_t hostParameterCount{};
-        std::optional<std::uint32_t> uniformSlot;
-        std::optional<std::uint32_t> textureSlot;
-        std::optional<std::uint32_t> samplerSlot;
-        std::optional<std::uint32_t> descriptorIndexSlot;
-        bool operator==(const PassLayout&) const = default;
-    };
+struct PassLayout
+{
+    RHIPipelineLayoutHandle handle;
+    BindingLayout material;
+    std::uint32_t hostParameterCount{};
+    std::optional<std::uint32_t> uniformSlot;
+    std::optional<std::uint32_t> textureSlot;
+    std::optional<std::uint32_t> samplerSlot;
+    std::optional<std::uint32_t> descriptorIndexSlot;
+    bool operator==(const PassLayout&) const = default;
+};
 
-    // Host ranges are kept intact. Material ranges are appended only when used;
-    // conflicting host constants, SRVs or static/dynamic samplers are rejected.
-    bool CreatePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& material,
-                          std::span<const RHIPipelineLayoutParam> hostParameters,
-                          std::span<const RHIStaticSamplerDesc> hostSamplers, bool inputAssembler, PassLayout& result,
-                          std::string& error);
+// Host ranges are kept intact. Material ranges are appended only when used;
+// conflicting host constants, SRVs or static/dynamic samplers are rejected.
+bool CreatePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& material,
+                      std::span<const RHIPipelineLayoutParam> hostParameters,
+                      std::span<const RHIStaticSamplerDesc> hostSamplers, bool inputAssembler, PassLayout& result,
+                      std::string& error);
 
-    struct BindlessMaterialFrame
-    {
-        std::mutex mutex;
-        std::vector<RHIBindingDesc> descriptions;
-        RHIBindingTable textures;
-        std::size_t publishedSize{};
-    };
+struct BindlessMaterialFrame
+{
+    std::mutex mutex;
+    std::vector<RHIBindingDesc> descriptions;
+    RHIBindingTable textures;
+    std::size_t publishedSize{};
+};
 
-    struct RenderBindings
-    {
-        own::shared_owner<InstanceFramePins> instancePins;
-        std::size_t instancePinIndex{ InstanceFramePins::InvalidIndex };
-        own::local_view<const Instance> instance;
-        PassLayout layout;
-        ResourcePacket resources;
-        RHIBufferSlice uniforms;
-        RHIBindingTable textures;
-        RHISamplerTable samplers;
-        std::shared_ptr<BindlessMaterialFrame> bindless;
-        RHIBufferSlice descriptorIndices;
-        const IRenderDeviceServices* device{};
-        std::uint64_t recordingId{};
-        std::uint64_t descriptorVersion{};
-    };
+struct RenderBindings
+{
+    own::shared_owner<InstanceFramePins> instancePins;
+    std::size_t instancePinIndex{InstanceFramePins::InvalidIndex};
+    own::local_view<const Instance> instance;
+    PassLayout layout;
+    ResourcePacket resources;
+    RHIBufferSlice uniforms;
+    RHIBindingTable textures;
+    RHISamplerTable samplers;
+    std::shared_ptr<BindlessMaterialFrame> bindless;
+    RHIBufferSlice descriptorIndices;
+    const IRenderDeviceServices* device{};
+    std::uint64_t recordingId{};
+    std::uint64_t descriptorVersion{};
+};
 
-    // One render owner per device. Texture cache owns GPU registrations and their
-    // fence retirement; the packet retains CPU/program owners through submission.
-    // Rebuild packets every recording so texture-cache use tracking stays current.
-    // RenderGraph declares shader reads/transitions; Bind does not change states.
-    class RenderBindingCache
-    {
-      public:
-        bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures, own::shared_owner<const Instance> instance,
-                     const PassLayout& layout, own::shared_owner<const RenderBindings>& result, std::string& error,
-                     own::shared_owner<InstanceFramePins> instancePins = {},
-                     const TextureFramePins* imagePins = nullptr);
+// One render owner per device. Texture cache owns GPU registrations and their
+// fence retirement; the packet retains CPU/program owners through submission.
+// Rebuild packets every recording so texture-cache use tracking stays current.
+// RenderGraph declares shader reads/transitions; Bind does not change states.
+class RenderBindingCache
+{
+  public:
+    bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
+                 own::shared_owner<const Instance> instance, const PassLayout& layout,
+                 own::shared_owner<const RenderBindings>& result, std::string& error,
+                 own::shared_owner<InstanceFramePins> instancePins = {}, const TextureFramePins* imagePins = nullptr);
 
-        // Call after SetPipeline with this packet's layout, before a draw/dispatch.
-        // Frame upload/descriptor handles cannot be reused in another recording.
-        static bool Bind(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
-                         const RenderBindings& bindings, std::string& error);
-        static bool Validate(const IRenderDeviceServices& device, const RenderBindings& bindings, std::string& error);
-        // A second pass in the same recording can consume the same material uploads
-        // with another host root layout. No cross-frame descriptor reuse is allowed.
-        static bool ValidatePass(const IRenderDeviceServices& device, const RenderBindings& source,
-                                 const PassLayout& layout, std::string& error);
-        static bool BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
-                             const RenderBindings& source, const PassLayout& layout, std::string& error);
+    // Call after SetPipeline with this packet's layout, before a draw/dispatch.
+    // Frame upload/descriptor handles cannot be reused in another recording.
+    static bool Bind(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                     const RenderBindings& bindings, std::string& error);
+    static bool Validate(const IRenderDeviceServices& device, const RenderBindings& bindings, std::string& error);
+    // A second pass in the same recording can consume the same material uploads
+    // with another host root layout. No cross-frame descriptor reuse is allowed.
+    static bool ValidatePass(const IRenderDeviceServices& device, const RenderBindings& source,
+                             const PassLayout& layout, std::string& error);
+    static bool BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                         const RenderBindings& source, const PassLayout& layout, std::string& error);
 
-        // Clear after device idle, before device recreation. Sampler registrations
-        // are device-owned; the RHI has no per-table release operation.
-        void Clear();
-        std::size_t SamplerTableCount() const { return bindlessSamplers_.IsValid() ? 1 : 0; }
+    // Clear after device idle, before device recreation. Sampler registrations
+    // are device-owned; the RHI has no per-table release operation.
+    void Clear();
+    std::size_t SamplerTableCount() const { return bindlessSamplers_.IsValid() ? 1 : 0; }
 
-      private:
-        IRenderDeviceServices* device_{};
-        std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
-        std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
-        std::shared_ptr<BindlessMaterialFrame> bindless_;
-        RHISamplerTable bindlessSamplers_;
-    };
+  private:
+    IRenderDeviceServices* device_{};
+    std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
+    std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
+    std::shared_ptr<BindlessMaterialFrame> bindless_;
+    RHISamplerTable bindlessSamplers_;
+};
 } // namespace material_graph

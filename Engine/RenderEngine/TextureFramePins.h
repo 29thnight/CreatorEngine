@@ -3,12 +3,7 @@
 #include "Ownership.h"
 #include "Texture.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <limits>
-#include <mutex>
-#include <unordered_map>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // A recording's small texture descriptions and explicitly prepared image payloads.
 // Each kind is pinned once per stable runtime ID; descriptions do not imply pixels.

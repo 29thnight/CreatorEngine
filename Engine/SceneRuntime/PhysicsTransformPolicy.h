@@ -2,10 +2,7 @@
 #include "../Physics/PhysicsGeometry.h"
 #include <mathematics/transform.hpp>
 #include <mathematics/views.hpp>
-#include <algorithm>
-#include <cmath>
-#include <ranges>
-#include <limits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 struct PhysicsTransformState
 {

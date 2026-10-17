@@ -6,9 +6,7 @@
 #include "../ShaderMetaReflection.h"
 #include "../LXMaterialRuntime.h"
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

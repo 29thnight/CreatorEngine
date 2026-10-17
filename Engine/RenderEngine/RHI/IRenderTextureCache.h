@@ -2,9 +2,7 @@
 #include "RHIResourceTypes.h"
 #include "../Texture.h"
 
-#include <array>
-#include <cstdint>
-#include <string>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 

@@ -4,10 +4,7 @@
 #include "Resource.h"
 #include <wingdi.h>
 #include <commctrl.h>
-#include <algorithm>
-#include <iterator>
-#include <atomic>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "comctl32.lib")
 

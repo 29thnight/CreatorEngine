@@ -25,11 +25,7 @@ TemporalCapabilities QueryFsrBuildAvailability(TemporalBackend backend)
 }
 
 #if CREATOR_ENABLE_FSR_SDK
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <exception>
-#include <limits>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

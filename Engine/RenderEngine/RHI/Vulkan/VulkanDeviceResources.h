@@ -14,11 +14,8 @@
 #include "../RHISubmissionThread.h"
 #include "VulkanEncoder.h"
 
-#include <atomic>
-#include <array>
-#include <memory>
-#include <mutex>
-#include <vector>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 class VulkanPipelineCache;
 class XeSSUpscalerVulkan;

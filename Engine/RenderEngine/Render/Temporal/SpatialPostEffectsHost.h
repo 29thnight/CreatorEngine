@@ -1,7 +1,7 @@
 #pragma once
 #include "SpatialPostEffects.h"
 #include "../Graph/EnhancedRenderGraph.h"
-#include <memory>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 class IRHIDeviceResources;
 struct EnhancedFrameContext;

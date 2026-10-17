@@ -2,12 +2,7 @@
 #include "../Physics/PhysicsScene.h"
 #include "ProjectLayerSettings.h"
 #include "CharacterMotionPolicy.h"
-#include <unordered_map>
-#include <thread>
-#include <memory>
-#include <span>
-#include <vector>
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Scene-owned runtime. Registration is authoring membership; no SDK scene exists in editor mode.
 class ScenePhysicsSimulation final

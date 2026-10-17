@@ -2,9 +2,9 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../RHIEncoder.h"
 
-#include <cassert>
-#include <cstring>
-#include <string>
+#include "../../../Utility_Framework/Contract.h"
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include "../RHIShaderCompiler.h"
 #include "../../Texture.h"
 #include "../IRenderTextureCache.h"
@@ -650,7 +650,11 @@ void EnhancedIBLGenerator::OnUploadAccepted(uint64_t recording, RHICompletionPoi
     {
         m_previousTargets->completion = completion.value;
         m_previousTargets->waitForIdle |= !completion.IsValid();
-        assert(m_retiredOwners.size() < m_retiredOwners.capacity());
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((m_retiredOwners.size() < m_retiredOwners.capacity()));
+            },
+            "m_retiredOwners.size() < m_retiredOwners.capacity()");
         m_retiredOwners.push_back(std::move(*m_previousTargets));
         // This is no longer a rollback candidate before any retirement handoff.
         m_previousTargets.reset();

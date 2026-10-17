@@ -1,10 +1,7 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringBase64.h"
 
-#include <algorithm>
-#include <limits>
-#include <string_view>
-#include <unordered_set>
+#include "StandardLibrary.h"
 
 namespace Authoring
 {

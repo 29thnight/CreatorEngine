@@ -1,8 +1,7 @@
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
+#include <stddef.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // PHASE 3.75 MBC6 — model generation 정점 속성 기술표의 제품 정본.
 //

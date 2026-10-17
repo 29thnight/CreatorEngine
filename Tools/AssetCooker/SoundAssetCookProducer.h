@@ -6,12 +6,7 @@
 #include "Assets/AudioClipSourceMetadata.h"
 #include "AuthoringCookedDocument.h"
 
-#include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <set>
-#include <unordered_map>
-#include <unordered_set>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace sound_cook
 {

@@ -1,8 +1,6 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
-#include <array>
-#include <algorithm>
-#include <vector>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include "../../Graph/ShadowMath.h"
 
 #include "../../Graph/EnhancedRenderPass.h"

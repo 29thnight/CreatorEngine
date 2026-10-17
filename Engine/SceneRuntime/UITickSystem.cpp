@@ -6,7 +6,7 @@
 #include "Canvas.h"
 #include "ImageComponent.h"
 #include "Entity.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void UITickSystem::RegisterSpriteSheet(SpriteSheetComponent* component)
 {

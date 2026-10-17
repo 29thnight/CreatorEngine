@@ -8,20 +8,8 @@
 //   포화로 보인다). 여기서는 thread_local 이 **슬롯 배열**이고 서비스마다
 //   자기 자리를 가지므로, 검사용 서비스와 라이브 서비스가 같은 스레드에서
 //   동시에 살아 서로를 건드리지 않는다.
-#include <atomic>
-#include <climits>
-#include <condition_variable>
-#include <cstdint>
-#include <deque>
-#include <future>
-#include <memory>
-#include <mutex>
-#include <semaphore>
-#include <span>
-#include <thread>
-#include <utility>
-#include <string>
-#include <vector>
+#include <limits.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "ProfileCapture.h"
 #include "ProfileCaptureFile.h"

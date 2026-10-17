@@ -4,12 +4,7 @@
 #include "HtmlFileSink.h"
 #include "ClassProperty.h"
 #include <spdlog/spdlog.h>
-#include <atomic>
-#include <format>
-#include <source_location>
-#include <string>
-#include <string_view>
-#include <type_traits>
+#include "StandardLibrary.h"
 
 class DebugClass : public Singleton<DebugClass>
 {

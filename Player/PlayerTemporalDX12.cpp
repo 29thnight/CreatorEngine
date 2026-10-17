@@ -8,12 +8,8 @@
 #include "Render/Temporal/TemporalRuntimeControl.h"
 #include "ProfileScope.h"
 
-#include <array>
-#include <atomic>
-#include <algorithm>
-#include <chrono>
-#include <condition_variable>
-#include <mutex>
+#include <stdint.h>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 namespace Player

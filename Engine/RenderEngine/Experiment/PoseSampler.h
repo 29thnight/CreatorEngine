@@ -4,8 +4,7 @@
 
 #include <mathematics/matrix4x4.hpp>
 
-#include <cstdint>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // experiment::Skeleton/AnimationClip 포즈 샘플러.
 //

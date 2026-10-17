@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <Import Project="$(MSBuildThisFileDirectory)WindowsAppSdk.props" Condition="'$(CreatorWindowsAppSdkPropsImported)' != 'true'" />
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <_CreatorContractsRoot>$(MSBuildThisFileDirectory)..\..\</_CreatorContractsRoot>
+    <CreatorContractConfigDir>$(_CreatorContractsRoot)Build\Generated\Contracts\$(Platform)-$(EngineConfigKey)\</CreatorContractConfigDir>
+    <_CreatorAssertionsEnabled Condition="'$(Configuration)' == 'Debug'">true</_CreatorAssertionsEnabled>
+    <_CreatorAssertionsEnabled Condition="'$(Configuration)' == 'Release'">false</_CreatorAssertionsEnabled>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ClCompile>
+      <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions Condition="'$(Configuration)' == 'Debug' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)' == 'Release'">NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <!-- Direct module imports also need these SDK libraries; adapter headers
+           retain autolink directives for standalone source probes. -->
+      <AdditionalDependencies>ole32.lib;runtimeobject.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">
+    <Link><AdditionalDependencies>WindowsApp.lib;$(CreatorWindowsAppSdkBootstrapLibrary);%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <!-- Forward legacy external STL includes to std. Keep this in compiler-only
+       options: reflgen snapshots include directories, not these options. Never
+       interpose while compiling the standard library module itself. -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'EngineContracts' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">
+    <ClCompile>
+      <AdditionalOptions>/I"$(_CreatorContractsRoot)Tools\build\StdModuleHeaders" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'EngineContracts' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">
+    <ProjectReference Include="$(_CreatorContractsRoot)Engine\Contracts\EngineContracts.vcxproj">
+      <Project>{A0D343A4-7A53-45DB-AC26-B0215C37FD80}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectName)' == 'EngineContracts'">
+    <ClCompile><AdditionalIncludeDirectories>$(CreatorContractConfigDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
+  <!-- Single writer; consuming projects wait through the project reference. -->
+  <Target Name="GenerateCreatorContractConfig" BeforeTargets="PrepareForBuild;ClCompile"
+          Condition="'$(MSBuildProjectName)' == 'EngineContracts'">
+    <Error Condition="'$(_CreatorAssertionsEnabled)' == ''" Text="Unsupported contracts configuration: $(Configuration)" />
+    <MakeDir Directories="$(CreatorContractConfigDir)" />
+    <WriteLinesToFile File="$(CreatorContractConfigDir)CreatorContractConfig.h"
+      Lines="#pragma once%0Anamespace ce::contract_detail {%0A    inline constexpr bool assertions_enabled = $(_CreatorAssertionsEnabled)%3B%0A}"
+      Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8" />
+    <ItemGroup><FileWrites Include="$(CreatorContractConfigDir)CreatorContractConfig.h" /></ItemGroup>
+  </Target>
+  <!-- reflgen uses Clang, which cannot consume MSVC IFCs. _ReflgenComputeInputs
+       copies compiler metadata into _ReflgenCompile before _ReflgenWriteArguments.
+       Change only that parser snapshot; the actual ClCompile items keep imports.
+       Give each project its own config so direct ReflgenGenerate calls also work
+       before project references or the module provider have been built. -->
+  <Target Name="ConfigureCreatorContractsForReflgen" BeforeTargets="_ReflgenWriteArguments"
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(ReflgenTargetsImported)' == 'true' and '@(_ReflgenCompile)' != ''">
+    <Error Condition="'$(_CreatorAssertionsEnabled)' == ''" Text="Unsupported contracts configuration: $(Configuration)" />
+    <PropertyGroup>
+      <_CreatorContractParserConfigDir>$(IntDir)contracts-parser\</_CreatorContractParserConfigDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(_CreatorContractParserConfigDir)" />
+    <WriteLinesToFile File="$(_CreatorContractParserConfigDir)CreatorContractConfig.h"
+      Lines="#pragma once%0Anamespace ce::contract_detail {%0A    inline constexpr bool assertions_enabled = $(_CreatorAssertionsEnabled)%3B%0A}"
+      Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8" />
+    <ItemGroup>
+      <_ReflgenCompile>
+        <PreprocessorDefinitions>CE_CONTRACT_STANDALONE=1;%(_ReflgenCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+        <AdditionalIncludeDirectories>$(_CreatorContractParserConfigDir);%(_ReflgenCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      </_ReflgenCompile>
+      <FileWrites Include="$(_CreatorContractParserConfigDir)CreatorContractConfig.h" />
+    </ItemGroup>
+  </Target>
+  <!-- reflgen adds its registration .cpp after the regular module scan. Supply
+       the already-built public module references to that late compiler input. -->
+  <Target Name="ReferenceStandardModulesInReflgenSource" AfterTargets="_ReflgenComputeInputs"
+          Condition="'$(ReflgenTargetsImported)' == 'true' and '@(ReferencedProjectsPublicModules)' != ''">
+    <ItemGroup>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+          Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'std.ixx'">
+        <ModuleName>std</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+          Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Contracts.ixx'">
+        <ModuleName>Creator.Contracts</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+          Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Concurrency.ixx'">
+        <ModuleName>Creator.Concurrency</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+          Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Platform.Windows.ixx'">
+        <ModuleName>Creator.Platform.Windows</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+          Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Window.ixx'">
+        <ModuleName>Creator.Core.Window</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <ClCompile Condition="'%(ClCompile.Identity)' == '$(_ReflgenModuleSource)'">
+        <AdditionalOptions>@(_CreatorReflgenModuleReference -> '/reference &quot;%(ModuleName)=%(FullPath)&quot;', ' ') %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      </ClCompile>
+    </ItemGroup>
+  </Target>
+</Project>

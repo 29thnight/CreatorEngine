@@ -12,8 +12,7 @@
 #include "UndoHistoryTransaction.h"
 #include "ConsoleCommandSystem.h"
 #include "ClassProperty.h"
-#include <stack>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Meta
 {

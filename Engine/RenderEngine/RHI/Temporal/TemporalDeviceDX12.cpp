@@ -1,6 +1,6 @@
 #include "TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
-#include <mutex>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

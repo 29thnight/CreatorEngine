@@ -1,6 +1,6 @@
 #pragma once
 #include "../../Graph/EnhancedRenderPass.h"
-#include <array>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 // Resource contract for METEOR surfaces. Owns allocation/clear only; no geometry,
 // material pipelines, draw batches, culling or alternate surface route.
@@ -17,6 +17,9 @@ public:
     };
     static RHIFormat GetRenderTargetFormat(uint32_t index);
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
+    void DeclareVisibility(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
+    void DeclareSurface(EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
+        RGHandle depth, RGHandle visibility);
     const Outputs& GetOutputs() const { return m_outputs; }
     void Shutdown() { m_outputs = {}; }
 private:

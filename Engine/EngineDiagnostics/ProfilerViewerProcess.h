@@ -1,10 +1,6 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "ProfilerViewerProtocol.h"
 

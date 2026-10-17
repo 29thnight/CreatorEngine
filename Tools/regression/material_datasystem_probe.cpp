@@ -1,4 +1,5 @@
 #include "../../Engine/RenderEngine/DataSystem.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "../../Engine/RenderEngine/Material.h"
 #include "../../Engine/RenderEngine/ShaderMeta.h"
 #include "../../Engine/Utility_Framework/AuthoringNodeViewAccess.h"
@@ -7,11 +8,7 @@
 #include "../../Engine/Utility_Framework/PathFinder.h"
 #include "../../Engine/Utility_Framework/ReflectionTypedYml.h"
 
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace reflgen::generated
 {
@@ -33,12 +30,14 @@ namespace
 
 struct ComApartment
 {
+    ce::platform::windows::apartment_scope scope{ ce::platform::windows::apartment_model::mta };
     ComApartment()
     {
-        if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED)))
-            throw std::runtime_error("WIC host COM initialization failed.");
+        if (FAILED(scope.result))
+        {
+            throw std::runtime_error("WIC host apartment initialization failed.");
+        }
     }
-    ~ComApartment() { CoUninitialize(); }
 };
 
 int main(int argc, char** argv)

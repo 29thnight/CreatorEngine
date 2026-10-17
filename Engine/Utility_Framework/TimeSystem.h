@@ -1,6 +1,6 @@
 #pragma once
 #include <wrl.h>
-#include <exception>
+#include "StandardLibrary.h"
 #include "TypeDefinition.h"
 #include "ClassProperty.h"
 

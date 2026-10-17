@@ -16,14 +16,8 @@
 #include <Windows.h>
 #include <DirectXTex.h>
 
-#include <algorithm>
-#include <atomic>
-#include <array>
-#include <limits>
-#include <memory>
-#include <string>
-#include <thread>
-#include <vector>
+#include <stddef.h>
+#include "../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 using namespace VulkanApi;
 

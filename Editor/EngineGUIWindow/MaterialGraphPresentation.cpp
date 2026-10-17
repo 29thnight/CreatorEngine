@@ -2,10 +2,8 @@
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../ImGuiHelper/EditorIcons.h"
 #include <imgui_stdlib.h>
-#include <algorithm>
-#include <cfloat>
-#include <map>
-#include <set>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::material_editing
 {

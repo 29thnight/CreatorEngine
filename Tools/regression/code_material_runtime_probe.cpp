@@ -9,8 +9,7 @@
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.h"
 #include "../../Engine/RenderEngine/LXMaterialPipeline.h"
 
-#include <stdexcept>
-#include <array>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace code_material_runtime_probe
 {

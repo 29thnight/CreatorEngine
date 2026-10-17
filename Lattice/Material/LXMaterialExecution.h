@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

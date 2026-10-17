@@ -6,10 +6,7 @@
 #include "LXMaterialRuntime.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 
-#include <functional>
-#include <map>
-#include <mutex>
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 namespace AssetDepot

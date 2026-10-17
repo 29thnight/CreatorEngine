@@ -9,14 +9,8 @@
 #include <AclAPI.h>
 #include <sddl.h>
 
-#include <array>
-#include <cstring>
-#include <cwchar>
-#include <limits>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
+#include <stddef.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "DxCaptureProtocol.h"
 

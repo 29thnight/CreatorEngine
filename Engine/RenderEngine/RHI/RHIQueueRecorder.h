@@ -1,7 +1,7 @@
 #pragma once
 #include "RHIQueueContract.h"
 #include "RHICommandRecordingJobs.h"
-#include <functional>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class RHIEncoder;
 class IRenderDeviceServices;

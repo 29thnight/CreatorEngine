@@ -17,9 +17,7 @@
 #include "EditorWindowNames.h"
 
 #include <imgui.h>
-#include <algorithm>
-#include <cctype>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

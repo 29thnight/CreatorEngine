@@ -1,23 +1,23 @@
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 
-CoreWindow* CoreWindow::s_instance = nullptr;
-CoreWindow::MessageHandler CoreWindow::m_CreateEventHandler = nullptr;
-DUMP_TYPE CoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
+WindowsCoreWindow* WindowsCoreWindow::s_instance = nullptr;
+WindowsCoreWindow::MessageHandler WindowsCoreWindow::m_CreateEventHandler = nullptr;
+DUMP_TYPE WindowsCoreWindow::g_dumpType = DUMP_TYPE::DUNP_TYPE_MINI;
 
-LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT WindowsCoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    CoreWindow* self = nullptr;
+    WindowsCoreWindow* self = nullptr;
 
     if (message == WM_NCCREATE)
     {
         // 윈도우 생성 시 초기화
         CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-        self = static_cast<CoreWindow*>(cs->lpCreateParams);
+        self = static_cast<WindowsCoreWindow*>(cs->lpCreateParams);
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
     }
     else
     {
-        self = reinterpret_cast<CoreWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+        self = reinterpret_cast<WindowsCoreWindow*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
     }
 
     if (self && self->m_desc.messageInterceptor)
@@ -42,7 +42,7 @@ LRESULT CoreWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT WindowsCoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 
     auto it = m_handlers.find(message);
@@ -54,7 +54,7 @@ LRESULT CoreWindow::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
 
-void CoreWindow::EnsureSwapChainCompatibleStyle()
+void WindowsCoreWindow::EnsureSwapChainCompatibleStyle()
 {
     if (!m_hWnd)
     {

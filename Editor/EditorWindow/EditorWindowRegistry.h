@@ -24,12 +24,7 @@
 #include "EditorWindowSchema.h"
 #include "EditorWindowSurface.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

@@ -1,10 +1,6 @@
 #pragma once
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <utility>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // Scene 슬롯과 평행한 계층 정본 store.
 //

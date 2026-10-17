@@ -5,8 +5,9 @@
 #include "VulkanFrameAllocators.h"
 #include "VulkanBindingTable.h"
 
-#include <algorithm>
-#include <cmath>
+#include <stddef.h>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(VkDrawIndirectCommand));
 static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==

@@ -3,12 +3,8 @@
 #include "Commands/CommandRegistrar.h"
 #include "CommandCore/CommandDescriptorSeeds.h"
 
-#include <array>
-#include <cstdio>
-#include <cstdlib>
-#include <string>
-#include <string_view>
-#include <unordered_set>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace deep_capture_command_fixtures
 {

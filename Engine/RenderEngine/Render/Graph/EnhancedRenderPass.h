@@ -1,19 +1,8 @@
 #pragma once
 #include "Ownership.h"
 #include "../../TextureFramePins.h"
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <array>
-#include <cmath>
-#include <memory>
-#include <cstring>
-#include <limits>
-#include <stdexcept>
-#include <string>
-#include <type_traits>
-#include <unordered_map>
-#include <vector>
+#include <stddef.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #include <mathematics/color.hpp>
 #include <mathematics/matrix4x4.hpp>

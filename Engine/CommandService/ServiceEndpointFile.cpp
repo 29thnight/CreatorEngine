@@ -11,6 +11,7 @@
 #endif
 #include <windows.h>
 #include <aclapi.h>
+#include <time.h> // gmtime_s is a Windows CRT extension, not an import std export.
 
 #pragma comment(lib, "Advapi32.lib")
 
@@ -18,12 +19,7 @@
 #include "SocketPlatform.h"
 #include "JsonValue.h"
 
-#include <cstdio>
-#include <ctime>
-#include <filesystem>
-#include <fstream>
-#include <vector>
-#include <sstream>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

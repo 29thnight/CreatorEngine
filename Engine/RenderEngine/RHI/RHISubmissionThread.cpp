@@ -5,19 +5,8 @@
 #include "RHIParallelCommandPool.h"
 #include "RHIRecordedBatch.h"
 
-#include <algorithm>
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <cstdio>
-#include <exception>
-#include <stdexcept>
-#include <deque>
-#include <mutex>
-#include <thread>
-#include <unordered_map>
-#include <utility>
-#include <vector>
+#include <stdio.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 const char* ToString(RHILifecycleCommand command)
 {

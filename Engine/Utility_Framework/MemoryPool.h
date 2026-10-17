@@ -1,6 +1,5 @@
 #pragma once
-#include <cstddef>
-#include <new>
+#include "StandardLibrary.h"
 
 template<typename type, size_t BlockSize>
 concept PoolPolicy = (BlockSize >= 2 * sizeof(type));

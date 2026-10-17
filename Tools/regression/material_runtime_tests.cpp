@@ -5,12 +5,8 @@
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
 #include "../../Engine/Utility_Framework/AuthoringWriteNode.h"
 
-#include <atomic>
-#include <future>
-#include <iostream>
-#include <limits>
-#include <stdexcept>
-#include <type_traits>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct,
                            const experiment::cooked::CookedAssetCatalog& catalog,

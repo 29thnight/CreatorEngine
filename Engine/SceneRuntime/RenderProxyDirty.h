@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // TransformUpdatePlan X8: gameplay writes publish semantic dirtiness; the
 // render bridge consumes the OR-ed mask once, after the final transform/layout

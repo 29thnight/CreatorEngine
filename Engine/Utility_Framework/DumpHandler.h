@@ -5,14 +5,9 @@
 #include "PathFinder.h"
 #include "LogSystem.h"
 #include <DbgHelp.h>
-#include <algorithm>
-#include <atomic>
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <exception>
-#include <system_error>
+#include <float.h>
+#include <stdio.h>
+#include "StandardLibrary.h"
 #include <crtdbg.h>
 
 #pragma comment(lib, "dbghelp.lib")
@@ -179,7 +174,7 @@ inline std::string BuildAbnormalExitReport(const char* reason, const char* detai
     context.ContextFlags = CONTEXT_FULL;
     RtlCaptureContext(&context);
 
-    // 이 함수 → CoreWindow::WriteCrashDump → LogSystem의 WriteCrashDumpOnce →
+    // 이 함수 → WindowsCoreWindow::WriteCrashDump → LogSystem의 WriteCrashDumpOnce →
     // LogSystem의 핸들러. 네 겹을 걷어 내야 abort()/terminate()를 부른 쪽이 맨 위에 온다
     // (실측으로 맞춘 값이라, 호출 경로를 바꾸면 다시 재 봐야 한다).
     constexpr int kHandlerFrames = 4;

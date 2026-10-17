@@ -4,9 +4,7 @@
 #include "../../Experiment/MaterialResolver.h"
 #include "../Graph/EnhancedRenderPass.h"
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 class Material;
 struct ShaderMeta;

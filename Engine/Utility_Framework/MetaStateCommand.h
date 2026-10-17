@@ -3,8 +3,7 @@
 // std::function을 쓰면서 include가 0개였고, ReflectionRegister.h가 자기보다
 // 앞줄에서 ReflectionType.h를 포함해 줄 때만 컴파일됐다.
 #include "ReflectionType.h"
-#include <functional>
-#include <memory>
+#include "StandardLibrary.h"
 
 #ifndef interface
 #define interface struct

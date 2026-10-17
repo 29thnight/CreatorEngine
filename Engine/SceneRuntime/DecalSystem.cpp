@@ -2,7 +2,7 @@
 #include "LifecycleTrace.h"
 #include "DecalComponent.h"
 #include "Entity.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void DecalSystem::Register(DecalComponent* decal)
 {

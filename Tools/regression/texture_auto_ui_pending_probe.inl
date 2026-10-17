@@ -1,12 +1,16 @@
 // Included in the asset-command namespace. This probe never generates edits:
 // actual Inspector input must enqueue the save before the race is requested.
+#include "texture_auto_ui_soak_probe.inl"
 static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const ConsoleCommandContext& ctx)
 {
     using namespace CommandCore;
     if (ctx.parts.size() != 3u || (ctx.parts[2] != "close" && ctx.parts[2] != "shutdown" &&
-        ctx.parts[2] != "conflict" && ctx.parts[2] != "conflictshutdown"))
+        ctx.parts[2] != "conflict" && ctx.parts[2] != "conflictshutdown" &&
+        ctx.parts[2] != "delete" && ctx.parts[2] != "corrupt" &&
+        ctx.parts[2] != "deleteshutdown" && ctx.parts[2] != "corruptshutdown" && ctx.parts[2] != "soak" &&
+        ctx.parts[2] != "nativeclose" && ctx.parts[2] != "conflictnativeclose"))
     {
-        return InvalidArguments("assets.texture.pendingprobe <isolated-source> <close|shutdown|conflict|conflictshutdown>");
+        return InvalidArguments("assets.texture.pendingprobe <isolated-source> <close|shutdown|conflict|conflictshutdown|delete|corrupt|deleteshutdown|corruptshutdown|soak|nativeclose|conflictnativeclose>");
     }
     const auto source = file::path(ctx.parts[1]);
     const auto project = source.parent_path().parent_path().parent_path();
@@ -26,6 +30,10 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
         return PreconditionFailed("texture.pending.baseline", "Use a readable sidecar without an existing pending save");
     }
     const auto mode = ctx.parts[2];
+    if (mode == "soak")
+    {
+        return StartTextureAutomaticSaveSoak(ctx, source, sidecar, before);
+    }
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
     auto* system = &ctx.system;
     ctx.system.WaitForResult([read, before, sidecar, mode, deadline, system, requested = false,
@@ -56,7 +64,40 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
             requested = true;
             std::printf("[TEXTURE_PENDING] mode=%s requestAgeMs=%lld disk=unchanged\n",
                 mode.c_str(), static_cast<long long>(requestedAge));
-            if (mode == "conflict" || mode == "conflictshutdown")
+            if (mode == "delete" || mode == "corrupt" || mode == "deleteshutdown" || mode == "corruptshutdown")
+            {
+                if (mode == "delete" || mode == "deleteshutdown")
+                {
+                    std::error_code failure;
+                    if (!file::remove(sidecar, failure) || failure)
+                    {
+                        return Fail("texture.pending.external", "Could not remove isolated metadata");
+                    }
+                }
+                else
+                {
+                    external = "guid: 33333333-3333-4333-8333-333333333333\nimportSettings: [\n";
+                    std::ofstream output(sidecar, std::ios::binary | std::ios::trunc);
+                    output << external;
+                    output.close();
+                    if (!output || read() != external)
+                    {
+                        return Fail("texture.pending.external", "Could not corrupt isolated metadata");
+                    }
+                }
+                if (mode == "deleteshutdown" || mode == "corruptshutdown")
+                {
+                    system->RequestQuit();
+                    auto data = CommandData::Object();
+                    data.Set("requestAgeMs", CommandData::Int(requestedAge));
+                    data.Set("diskUnchangedAtRequest", CommandData::Bool(true));
+                    data.Set("mode", CommandData::String(mode));
+                    data.Set("externalBytes", CommandData::String(external));
+                    return Ok("TEXTURE_METADATA_SHUTDOWN_REQUESTED", std::move(data));
+                }
+                return std::nullopt;
+            }
+            if (mode == "conflict" || mode == "conflictshutdown" || mode == "conflictnativeclose")
             {
                 std::string failure;
                 auto document = Authoring::WriteDocument::ParseFile(sidecar, &failure);
@@ -85,7 +126,26 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
                     data.Set("externalMaximumDimension", CommandData::Int(1));
                     return Ok("TEXTURE_CONFLICT_SHUTDOWN_REQUESTED", std::move(data));
                 }
-                return std::nullopt;
+                if (mode == "conflict")
+                {
+                    return std::nullopt;
+                }
+            }
+            if (mode == "nativeclose" || mode == "conflictnativeclose")
+            {
+                const auto* window = WindowsCoreWindow::GetForCurrentInstance();
+                const HWND handle = window ? window->GetHandle() : nullptr;
+                if (!handle || !::PostMessageW(handle, WM_CLOSE, 0, 0))
+                {
+                    return Fail("texture.pending.native_close", "Could not post WM_CLOSE to the Editor host");
+                }
+                auto data = CommandData::Object();
+                data.Set("requestAgeMs", CommandData::Int(requestedAge));
+                data.Set("diskUnchangedAtRequest", CommandData::Bool(true));
+                data.Set("mode", CommandData::String(mode));
+                data.Set("nativeMessage", CommandData::String("WM_CLOSE"));
+                data.Set("externalBytes", CommandData::String(external));
+                return Ok("TEXTURE_PENDING_WM_CLOSE_POSTED", std::move(data));
             }
             if (mode == "shutdown")
             {
@@ -105,11 +165,15 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
         {
             return std::nullopt;
         }
-        if (mode == "conflict")
+        if (mode == "conflict" || mode == "delete" || mode == "corrupt")
         {
             if (read() != external)
             {
                 return Fail("texture.pending.overwrite", "Pending UI edit overwrote external settings");
+            }
+            if (mode == "delete" && file::exists(sidecar))
+            {
+                return Fail("texture.pending.recreated", "Deleted metadata was silently recreated");
             }
             if (settled == std::chrono::steady_clock::time_point{})
             {
@@ -123,7 +187,16 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
             data.Set("requestAgeMs", CommandData::Int(requestedAge));
             data.Set("diskUnchangedAtRequest", CommandData::Bool(true));
             data.Set("externalBytesPreserved", CommandData::Bool(true));
-            data.Set("externalMaximumDimension", CommandData::Int(1));
+            data.Set("mode", CommandData::String(mode));
+            data.Set("automaticSaveError", CommandData::String(database.AutomaticSaveError(sidecar)));
+            if (database.AutomaticSaveError(sidecar).empty())
+            {
+                return Fail("texture.pending.diagnostic", "Rejected pending save did not expose an error");
+            }
+            if (mode == "conflict")
+            {
+                data.Set("externalMaximumDimension", CommandData::Int(1));
+            }
             return Ok("TEXTURE_PENDING_CONFLICT_PRESERVED", std::move(data));
         }
         experiment::cooked::TextureImportSettings settings;

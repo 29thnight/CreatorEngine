@@ -5,17 +5,8 @@
 #include "../RenderEngine/ClipSamplingCursor.h"
 #include "AnimTaskList.h"
 #include <mathematics/matrix4x4.hpp>
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <span>
-#include <string>
-#include <thread>
-#include <unordered_map>
-#include <vector>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Animator;
 class AnimationController;

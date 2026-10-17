@@ -1,10 +1,6 @@
 #include "MaterialGraphRasterSurface.h"
 
-#include <algorithm>
-#include <bit>
-#include <cmath>
-#include <cstring>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

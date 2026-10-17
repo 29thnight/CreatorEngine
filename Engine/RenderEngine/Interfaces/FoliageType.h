@@ -3,9 +3,7 @@
 #include "Reflection.hpp"
 #include "TypeTrait.h"
 #include "../AssetDepot/AssetLink.h"
-#include <cstdint>
-#include <memory>
-#include <string>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class Material;
 namespace material_graph

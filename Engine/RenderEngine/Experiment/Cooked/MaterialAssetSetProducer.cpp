@@ -6,14 +6,8 @@
 #include "AuthoringCookedDocument.h"
 #include "../MaterialAuthoringCodec.h"
 
-#include <algorithm>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
-#include <exception>
-#include <initializer_list>
-#include <set>
-#include <map>
-#include <cctype>
-#include <utility>
 
 namespace experiment::cooked
 {

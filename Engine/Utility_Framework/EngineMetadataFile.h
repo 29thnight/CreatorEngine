@@ -1,9 +1,5 @@
 #pragma once
-#include <filesystem>
-#include <fstream>
-#include <map>
-#include <stdexcept>
-#include <string>
+#include "StandardLibrary.h"
 
 // A bounded native projection of the JSON distribution manifest. The publisher
 // emits it and the distribution verifier checks exact equivalence. Keeping this

@@ -13,10 +13,8 @@
 // generation이면 아무것도 만들지 않고 nullptr — 반쪽 시공은 없다.
 
 #include "Ownership.h"
-#include <memory>
-#include <string>
-#include <chrono>
-#include <functional>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "CollisionGeometrySource.h"
 #include "EntityHandle.h"
 #include "Assets/ModelSceneAssetInputs.h"

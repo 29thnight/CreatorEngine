@@ -6,12 +6,8 @@
 #include "../../Graph/ShadowCasterBounds.h"
 #include "SceneSurfaceTargets.h"
 
-#include <algorithm>
-#include <bit>
-#include <cstring>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#include <stddef.h>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

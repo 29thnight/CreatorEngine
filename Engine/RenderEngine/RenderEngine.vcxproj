@@ -439,6 +439,7 @@
     <!-- 벤더링한 mikktspace. C99 소스라 C++ 유니티 빌드·PCH 에 섞이면 안 된다.
          근거: ThirdParty/mikktspace/README.md -->
     <ClCompile Include="..\..\ThirdParty\mikktspace\mikktspace.c">
+      <ForceSynchronousPDBWrites>true</ForceSynchronousPDBWrites>
       <CompileAs>CompileAsC</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -448,6 +449,7 @@
     <!-- 벤더링한 ufbx. 33,000줄짜리 단일 C 소스라 mikktspace 와 같은 규칙이다.
          근거: ThirdParty/ufbx/README.md -->
     <ClCompile Include="..\..\ThirdParty\ufbx\ufbx.c">
+      <ForceSynchronousPDBWrites>true</ForceSynchronousPDBWrites>
       <CompileAs>CompileAsC</CompileAs>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -924,6 +926,7 @@
     <ClInclude Include="RHI\RHISubmissionThread.h" />
     <ClInclude Include="TextureImage.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
+    <ClInclude Include="RHI\RHISharedSparsePagePool.h" />
     <ClInclude Include="RHI\IRenderDeviceServices.h" />
     <ClInclude Include="RHI\RHITransientHeap.h" />
     <ClInclude Include="Render\Core\PassResourceRetirement.h" />
@@ -964,5 +967,40 @@
   <ItemGroup>
     <ClCompile Include="RHI\Temporal\AntiLag2DX12Adapter.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="RHI\Temporal\AntiLag2DX12Adapter.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="GpuGeometryVisibilityShared.inl" />
+    <ClInclude Include="MaterialGraphHybridVisibility.h" />
+    <ClInclude Include="MaterialGraphIndirectBatch.h" />
+    <ClInclude Include="MaterialGraphSceneAccess.h" />
+    <ClInclude Include="MaterialGraphThinFilmSensitivity.h" />
+    <ClInclude Include="MaterialGraphVisibilityContract.h" />
+    <ClInclude Include="MeshletSparseStorage.inl" />
+    <ClInclude Include="MeshletStreamingTopology.inl" />
+    <ClInclude Include="Assets\ClusterStreaming.h" />
+    <ClInclude Include="Assets\MeshletCompression.h" />
+    <ClInclude Include="Assets\QuantizedGeometry.h" />
+    <ClInclude Include="Experiment\Cooked\CookedModelCodec.h" />
+    <ClInclude Include="Experiment\Cooked\CookedModelFormat.h" />
+    <ClInclude Include="Experiment\Import\VertexCacheOptimization.h" />
+    <ClInclude Include="Experiment\Import\VertexWelding.h" />
+    <ClInclude Include="Render\Graph\EnhancedDrawIdentity.h" />
+    <ClInclude Include="Render\Graph\EnhancedDrawSealLedger.h" />
+    <ClInclude Include="Render\Graph\EnhancedMaterialSealHash.h" />
+    <ClInclude Include="Render\Graph\EnhancedMaterialSealIdentity.h" />
+    <ClInclude Include="Render\Graph\PackedBoneMatrix.h" />
+    <ClInclude Include="Render\Graph\ShadowCasterBounds.h" />
+    <ClInclude Include="Render\Graph\ShadowMath.h" />
+    <ClInclude Include="Render\Scene\AuthoredMaterialDigest.h" />
+    <ClInclude Include="RHI\RHIFormat.h" />
+    <ClInclude Include="RHI\RHIHandle.h" />
+    <ClInclude Include="RHI\RHIPipelineLayout.h" />
+    <ClInclude Include="RHI\RHIPipelineState.h" />
+    <ClInclude Include="RHI\RHIResourceState.h" />
+    <ClInclude Include="RHI\RHIShaderBlob.h" />
+    <ClInclude Include="RHI\RHIShaderVerifiedCache.h" />
+    <ClInclude Include="RHI\DX12\DX12Format.h" />
+    <ClInclude Include="RHI\DX12\DX12PipelineLayoutTranslate.h" />
+    <ClInclude Include="RHI\DX12\DX12ResourceTable.h" />
   </ItemGroup>
 </Project>

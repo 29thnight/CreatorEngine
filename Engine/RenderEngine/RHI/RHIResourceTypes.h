@@ -1,16 +1,11 @@
 #pragma once
-#include <span>
-#include <string>
-#include <vector>
-#include <cstdint>
-#include <cstddef>
-#include <cstring>
+#include <stddef.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "RHIFormat.h"
 #include "RHIHandle.h"
 #include "RHIResourceState.h"
 
-#include <atomic>
 
 // ── 업로드 A/B 다이제스트 (축 A 게이트) ─────────────────────────────────
 //
@@ -786,6 +781,25 @@ struct RHIBufferDesc
     bool allowIndirectArguments{ false };
 };
 
+inline constexpr uint64_t RHISparseTileBytes = 64ull * 1024ull;
+
+struct RHISparseBufferDesc
+{
+    uint64_t virtualBytes{};
+    uint32_t physicalTileCapacity{};
+    bool allowUnorderedAccess{};
+    const wchar_t* debugName{};
+    // Share the physical heap and its budget lease; virtual addresses remain independent.
+    RHIBufferHandle physicalPoolOwner{};
+};
+
+struct RHISparseTileMapping
+{
+    uint32_t virtualTile{};
+    uint32_t physicalTile{};
+    bool mapped{true};
+};
+
 struct RHITextureDesc
 {
     enum class Dim : uint8_t { Texture2D, Texture3D };
@@ -1013,13 +1027,18 @@ struct RHIReadback
 /// remain logical byte offsets. Padding never changes authored stream indices.
 struct alignas(16) RHIMeshletBufferHeader
 {
-    uint32_t schemaVersion{ 4 }, profileVersion{}, meshletCount{}, descriptorOffset{};
+    uint32_t schemaVersion{ 5 }, profileVersion{}, meshletCount{}, descriptorOffset{};
     uint32_t descriptorStride{}, vertexRemapOffset{}, vertexRemapCount{}, triangleOffset{};
     uint32_t triangleByteCount{}, primitiveRemapOffset{}, primitiveRemapCount{}, vertexCount{};
     uint32_t vertexStride{}, vertexAttributeMask{}, sourceLodIndex{}, sourcePrimitiveCount{};
     uint32_t sourceVertexRemapOffset{}, sourceVertexRemapCount{}, sourceVertexCount{}, hierarchyOffset{};
+    uint32_t clusterVertexMapOffset{}, clusterResidentOffset{}, clusterGroupResidentOffset{};
+    float clusterPositionError{};
+    uint32_t clusterReserved[4]{};
 };
-static_assert(sizeof(RHIMeshletBufferHeader) == 80);
+static_assert(sizeof(RHIMeshletBufferHeader) == 112);
+// Schema 6 uses reserved[0] as the resident QMC2 packet-address table.
+static_assert(offsetof(RHIMeshletBufferHeader, clusterReserved) == 96);
 static_assert(offsetof(RHIMeshletBufferHeader, sourceVertexRemapOffset) == 64);
 static_assert(offsetof(RHIMeshletBufferHeader, sourceVertexCount) == 72);
 static_assert(offsetof(RHIMeshletBufferHeader, descriptorStride) == 16);

@@ -1,8 +1,6 @@
 #pragma once
 #include "JobScheduler.h"
-#include <cstdint>
-#include <functional>
-#include <stdexcept>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // RG4 and owned queue recording share the same engine jobs and join contract.
 // A completed handle has released every callback, including on job failure.

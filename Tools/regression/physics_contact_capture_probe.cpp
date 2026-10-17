@@ -1,6 +1,5 @@
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
-#include <iostream>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

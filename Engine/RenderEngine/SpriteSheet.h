@@ -9,13 +9,7 @@
 
 #pragma once
 
-#include <exception>
-#include <fstream>
-#include <locale>
-#include <map>
-#include <stdexcept>
-#include <string>
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "Core.Definition.h"
 #include "Navigation.h"

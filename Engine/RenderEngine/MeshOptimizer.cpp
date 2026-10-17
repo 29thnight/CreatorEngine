@@ -1,7 +1,6 @@
 #include "MeshOptimizer.h"
 #include <meshoptimizer.h>
-#include <cmath>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vector<uint32>& indices)
 {

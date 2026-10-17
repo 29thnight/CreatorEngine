@@ -1,7 +1,7 @@
 #include "ImGuiWin32Cursor.h"
 
 #include <imgui.h>
-#include <atomic>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

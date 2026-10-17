@@ -8,13 +8,7 @@
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
 
-#include <filesystem>
-#include <fstream>
-#include <iterator>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <type_traits>
+#include "StandardLibrary.h"
 
 // SerializationPlan D3-b-3 — 저작 writer의 ryml 경계.
 //

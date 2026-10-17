@@ -1,15 +1,8 @@
 #pragma once
 
-#include <array>
-#include <charconv>
-#include <cstdint>
-#include <cstdio>
-#include <vector>
-#include <filesystem>
-#include <string>
-#include <string_view>
-#include <system_error>
-#include <utility>
+#include <errno.h>
+#include <stdio.h>
+#include "StandardLibrary.h"
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -17,7 +10,6 @@
 #include <Windows.h>
 #include <io.h>
 #else
-#include <cerrno>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>

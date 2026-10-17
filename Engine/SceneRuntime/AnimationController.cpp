@@ -4,8 +4,8 @@
 #include "Animator.h"
 #include "BoneRegion.h"
 #include "AvatarMask.h"
-#include <atomic>
-#include <cassert>
+#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Contract.h"
 
 namespace
 {
@@ -17,7 +17,11 @@ AnimationController::AnimationController()
 
 ControllerPlayback& AnimationController::GetPlayback()
 {
-    assert(m_owner && !weak_from_this().expired());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((m_owner && !weak_from_this().expired()));
+        },
+        "m_owner && !weak_from_this().expired()");
     return m_owner->GetInstance().GetControllerPlayback(m_playbackId, weak_from_this());
 }
 

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <Target Name="CheckCreatorWindowsModulePackages" BeforeTargets="PrepareForBuild;CppWinRTMakeProjections">
+    <Error Condition="!Exists('$(CreatorCppWinRTPackageRoot)build\native\Microsoft.Windows.CppWinRT.targets')" Text="Restore Engine/Contracts/packages.config (Microsoft.Windows.CppWinRT $(CreatorCppWinRTVersion)), or set CreatorCppWinRTPackageRoot." />
+    <Error Condition="!Exists('$(CreatorWindowsAppSdkPackageRoot)lib\uap10.0.18362\Microsoft.UI.winmd')" Text="Restore Engine/Contracts/packages.config (Microsoft.WindowsAppSDK $(CreatorWindowsAppSdkVersion)), or set CreatorWindowsAppSdkPackageRoot." />
+    <Error Condition="!Exists('$(CreatorWindowsAppSdkBootstrapLibrary)') or !Exists('$(CreatorWindowsAppSdkBootstrapDll)')" Text="Windows App SDK bootstrap payload missing for $(Platform)." />
+  </Target>
+  <!-- Get...References rebuilds its item list. Append after it, immediately before
+       Get...Inputs copies that list into the platform projection inputs. -->
+  <Target Name="AddCreatorAppWindowWinMD" BeforeTargets="GetCppWinRTPlatformWinMDInputs"
+          DependsOnTargets="GetCppWinRTPlatformWinMDReferences;CheckCreatorWindowsModulePackages">
+    <ItemGroup>
+      <CppWinRTPlatformWinMDReferences Include="$(CreatorWindowsAppSdkPackageRoot)lib\uap10.0.18362\*.winmd">
+        <WinMDPath>%(FullPath)</WinMDPath>
+      </CppWinRTPlatformWinMDReferences>
+    </ItemGroup>
+  </Target>
+  <Target Name="ConfigureCreatorWinRTModuleScan" AfterTargets="CppWinRTAddModuleInterfaces" BeforeTargets="FixupCLCompileOptions">
+    <ItemGroup>
+      <ClCompile Update="$(GeneratedFilesDir)winrt\*.ixx">
+        <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
+      </ClCompile>
+    </ItemGroup>
+  </Target>
+</Project>

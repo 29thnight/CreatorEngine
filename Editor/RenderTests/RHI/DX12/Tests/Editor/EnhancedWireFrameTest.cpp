@@ -9,12 +9,8 @@
 #include "Mesh.h"
 #include "MaterialGraphSceneInput.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <cstring>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
-#include <vector>
 
 // 와이어프레임 패스 자가 검증 (PHASE 3-6, Gizmo 계열 4차 슬라이스).
 //

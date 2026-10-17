@@ -1,18 +1,7 @@
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/ArtifactByteSource.h"
 
-#include <algorithm>
-#include <chrono>
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <span>
-#include <stdexcept>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #if !defined(_WIN32)
 #include <sys/stat.h>
 #endif

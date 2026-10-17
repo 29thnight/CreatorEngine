@@ -4,8 +4,9 @@
 #include "InspectorControl.h"
 #include "EditorNavContract.h"
 #include "InspectorLayoutFixture.h"
-#include <atomic>
-#include <mutex>
+#include <stdint.h>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "EditorAssetDragPayload.h"
 
 #include "EditorInspectorPanel.h"
@@ -68,7 +69,6 @@
 
 #include "EditorIcons.h"
 #include "NodeEditor.h"
-#include <algorithm>
 #include "imgui_stdlib.h"
 
 namespace ed = ax::NodeEditor;

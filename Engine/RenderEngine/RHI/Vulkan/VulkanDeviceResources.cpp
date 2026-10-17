@@ -1,15 +1,13 @@
 #include "../Temporal/XeSSUpscaler.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
-#include <set>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include "VulkanDeviceResources.h"
 #include "../RHIRecordedBatch.h"
 #include "VulkanPipelineCache.h"
 
 #include <Windows.h>
-#include <algorithm>
-#include <cstdio>
-#include <exception>
-#include <cstring>
 
 using namespace VulkanApi;
 

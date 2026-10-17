@@ -1,7 +1,8 @@
 #include "DxCaptureTransport.h"
 #include "../../Engine/EngineDiagnostics/DxCaptureSecurity.h"
 
-#include <string_view>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "Advapi32.lib")
 

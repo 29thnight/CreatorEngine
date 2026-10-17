@@ -1,8 +1,7 @@
 #pragma once
 
-#include <cstdint>
-#include <filesystem>
-#include <string>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace audio_cook
 {

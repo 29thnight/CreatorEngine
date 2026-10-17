@@ -1,15 +1,6 @@
 #include "EditorWorkspaceFile.h"
 #include <Windows.h>
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <fstream>
-#include <iomanip>
-#include <regex>
-#include <set>
-#include <sstream>
-#include <stdexcept>
-#include <system_error>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::workspace
 {

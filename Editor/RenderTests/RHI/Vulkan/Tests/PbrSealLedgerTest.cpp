@@ -4,8 +4,7 @@
 #include "Render/Scene/AuthoredMaterialDigest.h"
 #include "Texture.h"
 
-#include <cstdio>
-#include <string>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // PBR-W8 — 세대 원자 밀봉의 값 신원과 장부를 잰다.
 //

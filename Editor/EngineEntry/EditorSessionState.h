@@ -4,8 +4,7 @@
 #include "EditorCameraRig.h"
 #include "EditorSelectionHistory.h"
 
-#include <atomic>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 class EditorSessionState final
 {

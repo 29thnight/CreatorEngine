@@ -6,8 +6,7 @@
 #include "RHI/RHIShaderReflection.h"
 #include "RHI/RHIShaderCompiler.h"
 
-#include <memory>
-#include <span>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 
@@ -23,7 +22,12 @@ namespace material_graph
 // 32: visibility-packet Temporal shader interface (forced recook).
 // 34: spatial replacement DAG addressing and group-based GPU LOD (forced recook).
 // 31: object-space vertex streams; lx_world/lx_previousWorld/lx_shadowWorld constants.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:34";
+// 35: resident meshlet attribute packets and direct GPU pose/attribute consumption.
+// 36: float4-row geometry SRVs; aligned bone rows avoid whole-point gathers (forced recook).
+// 37: stable sparse cluster addresses and GPU LOD demand feedback.
+// 38: bounded component decoding and vector CGQ descriptors for shader preparation.
+// 39: authenticated thin geometry metadata and paged GPU connectivity.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:39";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
@@ -100,26 +104,26 @@ struct ParameterBinding
     bool operator==(const ParameterBinding&) const = default;
 };
 
-    // Internal per-resource storage contract, not an editable graph parameter.
-    // Values match MaterialGraphTextureSample.slang: 0 = RGBA, 1 = BC5 normal XY.
-    enum class TextureSampleEncoding : std::uint32_t
-    {
-        Rgba = 0,
-        BC5Normal = 1
-    };
+// Internal per-resource storage contract, not an editable graph parameter.
+// Values match MaterialGraphTextureSample.slang: 0 = RGBA, 1 = BC5 normal XY.
+enum class TextureSampleEncoding : std::uint32_t
+{
+    Rgba = 0,
+    BC5Normal = 1
+};
 
-    struct TextureEncodingBinding
-    {
-        std::uint32_t slot{};
-        std::uint32_t offset{};
+struct TextureEncodingBinding
+{
+    std::uint32_t slot{};
+    std::uint32_t offset{};
 
-        bool operator==(const TextureEncodingBinding&) const = default;
-    };
+    bool operator==(const TextureEncodingBinding&) const = default;
+};
 
-    inline std::string TextureEncodingUniformName(std::uint32_t slot)
-    {
-        return "lx_bound_texture_" + std::to_string(slot) + "_encoding";
-    }
+inline std::string TextureEncodingUniformName(std::uint32_t slot)
+{
+    return "lx_bound_texture_" + std::to_string(slot) + "_encoding";
+}
 
 struct BindingLayout
 {
@@ -168,12 +172,11 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
 
 // Describe the selected cooked stages using their sealed compiler/dependency
 // identity. Empty entry names select an unambiguous single surface pair.
-bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary backend,
-    std::string_view vertex, std::string_view pixel, LX::Runtime::GraphicsShaderDescription& result,
-    std::string& error);
+bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary backend, std::string_view vertex,
+                            std::string_view pixel, LX::Runtime::GraphicsShaderDescription& result, std::string& error);
 
-bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend,
-    std::string_view entry, LX::Runtime::ComputeShaderDescription& result, std::string& error);
+bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend, std::string_view entry,
+                           LX::Runtime::ComputeShaderDescription& result, std::string& error);
 
 struct ParameterOverride
 {
@@ -210,8 +213,8 @@ bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOver
 // The common Material packer has already produced this immutable instance's
 // uniform block. Build resource descriptors without packing those values again.
 bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,
-                      std::span<const TextureBinding> textures, ResourcePacket& result,
-                      std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                                  std::span<const TextureBinding> textures, ResourcePacket& result,
+                                  std::vector<LX::LXMaterialDiagnostic>& diagnostics);
 
 // Cook payloads use a versioned, bounded binary envelope. Backend/entry pairs
 // are unique and the exact dependency-bearing semantic key is retained.

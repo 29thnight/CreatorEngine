@@ -1,7 +1,4 @@
-#include <functional>
-#include <concepts>
-#include <compare>
-#include <iostream>
+#include "StandardLibrary.h"
 
 template<typename T>
 struct Property

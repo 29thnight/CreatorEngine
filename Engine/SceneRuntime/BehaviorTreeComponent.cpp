@@ -5,8 +5,7 @@
 #include "ClrHost.h"
 #include "SceneManager.h"
 #include "AuthoringParsedDocument.h"
-#include <limits>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void BehaviorTreeComponent::Initialize()
 {
@@ -79,7 +78,6 @@ void BehaviorTreeComponent::OnUninitializing()
 	{
 		/*m_pBlackboard = nullptr;*/
 		Memory::SafeDelete(m_pBlackboard);
-		AIManagers->RemoveBlackBoard(name);
 	}
 	// 관리 측 트리도 함께 내린다. 남기면 Running 상태가 다음 씬으로 샌다.
 	if (m_treeInstanceId >= 0)

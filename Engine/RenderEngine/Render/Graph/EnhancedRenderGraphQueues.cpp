@@ -1,7 +1,6 @@
 #include "EnhancedRenderGraph.h"
-#include <algorithm>
-#include <chrono>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 void EnhancedRenderGraph::RequireQueueIdle() const
 {

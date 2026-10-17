@@ -7,12 +7,8 @@
 #include "Audio/SoundAssetSerialization.h"
 #include "AuthoringParseTelemetry.h"
 
-#include <cstdio>
-#include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <limits>
-#include <thread>
+#include <stdio.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

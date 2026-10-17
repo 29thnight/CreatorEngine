@@ -2,10 +2,7 @@
 
 #include "meshoptimizer.h"
 
-#include <chrono>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {

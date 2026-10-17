@@ -2,11 +2,7 @@
 
 #include "CookedAssetManifest.h"
 
-#include <cstddef>
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace Authoring
 {

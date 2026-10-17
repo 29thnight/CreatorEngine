@@ -10,10 +10,7 @@
 #include "RuntimeSettings.h"
 #include "Windows/EditorToolboxWindows.h"
 
-#include <iterator>
-#include <atomic>
-#include <algorithm>
-#include <limits>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 익명 네임스페이스가 아니라 이름을 준다. 이 프로젝트는 유니티 빌드라
 // (EnableUnitySupport) 여러 .cpp가 한 TU로 합쳐지는데, ResourceCounterWindow.cpp도

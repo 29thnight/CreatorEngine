@@ -12,8 +12,7 @@
 #include "ReflectionTypedYml.h" // CT6-a: typed 직렬화 썽크 등록
 #include "ReflgenRuntime.h"     // 런타임 타입 등록소(Meta::Types)
 #include "LogSystem.h"          // VerifyReflectRegistration — critical 로그 후 abort
-#include <cstdlib>
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "MeshRenderer.h"
 #include "LightMapping.h"
 #include "ShadowMapPassSetting.h"

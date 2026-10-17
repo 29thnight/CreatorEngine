@@ -7,9 +7,7 @@
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 #include "../../Utility_Framework/AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <fstream>
-#include <map>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

@@ -2,18 +2,13 @@
 #include "Core.Minimal.h"
 #include "IAIComponent.h"
 #include "EntityHandle.h"
-#include <mutex>
+#include "../Utility_Framework/StandardLibrary.h"
 // NodeFactory.h媛 BTHeader.h瑜??듯빐 ?꾩씠濡?怨듦툒?섎뜕 寃껊뱾?대떎(PHASE 9-8 B7?먯꽌 ?쒓굅).
 // 媛곸옄 ?꾩슂??寃껋쓣 吏곸젒 諛쏅뒗??
 #include "BlackBoard.h"
 #include "BTBuildGraph.h"
 #include <mathematics/frustum.hpp>
-#include <optional>
 #include <mathematics/bounds.hpp>
-#include <cstdint>
-#include <memory>
-#include <vector>
-#include <utility>
 
 class StateMachineComponent;
 class BehaviorTreeComponent;
@@ -61,10 +56,6 @@ public:
 		return m_globalBB;
 	}
 
-	BlackBoard* CreateBlackBoard(const std::string& aiName); // 이것도 다시 작성 : 블랙보드에 대한 팩토리가 필요한 거임
-
-	void RemoveBlackBoard(const std::string& aiName); // 이것도 다시 작성
-
 	void RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
 	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
@@ -109,8 +100,6 @@ private:
 	Core::Delegate<void, float>	InternalAIUpdateEvent{};
 
 	BlackBoard m_globalBB;
-	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용
-	plf::colony<BlackBoard> m_blackBoards;
     struct AIRegistration
     {
         EntityHandle m_owner;
@@ -119,8 +108,8 @@ private:
     };
 
     // Scene이 컴포넌트를 소유한다. 비소유 주소는 게임 스레드 레지스트리 안에만
-    // 남기며 colony의 기존 순서를 snapshot에도 유지한다.
-    plf::colony<AIRegistration> m_aiComponentMap;
+    // 남긴다. 새 등록은 끝에 추가하고, 해지 시 남은 등록의 상대 순서를 유지한다.
+    std::vector<AIRegistration> m_aiComponentMap;
     std::unordered_map<uint64_t, IAIComponent*> m_aiRegistrationsById;
     uint64_t m_nextAIRegistrationId = 1;
     // 등록·해지·Capture·Apply는 게임 스레드가 직렬화한다. 이 잠금은 레지스트리

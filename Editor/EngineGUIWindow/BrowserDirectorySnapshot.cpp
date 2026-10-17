@@ -1,8 +1,6 @@
 #include "BrowserDirectorySnapshot.h"
 
-#include <algorithm>
-#include <chrono>
-#include <unordered_map>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

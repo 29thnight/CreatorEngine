@@ -5,8 +5,7 @@
 #include "AuthoringReadNode.h"
 #include "AuthoringWriteNode.h"
 
-#include <array>
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

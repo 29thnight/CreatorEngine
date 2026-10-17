@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 엔티티(Entity)가 씬 그래프 위에서 놓인 단계 (SceneGraphRedesignPlan §4 트랙 L1).
 //

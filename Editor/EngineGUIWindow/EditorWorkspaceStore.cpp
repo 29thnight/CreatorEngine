@@ -7,13 +7,7 @@
 #include <imgui_internal.h>
 #include <Windows.h>
 #include "EditorTheme.h"
-#include <algorithm>
-#include <cstring>
-#include <system_error>
-#include <mutex>
-#include <stdexcept>
-#include <sstream>
-#include <cstdio>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 static_assert(IMGUI_VERSION_NUM == 19280, "Revalidate workspace docking adapter for the new ImGui version");
 namespace editor

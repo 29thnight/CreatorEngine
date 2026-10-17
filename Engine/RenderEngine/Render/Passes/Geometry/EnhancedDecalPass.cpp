@@ -8,11 +8,8 @@
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../TextureCodecImage.h"
 
-#include <algorithm>
-#include <bit>
-#include <cstring>
-#include <string>
-#include <vector>
+#include <stddef.h>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace

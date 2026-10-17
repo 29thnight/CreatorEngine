@@ -1,8 +1,5 @@
 #pragma once
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <sstream>
+#include "StandardLibrary.h"
 #include <Windows.h>
 
 inline std::string AnsiToUtf8(const std::string& ansiStr)

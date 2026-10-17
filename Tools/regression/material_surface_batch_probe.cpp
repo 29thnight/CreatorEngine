@@ -7,8 +7,7 @@
 #include "RHI/DX12/DX12TextureCache.h"
 #include "material_ibl_reference.h"
 
-#include <bit>
-#include <iostream>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

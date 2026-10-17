@@ -1,11 +1,6 @@
 #pragma once
 #include "ThreadPool.h"
-#include <exception>
-#include <functional>
-#include <memory>
-#include <span>
-#include <utility>
-#include <vector>
+#include "StandardLibrary.h"
 
 namespace job_detail
 {

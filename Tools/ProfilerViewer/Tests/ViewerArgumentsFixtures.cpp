@@ -3,8 +3,7 @@
 // harness can call RunViewerArgumentsFixtures on Windows without starting UI.
 #include "../ViewerArguments.h"
 
-#include <array>
-#include <stdexcept>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer::tests
 {

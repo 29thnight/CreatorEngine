@@ -2,9 +2,7 @@
 #include "Scene.h"
 #include "ClrHost.h"
 #include "ConsoleCommandSystem.h"
-#include <algorithm>
-#include <fstream>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "ReflectionYml.h"
 
 namespace

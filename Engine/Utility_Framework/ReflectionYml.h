@@ -17,8 +17,7 @@
 #include "ReflectionMeta.h"
 // 런타임 타입 창구(Meta::Find·TypeOf·TypeIDOf) — 템플릿 래퍼 3곳이 T 의 서술자를 등록소에서 찾는다.
 #include "ReflgenRuntime.h"
-#include <cstdint>
-#include <unordered_set>
+#include "StandardLibrary.h"
 
 namespace Meta
 {

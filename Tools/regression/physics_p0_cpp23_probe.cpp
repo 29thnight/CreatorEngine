@@ -1,15 +1,4 @@
-#include <expected>
-#include <flat_map>
-#include <flat_set>
-#include <mdspan>
-#include <ranges>
-#include <format>
-#include <source_location>
-#include <memory_resource>
-#include <variant>
-#include <array>
-#include <vector>
-#include <iostream>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/views.hpp>
 
 struct view_test {

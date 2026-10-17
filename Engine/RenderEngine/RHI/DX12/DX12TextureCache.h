@@ -16,10 +16,7 @@
 #include "../../TextureImage.h"
 #include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
-#include <cstdint>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 

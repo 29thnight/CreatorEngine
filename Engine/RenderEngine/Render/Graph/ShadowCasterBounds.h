@@ -2,11 +2,7 @@
 #include "ShadowMath.h"
 #include "EnhancedDrawIdentity.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstring>
-#include <limits>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace shadow_math
 {

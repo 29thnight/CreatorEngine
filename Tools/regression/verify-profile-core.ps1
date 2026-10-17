@@ -26,6 +26,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'ContractProbeConfiguration.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $vcvars = 'C:/Program Files/Microsoft Visual Studio/18/Community/VC/Auxiliary/Build/vcvars64.bat'
 $core = Join-Path $repo 'Engine/EngineDiagnostics'
@@ -928,10 +929,12 @@ function Invoke-Probe {
     $quoted = ($SourceList | ForEach-Object { '"' + $_ + '"' }) -join ' '
 
     # /WX — 새 코어는 경고 0 이 계약이다.
+    $contractProbe = New-ContractProbeConfiguration -Configuration $Config -OutputDirectory $OutDir
     $command = 'call "' + $vcvars + '" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /W4 /WX ' +
         $flags + ' /I"' + $core + '" /Fo"' + $OutDir + '/" /Fd"' + (Join-Path $OutDir "$Name.pdb") +
         '" /Fe"' + $exe + '" ' + $quoted
 
+    $command += $contractProbe.CommandLine
     $log = & $env:ComSpec /d /s /c $command 2>&1
     if ($LASTEXITCODE -ne 0) {
         return @{ Compiled = $false; ExitCode = -1; StdOut = ''; StdErr = ($log -join "`n") }

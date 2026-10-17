@@ -28,14 +28,7 @@
 // (EntityAt 우회 — Entity.inl 상단 주석 참고). 이 자급자족은
 // HeaderSelfSufficiency.cpp가 상시 검증한다.
 #include "Entity.h"
-#include <array>
-#include <atomic>
-#include <cstdint>
-#include <memory>
-#include <utility>
-#include <span>
-#include <unordered_map>
-#include <mutex> // MBC10: 마지막 animator publish 메트릭 스냅샷
+#include "../Utility_Framework/StandardLibrary.h"
 
 #pragma region forward_decl
 // LifecycleRegistry.h를 여기서 포함하지 않는 이유:
@@ -790,7 +783,6 @@ public:
 
     //Game logic
     void Update(float deltaSecond);
-    void YieldNull();
     void LateUpdate(float deltaSecond);
 
     // 프레임 끝 정리 패스. **매 프레임 돈다** — 씬이 파괴될 때 도는 것이 아니다

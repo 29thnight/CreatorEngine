@@ -5,7 +5,8 @@
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 
-#include <cstddef>
+#include <stddef.h>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // Half-resolution visibility bitmask AO followed by a depth-aware spatial filter.

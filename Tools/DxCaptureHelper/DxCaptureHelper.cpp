@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-#include <new>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #if !CE_DX_TIMING_CAPTURE || CE_SHIPPING
 #error CreatorDxCaptureHelper requires an explicitly enabled, non-shipping Deep Capture build.

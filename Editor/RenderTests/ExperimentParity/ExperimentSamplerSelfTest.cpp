@@ -6,12 +6,7 @@
 #include "Experiment/Import/NormalGeneration.h"
 #include "Experiment/Import/TangentGeneration.h"
 
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <cstdio>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

@@ -10,12 +10,7 @@
 #include "Render/Passes/Lighting/EnhancedVolumetricFogPass.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdio>
-#include <string>
-#include <vector>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -3,12 +3,9 @@
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include <variant>
-#include <cstdint>
-#include <atomic>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <mathematics/color.hpp>
 #include <mathematics/vector2.hpp>
-#include <type_traits>
 #include "Core.Minimal.h"
 #include "Navigation.h"
 #include "SpriteSheet.h"

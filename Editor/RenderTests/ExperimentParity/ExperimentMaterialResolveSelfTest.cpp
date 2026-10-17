@@ -8,14 +8,7 @@
 #include "ShaderMeta.h"
 #include "Texture.h"
 
-#include <cstdio>
-#include <filesystem>
-#include <array>
-#include <fstream>
-#include <cstring>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

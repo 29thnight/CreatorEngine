@@ -1,5 +1,5 @@
 #include "../../Editor/EngineEntry/LegacyProjectLayerImport.h"
-#include <iostream>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "../../Engine/SceneRuntime/EntityLayerSchema.h"
 
 namespace

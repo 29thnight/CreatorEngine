@@ -1,10 +1,7 @@
 #pragma once
 #include "Ownership.h"
 #include "Core.Minimal.h"
-#include <vector>
-#include <mutex>
-#include <thread>
-#include <variant>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "../RenderEngine/AssetDepot/AssetLink.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
 

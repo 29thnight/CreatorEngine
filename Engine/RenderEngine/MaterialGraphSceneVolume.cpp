@@ -3,11 +3,8 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHIShaderSource.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <map>
-#include <stdexcept>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {

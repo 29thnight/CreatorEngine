@@ -1,5 +1,6 @@
 #include "MaterialPipelineSlot.h"
-#include <algorithm>
+#include <stdint.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 namespace material_graph
 {
 namespace

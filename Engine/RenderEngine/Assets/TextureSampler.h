@@ -1,7 +1,7 @@
 #pragma once
 #include "../RHI/RHIPipelineLayout.h"
 
-#include <compare>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

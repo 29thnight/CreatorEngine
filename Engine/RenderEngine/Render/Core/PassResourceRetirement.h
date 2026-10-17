@@ -1,10 +1,8 @@
 #pragma once
 
 #include "../../RHI/IRenderDeviceServices.h"
-#include <algorithm>
-#include <cassert>
-#include <functional>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Contract.h"
 
 // Pass-owned resources are retired against submission notifications. A resource
 // replaced during an open recording also waits for that recording's decision.
@@ -52,7 +50,11 @@ public:
     {
         if (texture.IsValid())
         {
-            assert(retired_.size() < retired_.capacity());
+            ::ce::contracts::assert_that(
+                [&]() -> bool {
+                    return static_cast<bool>((retired_.size() < retired_.capacity()));
+                },
+                "retired_.size() < retired_.capacity()");
             retired_.push_back({texture, {}, 0, completion.value,
                 submittedWithoutCompletion_ || !completion.IsValid()});
         }

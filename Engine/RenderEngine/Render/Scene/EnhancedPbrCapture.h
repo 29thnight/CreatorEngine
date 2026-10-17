@@ -6,8 +6,7 @@
 #include "EnhancedLatticeReplayInput.h"
 #include "../Temporal/TemporalRuntimeControl.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
-#include <optional>
-#include <stdexcept>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Passes/Geometry/SceneSurfaceTargets.h"
 #include "../Graph/EnhancedDrawSealLedger.h"
@@ -20,11 +19,6 @@
 #include <ryml/ryml_std.hpp>
 #include <c4/yml/emit.hpp>
 #include <c4/format.hpp>
-#include <filesystem>
-#include <fstream>
-#include <cmath>
-#include <limits>
-#include <cstring>
 
 // Explicit diagnostic capture only. The render thread owns this object and its
 // readbacks. Release must run after submission completion (or frame abort).

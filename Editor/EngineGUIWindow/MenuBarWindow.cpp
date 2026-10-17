@@ -19,7 +19,7 @@
 #include "FileDialog.h"
 #include "ProfilerHUD.h"
 #include "EnhancedRenderDebugWindow.h"
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "EditorIcons.h"
 #include "EditorFontResources.h"
 #include "EditorAssetPresentation.h"
@@ -55,10 +55,7 @@
 #include "EditorScriptAuthoring.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include <algorithm>
-#include <cstdint>
-#include <regex>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 constexpr int kMaxLayerSize = 32;
 
@@ -404,10 +401,10 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     // Exit action
 					//
-					// 창 핸들은 CoreWindow 싱글턴에서 온다. 예전에는 DeviceResources를
+					// 창 핸들은 WindowsCoreWindow 싱글턴에서 온다. 예전에는 DeviceResources를
 					// 거쳤는데, 창을 디바이스가 들고 있을 이유가 없었고 그 경유가
 					// DeviceResources::GetActive의 마지막 소비자였다(2026-08-10).
-					if (auto* window = CoreWindow::GetForCurrentInstance())
+					if (auto* window = WindowsCoreWindow::GetForCurrentInstance())
 					{
 						PostMessage(window->GetHandle(), WM_CLOSE, 0, 0);
 					}

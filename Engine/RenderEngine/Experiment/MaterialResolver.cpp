@@ -6,7 +6,7 @@
 #include "../AssetDepot/TextureAssetRuntime.h"
 #include "../Texture.h"
 
-#include <algorithm>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

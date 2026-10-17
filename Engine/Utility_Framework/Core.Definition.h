@@ -51,39 +51,13 @@
 
 using namespace Microsoft::WRL;
 //STL
-#include <array>
-#include <algorithm>
-#include <fstream>
-#include <functional>
-#include <new>
-#include <memory>
-#include <mutex>
-#include <queue>
-#include <random>
-#include <unordered_map>
-#include <deque>
-#include <set>
-#include <stack>
-#include <numeric> 
-#include <cmath>
-#include <string>
-#include <tuple>
-#include <future>
-#include <utility>
-#include <vector>
-#include <cstdint>
-#include <ranges>
-#include <latch>
-#include <cstddef>
-#include <iterator>
-#include <memory_resource>
+#include "StandardLibrary.h"
 //Custom
 #include "ClassProperty.h"
 #include "TypeDefinition.h"
 #include "DirectXHelper.h"
 #include "LinkedListLib.hpp"
 //#include "flatbuffers/flatbuffers.h"
-#include "plf_colony.h"
 
 #ifndef _in
 #define _in

@@ -7,10 +7,7 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <map>
-#include <string>
-#include <tuple>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

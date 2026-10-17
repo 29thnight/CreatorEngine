@@ -22,9 +22,8 @@
 #include "EditorPropertyRow.h"
 #include "imgui_stdlib.h"
 #include "SceneManager.h"
-#include <algorithm>
-#include <climits>
-#include <cmath>
+#include <limits.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

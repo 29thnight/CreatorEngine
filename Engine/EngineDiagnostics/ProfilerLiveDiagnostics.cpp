@@ -1,11 +1,8 @@
 #include "ProfilerLiveDiagnostics.h"
 #include "ProfilerViewerProtocol.h"
 
-#include <bit>
-#include <cmath>
-#include <limits>
-#include <type_traits>
-#include <utility>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer::diagnostics
 {

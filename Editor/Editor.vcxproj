@@ -83,6 +83,7 @@
     <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h" />
     <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
+    <ClInclude Include="EngineEntry\ConditionalAssetPublish.h" />
     <ClInclude Include="EngineEntry\TextureSourceProcessing.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
     <ClInclude Include="EngineEntry\EditorModelCollisionAsset.h" />

@@ -1,8 +1,7 @@
 #pragma once
 #include "PhysicsGeometry.h"
-#include <algorithm>
-#include <array>
-#include <cmath>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

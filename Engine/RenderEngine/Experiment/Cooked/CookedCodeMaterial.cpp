@@ -15,13 +15,8 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <exception>
-#include <set>
-#include <stdexcept>
-#include <tuple>
-#include <type_traits>
-#include <utility>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

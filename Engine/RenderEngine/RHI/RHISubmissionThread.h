@@ -1,11 +1,7 @@
 #pragma once
 #include "RHIResourceTypes.h"
 
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class IRHIDeviceResources;
 class RHIRecordedBatch;

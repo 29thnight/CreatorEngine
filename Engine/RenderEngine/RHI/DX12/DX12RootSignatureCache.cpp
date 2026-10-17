@@ -2,8 +2,7 @@
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12DeviceResources.h"
 
-#include <sstream>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

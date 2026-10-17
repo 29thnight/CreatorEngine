@@ -24,16 +24,11 @@
 #include "ScriptComponent.h"
 #include "ClrHost.h"
 #include "ReflgenRuntime.h"
-#include <unordered_set>
+#include <limits.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RectTransformComponent.h"
 #include "AuthoringNodeEquality.h"
-#include <cmath>
-#include <limits>
-#include <sstream>
 #include <mathematics/color.hpp>
-#include <charconv>
-#include <memory>
-#include <utility>
 
 namespace EditorObjectOperations
 {

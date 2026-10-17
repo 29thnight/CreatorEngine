@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Render/Temporal/TemporalReconstruction.h"
-#include <string>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 #ifndef CREATOR_ENABLE_XESS_SDK
 #define CREATOR_ENABLE_XESS_SDK 0
@@ -22,7 +22,6 @@ inline std::string XeSSComponentVersion(const char* component, uint16_t major, u
 
 #if defined(_WIN32) && (CREATOR_ENABLE_XESS_SDK || CREATOR_ENABLE_XESS_VULKAN_SDK)
 #include <Windows.h>
-#include <filesystem>
 
 // SDK-only loader. The host chooses an absolute, trusted deployment directory.
 // Do not search the working directory, PATH, or load unapproved downloaded code.

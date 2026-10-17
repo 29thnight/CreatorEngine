@@ -4,12 +4,8 @@
 #include "DxCaptureSecurity.h"
 #include "ProfilerViewerClient.h"
 
-#include <algorithm>
-#include <atomic>
-#include <bit>
-#include <deque>
-#include <limits>
-#include <type_traits>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer::transport
 {

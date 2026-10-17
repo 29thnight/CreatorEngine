@@ -7,7 +7,7 @@
 #include "RenderScene.h"
 #include "CameraComponent.h"
 #include "CameraSystem.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void FoliageSystem::Register(FoliageComponent* foliage)
 {

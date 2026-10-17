@@ -5,9 +5,7 @@
 #include "AuthoringParsedDocument.h"
 #include "AuthoringWriteNode.h"
 
-#include <cstdio>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

@@ -3,9 +3,8 @@
 #include "../IRHIDeviceResources.h"
 #include "../../Render/Temporal/TemporalReconstruction.h"
 #include "DX12QueueService.h"
-#include <cstdint>
-#include <string>
-#include <array>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 
@@ -17,10 +16,6 @@
 #include "DX12ResourceTable.h"
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include "../RHISubmissionThread.h"
-#include <memory>
-#include <vector>
-#include <map>
-#include <mutex>
 
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
@@ -549,6 +544,13 @@ public:
     // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
     bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) override;
+    uint64_t SparseBufferTileBytes() const override;
+    bool StreamingMemoryPressure() const override { return m_persistentMemoryBudget.GetMemoryPressureInfo().memoryPressure; }
+    bool IsSparseBuffer(RHIBufferHandle buffer) const { return m_resourceTable.ResolveSparseHeap(buffer) != nullptr; }
+    bool CreateSparseBuffer(const RHISparseBufferDesc& desc,
+        RHIBufferHandle& outHandle, std::string& outError) override;
+    bool UpdateSparseBufferMappings(RHIBufferHandle buffer,
+        std::span<const RHISparseTileMapping> mappings, std::string& outError) override;
     bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) override;
 

@@ -1,9 +1,5 @@
 #include "ScreenSizedResource.h"
-#include <atomic>
-#include <barrier>
-#include <cstdio>
-#include <thread>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main()
 {

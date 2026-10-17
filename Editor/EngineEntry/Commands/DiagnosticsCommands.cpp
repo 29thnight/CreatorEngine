@@ -110,7 +110,7 @@
 #include "AuthoringParsedDocument.h"
 #include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -148,33 +148,13 @@
 #include <Windows.h>
 #include <psapi.h> // MBC11: peak working set
 #include <crtdbg.h>
-#include <algorithm>
-#include <atomic>
-#include <charconv>
-#include <cctype>
-#include <limits>
-#include <memory>
-#include <random>
-#include <stdexcept>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <DbgHelp.h>
 #include <DXProgrammableCapture.h>
-#include <chrono>
 #include <dxgidebug.h>
 #include <wrl/client.h>
-#include <algorithm>
-#include <cstring>
-#include <cstdio>
-#include <fstream>
-#include <functional>
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
-#include <unordered_set>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
 
 // ★ LC6: `mem.*` 전용이라 함께 옮겨 왔다(사용 25회 대 1회).
 // C0: CRT 할당 호출 계수. _CrtMemCheckpoint(live 블록)로는 프레임 내
@@ -1916,7 +1896,7 @@ namespace ConsoleCmd
         auto data = CommandData::Object();
         data.Set("ready", CommandData::Bool(Log::HasCrashDumpWriter()));
         data.Set("directory", CommandData::String(PathFinder::DumpPath().string()));
-        data.Set("unattended", CommandData::Bool(CoreWindow::IsUnattended()));
+        data.Set("unattended", CommandData::Bool(WindowsCoreWindow::IsUnattended()));
         return Ok({}, std::move(data));
     }
 

@@ -1,9 +1,7 @@
 #include "SoundAssetCookProducer.h"
 #include "AuthoringParseTelemetry.h"
 
-#include <chrono>
-#include <cstdio>
-#include <fstream>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

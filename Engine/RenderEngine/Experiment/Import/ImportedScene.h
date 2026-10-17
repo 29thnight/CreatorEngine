@@ -3,18 +3,7 @@
 #include "../ModelData.h"
 #include "../../../Utility_Framework/Ownership.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <functional>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // 임포트 전용 중간 표현(IR).
 //

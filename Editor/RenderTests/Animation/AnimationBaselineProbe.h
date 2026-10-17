@@ -1,8 +1,6 @@
 #pragma once
 #include "AnimationDiagnostics.h"
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 namespace RenderTest
 {
     struct AnimationBaselineReport

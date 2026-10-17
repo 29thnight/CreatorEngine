@@ -1,7 +1,7 @@
 #include "VulkanLoader.h"
 
 #include <Windows.h>
-#include <sstream>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace VulkanApi
 {

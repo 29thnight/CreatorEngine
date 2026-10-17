@@ -6,15 +6,8 @@
 #include "DxCaptureService.h"
 #include "DxCaptureSubmission.h"
 
-#include <array>
-#include <atomic>
-#include <barrier>
-#include <chrono>
-#include <cstdio>
-#include <cstdlib>
-#include <filesystem>
-#include <thread>
-#include <utility>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace dx_capture_control_fixtures
 {

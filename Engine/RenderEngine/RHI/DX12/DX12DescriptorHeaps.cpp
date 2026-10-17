@@ -1,7 +1,7 @@
 #include "DX12DescriptorHeaps.h"
 #include "DX12PipelineLayoutTranslate.h"
 
-#include <sstream>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -1,11 +1,11 @@
 #include "PhysicsTransformPolicy.h"
+#include "../Utility_Framework/TimeSystem.h"
 #include "Scene.h"
 #include "TemporalMotionFixture.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-5
-#include <chrono>
-#include <cstdio> // FireReentrancyStress가 stdout에도 낸다(회귀가 발화를 본다)
+#include "../Utility_Framework/StandardLibrary.h"
 #include "LifecycleRegistry.h"
 #include "SceneRenderProfileComponent.h"
 #include "LifecycleTrace.h"
@@ -44,15 +44,6 @@
 #include "Canvas.h"
 #include "SpriteSheetComponent.h"
 #include "AIManager.h"
-#include <execution>
-#include <queue>
-#include <algorithm>
-#include <ranges>
-#include <iterator>
-#include <atomic> // TryEnterTraversal의 깊이초과 1회 보고 플래그(std::atomic<bool>)에 필요 — 전이 include에 기대지 않음
-#include <limits>
-#include <mutex>
-#include <utility>
 
 struct Scene::TransformUpdateAccumulator
 {
@@ -3276,9 +3267,6 @@ void Scene::FixedUpdate(float deltaSecond)
                 found->second->m_observedWorld = found->second->GetOwner()->Transform_().GetWorldMatrix();
         }
     }
-
-    for (std::uint32_t tick = 0; tick < *advanced; ++tick)
-        CoroutineManagers->yield_WaitForFixedUpdate();
 }
 
 void Scene::Update(float deltaSecond)
@@ -3366,14 +3354,6 @@ void Scene::Update(float deltaSecond)
         ce::profile_scope _profile{ ce::marker<"LateAllUpdateWorldMatrix">() };
     	AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
     }
-}
-
-void Scene::YieldNull()
-{
-    CoroutineManagers->yield_Null();
-    CoroutineManagers->yield_WaitForSeconds();
-    CoroutineManagers->yield_OtherEvent();
-    CoroutineManagers->yield_StartCoroutine();
 }
 
 void Scene::LateUpdate(float deltaSecond)

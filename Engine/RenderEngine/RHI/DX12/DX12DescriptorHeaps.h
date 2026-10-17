@@ -1,15 +1,7 @@
 #pragma once
 #include "../RHIPipelineLayout.h"
 #include "../RHIDescriptorVersionPolicy.h"
-#include <atomic>
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <string>
-#include <mutex>
-#include <span>
-#include <unordered_map>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 

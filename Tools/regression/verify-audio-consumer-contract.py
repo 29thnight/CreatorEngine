@@ -148,7 +148,12 @@ def main():
                 shutil.copyfile(ROOT / "Engine/SceneRuntime" / (name + "." + extension), target / (name + "." + extension))
         shutil.copyfile(ROOT / "Engine/SceneRuntime/SoundDefinition.h", target / "SoundDefinition.h")
         shutil.copyfile(ROOT / "Tools/regression/audio_consumer_contract_probe.cpp", target / "probe.cpp")
-        command = [compiler, "-std=c++20", "-Wno-attributes", "-I", str(target), "-I", str(ROOT / "Engine/SceneRuntime"),
+        (target / "Contract.h").write_text('#include "' + (ROOT / "Engine/Utility_Framework/Contract.h").as_posix() + '"\n')
+        (target / "CreatorContractConfig.h").write_text(
+            "#pragma once\nnamespace ce::contract_detail { inline constexpr bool assertions_enabled = true; }\n")
+        probe_text = (target / "probe.cpp").read_text()
+        (target / "probe.cpp").write_text(probe_text.replace("../../Engine/Utility_Framework/Contract.h", "Contract.h"))
+        command = [compiler, "-std=c++20", "-DCE_CONTRACT_STANDALONE=1", "-Wno-attributes", "-I", str(target), "-I", str(ROOT / "Engine/SceneRuntime"),
                    "-I", str(ROOT / "ThirdParty/Mathematics/include")]
         command += [str(target / name) for name in ["probe.cpp", "SoundComponent.cpp", "SoundSystem.cpp", "AudioListenerComponent.cpp"]]
         command += [str(ROOT / "Engine/SceneRuntime/Audio" / name) for name in ["PlaybackService.cpp", "SoundGraph.cpp"]]

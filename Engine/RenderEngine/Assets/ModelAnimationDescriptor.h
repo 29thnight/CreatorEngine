@@ -2,7 +2,7 @@
 
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
-#include <algorithm>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

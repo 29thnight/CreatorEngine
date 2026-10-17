@@ -7,8 +7,7 @@
 #include "ShaderMeta.h"
 #include "StandardMaterialProperty.h"
 
-#include <algorithm>
-#include <limits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ExperimentMaterialMigration
 {

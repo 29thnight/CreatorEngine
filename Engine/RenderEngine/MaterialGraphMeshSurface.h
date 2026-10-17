@@ -1,12 +1,12 @@
 #pragma once
 
 #include "LXMaterialPipeline.h"
+#include "Assets/ClusterStreaming.h"
 
 #include "MaterialGraphSurfaceBatch.h"
 #include "Render/Graph/EnhancedRenderPass.h"
 
-#include <span>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -34,17 +34,50 @@ class MeshSurfaceInput
                      std::shared_ptr<const MeshSurfaceInput>& result, std::string& error);
 
     const RHIModelMeshView& Geometry() const { return geometry_; }
+    std::span<const std::byte> PackedVertices() const
+    {
+        return staticOwner_ ? staticOwner_->PackedVertices() : std::span<const std::byte>(packedVertices_);
+    }
+    const std::shared_ptr<const assets::cluster::Archive>& ClusterArchive() const
+    {
+        return staticOwner_ ? staticOwner_->ClusterArchive() : clusterArchive_;
+    }
+    std::shared_ptr<assets::cluster::Stream> ClusterStream() const
+    {
+        return staticOwner_ ? staticOwner_->ClusterStream() : clusterStream_;
+    }
+    std::shared_ptr<const assets::cluster::ResidentSet> ResidentClusters() const
+    {
+        return poseOwner_ ? poseOwner_->ResidentClusters() : residentClusters_;
+    }
     const math::matrix4x4& World() const { return world_; }
     const SurfaceView& View() const { return view_; }
-    std::span<const PackedBoneMatrix> Bones() const { return poseOwner_ ? poseOwner_->Bones() : std::span<const PackedBoneMatrix>(bones_); }
+    std::span<const PackedBoneMatrix> Bones() const
+    {
+        return poseOwner_ ? poseOwner_->Bones() : std::span<const PackedBoneMatrix>(bones_);
+    }
     std::span<const float> Lods() const { return staticOwner_ ? staticOwner_->Lods() : std::span<const float>(lods_); }
-    std::uint32_t Count() const { return static_cast<std::uint32_t>(Lods().size()); }
+    bool StreamedTopology() const { return staticOwner_ ? staticOwner_->StreamedTopology() : streamedTopology_; }
+    std::uint32_t Count() const
+    { return staticOwner_ ? staticOwner_->Count() : streamedTopology_ ? logicalVertexCount_ : static_cast<std::uint32_t>(lods_.size()); }
     const experiment::MeshletPayload& Meshlets() const { return staticOwner_ ? staticOwner_->Meshlets() : meshlets_; }
-    std::span<const uint32_t> SourceVertexIds() const { return staticOwner_ ? staticOwner_->SourceVertexIds() : std::span<const uint32_t>(sourceVertexIds_); }
+    std::span<const uint32_t> SourceVertexIds() const
+    {
+        return staticOwner_ ? staticOwner_->SourceVertexIds() : std::span<const uint32_t>(sourceVertexIds_);
+    }
     uint32_t SourceVertexCount() const { return staticOwner_ ? staticOwner_->SourceVertexCount() : sourceVertexCount_; }
-    uint32_t SourcePrimitiveCount() const { return staticOwner_ ? staticOwner_->SourcePrimitiveCount() : sourcePrimitiveCount_; }
-    const experiment::MeshClusterHierarchy& Hierarchy() const { return staticOwner_ ? staticOwner_->Hierarchy() : hierarchy_; }
-    uint32_t OriginalIndexCount() const { return staticOwner_ ? staticOwner_->OriginalIndexCount() : originalIndexCount_; }
+    uint32_t SourcePrimitiveCount() const
+    {
+        return staticOwner_ ? staticOwner_->SourcePrimitiveCount() : sourcePrimitiveCount_;
+    }
+    const experiment::MeshClusterHierarchy& Hierarchy() const
+    {
+        return staticOwner_ ? staticOwner_->Hierarchy() : hierarchy_;
+    }
+    uint32_t OriginalIndexCount() const
+    {
+        return staticOwner_ ? staticOwner_->OriginalIndexCount() : originalIndexCount_;
+    }
     bool Matches(const MeshSurfaceInput& other) const;
 
   private:
@@ -52,18 +85,23 @@ class MeshSurfaceInput
     friend class MeshSurfaceEvaluator;
     MeshSurfaceInput() = default;
     static bool SealImpl(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
-                         std::uint32_t maxVertices, std::shared_ptr<const MeshSurfaceInput>& result,
-                         std::string& error, bool includeHierarchy = false);
+                         std::uint32_t maxVertices, std::shared_ptr<const MeshSurfaceInput>& result, std::string& error,
+                         bool includeHierarchy = false);
     RHIModelMeshView geometry_;
     math::matrix4x4 world_;
     SurfaceView view_;
-    std::vector<std::byte> vertices_;
+    std::vector<std::byte> vertices_, packedVertices_;
+    std::shared_ptr<const assets::cluster::Archive> clusterArchive_;
+    std::shared_ptr<assets::cluster::Stream> clusterStream_;
+    std::shared_ptr<const assets::cluster::ResidentSet> residentClusters_;
     std::vector<std::uint32_t> indices_;
     experiment::MeshletPayload meshlets_;
     experiment::MeshClusterHierarchy hierarchy_{};
     uint32_t originalIndexCount_{};
     std::vector<std::uint32_t> sourceVertexIds_;
     uint32_t sourcePrimitiveCount_{}, sourceVertexCount_{};
+    uint32_t logicalVertexCount_{};
+    bool streamedTopology_{};
     std::vector<PackedBoneMatrix> bones_;
     std::vector<float> lods_;
     // A per-frame pose can share validated, immutable product bytes with the
@@ -87,6 +125,7 @@ struct MeshSurfacePlanCost
 {
     std::uint32_t sourceVertices{}, referencedVertices{}, triangles{};
     std::uint64_t points{}, duplicatedPoints{}, cpuPayloadBytes{}, gpuPayloadBytes{};
+    bool sourceReferenceCountsKnown{true};
 };
 
 struct MeshSurfaceChunk
@@ -95,6 +134,7 @@ struct MeshSurfaceChunk
     // First-appearance local -> original vertex index. No welding across seams.
     std::span<const std::uint32_t> sourceVertices;
     std::uint32_t firstTriangle{};
+
   private:
     friend class MeshSurfacePlan;
     std::shared_ptr<const std::vector<std::uint32_t>> sourceVerticesOwner_;
@@ -110,13 +150,13 @@ class MeshSurfacePlan
                       std::string& error);
     // Scene frames reuse the validated partition of one immutable model mesh.
     // World, eye, revision and bone palette are sealed afresh on every call.
-    static bool BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view,
-                              std::span<const float> lods, const MeshSurfacePlanBudget& budget,
-                              std::shared_ptr<const MeshSurfacePlan>& result, std::string& error);
+    static bool BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
+                              const MeshSurfacePlanBudget& budget, std::shared_ptr<const MeshSurfacePlan>& result,
+                              std::string& error);
     // Raster derives mip LOD per pixel; allocate zero vertex transport only on a cache miss.
     static bool BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view,
-                              const MeshSurfacePlanBudget& budget,
-                              std::shared_ptr<const MeshSurfacePlan>& result, std::string& error);
+                              const MeshSurfacePlanBudget& budget, std::shared_ptr<const MeshSurfacePlan>& result,
+                              std::string& error);
     std::span<const MeshSurfaceChunk> Chunks() const { return chunks_; }
     const std::shared_ptr<const MeshSurfaceInput>& Source() const { return source_; }
     const MeshSurfacePlanCost& Cost() const { return cost_; }
@@ -125,13 +165,15 @@ class MeshSurfacePlan
 
   private:
     MeshSurfacePlan() = default;
-    static bool BuildPartitioned(const EnhancedDrawItem& draw, const SurfaceView& view,
-                                 std::span<const float> lods, const MeshSurfacePlanBudget& budget,
-                                 std::uint32_t chunkCeiling,
-                                 std::shared_ptr<const MeshSurfacePlan>& result, std::string& error, bool includeHierarchy = false);
-    static bool BuildSceneZeroLod(const EnhancedDrawItem& draw, const SurfaceView& view,
-                                 std::span<const float> lods, const MeshSurfacePlanBudget& budget,
-                                 std::shared_ptr<const MeshSurfacePlan>& result, std::string& error);
+    static bool BuildPartitioned(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
+                                 const MeshSurfacePlanBudget& budget, std::uint32_t chunkCeiling,
+                                 std::shared_ptr<const MeshSurfacePlan>& result, std::string& error,
+                                 bool includeHierarchy = false);
+    static bool BuildSceneZeroLod(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
+                                  const MeshSurfacePlanBudget& budget, std::shared_ptr<const MeshSurfacePlan>& result,
+                                  std::string& error);
+    static bool BuildStreamed(const EnhancedDrawItem& draw, const SurfaceView& view, const MeshSurfacePlanBudget& budget,
+                              std::shared_ptr<const MeshSurfacePlan>& result, std::string& error);
     std::shared_ptr<const MeshSurfaceInput> source_;
     std::vector<MeshSurfaceChunk> chunks_;
     MeshSurfacePlanCost cost_;
@@ -171,7 +213,8 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     bool IsSampled() const { return !samples_.empty(); }
     std::uint64_t RecordingId() const override { return recordingId_; }
     bool IsValidated() const override { return validated_; }
-    bool IsReadyForEvaluation() const override {
+    bool IsReadyForEvaluation() const override
+    {
         return declarationOwner_ ? declared_.load() && declarationOwner_->IsReadyForEvaluation()
                                  : recordedStages_.load() == 3;
     }
@@ -181,6 +224,11 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     // Scene instances prepared together with identical geometry/pose/pipeline
     // share posed object-space output; consumers apply their own ObjectToWorld.
     bool IsObjectSpace() const { return objectSpace_; }
+    bool UsesDirectClusters() const { return directClusters_; }
+    const std::shared_ptr<const assets::cluster::ResidentSet>& ClusterResidency() const { return clusterResidency_; }
+    uint64_t BufferBytes() const { return bufferBytes_ ? bufferBytes_ : uint64_t(count_) * sizeof(SurfacePoint); }
+    static constexpr uint32_t GeometryViewStride = sizeof(float) * 4;
+    uint32_t GeometryViewElements() const { return static_cast<uint32_t>(BufferBytes() / GeometryViewStride); }
     const math::matrix4x4& ObjectToWorld() const;
     RHIBufferSlice Indices() const;
     RHIBufferSlice Meshlets() const;
@@ -191,10 +239,13 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     // set, so graph and profiler pass counts do not grow with the mesh count.
     static bool DeclareBatch(EnhancedRenderGraph& graph, std::span<const MeshSurfaceBatch* const> batches,
                              std::string& error);
-    void MarkSubmitted(RHICompletionPoint completion) const {
+    void MarkSubmitted(RHICompletionPoint completion) const
+    {
         completion_ = completion;
-        if (declarationOwner_) declarationOwner_->MarkSubmitted(completion);
-        else if (transformedOwner_) transformedOwner_->MarkSubmitted(completion);
+        if (declarationOwner_)
+            declarationOwner_->MarkSubmitted(completion);
+        else if (transformedOwner_)
+            transformedOwner_->MarkSubmitted(completion);
     }
     bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;
 
@@ -204,14 +255,17 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     bool RecordCommands(RHIEncoder& encoder, std::string& error) const;
     static bool PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
                                 std::shared_ptr<MeshTransformDispatch>& result, std::string& error);
-    static bool RecordDispatch(RHIEncoder& encoder,
-                               std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+    static bool RecordDispatch(RHIEncoder& encoder, std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
                                const MeshTransformDispatch& dispatch, std::string& error);
     // Imports inputs/output and appends this mesh's usages; adds no pass.
     bool DeclareResources(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& inputs,
                           bool& reused, std::string& error) const;
     IRenderDeviceServices* device_{};
     RHIBufferHandle buffer_;
+    uint64_t bufferBytes_{};
+    bool directClusters_{};
+    RHIBufferSlice clusterPoseUpload_;
+    std::shared_ptr<const assets::cluster::ResidentSet> clusterResidency_;
     std::shared_ptr<MeshSurfaceBufferPool> bufferPool_;
     std::shared_ptr<MeshSurfaceStaticBuffers> staticBuffers_;
     // Buffer lifetime belongs to the cached producer. A recording has exactly
@@ -260,7 +314,8 @@ class MeshSurfaceEvaluator
     // This records the current pose inside the same graph without an earlier submit.
     bool Prepare(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
                  std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error, bool cacheStatic = false,
-                 std::uint64_t auditRealFrame = 0, std::uint64_t auditView = 0, bool objectSpace = false);
+                 std::uint64_t auditRealFrame = 0, std::uint64_t auditView = 0, bool objectSpace = false,
+                 bool directClusters = false, const assets::cluster::StreamBudget& clusterBudget = {});
     void NotifyCompleted(std::uint64_t completed) const;
     // Advance once per upload recording, including empty scene frames. Active
     // outputs have scene lifetime; only unused, completed owners are retired.

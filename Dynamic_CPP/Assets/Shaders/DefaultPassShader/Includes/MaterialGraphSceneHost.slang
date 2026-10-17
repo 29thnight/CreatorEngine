@@ -63,7 +63,9 @@ cbuffer LXSceneConstants : register(b0)
     float4x4 lx_previousWorld;
 };
 
-StructuredBuffer<LXSurfacePoint> lx_vertices : register(t0);
+StructuredBuffer<float4> lx_vertices : register(t0);
+ByteAddressBuffer lx_meshlets : register(t155);
+#include "MeshletGeometryAccess.slang"
 // GPU compaction emits the original draw owners; direct paths bind one owner.
 StructuredBuffer<uint> lx_visibleOwners : register(t138);
 TextureCube<float4> gEnvironment : register(t1);
@@ -234,7 +236,7 @@ LXSurfacePoint LXSceneWorldPoint(LXSurfacePoint source, float4x4 world)
 
 LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection, float4x4 world)
 {
-    const LXSurfacePoint source = LXSceneWorldPoint(lx_vertices[index], world);
+    const LXSurfacePoint source = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,index), world);
     LXSceneVertex output = (LXSceneVertex)0;
     output.clip = mul(float4(source.position.xyz, 1), viewProjection);
     output.position = source.position.xyz;
@@ -256,7 +258,7 @@ LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceI
 // Chunk-local topology over the same transformed vertices used by LXSceneVS.
 // Scene preparation pins this immutable stream through submission completion.
 #include "LxMeshletGpuContract.slang"
-ByteAddressBuffer lx_meshlets : register(t155);
+
 StructuredBuffer<uint> lx_shadowMeshletIds : register(t157);
 
 // Per-primitive identity is emitted by the mesh shader, never inferred from
@@ -735,9 +737,9 @@ LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFac
     const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, identity.y >> 7u);
     const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, identity.y & 127u);
     // Reconstruction runs per record with that record's constants and world.
-    const LXSurfacePoint a = LXSceneWorldPoint(lx_vertices[primitive.vertices.x], lx_world);
-    const LXSurfacePoint b = LXSceneWorldPoint(lx_vertices[primitive.vertices.y], lx_world);
-    const LXSurfacePoint c = LXSceneWorldPoint(lx_vertices[primitive.vertices.z], lx_world);
+    const LXSurfacePoint a = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.x), lx_world);
+    const LXSurfacePoint b = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.y), lx_world);
+    const LXSurfacePoint c = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.z), lx_world);
     const float4 ca = mul(float4(a.position.xyz, 1), lx_viewProjection);
     const float4 cb = mul(float4(b.position.xyz, 1), lx_viewProjection);
     const float4 cc = mul(float4(c.position.xyz, 1), lx_viewProjection);
@@ -765,12 +767,12 @@ LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFac
 }
 
 // Current/previous posed streams share topology; worlds remain instance inputs.
-StructuredBuffer<LXSurfacePoint> lx_previousVertices : register(t156);
+StructuredBuffer<float4> lx_previousVertices : register(t156);
 [shader("vertex")]
 LXSceneVertex LXSceneTemporalVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
 {
     LXSceneVertex output = LXSceneVertexAt(index, lx_visibleOwners[instanceId], lx_viewProjection, lx_world);
-    const float3 previous = mul(float4(lx_previousVertices[index].position.xyz, 1), lx_previousWorld).xyz;
+    const float3 previous = mul(float4(MeteorGeometryPoint(lx_previousVertices,lx_meshlets,index).position.xyz, 1), lx_previousWorld).xyz;
     output.previousClip = mul(float4(previous, 1), lx_temporalPreviousProjection);
     return output;
 }
@@ -798,16 +800,16 @@ LXTemporalOutput LXSceneTemporalPS(LXSceneVertex input, bool frontFace : SV_IsFr
     // A LOD transition never reads the previous frame's different topology.
     const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, address >> 7u);
     const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, address & 127u);
-    const float3 a = LXSceneWorldPoint(lx_vertices[primitive.vertices.x], lx_world).position.xyz;
-    const float3 b = LXSceneWorldPoint(lx_vertices[primitive.vertices.y], lx_world).position.xyz;
-    const float3 c = LXSceneWorldPoint(lx_vertices[primitive.vertices.z], lx_world).position.xyz;
+    const float3 a = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.x), lx_world).position.xyz;
+    const float3 b = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.y), lx_world).position.xyz;
+    const float3 c = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.z), lx_world).position.xyz;
     const float3 x=b-a, y=c-a, delta=centered.position-a;
     const float xx=dot(x,x), xy=dot(x,y), yy=dot(y,y), determinant=xx*yy-xy*xy;
     const float2 uv=float2(dot(delta,x)*yy-dot(delta,y)*xy,dot(delta,y)*xx-dot(delta,x)*xy)/determinant;
     const float3 weights=float3(1-uv.x-uv.y,uv);
-    const float3 previous=lx_previousVertices[primitive.vertices.x].position.xyz*weights.x +
-        lx_previousVertices[primitive.vertices.y].position.xyz*weights.y +
-        lx_previousVertices[primitive.vertices.z].position.xyz*weights.z;
+    const float3 previous=MeteorGeometryPoint(lx_previousVertices,lx_meshlets,primitive.vertices.x).position.xyz*weights.x +
+        MeteorGeometryPoint(lx_previousVertices,lx_meshlets,primitive.vertices.y).position.xyz*weights.y +
+        MeteorGeometryPoint(lx_previousVertices,lx_meshlets,primitive.vertices.z).position.xyz*weights.z;
     const float4 previousClip=mul(mul(float4(previous,1),lx_previousWorld),lx_temporalPreviousProjection);
     const float4 currentClip=mul(float4(centered.position,1),lx_temporalCurrentProjection);
     // Opaque coverage is already fixed by final visibility; only replay evaluates alpha.

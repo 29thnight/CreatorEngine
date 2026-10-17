@@ -1,10 +1,7 @@
 #pragma once
 #include "../IRenderPipelineCache.h"
 #include "DX12ResourceEntries.h"
-#include <cstdint>
-#include <string>
-#include <mutex>
-#include <unordered_map>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 

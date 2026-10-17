@@ -1,13 +1,5 @@
 #pragma once
-#include <atomic>
-#include <functional>
-#include <vector>
-#include <mutex>
-#include <memory>
-#include <optional>
-#include <algorithm>
-#include <concepts>
-#include <future>
+#include "StandardLibrary.h"
 
 namespace Core
 {
@@ -98,7 +90,7 @@ namespace Core
 
 		DelegateHandle AddInternal(std::function<Ret(Args...)> func, int priority);
 
-		std::atomic_flag atomic_flag_ = ATOMIC_FLAG_INIT;
+		std::atomic_flag atomic_flag_{};
 		std::vector<CallbackInfo> callbacks_;
 		std::uint32_t nextID_;
 

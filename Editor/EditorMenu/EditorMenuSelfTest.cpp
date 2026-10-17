@@ -20,7 +20,7 @@
 #include "EditorMenuSchema.h"
 #include "EditorMenuSurface.h"
 
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

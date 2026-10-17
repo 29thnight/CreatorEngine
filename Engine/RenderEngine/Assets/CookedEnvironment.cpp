@@ -2,12 +2,7 @@
 #include "../RHI/DX12/EnhancedIBLGenerator.h"
 #include "../Experiment/Cooked/CookedAssetManifest.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
-#include <algorithm>
-#include <fstream>
-#include <iterator>
-#include <set>
-#include <vector>
-#include <cmath>
+#include "../../Utility_Framework/StandardLibrary.h"
 #include <Windows.h>
 
 namespace assets

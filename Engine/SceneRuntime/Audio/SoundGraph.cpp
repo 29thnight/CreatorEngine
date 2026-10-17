@@ -1,9 +1,6 @@
 #include "SoundGraph.h"
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
-#include <unordered_set>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // MAX_LIGHTS(255) · LightProperties · LightCount · cameraView를 걷었다.
 //

@@ -1,7 +1,6 @@
 #include "RHIAssetEvictionPolicy.h"
 
-#include <algorithm>
-#include <limits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

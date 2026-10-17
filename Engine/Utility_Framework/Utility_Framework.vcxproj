@@ -39,8 +39,6 @@
     <ClInclude Include="AuthoringDocumentAccess.h" />
     <ClInclude Include="AuthoringNodeEquality.h" />
     <ClInclude Include="SerializationProfiler.h" />
-    <ClInclude Include="plf_colony.h" />
-    <ClInclude Include="Core.Coroutine.h" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
@@ -49,8 +47,10 @@
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="JobScheduler.h" />
     <ClInclude Include="CoreWindow.h" />
+    <ClInclude Include="WindowsCoreWindow.h" />
+    <ClInclude Include="WindowsWindow.h" />
     <ClInclude Include="WindowDesc.h" />
-    <ClInclude Include="CoroutineHelper.h" />
+    <ClInclude Include="WindowsApartment.h" />
     <ClInclude Include="Delegate.h" />
     <ClInclude Include="DirectXHelper.h" />
     <ClInclude Include="DumpHandler.h" />
@@ -82,6 +82,9 @@
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="StringHelper.h" />
     <ClInclude Include="TimeSystem.h" />
+    <ClInclude Include="Contract.h" />
+    <ClInclude Include="StandardLibrary.h" />
+    <ClInclude Include="ConcurrentQueue.h" />
     <ClInclude Include="EngineMode.h" />
     <ClInclude Include="EnginePaths.h" />
     <ClInclude Include="RuntimeSettings.h" />
@@ -110,8 +113,7 @@
     <ClCompile Include="AuthoringDocument.cpp" />
     <ClCompile Include="AuthoringNodeEquality.cpp" />
     <ClCompile Include="SerializationProfiler.cpp" />
-    <ClCompile Include="Core.Coroutine.cpp" />
-    <ClCompile Include="CoreWindow.cpp" />
+    <ClCompile Include="WindowsCoreWindow.cpp" />
     <ClCompile Include="RuntimeSettings.cpp" />
     <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="TimeSystem.cpp" />

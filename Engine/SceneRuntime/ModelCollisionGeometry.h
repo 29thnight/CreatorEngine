@@ -2,11 +2,29 @@
 
 #include "CollisionGeometrySource.h"
 #include "../RenderEngine/Assets/ModelVertexLayout.h"
-#include <bit>
-#include <cstring>
+#include "../RenderEngine/Assets/ModelCpuGeometry.h"
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {
+inline result<triangle_mesh_source> BuildModelCollisionMesh(const assets::cpu_geometry::Geometry& geometry)
+{
+    if (geometry.positions.size() < 3 || geometry.positions.size() > assets::cpu_geometry::MaxVertices ||
+        geometry.indices.empty() || geometry.indices.size() > assets::cpu_geometry::MaxIndices || geometry.indices.size() % 3)
+        return std::unexpected(error{error_code::invalid_argument,0,"Invalid exact CPU collision geometry"});
+    triangle_mesh_source source; source.points = geometry.positions; source.triangles.reserve(geometry.indices.size() / 3);
+    for (const auto& point : source.points)
+        for (const auto value : math::components(point)) if (!std::isfinite(value))
+            return std::unexpected(error{error_code::invalid_argument,0,"Nonfinite exact CPU collision position"});
+    for (size_t index = 0; index < geometry.indices.size(); index += 3)
+    {
+        const auto a = geometry.indices[index], b = geometry.indices[index+1], c = geometry.indices[index+2];
+        if (a >= source.points.size() || b >= source.points.size() || c >= source.points.size() || a == b || a == c || b == c)
+            return std::unexpected(error{error_code::invalid_argument,0,"Invalid exact CPU collision triangle"});
+        source.triangles.push_back({a,b,c});
+    }
+    return source;
+}
 inline result<triangle_mesh_source> BuildModelCollisionMesh(std::span<const std::byte> vertices,
                                                             std::span<const std::uint32_t> indices, std::uint32_t mask,
                                                             std::uint32_t stride, std::uint64_t layoutHash)

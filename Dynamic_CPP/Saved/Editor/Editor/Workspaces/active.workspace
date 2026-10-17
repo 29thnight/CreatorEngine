@@ -1,9 +1,9 @@
 CreatorWorkspace 3
 name "S&Box Compact"
 preset "sbox_compact"
-viewport "###Editor.Game"
+viewport "###Editor.Scene"
 versions 1 19280
-geometry 1 640 525 204.889
+geometry 1 2880 1665 204.889
 monitors "1920x1200+908+2160;3840x2160+0+0"
 panel "###Editor.About" 0
 panel "###Editor.AnimationControllers" 0
@@ -34,26 +34,26 @@ panel "###Editor.TextureImportSelector" 0
 panel "###Editor.Viewport" 1
 --ini--
 [Window][###Editor.Hierarchy]
-Pos=499,45
-Size=141,229
+Pos=2246,45
+Size=634,856
 Collapsed=0
 DockId=0x00000003,0
 
 [Window][###Editor.Inspector]
-Pos=499,276
-Size=141,188
+Pos=2246,903
+Size=634,701
 Collapsed=0
 DockId=0x00000004,0
 
 [Window][###Editor.AssetBundle]
-Pos=0,317
-Size=497,147
+Pos=0,1138
+Size=2244,466
 Collapsed=0
 DockId=0x00000006,0
 
 [Window][###Editor.ContentBrowser]
-Pos=0,317
-Size=497,147
+Pos=0,1138
+Size=2244,466
 Collapsed=0
 DockId=0x00000006,1
 
@@ -63,7 +63,7 @@ DockId=0x00000006
 
 [Window][###Editor.Viewport]
 Pos=0,45
-Size=497,270
+Size=2244,1091
 Collapsed=0
 DockId=0x00000005,0
 
@@ -85,7 +85,7 @@ DockId=0x00000005
 
 [Window][Main DockSpace Window]
 Pos=0,45
-Size=640,419
+Size=2880,1559
 Collapsed=0
 
 [Window][Debug##Default]
@@ -94,10 +94,10 @@ Size=400,400
 Collapsed=0
 
 [Docking][Data]
-DockSpace     ID=0x65F8FF92 Window=0x144A997C Pos=0,45 Size=640,419 Split=X
-  DockNode    ID=0x00000001 Parent=0x65F8FF92 SizeRef=497,525 Split=Y
-    DockNode  ID=0x00000005 Parent=0x00000001 SizeRef=497,376 CentralNode=1 NoTabBar=1 Selected=0xCAC93FCE
-    DockNode  ID=0x00000006 Parent=0x00000001 SizeRef=497,147 Selected=0x534E62CB
-  DockNode    ID=0x00000002 Parent=0x65F8FF92 SizeRef=141,525 Split=Y
-    DockNode  ID=0x00000003 Parent=0x00000002 SizeRef=141,287 Selected=0x604A59F3
-    DockNode  ID=0x00000004 Parent=0x00000002 SizeRef=141,236 Selected=0xEC2B6106
+DockSpace     ID=0x65F8FF92 Window=0x144A997C Pos=0,45 Size=2880,1559 Split=X
+  DockNode    ID=0x00000001 Parent=0x65F8FF92 SizeRef=2244,1665 Split=Y
+    DockNode  ID=0x00000005 Parent=0x00000001 SizeRef=2244,1197 CentralNode=1 NoTabBar=1 Selected=0xCAC93FCE
+    DockNode  ID=0x00000006 Parent=0x00000001 SizeRef=2244,466 Selected=0x534E62CB
+  DockNode    ID=0x00000002 Parent=0x65F8FF92 SizeRef=634,1665 Split=Y
+    DockNode  ID=0x00000003 Parent=0x00000002 SizeRef=634,914 Selected=0x604A59F3
+    DockNode  ID=0x00000004 Parent=0x00000002 SizeRef=634,749 Selected=0xEC2B6106

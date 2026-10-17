@@ -6,13 +6,8 @@
 #include "AuthoringParsedDocument.h"
 #include "TemporalProductSettingsIO.h"
 
-#include <cstdio>
-#include <cmath>
-#include <exception>
-#include <filesystem>
-#include <memory>
-#include <string>
-#include <utility>
+#include <stdio.h>
+#include "StandardLibrary.h"
 
 namespace
 {

@@ -2,8 +2,8 @@
 
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
 
-#include <atomic>
-#include <limits>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <Windows.h>
 
 namespace ce::dx_capture

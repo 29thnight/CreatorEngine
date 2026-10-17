@@ -2,16 +2,7 @@
 
 #include "Ownership.h"
 
-#include <atomic>
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <string_view>
-#include <vector>
-#include <utility>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 enum class TextAlignment : std::uint8_t;

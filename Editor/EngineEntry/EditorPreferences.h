@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 편집 중 렌더 속도. 실행 중 게임과 배경 절전은 이 값 밖에서 정한다(App::ResolveLivePacing).
 enum class EditorFrameRateMode : std::uint8_t

@@ -1,14 +1,8 @@
 #pragma once
 #include "Ownership.h"
 #include "../../Render/Core/PassResourceRetirement.h"
-#include <optional>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include "../RHIFormat.h"
-#include <cstdint>
-#include <array>
-#include <memory>
-#include <filesystem>
-#include <vector>
-#include <future>
 #include "../../Assets/CookedEnvironment.h"
 
 #include "../../Render/Graph/EnhancedRenderPass.h"

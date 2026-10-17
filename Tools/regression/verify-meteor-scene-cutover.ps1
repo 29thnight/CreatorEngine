@@ -41,11 +41,15 @@ $commands=$tests+@('scene.new MeteorCutover','object.create ProbeCamera','compon
 $commands+=@("render.live.ready $FrameTimeoutSeconds")
 $commands+=@("render.live.capture $($out.Replace('\','/'))/live-empty editor",
     "assets.model.reimport $($project.Replace('\','/'))/Assets/Models/Prim_Suzanne.glb",
-    "model.loadcached $($project.Replace('\','/'))/Assets/Models/Prim_Suzanne.glb",'model.place Prim_Suzanne',
+    'model.place Prim_Suzanne',
     'camera.editor match')
 # Wait for a newer matching completed GPU view, not a fixed number of consumed
 # CPU packets: material preparation can defer rendering while packets keep flowing.
 $commands+=@("render.live.ready $FrameTimeoutSeconds")
+# The reimport may invalidate the resolver while a cold generation loads.
+# This renderer gate checks cached identity after the placed model's GPU view
+# completed. Immediate cold-load admission is a separate asset lifecycle gate.
+$commands+=@("model.loadcached $($project.Replace('\','/'))/Assets/Models/Prim_Suzanne.glb")
 $commands+=@('dx12.live status',"render.live.capture $($out.Replace('\','/'))/live editor",'dx12.validation','quit')
 [IO.File]::WriteAllText("$out/commands.txt",($commands -join "`n")+"`n",[Text.UTF8Encoding]::new($false))
 $start=[Diagnostics.ProcessStartInfo]::new($exe)
@@ -78,7 +82,7 @@ $expected=if($OnlyLive){0}elseif($ExtendedCases){144}else{12}
 $lists=$listLines.Count -eq $expected
 foreach($line in $listLines){if($line -notmatch ' missing=0 extra=\d+$'){$lists=$false}}
 $payloadLines=if($skin.Count){@($skin[0].data.log -split "`n"|Where-Object {$_ -match '^MESHLET_GPU_PAYLOAD '})}else{@()}
-$payloads=$payloadLines.Count -eq $expected -and @($payloadLines|Where-Object {$_ -notmatch ' schema=4 profile=2 identity=exact$'}).Count -eq 0
+$payloads=$payloadLines.Count -eq $expected -and @($payloadLines|Where-Object {$_ -notmatch ' schema=5 profile=2 identity=exact$'}).Count -eq 0
 $ready=@($rows|Where-Object command -eq 'render.live.ready')
 $readiness=$ready.Count -eq 2 -and @($ready|Where-Object {
     $_.status -ne 'succeeded' -or $_.data.completionKind -ne 'editor_gpu_frame_completed' -or

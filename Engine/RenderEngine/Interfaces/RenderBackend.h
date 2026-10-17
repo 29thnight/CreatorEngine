@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string_view>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 enum class RenderBackend : std::uint8_t
 {

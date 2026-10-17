@@ -1,7 +1,7 @@
 #include "LifecycleRegistry.h"
 #include "ComponentTypeUUID.h"
 
-#include <unordered_map>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 등록 대상 컴포넌트 헤더.
 // 이 목록이 곧 "생명주기를 받는 타입의 전부"다.

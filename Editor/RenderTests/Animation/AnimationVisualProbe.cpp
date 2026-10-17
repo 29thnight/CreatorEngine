@@ -11,8 +11,7 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Socket.h"
-#include <bit>
-#include <cstring>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 namespace RenderTest

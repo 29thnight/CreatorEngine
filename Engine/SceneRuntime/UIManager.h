@@ -6,7 +6,7 @@
 #include "Entity.h"
 #include "EntityHandle.h"
 #include "Core.Property.h"
-#include <stop_token>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Canvas;
 class Texture;

@@ -1,18 +1,7 @@
 #include "LXGraph.h"
 #include "LXNodeDefinition.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cmath>
-#include <filesystem>
-#include <fstream>
-#include <iomanip>
-#include <limits>
-#include <set>
-#include <sstream>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <Windows.h>
 
 namespace LX

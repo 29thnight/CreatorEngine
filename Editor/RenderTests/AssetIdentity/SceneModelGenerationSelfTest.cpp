@@ -11,10 +11,7 @@
 #include "Texture.h"
 #include "ModelSceneInstantiation.h"
 
-#include <cstdio>
-#include <map>
-#include <memory>
-#include <string>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

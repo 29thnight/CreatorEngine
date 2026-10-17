@@ -1,11 +1,12 @@
 #include "EditorProjectLayerSettings.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
 #include "MaterialGraphWindow.h"
 #include "ReflectionUndo.h"
 #include "ReflgenRuntime.h"
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "BootProgress.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneViewportOverlay.h"
@@ -47,7 +48,8 @@
 #include "ResourceCounterWindow.h"
 #include "MemoryProfilerSnapshot.h"
 #include "ThreadPool.h"
-#include <cstdio>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "WinProcProxy.h"
 #include "TagManager.h"
 #include "Entity.h"
@@ -60,12 +62,6 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 
-#include <array>
-#include <sstream>
-#include <algorithm>
-#include <chrono>
-#include <cstdlib>
-#include <stdexcept>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -75,7 +71,7 @@ namespace
 	/// DeviceResources로 물었고, 그것이 그 클래스를 붙들던 마지막 이유였다.
 	HWND EditorWindowHandle()
 	{
-		auto* window = CoreWindow::GetForCurrentInstance();
+		auto* window = WindowsCoreWindow::GetForCurrentInstance();
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
 
@@ -501,7 +497,8 @@ void Editor::EditorMain::StopPresentationThread()
 
 void Editor::EditorMain::PresentationThreadMain()
 {
-	const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+	const HRESULT comResult = apartmentScope.result;
 	{
 		std::lock_guard<std::mutex> lock(m_presentationMutex);
 		m_presentationThreadStartFailed = FAILED(comResult);
@@ -596,7 +593,6 @@ void Editor::EditorMain::PresentationThreadMain()
 	// 끊는 자리를 명시해 두면 종료 순서가 바뀌어도 수집기가 죽은 저장소를
 	// 가리키는 구간이 생기지 않는다.
 	ce::profiler().unregister_thread();
-	CoUninitialize();
 }
 
 void Editor::EditorMain::NotifyDisplayAvailable()
@@ -893,10 +889,6 @@ void Editor::EditorMain::Update()
 		// 씬 전환 뒤에 떠야 새 씬의 사본이 선다.
 		if (Scene* scene = SceneManagers->GetActiveScene())
 			scene->CaptureSelectionForSimulation();
-
-		// OnRender도 게임 상태를 진행시키는 코루틴 단계다. 다른 coroutine queue와
-		// 동시에 만지지 않도록 GT에서 실행하고, 결과를 이번 packet에 포함한다.
-		CoroutineManagers->yield_OnRender();
 
 		{
 			ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };

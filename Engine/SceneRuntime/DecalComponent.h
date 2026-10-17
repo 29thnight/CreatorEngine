@@ -3,7 +3,7 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 #include "AssetDepot/AssetRequest.h"
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class Texture;
 class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent, Component>

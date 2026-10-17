@@ -1,7 +1,7 @@
 #pragma once
 #include "../RHIQueueContract.h"
 #include <d3d12.h>
-#include <span>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // Backend-only bridge for existing encoders/pools. Lists must already be closed.
 // The mandatory token pins their non-resettable allocator/resource storage through

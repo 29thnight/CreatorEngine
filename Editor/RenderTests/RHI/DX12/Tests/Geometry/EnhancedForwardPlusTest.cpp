@@ -12,9 +12,7 @@
 #include "RHI/DX12/DX12MeshCache.h"
 #include "Mesh.h"
 #include "RHI/RHIShaderCompiler.h"
-#include <algorithm>
-#include <sstream>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 // ── 자가 검증 ──

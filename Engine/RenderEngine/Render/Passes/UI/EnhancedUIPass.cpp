@@ -6,13 +6,7 @@
 #include "../../../Texture.h"
 #include "../../../FontAsset.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <limits>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // 단계(순서대로 채운다):

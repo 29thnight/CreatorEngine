@@ -1,4 +1,5 @@
 #include "../../Editor/EngineEntry/TextureSourceProcessing.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "Experiment/Cooked/CookedTerrain.h"
 #include "Experiment/Cooked/CookedTexture.h"
 #include "AssetSetBuild.h"
@@ -6,7 +7,8 @@
 #include "AssetDepot/RuntimeBootstrap.h"
 #include "Experiment/Cooked/MaterialAssetSetCodec.h"
 #include "ArtifactStoreGuard.h"
-#include <cwctype>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "SoundAssetCookProducer.h"
 #include "FontAssetCookSupport.h"
 #include "CollisionGeometryCookProducer.h"
@@ -33,25 +35,8 @@
 #include "AuthoringNodeEquality.h"
 #include "AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <chrono>
-#include <array>
-#include <cstddef>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <optional>
 #include <process.h>
-#include <objbase.h> // MBC11: CoInitializeEx
-#include <set>
-#include <sstream>
-#include <span>
-#include <string>
-#include <system_error>
-#include <thread>
-#include <utility>
-#include <vector>
+#include <objbase.h>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -2716,8 +2701,8 @@ int wmain(int argc, wchar_t** argv)
 
     // MBC11 — generation 검증(LoadModelAssetGeneration)이 embedded texture를 WIC로
     // 디코드한다. 에디터는 부팅이 COM을 올리지만 cooker는 여기서 올린다.
-    const HRESULT comInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    struct ComScope { HRESULT hr; ~ComScope() { if (SUCCEEDED(hr)) CoUninitialize(); } } comScope{ comInit };
+    const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+    const HRESULT comInit = apartmentScope.result;
     Arguments arguments;
     std::string failure;
     std::vector<std::wstring> tokens;

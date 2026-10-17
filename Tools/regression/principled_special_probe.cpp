@@ -2,7 +2,7 @@
 #include "principled_layered_reference.h"
 #include "../../Lattice/Material/LXMaterialExecution.h"
 
-#include <iomanip>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -9,11 +9,7 @@
 #include "../../Engine/Utility_Framework/AuthoringParseTelemetry.h"
 #include "../../Engine/Utility_Framework/PathFinder.h"
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

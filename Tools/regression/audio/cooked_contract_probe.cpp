@@ -1,19 +1,9 @@
 // Portable exact-source CEAC/CEMF tests retained from the 86f7efd baseline.
 // No engine, audio device, Pak replacement, or altered production headers.
 #include "Experiment/Cooked/CookedAudioClipSource.h"
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <span>
-#include <stdexcept>
-#include <string>
-#include <thread>
-#include <vector>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

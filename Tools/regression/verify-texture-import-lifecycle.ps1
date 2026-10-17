@@ -12,6 +12,7 @@ $configs = if ($Configuration -eq 'All') { @('Debug', 'Release') } else { @($Con
 $output = Join-Path $repo 'Build/TextureImportLifecycle'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $sourcePaths = @('Editor/EngineEntry/EditorAssetDatabase.cpp', 'Editor/EngineEntry/EditorAssetDatabase.h',
+    'Editor/EngineEntry/ConditionalAssetPublish.h', 'Editor/Editor.vcxproj',
     'Engine/RenderEngine/AssetDepot/AssetDepot.cpp', 'Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp',
     'Engine/RenderEngine/Experiment/Cooked/TextureCookProducer.cpp',
     'Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp',
@@ -26,6 +27,7 @@ if ($SkipProjectReferences) {
     $options += '/p:BuildProjectReferences=false'
 }
 $receipts = @()
+$recoveryReceipts = @()
 $previousPath = $env:PATH
 try {
     foreach ($config in $configs) {
@@ -56,7 +58,7 @@ try {
             $exit = $LASTEXITCODE
             $text = [IO.File]::ReadAllText($log)
             $match = [regex]::Match($text, 'TEXTURE_IMPORT_LIFECYCLE_OK checks=(\d+)')
-            if ($exit -ne 0 -or !$match.Success -or [int]$match.Groups[1].Value -lt 36) {
+            if ($exit -ne 0 -or !$match.Success -or [int]$match.Groups[1].Value -lt 166) {
                 throw "Lifecycle probe failed: exit=$exit, $log"
             }
             $receipts += [pscustomobject]@{
@@ -66,6 +68,19 @@ try {
             "TEXTURE_IMPORT_LIFECYCLE_OK configuration=$config layout=$layout iteration=$iteration checks=$($match.Groups[1].Value)"
         }
         }
+        $recoveryRoot = Join-Path $repo ('Build/TCP-Recovery-' + $config + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8))
+        $interruptLog = Join-Path $output "interrupt-$config.log"
+        $recoverLog = Join-Path $output "recover-$config.log"
+        & $exe $recoveryRoot (Join-Path $repo 'Tools/regression/fixtures/browser-thumbnails/Tiny4.png') --interrupt-conditional *> $interruptLog
+        if ($LASTEXITCODE -ne 73) { throw "Controlled interruption failed: $interruptLog" }
+        & $exe $recoveryRoot (Join-Path $repo 'Tools/regression/fixtures/browser-thumbnails/Tiny4.png') --recover-conditional *> $recoverLog
+        $recoveryExit = $LASTEXITCODE
+        $recoveryMatch = [regex]::Match([IO.File]::ReadAllText($recoverLog), 'CONDITIONAL_RECOVERY_OK checks=(\d+)')
+        if ($recoveryExit -ne 0 -or !$recoveryMatch.Success -or [int]$recoveryMatch.Groups[1].Value -lt 6) {
+            throw "Startup recovery failed: exit=$recoveryExit, $recoverLog"
+        }
+        $recoveryReceipts += [pscustomobject]@{ configuration=$config; root=$recoveryRoot; interruptionExit=73; recoveryExit=$recoveryExit; checks=[int]$recoveryMatch.Groups[1].Value; interruptLog=$interruptLog; recoveryLog=$recoverLog }
+        "CONDITIONAL_RECOVERY_OK configuration=$config checks=$($recoveryMatch.Groups[1].Value)"
     }
 } finally {
     $env:PATH = $previousPath
@@ -75,6 +90,6 @@ foreach ($entry in $sources) {
         throw "Source drift during lifecycle validation: $($entry.path)"
     }
 }
-[ordered]@{ receipts=$receipts; sources=$sources; sourceDrift=0; scope='Editor asset service; no ImGui or scene reload UI' } |
+[ordered]@{ receipts=$receipts; recoveryReceipts=$recoveryReceipts; sources=$sources; sourceDrift=0; scope='Editor asset service and controlled process interruption/startup recovery; no ImGui or scene reload UI' } |
     ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output 'result.json') -Encoding utf8
 exit 0

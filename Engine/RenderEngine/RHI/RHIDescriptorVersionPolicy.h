@@ -2,9 +2,8 @@
 
 #include "RHIResourceTypes.h"
 
-#include <cstdint>
-#include <limits>
-#include <vector>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // Transient descriptor의 네이티브 payload는 DX12 shader-visible heap page와
 // Vulkan descriptor pool로 서로 다르다. 공통 계층은 payload를 소유하지 않고,

@@ -2,7 +2,7 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include <mathematics/vector2.hpp>
-#include <type_traits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 enum class Direction
 {

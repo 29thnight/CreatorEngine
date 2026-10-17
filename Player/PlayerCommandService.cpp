@@ -8,7 +8,8 @@
 
 #if CE_SHIPPING
 
-#include <cstdio>
+#include <stdio.h>
+#include "../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace PlayerCommandService
 {
@@ -39,10 +40,6 @@ namespace PlayerCommandService
 #include "../Engine/CommandService/JsonValue.h"
 #include "../Engine/CommandService/ResultEnvelope.h"
 
-#include <atomic>
-#include <condition_variable>
-#include <memory>
-#include <mutex>
 
 namespace PlayerCommandService
 {

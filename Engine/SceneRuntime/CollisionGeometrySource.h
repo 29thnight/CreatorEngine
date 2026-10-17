@@ -3,10 +3,7 @@
 #include "../Physics/PhysicsGeometry.h"
 #include "../Utility_Framework/Uuid.h"
 #include <mathematics/views.hpp>
-#include <algorithm>
-#include <cmath>
-#include <ranges>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

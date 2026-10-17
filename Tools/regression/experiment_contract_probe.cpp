@@ -1,4 +1,5 @@
 // experiment 합성 계약 probe — 에디터 없이 도는 단독 실행 파일
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 //
 // ★ 여기 있는 검사들은 원래 `experiment.*` CLI 명령이었다. 명령이 아니어야 하는
 //   이유는 하나다 — **엔진 프로세스가 필요 없다.** 씬도, 디바이스도, registry 도
@@ -52,10 +53,8 @@
 #include <d3d11.h>
 #include <DirectXTex.h>
 #include <objbase.h>
-#include <cstdio>
-#include <cstring>
-#include <string>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {
@@ -91,24 +90,20 @@ int main(int argc, char** argv)
     // DirectXTex retains a process-wide WIC factory. Keep the host apartment
     // alive across every cook, as Editor/AssetCooker do; per-call COM guards
     // cannot own that cached factory's lifetime.
-    const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    if (FAILED(comResult) && comResult != RPC_E_CHANGED_MODE)
+    const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+    const HRESULT comResult = apartmentScope.result;
+    if (FAILED(comResult))
     {
         std::fprintf(stderr, "EXPERIMENT_COM_FAILED hr=%08lx\n", comResult);
         return 1;
     }
     struct ComScope final
     {
-        HRESULT result;
         ~ComScope()
         {
             DirectX::SetWICFactory(nullptr);
-            if (SUCCEEDED(result))
-            {
-                CoUninitialize();
-            }
         }
-    } comScope{ comResult };
+    } comScope;
 
     // 인자를 주면 그 이름만 돌린다. 주지 않으면 전부 돈다.
     const char* filter = (argc > 1) ? argv[1] : nullptr;

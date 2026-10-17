@@ -2,7 +2,7 @@
 
 #include "ModelData.h"
 
-#include <string>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace Authoring
 {

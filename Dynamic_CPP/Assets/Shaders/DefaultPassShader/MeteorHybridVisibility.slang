@@ -1,20 +1,21 @@
 #include "Includes/MaterialGraphSurfacePoint.slang"
 #include "Includes/LxMeshletGpuContract.slang"
 #include "Includes/MeteorVisibilityContract.slang"
+#include "Includes/MeshletGeometryAccess.slang"
 cbuffer RasterConstants : register(b0) { float4x4 projection; uint width, height, recordCount, meshletCount; };
 StructuredBuffer<LXFrameGeometryRecord> geometryTable : register(t0);
 StructuredBuffer<uint4> metadata : register(t1); // visible offset, active/SW/double-sided flags
 StructuredBuffer<uint> visibleIds : register(t2);
 StructuredBuffer<uint64_t> completedKeys : register(t3);
 StructuredBuffer<uint> classifiedRoutes : register(t4);
-StructuredBuffer<LXSurfacePoint> vertices[4096] : register(t16);
+StructuredBuffer<float4> vertices[4096] : register(t16);
 ByteAddressBuffer topology[4096] : register(t4112);
 RWStructuredBuffer<uint> routes : register(u0);
 RWStructuredBuffer<uint64_t> keys : register(u1);
 uint GroupIndex(uint3 group) { return group.y * 65535u + group.x; }
 // Vertex streams are object space; the frame record carries object-to-world.
 float4 Clip(uint record, uint vertex) {
-    const float3 world=MeteorRecordWorldPosition(geometryTable[record],vertices[record-1u][vertex].position.xyz);
+    const float3 world=MeteorRecordWorldPosition(geometryTable[record],MeteorGeometryPoint(vertices[record-1u],topology[record-1u],vertex).position.xyz);
     return mul(float4(world,1),projection);
 }
 float2 Screen(float4 clip) { return (clip.xy/clip.w*float2(.5,-.5)+.5)*float2(width,height); }

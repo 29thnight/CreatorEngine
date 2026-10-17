@@ -4,12 +4,8 @@
 #include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
 
-#include <cstdio>
-#include <cstdlib>
-#include <optional>
-#include <string>
-#include <utility>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace TemporalProductSettingsContractFixture
 {

@@ -128,10 +128,11 @@
         "EngineBootstrap::Run"
       ],
       "limitations": [
-        "Source/callsite review only; no engine build, runtime, GPU or browser execution performed."
+        "Source/callsite review only; no engine build, runtime, GPU or browser execution performed.",
+        "2026-10-17 conflict integration: original source review stays pinned to baseline_commit; upstream records were retained, no runtime acceptance rerun."
       ],
       "baseline_blob": "4390c9b711bb97a614c2ccb5eb6228a3ee25b738",
-      "result_blob": "c6c450963073212837321b8f67d1d458938a516c",
+      "result_blob": "7f11fab23ab522df3961c961967e4748aae544b6",
       "content_changed": true,
       "sources": [
         {
@@ -174,7 +175,8 @@
           "blob": "781c70a59352576b7fee2787588cee5b6328e7f1",
           "kind": "file"
         }
-      ]
+      ],
+      "merge_integration_commit": "b767a3c67e0f8474792a0a141a4580c5eac15712"
     },
     {
       "path": "docs/TechnicalGuide.md",
@@ -3359,7 +3361,8 @@
         "Imported state writeback waits for admission; temporal state waits for submit"
       ],
       "limitations": [
-        "소스 정적 감사만 수행; 현재 커밋의 빌드·GPU·성능 결과는 미확인"
+        "소스 정적 감사만 수행; 현재 커밋의 빌드·GPU·성능 결과는 미확인",
+        "2026-10-17 conflict integration: original source review stays pinned to baseline_commit; upstream records were retained, no runtime acceptance rerun."
       ],
       "compatibility": "문서 경로 유지; HTML 명시적 id 보존",
       "entry_points": [
@@ -3367,7 +3370,7 @@
       ],
       "historical_source": "https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/LiveRenderWiring20261012.html",
       "baseline_blob": "e6355a3c6662fceb76fe5ab5a2ee86360b71355d",
-      "result_blob": "858dc16434f1e4b2971493ad264d569c9cc4e796",
+      "result_blob": "f20853a4e0ccd29a89a1b2f06a0a0a4eeea44982",
       "content_changed": true,
       "sources": [
         {
@@ -3425,7 +3428,8 @@
           "blob": "11933bc720275b0d914f04691f39506cc9c6802d",
           "kind": "file"
         }
-      ]
+      ],
+      "merge_integration_commit": "b767a3c67e0f8474792a0a141a4580c5eac15712"
     },
     {
       "path": "docs/analysis/LxHdrCutover20261012.md",
@@ -6993,7 +6997,8 @@
       ],
       "limitations": [
         "외부 RE ENGINE 현재 동작 검증 안 함",
-        "상대 성능 주장 없음"
+        "상대 성능 주장 없음",
+        "2026-10-17 conflict integration: original source review stays pinned to baseline_commit; upstream records were retained, no runtime acceptance rerun."
       ],
       "entry_points": [
         "BuildPipelineDesc METEOR stages → SceneHost admission → recording-owned visibility buffers",
@@ -7001,7 +7006,7 @@
       ],
       "verification_scope": "static-source-and-call-chain-review; no build/runtime/performance execution",
       "baseline_blob": "03f81c45962a3f4bfb95c9bf4b8ae4c483ad77db",
-      "result_blob": "80d0ce74b4a14bc7bd285ae0da52ef982dea11c0",
+      "result_blob": "7016d3f55f78a42c14444aaf323ccb301c8ae5c5",
       "content_changed": true,
       "sources": [
         {
@@ -7029,7 +7034,8 @@
           "blob": "8a26d7b13938081004d4257623594124042df9ad",
           "kind": "file"
         }
-      ]
+      ],
+      "merge_integration_commit": "b767a3c67e0f8474792a0a141a4580c5eac15712"
     },
     {
       "path": "docs/analysis/ReEngineMeshletGraphFeasibility20261011.html",
@@ -16727,11 +16733,12 @@
         "No persistent live shadow-depth cache; performance unverified"
       ],
       "limitations": [
-        "소스 정적 감사만 수행; 현재 커밋의 빌드·GPU·성능 결과는 미확인"
+        "소스 정적 감사만 수행; 현재 커밋의 빌드·GPU·성능 결과는 미확인",
+        "2026-10-17 conflict integration: original source review stays pinned to baseline_commit; upstream records were retained, no runtime acceptance rerun."
       ],
       "compatibility": "문서 경로 유지; HTML 명시적 id 보존",
       "baseline_blob": "f8f06ad986a2f0e395fc7943992e0b4cf9cac64c",
-      "result_blob": "4bcf4634e96eb140f449796e81989b259f8580f3",
+      "result_blob": "9dea1966293170acad9a68ba368b1cd5f36e5949",
       "content_changed": true,
       "sources": [
         {
@@ -16764,7 +16771,8 @@
           "blob": "f1ebc46f146fbaab06e1fab7ad07f47bbfb3fb72",
           "kind": "file"
         }
-      ]
+      ],
+      "merge_integration_commit": "b767a3c67e0f8474792a0a141a4580c5eac15712"
     },
     {
       "path": "docs/plans/SimulationEffectContractPlan.md",
@@ -17040,10 +17048,11 @@
       ],
       "limitations": [
         "실행 미수행",
-        "품질·성능·전체 GPU 조합 수용은 미입증"
+        "품질·성능·전체 GPU 조합 수용은 미입증",
+        "2026-10-17 conflict integration: original source review stays pinned to baseline_commit; upstream records were retained, no runtime acceptance rerun."
       ],
       "baseline_blob": "ac115c6dfd20d9d9e6337758a1152005e5051829",
-      "result_blob": "0664a410855107c28c85aa500944f044db537ff3",
+      "result_blob": "3de2f7df3a787bb3fd52cc13dbc850b099224643",
       "content_changed": true,
       "sources": [
         {
@@ -17096,7 +17105,8 @@
           "blob": "0e6c53d29e503805da51413a962949d4f0c68c18",
           "kind": "file"
         }
-      ]
+      ],
+      "merge_integration_commit": "b767a3c67e0f8474792a0a141a4580c5eac15712"
     },
     {
       "path": "docs/plans/UISystemRedesignPlan.md",
@@ -19813,5 +19823,80 @@
         }
       ]
     }
-  ]
+  ],
+  "merge_integration": {
+    "upstream_commit": "b767a3c67e0f8474792a0a141a4580c5eac15712",
+    "date": "2026-10-17",
+    "source_review_baseline_unchanged": true,
+    "inherited_files": [
+      {
+        "path": "docs/analysis/ConditionalAssetPublishValidation20261010.md",
+        "blob": "9f531a5b09588dce97bd4d09a85140aba298374c"
+      },
+      {
+        "path": "docs/analysis/ConditionalPublishActualInspectorValidation20261010.md",
+        "blob": "2935742e5489b6004a3db5311627e980e797761e"
+      },
+      {
+        "path": "docs/analysis/RenderProfileAutomaticSaveConflictValidation20261010.md",
+        "blob": "c3b1fd94b37d36ff96fdfeef6a7a788e870c0613"
+      },
+      {
+        "path": "docs/analysis/RenderingPipelineMermaid20261016.md",
+        "blob": "f2fb82f458480a58f613313479946fb5b56a4f26"
+      },
+      {
+        "path": "docs/analysis/TextureActualInspectorShutdownRepeatValidation20261010.md",
+        "blob": "62136daaf75801aa67c28ca17809355b9e2bcc0d"
+      },
+      {
+        "path": "docs/analysis/TextureAutomaticInspectorDebugFailureValidation20261010.md",
+        "blob": "8336ad3aa72000ee6247953b0a3ab8773ed51744"
+      },
+      {
+        "path": "docs/analysis/TextureAutomaticSaveSoakValidation20261010.md",
+        "blob": "ade7687031fad13e7e533ca6b7231596e4828970"
+      },
+      {
+        "path": "docs/analysis/TextureCookedGpuValidation20261010.md",
+        "blob": "d802e418211a64e91897b385ee729c7333f46c9c"
+      },
+      {
+        "path": "docs/analysis/TextureCookedVulkanValidation20261010.md",
+        "blob": "098920a3d71d994bb2a82b96161b6c2cc6712da7"
+      },
+      {
+        "path": "docs/analysis/TextureInspectorScaleDockValidation20261010.md",
+        "blob": "8bde48cd66b0062476714fa821ef46cf2b46349c"
+      },
+      {
+        "path": "docs/analysis/TexturePendingMetadataShutdownValidation20261010.md",
+        "blob": "3ea6be76cc41bbce03f4451d900a74996a3ee048"
+      },
+      {
+        "path": "docs/analysis/TexturePendingMetadataValidation20261010.md",
+        "blob": "bdd4a861132913f95dc44ea6316d45b40cfd618c"
+      },
+      {
+        "path": "docs/analysis/TexturePendingNativeCloseValidation20261010.md",
+        "blob": "0fd830b2b4033c19ff9ade4349bb48f0a53f74b6"
+      },
+      {
+        "path": "docs/analysis/TextureShippingArtifactFailureValidation20261010.md",
+        "blob": "27b242639f9c2e06b87baaa7fc2de94b4673e337"
+      },
+      {
+        "path": "docs/analysis/TextureShippingCoreValidation20261010.md",
+        "blob": "50842ac8aec4f89b1db120f19c25b8f9e82f8640"
+      },
+      {
+        "path": "docs/analysis/TextureSidecarDiagnosticsValidation20261010.md",
+        "blob": "0c5229fae8ea09c1ccc20eefb36f61db56295bb4"
+      },
+      {
+        "path": "docs/analysis/TextureStagedPublishConflictValidation20261010.md",
+        "blob": "662b627960bb96bf6945ece36c479e9d95e75917"
+      }
+    ]
+  }
 }

@@ -3,9 +3,7 @@
 
 #include "DX12ResourceTable.h"
 
-#include <algorithm>
-#include <cstdio>
-#include <limits>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

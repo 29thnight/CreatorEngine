@@ -10,11 +10,8 @@
 // Editor 쪽에 살면서 그 둘을 아래 값 타입으로 바꿔 준다. LC8 의 Player 는 같은
 // 인터페이스에 자기 어댑터를 끼운다.
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <vector>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

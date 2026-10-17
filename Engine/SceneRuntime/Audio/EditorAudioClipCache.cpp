@@ -2,14 +2,11 @@
 #include "AudioSourceInspection.h"
 #include "../../RenderEngine/Assets/AudioClipSourceMetadata.h"
 
-#include <atomic>
-#include <chrono>
-#include <fstream>
-#include <mutex>
+#include <errno.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 #if defined(_WIN32)
 #include <Windows.h>
 #else
-#include <cerrno>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>

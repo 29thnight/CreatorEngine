@@ -22,11 +22,7 @@
 // 만든 프레임이 끝나면 사라지는 것을 가리키면 안 된다. 큰 바이너리(PNG·dump)는
 // inline base64 가 아니라 artifact 경로와 digest 로 참조한다(§6.4).
 
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <utility>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace CommandCore
 {

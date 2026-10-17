@@ -1,4 +1,5 @@
-#pragma once
+﻿#pragma once
+#include "../Utility_Framework/WindowsApartment.h"
 #include "Camera.h"
 #include "ProfileScope.h"
 #include "ThreadPool.h"
@@ -6,7 +7,7 @@
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "DataSystem.h"
 #include "RuntimeSettings.h"
 #include "PrefabUtility.h"
@@ -18,11 +19,8 @@
 #include "EngineLaunchConfig.h"
 #include "JobScheduler.h"
 
-#include <array>
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
-#include <exception>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace EngineBootstrap
 {
@@ -280,7 +278,7 @@ namespace EngineBootstrap
         // 이미 다 걸어 둔 상태라, 등록이 늦으면 그 사이에 죽은 크래시는 로그에 CRASH
         // 줄만 남고 .dmp가 없다. 예전에는 App::Initialize 중반이 유일한 등록 지점이라
         // 디바이스 생성·셰이더 컴파일·리소스 로드 구간 전체가 덤프 사각지대였다.
-        CoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
+        WindowsCoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
 
 		// The Host owns package/import preparation. Run it after path, log, and crash
 		// diagnostics exist, but before RuntimeSettings reads ProjectSetting from that view.
@@ -314,7 +312,7 @@ namespace EngineBootstrap
 			return false;
 		}
 
-        CoreWindow::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT
+        WindowsCoreWindow::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT
         {
             return 0;
         });
@@ -356,21 +354,23 @@ namespace EngineBootstrap
     template <typename TApp>
     int Run(HINSTANCE hInstance, const EngineLaunchConfig& config)
     {
-        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+        const HRESULT hr = apartmentScope.result;
         if (FAILED(hr))
         {
             return static_cast<int>(hr);
         }
 
-        struct CoUninitializer
+        struct ApartmentShutdownTrace
         {
-            ~CoUninitializer()
+            ce::platform::windows::apartment_scope& scope;
+            ~ApartmentShutdownTrace()
             {
-                ShutdownTrace("[6] CoUninitialize 직전");
-                CoUninitialize();
-                ShutdownTrace("[7] CoUninitialize 완료");
+                ShutdownTrace("[6] RoUninitialize 직전");
+                scope.reset();
+                ShutdownTrace("[7] RoUninitialize 완료");
             }
-        } comGuard;
+        } comGuard{ apartmentScope };
 
         if (!InitializeRuntime(config)) return 2;
         InitializeShutdownTrace();
@@ -394,9 +394,30 @@ namespace EngineBootstrap
         // 먼저 정리된다. 예전 App::Initialize 지역 window는 app.Finalize 전에
         // 파괴됐고, InitializeTask의 값 반환 복사본도 같은 HWND를 조기 파괴했다.
         {
-            CoreWindow coreWindow(hInstance, config.window);
+            std::unique_ptr<WindowsCoreWindow> backend;
+            try
+            {
+                backend = std::make_unique<WindowsCoreWindow>(hInstance, config.window);
+            }
+            catch (const std::exception& error)
+            {
+                std::fprintf(stderr, "Window backend initialization failed: %s\n", error.what());
+                return 3;
+            }
+            WindowsCoreWindow& platformWindow = *backend;
+            CoreWindow coreWindow(std::move(backend));
             TApp app;
-            app.Initialize(coreWindow);
+            // Disconnect HWND callbacks before App's destructor, including when
+            // Initialize/Finalize throws and COM teardown pumps window messages.
+            struct WindowCallbackGuard
+            {
+                WindowsCoreWindow& window;
+                ~WindowCallbackGuard() noexcept
+                {
+                    window.DetachCallbacks();
+                }
+            } windowCallbacks{ platformWindow };
+            app.Initialize(platformWindow, coreWindow);
             app.Finalize();
             ShutdownTrace("[1] app.Finalize 완료");
         }

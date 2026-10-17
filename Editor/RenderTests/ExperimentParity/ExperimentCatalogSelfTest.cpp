@@ -3,14 +3,7 @@
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 
-#include <algorithm>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

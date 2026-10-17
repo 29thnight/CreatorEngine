@@ -5,14 +5,7 @@
 #include <ryml/ryml_std.hpp>
 #include <c4/yml/emit.hpp>
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <limits>
-#include <string>
-#include <vector>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // PBR-W9 — 두 제품 캡처의 픽셀을 실제로 맞대고 판정한다.
 //

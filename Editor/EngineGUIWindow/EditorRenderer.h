@@ -3,13 +3,8 @@
 // 그릴 창의 표를 생성자로 받으므로 타입을 안다(PHASE 21 W3).
 #include "EditorWindowRegistry.h"
 
-#include <atomic>
-#include <memory>
-#include <mutex>
-#include <functional>
-#include <string>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 namespace editor { class EditorWorkspaceStore; }
-#include <chrono>
 
 class IImGuiHost;
 

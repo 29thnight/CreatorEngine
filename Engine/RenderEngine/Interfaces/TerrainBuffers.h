@@ -3,8 +3,8 @@
 #include "Core.Minimal.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
-#include <cstddef>
-#include <type_traits>
+#include <stddef.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #define MAX_TERRAIN_LAYERS 16
 

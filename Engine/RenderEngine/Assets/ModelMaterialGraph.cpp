@@ -4,11 +4,7 @@
 #include "AuthoringParsedDocument.h"
 
 #include <Windows.h>
-#include <algorithm>
-#include <atomic>
-#include <fstream>
-#include <sstream>
-#include <stdexcept>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {

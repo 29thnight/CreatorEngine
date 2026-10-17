@@ -1,6 +1,5 @@
 #pragma once
-#include <cstdint>
-#include <string>
+#include "StandardLibrary.h"
 
 // SerializationPlan D3-b-1 — ryml을 제품 경로에 넣기 위한 **선결 조건**.
 //

@@ -2,7 +2,7 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
-#include <cstdint>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 #include "../../Graph/EnhancedRenderPass.h"
 

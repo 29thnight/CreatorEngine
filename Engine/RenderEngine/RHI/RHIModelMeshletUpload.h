@@ -2,13 +2,8 @@
 
 #include "IRenderDeviceServices.h"
 
-#include <cstring>
-#include <cmath>
-#include <limits>
-#include <new>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 struct RHIModelMeshletUpload
 {

@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include "../../../RHI/RHIFormat.h"
-#include <cstdint>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"

@@ -11,14 +11,7 @@
 #undef STB_TRUETYPE_IMPLEMENTATION
 #undef STBTT_STATIC
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <fstream>
-#include <exception>
-#include <limits>
-#include <unordered_map>
-#include <utility>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

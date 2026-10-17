@@ -4,13 +4,7 @@
 #include "AuthoringCookedDocument.h"
 #include "Sha256.h"
 
-#include <algorithm>
-#include <cmath>
-#include <fstream>
-#include <initializer_list>
-#include <regex>
-#include <sstream>
-#include <unordered_set>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

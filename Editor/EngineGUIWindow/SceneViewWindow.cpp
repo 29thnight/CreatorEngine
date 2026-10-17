@@ -24,9 +24,9 @@
 #include "RectTransformComponent.h"
 #include "LightComponent.h"
 #include "Entity.h"
-#include <cstdio>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
-#include <unordered_map>
 #include "DataSystem.h"
 #include "PrefabUtility.h"
 #include "Terrain.h"
@@ -38,8 +38,6 @@
 #include "EditorWindowRegistry.h"
 #include "Windows/EditorViewportWindows.h"
 
-#include <cmath>
-#include <cstring>
 #include <mathematics/transform.hpp>
 
 bool RayIntersectsPlane(const Ray& ray, const math::vector3& planeNormal, const math::vector3& planePoint, float& outDistance)

@@ -1,15 +1,10 @@
 // 소스 fixture만 추가한다. 이번 변경에서는 빌드하거나 실행하지 않았다.
 #include "DxCaptureFile.h"
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <span>
-#include <vector>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace dx_capture_file_tests
 {

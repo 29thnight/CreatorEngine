@@ -3,19 +3,8 @@
 #include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/ArtifactStoreGuard.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <limits>
-#include <span>
-#include <string>
-#include <string_view>
-#include <stdexcept>
-#include <utility>
-#include <cstdio>
-#include <mutex>
-#include <unordered_map>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <sys/stat.h>
 #if defined(_WIN32)
 #include <io.h>

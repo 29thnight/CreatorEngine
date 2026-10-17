@@ -1,9 +1,7 @@
 #pragma once
 #include "TypeTrait.h"
 #include "LogSystem.h"
-#include <array>
-#include <string_view>
-#include <cstdlib>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 컴포넌트 타입의 영속(디스크) UUID 표 (SceneGraphRedesignPlan K1-b).
 //

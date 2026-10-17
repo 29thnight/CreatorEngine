@@ -13,7 +13,7 @@
 // 엔진 스키마와 reflgen 다리(meta::of<T>)는 걷었다. 문자열은 reflgen::static_string 이다(구조적 타입 — C++26 주석
 // 값이 될 수 있다, reflgen::display_name 과 같은 이유).
 #include <reflgen/core/static_string.h>
-#include <string_view>
+#include "StandardLibrary.h"
 
 namespace creator
 {

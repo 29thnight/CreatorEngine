@@ -3,9 +3,7 @@
 #include "ProfilerLiveDiagnostics.h"
 #include "ImGui.h"
 
-#include <algorithm>
-#include <cstdint>
-#include <string>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

@@ -14,10 +14,7 @@
 
 #include <mathematics/frustum.hpp>
 #include "Mathematics.Intersect.h"
-#include <algorithm>
-#include <cmath>
-#include <memory>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 inline EnhancedLight MakeEnhancedLight(const LightRenderProxy& source)
 {

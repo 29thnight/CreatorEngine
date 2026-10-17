@@ -4,13 +4,14 @@
 #include "ModelMeshDescriptor.h"
 #include "ModelSkeletonPayload.h"
 
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 class Material;
 
 namespace assets
 {
     struct ModelGeometryPayload;
+    struct ModelCpuGeometryPayload;
 
     enum class ModelColliderPreparationPolicy : std::uint8_t
     {
@@ -42,6 +43,6 @@ namespace assets
         // Empty when the effective collider policy is disabled. Otherwise follows
         // summary.meshes with null entries for uninstantiated meshes. These are
         // transient collision inputs; components retain only mesh descriptions.
-        std::vector<own::shared_owner<const ModelGeometryPayload>> geometry{};
+        std::vector<own::shared_owner<const ModelCpuGeometryPayload>> geometry{};
     };
 }

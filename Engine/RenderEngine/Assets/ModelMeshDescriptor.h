@@ -3,8 +3,7 @@
 #include "ModelSkeletonPayload.h"
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
 
-#include <array>
-#include <limits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets
 {
@@ -74,8 +73,8 @@ namespace assets
         friend bool operator==(const ModelMeshLodSummary&, const ModelMeshLodSummary&) noexcept = default;
     };
 
-    // Immutable, independently useful render metadata. Reproducible vertex,
-    // index, meshlet and LOD arrays are NEVER owned by this descriptor.
+    // Immutable render metadata. Original vertices/indices and meshlet
+    // connectivity remain outside this descriptor, including streamed meshes.
     struct ModelMeshDescriptor final
     {
         // entry/revisions identify this logical generation and hard closure.
@@ -102,6 +101,7 @@ namespace assets
         std::array<ModelMeshLodSummary, experiment::kMeshLodMaxLevels> coarseLods{};
         std::uint32_t coarseLodCount{};
         std::size_t metadataBytes{};
+        std::shared_ptr<const experiment::cooked::ModelGeometryStreamMetadata> streamMetadata;
 
         [[nodiscard]] bool Matches(const experiment::cooked::ModelMeshSummary& summary) const noexcept
         {

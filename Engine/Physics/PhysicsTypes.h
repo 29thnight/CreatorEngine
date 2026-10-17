@@ -1,10 +1,5 @@
 #pragma once
-#include <compare>
-#include <cstdint>
-#include <expected>
-#include <limits>
-#include <source_location>
-#include <string_view>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

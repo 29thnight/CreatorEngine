@@ -1,6 +1,6 @@
 #pragma once
 #if CE_DEVELOPMENT && !CE_SHIPPING
-#include <functional>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #endif
 
 #include "../../../Render/Temporal/TemporalReconstruction.h"
@@ -26,10 +26,6 @@ TemporalCapabilities QueryFsrBuildAvailability(TemporalBackend backend);
 #include <FidelityFX/host/ffx_opticalflow.h>
 #include <FidelityFX/host/ffx_frameinterpolation.h>
 
-#include <cstddef>
-#include <memory>
-#include <mutex>
-#include <vector>
 
 static_assert(FFX_FSR3UPSCALER_VERSION_MAJOR == 3 && FFX_FSR3UPSCALER_VERSION_MINOR == 1 &&
     FFX_FSR3UPSCALER_VERSION_PATCH == 4, "Use the pinned FidelityFX SDK 1.1.4 headers");

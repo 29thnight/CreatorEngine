@@ -5,7 +5,7 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "DataSystem.h"
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void DecalComponent::OnInitialized()
 {

@@ -1,16 +1,7 @@
 #include "DxCaptureFile.h"
 
-#include <algorithm>
-#include <array>
-#include <bit>
-#include <cstring>
-#include <fstream>
-#include <limits>
-#include <map>
-#include <new>
-#include <set>
-#include <tuple>
-#include <utility>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 유니티 빌드에서 다른 파일의 내부 이름과 섞이지 않도록 전용 이름공간을 쓴다.
 namespace ce::dx_capture::file_detail

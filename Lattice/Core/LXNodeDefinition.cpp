@@ -1,7 +1,6 @@
 #include "LXNodeDefinition.h"
 
-#include <algorithm>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

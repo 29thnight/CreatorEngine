@@ -4,13 +4,7 @@
 
 #include <imgui.h>
 
-#include <algorithm>
-#include <functional>
-#include <map>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

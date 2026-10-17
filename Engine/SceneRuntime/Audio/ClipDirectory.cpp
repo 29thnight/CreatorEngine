@@ -1,9 +1,6 @@
 #include "ClipDirectory.h"
 
-#include <algorithm>
-#include <cctype>
-#include <system_error>
-#include <unordered_set>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

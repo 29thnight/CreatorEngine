@@ -25,10 +25,7 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <algorithm>
-#include <stdexcept>
-#include <string>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

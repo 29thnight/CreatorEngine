@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "StandardLibrary.h"
 
 // Shared by the content producer, consumer, and compiled host identity query.
 // Change this identity when cooked content can no longer be consumed unchanged.

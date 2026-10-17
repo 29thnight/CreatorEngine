@@ -1,10 +1,7 @@
 #pragma once
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12QueueBatchAdapter.h"
-#include <chrono>
-#include <thread>
-#include <stdexcept>
-#include <cstring>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
 {

@@ -7,8 +7,8 @@
 #include "../Utility_Framework/LogSystem.h"
 #include "../Utility_Framework/PathFinder.h"
 
-#include <cstdio>
-#include <limits>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

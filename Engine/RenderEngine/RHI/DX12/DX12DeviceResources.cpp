@@ -6,18 +6,10 @@
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include "../RHIRecordedBatch.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
-#include <vector>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cctype>
-#include <cstdio>
-#include <exception>
-#include <sstream>
-#include <fstream>
-#include <thread>
-#include <chrono>
-#include <mutex>
 #include <dxgidebug.h>   // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
 #include "../RHIValidationLedger.h"
 
@@ -2654,6 +2646,205 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
         return false;
     }
     return true;
+}
+
+uint64_t DX12DeviceResources::SparseBufferTileBytes() const
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+    return m_device && SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))) &&
+        options.TiledResourcesTier != D3D12_TILED_RESOURCES_TIER_NOT_SUPPORTED ? RHISparseTileBytes : 0;
+}
+
+bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc,
+    RHIBufferHandle& outHandle, std::string& outError)
+{
+    outHandle = {};
+    if (!m_device || !m_queue || !desc.virtualBytes || !desc.physicalTileCapacity ||
+        desc.virtualBytes > uint64_t(UINT32_MAX) * RHISparseTileBytes)
+    {
+        outError = "Invalid sparse buffer device, queue, or extent";
+        return false;
+    }
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+    if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))) ||
+        options.TiledResourcesTier == D3D12_TILED_RESOURCES_TIER_NOT_SUPPORTED)
+    {
+        outError = "DX12 tiled resources are unsupported";
+        return false;
+    }
+    D3D12_RESOURCE_DESC resourceDesc{};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Width = (desc.virtualBytes + RHISparseTileBytes - 1) & ~(RHISparseTileBytes - 1);
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Flags = desc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    HRESULT hr = m_device->CreateReservedResource(&resourceDesc, D3D12_RESOURCE_STATE_COMMON,
+        nullptr, IID_PPV_ARGS(&resource));
+    if (FAILED(hr))
+    {
+        outError = "Reserved buffer creation failed " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
+    if (desc.physicalPoolOwner.IsValid())
+    {
+        auto* sharedHeap = m_resourceTable.ResolveSparseHeap(desc.physicalPoolOwner);
+        auto lease = m_resourceTable.ResolveBufferLifetime(desc.physicalPoolOwner);
+        if (!sharedHeap || !lease || sharedHeap->GetDesc().SizeInBytes / RHISparseTileBytes != desc.physicalTileCapacity)
+        {
+            outError = "Sparse shared pool owner or capacity is invalid";
+            return false;
+        }
+        Microsoft::WRL::ComPtr<ID3D12Heap> retainedHeap = sharedHeap;
+        DevResApplyDebugName(resource.Get(), desc.debugName);
+        outHandle = m_resourceTable.AddBuffer(std::move(resource), false, std::move(retainedHeap), std::move(lease));
+        if (!outHandle.IsValid())
+        {
+            outError = "Sparse shared buffer handle table is full";
+            return false;
+        }
+        outError.clear();
+        return true;
+    }
+    D3D12_HEAP_DESC heapDesc{};
+    heapDesc.SizeInBytes = uint64_t(desc.physicalTileCapacity) * RHISparseTileBytes;
+    heapDesc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapDesc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    heapDesc.Flags = D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+    struct SparseBudgetLease
+    {
+        RHIDeviceMemoryBudgetCoordinator& coordinator;
+        RHIDeviceMemoryBudgetOwner owner;
+        RHIDeviceMemoryGrowthTicket ticket;
+        explicit SparseBudgetLease(RHIDeviceMemoryBudgetCoordinator& value)
+            : coordinator(value), owner(value.RegisterOwner()) {}
+        ~SparseBudgetLease()
+        {
+            if (ticket.IsValid()) coordinator.CancelGrowth(ticket);
+            coordinator.UnregisterOwner(owner);
+        }
+    };
+    auto budget = std::make_shared<SparseBudgetLease>(m_persistentMemoryBudget);
+    budget->ticket = m_persistentMemoryBudget.TryReserveGrowth(budget->owner,
+        kRHIDeviceLocalMemoryBudgetDomain, heapDesc.SizeInBytes);
+    if (!budget->ticket.IsValid())
+    {
+        outError = "Sparse physical heap exceeds the shared device VRAM growth budget";
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID3D12Heap> heap;
+    hr = m_device->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap));
+    if (FAILED(hr))
+    {
+        outError = "Sparse physical heap creation failed " + HrToString(hr);
+        return false;
+    }
+    DevResApplyDebugName(resource.Get(), desc.debugName);
+    if (!m_persistentMemoryBudget.CommitGrowth(budget->ticket))
+    {
+        outError = "Sparse physical heap budget commitment failed";
+        return false;
+    }
+    outHandle = m_resourceTable.AddBuffer(std::move(resource), false, std::move(heap), std::move(budget));
+    if (!outHandle.IsValid())
+    {
+        outError = "Sparse buffer handle table is full";
+        return false;
+    }
+    outError.clear();
+    return true;
+}
+
+bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
+    std::span<const RHISparseTileMapping> mappings, std::string& outError)
+{
+    auto resource = Resolve(buffer);
+    auto heap = m_resourceTable.ResolveSparseHeap(buffer);
+    if (!resource || !heap || !m_queue)
+    {
+        outError = "Sparse buffer or graphics queue is unavailable";
+        return false;
+    }
+    if (mappings.empty())
+    {
+        outError.clear();
+        return true;
+    }
+    if (mappings.size() > UINT32_MAX)
+    {
+        outError = "Sparse mapping batch exceeds native range";
+        return false;
+    }
+    const auto virtualTiles = resource->GetDesc().Width / RHISparseTileBytes;
+    const auto physicalTiles = heap->GetDesc().SizeInBytes / RHISparseTileBytes;
+    std::vector<D3D12_TILED_RESOURCE_COORDINATE> coordinates;
+    std::vector<D3D12_TILE_REGION_SIZE> regions;
+    std::vector<D3D12_TILE_RANGE_FLAGS> flags;
+    std::vector<UINT> offsets, counts;
+    std::set<uint32_t> seen;
+    for (const auto& mapping : mappings)
+    {
+        // Validate the complete batch before issuing any queue mutation.
+        if (mapping.virtualTile >= virtualTiles || (mapping.mapped && mapping.physicalTile >= physicalTiles) ||
+            !seen.insert(mapping.virtualTile).second)
+        {
+            outError = "Sparse mapping range or duplicate virtual tile";
+            return false;
+        }
+        coordinates.push_back({mapping.virtualTile, 0, 0, 0});
+        regions.push_back({1, FALSE, 0, 0, 0});
+        flags.push_back(mapping.mapped ? D3D12_TILE_RANGE_FLAG_NONE : D3D12_TILE_RANGE_FLAG_NULL);
+        offsets.push_back(mapping.mapped ? mapping.physicalTile : 0);
+        counts.push_back(1);
+    }
+    // Use the same FIFO submission owner as ExecuteCommandLists. Calling the
+    // native queue on the recording thread could overtake a prior frame batch.
+    ComPtr<ID3D12Resource> retainedResource = resource;
+    ComPtr<ID3D12Heap> retainedHeap = heap;
+    struct MappingLifetime
+    {
+        ComPtr<ID3D12Resource> resource;
+        ComPtr<ID3D12Heap> heap;
+        ComPtr<ID3D12Fence> fence;
+        std::shared_ptr<const void> budget;
+    };
+    auto lifetime = std::make_shared<MappingLifetime>();
+    lifetime->resource = retainedResource;
+    lifetime->heap = retainedHeap;
+    lifetime->budget = m_resourceTable.ResolveBufferLifetime(buffer);
+    const auto fenceResult = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&lifetime->fence));
+    if (FAILED(fenceResult))
+    {
+        outError = "Sparse mapping completion fence failed " + HrToString(fenceResult);
+        return false;
+    }
+    RHISubmissionTicket ticket;
+    if (!GetRHISubmissionThread().Enqueue(this, "DX12 sparse mappings",
+        [this, retainedResource, retainedHeap, coordinates = std::move(coordinates), regions = std::move(regions),
+         flags = std::move(flags), offsets = std::move(offsets), counts = std::move(counts), lifetime](std::string& error)
+        {
+            m_queue->UpdateTileMappings(retainedResource.Get(), static_cast<UINT>(coordinates.size()),
+                coordinates.data(), regions.data(), retainedHeap.Get(), static_cast<UINT>(flags.size()),
+                flags.data(), offsets.data(), counts.data(), D3D12_TILE_MAPPING_FLAG_NONE);
+            auto result = m_queue->Signal(lifetime->fence.Get(), 1);
+            if (SUCCEEDED(result)) result = m_device->GetDeviceRemovedReason();
+            if (FAILED(result))
+            {
+                error = "Sparse mapping device failure " + HrToString(result);
+                GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, error);
+                return false;
+            }
+            error.clear();
+            return true;
+        }, ticket, outError, RHICompletionPoint{1}, [lifetime] {
+            const auto value = lifetime->fence->GetCompletedValue();
+            return value == UINT64_MAX ? uint64_t(0) : value;
+        }, lifetime)) return false;
+    return GetRHISubmissionThread().Wait(ticket, outError);
 }
 
 namespace

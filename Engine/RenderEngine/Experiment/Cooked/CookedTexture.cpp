@@ -1,9 +1,6 @@
 #include "CookedTexture.h"
 
-#include <algorithm>
-#include <cstring>
-#include <exception>
-#include <limits>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

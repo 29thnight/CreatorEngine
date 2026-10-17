@@ -1,10 +1,5 @@
 #include <PxPhysicsAPI.h>
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <memory>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 using namespace physx;
 template<class T> struct release_px { void operator()(T* p) const { if(p) p->release(); } };

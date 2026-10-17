@@ -1,8 +1,6 @@
 #include "CommandDescriptorSeeds.h"
 
-#include <algorithm>
-#include <iterator>
-#include <string_view>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // LC3 (PHASE 14.5) — 명령 schema 의 seed 표.
 //

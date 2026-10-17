@@ -5,17 +5,7 @@
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/RHIShaderCompiler.h"
-#include <algorithm>
-#include <chrono>
-#include <thread>
-#include <stdexcept>
-#include <atomic>
-#include <memory>
-#include <utility>
-#include <vector>
-#include <sstream>
-#include <iomanip>
-#include <array>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/DX12/DX12GpuProfiler.h"
 
 namespace Rg8QueueExecutionTests

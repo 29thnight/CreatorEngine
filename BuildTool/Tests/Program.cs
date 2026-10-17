@@ -266,6 +266,23 @@ try
     PackageInputs.RemoveGeometrySources(cookInput);
     Check(!File.Exists(geometrySource) && !File.Exists(geometrySource + ".meta") && !File.Exists(geometryHistory), "Geometry source/history leaked into runtime package");
     Check(File.Exists(geometryArtifact) && File.Exists(Path.Combine(project, "Assets/Shader.hlsl")), "Cooked geometry or original project altered by source cleanup");
+    var authoredTexture = Paths.Child(project, "Assets/Textures/cooked.png");
+    var textureSource = Paths.Child(cookInput, "Assets/Textures/cooked.png");
+    var uncookedTexture = Paths.Child(cookInput, "Assets/Textures/uncooked.png");
+    var textureArtifact = Paths.Child(cookInput, "Assets/Derived/Textures/ab/cooked.cetex");
+    foreach (var path in new[] { authoredTexture, textureSource, uncookedTexture, textureArtifact })
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "preserved payload");
+    }
+    File.WriteAllText(textureSource + ".meta", "identity");
+    PackageInputs.RemoveCookedTextureSources(cookInput, ["Textures/cooked.png"]);
+    Check(!File.Exists(textureSource) && !File.Exists(textureSource + ".meta"), "Cooked texture source leaked into package");
+    Check(File.Exists(uncookedTexture), "Unlisted texture was silently removed");
+    Check(File.ReadAllText(textureArtifact) == "preserved payload", "Cooked texture artifact was changed");
+    Check(File.ReadAllText(authoredTexture) == "preserved payload", "Original project texture was changed");
+    Reject(() => PackageInputs.RemoveCookedTextureSources(cookInput, ["Textures/missing.png"]), "Missing cooked source accepted");
+    Reject(() => PackageInputs.RemoveCookedTextureSources(cookInput, ["../../outside.png"]), "Texture cleanup escaped Assets");
     foreach (var extension in new[] { "wav", "mp3", "flac", "ogg", "soundgraph", "soundpreset" })
     {
         var source = Paths.Child(cookInput, "Assets/Audio/source." + extension);

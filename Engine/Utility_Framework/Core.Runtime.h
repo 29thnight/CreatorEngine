@@ -1,6 +1,5 @@
 #pragma once
-#include <string>
-#include <exception>
+#include "StandardLibrary.h"
 
 namespace std
 {

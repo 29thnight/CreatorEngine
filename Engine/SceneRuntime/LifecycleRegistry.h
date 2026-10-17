@@ -1,8 +1,6 @@
 #pragma once
 #include "Component.h"
-#include <cstdint>
-#include <memory>
-#include <type_traits>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 컴포넌트 타입별 생명주기 구현 여부 표 (PHASE 9-1).
 //

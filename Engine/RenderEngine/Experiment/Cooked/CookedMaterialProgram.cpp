@@ -4,8 +4,8 @@
 #include "../../Assets/AssetIdentityProfile.h"
 #include "../../MaterialGraphShaderMeta.h"
 
-#include <algorithm>
-#include <cstring>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

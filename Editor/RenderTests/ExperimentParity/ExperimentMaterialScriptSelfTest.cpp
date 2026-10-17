@@ -6,14 +6,7 @@
 #include "RHI/RHIShaderSource.h"
 #include "ShaderMeta.h"
 
-#include <algorithm>
-#include <array>
-#include <cstdio>
-#include <span>
-#include <filesystem>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

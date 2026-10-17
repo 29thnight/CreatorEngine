@@ -11,7 +11,7 @@
 #include "Texture.h"
 #include "FontAsset.h"
 #include "imgui_stdlib.h"
-#include <algorithm>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 struct AssetEntryPayload
 {

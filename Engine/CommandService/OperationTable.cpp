@@ -2,7 +2,7 @@
 
 #include "ServiceEndpointFile.h"   // UtcTimestamp
 
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace CommandService
 {

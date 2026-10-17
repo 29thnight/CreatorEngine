@@ -1,14 +1,7 @@
 #pragma once
 
 #include "EnhancedRenderGraph.h"
-#include <algorithm>
-#include <array>
-#include <memory>
-#include <optional>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // Producer-thread history. Capture copies alter the measured graph, so every
 // lookup, eviction and failure watermark stays inside its measurement domain.

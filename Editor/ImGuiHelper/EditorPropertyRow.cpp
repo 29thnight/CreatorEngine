@@ -23,8 +23,8 @@
 #include "ImGui.h"
 #include "EditorTheme.h"
 
-#include <array>
-#include <cstring>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::widgets
 {

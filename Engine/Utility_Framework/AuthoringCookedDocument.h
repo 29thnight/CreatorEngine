@@ -3,14 +3,7 @@
 #include "AuthoringReadNode.h"
 #include "AuthoringWriteNode.h"
 
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <optional>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "StandardLibrary.h"
 
 namespace Authoring
 {

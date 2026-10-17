@@ -3,10 +3,7 @@
 #include "ArtifactByteSource.h"
 #include "../../../Utility_Framework/Paklib.hpp"
 
-#include <memory>
-#include <span>
-#include <string>
-#include <string_view>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

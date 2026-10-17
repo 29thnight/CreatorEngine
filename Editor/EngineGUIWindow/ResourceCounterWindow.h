@@ -1,10 +1,7 @@
 #pragma once
 #include "ImGui.h"
 #include "EngineResourceCensus.h"
-#include <cstdint>
-#include <atomic>
-#include <chrono>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 리소스 카운터 HUD.
 //

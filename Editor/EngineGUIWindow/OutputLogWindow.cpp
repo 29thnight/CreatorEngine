@@ -5,11 +5,7 @@
 #include "EditorPlatform.h"
 #include "LogSystem.h"
 
-#include <algorithm>
-#include <chrono>
-#include <cstdio>
-#include <string>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

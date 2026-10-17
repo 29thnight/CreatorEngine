@@ -1,12 +1,5 @@
 #pragma once
-#include <atomic>
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <span>
-#include <string>
-#include <thread>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 

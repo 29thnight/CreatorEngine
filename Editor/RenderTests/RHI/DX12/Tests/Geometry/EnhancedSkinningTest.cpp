@@ -15,15 +15,100 @@
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
+#include <stdint.h>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
-#include <vector>
+
+namespace material_graph
+{
+#include "MeshletStreamingTopology.inl"
+}
+
+// The oracle reads the actual GPU pose/packet bytes, then independently decodes
+// positions on the CPU. The dedicated cluster probe checks the GPU decoder.
+namespace
+{
+    bool ShadowReadbackPoints(const material_graph::MeshSurfaceBatch& geometry,
+        std::span<const std::byte> pose, std::span<const std::byte> topology,
+        std::vector<material_graph::SurfacePoint>& points, std::string& error)
+    {
+        using namespace assets::quantized;
+        try
+        {
+            points.resize(geometry.Count());
+            if (!geometry.UsesDirectClusters())
+            {
+                Require(pose.size() == points.size() * sizeof(points[0]), "Shadow compatibility point capacity");
+                std::memcpy(points.data(), pose.data(), pose.size());
+                return true;
+            }
+            const auto boneCount = Word(pose, 0);
+            Require(boneCount == geometry.Input()->Bones().size() && 32ull + boneCount * 48ull <= pose.size(),
+                "Shadow GPU pose header");
+            const auto map = Word(topology, 80);
+            std::map<uint32_t, std::vector<std::byte>> decoded;
+            for (uint32_t vertex = 0; vertex < geometry.Count(); ++vertex)
+            {
+                const auto packet = Word(topology, map + vertex * 8ull);
+                const auto local = Word(topology, map + vertex * 8ull + 4);
+                Require(packet && packet < topology.size(), "Shadow resident vertex map");
+                auto found = decoded.find(packet);
+                if (found == decoded.end())
+                {
+                    const auto bytes = Word(topology, packet + 20ull);
+                    Require(bytes <= topology.size() - packet, "Shadow packet range");
+                    std::vector<std::byte> attributes;
+                    Require(assets::cluster::Decode(topology.subspan(packet, bytes), attributes, error), "Shadow packet decode");
+                    found = decoded.emplace(packet, std::move(attributes)).first;
+                }
+                const auto mask = Word(topology, packet + 8ull);
+                const auto stride = assets::StrideOf(mask);
+                const auto& attributes = found->second;
+                Require(uint64_t(local + 1) * stride <= attributes.size(), "Shadow local vertex range");
+                float position[4]{0, 0, 0, 1};
+                std::memcpy(position, attributes.data() + uint64_t(local) * stride, 12);
+                if (boneCount)
+                {
+                    const auto base = uint64_t(local) * stride;
+                    const auto indices = Word(attributes, base + assets::OffsetOf(mask, assets::VertexAttribute::BoneIndices));
+                    float weights[4];
+                    std::memcpy(weights, attributes.data() + base + assets::OffsetOf(mask, assets::VertexAttribute::BoneWeights), 16);
+                    const auto sum = weights[0] + weights[1] + weights[2] + weights[3];
+                    if (sum > 0)
+                    {
+                        float result[3]{};
+                        for (unsigned influence = 0; influence < 4; ++influence)
+                        {
+                            if (weights[influence] <= 0)
+                            {
+                                continue;
+                            }
+                            const auto bone = (indices >> (influence * 8)) & 255u;
+                            Require(bone < boneCount, "Shadow bone range");
+                            PackedBoneMatrix packed;
+                            std::memcpy(&packed, pose.data() + 32 + bone * sizeof(packed), sizeof(packed));
+                            for (unsigned axis = 0; axis < 3; ++axis)
+                            {
+                                for (unsigned row = 0; row < 4; ++row)
+                                {
+                                    result[axis] += (weights[influence] / sum) * position[row] * packed.rows[axis][row];
+                                }
+                            }
+                        }
+                        std::memcpy(position, result, 12);
+                    }
+                }
+                std::memcpy(&points[vertex].position, position, 12);
+            }
+            return true;
+        }
+        catch (const std::exception& exception)
+        {
+            error = exception.what();
+            return false;
+        }
+    }
+}
 
 // GBuffer 스키닝 검증 (PHASE 3-6).
 //
@@ -642,18 +727,47 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                 const RGHandle shadowMap = casters.Declare(graph, shadow, frameContext);
                 const auto outputs = casters.ShadowMeshletOutputs();
                 struct Readbacks {
+                    struct Row {
+                        std::array<RHIReadback, 4> buffers;
+                        std::vector<std::pair<uint32_t, RHIReadback>> packets;
+                        bool sparse{};
+                        RHIReadback& operator[](size_t index) { return buffers[index]; }
+                        const RHIReadback& operator[](size_t index) const { return buffers[index]; }
+                    };
                     IRenderDeviceServices& device;
-                    std::vector<std::array<RHIReadback, 4>> rows;
-                    ~Readbacks() { for (auto& row : rows) for (auto& item : row) device.ReleaseReadback(item); }
+                    std::vector<Row> rows;
+                    ~Readbacks() { for (auto& row : rows) {
+                        for (auto& item : row.buffers) device.ReleaseReadback(item);
+                        for (auto& packet : row.packets) device.ReleaseReadback(packet.second);
+                    } }
                 } lists{resources};
                 if (outputs.empty()) { outLog += "Missing shadow compute outputs.\n"; return false; }
                 for (const auto& output : outputs) {
                     const auto& geometry = output.frame->MeshletGeometry(output.bin);
                     auto& row = lists.rows.emplace_back();
+                    auto metadataBytes = geometry->Meshlets().size;
+                    if (geometry->UsesDirectClusters() && geometry->ClusterResidency()->residencyAlignment == RHISparseTileBytes)
+                    {
+                        row.sparse = true;
+                        const auto& input = *geometry->Input();
+                        RHIModelMeshletUpload metadata;
+                        material_graph::SparseClusterPayload sparse;
+                        if (!PackMeteorMeshletGpuPayload(input.Meshlets(), input.Count(), input.Geometry().vertexStride,
+                            input.Geometry().vertexAttributeMask, input.Geometry().sourceLodIndex, input.SourcePrimitiveCount(),
+                            input.SourceVertexCount(), input.SourceVertexIds(), metadata, error, &input.Hierarchy())) return false;
+                        material_graph::AppendClusterTopology(metadata, input, *geometry->ClusterResidency(), &sparse);
+                        metadataBytes = metadata.bytes.size();
+                        for (const auto& packet : sparse.packets)
+                        {
+                            auto& read = row.packets.emplace_back();
+                            read.first = packet.offset;
+                            if (!resources.CreateBufferReadback(packet.bytes->size(), read.second, error)) return false;
+                        }
+                    }
                     if (!resources.CreateBufferReadback(20, row[0], error) ||
                         !resources.CreateBufferReadback((geometry->MeshletCount() + 1) * 4, row[1], error) ||
-                        !resources.CreateBufferReadback(geometry->Count() * sizeof(material_graph::SurfacePoint), row[2], error) ||
-                        !resources.CreateBufferReadback(geometry->Meshlets().size, row[3], error)) return false;
+                        !resources.CreateBufferReadback(geometry->BufferBytes(), row[2], error) ||
+                        !resources.CreateBufferReadback(metadataBytes, row[3], error)) return false;
                     std::vector<EnhancedRenderGraph::RGPassUsage> uses;
                     output.frame->AddReadUsages(graph, uses);
                     for (auto& use : uses) use.state = RHIResourceState::CopySource;
@@ -669,6 +783,8 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                         execution.encoder->CopyBufferToReadback(row[2], output.frame->MeshletGeometry(output.bin)->Buffer());
                         const auto data = output.frame->MeshletGeometry(output.bin)->Meshlets();
                         execution.encoder->CopyBufferToReadback(row[3], data.buffer, data.offset);
+                        for (const auto& packet : row.packets)
+                            execution.encoder->CopyBufferToReadback(packet.second, data.buffer, data.offset + packet.first);
                     }, true);
                 }
                 // 리드백이 소비자다 — 없으면 그래프가 그림자 패스를 걷어낸다.
@@ -703,16 +819,35 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     std::array<RHIReadbackImage, 4> images;
                     for (unsigned i = 0; i < 4; ++i)
                         if (!resources.MapReadback(lists.rows[outputIndex][i], images[i], error)) return false;
+                    if (lists.rows[outputIndex].sparse)
+                    {
+                        // Reconstruct only ranges actually copied from mapped GPU
+                        // tiles. Never copy unmapped virtual gaps from the device.
+                        images[3].data.resize(geometry->Meshlets().size);
+                        for (const auto& packet : lists.rows[outputIndex].packets)
+                        {
+                            RHIReadbackImage bytes;
+                            if (!resources.MapReadback(packet.second, bytes, error) ||
+                                packet.first > images[3].data.size() || bytes.data.size() > images[3].data.size() - packet.first) return false;
+                            std::memcpy(images[3].data.data() + packet.first, bytes.data.data(), bytes.data.size());
+                        }
+                    }
                     const auto args = images[0].Elements<RHIDrawIndexedIndirectArguments>();
                     const auto ids = images[1].Elements<std::uint32_t>();
-                    const auto points = images[2].Elements<material_graph::SurfacePoint>();
+                    std::vector<material_graph::SurfacePoint> points;
+                    if (!ShadowReadbackPoints(*geometry, std::as_bytes(std::span(images[2].data)),
+                        std::as_bytes(std::span(images[3].data)), points, error))
+                    {
+                        outLog += "Shadow point decode failed: " + error + "\n";
+                        return false;
+                    }
                     const auto count = geometry->MeshletCount();
                     if (images[1].ElementCount<std::uint32_t>() != count + 1) return false;
                     const auto survivorCount = ids[0];
                     if (images[0].ElementCount<RHIDrawIndexedIndirectArguments>() != 1 || survivorCount > count ||
                         args[0].indexCount != (std::min)(survivorCount, 65535u) ||
                         args[0].instanceCount != (std::max)(1u, (survivorCount + 65534u) / 65535u) || args[0].firstIndex != 1 ||
-                        images[2].ElementCount<material_graph::SurfacePoint>() != geometry->Count()) { outLog += "Invalid shadow list capacity/arguments.\n"; return false; }
+                        images[2].data.size() != geometry->BufferBytes()) { outLog += "Invalid shadow list capacity/arguments.\n"; return false; }
                     const auto& topology = geometry->Input()->Meshlets();
                     if (topology.descriptors.size() != count) return false;
                     const auto& sealed = *geometry->Input();
@@ -720,12 +855,24 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     if (!PackMeteorMeshletGpuPayload(topology, sealed.Count(), sealed.Geometry().vertexStride,
                         sealed.Geometry().vertexAttributeMask, sealed.Geometry().sourceLodIndex,
                         sealed.SourcePrimitiveCount(), sealed.SourceVertexCount(), sealed.SourceVertexIds(), packed, error, &sealed.Hierarchy())) return false;
+                    if (geometry->UsesDirectClusters())
+                    {
+                        material_graph::SparseClusterPayload sparse;
+                        const bool tiled = geometry->ClusterResidency()->residencyAlignment == RHISparseTileBytes;
+                        material_graph::AppendClusterTopology(packed, sealed, *geometry->ClusterResidency(), tiled ? &sparse : nullptr);
+                        if (tiled)
+                        {
+                            packed.bytes.resize(sparse.virtualBytes);
+                            for (const auto& packet : sparse.packets)
+                                std::memcpy(packed.bytes.data() + packet.offset, packet.bytes->data(), packet.bytes->size());
+                        }
+                    }
                     if (images[3].data.size() != packed.bytes.size() ||
                         std::memcmp(images[3].data.data(), packed.bytes.data(), packed.bytes.size()) != 0)
                     { outLog += "METEOR GPU cooked meshlet payload identity mismatch.\n"; return false; }
                     RHIMeshletBufferHeader actualHeader;
                     std::memcpy(&actualHeader, images[3].data.data(), sizeof(actualHeader));
-                    if (actualHeader.schemaVersion != 4 || actualHeader.profileVersion != experiment::kMeshletProfileVersion)
+                    if (actualHeader.schemaVersion != 5 || actualHeader.profileVersion != experiment::kMeshletProfileVersion)
                     { outLog += "METEOR GPU meshlet payload schema/profile mismatch.\n"; return false; }
                     outLog += "MESHLET_GPU_PAYLOAD case=" + caseName + " label=" + label + " cascade=" +
                         std::to_string(output.cascade) + " bytes=" + std::to_string(packed.bytes.size()) +
@@ -735,7 +882,9 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                         if (ids[i + 1] >= count || survivors[ids[i + 1]]) { outLog += "Invalid/duplicate survivor ID.\n"; return false; }
                         survivors[ids[i + 1]] = true;
                     }
-                    const auto& matrix = shadow.GetShadowData().lightViewProjection[output.cascade];
+                    // The readback contains posed object-space points. Match the
+                    // renderer's object -> world -> light-clip transform.
+                    const auto matrix = geometry->ObjectToWorld() * shadow.GetShadowData().lightViewProjection[output.cascade];
                     unsigned required{}, missing{}, extra{};
                     for (unsigned meshlet = 0; meshlet < count; ++meshlet) {
                         const auto& descriptor = topology.descriptors[meshlet];
@@ -767,12 +916,14 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     }
                 }
                 const auto routes = casters.RecordedShadowMeshletDrawCounts();
+                const auto shadowCache = casters.ShadowCacheStats();
                 for (unsigned cascade = 0; cascade < 3; ++cascade)
                 {
                     matrices[cascade] = shadow.GetShadowData().lightViewProjection[cascade];
                     outLog += std::string("SHADOW_ROUTE ") + (suite ? "case=" + caseName + " " : "") + "label=" + label + " cascade=" +
-                        std::to_string(cascade) + " meshDispatches=" + std::to_string(routes[cascade]) + "\n";
-                    if (routes[cascade] == 0)
+                        std::to_string(cascade) + " meshDispatches=" + std::to_string(routes[cascade]) +
+                        " staticCacheHit=" + std::to_string(shadowCache.hit) + "\n";
+                    if (routes[cascade] == 0 && !(shadowCache.hit && shadowCache.staticCasters != 0 && shadowCache.dynamicCasters == 0))
                     {
                         outLog += "Requested shadow route was not recorded.\n";
                         return false;

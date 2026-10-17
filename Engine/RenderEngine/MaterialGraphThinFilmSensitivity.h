@@ -3,7 +3,7 @@
 // Canonical values and attribution: PrincipledThinFilmSensitivity.slang.
 // XYZ CMF data: Copyright 2011-2025 Blender Foundation, Apache-2.0.
 // See Tools/blender/fixtures/thin-film-sensitivity-5.1.1/NOTICE.md.
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 namespace material_graph {
 inline constexpr std::array<float, 4096> kFilmSensitivityConstants{
     1.000000000e+00f, 1.000000000e+00f, 1.000000000e+00f, 0.0f,

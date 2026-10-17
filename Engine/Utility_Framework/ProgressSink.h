@@ -1,6 +1,5 @@
 #pragma once
-#include <functional>
-#include <string>
+#include "StandardLibrary.h"
 
 /// 진행률 게시 지점 (L1-3c).
 ///

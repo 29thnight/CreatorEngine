@@ -1,12 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <limits>
-#include <map>
-#include <mutex>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 /// Persistent GPU buffer heap의 백엔드 중립 free-list 정책.
 ///

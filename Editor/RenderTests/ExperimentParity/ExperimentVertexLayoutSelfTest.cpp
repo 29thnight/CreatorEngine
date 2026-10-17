@@ -8,12 +8,8 @@
 #include "RHI/DX12/Tests/Geometry/GraphSceneFixture.h"
 #include "Mesh.h" // legacy ::Vertex — 전환표 단정용
 
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <cstdio>
-#include <string>
-#include <vector>
+#include <stddef.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -246,7 +242,7 @@ namespace RenderTest
                     geometry.vertexAttributeMask, 3, geometry.indexCount / 3, static_cast<uint32_t>(vertices.size()), {}, upload, error), "LX canonical GPU packing");
                 RHIMeshletBufferHeader header{};
                 if (upload.bytes.size() >= sizeof(header)) std::memcpy(&header, upload.bytes.data(), sizeof(header));
-                check.Check(header.schemaVersion == 4 && header.hierarchyOffset == 0 && header.sourceLodIndex == 3 && header.meshletCount == cooked.descriptors.size()
+                check.Check(header.schemaVersion == 5 && header.hierarchyOffset == 0 && header.sourceLodIndex == 3 && header.meshletCount == cooked.descriptors.size()
                     && header.descriptorStride == sizeof(experiment::MeshletDescriptor) && header.sourcePrimitiveCount == indices.size() / 3,
                     "METEOR GPU header has explicit cluster/LOD/primitive contract");
                 experiment::cooked::ModelGeometryArtifact artifact;
@@ -256,11 +252,11 @@ namespace RenderTest
                 const bool encodedOk = experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error);
                 check.Check(encodedOk, "METEOR cooked geometry encoding: " + error);
                 experiment::cooked::ModelGeometryArtifact decoded;
-                const bool decodedOk = experiment::cooked::ReadModelGeometryArtifact(encoded, decoded, error);
+                const bool decodedOk = experiment::cooked::ExpandModelGeometryPages(encoded, decoded, error);
                 check.Check(decodedOk, "METEOR cooked geometry round trip: " + error);
                 auto old = encoded;
                 if (old.size() > 7) { const uint32_t version = 2; std::memcpy(old.data() + 4, &version, sizeof(version)); }
-                check.Check(!experiment::cooked::ReadModelGeometryArtifact(old, decoded, error), "METEOR rejects prior cooked geometry version");
+                check.Check(!experiment::cooked::ExpandModelGeometryPages(old, decoded, error), "METEOR rejects prior cooked geometry version");
                 artifact.mesh.meshlets = {};
                 check.Check(!experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error), "METEOR cooker rejects indexed-only geometry");
                 material_graph::SceneGeometryIdentity identity{0x1122334455667788ull, 11, 12, 13, 14, 3, 330};

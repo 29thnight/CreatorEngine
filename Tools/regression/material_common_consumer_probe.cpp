@@ -8,14 +8,7 @@
 #include "PathFinder.h"
 #include "RHI/RHIShaderCompiler.h"
 
-#include <algorithm>
-#include <cmath>
-#include <fstream>
-#include <iostream>
-#include <memory>
-#include <limits>
-#include <sstream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 void RunMaterialCodeRuntimeTests(const std::filesystem::path& root);
 void RunCookedGraphicsIdentityTests(const material_graph::VerifiedProduct& product);

@@ -1,9 +1,7 @@
 #pragma once
 #include "VulkanLoader.h"
 
-#include <vector>
-#include <cstdint>
-#include <mutex>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // 프레임 렌더 타깃 표 (5c-4c).
 //

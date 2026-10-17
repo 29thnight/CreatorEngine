@@ -4,11 +4,7 @@
 #include "../../Utility_Framework/AuthoringParsedDocument.h"
 #include "../../Utility_Framework/AuthoringWriteNode.h"
 
-#include <algorithm>
-#include <cmath>
-#include <stdexcept>
-#include <type_traits>
-#include <unordered_set>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

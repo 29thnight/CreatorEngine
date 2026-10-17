@@ -6,15 +6,7 @@
 
 #include "ufbx.h"
 
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {

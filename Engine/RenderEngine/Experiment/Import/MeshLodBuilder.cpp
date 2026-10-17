@@ -4,18 +4,8 @@
 #include "Sha256.h"
 #include "meshoptimizer.h"
 
-#include <algorithm>
-#include <array>
-#include <bit>
-#include <cmath>
-#include <cstring>
-#include <limits>
-#include <functional>
-#include <map>
-#include <numeric>
-#include <new>
-#include <stdexcept>
-#include <utility>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {

@@ -20,21 +20,12 @@
 #include "Assets/ModelAnimationDescriptor.h"
 #include "Assets/ModelAnimationPayload.h"
 #include "Assets/ModelAnimationSampler.h"  // PHASE 3.75 MBC8
-#include <limits>
-#include <stdexcept>
-#include <span>
-#include <cmath>
-#include <atomic> // D34b: 루트 본 부재 1회 경고
-#include <exception>
-#include <utility>
+#include "../Utility_Framework/StandardLibrary.h"
 #include "ModelConsumptionDiagnostics.h" // MBC10: 틱 경로 관측(읽기 전용 계수)
 #include <mathematics/transform.hpp>
 #include <mathematics/bounds.hpp>
 #include <mathematics/scalar.hpp>
 #include "Mathematics.Intersect.h"
-#include <algorithm>
-#include <optional>
-#include <unordered_map>
 
 namespace
 {

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Repository,
     [Parameter(Mandatory)][string]$BinaryRoot,
@@ -8,7 +8,8 @@ param(
     [Parameter(Mandatory)][string]$GcceRuntimePath,
     [Parameter(Mandatory)][string]$VcpkgDirectory,
     [Parameter(Mandatory)][string]$VcToolsDirectory,
-    [Parameter(Mandatory)][string]$VcRedistDirectory
+    [Parameter(Mandatory)][string]$VcRedistDirectory,
+    [string]$WindowsAppSdkBootstrapDll = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -26,6 +27,12 @@ for ($attempt = 0; $attempt -lt 600 -and $null -eq $lock; $attempt++) {
 if ($null -eq $lock) { throw 'Timed out waiting for runtime deployment lock.' }
 try {
     $lookup = @{}
+    if ($WindowsAppSdkBootstrapDll) {
+        if (-not (Test-Path -LiteralPath $WindowsAppSdkBootstrapDll -PathType Leaf)) {
+            throw "Windows App SDK bootstrap DLL missing: $WindowsAppSdkBootstrapDll"
+        }
+        $lookup['Microsoft.WindowsAppRuntime.Bootstrap.dll'] = [IO.Path]::GetFullPath($WindowsAppSdkBootstrapDll)
+    }
     $vcpkgBin = Join-Path $VcpkgDirectory $(if ($Config -eq 'Debug') { 'debug\bin' } else { 'bin' })
     if (-not (Test-Path -LiteralPath $vcpkgBin)) { throw "vcpkg runtime directory missing: $vcpkgBin" }
     $roots = @($vcpkgBin, (Join-Path $Repository 'ThirdParty\Slang\bin'),
@@ -64,6 +71,7 @@ try {
     $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $paths = [Collections.Generic.List[string]]::new()
     $systemImports = [Collections.Generic.List[string]]::new()
+    $frameworkImports = [Collections.Generic.List[object]]::new()
     [void][IO.Directory]::CreateDirectory((Join-Path $runtime 'Common'))
     [void][IO.Directory]::CreateDirectory((Join-Path $runtime 'Editor'))
     while ($queue.Count) {
@@ -89,7 +97,18 @@ try {
             Copy-Item -LiteralPath $source -Destination $destination -Force
         }
         $paths.Add($relative)
-        foreach ($dependency in @(Get-EnginePeImports $source)) { $queue.Enqueue($dependency) }
+        foreach ($dependency in @(Get-EnginePeImports $source -Detailed)) {
+            # The SDK bootstrap resolves this delay import only after selecting its
+            # installed framework package. It must not be copied app-locally.
+            # Keep ordinary imports and every other delay import fully validated.
+            if ($name -ieq 'Microsoft.WindowsAppRuntime.Bootstrap.dll' -and
+                $dependency.delayLoaded -and $dependency.name -ieq 'Microsoft.WindowsAppRuntime.dll') {
+                $frameworkImports.Add([ordered]@{ importer = $name; name = $dependency.name;
+                    resolution = 'Windows App SDK bootstrap framework package' })
+                continue
+            }
+            $queue.Enqueue($dependency.name)
+        }
     }
     [IO.File]::WriteAllText((Join-Path $runtime 'layout.version'), "1`n")
     $hostDirectory = Split-Path -Parent $HostPath
@@ -124,7 +143,8 @@ try {
         $entries += $symbolEntries
     }
     $manifest = [ordered]@{ schemaVersion = 1; host = $HostName; configuration = $Config;
-        abi = $info; entries = $entries; digest = Get-EngineDigest $entries; systemImports = @($systemImports | Sort-Object) }
+        abi = $info; entries = $entries; digest = Get-EngineDigest $entries; systemImports = @($systemImports | Sort-Object);
+        frameworkImports = @($frameworkImports | Sort-Object name) }
     Write-EngineJson (Join-Path $runtime "Manifests\$HostName.json") $manifest
     Write-Host "Shared runtime: $HostName, $($entries.Count) files, $($manifest.digest)"
 }

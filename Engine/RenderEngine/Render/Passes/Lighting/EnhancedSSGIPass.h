@@ -1,8 +1,7 @@
 #pragma once
 #include "../../Core/PassResourceRetirement.h"
 #include "../../../RHI/RHIFormat.h"
-#include <array>
-#include <cstdint>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"

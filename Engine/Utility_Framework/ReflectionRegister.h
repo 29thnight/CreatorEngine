@@ -10,7 +10,4 @@
 #include "MetaPolymorphic.h"
 #include "ClassProperty.h"
 #include "ReflgenRuntime.h"
-#include <any>        // 옛 include 사슬 — 소비자가 전이로 받던 표준 헤더
-#include <functional>
-#include <string_view>
-#include <typeindex>
+#include "StandardLibrary.h"

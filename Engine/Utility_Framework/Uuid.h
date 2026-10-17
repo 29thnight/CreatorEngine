@@ -34,12 +34,7 @@
 //   TypeTrait.h가 Core.Minimal.h를 통해 거의 전 저장소에 퍼져 있다. .cpp를
 //   더하면 링크 그래프와 vcxproj를 건드려야 하는데, 얻는 것보다 위험이 크다.
 
-#include <array>
-#include <cstdint>
-#include <cstring>
-#include <stdexcept>
-#include <string>
-#include <string_view>
+#include "StandardLibrary.h"
 
 namespace Uuid
 {

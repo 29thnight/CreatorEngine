@@ -4,13 +4,8 @@
 #include <spdlog/details/log_msg.h>
 #include <spdlog/common.h>
 
-#include <atomic>
-#include <chrono>
-#include <cstdio>
-#include <ctime>
-#include <mutex>
-#include <string>
-#include <string_view>
+#include <stdio.h>
+#include "StandardLibrary.h"
 
 // 로그를 HTML 문서로 기록하는 spdlog 싱크.
 //

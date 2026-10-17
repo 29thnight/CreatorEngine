@@ -1,7 +1,8 @@
 #include "EditorSettingsStore.h"
 
 #include "LogSystem.h"
-#include <source_location>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "PathFinder.h"
 #include "ReflectionTypedYml.h"
 #include "RuntimeSettings.h"
@@ -11,13 +12,6 @@
 
 #include <Windows.h>
 
-#include <atomic>
-#include <cmath>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <utility>
 
 namespace
 {

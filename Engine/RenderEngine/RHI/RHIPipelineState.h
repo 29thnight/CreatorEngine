@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "RHIFormat.h"
 #include "RHIHandle.h"

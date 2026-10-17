@@ -6,6 +6,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ContractProbeConfiguration.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath((Join-Path $repo $OutputDirectory))
 $core = Join-Path $repo 'Engine/EngineDiagnostics'
@@ -33,8 +34,10 @@ $sources = @('ProfileMarker.cpp', 'ProfileThreadStream.cpp', 'ProfileCapture.cpp
 $sources += @($baselineSource, (Join-Path $PSScriptRoot 'profile_aggregate_benchmark.cpp'))
 $quoted = ($sources | ForEach-Object { '"' + $_ + '"' }) -join ' '
 $exe = Join-Path $out 'benchmark.exe'
+$contractProbe = New-ContractProbeConfiguration -Configuration 'Release' -OutputDirectory $out
 $command = 'call "' + $vcvars + '" >nul && cl /nologo /Bv /EHsc /std:c++latest /utf-8 /W4 /WX /MD /O2 /DNDEBUG /I"' +
     $core + '" /I"' + $out + '" /Fo"' + $out + '/" /Fe"' + $exe + '" ' + $quoted
+$command += $contractProbe.CommandLine
 & $env:ComSpec /d /s /c $command *> (Join-Path $out 'build.log')
 if ($LASTEXITCODE -ne 0) {
     Get-Content (Join-Path $out 'build.log') -Tail 30

@@ -7,9 +7,7 @@
 #include "../../Engine/SceneRuntime/ScriptObjectRegistry.h"
 #include "../../Engine/RenderEngine/DataSystem.h"
 
-#include <array>
-#include <stdexcept>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace script_asset_probe
 {

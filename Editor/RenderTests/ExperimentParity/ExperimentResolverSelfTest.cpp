@@ -2,11 +2,7 @@
 
 #include "Experiment/Cooked/ResolvingModelDecoder.h"
 
-#include <algorithm>
-#include <cstdio>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

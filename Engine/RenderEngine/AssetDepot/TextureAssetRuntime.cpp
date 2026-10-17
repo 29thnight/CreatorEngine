@@ -3,12 +3,8 @@
 #include "../Texture.h"
 #include "../Experiment/Cooked/CookedTexture.h"
 
-#include <algorithm>
-#include <cassert>
-#include <stdexcept>
-#include <exception>
-#include <limits>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Contract.h"
 
 namespace
 {
@@ -702,7 +698,11 @@ void DataSystem::TrimTextureAssetsLocked(AssetDepot::TextureAssetRetiredEntries&
 
 void DataSystem::StageTextureAssetRetirementLocked(AssetDepot::TextureAssetRetiredEntries& retired)
 {
-    assert(retired.entries.empty() && retired.consumerPins.empty() && retired.images.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.entries.empty() && retired.consumerPins.empty() && retired.images.empty()));
+        },
+        "retired.entries.empty() && retired.consumerPins.empty() && retired.images.empty()");
     retired.descriptorPins.reserve(m_textureAssets.entries.size());
     retired.imagePins.reserve(m_textureAssets.images.size());
     if (m_assetPreparationStopping)
@@ -765,7 +765,11 @@ void DataSystem::StageTextureAssetRetirementLocked(AssetDepot::TextureAssetRetir
 void DataSystem::InvalidateTextureAssetsLocked(AssetDepot::TextureAssetRetiredEntries& retired) noexcept
 {
     using namespace AssetDepot;
-    assert(retired.entries.empty());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((retired.entries.empty()));
+        },
+        "retired.entries.empty()");
     static_assert(noexcept(retired.entries.swap(m_textureAssets.entries)));
     retired.entries.swap(m_textureAssets.entries);
     m_textureAssets.retainedChargeBytes = 0u;

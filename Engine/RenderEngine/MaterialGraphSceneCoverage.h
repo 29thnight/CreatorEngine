@@ -1,6 +1,6 @@
 #pragma once
 #include "Render/Graph/EnhancedRenderPass.h"
-#include <string>
+#include "../Utility_Framework/StandardLibrary.h"
 namespace material_graph
 {
     enum class SceneCoverage : std::uint8_t

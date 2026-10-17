@@ -4,7 +4,7 @@
 
 #include "EditorMenuAudit.h"
 
-#include <algorithm>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

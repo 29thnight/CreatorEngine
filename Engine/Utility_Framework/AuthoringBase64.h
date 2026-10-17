@@ -1,10 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "StandardLibrary.h"
 
 // D3-b-4 — 저작 payload의 base64는 YAML parser의 책임이 아니다.
 //

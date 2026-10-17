@@ -1,8 +1,6 @@
 #include "RHIShaderPermutation.h"
 
-#include <algorithm>
-#include <iomanip>
-#include <sstream>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

@@ -7,7 +7,7 @@
 #include "CanvasScaleMode.h"
 #include "CanvasRenderMode.h"
 #include "EntityHandle.h"
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 

@@ -19,20 +19,8 @@
 #include "ProfilerViewerClient.h"
 #include "ProfilerLiveDiagnostics.h"
 
-#include <cinttypes>
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <functional>
-#include <exception>
-#include <utility>
-#include <atomic>
-#include <cstdio>
-#include <memory>
-#include <string>
-#include <stdexcept>
-#include <string_view>
-#include <vector>
+#include <inttypes.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ImGui.h"
 #include <imgui_internal.h>

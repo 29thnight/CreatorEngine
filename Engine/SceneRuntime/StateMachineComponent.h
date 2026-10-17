@@ -2,8 +2,7 @@
 #include "Component.h"
 #include "IAIComponent.h"
 #include "BlackBoard.h"
-#include <vector>
-#include <memory>
+#include "../Utility_Framework/StandardLibrary.h"
 //
 namespace FSM
 {

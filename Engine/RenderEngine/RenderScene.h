@@ -3,9 +3,9 @@
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
 #include "ProxyCommandQueue.h"
-#include "concurrent_unordered_map.h"
 
-using namespace concurrency;
+
+
 
 class Entity;
 class Scene;

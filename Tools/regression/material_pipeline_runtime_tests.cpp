@@ -5,10 +5,7 @@
 #include "MaterialGraphSceneCompiler.h"
 #include "../../Lattice/Material/LXMaterialGraph.h"
 
-#include <algorithm>
-#include <cstring>
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

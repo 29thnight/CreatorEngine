@@ -1,4 +1,5 @@
 param(
+    [ValidateSet('Debug', 'Release')][string[]]$Configurations = @('Debug', 'Release'),
     [string]$VisualStudioInstallation = '',
     [switch]$SkipDependencyRestore,
     [switch]$SkipProjectReferences
@@ -36,7 +37,7 @@ $dependencyOptions = @()
 if ($SkipDependencyRestore) { $dependencyOptions += '/p:VcpkgManifestInstall=false' }
 if ($SkipProjectReferences) { $dependencyOptions += '/p:BuildProjectReferences=false' }
 
-foreach ($configuration in @('Debug', 'Release')) {
+foreach ($configuration in $Configurations) {
     foreach ($project in @('Tools/regression/MaterialRasterSurfaceProbe.vcxproj', 'Tools/AssetCooker/AssetCooker.vcxproj')) {
         $build = @(& $msbuild (Join-Path $repo $project) /m:2 /nologo "/p:Configuration=$configuration" `
             /p:Platform=x64 /p:UseDynamicDebugging=false /p:LinkIncremental=false @dependencyOptions /v:minimal 2>&1)
@@ -157,5 +158,5 @@ textures: []
 foreach ($entry in $snapshot) {
     if ((Get-FileHash $entry.path -Algorithm SHA256).Hash -ne $entry.hash) { throw "Scene cook source changed: $($entry.path)" }
 }
-"LX_MATERIAL_SCENE_COOK_GATE_OK sources=$($snapshot.Count) drift=0 configurations=Debug,Release"
+"LX_MATERIAL_SCENE_COOK_GATE_OK sources=$($snapshot.Count) drift=0 configurations=$($Configurations -join ',')"
 exit 0

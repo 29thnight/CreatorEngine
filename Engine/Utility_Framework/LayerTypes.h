@@ -1,9 +1,6 @@
 #pragma once
 
-#include <compare>
-#include <cstdint>
-#include <expected>
-#include <string_view>
+#include "StandardLibrary.h"
 
 namespace ce::layers
 {

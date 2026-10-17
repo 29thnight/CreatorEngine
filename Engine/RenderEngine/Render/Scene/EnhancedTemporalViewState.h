@@ -3,10 +3,7 @@
 #include "../Temporal/TemporalUpscalerHost.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Temporal/SpatialPostEffectsHost.h"
-#include <algorithm>
-#include <bit>
-#include <map>
-#include <tuple>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // Submission-committed, per logical view history. Preparing/aborting a frame does
 // not advance either the jitter sequence or previous object/skin/camera inputs.

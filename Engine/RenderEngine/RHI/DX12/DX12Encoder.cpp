@@ -1,9 +1,9 @@
 #include "DX12Encoder.h"
 #include "DX12DeviceResources.h"
 
-#include <vector>
-#include <cmath>
-#include <stdexcept>
+#include <stddef.h>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(D3D12_DRAW_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==

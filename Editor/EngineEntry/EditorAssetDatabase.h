@@ -3,12 +3,7 @@
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
 
-#include <memory>
-#include <cstdint>
-#include <chrono>
-#include <optional>
-#include <span>
-#include <string_view>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 class Material;
 namespace LX { class LXMaterialAsset; }

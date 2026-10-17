@@ -8,6 +8,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ContractProbeConfiguration.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $core = Join-Path $repo 'Engine/EngineDiagnostics'
 $vcvars = 'C:/Program Files/Microsoft Visual Studio/18/Community/VC/Auxiliary/Build/vcvars64.bat'
@@ -34,9 +35,11 @@ foreach ($config in $configs) {
     $exe = Join-Path $out 'profile_collector_stress.exe'
     $flags = if ($config -eq 'Debug') { '/MDd /Od /RTC1 /D_DEBUG' } else { '/MD /O2 /DNDEBUG' }
     $quoted = ($sources | ForEach-Object { '"' + $_ + '"' }) -join ' '
+    $contractProbe = New-ContractProbeConfiguration -Configuration $Config -OutputDirectory $out
     $command = 'call "' + $vcvars + '" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /W4 /WX /DCE_SHIPPING=0 ' +
         $flags + ' /I"' + $core + '" /Fo"' + $out + '/" /Fd"' + (Join-Path $out 'probe.pdb') +
         '" /Fe"' + $exe + '" ' + $quoted
+    $command += $contractProbe.CommandLine
     $buildLog = & $env:ComSpec /d /s /c $command 2>&1
     $buildLog | Set-Content -LiteralPath (Join-Path $out 'build.log') -Encoding UTF8
     if ($LASTEXITCODE -ne 0) { throw "$config collector stress build failed: $out/build.log" }

@@ -2,9 +2,7 @@
 
 #include "Experiment/Import/VertexWelding.h"
 
-#include <cstdio>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

@@ -17,10 +17,7 @@
 #include <mathematics/quaternion.hpp>
 #include <mathematics/vector3.hpp>
 
-#include <cstddef>
-#include <cstdint>
-#include <span>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace assets::animation
 {

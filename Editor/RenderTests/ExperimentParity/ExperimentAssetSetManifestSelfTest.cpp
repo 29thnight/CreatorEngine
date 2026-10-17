@@ -1,11 +1,6 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 
-#include <algorithm>
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

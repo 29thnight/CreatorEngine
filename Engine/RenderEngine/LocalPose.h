@@ -2,13 +2,8 @@
 
 #include <mathematics/transform.hpp>
 
-#include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
-#include <span>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Contract.h"
 
 namespace Animation
 {
@@ -120,13 +115,21 @@ namespace Animation
 
         [[nodiscard]] LocalTransform GetTransform(std::size_t bone) const noexcept
         {
-            assert(bone < GetCount());
+            ::ce::contracts::assert_that(
+                [&]() -> bool {
+                    return static_cast<bool>((bone < GetCount()));
+                },
+                "bone < GetCount()");
             return { m_translations[bone], m_rotations[bone], m_scales[bone] };
         }
 
         void SetTransform(std::size_t bone, const LocalTransform& local) noexcept
         {
-            assert(bone < GetCount());
+            ::ce::contracts::assert_that(
+                [&]() -> bool {
+                    return static_cast<bool>((bone < GetCount()));
+                },
+                "bone < GetCount()");
             m_translations[bone] = local.m_translation;
             m_rotations[bone] = local.m_rotation;
             m_scales[bone] = local.m_scale;

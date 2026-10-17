@@ -8,15 +8,7 @@
 #include "Sha256.h"
 #include "Uuid.h"
 
-#include <cctype>
-#include <cstddef>
-#include <cstdint>
-#include <cstdio>
-#include <set>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

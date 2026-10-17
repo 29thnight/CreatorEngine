@@ -1,6 +1,6 @@
 #include "RHIPersistentHeapPolicy.h"
 
-#include <algorithm>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 RHIPersistentHeapPolicy::RHIPersistentHeapPolicy(
     const RHIPersistentHeapConfig& config)

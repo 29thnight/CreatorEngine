@@ -3,12 +3,7 @@
 #include "EngineResourceCensus.h"
 #include "LogSystem.h"
 
-#include <algorithm>
-#include <format>
-#include <map>
-#include <string>
-#include <utility>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <dxgi1_3.h>     // DXGIGetDebugInterface1 — dxgidebug.h 는 타입만 준다
 #include <dxgidebug.h>

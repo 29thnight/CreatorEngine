@@ -4,8 +4,7 @@
 #include "AnimationController.h"
 #include "ConditionParameter.h"
 #include "Entity.h"
-#include <algorithm>
-#include <stdexcept>
+#include "../Utility_Framework/StandardLibrary.h"
 
 void AnimatorSystem::RequireOwnerThread() const
 {

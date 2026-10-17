@@ -44,3 +44,12 @@ python docs/check_documentation.py
 최종 로컬 정적 검사에서 링크 2,969개와 anchor 69개를 확인했고 오류는 0개였다. `git diff --check`도 통과했다. 이 결과는 아래 실행 검증과 구분한다.
 
 이번 작업에서 엔진 빌드, Windows Editor/Player 실행, GPU 성능·화질 측정, package smoke, Vite build, 웹 브라우저/Pages 배포 검증은 수행하지 않았다. PR의 정적 검사 결과와 기존 역사 자료를 이 실행 검증의 대체 증거로 취급하지 않는다.
+
+
+## 2026-10-17 PR #174 충돌 통합
+
+master `b767a3c67e0f8474792a0a141a4580c5eac15712`를 병합했다. 5개 충돌 문서 중 LiveRenderWiring은 최신 master 내용을 보존하고, 비교·그림자 계획에는 후속 추가 기록을 이식했다. dashboard는 새 문서 인덱스를 유지하며 master 추가 문서로 연결한다. TexturePipelinePlan에는 후속 21~37절을 보존했다. master가 추가한 17개 문서는 원문을 보존하며 coverage의 merge_integration에 출처와 blob을 별도 기록한다.
+
+원래 403파일 감사와 2026-10-15 소스 검토의 기준 커밋은 바꾸지 않았다. 이후 master의 소스 변경은 이 감사의 의미 검토를 받은 것으로 표시하지 않는다. 따라서 정적 검사에서 evidence-hash-drift/API source drift가 나오면 이전 기준과 현재 소스의 차이이며 전체 문서 재감사나 엔진 회귀 실행을 대신하지 않는다. master에서 승계한 Build/Artifacts 상대 링크는 로컬 실행 산출물이 없으면 missing-file로 보고된다. 이번 통합은 이 링크의 원본 로그나 측정 결과를 생성하지 않았다.
+
+병합 결과 검사: 원본 감사 406파일과 master 추가 17파일로 문서는 423개다. 링크 3,011개·anchor 84개를 확인했다. 충돌 marker, 문서/승계 문서 hash 불일치, 문서 밖 master 대비 변경은 없다. 정적 검사 전체는 통과가 아니다. master에서 승계한 로컬 Build/Artifacts 링크 171개가 누락이며, 소스 drift는 고유 425경로(일반 근거 1,295건·API source 22건·API 근거 42건)다. 누락 링크는 모두 master 원문에 있고 drift 소스는 모두 master와 동일함을 별도로 대조했다. Windows UTF-8·POSIX 상대경로·Git 줄바꿈 정규화를 검사기에 반영했다. 최종 index 기준 무결성 검사와 git diff --cached --check는 통과했다. 엔진 빌드·실행 검증은 수행하지 않았다.

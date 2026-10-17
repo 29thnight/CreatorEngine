@@ -4,9 +4,7 @@
 #include "CommandCore/CommandResult.h"
 #include "EntityHandle.h"
 #include "AuthoringWriteNode.h"
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/vector3.hpp>
 #include <mathematics/quaternion.hpp>
 class Scene;

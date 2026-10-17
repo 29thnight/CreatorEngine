@@ -6,7 +6,7 @@
 #include "ShaderMeta.h"
 #include "StandardMaterialProperty.h"
 
-#include <algorithm>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace MaterialScriptBinding
 {

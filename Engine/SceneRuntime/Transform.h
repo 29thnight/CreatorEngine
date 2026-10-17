@@ -7,10 +7,7 @@
 #include <mathematics/transform.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include <optional>
-#include <memory>
-#include <cstdint>
-#include <string_view>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class RenderScene;
 class InspectorWindow;

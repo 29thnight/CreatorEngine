@@ -5,13 +5,7 @@
 #include "../../Engine/Utility_Framework/ContentAbi.h"
 #include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
 
-#include <algorithm>
-#include <chrono>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

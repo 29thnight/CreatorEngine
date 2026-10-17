@@ -17,7 +17,12 @@
     <ResourceCompile Include="$(SolutionDir)Tools\runtime\EngineVersion.rc">
       <PreprocessorDefinitions>CREATOR_ENGINE_RUNTIME_HOST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
-    <ClCompile Include="$(SolutionDir)Tools\runtime\HostInfo.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(SolutionDir)Tools\runtime\HostInfo.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <!-- Read ABI macros before reflgen's forced headers import std. -->
+      <ForcedIncludeFiles>$(VCToolsInstallDir)include\yvals.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
     <ClCompile Include="$(SolutionDir)Tools\runtime\HostGuiEntry.cpp" Condition="'$(_EngineLauncherSubsystem)' == 'Windows'"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="$(SolutionDir)Tools\runtime\HostConsoleEntry.cpp" Condition="'$(_EngineLauncherSubsystem)' == 'Console'"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
   </ItemGroup>
@@ -27,6 +32,6 @@
   <Target Name="DeploySharedEngineRuntime" AfterTargets="Build" Condition="'$(EngineHostedApplication)' == 'true'">
     <MSBuild Projects="$(SolutionDir)Tools\runtime\RuntimeLauncher.vcxproj" Targets="Build"
       Properties="Configuration=$(Configuration);Platform=$(Platform);SolutionDir=$(SolutionDir);LauncherName=$(MSBuildProjectName);LauncherOutputDir=$(OutDir);LauncherSubsystem=$(_EngineLauncherSubsystem);EngineShipping=$(EngineShipping);EngineAsan=false" />
-    <Exec Command="pwsh -NoProfile -File &quot;$(SolutionDir)Tools\runtime\deploy-runtime.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -BinaryRoot &quot;$(EngineBinaryRoot).&quot; -HostPath &quot;$(TargetPath)&quot; -HostName &quot;$(MSBuildProjectName)&quot; -Config &quot;$(Configuration)&quot; -GcceRuntimePath &quot;$(EngineGCCERuntimeDir)gcce.dll&quot; -VcpkgDirectory &quot;$(_ZVcpkgCurrentInstalledDir).&quot; -VcToolsDirectory &quot;$(VCToolsInstallDir).&quot; -VcRedistDirectory &quot;$(VCToolsRedistDir).&quot;" />
+    <Exec Command="pwsh -NoProfile -File &quot;$(SolutionDir)Tools\runtime\deploy-runtime.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -BinaryRoot &quot;$(EngineBinaryRoot).&quot; -HostPath &quot;$(TargetPath)&quot; -HostName &quot;$(MSBuildProjectName)&quot; -Config &quot;$(Configuration)&quot; -GcceRuntimePath &quot;$(EngineGCCERuntimeDir)gcce.dll&quot; -VcpkgDirectory &quot;$(_ZVcpkgCurrentInstalledDir).&quot; -VcToolsDirectory &quot;$(VCToolsInstallDir).&quot; -VcRedistDirectory &quot;$(VCToolsRedistDir).&quot; -WindowsAppSdkBootstrapDll &quot;$(CreatorWindowsAppSdkBootstrapDll)&quot;" />
   </Target>
 </Project>

@@ -6,11 +6,7 @@
 // GpuFrameToken 은 값으로 오가므로 전방 선언으로는 부족하다.
 #include "../../RHI/IRHIGpuProfiler.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 struct IDisplayPresentationSink;
 class IRHIParallelCommandPool;

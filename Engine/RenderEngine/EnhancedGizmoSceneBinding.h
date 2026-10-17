@@ -1,8 +1,6 @@
 ﻿#pragma once
 #include "Ownership.h"
-#include <cstdint>
-#include <memory>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include "EnhancedGizmoSceneTypes.h"
 #include "FrameCameraSnapshot.h"

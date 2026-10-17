@@ -57,10 +57,7 @@
 
 // ★ 이 헤더도 ImGui 를 끌어오지 않는다 — 이유는 `EditorNavContract.h` 와 같다.
 
-#include <cstddef>
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::clipping
 {

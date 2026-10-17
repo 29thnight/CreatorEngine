@@ -4,11 +4,7 @@
 #include "RHIShaderPermutation.h"
 #include "RHIShaderReflection.h"
 
-#include <cstdint>
-#include <filesystem>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 enum class RHIShaderBinary : std::uint8_t
 {

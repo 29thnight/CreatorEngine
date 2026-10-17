@@ -1,8 +1,6 @@
 #pragma once
 
-#include <array>
-#include <cstddef>
-#include <string_view>
+#include "../Utility_Framework/StandardLibrary.h"
 
 // 엔진 표준 PBR 머테리얼의 논리 property 이름 정본.
 //

@@ -6,9 +6,7 @@
 #include "AuthoringWriteNode.h"
 #include "ContentBrowserControl.h"
 #include "BrowserDirectorySnapshot.h"
-#include <cstdint>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 // ── 콘텐츠 브라우저 (PHASE 4-3 슬라이스 2) ──
 //

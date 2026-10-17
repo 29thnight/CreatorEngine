@@ -2,8 +2,9 @@
 #include "MaterialGraphGeometryContract.h"
 #include "MaterialGraphVisibilityContract.h"
 #include "MaterialGraphMeshSurface.h"
-#include <cstring>
-#include <stdexcept>
+#include <stddef.h>
+#include <stdint.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -14,14 +15,17 @@ namespace material_graph
 // Original primitive/cluster/LOD/vertex IDs are read with LXLoadGeometryPrimitive.
 struct SceneFrameGeometry final
 {
-    struct alignas(16) Record {
+    struct alignas(16) Record
+    {
         SceneGeometryIdentity identity;
         uint32_t chunkIndex{}, owner{}, meshletCount{}, vertexCount{};
         // Object-to-world columns of the row-vector transform: world = dot(float4(p,1), column).
         math::vector4 worldColumns[3];
-        void SetWorld(const math::matrix4x4& world) {
+        void SetWorld(const math::matrix4x4& world)
+        {
             for (unsigned column = 0; column < 3; ++column)
-                worldColumns[column] = math::vector4(world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]);
+                worldColumns[column] =
+                    math::vector4(world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]);
         }
     };
     static_assert(sizeof(Record) == 128);
@@ -30,15 +34,21 @@ struct SceneFrameGeometry final
     std::vector<Record> records{Record{}};
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> geometry{nullptr};
     uint32_t nextPrimitiveAddress{1};
-    uint32_t FindRecord(uint32_t address) const {
-        if (!address || address == UINT32_MAX) return 0;
+    uint32_t FindRecord(uint32_t address) const
+    {
+        if (!address || address == UINT32_MAX)
+            return 0;
         size_t first = 1, last = records.size();
-        while (first < last) {
+        while (first < last)
+        {
             const auto middle = first + (last - first) / 2;
             const auto& range = records[middle].identity.reserved;
-            if (address < range[1]) last = middle;
-            else if (address >= range[2]) first = middle + 1;
-            else return (address - range[1]) % 128 < 126 ? static_cast<uint32_t>(middle) : 0;
+            if (address < range[1])
+                last = middle;
+            else if (address >= range[2])
+                first = middle + 1;
+            else
+                return (address - range[1]) % 128 < 126 ? static_cast<uint32_t>(middle) : 0;
         }
         return 0;
     }
@@ -47,38 +57,57 @@ struct SceneFrameGeometry final
     mutable RGHandle graphTable;
     mutable const EnhancedRenderGraph* graphOwner{};
     mutable uint64_t graphEpoch{};
-    ~SceneFrameGeometry() { if (device && buffer.IsValid()) device->ReleaseBuffer(buffer); }
+    ~SceneFrameGeometry()
+    {
+        if (device && buffer.IsValid())
+            device->ReleaseBuffer(buffer);
+    }
 
-    bool Upload(std::string& error) {
-        if (records.size() != geometry.size()) { error = "METEOR geometry table ownership mismatch."; return false; }
+    bool Upload(std::string& error)
+    {
+        if (records.size() != geometry.size())
+        {
+            error = "METEOR geometry table ownership mismatch.";
+            return false;
+        }
         const auto bytes = records.size() * sizeof(Record);
         staging = device->AllocateUpload({bytes, RHIUploadUsage::BufferCopy, 16});
-        if (!staging.IsWritable()) { error = "METEOR frame geometry table staging failed."; return false; }
+        if (!staging.IsWritable())
+        {
+            error = "METEOR frame geometry table staging failed.";
+            return false;
+        }
         std::memcpy(staging.cpuAddress, records.data(), bytes);
-        RHIBufferDesc desc; desc.bytes = bytes; desc.debugName = L"METEOR.Scene.Geometry.Table";
+        RHIBufferDesc desc;
+        desc.bytes = bytes;
+        desc.debugName = L"METEOR.Scene.Geometry.Table";
         return device->CreateBuffer(desc, buffer, error);
     }
-    void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneFrameGeometry> owner) const {
-        if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch()) return;
-        if (graphOwner) throw std::runtime_error("METEOR geometry table cannot cross frame graphs.");
-        graphOwner = &graph; graphEpoch = graph.ResourceEpoch();
+    void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneFrameGeometry> owner) const
+    {
+        if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
+            return;
+        if (graphOwner)
+            throw std::runtime_error("METEOR geometry table cannot cross frame graphs.");
+        graphOwner = &graph;
+        graphEpoch = graph.ResourceEpoch();
         graphTable = graph.ImportBuffer(buffer, RHIResourceState::Common, "METEOR.Scene.Geometry.Table");
         if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
             throw std::runtime_error("METEOR geometry table requires an ExplicitVersioned graph.");
         graphTable = graph.Write(graphTable);
         graph.AddPass("METEOR.Scene.Geometry.Table.Upload",
-            {{graphTable, RHIResourceState::CopyDest, RGAccessMode::Write}},
-            [owner](const auto& execution) {
-                auto destination = RHIBufferSlice::Whole(owner->buffer);
-                destination.size = owner->staging.size;
-                if (!execution.encoder->CopyBuffer(destination, owner->staging))
-                    throw std::runtime_error("METEOR geometry table copy failed.");
-            });
+                      {{graphTable, RHIResourceState::CopyDest, RGAccessMode::Write}}, [owner](const auto& execution) {
+                          auto destination = RHIBufferSlice::Whole(owner->buffer);
+                          destination.size = owner->staging.size;
+                          if (!execution.encoder->CopyBuffer(destination, owner->staging))
+                              throw std::runtime_error("METEOR geometry table copy failed.");
+                      });
     }
-    RGHandle GraphTable(const EnhancedRenderGraph& graph) const {
+    RGHandle GraphTable(const EnhancedRenderGraph& graph) const
+    {
         if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
             throw std::runtime_error("METEOR geometry table requires its explicit producer.");
         return graphTable;
     }
 };
-}
+} // namespace material_graph

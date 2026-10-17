@@ -1,8 +1,10 @@
 #include "ModelAssetGeneration.h"
 #include "ModelMeshDescriptor.h"
 #include "ModelAnimationSampler.h"
+#include "ModelGenerationStreaming.h"
 
-#include <chrono>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "ModelSidecarV2.h"
 #include "AuthoringParsedDocument.h"
@@ -15,17 +17,7 @@
 #include "../../EngineDiagnostics/ProfileScope.h"
 #include "../Interfaces/AssetAuthoringPort.h"
 
-#include <algorithm>
-#include <array>
-#include <cassert>
-#include <fstream>
-#include <limits>
-#include <optional>
-#include <ranges>
-#include <set>
-#include <string_view>
-#include <type_traits>
-#include <utility>
+#include "../../Utility_Framework/Contract.h"
 
 namespace assets
 {
@@ -66,6 +58,7 @@ namespace assets
             std::string sidecarFingerprint{};
             std::filesystem::path modelArtifactPath{};
             std::string modelArtifactFingerprint{};
+            std::string streamingManifestFingerprint{}, streamingMetadataFingerprint{};
             std::vector<GenerationSubAsset> subAssets{};
         };
 
@@ -152,9 +145,9 @@ namespace assets
                 return false;
             }
             const Authoring::ReadNode root = document.Root();
-            if (root["schemaVersion"].As(0u) != 1u)
+            if (root["schemaVersion"].As(0u) != 2u)
             {
-                failure = "지원하는 generation record schemaVersion은 1이다.";
+                failure = "지원하는 generation record schemaVersion은 2이다. 재임포트가 필요하다.";
                 return false;
             }
 
@@ -190,7 +183,14 @@ namespace assets
                 return false;
             }
             record.modelArtifactPath = std::filesystem::path(modelPath);
-            if (!IsSafeRelativePath(record.modelArtifactPath)
+            const auto streaming = root["streaming"];
+            {
+                if (!streaming || !streaming.IsMap() || !ReadRequiredScalar(streaming,"manifestFingerprint",record.streamingManifestFingerprint) ||
+                    !ReadRequiredScalar(streaming,"metadataFingerprint",record.streamingMetadataFingerprint) ||
+                    !IsFingerprintText(record.streamingManifestFingerprint) || !IsFingerprintText(record.streamingMetadataFingerprint))
+                { failure = "Invalid generation streaming fingerprints"; return false; }
+            }
+            if (record.modelArtifactFingerprint != record.streamingMetadataFingerprint || record.modelArtifactPath != "metadata.cemc" || !IsSafeRelativePath(record.modelArtifactPath)
                 || !IsFingerprintText(record.modelArtifactFingerprint))
             {
                 failure = "modelArtifact 경로 또는 fingerprint가 잘못됐다.";
@@ -508,9 +508,10 @@ namespace assets
             }
             for (const ModelMeshAsset& mesh : meshes)
             {
-                if (!IsUuidV8(mesh.meshId) || mesh.vertexBytes.empty()
-                    || mesh.indices.empty() || mesh.vertexStride == 0u
-                    || mesh.vertexBytes.size() % mesh.vertexStride != 0u)
+                if (!IsUuidV8(mesh.meshId) || mesh.vertexStride == 0u ||
+                    (mesh.streamDescriptor ? !mesh.streamDescriptor->streamMetadata || !mesh.vertexBytes.empty() || !mesh.indices.empty() ||
+                        mesh.streamDescriptor->meshId != mesh.meshId : mesh.vertexBytes.empty() || mesh.indices.empty() ||
+                        mesh.vertexBytes.size() % mesh.vertexStride != 0u))
                 {
                     return false;
                 }
@@ -622,6 +623,7 @@ namespace assets
         for (const auto& mesh : meshes_)
         {
             addString(mesh.name);
+            if (mesh.streamDescriptor) add(1,mesh.streamDescriptor->ByteSize());
             addVector(mesh.vertexBytes);
             addVector(mesh.indices);
             addMeshlets(mesh.meshlets);
@@ -891,6 +893,12 @@ namespace assets
         phaseProfile.reset();
         phaseProfile.emplace(ce::marker<"ModelGen.CemcRead">());
         std::vector<std::byte> cookedBytes;
+        std::optional<generation_streaming::Loaded> streaming;
+        {
+            try { streaming = generation_streaming::Load(generationPath,record.streamingManifestFingerprint,sidecar.assetId,sidecar.generation); }
+            catch (const std::exception& error)
+            { AddIssue(result,ModelAssetGenerationIssueCode::CookedModelRejected,"streaming",error.what()); return result; }
+        }
         if (!ReadBytes(generationPath / record.modelArtifactPath, cookedBytes)
             || cookedBytes.empty())
         {
@@ -904,7 +912,7 @@ namespace assets
         markPhase("cemc-read");
         phaseProfile.reset();
         phaseProfile.emplace(ce::marker<"ModelGen.CemcSha">());
-        if (record.modelArtifactFingerprint != Fingerprint(cookedBytes))
+        if (record.streamingMetadataFingerprint != Fingerprint(cookedBytes))
         {
             AddIssue(result, ModelAssetGenerationIssueCode::FingerprintMismatch,
                 "modelArtifact", "CEMC SHA-256이 generation record와 다르다.");
@@ -953,7 +961,7 @@ namespace assets
         const std::size_t skeletonCount = draft.skeleton ? 1u : 0u;
         const std::size_t animationCount = draft.skeleton
             ? draft.skeleton->clips.size() : 0u;
-        if (meshRecords.size() != draft.meshes.size()
+        if (meshRecords.size() != streaming->meshes.size()
             || materialRecords.size() != draft.materials.size()
             || skeletonRecords.size() != skeletonCount
             || animationRecords.size() != animationCount)
@@ -1032,26 +1040,23 @@ namespace assets
         }
 
         std::vector<ModelMeshAsset> meshes;
-        meshes.reserve(draft.meshes.size());
-        for (std::size_t index = 0; index < draft.meshes.size(); ++index)
+        meshes.reserve(streaming->meshes.size());
         {
-            experiment::Mesh& source = draft.meshes[index];
-            ModelMeshAsset mesh;
-            mesh.meshId = meshRecords[index]->assetId;
-            mesh.name = std::move(source.name);
-            mesh.vertexAttributeMask = source.vertices.AttributeMask();
-            mesh.vertexStride = source.vertices.Stride();
-            mesh.vertexLayoutHash = VertexLayoutHash(
-                source.vertices.AttributeMask());
-            const std::span<const std::byte> vertexBytes = source.vertices.Bytes();
-            mesh.vertexBytes.assign(vertexBytes.begin(), vertexBytes.end());
-            mesh.indices = std::move(source.indices);
-            mesh.meshlets = std::move(source.meshlets);
-            mesh.coarseLods = std::move(source.coarseLods);
-            mesh.bounds = source.bounds;
-            if (source.material.IsValid())
-                mesh.materialId = materialRecords[source.material.Value()]->assetId;
-            meshes.push_back(std::move(mesh));
+            if (!draft.meshes.empty() || streaming->summary.materials.size() != materials.size() ||
+                streaming->summary.nodes.size() != draft.nodes.size())
+            { AddIssue(result,ModelAssetGenerationIssueCode::ClosureMismatch,"streaming","Metadata envelope closure differs"); return result; }
+            for (size_t index = 0; index < streaming->meshes.size(); ++index)
+            {
+                const auto& description = streaming->summary.meshes[index];
+                const auto& descriptor = streaming->meshes[index];
+                if (descriptor->meshId != meshRecords[index]->assetId)
+                { AddIssue(result,ModelAssetGenerationIssueCode::ClosureMismatch,"streaming","Mesh identity differs from sidecar"); return result; }
+                ModelMeshAsset mesh; mesh.meshId = descriptor->meshId; mesh.materialId = description.materialAssetId.value;
+                mesh.name = description.name; mesh.bounds = descriptor->bounds;
+                mesh.vertexAttributeMask = descriptor->vertexAttributeMask; mesh.vertexStride = descriptor->vertexStride;
+                mesh.vertexLayoutHash = descriptor->vertexLayoutHash; mesh.streamDescriptor = descriptor;
+                meshes.push_back(std::move(mesh));
+            }
         }
 
         std::vector<ModelNodeAsset> nodes;
@@ -1067,6 +1072,16 @@ namespace assets
             for (experiment::MeshIndex mesh : source.meshes)
                 node.meshes.push_back(meshRecords[mesh.Value()]->assetId);
             nodes.push_back(std::move(node));
+        }
+        {
+            for (size_t index = 0; index < nodes.size(); ++index)
+            {
+                const auto& summary = streaming->summary.nodes[index]; auto& node = nodes[index];
+                if (!node.meshes.empty() || node.name != summary.name ||
+                    node.parent != summary.parent.Value() || node.localTransform != summary.localTransform)
+                { AddIssue(result,ModelAssetGenerationIssueCode::ClosureMismatch,"streaming","Node envelope differs from summary"); return result; }
+                for (const auto& mesh : summary.meshAssetIds) node.meshes.push_back(mesh.value);
+            }
         }
 
         std::optional<ModelSkeletonAsset> skeleton;
@@ -1220,14 +1235,16 @@ namespace assets
         for (std::size_t index = 0; index < meshes.size(); ++index)
         {
             const ModelMeshAsset& mesh = meshes[index];
+            const auto vertexCount = mesh.streamDescriptor ? mesh.streamDescriptor->vertexCount : static_cast<uint32_t>(mesh.vertexBytes.size() / mesh.vertexStride);
+            const auto indexCount = mesh.streamDescriptor ? mesh.streamDescriptor->indexCount : static_cast<uint32_t>(mesh.indices.size());
             descriptors.push_back({ ModelGpuUploadKind::VertexBuffer, mesh.meshId,
-                static_cast<std::uint32_t>(index), mesh.vertexBytes.size(),
+                static_cast<std::uint32_t>(index), uint64_t(vertexCount) * mesh.vertexStride,
                 mesh.vertexStride,
-                static_cast<std::uint32_t>(mesh.vertexBytes.size() / mesh.vertexStride) });
+                vertexCount });
             descriptors.push_back({ ModelGpuUploadKind::IndexBuffer, mesh.meshId,
                 static_cast<std::uint32_t>(index),
-                mesh.indices.size() * sizeof(std::uint32_t),
-                sizeof(std::uint32_t), static_cast<std::uint32_t>(mesh.indices.size()) });
+                uint64_t(indexCount) * sizeof(std::uint32_t),
+                sizeof(std::uint32_t), indexCount });
         }
         for (std::size_t index = 0; index < textures.size(); ++index)
         {
@@ -1543,8 +1560,16 @@ namespace assets
 
     void ModelAssetGenerationCache::DetachAll(RetiredEntries& retired) noexcept
     {
-        assert(retired.generations_.empty());
-        assert(retired.currentByAsset_.empty());
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((retired.generations_.empty()));
+            },
+            "retired.generations_.empty()");
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((retired.currentByAsset_.empty()));
+            },
+            "retired.currentByAsset_.empty()");
         std::lock_guard lock(mutex_);
         retired.generations_.swap(generations_);
         retired.currentByAsset_.swap(currentByAsset_);

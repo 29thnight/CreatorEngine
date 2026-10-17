@@ -1,13 +1,8 @@
 #include "ProfileCapture.h"
 
-#include <algorithm>
-#include <cassert>
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
-#include <limits>
-#include <mutex>
-#include <utility>
+#include <stdio.h>
+#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Contract.h"
 
 namespace ce
 {
@@ -201,7 +196,11 @@ namespace ce
 
     const profile_event& frame_events::operator[](std::size_t index) const
     {
-        assert(index < m_count);
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((index < m_count));
+            },
+            "index < m_count");
         std::size_t low = 0;
         std::size_t high = m_segments.size();
         while (low + 1 < high)
@@ -243,7 +242,11 @@ namespace ce
 
     profile_event& frame_events::mutable_at(std::size_t index)
     {
-        assert(index < m_count);
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((index < m_count));
+            },
+            "index < m_count");
         materialize();
         return (*m_segments[0].owned)[index];
     }
@@ -289,7 +292,11 @@ namespace ce
         {
             return;
         }
-        assert(offset + count <= page->count);
+        ::ce::contracts::assert_that(
+            [&]() -> bool {
+                return static_cast<bool>((offset + count <= page->count));
+            },
+            "offset + count <= page->count");
         // Sparse producer pages must return to the bounded pool promptly. Keeping
         // one whole page for a few events can exhaust producers before ring trim.
         // Dense ranges retain the zero-copy path; owned segments remain copy-on-write.

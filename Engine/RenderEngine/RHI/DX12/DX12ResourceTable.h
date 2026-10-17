@@ -1,7 +1,5 @@
 #pragma once
-#include <atomic>
-#include <mutex>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 
@@ -42,13 +40,15 @@ public:
     }
 
     RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-        bool allowIndirectArguments = false)
+        bool allowIndirectArguments = false, Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
+        std::shared_ptr<const void> allocationLifetime = {})
     {
         if (nullptr == resource.Get())
         {
             return {};
         }
-        return RHIBufferHandle{ AcquireBuffer(std::move(resource), nullptr, allowIndirectArguments) };
+        return RHIBufferHandle{ AcquireBuffer(std::move(resource), nullptr, allowIndirectArguments,
+            std::move(sparseHeap), std::move(allocationLifetime)) };
     }
 
     /// 소유하지 않고 등록한다 — 임포트(스왑체인 백버퍼·자가 검증이 만든 텍스처).
@@ -72,6 +72,23 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveIn(m_textures, handle.id); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveBuffer(handle.id); }
+    ID3D12Heap* ResolveSparseHeap(RHIBufferHandle handle) const
+    {
+        if (!handle.IsValid()) return nullptr;
+        const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return nullptr;
+        const Slot& entry = m_buffers[slot];
+        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id)
+            ? entry.sparseHeap.Get() : nullptr;
+    }
+    std::shared_ptr<const void> ResolveBufferLifetime(RHIBufferHandle handle) const
+    {
+        if (!handle.IsValid()) return {};
+        const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return {};
+        const Slot& entry = m_buffers[slot];
+        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.allocationLifetime : nullptr;
+    }
 
     DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
     {
@@ -174,6 +191,8 @@ public:
             {
                 Slot& entry = m_buffers[i];
                 entry.owned.Reset();
+                entry.sparseHeap.Reset();
+                entry.allocationLifetime.reset();
                 entry.external = nullptr;
                 entry.gpuAddress = 0;
                 entry.bufferBytes = 0;
@@ -209,6 +228,8 @@ private:
     struct Slot
     {
         Microsoft::WRL::ComPtr<ID3D12Resource> owned;      // 소유할 때만
+        Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap;
+        std::shared_ptr<const void> allocationLifetime;
         ID3D12Resource*                        external{ nullptr };  // 임포트일 때만
         uint32_t                               generation{ 0 };
         bool                                   alive{ false };
@@ -272,7 +293,8 @@ private:
     }
 
     uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned,
-        ID3D12Resource* external, bool allowIndirectArguments = false)
+        ID3D12Resource* external, bool allowIndirectArguments = false,
+        Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {}, std::shared_ptr<const void> allocationLifetime = {})
     {
         std::lock_guard lock(m_bufferRegistryMutex);
 
@@ -291,6 +313,8 @@ private:
 
         Slot& entry = m_buffers[slot];
         entry.owned = std::move(owned);
+        entry.sparseHeap = std::move(sparseHeap);
+        entry.allocationLifetime = std::move(allocationLifetime);
         entry.external = external;
         entry.gpuAddress = nullptr != entry.Get()
             ? entry.Get()->GetGPUVirtualAddress() : 0;
@@ -329,6 +353,8 @@ private:
         if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id)) return;
         entry.alive = false;
         entry.owned.Reset();
+        entry.sparseHeap.Reset();
+        entry.allocationLifetime.reset();
         entry.external = nullptr;
         entry.gpuAddress = 0;
         entry.bufferBytes = 0;

@@ -4,9 +4,7 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../Mesh.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 DX12MeshCache::~DX12MeshCache()
 {

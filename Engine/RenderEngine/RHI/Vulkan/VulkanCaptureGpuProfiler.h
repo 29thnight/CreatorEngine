@@ -2,13 +2,8 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
 #include "../IRHIGpuProfiler.h"
-#include <array>
-#include <atomic>
-#include <algorithm>
-#include <map>
-#include <vector>
-#include <cstdio>
-#include <exception>
+#include <stdio.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // One diagnostic submission. Query ownership never borrows the interactive
 // profiler's ring slot. Destruction waits for device completion on abort too.

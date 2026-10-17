@@ -13,11 +13,8 @@
 #include "../RenderEngine/LocalPose.h"
 #include "../RenderEngine/ClipSamplingCursor.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
-#include <array>
+#include "../Utility_Framework/StandardLibrary.h"
 #include <mathematics/matrix4x4.hpp>
-#include <optional>
-#include <span>
-#include <type_traits>
 #include "BoneRegion.h" // kMaxBones·BoneRegion
 
 // I5-D4e-2 — 클립별 이벤트·루프 오버라이드. 소유는 씬(Animator)이다(D0a 판정):

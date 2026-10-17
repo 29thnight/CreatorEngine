@@ -4,7 +4,7 @@
 #include "../../Assets/AssetIdentityProfile.h"
 #include "AuthoringParsedDocument.h"
 
-#include <fstream>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

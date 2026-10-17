@@ -1,18 +1,7 @@
 #pragma once
 #include "LogEntry.h"
 #include "LogGroup.h"
-#include <algorithm>
-#include <cstddef>
-#include <deque>
-#include <functional>
-#include <initializer_list>
-#include <mutex>
-#include <optional>
-#include <stdexcept>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
+#include "StandardLibrary.h"
 
 struct LogStoreLimits
 {

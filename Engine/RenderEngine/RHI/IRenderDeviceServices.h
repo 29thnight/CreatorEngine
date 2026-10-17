@@ -1,8 +1,6 @@
 #pragma once
-#include <functional>
-#include <span>
-#include <string>
-#include <utility>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #include "RHIResourceTypes.h"
 #include "RHIFormat.h"
@@ -281,6 +279,24 @@ public:
     virtual bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) = 0;
 
+    virtual uint64_t SparseBufferTileBytes() const { return 0; }
+    virtual bool StreamingMemoryPressure() const { return false; }
+    virtual bool CreateSparseBuffer(const RHISparseBufferDesc&,
+        RHIBufferHandle&, std::string& error)
+    {
+        error = "Sparse buffers are unsupported";
+        return false;
+    }
+    // Called before enqueuing consumers of the new residency cut. All readers
+    // of the previous cut must already be admitted to this device's FIFO queue.
+    // Reusing mapped physical tiles requires an aliasing barrier before access.
+    virtual bool UpdateSparseBufferMappings(RHIBufferHandle,
+        std::span<const RHISparseTileMapping>, std::string& error)
+    {
+        error = "Sparse buffer mappings are unsupported";
+        return false;
+    }
+
     virtual bool SupportsTransientAliasing() const { return false; }
     virtual bool DescribeTransientAllocation(const RHITransientResourceDesc&,
         RHITransientAllocationInfo&, std::string& error) const
@@ -491,7 +507,8 @@ struct RHIModelMeshView
         const auto* mesh = SourceMesh();
         if (!mesh)
         {
-            return nullptr;
+            const auto* stream = StreamMetadata();
+            return stream ? &stream->meshlets : nullptr;
         }
         const auto& payload = sourceLodIndex == 0 ? mesh->meshlets
             : mesh->coarseLods.levels[sourceLodIndex - 1].meshlets;
@@ -519,6 +536,19 @@ struct RHIModelMeshView
         return IsMetadataComplete() && vertexData && indexData &&
             (handle.domain == assets::ModelMeshDomain::LegacyAggregate || SourceMesh());
     }
+
+    [[nodiscard]] const experiment::cooked::ModelGeometryStreamMetadata* StreamMetadata() const noexcept
+    {
+        if (!IsMetadataComplete() || sourceLodIndex || sourcePayload || vertexData || indexData ||
+            !sourceDescriptor || !sourceDescriptor->streamMetadata) return nullptr;
+        const auto& stream = *sourceDescriptor->streamMetadata;
+        return stream.attributes == vertexAttributeMask && stream.stride == vertexStride &&
+            uint64_t(stream.vertexCount) * stream.stride == vertexBytes && !stream.counts.empty() &&
+            stream.counts[0].indexCount == indexCount && stream.bounds == sourceDescriptor->bounds &&
+            stream.archive && stream.archive->pagedTopology && stream.flatDescriptors && !stream.flatDescriptors->empty()
+                ? &stream : nullptr;
+    }
+    [[nodiscard]] bool IsSceneComplete() const noexcept { return IsComplete() || StreamMetadata(); }
 };
 
 /// Compact draw/batch hash of every full-identity equality field. Backend maps
@@ -627,6 +657,7 @@ struct RHIModelMeshView
     const auto meshes = generation.Meshes();
     if (meshIndex >= meshes.size()) return false;
     const assets::ModelMeshAsset& mesh = meshes[meshIndex];
+    if (mesh.streamDescriptor) return BuildRHIModelMeshView(*mesh.streamDescriptor,outView);
     const assets::ModelGpuUploadDescriptor* vertexDescriptor = nullptr;
     const assets::ModelGpuUploadDescriptor* indexDescriptor = nullptr;
     for (const assets::ModelGpuUploadDescriptor& descriptor

@@ -4,10 +4,7 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <string>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

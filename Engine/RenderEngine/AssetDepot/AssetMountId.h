@@ -1,7 +1,6 @@
 #pragma once
 
-#include <compare>
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace AssetDepot
 {

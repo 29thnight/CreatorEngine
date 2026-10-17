@@ -2,7 +2,7 @@
 
 #include "LXMaterialGraph.h"
 
-#include <functional>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace LX
 {

@@ -10,9 +10,7 @@
 //   게이트: Tools/regression/verify-header-inline-singleton.ps1
 
 #include "TypeTrait.h"
-#include <atomic>
-#include <exception>
-#include <limits>
+#include "StandardLibrary.h"
 
 namespace TypeTrait
 {

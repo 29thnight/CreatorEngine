@@ -2,15 +2,8 @@
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
-#include <algorithm>
-#include <unordered_set>
-#include <atomic>
-#include <queue>
-#include <limits>
-#include <chrono>
-#include <array>
-#include <mutex>
-#include <bit>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace
 {

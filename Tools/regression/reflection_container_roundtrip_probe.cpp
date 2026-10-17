@@ -25,17 +25,7 @@
 #include "ReflectionTypedYml.h"
 #include "AuthoringParsedDocument.h"
 
-#include <array>
-#include <cstdio>
-#include <cstring>
-#include <deque>
-#include <list>
-#include <map>
-#include <set>
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

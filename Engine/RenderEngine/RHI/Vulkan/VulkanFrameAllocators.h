@@ -4,13 +4,8 @@
 #include "../RHIDescriptorVersionPolicy.h"
 #include "../RHIResourceTypes.h"
 
-#include <atomic>
-#include <string>
-#include <memory>
-#include <mutex>
-#include <span>
-#include <thread>
-#include <vector>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // transient 업로드 세그먼트 allocator와 descriptor pool recycler.
 //

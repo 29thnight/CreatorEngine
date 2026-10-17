@@ -1,7 +1,6 @@
 #pragma once
-#include <array>
-#include <cmath>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "EnhancedTransientFailureRg7Tests.h"
 #include "EnhancedTransientLifetimeRg7Tests.h"
 #include "EnhancedTransientDeviceLossRg7Tests.h"

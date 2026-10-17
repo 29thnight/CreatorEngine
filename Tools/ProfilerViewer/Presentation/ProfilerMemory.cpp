@@ -4,16 +4,7 @@
 #include "EditorIcons.h"
 #include "ImGui.h"
 
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <cstdio>
-#include <cstring>
-#include <map>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

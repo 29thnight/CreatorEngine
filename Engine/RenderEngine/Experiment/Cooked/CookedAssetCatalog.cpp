@@ -1,10 +1,7 @@
 #include "CookedAssetCatalog.h"
 #include "CookedAudioClipSource.h"
 
-#include <algorithm>
-#include <set>
-#include <utility>
-#include <vector>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::cooked
 {

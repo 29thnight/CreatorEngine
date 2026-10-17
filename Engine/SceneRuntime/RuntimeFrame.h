@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/TimeSystem.h"
 // 시뮬레이션 프레임의 단일 소유자 (E3-7).
 //
 // 왜 필요한가

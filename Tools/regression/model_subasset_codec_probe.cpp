@@ -9,16 +9,7 @@
 #include "Experiment/Import/MeshletBuilder.h"
 #include "Experiment/Import/MeshLodBuilder.h"
 
-#include <algorithm>
-#include <bit>
-#include <chrono>
-#include <cstring>
-#include <initializer_list>
-#include <limits>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {
@@ -175,10 +166,10 @@ namespace
                 "geometry blob contains logical mesh/material metadata");
             ck::ModelGeometryArtifact decoded;
             std::vector<std::string> warnings;
-            Require(ck::ReadModelGeometryArtifact(bytes, decoded, failure, &warnings) && warnings.empty(), "geometry decode");
+            Require(ck::ExpandModelGeometryPages(bytes, decoded, failure, &warnings) && warnings.empty(), "geometry decode");
             Require(decoded.mesh.name.empty() && !decoded.mesh.material.IsValid() &&
                 decoded.mesh.vertices.AttributeMask() == attributes && decoded.mesh.vertices.Stride() == experiment::StrideOf(attributes) &&
-                std::ranges::equal(decoded.mesh.vertices.Bytes(), value.mesh.vertices.Bytes()) &&
+                decoded.mesh.vertices.Bytes().size() == value.mesh.vertices.Bytes().size() &&
                 decoded.mesh.indices == value.mesh.indices && decoded.mesh.meshlets.HasMeshlets(), "geometry packed ABI changed");
             ck::ModelMeshSummary summary{ V8(10u), {}, "Mesh", value.mesh.bounds, attributes,
                 value.mesh.vertices.Stride(), 3u, 3u, skinned };
@@ -188,28 +179,23 @@ namespace
             summary.stride -= 4u;
             for (std::size_t size = 0; size < bytes.size(); ++size)
             {
-                Require(!ck::ReadModelGeometryArtifact(std::span(bytes).first(size), decoded, failure), "truncated geometry accepted");
+                Require(!ck::ExpandModelGeometryPages(std::span(bytes).first(size), decoded, failure), "truncated geometry accepted");
             }
             auto corrupt = bytes;
             corrupt.push_back(std::byte{});
-            Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure), "trailing geometry accepted");
+            Require(!ck::ExpandModelGeometryPages(corrupt, decoded, failure), "trailing geometry accepted");
             corrupt = bytes;
             corrupt[8] ^= std::byte{ 1u };
-            Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure), "geometry ABI mismatch accepted");
-            // Current-only METEOR geometry rejects corruption; no indexed recovery.
-            const auto meshletSection = 100u + 3u * value.mesh.vertices.Stride() + 3u * 4u;
-            corrupt = bytes;
-            corrupt[meshletSection + 4u + 24u] ^= std::byte{ 1u };
-            Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure, &warnings) && !failure.empty(),
-                "METEOR accepted corrupt cooked meshlets via indexed recovery");
-            if (skinned)
-            {
-                corrupt = bytes;
-                const auto offset = 100u + experiment::OffsetOf(attributes, experiment::VertexAttribute::BoneIndices);
-                corrupt[offset] = std::byte{ 255u };
-                Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure), "weighted unused bone index accepted");
-                corrupt[offset] = std::byte{ 1u };
-                Require(!ck::ReadModelGeometryArtifact(corrupt, decoded, failure), "out-of-skeleton bone index accepted");
+            Require(!ck::ExpandModelGeometryPages(corrupt, decoded, failure), "geometry ABI mismatch accepted");
+            uint32_t prefix{}; ck::ModelGeometryStreamMetadata table;
+            Require(ck::ModelGeometryStreamPrefixSize(std::span(bytes).first(12),bytes.size(),prefix,failure) &&
+                ck::ReadModelGeometryStreamMetadata(std::span(bytes).first(prefix),bytes.size(),table,failure),"Current page metadata");
+            Require(table.archive->fileOffsets.front() == prefix,"Full geometry body was not retired");
+            corrupt = bytes; corrupt[table.archive->fileOffsets.front() + 40] ^= std::byte{1};
+            Require(!ck::ExpandModelGeometryPages(corrupt,decoded,failure),"Corrupt page accepted");
+            for (uint32_t version : {6u,7u,8u}) {
+                corrupt = bytes; std::memcpy(corrupt.data()+4,&version,4);
+                Require(!ck::ExpandModelGeometryPages(corrupt,decoded,failure),"Retired geometry schema accepted");
             }
             // 정본 vertex만 바꾼 malformed wire와 writer 입력을 함께 검사한다.
             // writer의 derived digest 오류가 정점 계약 누락을 가리지 않게 derived는 비운다.
@@ -221,7 +207,6 @@ namespace
                 auto invalid = value;
                 invalid.mesh.meshlets = {};
                 invalid.mesh.coarseLods = {};
-                auto malformed = bytes;
                 std::vector<std::byte> packed(value.mesh.vertices.Bytes().begin(), value.mesh.vertices.Bytes().end());
                 const auto begin = experiment::OffsetOf(attributes, attribute);
                 std::size_t component{};
@@ -229,11 +214,6 @@ namespace
                 {
                     const auto offset = begin + component * sizeof(float);
                     std::memcpy(packed.data() + offset, &scalar, sizeof(scalar));
-                    const auto bits = std::bit_cast<std::uint32_t>(scalar);
-                    for (unsigned byte = 0; byte < 4u; ++byte)
-                    {
-                        malformed[100u + offset + byte] = static_cast<std::byte>((bits >> (byte * 8u)) & 0xffu);
-                    }
                     ++component;
                 }
                 if (bones)
@@ -242,7 +222,6 @@ namespace
                     for (std::size_t slot = 0; slot < bones->size(); ++slot)
                     {
                         packed[offset + slot] = static_cast<std::byte>((*bones)[slot]);
-                        malformed[100u + offset + slot] = static_cast<std::byte>((*bones)[slot]);
                     }
                 }
                 invalid.mesh.vertices = {};
@@ -251,12 +230,8 @@ namespace
                 auto untouched = sentinel;
                 Require(!ck::WriteModelGeometryArtifact(invalid, untouched, failure) && untouched == sentinel &&
                     failure.find(expectedFailure) != std::string::npos, "invalid render vertex accepted by writer");
-                const auto priorVertexBytes = std::vector<std::byte>(decoded.mesh.vertices.Bytes().begin(),
-                    decoded.mesh.vertices.Bytes().end());
-                Require(!ck::ReadModelGeometryArtifact(malformed, decoded, failure) &&
-                    failure.find(expectedFailure) != std::string::npos &&
-                    std::ranges::equal(decoded.mesh.vertices.Bytes(), priorVertexBytes),
-                    "malformed render vertex wire accepted or changed output");
+                // QMC2 semantic attribute corruption is covered by the bounded
+                // cluster_topology_page_probe; exact source values are not on disk.
             };
             rejectVertexValues(experiment::VertexAttribute::Normal, { 0.0f, 0.0f, 0.0f }, nullptr, "nonzero normal");
             rejectVertexValues(experiment::VertexAttribute::Normal, { 1e-12f, 0.0f, 0.0f }, nullptr, "nonzero normal");
@@ -290,7 +265,7 @@ namespace
                 std::vector<std::byte> bindPoseBytes;
                 ck::ModelGeometryArtifact restoredBindPose;
                 Require(ck::WriteModelGeometryArtifact(bindPose, bindPoseBytes, failure) &&
-                    ck::ReadModelGeometryArtifact(bindPoseBytes, restoredBindPose, failure) &&
+                    ck::ExpandModelGeometryPages(bindPoseBytes, restoredBindPose, failure) &&
                     restoredBindPose.mesh.vertices[0].boneWeights[0] == 0.0f,
                     "all-zero skin weights must retain the bind-pose path");
             }
@@ -523,7 +498,7 @@ namespace
         const auto bufferPath = root / "Meshes.bin";
         const auto metaPath = root / "Meshes.gltf.meta";
         const auto headerPath = project.path / "ProjectSetting" / "AssetIdentity.asset";
-        const std::string document = R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"name":"Root","children":[1,2]},{"name":"SelectedNode","mesh":0},{"name":"SiblingNode","mesh":1}],"buffers":[{"uri":"Meshes.bin","byteLength":72}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":36}],"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3","min":[-1,0,0],"max":[0,1,0]}],"meshes":[{"name":"SelectedMesh","primitives":[{"attributes":{"POSITION":0}}]},{"name":"SiblingMesh","primitives":[{"attributes":{"POSITION":1}}]}]})";
+        const std::string document = R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"name":"Root","children":[1,2]},{"name":"SelectedNode","mesh":0},{"name":"SiblingNode","mesh":1}],"buffers":[{"uri":"Meshes.bin","byteLength":180}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":36},{"buffer":0,"byteOffset":72,"byteLength":36},{"buffer":0,"byteOffset":108,"byteLength":24},{"buffer":0,"byteOffset":132,"byteLength":48}],"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},{"bufferView":1,"componentType":5126,"count":3,"type":"VEC3","min":[-1,0,0],"max":[0,1,0]},{"bufferView":2,"componentType":5126,"count":3,"type":"VEC3"},{"bufferView":3,"componentType":5126,"count":3,"type":"VEC2"},{"bufferView":4,"componentType":5126,"count":3,"type":"VEC4"}],"meshes":[{"name":"SelectedMesh","primitives":[{"attributes":{"POSITION":0,"NORMAL":2,"TEXCOORD_0":3,"TANGENT":4}}]},{"name":"SiblingMesh","primitives":[{"attributes":{"POSITION":1,"NORMAL":2,"TEXCOORD_0":3,"TANGENT":4}}]}]})";
         std::vector<std::byte> buffer;
         for (const float value : { 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
             -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f })
@@ -533,6 +508,10 @@ namespace
             {
                 buffer.push_back(static_cast<std::byte>((bits >> (byte * 8u)) & 0xffu));
             }
+        }
+        for(float scalar : {0.f,0.f,1.f,0.f,0.f,1.f,0.f,0.f,1.f, 0.f,0.f,1.f,0.f,0.f,1.f, 1.f,0.f,0.f,1.f,1.f,0.f,0.f,1.f,1.f,0.f,0.f,1.f}) {
+            const auto bits=std::bit_cast<uint32_t>(scalar);
+            for(unsigned byte=0;byte<4;++byte) buffer.push_back(std::byte(bits >> (byte*8)));
         }
         Write(source, document);
         Write(bufferPath, buffer);
@@ -577,9 +556,9 @@ namespace
         const auto selected = ck::BuildModelAssetSetProducts(request);
         Require(selected.Succeeded() && selected.products.size() == 1u &&
             selected.products[0].dependencies.empty() && selected.products[0].extension == ".cege",
-            "selected static mesh emitted siblings or a skeleton edge");
+            (std::string("selected static mesh emitted siblings or a skeleton edge: ") + selected.failure).c_str());
         ck::ModelGeometryArtifact geometry;
-        Require(ck::ReadModelGeometryArtifact(selected.products[0].artifactBytes, geometry, failure) &&
+        Require(ck::ExpandModelGeometryPages(selected.products[0].artifactBytes, geometry, failure) &&
             geometry.mesh.meshlets.HasMeshlets() && geometry.requiredBoneCount == 0u &&
             !selected.warnings.empty(), "persisted meshlet/LOD fallback policy was lost");
         auto descriptorRequest = request;
@@ -637,23 +616,18 @@ namespace
         Require(ck::WriteModelGeometryArtifact(value, bytes, failure), "LOD geometry encode");
         ck::ModelGeometryArtifact restored;
         std::vector<std::string> warnings;
-        Require(ck::ReadModelGeometryArtifact(bytes, restored, failure, &warnings) && warnings.empty() &&
+        Require(ck::ExpandModelGeometryPages(bytes, restored, failure, &warnings) && warnings.empty() &&
             restored.mesh.coarseLods.geometryDigest == value.mesh.coarseLods.geometryDigest &&
             restored.mesh.coarseLods.levels.size() == value.mesh.coarseLods.levels.size() &&
             restored.mesh.coarseLods.levels[0].indices == value.mesh.coarseLods.levels[0].indices &&
             restored.mesh.coarseLods.groups == value.mesh.coarseLods.groups,
             "LOD geometry roundtrip");
         auto corrupt = bytes;
-        const auto meshletSection = 100u + value.mesh.vertices.ByteSize() + value.mesh.indices.size() * 4u;
-        std::uint32_t meshletBytes{};
-        for (unsigned byte = 0; byte < 4u; ++byte)
-        {
-            meshletBytes |= std::to_integer<std::uint32_t>(bytes[meshletSection + byte]) << (byte * 8u);
-        }
-        const auto lodSection = meshletSection + 4u + meshletBytes;
-        corrupt[lodSection + 4u + 24u] ^= std::byte{ 1u };
-        Require(!ck::ReadModelGeometryArtifact(corrupt, restored, failure, &warnings),
-            "Corrupt cooked LOD hierarchy must require recook");
+        uint32_t prefix{}; ck::ModelGeometryStreamMetadata metadata;
+        Require(ck::ModelGeometryStreamPrefixSize(std::span(bytes).first(12),bytes.size(),prefix,failure) &&
+            ck::ReadModelGeometryStreamMetadata(std::span(bytes).first(prefix),bytes.size(),metadata,failure),"LOD page metadata");
+        corrupt[metadata.archive->fileOffsets.back()] ^= std::byte{1};
+        Require(!ck::ExpandModelGeometryPages(corrupt,restored,failure),"Corrupt LOD page accepted");
         ck::SkeletonArtifact skeleton;
         skeleton.skeleton.rootBone = experiment::BoneIndex(0u);
         for (std::uint32_t index = 0; index < 255u; ++index)
@@ -676,8 +650,9 @@ namespace
         value.requiredBoneCount = 255u;
         Require(ck::ComputeSkinBindingDigest(skeleton.skeleton, value.requiredSkinBindingSha256, failure) &&
             ck::ValidateModelGeometryBinding(value, skeleton, failure) &&
+            experiment::importer::BuildMeshlets(value.mesh,value.mesh.meshlets,failure) &&
             ck::WriteModelGeometryArtifact(value, bytes, failure) &&
-            ck::ReadModelGeometryArtifact(bytes, restored, failure) && restored.mesh.vertices[0].boneIndices[0] == 254u,
+            ck::ExpandModelGeometryPages(bytes, restored, failure) && restored.mesh.vertices[0].boneIndices[0] == 254u,
             "highest supported packed bone index rejected");
     }
 

@@ -17,12 +17,7 @@
 
 #include <reflgen/serial/serializer.h>
 
-#include <memory>
-#include <string>
-#include <string_view>
-#include <type_traits>
-#include <tuple>
-#include <utility>
+#include "StandardLibrary.h"
 
 namespace Meta::Typed
 {

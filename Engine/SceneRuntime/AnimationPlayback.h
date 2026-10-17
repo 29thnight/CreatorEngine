@@ -2,11 +2,7 @@
 
 #include <mathematics/matrix4x4.hpp>
 
-#include <algorithm>
-#include <cmath>
-#include <cstddef>
-#include <span>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace animation
 {

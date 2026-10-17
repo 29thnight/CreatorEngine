@@ -1,13 +1,5 @@
 #include "ProfileCaptureFile.h"
-#include <algorithm>
-#include <cmath>
-#include <iostream>
-#include <iomanip>
-#include <map>
-#include <numeric>
-#include <ranges>
-#include <vector>
-#include <tuple>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 static void distribution(const std::vector<double>& input)
 {

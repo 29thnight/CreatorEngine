@@ -6,12 +6,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <cstring>
-#include <functional>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 볼류메트릭 포그 패스 자가 검증 (PHASE 3-6, 미구현 패스 이식 4차).
 //

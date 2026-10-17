@@ -1,9 +1,8 @@
 #pragma once
 
 #include "../Physics/PhysicsGeometry.h"
-#include <cstddef>
-#include <cstdint>
-#include <type_traits>
+#include <stddef.h>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::script
 {

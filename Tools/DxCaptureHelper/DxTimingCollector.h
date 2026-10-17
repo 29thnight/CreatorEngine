@@ -1,7 +1,6 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace ce::dx_capture
 {

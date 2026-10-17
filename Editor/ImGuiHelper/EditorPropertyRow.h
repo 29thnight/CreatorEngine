@@ -30,8 +30,8 @@
 // 돈 적 없는 경로를 "된다" 고 적을 수는 없다. 필요해지면 호출자가
 // `BeginDisabled` 로 감싸는 한 겹이고, 그때 이 규약 안으로 들인다.
 
-#include <cstdint>
-#include <initializer_list>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::widgets
 {

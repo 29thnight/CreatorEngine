@@ -12,14 +12,8 @@
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 #include <wrl/client.h>
-#include <unordered_map>
-#include <vector>
-#include <unordered_set>
-#include <mutex>
-#include <cstring>
-#include <utility>
-#include <cstdio>
-#include <exception>
+#include <stdio.h>
+#include "../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 namespace

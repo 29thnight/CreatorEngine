@@ -1,7 +1,7 @@
 #include "../../Engine/SceneRuntime/PhysicsPrimitivePreview.h"
 #include "../../Engine/RenderEngine/EnhancedGizmoSceneTypes.h"
-#include <iostream>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main()
 {

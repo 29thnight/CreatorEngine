@@ -25,16 +25,8 @@
 #include "../../Lattice/Core/LXDocument.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include <imgui_stdlib.h>
-#include <algorithm>
-#include <array>
-#include <charconv>
-#include <cmath>
-#include <mutex>
-#include <memory>
-#include <fstream>
-#include <limits>
-#include <chrono>
-#include <set>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor::material_editing
 {

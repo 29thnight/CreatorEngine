@@ -6,12 +6,7 @@
 #include <Windows.h>
 #include <bcrypt.h>
 
-#include <algorithm>
-#include <cstring>
-#include <map>
-#include <optional>
-#include <set>
-#include <utility>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 #pragma comment(lib, "bcrypt.lib")
 

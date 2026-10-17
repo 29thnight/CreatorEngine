@@ -1,6 +1,7 @@
 #pragma once
+#include "../../../../Utility_Framework/TimeSystem.h"
 #include "../../../RHI/RHIFormat.h"
-#include <cstdint>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../Core/PassResourceRetirement.h"

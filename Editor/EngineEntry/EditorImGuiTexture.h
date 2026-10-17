@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "Texture.h"
 
 // 에디터 UI가 ImGui::Image에 넘길 ImTextureID의 백엔드 중립 변환기

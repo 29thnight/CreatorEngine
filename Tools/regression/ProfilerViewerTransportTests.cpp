@@ -3,8 +3,9 @@
 // coverage; these fixtures cover the shared framing, typed state and codec bounds.
 #include "ProfilerViewerTransport.h"
 
-#include <cstdio>
-#include <cstdlib>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace profiler_viewer_transport_tests
 {

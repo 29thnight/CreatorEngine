@@ -1,11 +1,7 @@
 #pragma once
 
 #include "CrashReportProtocol.h"
-#include <filesystem>
-#include <cwchar>
-#include <cstring>
-#include <iterator>
-#include <vector>
+#include "StandardLibrary.h"
 
 namespace crash_report
 {

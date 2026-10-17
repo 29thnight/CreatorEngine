@@ -6,25 +6,28 @@ This read-only check needs no dependencies, network, or engine build.
 Hashes establish integrity, not semantic correctness or runtime acceptance.
 """
 import collections
-import hashlib
+import functools
 import json
 from pathlib import Path
 import re
 import sys
+import subprocess
 import urllib.parse
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 
 
+@functools.lru_cache(maxsize=None)
 def blob(path):
-    data = path.read_bytes()
-    header = b"blob " + str(len(data)).encode() + b"\0"
-    return hashlib.sha1(header + data).hexdigest()
+    # Respect Git's text filters (including Windows CRLF checkout conversion).
+    return subprocess.check_output(
+        ["git", "hash-object", "--", str(path)], cwd=ROOT, text=True
+    ).strip()
 
 
 def document_anchors(path):
-    text = path.read_text(errors="replace")
+    text = path.read_text(encoding="utf-8", errors="replace")
     result = set(re.findall(r"\bid=[\"']([^\"']+)", text))
     seen = collections.Counter()
     if path.suffix == ".md":
@@ -50,7 +53,7 @@ def check_links(issue):
         parts = path.relative_to(ROOT).parts
         if any(part in {".git", "node_modules", "dist", "ThirdParty"} for part in parts):
             continue
-        text = re.sub(r"```.*?```", "", path.read_text(errors="replace"), flags=re.S)
+        text = re.sub(r"```.*?```", "", path.read_text(encoding="utf-8", errors="replace"), flags=re.S)
         refs = re.findall(r"\[[^\]]*\]\(([^)]+)\)", text)
         refs += re.findall(r"(?:href|src)=[\"']([^\"']+)", text)
         for url in refs:
@@ -100,7 +103,7 @@ def api_anchors(page):
 
 def check_api(issue):
     path = DOCS / "api/reference.json"
-    api = json.loads(path.read_text())
+    api = json.loads(path.read_text(encoding="utf-8"))
     page_ids = [page["id"] for page in api["pages"]]
     if len(page_ids) != len(set(page_ids)):
         issue(path, "", "duplicate-api-page")
@@ -118,7 +121,7 @@ def check_api(issue):
             if count > 1:
                 issue(path, page["id"] + "~" + anchor, "duplicate-api-anchor")
     app_path = DOCS / "src/App.jsx"
-    routes = re.findall(r"['\"]((?:guide|script|native|tools)/[^'\" ]+)['\"]", app_path.read_text())
+    routes = re.findall(r"['\"]((?:guide|script|native|tools)/[^'\" ]+)['\"]", app_path.read_text(encoding="utf-8"))
     for route in routes:
         if route not in page_ids:
             issue(app_path, route, "missing-app-route")
@@ -137,7 +140,7 @@ def check_coverage(issue):
     if not path.exists():
         issue(path, "", "missing-coverage")
         return
-    coverage = json.loads(path.read_text())
+    coverage = json.loads(path.read_text(encoding="utf-8"))
     seen = set()
     for item in coverage["files"]:
         name = item["path"]
@@ -160,7 +163,7 @@ def check_coverage(issue):
                 issue(target, source["path"], "missing-evidence")
             elif evidence.is_file() and blob(evidence) != source["blob"]:
                 issue(target, source["path"], "evidence-hash-drift")
-    api = json.loads((DOCS / "api/reference.json").read_text())
+    api = json.loads((DOCS / "api/reference.json").read_text(encoding="utf-8"))
     expected_pages = {page["id"] for page in api["pages"]}
     reviewed_pages = [page["page_id"] for page in coverage.get("api_pages", [])]
     if set(reviewed_pages) != expected_pages or len(reviewed_pages) != len(expected_pages):
@@ -170,8 +173,13 @@ def check_coverage(issue):
             evidence = ROOT / source["path"]
             if not evidence.is_file() or blob(evidence) != source["blob"]:
                 issue(path, source["path"], "api-evidence-hash-drift")
-    actual = {str(p.relative_to(ROOT)) for p in DOCS.rglob("*") if p.is_file()}
-    expected = seen | set(coverage["additional_audit_files"])
+    actual = {p.relative_to(ROOT).as_posix() for p in DOCS.rglob("*") if p.is_file()}
+    inherited = coverage.get("merge_integration", {}).get("inherited_files", [])
+    for item in inherited:
+        target = ROOT / item["path"]
+        if not target.is_file() or blob(target) != item["blob"]:
+            issue(path, item["path"], "inherited-document-hash-drift")
+    expected = seen | set(coverage["additional_audit_files"]) | {item["path"] for item in inherited}
     for name in sorted(actual ^ expected):
         issue(ROOT / name, "", "coverage-file-set-mismatch")
     if len(seen) != coverage["baseline_file_count"]:

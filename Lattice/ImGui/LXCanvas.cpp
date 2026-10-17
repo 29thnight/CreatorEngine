@@ -1,15 +1,9 @@
 #include "LXCanvas.h"
 #include "../Core/LXDocument.h"
 
-#include <algorithm>
-#include <cassert>
-#include <charconv>
-#include <cfloat>
-#include <cmath>
-#include <iomanip>
-#include <limits>
-#include <sstream>
-#include <utility>
+#include <float.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Contract.h"
 
 namespace LX
 {
@@ -695,7 +689,11 @@ ImVec2 PinPosition(const Node& node, const NodeLayout& layout, const Pin& pin, c
 void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, const LXNodeItemRegistry& items,
                 LXDocument* document)
 {
-    assert(!document || &graph == &document->GraphForCanvas());
+    ::ce::contracts::assert_that(
+        [&]() -> bool {
+            return static_cast<bool>((!document || &graph == &document->GraphForCanvas()));
+        },
+        "!document || &graph == &document->GraphForCanvas()");
     const LXNodeItemRegistry::RowCacheScope rowCache(items);
     if (state.pendingPin &&
         (!graph.FindPin(state.pendingPin) ||

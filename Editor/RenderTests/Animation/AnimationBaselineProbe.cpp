@@ -13,9 +13,7 @@
 #include "SceneManager.h"
 #include "Socket.h"
 #include "ThreadPool.h"
-#include <algorithm>
-#include <cmath>
-#include <stdexcept>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

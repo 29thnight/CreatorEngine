@@ -1,9 +1,5 @@
 #pragma once
-#include <atomic>
-#include <memory>
-#include <mutex>
-#include <unordered_map>
-#include <utility>
+#include "StandardLibrary.h"
 
 class Noncopyable
 {

@@ -1,7 +1,7 @@
 // Production SceneHost oracle: one skinned stream, independent per-instance worlds,
 // two poses, normal-map TBN, world/pose motion, and warm cross-frame reuse.
 void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
-    ProbeTextures& textures, ProbePool& pool)
+    ProbeTextures& textures, ProbePool& pool, bool cold = false)
 {
     std::string error;
     LXMaterialAsset asset;
@@ -44,6 +44,29 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
     }
     geometry.vertices=std::move(vertices);mesh.vertexAttributeMask=skinMask;mesh.vertexStride=skinStride;
     mesh.vertexLayoutHash=assets::VertexLayoutHash(skinMask);mesh.vertexData=geometry.vertices.data();mesh.vertexBytes=geometry.vertices.size();mesh.indexData=geometry.indices.data();mesh.handle.generation=80001;
+    std::optional<ColdGeometryFixture> coldGeometry;
+    if (cold)
+    {
+        RHIModelMeshView cooked;
+        Check(cookedMeshes.Cook(mesh,cooked,error),"Cold skin fixture cooking " + error);
+        experiment::cooked::ModelGeometryArtifact artifact;
+        Check(artifact.mesh.vertices.AssignPacked(skinMask,6,geometry.vertices),"Cold skin exact reference");
+        artifact.mesh.indices.assign(geometry.indices.begin(),geometry.indices.end()); artifact.mesh.meshlets = cooked.SourceMesh()->meshlets;
+        auto minimum = math::vector3{float(local[0][0]),float(local[0][1]),float(local[0][2])}, maximum = minimum;
+        for (const auto& p : local) { minimum.x=std::min(minimum.x,float(p[0]));minimum.y=std::min(minimum.y,float(p[1]));minimum.z=std::min(minimum.z,float(p[2]));
+            maximum.x=std::max(maximum.x,float(p[0]));maximum.y=std::max(maximum.y,float(p[1]));maximum.z=std::max(maximum.z,float(p[2])); }
+        artifact.mesh.bounds = math::aabb::from_min_max(minimum,maximum); artifact.requiredBoneCount=2;
+        experiment::Skeleton skeleton; skeleton.rootBone=experiment::BoneIndex{0}; skeleton.bones.resize(2);
+        skeleton.bones[0].name="Root";skeleton.bones[1].name="Child";skeleton.bones[1].parent=experiment::BoneIndex{0};
+        Check(experiment::cooked::ComputeSkinBindingDigest(skeleton,artifact.requiredSkinBindingSha256,error),"Cold skin bind identity " + error);
+        auto descriptor=own::make_shared<assets::ModelMeshDescriptor>(*cooked.sourceDescriptor);
+        auto storage=own::make_shared<assets::ModelSkeletonStorage>();storage->skeleton=descriptor->skeleton->skeleton;
+        storage->skinBindingSha256=artifact.requiredSkinBindingSha256;
+        descriptor->requiredSkinBindingSha256=artifact.requiredSkinBindingSha256;
+        descriptor->skeleton=own::make_shared<assets::ModelSkeletonPayload>(storage,experiment::cooked::ResolvedAssetEntry{},0);
+        coldGeometry.emplace(MakeColdGeometryFixture(artifact,*descriptor));
+        Check(cookedMeshes.AdoptStream(coldGeometry->descriptor,mesh,error),"Cold skin descriptor adoption " + error);
+    }
     using V=std::array<double,3>;
     const auto transform=[](const V& p,const math::matrix4x4& m,double w){V r{};for(unsigned j=0;j<3;++j){r[j]=w*m.m[3][j];for(unsigned i=0;i<3;++i)r[j]+=p[i]*m.m[i][j];}return r;};
     const auto dot=[](V a,V b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];};
@@ -84,6 +107,9 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
             }
             SceneInputView view{context.frameId,context.sceneEpoch,218+workers,1,48,48,camera};view.temporalFrame.reset=step==0;
             own::shared_owner<const SceneViewInput> input;Check(SealScene(view,draws,{},input,error,previous?&*previous:nullptr),"Object sealed "+error);
+            if (cold) Check(input->Draws()[0].geometry->Source()->StreamedTopology() &&
+                !input->Draws()[0].geometry->Source()->Geometry().vertexData && !input->Draws()[0].geometry->Source()->Geometry().indexData &&
+                !coldGeometry->backing->rejectedBulk,"Skin rendering must not acquire CPU vertex/index arrays or full body");
             Check(device.BeginFrame(error),"Object begin");textures.BeginFrame(context.frameId);
             Check(host.PrepareResidency(context,input,error),"Object residency "+error);
             auto graph=std::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned,RGOrderPolicy::DependencyOrder);
@@ -148,6 +174,7 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
         }
     }
     host.ShutdownAfterIdle();
+    if (cold) std::cout << "METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0\n";
     Check(sharedFrames==9&&reuseFrames==3&&checkedPixels>100,"Object sharing/world/skin/motion coverage");
     std::cout<<"METEOR_OBJECT_SPACE_INSTANCES_OK frames="<<frames<<" worlds=4 poses=2 partitions=3 sharedFrames="<<sharedFrames<<" reuseFrames="<<reuseFrames<<" weightedBones=2 normalAndMotionPixels="<<checkedPixels<<" validation=0\n";
 }

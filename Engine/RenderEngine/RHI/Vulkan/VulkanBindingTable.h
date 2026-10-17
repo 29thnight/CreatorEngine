@@ -2,11 +2,8 @@
 #include "VulkanLoader.h"
 #include "../RHIResourceTypes.h"
 
-#include <span>
-#include <memory>
-#include <mutex>
-#include <utility>
-#include <vector>
+#include <stdint.h>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 // 프레임 수명의 바인딩 요청 표.
 //

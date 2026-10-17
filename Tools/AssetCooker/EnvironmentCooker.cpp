@@ -1,4 +1,5 @@
 #include "../../Editor/EngineEntry/TextureSourceProcessing.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "Assets/CookedEnvironment.h"
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -9,11 +10,7 @@
 #include "Texture.h"
 #include "PathFinder.h"
 #include "RHI/RHIShaderCompiler.h"
-#include <chrono>
-#include <fstream>
-#include <iostream>
-#include <thread>
-#include <stdexcept>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include <objbase.h>
 
 namespace
@@ -36,7 +33,8 @@ int wmain(int argc,wchar_t** argv)
     } textureSourceScope;
 
     if (argc<4 || argc>5) { std::cerr<<"EnvironmentCooker <repo> <source-HDR/EXR> <output.ceibl> [decoded-RGBA32F|--check-cache|--check-shaders]\n"; return 2; }
-    const HRESULT com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
+    const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
+    const HRESULT com = apartmentScope.result;
     try
     {
         EnvironmentRequire(SUCCEEDED(com),"COM initialization failed");
@@ -68,17 +66,17 @@ int wmain(int argc,wchar_t** argv)
                 options.strictMath=true;
             }
             std::cout<<"ENVIRONMENT_IMPORTANCE_SHADER_OK DXIL=7 SPIRV=7\n";
-            CoUninitialize();return 0;
+            return 0;
         }
         assets::CookedEnvironment warm;
         const auto cacheStart=std::chrono::steady_clock::now();
         if (assets::ReadCookedEnvironment(output,warm,error,&identity))
         {
             std::cout<<"ENVIRONMENT_COOK_CACHE_HIT ms="<<EnvironmentElapsed(cacheStart)<<" key="<<assets::EnvironmentCacheName(identity)<<'\n';
-            CoUninitialize(); return 0;
+            return 0;
         }
         if (argc==5 && std::wstring_view(argv[4])==L"--check-cache")
-        { std::cout<<"ENVIRONMENT_COOK_CACHE_MISS\n"; CoUninitialize(); return 3; }
+        { std::cout<<"ENVIRONMENT_COOK_CACHE_MISS\n"; return 3; }
         error.clear();
         const auto start=std::chrono::steady_clock::now();
         own::shared_owner<const Texture> texture;
@@ -143,8 +141,8 @@ int wmain(int argc,wchar_t** argv)
         generator.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown(); device.Shutdown();
         std::cout<<"ENVIRONMENT_COOK_OK generated_ms="<<generationMs<<" upload_readback_ms="<<uploadMs
             <<" total_ms="<<EnvironmentElapsed(start)<<" bytes="<<bytes<<" maps=8 roundtrip=exact importancePersisted=true validation=0 key="<<assets::EnvironmentCacheName(identity)<<'\n';
-        CoUninitialize(); return 0;
+        return 0;
     }
     catch(const std::exception& failure)
-    { std::cerr<<"ENVIRONMENT_COOK_FAILED "<<failure.what()<<'\n'; if(SUCCEEDED(com)) CoUninitialize(); return 1; }
+    { std::cerr<<"ENVIRONMENT_COOK_FAILED "<<failure.what()<<'\n'; return 1; }
 }

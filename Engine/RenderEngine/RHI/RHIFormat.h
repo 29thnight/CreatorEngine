@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 // 픽셀 포맷 — 백엔드 중립 (PHASE 3-1 재정의, V1).
 //

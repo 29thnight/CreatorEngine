@@ -1,11 +1,7 @@
 #pragma once
 
 #include "AnimTaskList.h"
-#include <array>
-#include <algorithm>
-#include <cmath>
-#include <cstddef>
-#include <cstdint>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace animation
 {

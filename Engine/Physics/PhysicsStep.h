@@ -1,11 +1,7 @@
 #pragma once
 #include "PhysicsGeometry.h"
 #include "PhysicsCharacter.h"
-#include <array>
-#include <optional>
-#include <new>
-#include <tuple>
-#include <vector>
+#include "../Utility_Framework/StandardLibrary.h"
 
 namespace ce::physics
 {

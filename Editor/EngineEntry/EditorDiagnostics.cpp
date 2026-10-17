@@ -2,11 +2,7 @@
 #include "EditorObjectOperations.h"
 #include "Scene.h"
 #include "Animator.h"
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <unordered_map>
-#include <unordered_set>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 namespace EditorDiagnostics
 {
     CommandCore::CommandResult ValidateHierarchy(Scene* scene)

@@ -7,8 +7,7 @@
 #include <windowsx.h>
 #include <imgui.h>
 
-#include <algorithm>
-#include <optional>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace ce::profiler_viewer
 {

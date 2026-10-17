@@ -3,10 +3,7 @@
 
 #include "TypeTrait.h"
 
-#include <cstdint>
-#include <memory>
-#include <span>
-#include <string_view>
+#include "../Utility_Framework/StandardLibrary.h"
 
 #include <mathematics/color.hpp>
 

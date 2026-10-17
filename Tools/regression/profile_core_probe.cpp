@@ -12,21 +12,8 @@
 #include <crtdbg.h>
 #endif
 
-#include <array>
-#include <atomic>
-#include <chrono>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <filesystem>
-#include <fstream>
-#include <functional>
-#include <new>
-#include <semaphore>
-#include <string>
-#include <thread>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 #include "ProfileAggregate.h"
 #include "ProfileCaptureFile.h"

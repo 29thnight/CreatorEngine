@@ -1,17 +1,7 @@
 #pragma once
 
 #include "LayerTypes.h"
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <limits>
-#include <memory>
-#include <optional>
-#include <ranges>
-#include <span>
-#include <string>
-#include <string_view>
-#include <thread>
+#include "StandardLibrary.h"
 
 namespace ce::layers
 {

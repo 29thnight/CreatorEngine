@@ -2,10 +2,8 @@
 #include "AuthoringWriteNode.h"
 #include "AuthoringCookedDocument.h"
 #include "../../Engine/Physics/PhysicsSensorPairs.h"
-#include <fstream>
-#include <iostream>
-#include <iterator>
-#include <stdexcept>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 int main(int argc, char** argv)
 {
     std::size_t checks = 0;

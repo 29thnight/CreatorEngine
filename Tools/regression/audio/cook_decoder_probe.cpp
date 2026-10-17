@@ -1,8 +1,6 @@
 #include "AudioDecodeValidation.h"
 
-#include <cstdio>
-#include <filesystem>
-#include <string>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

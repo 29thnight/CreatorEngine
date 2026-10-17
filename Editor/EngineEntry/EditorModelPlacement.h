@@ -1,12 +1,8 @@
 #pragma once
 
 #include "Ownership.h"
-#include <cstddef>
-#include <cstdint>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "Windows/EditorWindowBody.h"
-#include <memory>
-#include <optional>
-#include <string>
 #include <mathematics/vector3.hpp>
 
 namespace Editor

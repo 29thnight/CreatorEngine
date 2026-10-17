@@ -9,11 +9,7 @@
 #include "Scene.h"
 #include "SceneManager.h"
 
-#include <algorithm>
-#include <chrono>
-#include <memory>
-#include <string>
-#include <utility>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

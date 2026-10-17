@@ -108,6 +108,9 @@
     <ProjectReference Include="..\..\Editor\RenderTests\RenderTests.vcxproj" />
   </ItemGroup>
   <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SolutionDir)ThirdParty\DotNetHost\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>

@@ -7,11 +7,7 @@
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 
-#include <cstdint>
-#include <deque>
-#include <string>
-#include <unordered_map>
-#include <vector>
+#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 class DX12DeviceResources;
 struct Vertex;
@@ -68,6 +64,7 @@ public:
         const RHISubmissionTicket& ticket = {});
 
     std::uint32_t ShadowDrawCount() const { return m_host.ShadowDrawCount(); }
+    auto ShadowCacheStats() const { return m_host.CurrentShadowCacheStats(); }
     std::array<std::uint32_t, 3> RecordedShadowMeshletDrawCounts() const
         { return m_host.RecordedShadowMeshletDrawCounts(); }
     auto ShadowMeshletOutputs() const { return m_host.ShadowMeshletOutputs(); }

@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cstddef>
-#include <filesystem>
-#include <string>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace Authoring
 {

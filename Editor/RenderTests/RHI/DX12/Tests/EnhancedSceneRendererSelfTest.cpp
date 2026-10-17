@@ -76,17 +76,8 @@
 
 #include <DirectXTex.h>
 #include "JobScheduler.h"
-#include <condition_variable>
-#include <atomic>
-#include <array>
-#include <vector>
-#include <thread>
-#include <chrono>
-#include <cstdio>
-#include <cmath>
-#include <cstdlib>
-#include <algorithm>
-#include <limits>
+#include <stdint.h>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Passes/Lighting/EnhancedSSSPass.h"
 #include "Render/Passes/Lighting/EnhancedSSRPass.h"
@@ -2321,15 +2312,16 @@ passes:
                 {
                     return false;
                 }
-                if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 2} || snapshot.resources.size() != std::size(handles) ||
-                    graph.GetStats().passesExecuted != 3)
+                // Visibility and surface colors now have independent clear producers.
+                if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 2, 3} || snapshot.resources.size() != std::size(handles) ||
+                    graph.GetStats().passesExecuted != 4)
                 {
                     error = "RG5 product producer/consumer plan mismatch";
                     return false;
                 }
                 if (mode != RGSchedulingMode::DeclarationOrder)
                 {
-                    for (size_t pass = 0; pass < 2; ++pass)
+                    for (size_t pass = 0; pass < 3; ++pass)
                     {
                         for (const auto& usage : snapshot.passes[pass].usages)
                         {

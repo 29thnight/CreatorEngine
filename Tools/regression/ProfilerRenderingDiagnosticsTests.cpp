@@ -1,11 +1,8 @@
 // Standalone diagnostics codec and delayed GPU/display association regressions.
 #include "../../Engine/EngineDiagnostics/ProfilerRenderingDiagnostics.h"
 
-#include <bit>
-#include <cstdio>
-#include <limits>
-#include <string>
-#include <vector>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace rendering_diagnostics_tests
 {

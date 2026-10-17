@@ -1,4 +1,5 @@
 #include "TextureSourceProcessing.h"
+#include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "TextureCodecImage.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
@@ -6,27 +7,17 @@
 #include <d3d11.h>
 #include <DirectXTex.h>
 #include <objbase.h>
-#include <algorithm>
-#include <cctype>
-#include <cmath>
-#include <cstring>
-#include <limits>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {
     struct SourceImageApartment final
     {
-        HRESULT result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
-        ~SourceImageApartment()
-        {
-            if (SUCCEEDED(result))
-            {
-                CoUninitialize();
-            }
-        }
+        ce::platform::windows::apartment_scope scope{ ce::platform::windows::apartment_model::current_or_mta };
         bool Ready() const noexcept
         {
-            return SUCCEEDED(result) || result == RPC_E_CHANGED_MODE;
+            return SUCCEEDED(scope.result);
         }
     };
 

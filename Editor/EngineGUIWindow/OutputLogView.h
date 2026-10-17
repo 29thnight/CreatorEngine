@@ -28,13 +28,7 @@
 
 #include "LogStore.h"
 
-#include <algorithm>
-#include <cstdint>
-#include <deque>
-#include <map>
-#include <string>
-#include <string_view>
-#include <vector>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace editor
 {

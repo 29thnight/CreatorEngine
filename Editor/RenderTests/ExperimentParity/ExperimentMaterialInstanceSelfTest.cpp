@@ -8,10 +8,7 @@
 #include "ShaderMetaReflection.h"
 #include "Texture.h"
 
-#include <cstdio>
-#include <memory>
-#include <string>
-#include <vector>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace RenderTest
 {

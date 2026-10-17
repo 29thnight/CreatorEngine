@@ -1,9 +1,6 @@
 #include "ImportedScene.h"
 
-#include <span>
-#include <algorithm>
-#include <cmath>
-#include <utility>
+#include "../../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment::importer
 {

@@ -2,12 +2,7 @@
 
 #include "material_probe_gpu.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <iomanip>
-#include <limits>
-#include <sstream>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 namespace
 {

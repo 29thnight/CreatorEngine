@@ -6,7 +6,7 @@
 #include "Component.h"
 #include "AssetDepot/AssetRequest.h"
 #include <mathematics/frustum.hpp>
-#include <optional>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class TerrainComponent;
 class [[reflgen::reflect]] FoliageComponent : public meta::identity<FoliageComponent, Component>

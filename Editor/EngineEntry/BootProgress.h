@@ -1,6 +1,6 @@
 #pragma once
 #include "ProgressWindow.h"
-#include <algorithm>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 /// 부팅 진행률 추적자.
 ///

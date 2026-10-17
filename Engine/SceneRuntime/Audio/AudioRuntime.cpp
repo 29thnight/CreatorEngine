@@ -1,9 +1,7 @@
 #include "AudioRuntime.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace wave
 {

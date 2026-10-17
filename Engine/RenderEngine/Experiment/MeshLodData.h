@@ -2,9 +2,9 @@
 
 #include "MeshletData.h"
 
-#include <cstdint>
-#include <type_traits>
-#include <vector>
+#include <stddef.h>
+#include <stdint.h>
+#include "../../Utility_Framework/StandardLibrary.h"
 
 namespace experiment
 {

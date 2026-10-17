@@ -2,9 +2,7 @@
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h"
 #include "../AssetCooker/CollisionGeometryCookProducer.h"
-#include <fstream>
-#include <iostream>
-#include <source_location>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {

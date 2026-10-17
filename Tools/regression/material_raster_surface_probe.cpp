@@ -1,5 +1,8 @@
+#include "Assets/QuantizedGeometry.h"
+#include "Assets/ModelCpuGeometry.h"
 #include "RHI/RHIShaderSource.h"
 #include "RHI/RHIModelMeshletUpload.h"
+#include "RHI/RHISharedSparsePagePool.h"
 #include "material_owner_checks.h"
 #include "MaterialGraphRasterSurface.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
@@ -19,7 +22,8 @@
 #include "Render/Passes/Lighting/EnhancedSSGIPass.h"
 #include "Render/Passes/Lighting/EnhancedVolumetricFogPass.h"
 #include "RHI/DX12/EnhancedIBLGenerator.h"
-#include <set>
+#include <stdint.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "RHI/DX12/DX12MeshCache.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -37,14 +41,6 @@
 #include "RHI/Vulkan/VulkanLoader.h"
 #endif
 
-#include <bit>
-#include <chrono>
-#include <iostream>
-#include <limits>
-#include <optional>
-#include <thread>
-#include <type_traits>
-#include <utility>
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
@@ -619,6 +615,31 @@ Reference PixelReference(const Geometry& geometry, unsigned x, unsigned y, const
 class RecordingChangeDevice : public ProbeDevice
 {
   public:
+    struct CompletionRelay final : IRHIUploadTransactionListener
+    {
+        IRHIUploadTransactionListener* target{};
+        RecordingChangeDevice* owner{};
+        void OnUploadSubmitted(uint64_t r, RHICompletionPoint c) override { target->OnUploadSubmitted(r, c); }
+        void OnUploadAccepted(uint64_t r, RHICompletionPoint c) override { target->OnUploadAccepted(r, c); }
+        void OnUploadAborted(uint64_t r) override { target->OnUploadAborted(r); }
+        void OnUploadSubmissionRejected(uint64_t r, RHICompletionPoint c) override { target->OnUploadSubmissionRejected(r, c); }
+        void OnUploadCompleted(uint64_t c) override
+        {
+            target->OnUploadCompleted((std::min)(c, owner->completionCeiling.load()));
+        }
+    };
+    bool relayCompletions{};
+    std::atomic<uint64_t> completionCeiling{UINT64_MAX};
+    std::map<IRHIUploadTransactionListener*, std::unique_ptr<CompletionRelay>> completionRelays;
+    void ReleaseCompletionGate()
+    {
+        completionCeiling = UINT64_MAX;
+        const auto completed = GetCompletedFenceValue();
+        for (const auto& [target, relay] : completionRelays)
+        {
+            target->OnUploadCompleted(completed);
+        }
+    }
     bool flushOnUpload{};
     bool disableAtomic64{};
     RHIAtomicCapabilities GetAtomicCapabilities() const override
@@ -633,7 +654,31 @@ class RecordingChangeDevice : public ProbeDevice
       {
           lastListener = listener;
           if (!firstListener) firstListener = listener;
-          ProbeDevice::RegisterUploadTransactionListener(listener);
+          if (relayCompletions)
+          {
+              auto relay = std::make_unique<CompletionRelay>();
+              relay->target = listener;
+              relay->owner = this;
+              ProbeDevice::RegisterUploadTransactionListener(relay.get());
+              completionRelays.emplace(listener, std::move(relay));
+          }
+          else
+          {
+              ProbeDevice::RegisterUploadTransactionListener(listener);
+          }
+      }
+      void UnregisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+      {
+          const auto found = completionRelays.find(listener);
+          if (found != completionRelays.end())
+          {
+              ProbeDevice::UnregisterUploadTransactionListener(found->second.get());
+              completionRelays.erase(found);
+          }
+          else
+          {
+              ProbeDevice::UnregisterUploadTransactionListener(listener);
+          }
       }
       bool CreateTexture(const RHITextureDesc& desc, RHITextureHandle& result, std::string& error) override
       {
@@ -3696,9 +3741,13 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
 #include "support/MeshletBatchDispatchProbe.inl"
 #include "support/AtomicReductionProbe.inl"
 #include "support/GeometryAccessProbe.inl"
+#include "support/QuantizedGeometryProbe.inl"
+#include "support/ClusterStorageProbe.inl"
 #include "support/HybridVisibilityProbe.inl"
+#include "support/ColdGeometryProbe.inl"
 #include "support/ObjectSpaceInstanceProbe.inl"
 #include "support/ClusterLodProbe.inl"
+#include "support/ShadowCorrectnessProbe.inl"
 #include "support/MeshletHzbProbe.inl"
 
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
@@ -3897,10 +3946,34 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         return;
     }
     if (mode == "--temporal-transmission-only") { RunTemporalBuckets(device, roots, pipelines, textures, pool, root, image, true); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--shadow-correctness-only" || mode == "--shadow-correctness-recreated")
+    {
+        RunShadowCorrectness(device, roots, pipelines, textures, pool, instances[0]);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        if (mode == "--shadow-correctness-only")
+        {
+            Run(root, "--shadow-correctness-recreated");
+            std::cout << "METEOR_SHADOW_DEVICE_RECREATION_OK devices=2 validation=0\n";
+        }
+        return;
+    }
+    if (mode == "--cluster-streaming-only")
+    {
+        RunClusterLod(device, roots, pipelines, textures, pool, instances[0], true);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
     if (mode == "--cluster-lod-only") { RunClusterLod(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
-    if (mode == "--object-space-only") { RunObjectSpaceInstances(device, roots, pipelines, textures, pool); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--object-space-only") { RunObjectSpaceInstances(device, roots, pipelines, textures, pool); RunObjectSpaceInstances(device, roots, pipelines, textures, pool, true); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--hybrid-visibility-only") { RunHybridVisibility(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--atomic-reduction-only") { RunAtomicReduction(device, roots, pipelines, root, pool); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--cluster-storage-only")
+    {
+        RunClusterStorage(device, roots, pipelines, root);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--quantized-geometry-only") { RunQuantizedGeometry(device, roots, pipelines, root); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--geometry-access-only") { RunGeometryAccess(device, roots, pipelines, root); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--meshlet-hzb-only") { RunMeshletHzb(device, roots, pipelines, root); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--meshlet-dispatch-only")
@@ -4488,7 +4561,7 @@ int main(int argc, char** argv)
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
                    (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
-                    std::string_view(argv[2]) == "--layer-shape-only" || std::string_view(argv[2]) == "--layer-bucket-only" || std::string_view(argv[2]) == "--temporal-bucket-only" || std::string_view(argv[2]) == "--visibility-reconstruction-only" || std::string_view(argv[2]) == "--hw-visibility-only" || std::string_view(argv[2]) == "--material-bucket-only" || std::string_view(argv[2]) == "--lx-meshlet-only" || std::string_view(argv[2]) == "--geometry-access-only" || std::string_view(argv[2]) == "--meshlet-dispatch-only" || std::string_view(argv[2]) == "--temporal-transmission-only" || std::string_view(argv[2]) == "--cluster-lod-only" || std::string_view(argv[2]) == "--object-space-only" || std::string_view(argv[2]) == "--hybrid-visibility-only" || std::string_view(argv[2]) == "--atomic-reduction-only" || std::string_view(argv[2]) == "--meshlet-hzb-only" ||
+                    std::string_view(argv[2]) == "--layer-shape-only" || std::string_view(argv[2]) == "--layer-bucket-only" || std::string_view(argv[2]) == "--temporal-bucket-only" || std::string_view(argv[2]) == "--visibility-reconstruction-only" || std::string_view(argv[2]) == "--hw-visibility-only" || std::string_view(argv[2]) == "--material-bucket-only" || std::string_view(argv[2]) == "--lx-meshlet-only" || std::string_view(argv[2]) == "--cluster-streaming-only" || std::string_view(argv[2]) == "--cluster-storage-only" || std::string_view(argv[2]) == "--quantized-geometry-only" || std::string_view(argv[2]) == "--geometry-access-only" || std::string_view(argv[2]) == "--meshlet-dispatch-only" || std::string_view(argv[2]) == "--temporal-transmission-only" || std::string_view(argv[2]) == "--shadow-correctness-only" || std::string_view(argv[2]) == "--shadow-correctness-recreated" || std::string_view(argv[2]) == "--cluster-lod-only" || std::string_view(argv[2]) == "--object-space-only" || std::string_view(argv[2]) == "--hybrid-visibility-only" || std::string_view(argv[2]) == "--atomic-reduction-only" || std::string_view(argv[2]) == "--meshlet-hzb-only" ||
                     std::string_view(argv[2]) == "--issue-resource-lifetime" ||
                     std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||

@@ -12,13 +12,8 @@
 #include "FrameCameraSnapshot.h"
 #include "Mesh.h"
 
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstdio>
+#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 #include <mathematics/transform.hpp>
-#include <string>
-#include <vector>
 
 namespace
 {

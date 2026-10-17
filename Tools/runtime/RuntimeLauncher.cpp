@@ -1,12 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <shellapi.h>
-#include <cstdio>
-#include <cstring>
-#include <exception>
-#include <filesystem>
-#include <fstream>
-#include <string>
+#include <stdio.h>
+#include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "HostAbi.h"
 #include "CrashReporter.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"

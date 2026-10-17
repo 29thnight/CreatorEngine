@@ -47,7 +47,9 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
-#include <cmath>
+#include <stdint.h>
+#include <stdio.h>
+#include "../../../Engine/Utility_Framework/StandardLibrary.h"
 #include "EnhancedRenderDebugWindow.h"
 #include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
@@ -130,7 +132,7 @@
 #include "AuthoringParsedDocument.h"
 #include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "CoreWindow.h"
+#include "WindowsCoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
@@ -165,31 +167,12 @@
 #include <Windows.h>
 #include <psapi.h> // MBC11: peak working set
 #include <crtdbg.h>
-#include <algorithm>
-#include <atomic>
-#include <cctype>
-#include <limits>
-#include <random>
-#include <stdexcept>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 #include <DbgHelp.h>
 #include <DXProgrammableCapture.h>
-#include <chrono>
 #include <dxgidebug.h>
 #include <wrl/client.h>
-#include <algorithm>
-#include <cstring>
-#include <cstdio>
-#include <fstream>
-#include <functional>
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
-#include <unordered_set>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
 
 namespace ConsoleCmd
 {

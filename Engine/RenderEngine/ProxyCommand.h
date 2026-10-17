@@ -7,9 +7,7 @@
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
-#include <type_traits>
-#include <utility>
-#include <variant>
+#include "../Utility_Framework/StandardLibrary.h"
 
 class FoliageComponent;
 class TerrainComponent;

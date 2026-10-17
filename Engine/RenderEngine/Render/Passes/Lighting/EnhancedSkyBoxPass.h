@@ -1,7 +1,7 @@
 #pragma once
 #include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
-#include <cstdint>
+#include "../../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
