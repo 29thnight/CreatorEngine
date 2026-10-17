@@ -756,8 +756,67 @@ void VerifyCacheAdmissionGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
     std::cout << "ISSUE_CACHE_ADMISSION_OK completed=260 retained=1 validation=0\n";
 }
 
+void VerifyProfilerMergeLifetime()
+{
+    DX12GpuProfiler profiler;
+    DX12GpuProfiler::FrameTimings timings;
+    timings.ticksPerSecond = 1000;
+    std::vector<DX12GpuProfiler::PassTiming> merged;
+    // Grow the retained hash table, then shrink the live pass set enough to
+    // select MSVC's element-wise clear. The old implementation retained views
+    // into names that Collect overwrote before that clear hashed them again.
+    for (unsigned cycle = 0; cycle < 32; ++cycle)
+    {
+        timings.slices.clear();
+        for (unsigned pass = 0; pass < 300; ++pass)
+        {
+            timings.slices.push_back({"MergeLifetime.Warmup.Pass." + std::to_string(pass), pass, pass + 1});
+        }
+        profiler.MergeSlices(timings, merged);
+        Check(merged.size() == 300 && profiler.GetLastTotalMilliseconds() == 300,
+              "Profiler merge grows retained storage");
+        timings.slices.resize(3);
+        const std::string first = "METEOR.Shadow.Occlusion.C0.Build";
+        timings.slices[0] = {first, 0, 10};
+        timings.slices[1] = {"B", 10, 90};
+        timings.slices[2] = {first, 90, 100};
+        profiler.MergeSlices(timings, merged);
+        Check(merged.size() == 2 && merged[0].name == first + "(x2)" && merged[1].name == "B" &&
+                  merged[0].milliseconds == 20 && merged[0].spanMilliseconds == 100 &&
+                  profiler.GetLastTotalMilliseconds() == 100,
+              "Profiler merge preserves first appearance, duration and span");
+        // Mutate a long name in place, then reallocate its backing allocation.
+        timings.slices[0].name[0] = 'X';
+        timings.slices[0].name.assign(1024, 'Z');
+        timings.slices[2].name[0] = 'Y';
+        timings.slices.clear();
+        timings.slices.shrink_to_fit();
+        timings.slices.push_back({first, 1, 4});
+        profiler.MergeSlices(timings, merged);
+        Check(merged.size() == 1 && merged[0].name == first && merged[0].milliseconds == 3 &&
+                  merged[0].spanMilliseconds == 3 && profiler.GetLastTotalMilliseconds() == 3,
+              "Profiler merge survives mutated, freed and replaced slice names");
+        timings.slices.clear();
+        profiler.MergeSlices(timings, merged);
+        Check(merged.empty() && profiler.GetLastTotalMilliseconds() == 0,
+              "Profiler empty merge clears previous output");
+        {
+            DX12GpuProfiler::FrameTimings temporary;
+            temporary.ticksPerSecond = 0;
+            temporary.slices = {{"Temporary.Long.Pass.Name.For.Lifetime", 2, 9}};
+            profiler.MergeSlices(temporary, merged);
+            Check(merged.size() == 1 && merged[0].milliseconds == 0 && merged[0].spanMilliseconds == 0,
+                  "Profiler zero frequency keeps finite zero durations");
+        }
+        profiler.MergeSlices(timings, merged);
+        Check(merged.empty(), "Profiler merge survives destroyed input frame");
+    }
+    std::cout << "DX12_PROFILER_MERGE_LIFETIME_OK cycles=32 checks=192 mutation=1 reallocation=1 destroyedInput=1 empty=1\n";
+}
+
 void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evaluator, SurfaceView view)
 {
+    VerifyProfilerMergeLifetime();
     DX12GpuProfiler profiler;
     DX12GpuProfiler::FrameTimings timings;
     timings.ticksPerSecond = 1000;
@@ -2044,6 +2103,11 @@ int main(int argc, char** argv)
 {
     try
     {
+        if (argc == 3 && std::string_view(argv[2]) == "--profiler-merge-only")
+        {
+            VerifyProfilerMergeLifetime();
+            return 0;
+        }
         if (argc == 3 && std::string_view(argv[2]) == "--graph-admission-only")
         {
             RecordingChangeDevice device;

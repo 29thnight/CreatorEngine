@@ -512,6 +512,21 @@ void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
     // 스크래치는 멤버다(선언부 주석) — clear 는 용량을 지우지 않는다.
     m_mergeScratch.clear();
     m_mergeIndex.clear();
+    // Collect may overwrite/reallocate slice names before the next merge. A
+    // borrowed hash key must remain immutable even during unordered_map::clear:
+    // MSVC's sparse clear hashes keys again to locate their original buckets.
+    // Release every view before returning, including output allocation failures.
+    // The containers retain their capacity; no frame owns these borrowed names.
+    struct BorrowedNamesScope
+    {
+        decltype(m_mergeIndex)& index;
+        decltype(m_mergeScratch)& scratch;
+        ~BorrowedNamesScope()
+        {
+            index.clear();
+            scratch.clear();
+        }
+    } borrowedNames{m_mergeIndex, m_mergeScratch};
     for (const PassSlice& slice : timings.slices)
     {
         // 키는 slice.name 을 가리키는 view 다 — 사본을 만들지 않는다.

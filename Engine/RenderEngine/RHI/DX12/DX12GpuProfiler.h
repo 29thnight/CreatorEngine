@@ -203,8 +203,9 @@ private:
     // 지역 변수였을 때 프레임마다 벡터 하나 + 엔트리마다 std::string 하나를
     // 새로 할당했고, 그것이 할당 귀속 상위에 잡혔다(ContainerLibraryDesign C0).
     //
-    // 키가 string_view인 이유: 가리키는 대상이 m_records[i].name이고 그 벡터는
-    // Collect() 호출을 넘어 산다. 이 함수 안에서만 쓰므로 안전하다.
+    // 키는 입력 FrameTimings::slices[i].name을 빌린다. 다음 Collect()가 그
+    // 문자열을 바꾸기 전에 MergeSlices()의 scope guard가 모든 view를 지운다.
+    // 컨테이너 용량만 재사용하며, 반환 뒤에 빌린 키를 남기지 않는다.
     struct MergedSpan
     {
         uint64_t begin{ 0 };
