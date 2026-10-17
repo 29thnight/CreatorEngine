@@ -38,6 +38,10 @@ struct BindlessMaterialFrame
     std::map<TextureKey, std::uint32_t> textureIndices;
     RHIBindingTable textures;
     std::size_t publishedSize{};
+    // Frame ownership pins complete immutable table values, including backend
+    // version. Readers never touch the mutable descriptions or owner vector.
+    std::vector<std::unique_ptr<const RHIBindingTable>> publishedTables;
+    std::atomic<const RHIBindingTable*> publishedTable{};
 };
 
 struct RenderBindings

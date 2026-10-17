@@ -528,11 +528,13 @@ public:
     ///   이미 들고 있으므로 호출부가 같은 값을 도로 넘기지 않는다.
     bool Compile(std::string& outError);
     struct StructuralSchedule;
+    static constexpr size_t MaxStructuralSchedules = 8;
     // Source must be a frozen submitted graph; immutable CPU metadata is shared.
     void InheritStructuralSchedule(const EnhancedRenderGraph& previous);
     void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous);
     void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous,
         const std::shared_ptr<const StructuralSchedule>& alternate);
+    void InheritStructuralSchedule(std::span<const std::shared_ptr<const StructuralSchedule>> schedules);
     std::shared_ptr<const StructuralSchedule> SnapshotStructuralSchedule() const;
 
     struct QueueHint
@@ -1045,6 +1047,7 @@ public:
 private:
     std::shared_ptr<const StructuralSchedule> m_structuralSchedule;
     std::shared_ptr<const StructuralSchedule> m_alternateSchedule;
+    std::array<std::shared_ptr<const StructuralSchedule>, MaxStructuralSchedules - 2> m_additionalSchedules;
     std::shared_ptr<const StructuralSchedule> m_activeStructuralSchedule;
     bool MatchesStructuralSchedule(const StructuralSchedule& schedule) const;
     void CaptureStructuralDeclarations(StructuralSchedule& schedule) const;

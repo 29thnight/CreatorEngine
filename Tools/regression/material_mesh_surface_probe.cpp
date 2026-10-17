@@ -1411,6 +1411,49 @@ void GraphAdmissionTests(RecordingChangeDevice& device)
         description.bytes = 64;
         description.allowUnorderedAccess = true;
         Check(device.CreateBuffer(description, pooled, error), "Imported final-state fixture buffer");
+        {
+            EnhancedRenderGraph variants(device, RGSchedulingMode::ExplicitVersioned);
+            std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>,
+                EnhancedRenderGraph::MaxStructuralSchedules> retained;
+            for (unsigned cycle = 0; cycle < 3; ++cycle)
+            {
+                for (size_t variant = 0; variant < retained.size(); ++variant)
+                {
+                    const auto buffer = variants.ImportBuffer(pooled, RHIResourceState::Common, "Variants.Buffer");
+                    const auto output = variants.Write(buffer);
+                    variants.AddPass("Variants." + std::to_string(variant),
+                        {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [](const auto&) {}, true);
+                    Check(variants.Compile(error), "Variant schedule compile: " + error);
+                    Check(variants.GetStats().structuralScheduleReused == (cycle != 0),
+                        "All bounded variants retain their exact compiled DAG across Reset");
+                    if (cycle == 0)
+                    {
+                        retained[variant] = variants.SnapshotStructuralSchedule();
+                    }
+                    Check(variants.SnapshotStructuralSchedule() == retained[variant],
+                        "Variant reuse shares the original immutable schedule identity");
+                    variants.Reset();
+                }
+            }
+            EnhancedRenderGraph inherited(device, RGSchedulingMode::ExplicitVersioned);
+            inherited.InheritStructuralSchedule(retained);
+            auto buffer = inherited.ImportBuffer(pooled, RHIResourceState::Common, "Variants.Buffer");
+            auto output = inherited.Write(buffer);
+            inherited.AddPass("Variants.5", {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                [](const auto&) {}, true);
+            Check(inherited.Compile(error) && inherited.GetStats().structuralScheduleReused &&
+                inherited.SnapshotStructuralSchedule() == retained[5], "Fresh slot inherits every retained variant");
+            inherited.Reset();
+            buffer = inherited.ImportBuffer(pooled, RHIResourceState::Common, "Variants.Buffer");
+            output = inherited.Write(buffer);
+            const auto changedPass = inherited.AddPass("Variants.5", {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                [](const auto&) {}, true);
+            inherited.DeclareRecordingIndependent(changedPass);
+            Check(inherited.Compile(error) && !inherited.GetStats().structuralScheduleReused,
+                "A changed recording contract still rejects every cached variant");
+            inherited.Reset();
+            std::cout << "RG_VARIANT_CACHE_OK variants=8 cycles=3 exactInvalidation=1\n";
+        }
         for (const auto mode : {RGSchedulingMode::DeclarationOrder, RGSchedulingMode::ExplicitSingleWriter,
                                 RGSchedulingMode::ExplicitVersioned})
         {
@@ -2471,6 +2514,24 @@ void Run(const std::filesystem::path& root)
                       device.materialTableCalls == retryTablesBefore + 1 &&
                       materialBindings->bindless->publishedSize == materialBindings->bindless->descriptions.size(),
                   "Surface retry publishes once and binds without another descriptor allocation");
+            {
+                // A published immutable table remains readable while preparation
+                // holds its mutation mutex. Always unlock before joining a failure.
+                std::unique_lock held(materialBindings->bindless->mutex);
+                auto reader = std::async(std::launch::async, [&]
+                {
+                    RenderBindingCache::PreparedPass prepared;
+                    std::string failure;
+                    return RenderBindingCache::PreparePass(device, *materialBindings,
+                        materialBindings->layout, prepared, failure);
+                });
+                const bool independent = reader.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
+                held.unlock();
+                const bool accepted = reader.get();
+                Check(independent && accepted, "Published material table reads never wait for the mutation mutex");
+                Check(device.materialTableCalls == retryTablesBefore + 1,
+                    "Published table reader performs no descriptor allocation");
+            }
             auto& retryEncoder = device.GetImmediateEncoder();
             const RHIBufferHandle buffers[]{prefixMesh->Buffer(), prefixSurface->Buffer()};
             for (unsigned index = 0; index < 2; ++index)
@@ -2530,6 +2591,7 @@ void Run(const std::filesystem::path& root)
         }
         std::cout << "SURFACE_PREFIX_LIFETIME_OK cases=2 bindingFailures=1 bindingFlushes=1 "
                      "retries=2 preserved=2 gpuComponents=4736 validation=0\n";
+        std::cout << "MATERIAL_TABLE_READERS_OK cases=2 mutationMutexHeld=1 descriptorAllocations=0\n";
         Check(device.BeginFrame(error), "Prefix bake begin");
         textures.BeginFrame(++frames);
         Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),

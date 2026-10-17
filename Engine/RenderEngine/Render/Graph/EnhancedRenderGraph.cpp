@@ -8,6 +8,44 @@
 
 namespace
 {
+    void AuditStructuralMiss(const std::string& current, const std::shared_ptr<const std::string>& previous,
+        const std::shared_ptr<const std::string>& alternate)
+    {
+        static const std::string prefix = []
+        {
+            char* value{};
+            size_t length{};
+            std::string result;
+            if (_dupenv_s(&value, &length, "CREATOR_RENDERGRAPH_CACHE_AUDIT") == 0 && value)
+            {
+                result = value;
+            }
+            std::free(value);
+            return result;
+        }();
+        if (prefix.empty())
+        {
+            return;
+        }
+        ce::profile_scope profile{ce::marker<"RenderGraphCacheAudit">()};
+        static thread_local uint64_t serial{};
+        const auto path = prefix + "." + std::to_string(++serial);
+        const auto write = [&](const char* suffix, const std::string& data)
+        {
+            std::ofstream file(path + suffix, std::ios::binary);
+            file.write(data.data(), static_cast<std::streamsize>(data.size()));
+        };
+        write(".current.bin", current);
+        if (previous)
+        {
+            write(".previous.bin", *previous);
+        }
+        if (alternate)
+        {
+            write(".alternate.bin", *alternate);
+        }
+    }
+
     template<class Values>
     void ClearNonempty(Values& values)
     {
@@ -642,8 +680,15 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
     if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
     {
         using Reason = DiagnosticSnapshot::VersionEdge::Reason;
-        std::vector<std::vector<std::vector<uint16_t>>> producers(m_resources.size());
-        std::vector<std::vector<std::vector<uint16_t>>> consumers(m_resources.size());
+        // Flatten cold-compile access lists instead of allocating a Debug STL
+        // container/proxy for every resource version and its producer/consumer.
+        std::vector<size_t> versionOffsets(m_resources.size() + 1, 0);
+        for (size_t resource = 0; resource < m_resources.size(); ++resource)
+        {
+            versionOffsets[resource + 1] = versionOffsets[resource] + m_resources[resource].versions.size();
+        }
+        const size_t versionCount = versionOffsets.back();
+        std::vector<size_t> producerCounts(versionCount, 0), consumerCounts(versionCount, 0);
         const auto fail = [&](const std::string& why, size_t r, uint16_t v) {
             outError = "RG2 " + why + ": " + m_resources[r].name + " v" + std::to_string(v); return false;
         };
@@ -655,8 +700,6 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             {
                 return fail("duplicate physical import; reuse its handle",r,0);
             }
-            producers[r].resize(resource.versions.size());
-            consumers[r].resize(resource.versions.size());
             for (size_t v=resource.imported ? 1 : 0; v<resource.versions.size(); ++v)
             {
                 const auto parent=resource.versions[v].parent;
@@ -669,7 +712,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         for (size_t p=0; p<count; ++p)
         {
             std::vector<uint16_t> seen;
-            for (const auto& u:m_passes[p].usages)
+            for (const auto& u:std::span{m_passes[p].usages})
             {
                 const auto bad = [&](const std::string& why) {
                     outError="RG2 pass '"+m_passes[p].name+"': "+why;
@@ -679,7 +722,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 };
                 if (!ValidVersionHandle(u.handle)) return bad("stale/foreign/invalid resource version or kind");
                 const auto r=u.handle.index, v=u.handle.version;
-                if (std::find(seen.begin(),seen.end(),r)!=seen.end()) return bad("duplicate resource access; use Modify: "+m_resources[r].name);
+                if (std::ranges::find(std::span{seen}, r)!=std::span{seen}.end()) return bad("duplicate resource access; use Modify: "+m_resources[r].name);
                 seen.push_back(r);
                 if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite && u.access!=RGAccessMode::AtomicMin64)
                     return bad("explicit access required");
@@ -701,17 +744,64 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                     if (declaration.atomicMin64 && (!m_resources[r].IsBuffer() ||
                         u.state != RHIResourceState::UnorderedAccess))
                         return fail("AtomicMin64 requires a buffer UAV",r,v);
-                    if (!declaration.atomicMin64 && !producers[r][v].empty()) return fail("multiple version producers",r,v);
-                    producers[r][v].push_back(static_cast<uint16_t>(p));
-                    if (declaration.modify) consumers[r][declaration.parent].push_back(static_cast<uint16_t>(p));
+                    if (!declaration.atomicMin64 && producerCounts[versionOffsets[r] + v] != 0) return fail("multiple version producers",r,v);
+                    ++producerCounts[versionOffsets[r] + v];
+                    if (declaration.modify) ++consumerCounts[versionOffsets[r] + declaration.parent];
                 }
-                else consumers[r][v].push_back(static_cast<uint16_t>(p));
+                else ++consumerCounts[versionOffsets[r] + v];
             }
         }
-        for(size_t r=0; r<m_resources.size(); ++r)
-            for(size_t v=0; v<producers[r].size(); ++v)
-                if(producers[r][v].empty() && !(m_resources[r].imported && v==0))
-                    return fail("missing version producer",r,static_cast<uint16_t>(v));
+        for (size_t r = 0; r < m_resources.size(); ++r)
+        {
+            for (size_t v = 0; v < m_resources[r].versions.size(); ++v)
+            {
+                if (producerCounts[versionOffsets[r] + v] == 0 && !(m_resources[r].imported && v == 0))
+                {
+                    return fail("missing version producer", r, static_cast<uint16_t>(v));
+                }
+            }
+        }
+        std::vector<size_t> producerOffsets(versionCount + 1, 0), consumerOffsets(versionCount + 1, 0);
+        for (size_t version = 0; version < versionCount; ++version)
+        {
+            producerOffsets[version + 1] = producerOffsets[version] + producerCounts[version];
+            consumerOffsets[version + 1] = consumerOffsets[version] + consumerCounts[version];
+        }
+        std::vector<uint16_t> producerStorage(producerOffsets.back()), consumerStorage(consumerOffsets.back());
+        std::ranges::fill(std::span{producerCounts}, 0);
+        std::ranges::fill(std::span{consumerCounts}, 0);
+        for (size_t pass = 0; pass < count; ++pass)
+        {
+            for (const auto& usage : std::span{m_passes[pass].usages})
+            {
+                const auto resource = usage.handle.index;
+                const auto version = usage.handle.version;
+                const auto slot = versionOffsets[resource] + version;
+                if (Writes(usage))
+                {
+                    producerStorage[producerOffsets[slot] + producerCounts[slot]++] = static_cast<uint16_t>(pass);
+                    if (m_resources[resource].versions[version].modify)
+                    {
+                        const auto parent = versionOffsets[resource] + m_resources[resource].versions[version].parent;
+                        consumerStorage[consumerOffsets[parent] + consumerCounts[parent]++] = static_cast<uint16_t>(pass);
+                    }
+                }
+                else
+                {
+                    consumerStorage[consumerOffsets[slot] + consumerCounts[slot]++] = static_cast<uint16_t>(pass);
+                }
+            }
+        }
+        const auto producers = [&](size_t resource, size_t version)
+        {
+            const auto slot = versionOffsets[resource] + version;
+            return std::span<const uint16_t>{producerStorage}.subspan(producerOffsets[slot], producerCounts[slot]);
+        };
+        const auto consumers = [&](size_t resource, size_t version)
+        {
+            const auto slot = versionOffsets[resource] + version;
+            return std::span<const uint16_t>{consumerStorage}.subspan(consumerOffsets[slot], consumerCounts[slot]);
+        };
         // Only data dependencies retain work. WAR/WAW constrain surviving
         // accesses; they must not keep discarded versions or dead readers alive.
         alive.assign(count, false);
@@ -726,17 +816,17 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         };
         for(size_t p=0; p<count; ++p) if(m_passes[p].hasSideEffect) retain(static_cast<uint16_t>(p));
         for(size_t r=0; r<m_resources.size(); ++r)
-            if(m_resources[r].imported && producers[r].size()>1)
-                for (const auto producer : producers[r].back()) retain(producer);
+            if(m_resources[r].imported && m_resources[r].versions.size()>1)
+                for (const auto producer : producers(r, m_resources[r].versions.size() - 1)) retain(producer);
         while(!roots.empty())
         {
             const auto p=roots.back(); roots.pop_back();
-            for(const auto& u:m_passes[p].usages)
+            for(const auto& u:std::span{m_passes[p].usages})
             {
                 if(!Reads(u)) continue;
                 const auto r=u.handle.index;
                 const auto v=(u.access==RGAccessMode::ReadWrite || u.access==RGAccessMode::AtomicMin64) ? m_resources[r].versions[u.handle.version].parent : u.handle.version;
-                for (const auto producer : producers[r][v]) retain(producer);
+                for (const auto producer : producers(r, v)) retain(producer);
             }
         }
         for (size_t p = 0; p < count; ++p)
@@ -747,18 +837,20 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             if (from<0 || from==to) return;
             m_versionEdges.push_back({static_cast<uint32_t>(from),to,r,v,reason});
             auto& outgoing=edges[from];
-            if (std::none_of(outgoing.begin(),outgoing.end(),[&](const Edge& e){return e.to==to;}))
+            if (std::ranges::none_of(std::span{outgoing},[&](const Edge& e){return e.to==to;}))
             { outgoing.push_back({to,r,v}); ++incoming[to]; }
         };
+        std::vector<uint16_t> previousWriters, current;
+        std::vector<std::pair<uint16_t, uint16_t>> pendingReaders;
         for (size_t r=0; r<m_resources.size(); ++r)
         {
-            std::vector<uint16_t> previousWriters;
+            previousWriters.clear();
+            pendingReaders.clear();
             uint16_t previousVersion=0;
-            std::vector<std::pair<uint16_t,uint16_t>> pendingReaders;
-            for (size_t v=0; v<producers[r].size(); ++v)
+            for (size_t v=0; v<m_resources[r].versions.size(); ++v)
             {
-                std::vector<uint16_t> current;
-                for (const auto producer : producers[r][v])
+                current.clear();
+                for (const auto producer : producers(r, v))
                 {
                     if (alive.test(producer))
                     {
@@ -767,26 +859,26 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 }
                 if (!current.empty())
                 {
-                    for (const auto producer : current)
+                    for (const auto producer : std::span{current})
                     {
-                        for (const auto previous : previousWriters)
+                        for (const auto previous : std::span{previousWriters})
                             edge(previous,producer,static_cast<uint16_t>(r),previousVersion,Reason::WAW);
-                        for (const auto& [reader,readVersion] : pendingReaders)
+                        for (const auto& [reader,readVersion] : std::span{pendingReaders})
                         {
                             // Atomic writers consume initialization, not sibling results.
-                            if (std::find(current.begin(),current.end(),reader)==current.end())
+                            if (std::ranges::find(std::span{current}, reader)==std::span{current}.end())
                                 edge(reader,producer,static_cast<uint16_t>(r),readVersion,Reason::WAR);
                         }
                     }
                     pendingReaders.clear(); previousWriters=current; previousVersion=static_cast<uint16_t>(v);
                 }
-                for (const auto reader : consumers[r][v])
+                for (const auto reader : consumers(r, v))
                 {
                     if (!alive.test(reader))
                     {
                         continue;
                     }
-                    for (const auto producer : current)
+                    for (const auto producer : std::span{current})
                         edge(producer,reader,static_cast<uint16_t>(r),static_cast<uint16_t>(v),Reason::RAW);
                     pendingReaders.push_back({reader,static_cast<uint16_t>(v)});
                 }
@@ -2596,7 +2688,11 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
 
 void EnhancedRenderGraph::InheritStructuralSchedule(const EnhancedRenderGraph& previous)
 {
-    InheritStructuralSchedule(previous.m_structuralSchedule, previous.m_alternateSchedule);
+    std::array<std::shared_ptr<const StructuralSchedule>, MaxStructuralSchedules> schedules;
+    schedules[0] = previous.m_structuralSchedule;
+    schedules[1] = previous.m_alternateSchedule;
+    std::copy(previous.m_additionalSchedules.begin(), previous.m_additionalSchedules.end(), schedules.begin() + 2);
+    InheritStructuralSchedule(schedules);
 }
 
 void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous)
@@ -2613,7 +2709,19 @@ void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const 
         m_structuralSchedule = previous;
     }
     m_alternateSchedule = alternate;
+    m_additionalSchedules.fill({});
     m_compiled = false;
+}
+
+void EnhancedRenderGraph::InheritStructuralSchedule(
+    std::span<const std::shared_ptr<const StructuralSchedule>> schedules)
+{
+    InheritStructuralSchedule(schedules.empty() ? nullptr : schedules[0],
+        schedules.size() < 2 ? nullptr : schedules[1]);
+    for (size_t index = 2; index < (std::min)(schedules.size(), MaxStructuralSchedules); ++index)
+    {
+        m_additionalSchedules[index - 2] = schedules[index];
+    }
 }
 
 std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> EnhancedRenderGraph::SnapshotStructuralSchedule() const
@@ -2677,6 +2785,18 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
             std::swap(m_structuralSchedule, m_alternateSchedule);
             reuse = true;
         }
+        if (!reuse)
+        {
+            for (auto& schedule : m_additionalSchedules)
+            {
+                if (schedule && MatchesStructuralSchedule(*schedule))
+                {
+                    std::swap(m_structuralSchedule, schedule);
+                    reuse = true;
+                    break;
+                }
+            }
+        }
         if (reuse)
         {
             m_activeStructuralSchedule = m_structuralSchedule;
@@ -2705,6 +2825,8 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
             }
             BuildTimingSignature();
             const auto structuralKey = m_timingSignature;
+            AuditStructuralMiss(*structuralKey, m_structuralSchedule ? m_structuralSchedule->key : nullptr,
+                m_alternateSchedule ? m_alternateSchedule->key : nullptr);
             if (!BuildOrder(outError))
             {
                 return false;
@@ -2732,6 +2854,11 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
                 {
                     schedule->culled.push_back(pass.culled);
                 }
+                for (size_t index = m_additionalSchedules.size() - 1; index > 0; --index)
+                {
+                    m_additionalSchedules[index] = std::move(m_additionalSchedules[index - 1]);
+                }
+                m_additionalSchedules[0] = std::move(m_alternateSchedule);
                 m_alternateSchedule = std::move(m_structuralSchedule);
                 m_structuralSchedule = std::move(schedule);
                 m_activeStructuralSchedule = m_structuralSchedule;
@@ -3856,7 +3983,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // A bounded owner-thread cache also serves graph storage in other frame slots.
     // Workers cannot recursively record, so an active entry cannot be evicted by
     // its callbacks. Exact immutable schedule identity and unit shapes gate reuse.
-    static thread_local std::array<std::optional<CachedRecordingPlan>, 8> cachedPlans;
+    static thread_local std::array<std::optional<CachedRecordingPlan>, MaxStructuralSchedules * 2> cachedPlans;
     static thread_local size_t nextCachedPlan = 0;
     const bool cacheEligible = bindingAware && !recordingSideEffects && workers > 1 &&
         m_activeStructuralSchedule && unitCount <= 4096;

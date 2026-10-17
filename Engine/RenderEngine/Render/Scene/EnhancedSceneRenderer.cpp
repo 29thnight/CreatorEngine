@@ -809,9 +809,10 @@ namespace
             EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
             EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
             DisplaySlot      slots[kSlotsPerView];
-            // Keep two CPU-only shapes: ping-pong history changes logical read/write
-            // slots every submission. Neither entry retains native resources.
-            std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>, 2> structuralSchedules;
+            // History slots and completed/fresh geometry yield several exact CPU
+            // shapes. These bounded templates retain no native resources.
+            std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>,
+                EnhancedRenderGraph::MaxStructuralSchedules> structuralSchedules;
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
             uint64_t         promotionCount{ 0 }; // GPU 완료 뒤 표시로 승격한 횟수
@@ -6923,7 +6924,7 @@ namespace
             // exclusively owned graph after its GPU completion can be recycled.
             if (reuseStructuralSchedule)
             {
-                nextGraph->InheritStructuralSchedule(view.structuralSchedules[0], view.structuralSchedules[1]);
+                nextGraph->InheritStructuralSchedule(view.structuralSchedules);
             }
             slot.graph = std::move(nextGraph);
             slot.graphCompleted = false;
@@ -7032,11 +7033,19 @@ namespace
                 if (reuseStructuralSchedule)
                 {
                     const auto schedule = graph.SnapshotStructuralSchedule();
-                    // Keep two distinct templates, not two copies of the same
-                    // last frame. Compile matches both exact declaration keys.
+                    // Pose upload, completed geometry reuse and their mixtures
+                    // have distinct valid DAGs. Keep bounded exact templates.
                     if (schedule != view.structuralSchedules[0])
                     {
-                        view.structuralSchedules[1] = std::move(view.structuralSchedules[0]);
+                        const auto found = std::find(view.structuralSchedules.begin(),
+                            view.structuralSchedules.end(), schedule);
+                        const size_t position = found == view.structuralSchedules.end()
+                            ? view.structuralSchedules.size() - 1
+                            : static_cast<size_t>(found - view.structuralSchedules.begin());
+                        for (size_t index = position; index > 0; --index)
+                        {
+                            view.structuralSchedules[index] = std::move(view.structuralSchedules[index - 1]);
+                        }
                         view.structuralSchedules[0] = schedule;
                     }
                 }
