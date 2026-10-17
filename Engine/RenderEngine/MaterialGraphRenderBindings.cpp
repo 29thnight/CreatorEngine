@@ -508,7 +508,11 @@ bool RenderBindingCache::PreparePass(IRenderDeviceServices& device, const Render
             std::lock_guard lock(frame.mutex);
             if (!frame.textures.IsValid() || frame.publishedSize != frame.descriptions.size())
             {
-                auto descriptions = frame.descriptions;
+                // 완성된 테이블 크기를 먼저 확보해 실제 텍스처 복사 뒤 null padding으로
+                // 확장할 때 같은 cold 게시 경로에서 저장 공간을 다시 할당하지 않는다.
+                std::vector<RHIBindingDesc> descriptions;
+                descriptions.reserve(BindlessTextureCapacity);
+                descriptions.assign(frame.descriptions.begin(), frame.descriptions.end());
                 descriptions.resize(BindlessTextureCapacity, RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
                 const auto textures = device.CreateBindings(descriptions);
                 if (!textures.IsValid() || textures.count != BindlessTextureCapacity)

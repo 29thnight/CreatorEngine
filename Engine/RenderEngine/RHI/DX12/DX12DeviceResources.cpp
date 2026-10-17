@@ -250,6 +250,9 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
 bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::string& outError,
     LUID matchAdapterLuid, bool followScreenSize)
 {
+    m_nullTextureDescriptorHeap.Reset();
+    m_nullTextureDescriptor = {};
+    m_nullTextureDescriptorCount = 0;
     m_width = width;
     m_height = height;
     m_drawIndirectSignature.Reset();
@@ -569,6 +572,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     {
         return false;
     }
+    InitializeNullTextureDescriptors();
 
     constexpr uint32_t kSamplerCapacity = 128;
     if (!m_samplerHeap.Initialize(m_device.Get(), kSamplerCapacity, outError))
@@ -712,6 +716,9 @@ void DX12DeviceResources::Shutdown()
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadAllocator.Shutdown();
     m_descriptorRecycler.Shutdown();
+    m_nullTextureDescriptorHeap.Reset();
+    m_nullTextureDescriptor = {};
+    m_nullTextureDescriptorCount = 0;
     m_samplerHeap.Shutdown();
     m_rtvViewHeap.Shutdown();
     m_dsvViewHeap.Shutdown();
@@ -2244,6 +2251,47 @@ ID3D12Resource* DX12DeviceResources::ResolveBinding(const RHIBindingDesc& desc) 
     return Resolve(desc.resource);
 }
 
+void DX12DeviceResources::InitializeNullTextureDescriptors()
+{
+    constexpr uint32_t descriptorCount = 256;
+    D3D12_DESCRIPTOR_HEAP_DESC heapDescription{};
+    heapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    heapDescription.NumDescriptors = descriptorCount;
+    heapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    ComPtr<ID3D12DescriptorHeap> heap;
+    if (FAILED(m_device->CreateDescriptorHeap(&heapDescription, IID_PPV_ARGS(&heap))))
+    {
+        // 최적화용 원본을 못 만들어도 기존 CreateBindings는 그대로 동작한다.
+        // Initialize에서만 시도하므로 worker 기록에 할당 재시도나 잠금이 붙지 않는다.
+        return;
+    }
+
+    const auto source = heap->GetCPUDescriptorHandleForHeapStart();
+    const uint32_t increment = m_device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    D3D12_SHADER_RESOURCE_VIEW_DESC description{};
+    description.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    description.Format = ToDXGI(RHIFormat::RGBA8Unorm);
+    description.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    description.Texture2D.MipLevels = 1;
+    m_device->CreateShaderResourceView(nullptr, &description, source);
+
+    // Simple은 한 원본을 반복하는 API가 아니므로 블록 전체를 먼저 채운다.
+    // 매 복사의 원본 [0, initialized)와 목적지 [initialized, 2*initialized)는
+    // 겹치지 않으며, 이미 채운 CPU 전용 원본만 읽는다.
+    for (uint32_t initialized = 1; initialized < descriptorCount; initialized *= 2)
+    {
+        auto destination = source;
+        destination.ptr += static_cast<SIZE_T>(initialized) * increment;
+        m_device->CopyDescriptorsSimple(initialized, destination, source,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+
+    m_nullTextureDescriptorHeap = std::move(heap);
+    m_nullTextureDescriptor = source;
+    m_nullTextureDescriptorCount = descriptorCount;
+}
+
 RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
 {
     if (descs.empty()) return {};
@@ -2274,10 +2322,37 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     if (!range.IsValid()) return {};
 
     ID3D12Device* device = m_device.Get();
+    const auto isCanonicalNull = [](const RHIBindingDesc& desc)
+    {
+        // null padding의 정확한 기본 설명만 합친다. 자원이 해제된 경우에도
+        // 0이 아닌 핸들이나 다른 차원/포맷/밉은 기존 native 뷰 생성 경로를 따른다.
+        return desc.kind == RHIBindingDesc::Kind::ShaderResource &&
+            desc.dim == RHIBindingDesc::Dim::Texture2D &&
+            desc.resource == RHITextureHandle{} && desc.bufferResource == RHIBufferHandle{} &&
+            desc.format == RHIFormat::RGBA8Unorm && !desc.depthAsColor && desc.allowNull &&
+            desc.mostDetailedMip == 0 && desc.mipLevels == 1 && desc.firstSlice == 0 &&
+            desc.sliceCount == 1 && desc.firstElement == 0 && desc.numElements == 0 &&
+            desc.structureByteStride == 0;
+    };
     for (uint32_t i = 0; i < descs.size(); ++i)
     {
         const RHIBindingDesc& desc = descs[i];
         const D3D12_CPU_DESCRIPTOR_HANDLE handle = range.CpuAt(i);
+        if (m_nullTextureDescriptorCount && isCanonicalNull(desc))
+        {
+            uint32_t count = 1;
+            while (count < m_nullTextureDescriptorCount && count < descs.size() - i &&
+                isCanonicalNull(descs[static_cast<size_t>(i) + count]))
+            {
+                ++count;
+            }
+            // 원본은 worker 전체가 공유하는 불변 CPU 힙이고, 목적지는 이 호출이
+            // 새로 예약한 범위다. 제출된 shader-visible page를 원본으로 읽지 않는다.
+            device->CopyDescriptorsSimple(count, handle, m_nullTextureDescriptor,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            i += count - 1;
+            continue;
+        }
         ID3D12Resource* const resource = ResolveBinding(desc);
 
         if (RHIBindingDesc::Kind::UnorderedAccess == desc.kind)

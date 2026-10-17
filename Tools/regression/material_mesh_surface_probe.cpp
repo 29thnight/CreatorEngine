@@ -1262,6 +1262,7 @@ void VerifyResourceMetadataReuse(RecordingChangeDevice& device)
         EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
         std::array<RHIResourceState, 2> oldWritebacks{
             RHIResourceState::PixelShaderResource, RHIResourceState::PixelShaderResource};
+        std::array<std::array<bool, 3>, 2> declaredForms{};
         // 초기 저장 공간을 넘긴 뒤 활성 구간을 줄이고 다시 늘려, 같은 자리의 종류와 소유권을 바꾼다.
         const std::array<uint32_t, 5> counts{513, 1, 257, 514, 4};
         for (uint32_t iteration = 0; iteration < counts.size(); ++iteration)
@@ -1321,17 +1322,48 @@ void VerifyResourceMetadataReuse(RecordingChangeDevice& device)
                               "Recycled resource resolves only its current texture or buffer kind");
                     };
                     const auto passName = "Reuse.Write." + std::to_string(index);
-                    if (iteration % 2 == 0)
+                    const bool split = (iteration + index) % 2 != 0;
+                    const unsigned form = (iteration + index) % 3;
+                    const auto declare = [&](auto&& uses)
+                    {
+                        RGPassId pass;
+                        if (split)
+                        {
+                            pass = graph.AddSplitPass(passName, std::forward<decltype(uses)>(uses),
+                                [execute](const auto& context, uint32_t slice, uint32_t slices)
+                                {
+                                    Check(slice == 0 && slices == 1, "Sequential split has one current slice");
+                                    execute(context);
+                                }, 3, true, 17);
+                        }
+                        else
+                        {
+                            pass = graph.AddPass(passName, std::forward<decltype(uses)>(uses), execute, true);
+                        }
+                        Check(pass.IsValid(), "Usage ownership pass declaration");
+                        declaredForms[split ? 1u : 0u][form] = true;
+                    };
+                    if (form == 2)
                     {
                         const std::initializer_list<EnhancedRenderGraph::RGPassUsage> localUses{
                             {handle, RHIResourceState::CopyDest, RGAccessMode::Write}};
-                        graph.AddPass(passName, localUses, execute, true);
+                        declare(localUses);
                     }
                     else
                     {
                         std::vector<EnhancedRenderGraph::RGPassUsage> uses{
                             {handle, RHIResourceState::CopyDest, RGAccessMode::Write}};
-                        graph.AddPass(passName, std::move(uses), execute, true);
+                        if (form == 0)
+                        {
+                            declare(uses);
+                            // 선언 직후 원본을 바꾸고 파괴해도 그래프가 복사한 핸들·상태는 남아야 한다.
+                            uses.front() = {};
+                            uses.clear();
+                        }
+                        else
+                        {
+                            declare(std::move(uses));
+                        }
                     }
                 }
                 handles.push_back(handle);
@@ -1358,7 +1390,11 @@ void VerifyResourceMetadataReuse(RecordingChangeDevice& device)
                     Check(usages.size() == 1 && usages[0].resource == index &&
                               usages[0].version == handles[index].version && usages[0].kind == handles[index].kind &&
                               usages[0].state == RHIResourceState::CopyDest && usages[0].access == RGAccessMode::Write,
-                          "Initializer-list and vector declarations own the exact current usage");
+                          "Normal and split declarations own usages after caller mutation and destruction");
+                    const bool split = (iteration + index) % 2 != 0;
+                    Check(snapshot.passes[index].maxSlices == (split ? 3u : 1u) &&
+                              snapshot.passes[index].recordCost == (split ? 17u : 0u),
+                          "Recycled declarations retain only the current callback kind and recording cost");
                 }
             }
             Check(graph.Execute(error), "Resource reuse records current handles: " + error);
@@ -1385,6 +1421,12 @@ void VerifyResourceMetadataReuse(RecordingChangeDevice& device)
                   "Reset clears physical import lookup and invalidates every previous resource epoch");
             oldWritebacks.fill(RHIResourceState::PixelShaderResource);
         }
+        for (const auto& forms : declaredForms)
+        {
+            Check(std::ranges::all_of(forms, [](bool declared) { return declared; }),
+                  "Normal and split passes each cover lvalue, rvalue and initializer-list ownership");
+        }
+        std::cout << "RG_USAGE_OWNERSHIP_OK normal=3 split=3 resetCycles=5\n";
     }
     device.ReleaseTexture(importedTexture);
     device.ReleaseBuffer(importedBuffer);
@@ -1912,6 +1954,8 @@ void GraphAdmissionTests(RecordingChangeDevice& device)
     }
 
 }
+
+#include "support/NullTextureBindingProbe.inl"
 
 void Run(const std::filesystem::path& root)
 {
@@ -2648,6 +2692,11 @@ int main(int argc, char** argv)
             VerifyProfilerMergeLifetime();
             return 0;
         }
+        if (argc == 3 && std::string_view(argv[2]) == "--null-texture-bindings-only")
+        {
+            VerifyNullTextureBindings(std::filesystem::absolute(argv[1]));
+            return 0;
+        }
         if (argc == 3 && std::string_view(argv[2]) == "--graph-admission-only")
         {
             RecordingChangeDevice device;
@@ -2660,7 +2709,9 @@ int main(int argc, char** argv)
             return 0;
         }
         Check(argc == 2, "Expected repository root");
-        Run(std::filesystem::absolute(argv[1]));
+        const auto root = std::filesystem::absolute(argv[1]);
+        VerifyNullTextureBindings(root);
+        Run(root);
         return 0;
     }
     catch (const std::exception& error)

@@ -579,6 +579,7 @@ private:
     void RefreshUploadBudget();
     void RefreshPersistentMemoryBudget();
     bool WaitForFenceValue(uint64_t value, std::string& outError);
+    void InitializeNullTextureDescriptors();
 
     // 핸들 → 리소스. 등록 경로는 둘뿐이다 — Create* 가 만들면서, 그래프가
     // transient 를 만들면서(V2-c).
@@ -667,6 +668,13 @@ private:
     std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
     DX12DescriptorRecycler             m_descriptorRecycler;
     DX12SamplerHeap                    m_samplerHeap;
+
+    // 복사 원본은 CPU 전용 힙이어야 한다. 초기화 뒤 worker가 읽기만 하며,
+    // recording 합류 뒤 종료/재초기화할 때만 해제한다. 준비 실패 시 count=0으로
+    // 기존 뷰 생성 경로를 유지하고 프레임마다 다시 할당하지 않는다.
+    ComPtr<ID3D12DescriptorHeap>        m_nullTextureDescriptorHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE        m_nullTextureDescriptor{};
+    uint32_t                          m_nullTextureDescriptorCount{ 0 };
 
     // 패스가 매 프레임 다시 만드는 RTV/DSV(R2b). 링과 달리 프레임 구간으로
     // 나누지 않는다 — 이 디스크립터는 기록 시점에 소비된다(DX12DescriptorHeaps.h).
