@@ -49,6 +49,104 @@ bool Direction(const float* value)
 #include "MeshletStreamingTopology.inl"
 #include "MeshletSparseStorage.inl"
 
+// Only the CPU prefetch order is cached. Stream::Prepare must still observe
+// every recording/view so feedback, pending reads and residency budgets advance.
+// An exact immutable partition plus world/eye values determines this order;
+// frame/view revisions alone would discard it even for a stationary camera.
+struct MeshSurfaceRequestCache
+{
+    using Key = std::tuple<std::uintptr_t, std::uint64_t, std::uint64_t,
+                           std::array<std::uint32_t, 16>, std::array<std::uint32_t, 4>>;
+    struct Entry
+    {
+        std::weak_ptr<const MeshSurfaceInput> identity;
+        std::shared_ptr<const std::vector<std::uint32_t>> requests;
+        std::uint64_t generation{}, lastUse{};
+    };
+    std::map<Key, Entry> entries;
+    std::uint64_t bytes{}, clock{};
+    static constexpr std::uint64_t maxBytes = 8ull << 20;
+    static constexpr std::size_t maxEntries = 1024;
+
+    void Trim(std::uint64_t generation)
+    {
+        std::erase_if(entries, [&](const auto& item) {
+            if (!item.second.identity.expired() && generation - item.second.generation <= 2)
+            {
+                return false;
+            }
+            bytes -= item.second.requests->size() * sizeof(std::uint32_t);
+            return true;
+        });
+    }
+
+    std::shared_ptr<const std::vector<std::uint32_t>> Acquire(
+        const std::shared_ptr<const MeshSurfaceInput>& identity, const MeshSurfaceInput& input,
+        std::uint64_t view, std::uint64_t generation)
+    {
+        const Key key{reinterpret_cast<std::uintptr_t>(identity.get()), view, input.View().sceneEpoch,
+                      std::bit_cast<std::array<std::uint32_t, 16>>(input.World()),
+                      std::bit_cast<std::array<std::uint32_t, 4>>(input.View().eye)};
+        if (const auto found = entries.find(key); found != entries.end())
+        {
+            // The lookup address is not ownership. Lock and compare before
+            // accepting a hit so an expired/recycled partition cannot alias it.
+            if (const auto owner = found->second.identity.lock(); owner == identity)
+            {
+                found->second.generation = generation;
+                found->second.lastUse = ++clock;
+                return found->second.requests;
+            }
+            bytes -= found->second.requests->size() * sizeof(std::uint32_t);
+            entries.erase(found);
+        }
+
+        ce::profile_scope sortProfile{ce::marker<"MaterialClusterRequestSort">()};
+        const auto count = input.Hierarchy().groupCount ? input.Hierarchy().groupCount : 1;
+        const auto& groups = input.Hierarchy().groups;
+        auto requests = std::make_shared<std::vector<std::uint32_t>>(count);
+        std::vector<double> distances(count);
+        for (std::uint32_t group = 0; group < count; ++group)
+        {
+            (*requests)[group] = group;
+            if (groups.empty())
+            {
+                continue;
+            }
+            const auto& sphere = groups[group].sphere;
+            for (unsigned axis = 0; axis < 3; ++axis)
+            {
+                double world = input.World().m[3][axis];
+                for (unsigned i = 0; i < 3; ++i)
+                {
+                    world += sphere[i] * double(input.World().m[i][axis]);
+                }
+                const auto delta = world - input.View().eye[axis];
+                distances[group] += delta * delta;
+            }
+        }
+        // Compute each world-space distance once. Stable ordering retains the
+        // old ascending group priority when distances tie.
+        std::stable_sort(requests->begin(), requests->end(),
+                         [&](auto a, auto b) { return distances[a] < distances[b]; });
+        const auto charge = requests->size() * sizeof(std::uint32_t);
+        if (charge <= maxBytes)
+        {
+            while (!entries.empty() && (entries.size() >= maxEntries || bytes + charge > maxBytes))
+            {
+                const auto oldest = std::ranges::min_element(entries, {}, [](const auto& item) {
+                    return item.second.lastUse;
+                });
+                bytes -= oldest->second.requests->size() * sizeof(std::uint32_t);
+                entries.erase(oldest);
+            }
+            entries.emplace(key, Entry{identity, requests, generation, ++clock});
+            bytes += charge;
+        }
+        return requests;
+    }
+};
+
 struct MeshSurfaceStaticBuffers
 {
     IRenderDeviceServices& device;
@@ -285,7 +383,10 @@ struct MeshSurfaceStaticCache final : IRHIUploadTransactionListener
                     sparseStorage->SetEvictable(false);
                 }
                 if (entry->identity == identity && bool(entry->residency) == bool(residency) &&
-                    (!residency || entry->residency->revision == residency->revision) && entry->prepared &&
+                    (!residency || (entry->residency->revision == residency->revision &&
+                                    entry->residency->residentLimit == residency->residentLimit &&
+                                    entry->residency->residencyAlignment == residency->residencyAlignment)) &&
+                    entry->prepared &&
                     (!entry->sparse || entry->sparseRevision == entry->sparse->Revision()) &&
                     ((entry->state == RHIUploadTransactionState::Resident && entry->usable) ||
                      (entry->state == RHIUploadTransactionState::Recording && entry->recording == recording)))
@@ -1312,6 +1413,10 @@ void MeshSurfaceEvaluator::BeginFrame(std::uint64_t recording)
         return;
     cacheRecording_ = recording;
     ++cacheGeneration_;
+    if (requestCache_)
+    {
+        requestCache_->Trim(cacheGeneration_);
+    }
     const auto completed = bufferPool_ ? bufferPool_->completed.load(std::memory_order_acquire) : 0;
     std::erase_if(transformedCache_, [&](const auto& batch) {
         // Keep the preceding two recordings for motion/history and queue
@@ -1375,35 +1480,22 @@ bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, std::shared_pt
         directClusters && objectSpace && candidate->input_->ClusterArchive() && candidate->input_->ClusterStream();
     if (candidate->input_->StreamedTopology() && !candidate->directClusters_)
         return Fail(error, "Streamed connectivity requires direct GPU cluster consumption.");
+    auto identity = candidate->input_;
+    while (identity->staticOwner_)
+    {
+        identity = identity->staticOwner_;
+    }
+    if (cacheStatic || candidate->directClusters_)
+    {
+        BeginFrame(candidate->recordingId_);
+    }
     if (candidate->directClusters_)
     {
-        std::vector<uint32_t> requests(
-            candidate->input_->Hierarchy().groupCount ? candidate->input_->Hierarchy().groupCount : 1);
-        for (uint32_t group = 0; group < requests.size(); ++group)
+        if (!requestCache_)
         {
-            requests[group] = group;
+            requestCache_ = std::make_shared<MeshSurfaceRequestCache>();
         }
-        const auto& groups = candidate->input_->Hierarchy().groups;
-        const auto distance = [&](uint32_t group) {
-            if (groups.empty())
-            {
-                return 0.0;
-            }
-            const auto& sphere = groups[group].sphere;
-            double squared{};
-            for (unsigned axis = 0; axis < 3; ++axis)
-            {
-                double world = candidate->input_->World().m[3][axis];
-                for (unsigned i = 0; i < 3; ++i)
-                {
-                    world += sphere[i] * double(candidate->input_->World().m[i][axis]);
-                }
-                const auto delta = world - candidate->input_->View().eye[axis];
-                squared += delta * delta;
-            }
-            return squared;
-        };
-        std::stable_sort(requests.begin(), requests.end(), [&](auto a, auto b) { return distance(a) < distance(b); });
+        const auto requests = requestCache_->Acquire(identity, *candidate->input_, auditView, cacheGeneration_);
         auto budget = clusterBudget;
         const auto tileBytes = device.SparseBufferTileBytes();
         if (tileBytes)
@@ -1414,21 +1506,15 @@ bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, std::shared_pt
             budget.residentBytes = (std::min)(
                 budget.residentBytes, candidate->input_->ClusterStream()->PinnedBytes(budget.residencyAlignment));
         candidate->clusterResidency_ =
-            candidate->input_->ClusterStream()->Prepare(candidate->recordingId_, requests, budget);
+            candidate->input_->ClusterStream()->Prepare(candidate->recordingId_, *requests, budget);
     }
     const auto& source = *candidate->input_;
     if (cacheStatic)
     {
-        BeginFrame(candidate->recordingId_);
         candidate->lastUsedGeneration_ = cacheGeneration_;
         if (!staticCache_)
         {
             staticCache_ = std::make_shared<MeshSurfaceStaticCache>(device);
-        }
-        auto identity = candidate->input_;
-        while (identity->staticOwner_)
-        {
-            identity = identity->staticOwner_;
         }
         if (!staticCache_->Acquire(std::move(identity), candidate->staticBuffers_, error, candidate->clusterResidency_))
         {

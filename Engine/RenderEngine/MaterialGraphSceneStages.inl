@@ -122,11 +122,12 @@ struct SceneHost::VisibilityStage
                                   const std::shared_ptr<const SceneFrameGeometry>& geometry,
                                   HybridVisibilityPipelines& pipelines, const char* name, bool depthOnly,
                                   const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
-                                  std::shared_ptr<const SceneHybridVisibility>& result, std::string& error);
+                                  std::shared_ptr<const SceneHybridVisibility>& result, std::string& error,
+                                  const SceneHybridVisibility* sharedPreparation = nullptr);
     bool Prepare(const FrameInput& frame, const EnhancedFrameContext& context,
                  const std::shared_ptr<const SceneFrameGeometry>& geometry,
                  const std::shared_ptr<const GpuGeometryVisibility::Frame>& list, HybridVisibilityPipelines& pipelines,
-                 std::string& error);
+                 std::string& error, const SceneHybridVisibility* sharedPreparation = nullptr);
     mutable SceneSurfaceTargets::Outputs targets;
     SceneSurfaceTargets::Outputs Declare(const own::shared_owner<const FrameInput>& prepared,
                                          EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,

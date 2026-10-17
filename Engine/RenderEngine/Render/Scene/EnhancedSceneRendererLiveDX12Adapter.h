@@ -121,7 +121,8 @@ public:
     /// 제출 하나를 열고 그 제출의 표를 돌려준다. 부른 쪽이 보관했다가
     /// Resolve · Collect 에 그대로 넘긴다.
     GpuFrameToken BeginProfilerFrame(uint64_t engineFrameId, uint64_t submissionId,
-        uint64_t renderViewId, uint64_t captureGeneration, bool diagnosticCapture = false);
+        uint64_t renderViewId, uint64_t captureGeneration, bool diagnosticCapture = false,
+        bool collectTimings = true);
     void ResolveProfilerFrame(const GpuFrameToken& token);
 
     /// 두 시계를 맞춘 표본의 상태. 통합 축이 꺼져 있으면 valid 가 거짓이다.

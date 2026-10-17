@@ -35,22 +35,43 @@ namespace material_graph
     inline void NormalizeSceneReads(const EnhancedRenderGraph& graph,
                                     std::vector<EnhancedRenderGraph::RGPassUsage>& uses)
     {
-        if (graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder)
+        if (graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder || uses.size() < 2)
         {
             return;
         }
+        struct HandleHash
+        {
+            size_t operator()(const RGHandle& handle) const noexcept
+            {
+                const uint64_t slot = uint64_t(handle.index) | (uint64_t(handle.version) << 16) |
+                    (uint64_t(handle.kind) << 32);
+                return std::hash<uint64_t>{}(slot) ^ (std::hash<uint64_t>{}(handle.epoch) +
+                    size_t{0x9e3779b9u} + (size_t(slot) << 6) + (size_t(slot) >> 2));
+            }
+        };
+        struct SameHandle
+        {
+            bool operator()(const RGHandle& left, const RGHandle& right) const noexcept
+            {
+                return left.index == right.index && left.version == right.version &&
+                    left.kind == right.kind && left.epoch == right.epoch;
+            }
+        };
+        // Keep first-use order while looking up the complete logical handle.
+        // A hash collision still compares index/version/kind/epoch exactly.
+        std::unordered_map<RGHandle, size_t, HandleHash, SameHandle> indices;
+        indices.reserve(uses.size());
         std::vector<EnhancedRenderGraph::RGPassUsage> unique;
+        unique.reserve(uses.size());
         for (const auto& use : uses)
         {
-            const auto found = std::ranges::find_if(unique, [&](const auto& prior) {
-                return prior.handle.index == use.handle.index && prior.handle.version == use.handle.version &&
-                       prior.handle.kind == use.handle.kind && prior.handle.epoch == use.handle.epoch;
-            });
-            if (found == unique.end())
+            const auto [entry, inserted] = indices.try_emplace(use.handle, unique.size());
+            if (inserted)
             {
                 unique.push_back(use);
                 continue;
             }
+            auto* found = &unique[entry->second];
             if (found->access != RGAccessMode::Read || use.access != RGAccessMode::Read)
             {
                 throw std::runtime_error("Scene pass duplicates a writable resource version.");

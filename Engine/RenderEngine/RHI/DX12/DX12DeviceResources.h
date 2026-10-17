@@ -7,6 +7,7 @@
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
+#include <tuple>
 
 #include "../ScreenSizedResource.h"
 #include <dxgi1_6.h>
@@ -491,6 +492,10 @@ public:
     {
         return m_dispatchMeshIndirectSignature.Get();
     }
+    ID3D12CommandSignature* GetDispatchIndirectSignature() const
+    {
+        return m_dispatchIndirectSignature.Get();
+    }
     ID3D12CommandSignature* GetMaterialBatchSignature(ID3D12RootSignature*, std::span<const uint32_t>, bool indexed);
     ID3D12CommandSignature* GetDrawIndirectSignature() const
     {
@@ -597,8 +602,19 @@ private:
     ComPtr<ID3D12CommandSignature>     m_drawIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_dispatchMeshIndirectSignature;
+    ComPtr<ID3D12CommandSignature>     m_dispatchIndirectSignature;
+    // Ascending unique root slots have an exact allocation-free representation:
+    // native root identity, occupied slots, CBV slots, indexed/mesh command kind.
+    using MaterialBatchSignatureKey = std::tuple<uintptr_t, uint64_t, uint64_t, bool>;
+    struct MaterialBatchSignature
+    {
+        ComPtr<ID3D12RootSignature> root;
+        ComPtr<ID3D12CommandSignature> signature;
+    };
+    static uint64_t NextMaterialBatchSignatureGeneration();
+    uint64_t m_meshBatchSignatureGeneration{NextMaterialBatchSignatureGeneration()};
     std::mutex m_meshBatchSignatureMutex;
-    std::map<std::pair<ID3D12RootSignature*, std::vector<uint32_t>>, ComPtr<ID3D12CommandSignature>> m_meshBatchSignatures;
+    std::map<MaterialBatchSignatureKey, MaterialBatchSignature> m_meshBatchSignatures;
     RHIAtomicCapabilities             m_atomicCapabilities;
     RHIMeshShaderCapabilities          m_meshShaderCapabilities;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이

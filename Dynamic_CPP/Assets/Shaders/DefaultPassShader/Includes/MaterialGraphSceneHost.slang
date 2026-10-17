@@ -662,15 +662,32 @@ LXSceneGBuffer LXSceneGBufferPSEvaluate(LXSceneVertex input, bool frontFace)
 {
     return LXSceneEvaluateSurface(input, frontFace);
 }
+// The mask is uniform within a quad: every lane observes the same four IDs.
+// Keep the first occurrence of each complete {record, primitive} identity.
+// Every helper lane must still reconstruct/evaluate each selected primitive at
+// its own pixel center so material derivatives remain valid at triangle edges.
+uint LXSceneUniqueQuadIdentityLanes(uint2 own)
+{
+    const uint2 q0 = QuadReadLaneAt(own, 0u);
+    const uint2 q1 = QuadReadLaneAt(own, 1u);
+    const uint2 q2 = QuadReadLaneAt(own, 2u);
+    const uint2 q3 = QuadReadLaneAt(own, 3u);
+    return 1u |
+        (uint(any(q1 != q0)) << 1u) |
+        (uint(any(q2 != q0) && any(q2 != q1)) << 2u) |
+        (uint(any(q3 != q0) && any(q3 != q1) && any(q3 != q2)) << 3u);
+}
 [shader("fragment")]
 LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
     if (input.reconstruction == 0u) return LXSceneGBufferPSEvaluate(input, frontFace);
     const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint uniqueLanes = LXSceneUniqueQuadIdentityLanes(own);
     LXSceneGBuffer output = (LXSceneGBuffer)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if (identity.x == lx_geometryIdentityPadding.x) {
+        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == lx_geometryIdentityPadding.x)
+        {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
             const LXSceneGBuffer value = LXSceneGBufferPSEvaluate(restored, face);
@@ -1217,10 +1234,12 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
 {
     if (input.reconstruction == 0u) return LXSceneColorPSEvaluate(input, frontFace);
     const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint uniqueLanes = LXSceneUniqueQuadIdentityLanes(own);
     float4 output = (float4)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if (identity.x == lx_geometryIdentityPadding.x) {
+        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == lx_geometryIdentityPadding.x)
+        {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
             const float4 value = LXSceneColorPSEvaluate(restored, face);

@@ -1277,8 +1277,24 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
 
 GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
     uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration,
-    bool diagnosticCapture)
+    bool diagnosticCapture, bool collectTimings)
 {
+    // Queue endpoints override the graph profiler during owned recording, so
+    // both paths must opt out together. A capture always keeps complete queries.
+    collectTimings = collectTimings || diagnosticCapture || captureGeneration != 0;
+    m_impl->graphics.profiler = collectTimings ? &m_impl->profiler : nullptr;
+    m_impl->compute.profiler = collectTimings ? &m_impl->computeProfiler : nullptr;
+    if (!collectTimings)
+    {
+        auto& token = m_impl->currentProfilerToken;
+        token = {};
+        token.engineFrameId = engineFrameId;
+        token.submissionId = submissionId;
+        token.renderViewId = renderViewId;
+        // No query slot was reserved. This identity still labels CPU submission
+        // and retirement, but may not be collected as a measured GPU frame.
+        return token;
+    }
     GpuFrameToken computeToken;
     if (m_impl->asyncCompute)
     {
@@ -1300,6 +1316,10 @@ GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
 
 void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameToken& token)
 {
+    if (!token.IsValid())
+    {
+        return;
+    }
     m_impl->profiler.ResolveFrame(m_impl->resources.GetCommandList(), token);
     const auto* submission = m_impl->FindMeasurementSubmission(token);
     if (submission && submission->computeToken.IsValid())

@@ -345,13 +345,13 @@ struct SceneHost::FrameInput
         uint32_t commands{};
         uint32_t buckets{};
     };
-    // One writer per slot: C0..C2 static-cache and final dynamic raster jobs.
-    // Readers reduce these slots only after the graph's recording join. Separate
-    // cache lines avoid writes to neighboring cascades sharing a line.
-    mutable std::array<ShadowRecordingStats, 6> shadowRecordingStats{};
-    // One writer: final METEOR.Scene.Visibility.HW recording. Consumers read after the
-    // graph's recording join and native submission, never while recording.
-    mutable std::vector<SceneGeometryRouteAudit::Draw> recordedGeometryRoutes;
+    static constexpr uint32_t kMaxRasterRecordingSlices = 4;
+    // Each split callback owns one cache line. Readers reduce only after the
+    // graph joins; static-cache and final dynamic raster keep separate slots.
+    mutable std::array<std::array<ShadowRecordingStats, kMaxRasterRecordingSlices>, 6> shadowRecordingStats{};
+    // Final visibility writers own separate vectors; observations are assembled
+    // after recording in slice order. No worker mutates another worker's vector.
+    mutable std::array<std::vector<SceneGeometryRouteAudit::Draw>, kMaxRasterRecordingSlices> recordedGeometryRoutes;
     mutable bool geometryRouteAuditEnabled{};
     mutable const EnhancedRenderGraph* graph{};
     mutable std::uint64_t graphEpoch{};
@@ -1766,8 +1766,11 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         !candidate->occluderStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
                                           candidate->firstCullStage.cameraDepthMeshlets, hybridPipelines_, error) ||
         !candidate->visibilityStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
-                                            candidate->finalCullStage.cameraMeshlets, hybridPipelines_, error))
+                                            candidate->finalCullStage.cameraMeshlets, hybridPipelines_, error,
+                                            candidate->occluderStage.occluderVisibility.get()))
+    {
         return false;
+    }
     candidate->inputRanges.resize(candidate->input->Draws().size());
     for (size_t i = 0; i < candidate->draws.size(); ++i)
     {
@@ -2618,18 +2621,26 @@ void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own:
                             RGAccessMode::Read});
     }
     NormalizeSceneReads(graph, uses);
-    const auto pass = graph.AddPass(
-        (hybrid->name + ".HW").c_str(), uses, [frame, hybrid, list, commands, occluder](const auto& execution) {
+    const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
+    graph.AddSplitPass(
+        hybrid->name + ".HW", std::move(uses),
+        [frame, hybrid, list, commands, occluder](const auto& execution, uint32_t slice, uint32_t sliceCount) {
             frame->CheckCurrent(execution.graph);
             const bool audit = !occluder && frame->geometryRouteAuditEnabled;
+            auto& observations = frame->recordedGeometryRoutes[slice];
             if (audit)
-                frame->recordedGeometryRoutes.clear();
+            {
+                observations.clear();
+            }
             auto& encoder = *execution.encoder;
             if (!encoder.BeginRasterWithoutAttachments(frame->input->View().width, frame->input->View().height))
                 throw std::runtime_error("METEOR HW visibility requires UAV-only raster support.");
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->RasterDrawsFor())
+            const auto first = commands->buckets.size() * slice / sliceCount;
+            const auto last = commands->buckets.size() * (slice + 1) / sliceCount;
+            for (auto bucket = first; bucket < last; ++bucket)
             {
+                const auto& draw = frame->draws[commands->buckets[bucket].representative];
                 if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
                     continue;
                 if (!frame->UsesMeshlets(draw))
@@ -2646,7 +2657,7 @@ void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own:
                 if (!encoder.SetRootUnorderedBuffer(RHIBindPoint::Graphics, draw.program->visibilityKeyRoot,
                                                     hybrid->KeySlice()))
                     throw std::runtime_error("METEOR HW visibility key binding failed.");
-                commands->Draw(encoder, draw.materialBucket);
+                commands->Draw(encoder, bucket);
                 if (!audit)
                     continue;
                 for (const auto& submitted : frame->draws)
@@ -2654,14 +2665,12 @@ void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own:
                     if (submitted.materialBucket != draw.materialBucket || submitted.blended)
                         continue;
                     const auto& source = frame->input->Draws()[submitted.inputIndex];
-                    frame->recordedGeometryRoutes.push_back(
+                    observations.push_back(
                         {source.geometryKey, source.temporalObjectId, source.temporalInstanceId, sourcePipeline.id,
                          recordedPipeline.id, submitted.geometry->MeshletCount(), true, true});
                 }
             }
-        });
-    // Sealed frame inputs only; route observations are read after the whole graph joins.
-    graph.DeclareRecordingIndependent(pass);
+        }, (std::min)(FrameInput::kMaxRasterRecordingSlices, (std::max)(1u, bucketCount)), false, bucketCount);
 }
 
 std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::CameraMeshletWork() const
@@ -2726,7 +2735,10 @@ SceneGeometryRouteAudit SceneHost::RecordedGeometryRoutes() const
         result.sourceFrameId = frame_->input->View().frameId;
         result.sceneEpoch = frame_->input->View().sceneEpoch;
         result.viewId = frame_->input->View().viewId;
-        result.draws = frame_->recordedGeometryRoutes;
+        for (const auto& slice : frame_->recordedGeometryRoutes)
+        {
+            result.draws.insert(result.draws.end(), slice.begin(), slice.end());
+        }
     }
     return result;
 }
@@ -2738,8 +2750,11 @@ std::array<uint32_t, 3> SceneHost::ShadowBucketSubmissionCounts() const
     {
         for (unsigned cascade = 0; cascade < result.size(); ++cascade)
         {
-            result[cascade] = frame_->shadowRecordingStats[cascade * 2].buckets +
-                              frame_->shadowRecordingStats[cascade * 2 + 1].buckets;
+            for (uint32_t slice = 0; slice < FrameInput::kMaxRasterRecordingSlices; ++slice)
+            {
+                result[cascade] += frame_->shadowRecordingStats[cascade * 2][slice].buckets +
+                                   frame_->shadowRecordingStats[cascade * 2 + 1][slice].buckets;
+            }
         }
     }
     return result;
@@ -2779,8 +2794,11 @@ std::array<uint32_t, 3> SceneHost::RecordedShadowMeshletDrawCounts() const
     {
         for (unsigned cascade = 0; cascade < counts.size(); ++cascade)
         {
-            counts[cascade] = frame_->shadowRecordingStats[cascade * 2].commands +
-                              frame_->shadowRecordingStats[cascade * 2 + 1].commands;
+            for (uint32_t slice = 0; slice < FrameInput::kMaxRasterRecordingSlices; ++slice)
+            {
+                counts[cascade] += frame_->shadowRecordingStats[cascade * 2][slice].commands +
+                                   frame_->shadowRecordingStats[cascade * 2 + 1][slice].commands;
+            }
         }
     }
     return counts;

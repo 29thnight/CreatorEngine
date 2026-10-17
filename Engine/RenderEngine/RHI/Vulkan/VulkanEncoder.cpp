@@ -481,6 +481,34 @@ bool VulkanEncoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byt
     return true;
 }
 
+static_assert(sizeof(RHIDispatchIndirectArguments) == sizeof(VkDispatchIndirectCommand));
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountX) ==
+    offsetof(VkDispatchIndirectCommand, x));
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountY) ==
+    offsetof(VkDispatchIndirectCommand, y));
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountZ) ==
+    offsetof(VkDispatchIndirectCommand, z));
+
+bool VulkanEncoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || m_renderingOpen || !m_resources ||
+        nullptr == vkCmdDispatchIndirect || byteOffset % 4 != 0 ||
+        !IsPipelineBound(RHIBindPoint::Compute))
+    {
+        return false;
+    }
+    const auto entry = m_resources->Resolve(arguments);
+    if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        sizeof(RHIDispatchIndirectArguments) > entry.bytes - byteOffset ||
+        !FlushDescriptors(RHIBindPoint::Compute))
+    {
+        return false;
+    }
+    vkCmdDispatchIndirect(m_commandBuffer, entry.buffer, byteOffset);
+    ++m_computeDispatches;
+    return true;
+}
+
 void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
     if (VK_NULL_HANDLE == m_commandBuffer || !IsPipelineBound(RHIBindPoint::Compute))

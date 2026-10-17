@@ -434,6 +434,33 @@ bool DX12Encoder::DrawIndexedIndirectBatch(RHIBufferHandle arguments, uint64_t b
     return true;
 }
 
+static_assert(sizeof(RHIDispatchIndirectArguments) == sizeof(D3D12_DISPATCH_ARGUMENTS));
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountX) ==
+    offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountX));
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountY) ==
+    offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountY));
+static_assert(offsetof(RHIDispatchIndirectArguments, groupCountZ) ==
+    offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountZ));
+
+bool DX12Encoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (!m_commandList || !m_resources || byteOffset % 4 != 0 ||
+        !IsPipelineBound(RHIBindPoint::Compute))
+    {
+        return false;
+    }
+    const auto entry = m_resources->DescribeBuffer(arguments);
+    auto* signature = m_resources->GetDispatchIndirectSignature();
+    if (!signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        sizeof(RHIDispatchIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+    m_commandList->ExecuteIndirect(signature, 1, entry.resource, byteOffset, nullptr, 0);
+    ++m_computeDispatches;
+    return true;
+}
+
 void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
     if (nullptr == m_commandList)

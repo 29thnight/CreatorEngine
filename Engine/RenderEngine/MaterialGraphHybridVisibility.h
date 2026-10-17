@@ -9,7 +9,8 @@ namespace material_graph
 {
 struct HybridVisibilityPipelines final
 {
-    std::array<LX::Runtime::ComputePipeline, 3> compute;
+    enum Stage : unsigned { Initialize, PrepareClassify, Classify, PrepareSoftware, Rasterize, Count };
+    std::array<LX::Runtime::ComputePipeline, Count> compute;
     // Final surface writes visibility + depth; the occluder stage writes depth only.
     LX::Runtime::GraphicsPipeline resolve, resolveDepth;
     bool Prepare(const EnhancedFrameContext& context, std::string& error)
@@ -24,7 +25,9 @@ struct HybridVisibilityPipelines final
                                               RHILayout::SrvBufferTable(4096, 4112),
                                               RHILayout::Uav(0),
                                               RHILayout::Uav(1),
-                                              RHILayout::Srv(4)};
+                                              RHILayout::Uav(2),
+                                              RHILayout::Uav(3),
+                                              RHILayout::Srv(5)};
         const auto layout = context.rootSignatures->GetOrCreate({params, {}}, error);
         if (!layout.IsValid())
             return false;
@@ -32,8 +35,10 @@ struct HybridVisibilityPipelines final
         options.strictMath = true;
         options.bufferInt64Atomics = true;
         const auto source = RHIShaderSource::Resolve("MeteorHybridVisibility.slang").string();
-        const char* entries[]{"Initialize", "Classify", "Rasterize"};
-        for (unsigned i = 0; i < 3; ++i)
+        const char* entries[]{"Initialize", "PrepareClassify", "Classify", "PrepareSoftware", "Rasterize"};
+        static_assert(std::size(entries) == Count);
+        for (unsigned i = 0; i < Count; ++i)
+        {
             if (!compute[i].IsValid())
             {
                 LX::Runtime::CompiledCompute shader;
@@ -46,6 +51,7 @@ struct HybridVisibilityPipelines final
                 if (!compute[i].Create(*context.psoManager, desc, std::move(shader.description), error))
                     return false;
             }
+        }
         const RHIPipelineLayoutParam finalParams[]{RHILayout::Cbv(0), RHILayout::Srv(3, RHIShaderVisibility::Pixel)};
         const auto finalLayout = context.rootSignatures->GetOrCreate({finalParams, {}}, error);
         if (!finalLayout.IsValid())
@@ -83,6 +89,12 @@ struct HybridVisibilityPipelines final
 // resolves depth only; the final surface consumes the recovered union.
 struct SceneHybridVisibility final
 {
+    using Pipeline = HybridVisibilityPipelines;
+    // Keep in sync with MeteorHybridVisibility.slang. The work buffer contains
+    // four header words, recordCount+1 prefixes and two words per software item.
+    static constexpr uint32_t WorkHeaderWords = 4;
+    static constexpr uint64_t SoftwareArgumentsOffset = sizeof(RHIDispatchIndirectArguments);
+    static constexpr uint64_t DispatchArgumentBytes = 2 * sizeof(RHIDispatchIndirectArguments);
     // Pass/resource prefix, e.g. METEOR.Scene.Occluder or METEOR.Scene.Visibility.
     std::string name;
     bool depthOnly{};
@@ -90,14 +102,16 @@ struct SceneHybridVisibility final
     std::shared_ptr<TransientBufferPool> pool;
     std::shared_ptr<const SceneFrameGeometry> geometry;
     std::shared_ptr<const GpuGeometryVisibility::Frame> visible;
-    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 3> compute;
+    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, Pipeline::Count> compute;
     std::shared_ptr<const LX::Runtime::GraphicsGeneration> resolve;
     std::vector<std::array<uint32_t, 4>> records;
     RHIBufferSlice constants, metadata;
-    RHIBufferHandle keys, routes;
+    RHIBufferHandle keys, routes, work, dispatchArguments;
     RHIBindingTable vertices, topologies;
     uint32_t width{}, height{}, meshlets{};
-    mutable RGHandle graphKeys, graphRoutes, graphDepth;
+    uint64_t recording{}, descriptorVersion{};
+    math::matrix4x4 preparedProjection{};
+    mutable RGHandle graphKeys, graphRoutes, graphWork, graphDispatchArguments, graphDepth;
     mutable const EnhancedRenderGraph* graphOwner{};
     mutable uint64_t graphEpoch{};
     ~SceneHybridVisibility()
@@ -106,6 +120,8 @@ struct SceneHybridVisibility final
         {
             ReleaseSceneBuffer(*device, pool, keys);
             ReleaseSceneBuffer(*device, pool, routes);
+            ReleaseSceneBuffer(*device, pool, work);
+            ReleaseSceneBuffer(*device, pool, dispatchArguments);
         }
     }
     uint64_t KeyBytes() const { return uint64_t(width) * height * 8; }
@@ -121,15 +137,41 @@ struct SceneHybridVisibility final
         s.size = uint64_t(meshlets) * 4;
         return s;
     }
+    uint64_t WorkBytes() const
+    {
+        return (uint64_t(WorkHeaderWords) + records.size() + 1 + uint64_t(meshlets) * 2) * sizeof(uint32_t);
+    }
+    RHIBufferSlice WorkSlice() const
+    {
+        auto s = RHIBufferSlice::Whole(work);
+        s.size = WorkBytes();
+        return s;
+    }
+    RHIBufferSlice DispatchArgumentSlice() const
+    {
+        auto s = RHIBufferSlice::Whole(dispatchArguments);
+        s.size = DispatchArgumentBytes;
+        return s;
+    }
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& projection,
-                 HybridVisibilityPipelines& pipelines, std::string& error)
+                 HybridVisibilityPipelines& pipelines, std::string& error,
+                 const SceneHybridVisibility* sharedPreparation = nullptr)
     {
         device = context.resources;
+        if (!device || !geometry)
+        {
+            error = "METEOR hybrid visibility requires a device and frame geometry.";
+            return false;
+        }
         width = context.width;
         height = context.height;
+        recording = device->GetCurrentUploadRecordingId();
+        descriptorVersion = device->GetDescriptorVersionToken();
+        preparedProjection = projection;
         meshlets = (geometry->nextPrimitiveAddress - 1) / 128;
         if (name.empty() || !device->GetAtomicCapabilities().bufferInt64Min || !visible || !meshlets || !width ||
-            !height || uint64_t(width) * height > UINT32_MAX || geometry->records.size() > 4097 ||
+            !height || uint64_t(width) * height > UINT32_MAX || geometry->records.size() < 2 ||
+            geometry->records.size() > 4097 || geometry->geometry.size() != geometry->records.size() ||
             records.size() != geometry->records.size())
         {
             error = "METEOR hybrid visibility requires atomic64, bounded frame geometry and GPU culling; no fallback.";
@@ -137,8 +179,10 @@ struct SceneHybridVisibility final
         }
         if (!pipelines.Prepare(context, error))
             return false;
-        for (unsigned i = 0; i < 3; ++i)
+        for (unsigned i = 0; i < Pipeline::Count; ++i)
+        {
             compute[i] = pipelines.compute[i].GetGeneration();
+        }
         resolve = (depthOnly ? pipelines.resolveDepth : pipelines.resolve).GetGeneration();
         struct Constants
         {
@@ -148,14 +192,27 @@ struct SceneHybridVisibility final
         static_assert(sizeof(Constants) == 80);
         const Constants values{math::transpose(projection), width, height, static_cast<uint32_t>(records.size()),
                                meshlets};
-        constants = device->UploadConstants(&values, sizeof(values));
-        metadata = device->AllocateUpload(records.size() * 16, 16);
-        if (!constants.IsValid() || !metadata.IsWritable())
+        // First/final culling own different results. Only immutable preparation
+        // can be shared, and only inside the same recording/descriptor lifetime.
+        const bool shareGeometry = sharedPreparation && sharedPreparation->device == device &&
+            sharedPreparation->geometry == geometry && sharedPreparation->recording == recording &&
+            sharedPreparation->descriptorVersion == descriptorVersion && sharedPreparation->vertices.IsValid() &&
+            sharedPreparation->topologies.IsValid();
+        const bool shareConstants = shareGeometry && sharedPreparation->width == width &&
+            sharedPreparation->height == height &&
+            std::memcmp(&sharedPreparation->preparedProjection, &projection, sizeof(projection)) == 0;
+        const bool shareMetadata = shareGeometry && sharedPreparation->records == records;
+        constants = shareConstants ? sharedPreparation->constants : device->UploadConstants(&values, sizeof(values));
+        metadata = shareMetadata ? sharedPreparation->metadata : device->AllocateUpload(records.size() * 16, 16);
+        if (!constants.IsValid() || !metadata.IsValid() || (!shareMetadata && !metadata.IsWritable()))
         {
             error = "METEOR raster metadata upload failed.";
             return false;
         }
-        std::memcpy(metadata.cpuAddress, records.data(), records.size() * 16);
+        if (!shareMetadata)
+        {
+            std::memcpy(metadata.cpuAddress, records.data(), records.size() * 16);
+        }
         RHIBufferDesc desc;
         desc.bytes = KeyBytes();
         desc.allowUnorderedAccess = true;
@@ -168,7 +225,30 @@ struct SceneHybridVisibility final
         desc.debugName = routeName.c_str();
         if (!CreateSceneBuffer(*device, pool.get(), desc, routes, error))
             return false;
+        const std::wstring workName(std::wstring(name.begin(), name.end()) + L".Work");
+        const std::wstring argumentsName(std::wstring(name.begin(), name.end()) + L".DispatchArguments");
+        desc.bytes = WorkBytes();
+        desc.debugName = workName.c_str();
+        if (!CreateSceneBuffer(*device, pool.get(), desc, work, error))
+        {
+            return false;
+        }
+        desc.bytes = DispatchArgumentBytes;
+        desc.allowIndirectArguments = true;
+        desc.debugName = argumentsName.c_str();
+        if (!CreateSceneBuffer(*device, pool.get(), desc, dispatchArguments, error))
+        {
+            return false;
+        }
+        if (shareGeometry)
+        {
+            vertices = sharedPreparation->vertices;
+            topologies = sharedPreparation->topologies;
+            return true;
+        }
         std::vector<RHIBindingDesc> v, t;
+        v.reserve(geometry->geometry.size() - 1);
+        t.reserve(geometry->geometry.size() - 1);
         for (size_t i = 1; i < geometry->geometry.size(); ++i)
         {
             const auto& g = geometry->geometry[i];
@@ -191,37 +271,62 @@ struct SceneHybridVisibility final
     {
         e.Dispatch((std::min)(count, 65535u), (count + 65534u) / 65535u, 1);
     }
-    void Bind(RHIEncoder& e, unsigned stage) const
+    void Bind(RHIEncoder& e, Pipeline::Stage stage) const
     {
         e.SetPipeline(RHIBindPoint::Compute, compute[stage]->GetHandle());
         e.SetConstantBuffer(RHIBindPoint::Compute, 0, constants);
-        if (stage != 0)
+        if (stage == Pipeline::PrepareClassify || stage == Pipeline::Classify || stage == Pipeline::Rasterize)
         {
             e.SetRootBuffer(RHIBindPoint::Compute, 1, RHIBufferSlice::Whole(geometry->buffer));
             e.SetRootBuffer(RHIBindPoint::Compute, 2, metadata);
+        }
+        if (stage == Pipeline::Classify || stage == Pipeline::Rasterize)
+        {
             e.SetBindings(RHIBindPoint::Compute, 4, vertices);
             e.SetBindings(RHIBindPoint::Compute, 5, topologies);
         }
-        if (stage == 1)
+        if (stage == Pipeline::PrepareClassify || stage == Pipeline::Classify)
+        {
             e.SetRootBuffer(RHIBindPoint::Compute, 3, RHIBufferSlice::Whole(visible->VisibleIdBuffer()));
-        if (stage != 2 && !e.SetRootUnorderedBuffer(RHIBindPoint::Compute, 6, RouteSlice()))
+        }
+        if ((stage == Pipeline::Initialize || stage == Pipeline::Classify) &&
+            !e.SetRootUnorderedBuffer(RHIBindPoint::Compute, 6, RouteSlice()))
+        {
             throw std::runtime_error("METEOR raster route UAV binding failed.");
-        if (stage != 1 && !e.SetRootUnorderedBuffer(RHIBindPoint::Compute, 7, KeySlice()))
+        }
+        if ((stage == Pipeline::Initialize || stage == Pipeline::Rasterize) &&
+            !e.SetRootUnorderedBuffer(RHIBindPoint::Compute, 7, KeySlice()))
+        {
             throw std::runtime_error("METEOR raster key UAV binding failed.");
-        if (stage == 2)
-            e.SetRootBuffer(RHIBindPoint::Compute, 8, RouteSlice());
+        }
+        if ((stage == Pipeline::PrepareClassify || stage == Pipeline::Classify) &&
+            !e.SetRootUnorderedBuffer(RHIBindPoint::Compute, 8, WorkSlice()))
+        {
+            throw std::runtime_error("METEOR raster work UAV binding failed.");
+        }
+        if ((stage == Pipeline::PrepareClassify || stage == Pipeline::PrepareSoftware) &&
+            !e.SetRootUnorderedBuffer(RHIBindPoint::Compute, 9, DispatchArgumentSlice()))
+        {
+            throw std::runtime_error("METEOR raster dispatch UAV binding failed.");
+        }
+        if (stage == Pipeline::PrepareSoftware || stage == Pipeline::Rasterize)
+        {
+            e.SetRootBuffer(RHIBindPoint::Compute, 10, WorkSlice());
+        }
     }
     void GeometryReads(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
     {
         uses.push_back({geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
         for (size_t i = 1; i < records.size(); ++i)
-            if (records[i][1] & 1u)
+        {
+            if ((records[i][1] & 3u) == 3u)
             {
                 uses.push_back(
                     {geometry->geometry[i]->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
                 uses.push_back({geometry->geometry[i]->GraphMeshlets(graph), RHIResourceState::ShaderResource,
                                 RGAccessMode::Read});
             }
+        }
         NormalizeSceneReads(graph, uses);
     }
     void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneHybridVisibility> owner) const
@@ -232,8 +337,13 @@ struct SceneHybridVisibility final
         graphEpoch = graph.ResourceEpoch();
         graphKeys = graph.ImportBuffer(keys, RHIResourceState::Common, (name + ".Keys").c_str());
         graphRoutes = graph.ImportBuffer(routes, RHIResourceState::Common, (name + ".Routes").c_str());
+        graphWork = graph.ImportBuffer(work, RHIResourceState::Common, (name + ".Work").c_str());
+        graphDispatchArguments =
+            graph.ImportBuffer(dispatchArguments, RHIResourceState::Common, (name + ".DispatchArguments").c_str());
         graph.RequireImportedFinalState(graphKeys, RHIResourceState::Common);
         graph.RequireImportedFinalState(graphRoutes, RHIResourceState::Common);
+        graph.RequireImportedFinalState(graphWork, RHIResourceState::Common);
+        graph.RequireImportedFinalState(graphDispatchArguments, RHIResourceState::Common);
         graphKeys = graph.Write(graphKeys);
         graphRoutes = graph.Write(graphRoutes);
         graph.AddPass(
@@ -241,21 +351,38 @@ struct SceneHybridVisibility final
             {{graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
              {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
             [owner](const auto& x) {
-                owner->Bind(*x.encoder, 0);
+                owner->Bind(*x.encoder, Pipeline::Initialize);
                 DispatchGroups(
                     *x.encoder,
                     static_cast<uint32_t>(
                         ((std::max)(uint64_t(owner->width) * owner->height, uint64_t(owner->meshlets)) + 63) / 64));
             });
+        graphWork = graph.Write(graphWork);
+        graphDispatchArguments = graph.Write(graphDispatchArguments);
+        std::vector<EnhancedRenderGraph::RGPassUsage> prepareUses{
+            {graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+            {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+            {geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}};
+        visible->AddVisibleIdsRead(graph, prepareUses);
+        graph.AddPass((name + ".PrepareClassify").c_str(), prepareUses, [owner](const auto& x) {
+            owner->Bind(*x.encoder, Pipeline::PrepareClassify);
+            x.encoder->Dispatch(1, 1, 1);
+        });
         graphKeys = graph.AtomicMin64(graphKeys);
         graphRoutes = graph.Modify(graphRoutes);
+        graphWork = graph.Modify(graphWork);
         std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}};
+            {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite},
+            {graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite},
+            {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}};
         GeometryReads(graph, uses);
         visible->AddVisibleIdsRead(graph, uses);
         graph.AddPass((name + ".Classify").c_str(), uses, [owner](const auto& x) {
-            owner->Bind(*x.encoder, 1);
-            DispatchGroups(*x.encoder, owner->meshlets);
+            owner->Bind(*x.encoder, Pipeline::Classify);
+            if (!x.encoder->DispatchIndirect(owner->dispatchArguments))
+            {
+                throw std::runtime_error("METEOR classifier indirect dispatch failed.");
+            }
         });
     }
     void AddRasterUses(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
@@ -267,12 +394,29 @@ struct SceneHybridVisibility final
     }
     void DeclareSoftware(EnhancedRenderGraph& graph, std::shared_ptr<const SceneHybridVisibility> owner) const
     {
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-        AddRasterUses(graph, uses);
+        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
+        {
+            throw std::runtime_error("METEOR software raster requires explicit classification.");
+        }
+        graphDispatchArguments = graph.Modify(graphDispatchArguments);
+        graph.AddPass((name + ".PrepareSoftware").c_str(),
+                      {{graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                       {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}},
+                      [owner](const auto& x) {
+                          owner->Bind(*x.encoder, Pipeline::PrepareSoftware);
+                          x.encoder->Dispatch(1, 1, 1);
+                      });
+        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+            {graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64},
+            {graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
+            {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}};
         GeometryReads(graph, uses);
         graph.AddPass((name + ".SW").c_str(), uses, [owner](const auto& x) {
-            owner->Bind(*x.encoder, 2);
-            DispatchGroups(*x.encoder, owner->meshlets);
+            owner->Bind(*x.encoder, Pipeline::Rasterize);
+            if (!x.encoder->DispatchIndirect(owner->dispatchArguments, SoftwareArgumentsOffset))
+            {
+                throw std::runtime_error("METEOR software raster indirect dispatch failed.");
+            }
         });
     }
     // Occluder stage: the merged atomic keys become the HZB source depth.
