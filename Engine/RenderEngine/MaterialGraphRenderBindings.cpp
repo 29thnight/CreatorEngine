@@ -476,36 +476,87 @@ bool RenderBindingCache::ValidatePass(const IRenderDeviceServices& device, const
 bool RenderBindingCache::BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
                                   const RenderBindings& source, const PassLayout& layout, std::string& error)
 {
+    PreparedPass prepared;
+    if (!PreparePass(device, source, layout, prepared, error))
+    {
+        return false;
+    }
+    BindPassCommands(encoder, point, source, layout, prepared);
+    return true;
+}
+
+bool RenderBindingCache::PreparePass(IRenderDeviceServices& device, const RenderBindings& source,
+                                     const PassLayout& layout, PreparedPass& result, std::string& error)
+{
     if (!ValidatePass(device, source, layout, error))
     {
         return false;
     }
+    PreparedPass candidate;
+    candidate.source_ = &source;
+    candidate.layout_ = layout.handle;
+    candidate.recordingId_ = source.recordingId;
+    candidate.descriptorVersion_ = source.descriptorVersion;
+    if (layout.textureSlot)
+    {
+        std::lock_guard lock(source.bindless->mutex);
+        auto& frame = *source.bindless;
+        if (!frame.textures.IsValid() || frame.publishedSize != frame.descriptions.size())
+        {
+            auto descriptions = frame.descriptions;
+            descriptions.resize(BindlessTextureCapacity, RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
+            const auto textures = device.CreateBindings(descriptions);
+            if (!textures.IsValid())
+            {
+                return Fail(error, "LX bindless texture table allocation failed.");
+            }
+            if (!ValidatePass(device, source, layout, error))
+            {
+                return Fail(error, "LX bindless texture table allocation changed recording/descriptors.");
+            }
+            frame.textures = textures;
+            frame.publishedSize = frame.descriptions.size();
+        }
+        candidate.textures_ = frame.textures;
+    }
+    result = candidate;
+    return true;
+}
+
+bool RenderBindingCache::BindPreparedPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                                         const RenderBindings& source, const PassLayout& layout,
+                                         const PreparedPass& prepared, std::string& error)
+{
+    if (!ValidatePass(device, source, layout, error) || prepared.source_ != &source ||
+        prepared.layout_ != layout.handle || prepared.recordingId_ != source.recordingId ||
+        prepared.descriptorVersion_ != source.descriptorVersion ||
+        (layout.textureSlot && !prepared.textures_.IsValid()))
+    {
+        return Fail(error, "Material prepared pass belongs to a different packet, layout or recording.");
+    }
+    BindPassCommands(encoder, point, source, layout, prepared);
+    return true;
+}
+
+void RenderBindingCache::BindPassCommands(RHIEncoder& encoder, RHIBindPoint point, const RenderBindings& source,
+                                         const PassLayout& layout, const PreparedPass& prepared)
+{
     if (layout.uniformSlot)
     {
         encoder.SetConstantBuffer(point, *layout.uniformSlot, source.uniforms);
     }
     if (layout.textureSlot)
     {
-        std::lock_guard lock(source.bindless->mutex);
-        auto& frame = *source.bindless;
-        if (frame.publishedSize != frame.descriptions.size())
-        {
-            auto descriptions = frame.descriptions;
-            descriptions.resize(BindlessTextureCapacity, RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
-            frame.textures = device.CreateBindings(descriptions);
-            if (!frame.textures.IsValid())
-                return Fail(error, "LX bindless texture table allocation failed.");
-            frame.publishedSize = frame.descriptions.size();
-        }
-        encoder.SetBindings(point, *layout.textureSlot, frame.textures);
+        encoder.SetBindings(point, *layout.textureSlot, prepared.textures_);
     }
     if (layout.samplerSlot)
     {
         encoder.SetSamplers(point, *layout.samplerSlot, source.samplers);
     }
     if (layout.descriptorIndexSlot)
+    {
         encoder.SetConstantBuffer(point, *layout.descriptorIndexSlot, source.descriptorIndices);
-    return true;
+    }
 }
 
 bool RenderBindingCache::Validate(const IRenderDeviceServices& device, const RenderBindings& bindings,

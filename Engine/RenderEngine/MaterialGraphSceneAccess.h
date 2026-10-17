@@ -57,64 +57,87 @@ namespace material_graph
                     left.kind == right.kind && left.epoch == right.epoch;
             }
         };
-        // Keep first-use order without allocating a hash node per resource on
-        // every declaration. Slots own only indices into the local result;
-        // no borrowed handles or frame state survive this call. At most half
-        // the table is occupied, and collisions compare the complete handle.
+        // 호출자의 vector를 수정하기 전에 원본 사용 목록을 전부 검증한다.
+        // 해시 슬롯은 최초 사용 위치를 가리킨다. 입력마다 압축할 목적지도 기록하므로
+        // 압축 중에 덮어쓴 원본 핸들을 다시 참조하지 않는다. 호출이 끝나면 모든 임시
+        // 인덱스를 버린다. 테이블은 절반까지만 채우며 충돌 시 핸들 전체를 비교한다.
         constexpr size_t empty = (std::numeric_limits<size_t>::max)();
         std::array<size_t, 128> localSlots;
-        std::vector<size_t> overflowSlots;
+        std::array<size_t, 64> localDestinations;
+        std::vector<size_t> overflowScratch;
         std::span<size_t> slots;
-        if (uses.size() <= localSlots.size() / 2)
+        std::span<size_t> destinations;
+        if (uses.size() <= localDestinations.size())
         {
             slots = localSlots;
+            destinations = std::span{localDestinations}.first(uses.size());
             std::ranges::fill(slots, empty);
         }
         else
         {
-            if (uses.size() > overflowSlots.max_size() / 2)
+            if (uses.size() > overflowScratch.max_size() / 3)
             {
                 throw std::length_error("Scene pass has too many resource uses.");
             }
-            overflowSlots.assign(uses.size() * 2, empty);
-            slots = overflowSlots;
+            overflowScratch.assign(uses.size() * 3, empty);
+            slots = std::span{overflowScratch}.first(uses.size() * 2);
+            destinations = std::span{overflowScratch}.subspan(slots.size());
         }
-        std::vector<EnhancedRenderGraph::RGPassUsage> unique;
-        unique.reserve(uses.size());
-        for (const auto& use : std::span{uses})
+        const auto original = std::span{uses};
+        size_t uniqueCount = 0;
+        for (size_t index = 0; index < original.size(); ++index)
         {
+            const auto& use = original[index];
             size_t slot = HandleHash{}(use.handle) % slots.size();
-            while (slots[slot] != empty && !SameHandle{}(unique.data()[slots[slot]].handle, use.handle))
+            while (slots[slot] != empty && !SameHandle{}(original[slots[slot]].handle, use.handle))
             {
                 slot = slot + 1 == slots.size() ? 0 : slot + 1;
             }
             if (slots[slot] == empty)
             {
-                slots[slot] = unique.size();
-                unique.push_back(use);
+                slots[slot] = index;
+                destinations[index] = uniqueCount++;
                 continue;
             }
-            auto* found = &unique.data()[slots[slot]];
-            if (found->access != RGAccessMode::Read || use.access != RGAccessMode::Read)
+            const auto& first = original[slots[slot]];
+            destinations[index] = destinations[slots[slot]];
+            if (first.access != RGAccessMode::Read || use.access != RGAccessMode::Read)
             {
                 throw std::runtime_error("Scene pass duplicates a writable resource version.");
             }
-            if (found->state == use.state)
+            if (first.state == use.state)
             {
                 continue;
             }
             const auto shaderRead = [](RHIResourceState state) {
                 return state == RHIResourceState::ShaderResource || state == RHIResourceState::PixelShaderResource;
             };
-            if (shaderRead(found->state) && shaderRead(use.state))
-            {
-                found->state = RHIResourceState::ShaderResource;
-            }
-            else
+            if (!shaderRead(first.state) || !shaderRead(use.state))
             {
                 throw std::runtime_error("Scene pass duplicates incompatible read states.");
             }
         }
-        uses = std::move(unique);
+        if (uniqueCount == uses.size())
+        {
+            return;
+        }
+        // 목적지는 해당 자원보다 먼저 등장한 고유 자원의 수이므로 원본 인덱스를 넘지 않는다.
+        // 따라서 압축해도 아직 읽지 않은 뒤쪽 입력을 덮지 않는다. 이 첫 수정 이후에는
+        // 해시 테이블을 다시 참조하지 않는다.
+        size_t copied = 0;
+        for (size_t index = 0; index < original.size(); ++index)
+        {
+            const auto destination = destinations[index];
+            if (destination == copied)
+            {
+                original[destination] = original[index];
+                ++copied;
+            }
+            else if (original[destination].state != original[index].state)
+            {
+                original[destination].state = RHIResourceState::ShaderResource;
+            }
+        }
+        uses.resize(uniqueCount);
     }
 } // namespace material_graph

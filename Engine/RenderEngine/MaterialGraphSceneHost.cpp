@@ -180,6 +180,48 @@ struct SceneShadowConstants
 };
 static_assert(sizeof(SceneShadowConstants) == 208);
 
+struct SceneIndirectRootLayout
+{
+    // 루트 상한은 그림자 6개, 표면 7개, 머티리얼 타일 6개, Temporal 8개다.
+    // 현재 주소 검사는 모두 유지하고 명령별 슬롯 임시 저장소만 스택에 둔다.
+    static constexpr std::size_t kCapacity = 8;
+    std::array<std::uint32_t, kCapacity> slots{};
+    std::size_t count{};
+
+    bool Append(std::uint32_t slot, bool cbv)
+    {
+        if (count == slots.size())
+        {
+            return false;
+        }
+        slots[count++] = slot | (cbv ? 0x80000000u : 0u);
+        return true;
+    }
+
+    bool MatchOrInitialize(std::vector<std::uint32_t>& bucket) const
+    {
+        const std::span<const std::uint32_t> roots{slots.data(), count};
+        if (bucket.empty())
+        {
+            bucket.assign(roots.begin(), roots.end());
+        }
+        return std::ranges::equal(bucket, roots);
+    }
+};
+
+bool ReserveSceneIndirectCommands(std::size_t count, std::vector<std::uint32_t>& words,
+                                   std::vector<std::array<std::uint32_t, 4>>& records, std::string& error)
+{
+    constexpr auto wordsPerCommand = SceneIndirectRootLayout::kCapacity * 2;
+    if (count > words.max_size() / wordsPerCommand || count > records.max_size())
+    {
+        return Fail(error, "METEOR indirect command preparation exceeds CPU storage capacity.");
+    }
+    words.reserve(count * wordsPerCommand);
+    records.reserve(count);
+    return true;
+}
+
 std::array<RGHandle, 5> Colors(const SceneSurfaceTargets::Outputs& outputs)
 {
     return {outputs.diffuse, outputs.metalRough, outputs.normal, outputs.emissive, outputs.bitmask};
@@ -2135,7 +2177,9 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         }
         // GBuffer bytecode can be identical while the color/lookup shader
         // differs. A bucket must share the complete cooked program identity.
-        std::map<std::pair<std::string, bool>, std::vector<std::size_t>> groups;
+        // draw가 이 블록 전체에서 불변 Program과 Generation을 소유한다.
+        // map은 candidate 게시 전에 파괴되어 문자열 참조가 Prepare 밖에 남지 않는다.
+        std::map<std::pair<std::string_view, bool>, std::vector<std::size_t>> groups;
         for (std::size_t index = 0; index < candidate->draws.size(); ++index)
         {
             const auto& draw = candidate->draws[index];
@@ -2163,6 +2207,20 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                         : candidate->finalCullStage.cameraMeshlets;
             std::vector<std::uint32_t> words;
             std::vector<std::array<std::uint32_t, 4>> records;
+            std::size_t commandCount{};
+            for (const auto& [key, indices] : groups)
+            {
+                if (indices.size() > records.max_size() - commandCount)
+                {
+                    return Fail(error, "METEOR indirect command count exceeds CPU storage capacity.");
+                }
+                commandCount += indices.size();
+            }
+            if (!ReserveSceneIndirectCommands(commandCount, words, records, error))
+            {
+                return false;
+            }
+            batch->buckets.reserve(groups.size());
             std::uint32_t outputBytes{};
             for (const auto& [key, indices] : groups)
             {
@@ -2176,13 +2234,15 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                     draw.materialBucket = static_cast<std::uint32_t>(batch->buckets.size());
                     draw.bucketRepresentative = index == indices.front();
                     const auto& layout = cascade ? draw.program->shadowLayout : draw.program->layout;
-                    std::vector<std::uint32_t> roots;
+                    SceneIndirectRootLayout roots;
                     const auto first = static_cast<std::uint32_t>(words.size() * 4);
                     const auto append = [&](std::uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
                         std::uint64_t value{};
-                        if (!device_->EncodeIndirectBuffer(slice, value) || (cbv && value % 256))
+                        if (!device_->EncodeIndirectBuffer(slice, value) || (cbv && value % 256) ||
+                            !roots.Append(slot, cbv))
+                        {
                             return false;
-                        roots.push_back(slot | (cbv ? 0x80000000u : 0));
+                        }
                         words.push_back(static_cast<std::uint32_t>(value));
                         words.push_back(static_cast<std::uint32_t>(value >> 32));
                         return true;
@@ -2209,13 +2269,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                          !append(*layout.descriptorIndexSlot, draw.bindings->descriptorIndices, true)))
                         return Fail(error,
                                     "LX indirect root descriptor preparation failed; no CPU submission fallback.");
-                    if (bucket.roots.empty())
-                        bucket.roots = roots;
-                    if (bucket.roots != roots)
+                    if (!roots.MatchOrInitialize(bucket.roots))
+                    {
                         return Fail(error, "LX shader bucket root ABI differs between instances.");
-                    records.push_back({first, outputBytes, static_cast<std::uint32_t>(roots.size() * 2),
+                    }
+                    records.push_back({first, outputBytes, static_cast<std::uint32_t>(roots.count * 2),
                                        static_cast<std::uint32_t>(batch->visibility->ArgsOffset(bin))});
-                    outputBytes += static_cast<std::uint32_t>(roots.size() * 8 + 12);
+                    outputBytes += static_cast<std::uint32_t>(roots.count * 8 + 12);
                 }
                 batch->buckets.push_back(std::move(bucket));
             }
@@ -2244,10 +2304,6 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         };
         if (std::ranges::any_of(groups, needsMaterialTiles))
         {
-            const RHIPipelineLayoutParam params[]{
-                RHILayout::Cbv(0), RHILayout::SrvTable(1, 0),       RHILayout::Srv(1),
-                RHILayout::Srv(2), RHILayout::UavBufferTable(2, 0), RHILayout::Srv(3)};
-            const auto layout = context.rootSignatures->GetOrCreate({params, {}}, error);
             constexpr const char* entries[]{"ResetMaterialWork", "CountMaterialTiles", "BuildMaterialRanges",
                                             "ScatterMaterialTiles"};
             auto work = std::make_shared<SceneMaterialWork>();
@@ -2261,6 +2317,10 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             {
                 if (!materialWorkPipelines_[stage].GetGeneration())
                 {
+                    const RHIPipelineLayoutParam params[]{
+                        RHILayout::Cbv(0), RHILayout::SrvTable(1, 0),       RHILayout::Srv(1),
+                        RHILayout::Srv(2), RHILayout::UavBufferTable(2, 0), RHILayout::Srv(3)};
+                    const auto layout = context.rootSignatures->GetOrCreate({params, {}}, error);
                     LX::Runtime::CompiledCompute compiled;
                     RHIShaderCompileOptions options;
                     options.strictMath = true;
@@ -2280,6 +2340,25 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             }
             std::vector<uint32_t> words;
             std::vector<std::array<uint32_t, 4>> records;
+            std::size_t commandCount{};
+            std::size_t bucketCount{};
+            for (const auto& group : groups)
+            {
+                if (needsMaterialTiles(group))
+                {
+                    if (group.second.size() > records.max_size() - commandCount)
+                    {
+                        return Fail(error, "METEOR material tile command count exceeds CPU storage capacity.");
+                    }
+                    commandCount += group.second.size();
+                    ++bucketCount;
+                }
+            }
+            if (!ReserveSceneIndirectCommands(commandCount, words, records, error))
+            {
+                return false;
+            }
+            work->buckets.reserve(bucketCount);
             uint32_t bytes{};
             for (const auto& group : groups)
             {
@@ -2295,12 +2374,14 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                     auto& draw = candidate->draws[index];
                     draw.materialTileBucket = static_cast<uint32_t>(work->buckets.size());
                     const auto first = static_cast<uint32_t>(words.size() * 4);
-                    std::vector<uint32_t> roots;
+                    SceneIndirectRootLayout roots;
                     const auto append = [&](uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
                         uint64_t address{};
-                        if (!device_->EncodeIndirectBuffer(slice, address) || (cbv && address % 256))
+                        if (!device_->EncodeIndirectBuffer(slice, address) || (cbv && address % 256) ||
+                            !roots.Append(slot, cbv))
+                        {
                             return false;
-                        roots.push_back(slot | (cbv ? 0x80000000u : 0));
+                        }
                         words.push_back(static_cast<uint32_t>(address));
                         words.push_back(static_cast<uint32_t>(address >> 32));
                         return true;
@@ -2315,12 +2396,12 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                         (bindings.descriptorIndexSlot &&
                          !append(*bindings.descriptorIndexSlot, draw.bindings->descriptorIndices, true)))
                         return Fail(error, "METEOR material tile root template failed.");
-                    if (bucket.roots.empty())
-                        bucket.roots = roots;
-                    if (bucket.roots != roots)
+                    if (!roots.MatchOrInitialize(bucket.roots))
+                    {
                         return Fail(error, "METEOR material tile bucket ABI mismatch.");
-                    records.push_back({first, bytes, static_cast<uint32_t>(roots.size() * 2), draw.geometryRecord});
-                    bytes += static_cast<uint32_t>(roots.size() * 8 + 12);
+                    }
+                    records.push_back({first, bytes, static_cast<uint32_t>(roots.count * 2), draw.geometryRecord});
+                    bytes += static_cast<uint32_t>(roots.count * 8 + 12);
                 }
                 work->buckets.push_back(std::move(bucket));
             }
@@ -2374,6 +2455,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         replay->pipeline = indirectCommands_.GetGeneration();
         std::vector<uint32_t> replayWords;
         std::vector<std::array<uint32_t, 4>> replayRecords;
+        const auto replayCount = static_cast<std::size_t>(std::ranges::count_if(candidate->draws, [](const auto& draw) {
+            return draw.program->hasSurface && draw.blended;
+        }));
+        if (!ReserveSceneIndirectCommands(replayCount, replayWords, replayRecords, error))
+        {
+            return false;
+        }
         RHIPipelineHandle previousPipeline{};
         uint32_t replayBytes{};
         for (std::size_t index = 0; index < candidate->draws.size(); ++index)
@@ -2392,12 +2480,14 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             }
             auto& bucket = replay->buckets.back();
             const auto first = static_cast<uint32_t>(replayWords.size() * 4);
-            std::vector<uint32_t> roots;
+            SceneIndirectRootLayout roots;
             const auto append = [&](uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
                 uint64_t address{};
-                if (!device_->EncodeIndirectBuffer(slice, address) || (cbv && address % 256))
+                if (!device_->EncodeIndirectBuffer(slice, address) || (cbv && address % 256) ||
+                    !roots.Append(slot, cbv))
+                {
                     return false;
-                roots.push_back(slot | (cbv ? 0x80000000u : 0));
+                }
                 replayWords.push_back(uint32_t(address));
                 replayWords.push_back(uint32_t(address >> 32));
                 return true;
@@ -2415,13 +2505,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                 (layout.descriptorIndexSlot &&
                  !append(*layout.descriptorIndexSlot, draw.bindings->descriptorIndices, true)))
                 return Fail(error, "LX temporal indirect root preparation failed.");
-            if (bucket.roots.empty())
-                bucket.roots = roots;
-            if (bucket.roots != roots)
+            if (!roots.MatchOrInitialize(bucket.roots))
+            {
                 return Fail(error, "LX temporal bucket root ABI mismatch.");
-            replayRecords.push_back({first, replayBytes, uint32_t(roots.size() * 2),
+            }
+            replayRecords.push_back({first, replayBytes, uint32_t(roots.count * 2),
                                      uint32_t(replay->visibility->ArgsOffset(draw.cameraMeshletBin))});
-            replayBytes += uint32_t(roots.size() * 8 + 12);
+            replayBytes += uint32_t(roots.count * 8 + 12);
             ++bucket.count;
         }
         if (!replayRecords.empty())

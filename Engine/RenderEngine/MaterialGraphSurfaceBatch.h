@@ -102,7 +102,8 @@ namespace material_graph
       private:
         friend class SurfaceEvaluator;
         SurfaceBatch() = default;
-        bool RecordCommands(RHIEncoder& encoder, std::string& error) const;
+        bool RecordCommands(RHIEncoder& encoder, std::string& error,
+                            const RenderBindingCache::PreparedPass* prepared = nullptr) const;
         IRenderDeviceServices* device_{};
         RHIBufferHandle buffer_;
         SurfaceView view_;
@@ -134,8 +135,8 @@ namespace material_graph
         const PassLayout& Layout() const { return layout_; }
 
         // Immediate recording only, after material textures are ShaderResource.
-        // All allocations/bind validation precede dispatch. Keep returned owner
-        // through submission completion/abort and release it before device shutdown.
+        // 평가 입력·출력과 머티리얼 테이블의 준비 검증은 첫 자원 참조 전에 끝낸다.
+        // 반환된 owner는 제출 완료/취소까지 보유하고 device shutdown 전에 해제한다.
         bool Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,
                     std::span<const SurfacePoint> points, std::shared_ptr<const SurfaceBatch>& result, std::string& error);
         // GPU skin/world frame -> graph -> IBL, without a CPU readback between stages.

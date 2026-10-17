@@ -101,7 +101,7 @@ struct IndirectMaterialBatch
         graph.RequireImportedFinalState(graphOutput, RHIResourceState::Common);
         graphOutput = graph.Write(graphOutput);
         uses.push_back({graphOutput, RHIResourceState::UnorderedAccess, RGAccessMode::Write});
-        graph.AddPass((name + ".Build").c_str(), uses, [owner](const auto& execution) {
+        const auto pass = graph.AddPass((name + ".Build").c_str(), std::move(uses), [owner](const auto& execution) {
             auto& encoder = *execution.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute, owner->pipeline->GetHandle());
             encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, owner->constants);
@@ -113,6 +113,8 @@ struct IndirectMaterialBatch
             encoder.SetBindings(RHIBindPoint::Compute, 4, owner->outputTable);
             encoder.Dispatch((owner->commandCount + 63) / 64, 1, 1);
         });
+        // CPU 콜백은 준비된 불변 입력만 읽는다. visibility 결과의 GPU 의존성은 위 resource read로 유지한다.
+        graph.DeclareRecordingIndependent(pass);
     }
     RGHandle GraphOutput(const EnhancedRenderGraph& graph) const
     {

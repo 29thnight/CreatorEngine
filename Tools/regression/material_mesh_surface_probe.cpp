@@ -665,8 +665,13 @@ SurfacePoint SampleReference(const Geometry& geometry, const MeshSurfaceSample& 
 struct Drain
 {
     DX12DeviceResources& device;
+    bool pending{true};
     ~Drain()
     {
+        if (!pending)
+        {
+            return;
+        }
         if (device.GetCurrentUploadRecordingId())
         {
             device.AbortFrame();
@@ -682,6 +687,9 @@ class RecordingChangeDevice final : public DX12DeviceResources
     unsigned flushUploadCountdown{};
     bool flushOnBindings{};
     bool failBindings{};
+    bool flushOnMaterialTable{};
+    bool failMaterialTable{};
+    unsigned bindingCalls{}, materialTableCalls{};
     unsigned injectedPrefixSubmissions{};
     RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override
     {
@@ -694,6 +702,21 @@ class RecordingChangeDevice final : public DX12DeviceResources
     }
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descriptions) override
     {
+        ++bindingCalls;
+        if (descriptions.size() == BindlessTextureCapacity)
+        {
+            ++materialTableCalls;
+            if (flushOnMaterialTable)
+            {
+                flushOnMaterialTable = false;
+                FlushPrefix();
+            }
+            if (failMaterialTable)
+            {
+                failMaterialTable = false;
+                return {};
+            }
+        }
         if (flushOnBindings)
         {
             flushOnBindings = false;
@@ -2390,6 +2413,123 @@ void Run(const std::filesystem::path& root)
         }
         std::cout << "MESH_PREFIX_LIFETIME_OK cases=6 uploadFlushes=4 bindingFlushes=1 bindingFailures=1 "
                      "retries=6 preserved=6 validation=0\n";
+        auto prefixSurface = slot.Active()->evaluation.gpu;
+        Check(prefixSurface && prefixSurface->IsValidated(), "Surface prefix retains an accepted prior result");
+        for (unsigned failure = 0; failure < 2; ++failure)
+        {
+            Check(device.BeginFrame(error), "Surface prefix begin");
+            textures.BeginFrame(++frames);
+            Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
+                  "Surface prefix fresh material bindings");
+            const auto failedFrame = materialBindings->bindless;
+            Check(materialBindings->layout.textureSlot && failedFrame && !failedFrame->descriptions.empty() &&
+                      failedFrame->publishedSize == 0 && !failedFrame->textures.IsValid(),
+                  "Surface prefix targets an unpublished shared material table");
+            Check(meshEvaluator.Record(device, sealed, prefixMesh, error), "Surface prefix mesh");
+            const auto submittedSource = prefixMesh;
+            const auto preservedSurface = prefixSurface;
+            // 검사가 예외로 끝나도 GPU를 먼저 정리한 뒤 위 두 소유자를 해제한다.
+            // 정상 경로는 아래 기존 완료 대기 직후 guard를 해제한다.
+            Drain failureDrain{device};
+            const auto recordingBefore = device.GetCurrentUploadRecordingId();
+            const auto descriptorsBefore = device.GetDescriptorVersionToken();
+            const auto submissionsBefore = device.injectedPrefixSubmissions;
+            const auto bindingsBefore = device.bindingCalls;
+            const auto tablesBefore = device.materialTableCalls;
+            // 첫 output UAV는 성공시키고, 그 뒤의 4096칸 shared material table만
+            // 거절/교체한다. 일반 descriptor 실패를 다른 호출에서 소모하면 안 된다.
+            device.failMaterialTable = failure == 0;
+            device.flushOnMaterialTable = failure == 1;
+            Check(!evaluators[0].RecordGpu(device, materialBindings, prefixMesh, prefixSurface, error) &&
+                      prefixSurface == preservedSurface,
+                  "Surface table failure preserves the previous accepted result");
+            Check(error == (failure == 0 ? "LX bindless texture table allocation failed."
+                                        : "LX bindless texture table allocation changed recording/descriptors."),
+                  "Surface failure identifies shared material table publication");
+            Check(device.bindingCalls == bindingsBefore + 2 && device.materialTableCalls == tablesBefore + 1 &&
+                      !device.failMaterialTable && !device.flushOnMaterialTable,
+                  "Fault reaches the shared table after exactly one output UAV table");
+            Check(failedFrame->publishedSize == 0 && !failedFrame->textures.IsValid(),
+                  "Failed or rotated shared table is never published");
+            Check(device.injectedPrefixSubmissions == submissionsBefore + failure &&
+                      (device.GetCurrentUploadRecordingId() != recordingBefore) == (failure == 1) &&
+                      (device.GetDescriptorVersionToken() != descriptorsBefore) == (failure == 1),
+                  "Surface fault rotates exactly the expected recording and descriptor version");
+            Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Surface prefix native submit");
+            // prefix GPU를 기다리지 않고 새 recording으로 재시도한다. 이전 source와
+            // 성공 결과는 두 제출이 완료될 때까지 이 scope가 계속 소유한다.
+            Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
+                  "Surface prefix retry bindings");
+            Check(meshEvaluator.Record(device, sealed, prefixMesh, error), "Surface prefix retry mesh");
+            Check(submittedSource->Buffer() != prefixMesh->Buffer(),
+                  "Surface retry retains a distinct source for the original recording");
+            const auto retryBindingsBefore = device.bindingCalls;
+            const auto retryTablesBefore = device.materialTableCalls;
+            Check(evaluators[0].RecordGpu(device, materialBindings, prefixMesh, prefixSurface, error),
+                  "Surface prefix retry evaluation");
+            Check(device.bindingCalls == retryBindingsBefore + 2 &&
+                      device.materialTableCalls == retryTablesBefore + 1 &&
+                      materialBindings->bindless->publishedSize == materialBindings->bindless->descriptions.size(),
+                  "Surface retry publishes once and binds without another descriptor allocation");
+            auto& retryEncoder = device.GetImmediateEncoder();
+            const RHIBufferHandle buffers[]{prefixMesh->Buffer(), prefixSurface->Buffer()};
+            for (unsigned index = 0; index < 2; ++index)
+            {
+                const RHIBufferTransition toCopy{buffers[index], RHIResourceState::ShaderResource,
+                                                 RHIResourceState::CopySource};
+                retryEncoder.ResourceBarriers({{}, {&toCopy, 1}});
+                retryEncoder.CopyBufferToReadback(readbacks[index], buffers[index]);
+                const RHIBufferTransition toRead{buffers[index], RHIResourceState::CopySource,
+                                                 RHIResourceState::ShaderResource};
+                retryEncoder.ResourceBarriers({{}, {&toRead, 1}});
+            }
+            Check(device.EndFrame(error), "Surface prefix retry submit");
+            Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Surface retry native submit");
+            device.WaitForGpu();
+            failureDrain.pending = false;
+            std::array<RHIReadbackImage, 2> mapped;
+            for (unsigned index = 0; index < mapped.size(); ++index)
+            {
+                Check(device.MapReadback(readbacks[index], mapped[index], error), "Surface prefix retry readback");
+            }
+            const auto worldPoints = mapped[0].Elements<SurfacePoint>();
+            const auto surfacePoints = mapped[1].Elements<IblBakePoint>();
+            Check(prefixMesh->ValidateReadback({worldPoints, kPoints}, error), "Surface retry accepts its mesh source");
+            Check(prefixSurface->ValidateReadback({surfacePoints, kPoints}, error),
+                  "Surface retry accepts its evaluated material");
+            for (unsigned point = 0; point < kPoints; ++point)
+            {
+                const auto expectedWorld = WorldReference(geometry, point);
+                const auto worldValues = std::bit_cast<std::array<float, 20>>(expectedWorld);
+                const auto actualWorld = std::bit_cast<std::array<float, 20>>(worldPoints[point]);
+                for (unsigned component = 0; component < actualWorld.size(); ++component)
+                {
+                    Near(actualWorld[component], worldValues[component], "Surface retry world scalar reference");
+                }
+                const auto expectedMaterial =
+                    std::bit_cast<std::array<float, 44>>(ExpectedPoint(expectedWorld, view, 1.3f, .5f, false));
+                const auto actualMaterial = std::bit_cast<std::array<float, 44>>(surfacePoints[point]);
+                for (unsigned component = 0; component < actualMaterial.size(); ++component)
+                {
+                    if (component < 3)
+                    {
+                        const double difference = std::abs(actualMaterial[component] - expectedMaterial[component]);
+                        maxColorError = std::max(maxColorError, difference);
+                        Check(std::isfinite(actualMaterial[component]) && difference <= .001,
+                              "Surface retry SRGB texel selection");
+                        ++gpuComponents;
+                    }
+                    else
+                    {
+                        Near(actualMaterial[component], expectedMaterial[component],
+                             "Surface retry material scalar reference");
+                    }
+                }
+            }
+            Check(device.DrainDebugMessages(messages) == 0, "Surface prefix GPU validation: " + messages);
+        }
+        std::cout << "SURFACE_PREFIX_LIFETIME_OK cases=2 bindingFailures=1 bindingFlushes=1 "
+                     "retries=2 preserved=2 gpuComponents=4736 validation=0\n";
         Check(device.BeginFrame(error), "Prefix bake begin");
         textures.BeginFrame(++frames);
         Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
