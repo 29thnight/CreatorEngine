@@ -1,75 +1,40 @@
-# Source-free AssetSet package composition
+# Source-free AssetSet 패키징 계약
 
-Status: source implementation and unrun fixtures. No build, package, smoke test, shader compilation, or performance result is claimed.
+> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
 
-## Two explicit package paths
+## 세 개의 생산물
 
-The default `package-game --content-mode Legacy` retains Project/Workspace/Tracked staging, generation export and the existing CEMF v2 cook. It can also attach validated AssetSets.
+source-free 패키지는 하나의 cook 명령이 아니다. 먼저 `build-asset-set`으로 typed CEMF3와 immutable blob 디렉터리를 만든다. `build-runtime-bootstrap`은 scene/prefab/설정과 필요한 runtime 문서 및 manifest bridge를 만든다. 마지막 `package-game --content-mode PrebuiltAssetSets`가 둘과 사전 컴파일된 GameScripts, 발행된 Player를 조합한다.
 
-`package-game --content-mode PrebuiltAssetSets` composes a verified installed Player, a prebuilt GameScripts assembly, an immutable runtime bootstrap and 1–64 independently built AssetSets. It never stages project assets, invokes model-generation authoring, calls the legacy cook, compiles runtime documents, or compiles managed/native code. It still requires a project engine pin and existing `Assets` / `ProjectSetting` directories, but `Assets` may be empty. `GameCompiler` only validates/copies the supplied prebuilt assembly in this mode. It captures a bounded receipt and holds both source handles without write/delete sharing, checks the copied bytes against the captured hash, rechecks the receipt, retains that expected hash in the emitted receipt, and checks again before publication.
+AssetSet output은 반드시 새 디렉터리이며 C# orchestration은 native completion report, CEMF version envelope, build-key hash와 허용된 blob 파일 inventory를 확인한다. CEMF의 세부 의미 검증은 native reader가 소유한다. Legacy v2 package manifest를 자동 변환하는 입력 경로는 아니다.
 
-Required options:
+## bootstrap 생산
 
-```text
-package-game --engine-distribution C:\Engine --project C:\Game --config Release
-  --content-mode PrebuiltAssetSets --bootstrap-root C:\Content\Bootstrap-r1
-  --asset-set-list C:\Content\sets.txt --game-scripts-assembly C:\Game\Compiled\GameScripts.dll
-```
+RuntimeBootstrap은 선택된 배포와 project pin, content ABI를 검증한다. project의 문서 입력을 별도 candidate에 복사하고 configured set group을 activation validator에 제공한다. texture identity sidecar는 입력 증거로 포착·재검증하지만 runtime 문서로 배포하지 않는다.
 
-`--input-mode Workspace|Tracked`, `--asset-list`, `--startup-scene`, `--render-backend` and `--build-native` are rejected in PrebuiltAssetSets mode. Startup/backend/settings belong to the frozen bootstrap. `--asset-set-abi` is an optional exact assertion of the installed content ABI, not a compatibility selector.
+scene/prefab/audio/collision 등 지원되는 cooked 결과와 CEBR document-reference bridge를 구성하고 source geometry/audio 및 제외 대상 sidecar를 제거한다. runtime settings와 시작 scene/backend는 여기서 고정한다. `CEBOOT1` report는 engine buildId/payloadDigest, content ABI, input/content digest, exact file entries 및 preflight를 기록한다. 검증에만 잠시 합친 AssetSets는 bootstrap 자체에 중복 저장하지 않는다.
 
-Native leased AssetSet copy, pre/post CAS verification, CEAS group validation, PAK reopening, smoke verification and transactional current-pointer publication are unchanged. `--skip-verify` retains an unpublished candidate. Package provenance names the exact bootstrap content digest, includes its producer receipt, and records `cook: null`; it does not attribute the bootstrap's earlier document compilation to the current packaging invocation.
+`ValidateBoundary`가 허용하는 shader source(.slang/.hlsl/.hlsli)와 문서 확장자는 남을 수 있다. 여기서 source-free란 원본 모델·텍스처 등의 재import 없이 prebuilt typed payload를 조합한다는 의미다. 모든 종류의 소스 문자열이 패키지에 0개라는 뜻은 아니다.
 
-## Producing the document bootstrap
+## 최종 조합의 제한
 
-Scene, Prefab and Audio remain existing runtime document/audio subsystems. There are no new typed Scene/Prefab/Audio/Font loaders.
+PrebuiltAssetSets는 `--bootstrap-root`, `--asset-set-list`, `--game-scripts-assembly`를 요구한다. Project mode만 허용하고 asset-list, startup-scene, render-backend override와 build-native를 거부한다. 이미 동결된 bootstrap을 다른 설정으로 조용히 재해석하지 않는다.
 
-```text
-build-runtime-bootstrap --engine-distribution C:\Engine --project C:\Game
-  --output C:\Content\Bootstrap-r1 --asset-set-list C:\Content\sets.txt
-  --startup-scene Start.creator --render-backend dx12
-```
+AssetSetPackaging은 native `--copy-asset-set`으로 각 set을 복사하고 manifest hash 목록으로 `CEAS1` activation policy를 만든다. 기존 source가 activation policy를 공급하면 중복 정본을 거부한다. 설치 ABI는 manifest의 선언뿐 아니라 hash inventory에 묶인 Player/AssetCooker build record와 실제 payload까지 검증한다. `--asset-set-abi`는 호출자의 assertion이지 실제 host ABI를 덮어쓰는 스위치가 아니다.
 
-This independent, offline command requires no model generations, model sources, texture sources or material/graph sources. Its strict staging boundary includes scene/prefab documents and sidecars; existing input-map, behavior-tree, blackboard, render-profile, terrain and foliage documents; collision-geometry authoring documents; audio clips/sound graphs/presets and sidecars; shader files under `Assets/Shaders` needed by the existing renderer; and project `.asset` / `.celayers` settings. Other sources are not copied. An optional exact `--asset-list` rejects non-document selections and still requires the selected startup scene and shader closure. Preserved `.foliage` documents receive a bounded bootstrap-only typed-reference preflight against the captured AssetSet union. Other ancillary document support remains the existing subsystem contract, and final Player verification remains required.
+## 실패와 수용
 
-The native `--build-runtime-bootstrap` mode rejects model/texture/material/graph import options and non-document staged inputs. It reuses the existing SceneCookProducer, audio/sound and collision producers plus CEDO compilation. Verified prebuilt MaterialProgram bytes may be read to validate inline instance overrides; no shader source compiler runs. Existing scene texture-name fallback is rejected. Sources and sidecars are inputs only; audio and geometry authoring inputs are removed. Scene/prefab identity paths and renderer shader documents remain for existing runtime identity/path contracts, while scene loading uses cooked CEDO artifacts.
+bootstrap과 AssetSet은 새 candidate를 검증한 후 발행한다. package는 마지막 Player smoke와 digest 재확인 뒤 current pointer를 변경한다. prebuilt GameScripts receipt도 정확한 엔진 buildId/script API/hash와 맞아야 한다. 손상 set, 누락 hard dependency, stale bootstrap, 다른 engine, source 삭제 후 실행, 취소·종료를 각기 검증해야 한다.
 
-Output is a new immutable `Assets` / `ProjectSetting` tree plus `bootstrap-report.json`. The report binds engine build ID, installed payload digest, content ABI, every staged source-input hash, every output file hash, startup/preflight and runtime-document facts. Packaging validates the full exact inventory, forbids model/texture/material legacy payloads, rechecks source/report after copying, and validates the copied bytes. Bootstrap inputs are ordinary caller-owned immutable directories; this is not enrollment in the AssetSet collectible-store protocol.
+현재 구현의 조합 경로를 설명했으며 source-free Windows 패키지 실행을 이번에 재검증하지 않았다. [BuildPipelinePlan](../plans/BuildPipelinePlan.md), [AssetSetImportReceipts](AssetSetImportReceipts.md)와 함께 사용한다.
 
-## CEBR1 document-reference bridge
+## 구현 근거
 
-CEMF v2 schema, reader and standalone dependency rules remain unchanged. The document bootstrap's v2 manifest contains only local Scene, Prefab, AudioClip, SoundGraph, SoundPreset and CollisionGeometry entries. Local edges retain existing meanings and must close inside that manifest. The bridge neither fabricates v2 model entries nor converts a v2 package into an AssetSet.
-
-`Assets/Derived/bootstrap-asset-references.cebr` explicitly records checked external typed references from scene/prefab documents. Recognized serialized fields supply expected kinds, including direct Mesh, Model/Animator, Texture, context-specific `m_Material.ref` base Materials and their typed texture overrides, nonnil inline authored Material identities plus ShaderMeta, and Lattice MaterialProgram dependencies. Override values use the existing MaterialAuthoringCodec (`texture.guid` on the wire); generic `ref` or `assetId` metadata fields are not reinterpreted. Bootstrap-only inline authored materials require a nonnil base Material identity for source-free Code-program binding; legacy inline nil identities remain unchanged. A direct MeshRenderer Mesh reference does not require an unrelated parent Model source. Foliage is context-specific: `m_foliageTypes` and the existing `FoliageAsset.Types` document shape require a nonnil typed Model even with explicit Mesh/Material IDs; optional nil child IDs retain descriptor-default selection. Every explicit nonnil child ID is checked with its expected Mesh/Material kind. A standalone inline FoliageType is recognized only by its complete reflected Model/Mesh/Material/legacy-flag shape, not a coincidental flag alone. Name-only fallback is rejected by source-free bootstrap. `.foliage` preflight uses the same bounded reference walker and existing document parser (maximum 16 MiB per file, 64 MiB total and 16384 files); report input/output hashes and the exact CEBR AssetSet group bind the checked documents without a new CEBR record/kind or runtime Foliage payload reads. Nested prefab overrides are inspected as documents. Each checked external reference is removed from only that document's legacy edge list and represented explicitly in CEBR; unexplained unresolved v2 edges still fail the unchanged writer.
-
-Canonical UTF-8 format, LF terminated:
-
-```text
-CEBR1
-win-x64
-creator-content-v1
-legacy <exact CEMF-v2 SHA256>
-set <exact CEMF-v3 SHA256>
-document <scene-or-prefab UUID> <cooked-document SHA256>
-reference <owning-document UUID> <expected-kind decimal> <target UUID>
-```
-
-Sets and documents are sorted; references are sorted by typed-reference ordering within their owning document. Every scene/prefab appears even if it has no external references. Limits are 4 MiB, 1–64 distinct sets, 1–16384 documents and at most 65536 references. Duplicate/conflicting identities, noncanonical records, unexpected kinds, unknown lines, control characters and changed document/set/legacy hashes are rejected. AssetSet source recipes still use explicit v3 Hard/Loadable edges; CEBR does not classify scene references as those ownership edges.
-
-Package validation resolves the complete candidate v3 union and each expected CEBR type. Startup validates the same receipt, legacy manifest metadata and exact v3 manifest group before atomic resolver publication. It reads no Scene/Texture/Model/Program bulk payload. Normal scene admission subsequently performs asynchronous typed acquisition using the existing consumer path. Changing any activated set manifest requires a new document bootstrap, conservatively binding content updates without recompiling Player. This is a local/pak bridge, not CDN delivery, patching, signing or a general Scene asset system.
-
-## Installed content compatibility
-
-`CreatorContentAbi::Version` and `CreatorContentAbi::Token` are the compiled authority, currently `1` / `creator-content-v1`. They are separate from host ABI 1 and managed script API 35. `CreatorHostGetContentInfoV1` is an additive export; `CreatorHostInfoV1` layout is unchanged. The launcher checks its host's content identity and appends it to its existing `--engine-info` JSON. Engine publication requires agreement among all four compiled host records and includes the identity in the engine manifest. Opt-in content paths bind the installed Player/AssetCooker records and their hashed payload inventories to that manifest. Old distributions without these fields fail clearly on AssetSet/bootstrap use; legacy distribution loading remains available.
-
-CEAS no longer takes its own token as proof that the host supports it. Its token must equal the compiled host constant, and every incoming manifest must satisfy that expected identity plus the existing per-kind representation/schema checks. Arbitrary tokens remain possible for independent generic cooker/catalog experiments; they cannot self-authorize activation in this Player.
-
-Build-record hashes provide local provenance and integrity, not a cryptographic publisher signature or defense against an attacker able to rewrite an entire trusted distribution and its receipts. Existing publication trust assumptions are unchanged.
-
-## Unrun verification sources
-
-- BuildTool/Tests/Program.cs: strict prebuilt option combinations, bootstrap source/output boundaries, old-distribution rejection, AssetSet copy hash and interruption checks
-- Tools/regression/runtime_bootstrap_probe.cpp: canonical receipt parity/rejections, exact group/document/type rejection, metadata-only validation without payload files, typed direct-Mesh extraction and unchanged legacy scene semantics
-- Tools/regression/asset_set_activation_probe.cpp: installed ABI rejection even when both policy and manifest assert the same incorrect token
-
-Windows build, end-to-end source-free package/smoke, all supported rendered kinds, failure injection and shader/backend runtime checks remain unrun.
+- [BuildTool/Program.cs](../../BuildTool/Program.cs)
+- [BuildTool/AssetSetBuilding.cs](../../BuildTool/AssetSetBuilding.cs)
+- [BuildTool/RuntimeBootstrap.cs](../../BuildTool/RuntimeBootstrap.cs)
+- [BuildTool/AssetSetPackaging.cs](../../BuildTool/AssetSetPackaging.cs)
+- [BuildTool/ContentCompatibility.cs](../../BuildTool/ContentCompatibility.cs)
+- [BuildTool/GamePackager.cs](../../BuildTool/GamePackager.cs)
+- [BuildTool/GameCompiler.cs](../../BuildTool/GameCompiler.cs)
+- [Tools/AssetCooker/AssetSetBuild.cpp](../../Tools/AssetCooker/AssetSetBuild.cpp)

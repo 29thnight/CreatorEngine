@@ -1,49 +1,25 @@
-# LX 그림자 DX12 현재 빌드 회귀 기준선 (2026-10-11)
+# 그림자 기준선과 backOff 검사
 
-**후속 목록 2번 완료.** 현재 작업 트리에서 DX12 Debug/Release를 빌드하고 backOff 확장 제거 변이를 실행한 뒤, 원본 소스를 바이트 단위로 복구·재빌드하여 정상 회귀를 실행했다. Vulkan 실행·교차 비교는 [PHASE 4.9](../plans/BackendParityPlan.md)에 남긴다.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-## 판정
+## 현재 구현
 
-| 검사 | Debug | Release |
-|---|---|---|
-| `dx12.shadowquality` | 통과 | 통과 |
-| `dx12.skinning` | 통과 | 통과 |
-| `dx12.iblshade` | 통과 | 통과 |
-| `dx12.rendergraph` | 통과 | 통과 |
-| `dx12.scene` | 통과 | 통과 |
-| backOff 확장 제거 변이 | 먼 판 그림자 누락으로 예상 거부 | 먼 판 그림자 누락으로 예상 거부 |
-| GPU 검증 레이어 | GPU 모드 활성, 문제 0, 누락 메시지 0 | GPU 모드 활성, 문제 0, 누락 메시지 0 |
-| 정상 회귀 프로세스 | 종료 코드 0, quit 성공 | 종료 코드 0, quit 성공 |
+EnhancedShadowPass는 receiver cascade를 만들고 관련 caster가 광원 쪽으로 멀면 backOff depth 범위를 확장한다. SceneHost는 3-slice D32 shadow를 각 cascade별로 갱신한다. 화면 밖 caster와 카메라 가시성은 같은 판정이 아니다.
 
-정상·변이 네 실행 모두 실행 전후 소스·실행 파일 해시가 일치했다. 복구된 소스와 최종 Debug/Release 실행 파일도 정상 회귀의 해시와 다시 대조했다. 기존 작업 트리 변경은 보존했고, 문서 갱신 전 상태 비교에서 추가된 항목은 새 검증 스크립트뿐이었다.
+## 확인해야 할 경계
 
-## 확인한 동작과 범위
+원거리 가림체·skin pose·최종 IBL shade를 현행 바이너리로 확인한다. 과거 Debug/Release pass 표는 현재 build 결과가 아니며 source/runtime hash, validation dropped count와 정상 shutdown까지 다시 수집한다.
 
-- 수직 광원 아래 판 높이 1823.7: 정상 코드는 깊이 범위 2270.1, 중앙 그늘 0 → 2622. backOff 제거 변이는 깊이 범위 729.5, 그늘 0 → 0으로 실패했다. Debug/Release 결과가 같다.
-- 스키닝 그림자: 첫 캐스케이드에서 맵 텍셀 45,856, 포즈에 따른 변화 40,762. 비어 있지 않음·포즈 변화의 검증이며 정확한 형상이나 3개 캐스케이드 전체 동치 수용은 아니다.
-- 장면: Suzanne 모델과 카메라·방향광을 배치하고 실제 렌더 준비 완료를 기다렸다. 두 구성 모두 드로우 1, 광원 1, 커버리지 276/65,536. `dx12.scene`은 내부적으로 최대 1,024개 드로우·여러 재질·순차/병렬 기록 회귀도 실행한다.
-- 렌더 그래프: RG5 sprite/screen/final 및 RG3/RG4 실행·픽셀 비교와 transient 재사용 검사가 통과했다.
-- GPU validation ledger의 메시지 1건은 GPU-Based Validation 활성화 안내다. 문제 0건이며 메시지 전체가 0이라고 표현하지 않는다.
-- 두 정상 실행과 변이 실행의 stderr에는 `[profiler] shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]` 진단이 있다. GPU 검증 오류는 아니며, 이번 결과로 프로파일러 종료 진단까지 해결됐다고 주장하지 않는다.
-- GPU 검증 레이어를 켠 기능 회귀다. 로그의 GPU/CPU 시간과 순차/병렬 배율을 일반 성능 수용에 사용하지 않는다.
-- 그림자 맵 3장의 indexed/meshlet 동치, 메시렛 누락 변이, 알파 마스크·변환·경계 확대 검증, 새 compute 생존 목록 비교는 다음 작업이다. 본 검사는 GPU readback을 메모리에서 판정하며, 경로 동치 검사용 3장 원본 깊이 캡처를 확보한 것은 아니다.
+## 정본과 이전 기록
 
-## 재현과 증거
+전체 geometry 계약은 [GPU 메시렛 배선](../design/GpuDrivenMeshletDxrWiring.md), 라이브 연결은 [파이프라인 흐름](RenderPipelineFlow.md)을 따른다. 이 날짜 문서는 주제와 경로를 보존한 호환 안내다. 과거 선택 스위치·형식 버전·로컬 실행 수치는 현행 제품 계약으로 재사용하지 않는다. 이번 개정의 확인 범위는 소스와 호출 경로이며 GPU 실행·성능 수용은 미실행이다.
 
-반복 실행 스크립트: [verify-lx-shadow-baseline.ps1](../../Tools/regression/verify-lx-shadow-baseline.ps1). 현재 Editor를 먼저 빌드하고 구성, 작은 fixture 프로젝트, 새로운 출력 폴더를 지정한다. 스크립트는 프로젝트를 복사하고 현행 셰이더·입력 manifest·소스/binary 해시·명령 결과·stdout/stderr·판정을 보관한다. 변이 옵션은 별도로 빌드한 backOff 제거 실행 파일에서만 사용한다.
+## 소스 근거
 
-아티팩트 용량 검사를 통과한 뒤 약 12 MB의 fixture를 복사했다. 시작 여유 공간은 약 179 GiB였다. 원본 fixture와 사용자 자산을 수정하지 않았으며, 이 변이 실행은 픽셀 payload 복사본을 만들지 않았다. 성공 보존 ledger와 로그·해시는 유지한다.
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp](../../Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp)
+- [Engine/RenderEngine/Render/Graph/ShadowMath.h](../../Engine/RenderEngine/Render/Graph/ShadowMath.h)
+- [Engine/RenderEngine/MaterialGraphSceneShadowStage.inl](../../Engine/RenderEngine/MaterialGraphSceneShadowStage.inl)
 
-- Mutant-Debug: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/reviewed-verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/identity-before.json).
-- Mutant-Release: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/identity-before.json).
-- Normal-Debug: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/identity-before.json).
-- Normal-Release: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/identity-before.json).
+## 이전 기록
 
-- [최종 재검토 집계](../../Build/Verification/ShadowBaseline-20261011T142012Z/reviewed-overall.json), [소스 복구 확인](../../Build/Verification/ShadowBaseline-20261011T142012Z/restoration.json), [실행·빌드 기록](../../Build/Verification/ShadowBaseline-20261011T142012Z/orchestration.log).
-- Debug 변이의 최초 harness는 실패 종료 코드를 0/1로 잘못 예상했다. 실제 명령은 의도한 이유로 실패하고 정상 종료했으며 `CommandSession::ExitCodeFor(Failed)` 계약은 4다. 스크립트를 수정하고 원본 결과·최초 판정·최초 집계를 보존한 채 `reviewed-verdict.json`과 `reviewed-overall.json`에서 재판정했다. Release 변이와 두 정상 회귀는 수정된 스크립트로 통과했다.
-
-최종 정상 runtime SHA-256:
-
-- Debug: `A0A57F115873729F8D316A36D82A8C2DE44A683A33FBACD46BC55C2CF30439FD`
-- Release: `DC9C0E79FCA4E3ED7B17A1A936847D36A07FC60B50F3C2BECAC71EB78F2D9162`
-- 복구된 `EnhancedShadowPass.cpp`: `A75EB1D2C8F41EA226BC04F8F2686BBE4F5DB188D1177DAC309B7C418FD21625`
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/LxShadowBaseline20261011.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

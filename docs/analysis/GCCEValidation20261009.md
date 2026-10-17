@@ -1,72 +1,38 @@
-# GCCE 추가 검증 — 2026-10-09
+# GCCE: 2026-10-09 검증 기록과 현재 재검증 계약
 
-Windows x64 Debug/Release 빌드, 구성별 Scene GC 20회 반복, 구성별 Play→Stop 회귀를 통과했다.
-이 결과는 아래 테스트 범위의 객체 수명·직렬화·재생 복원 증거다. 성능 개선이나 전체 GC 수용 완료를 뜻하지 않는다.
+> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
 
-## 소스와 실행 경로
+## 결과를 읽는 범위
 
-- 기준 HEAD: `2965dc48` 및 이 검증의 로컬 테스트 변경.
-- 기존 `RunSceneGCSelfTest`는 호출자가 없었다. `scene.gc.selftest`를 process-scoped commandlet로 연결했다.
-  일반 편집/HTTP 명령 표에는 노출하지 않는다. 기존 GameThread의 scene borrow fence 안에서 호출한다.
-- 마지막 순환 그래프 회수를 `collect_step(250μs, min_units=16)`으로 검사하고,
-  수집 종료·idle 복귀·중단 횟수 불변을 추가 검증했다. pin 유지와 DDOL 이송 중에는 기존 full collection 검사를 유지한다.
-- `Tools/regression/verify-scene-gc.ps1`는 새 호스트 DLL 여부, 성공 표지의 정확한 횟수,
-  실패 표지 부재, 종료 코드 0을 검사한다. 별도 작업공간·파일 로그·시간 제한을 사용한다.
+2026-10-09 기록은 당시 revision의 Debug/Release `scene.gc.selftest` 반복 실행을 남긴 역사적 증거다. 각 구성 20회 통과라는 기록을 현 checkout의 새 실행 결과나 배포 승인으로 읽지 않는다. 당시 로컬 `Artifacts/gc-validation-20261009` 로그는 저장소에 항상 포함되는 산출물이 아니며, 원본 로그가 없으면 문서의 요약만으로 재현성을 입증할 수 없다.
 
-## 결과
+현재 소유권과 종료 순서의 정본은 [GCCE 통합](../design/GCCEIntegration.md)이다. 이 페이지는 그 계약을 어떤 게이트로 확인할지 설명한다.
 
-| 검사 | Debug | Release | 근거 |
-|---|---|---|---|
-| Editor 및 종속 프로젝트 Build | exit 0 | exit 0 | `Artifacts/gc-validation-20261009/build-{debug,release}.log` |
-| Scene GC 반복 | 20/20, exit 0 | 20/20, exit 0 | 구성별 `scene-gc.out.log`, `gc-results.json` |
-| 마지막 점진 수집 | 반복별 2 steps | 반복별 1 step | 각 `SCENE_GC_OK` 표지 |
-| Play→Stop 내용 복원 | PASS | PASS | `play-{debug,release}-gate.log` |
-| W5 상태 머신·실패 주입·Undo 보존 | PASS | PASS | 동일 gate 로그와 구성별 Play 실행 산출물 |
-| 리플렉션 컨테이너 형상 | PASS | PASS | `reflection-container.log` |
-| 리플렉션 값·출력 형상 왕복 | 37 axes, failures 0 | 이 게이트는 Debug 전용 | `reflection-roundtrip.log` |
+## 실행 진입점과 판정
 
-에디터 GC 소유 스레드 정적 계약 8개와 `verify-entity-ownership.ps1`도 통과했다.
-정적 검사는 실제 PresentationThread의 모든 편집 동작에 대한 실행 증거로 확대하지 않는다.
+`verify-scene-gc.ps1`은 Debug/Release 구성을 선택하고 기본 20회(허용 1..1000) selftest를 실행한다. 기본 timeout은 180초다. 기존 Editor가 실행 중이면 거부하며, 선택한 실행 파일과 runtime DLL이 관련 Scene·Component·selftest 소스보다 오래되면 먼저 갱신하도록 실패한다. 따라서 오래된 바이너리의 통과를 소스 검증으로 잘못 세지 않는다.
 
-Scene GC 반복의 각 실행은 다음을 확인한다.
+도구는 격리 workspace와 commandlet을 만들고 `scene.gc.selftest`를 반복한다. 각 성공 marker의 cycle/lifecycle/staleHandles/selection 값은 2, DDOL/workerPin 값은 1이어야 하고 incrementalSteps는 양수여야 한다. exit code 0, 정확한 성공 횟수, 실패 marker 부재를 함께 요구한다. finally에서 환경 변수를 복원하고 남은 process를 정리한다.
 
-- Scene/Entity/Component를 연결하는 두 component의 순환 참조가 최종 회수된다.
-- 최종 cleanup 중 ScriptObjectHandle이 유효하고, cleanup 후 native/script handle이 무효화된다.
-- 재사용 슬롯의 이전 generation handle은 되살아나지 않는다.
-- 삭제와 DDOL 이송 시 단일·복수·simulation 선택 borrow가 제거된다.
-- DDOL transfer root가 이송 중 객체를 보존하고 destination graph로 소유권을 넘긴다.
-- 실제 component pin이 worker의 읽기와 join까지 메모리를 보존한다. 논리적 Destroy는 별도로 진행된다.
-- 종료 시 live object 수와 quarantined 수가 실행 전 기준값으로 돌아오고 cycles_aborted는 증가하지 않는다.
+실제 테스트는 `SceneGCSelfTest.cpp`, 명령 연결은 `RenderTestCommands.cpp`다. 테스트 이름이 있거나 handler가 등록됐다는 사실은 실행 통과와 다르다. marker의 숫자는 테스트 사례 수이며 collector latency 상한이나 모든 Scene 경로의 coverage가 아니다.
 
-Play 회귀는 재생 중 객체 추가 후 정지하여 편집 씬의 3개 객체와 내용 digest를 복원한다.
-슬롯 순서는 재할당되어 달라질 수 있으나 내용은 복원됐다. W5는 snapshot 실패 시 Undo 이력 보존,
-입력 소유권·커서·표시 타깃 전환과 확정 전 pause 거부를 검사했다.
-Debug/Release 각각 두 Play 호스트 실행이 정상 종료됐다.
+## 이 게이트가 필요한 이유
 
-## 재현
+수집 가능한 cycle과 결정적 Destroy를 구분하고, 파괴 뒤 generation handle과 selection이 stale가 되는지 확인해야 한다. DDOL의 Scene 간 이동은 완전 파괴와 다르며 worker pin은 메모리 수명만 유지한다. pin이 논리 Destroy를 되돌리거나 concurrent mutation을 안전하게 만들지는 않는다.
 
-```powershell
-pwsh -NoProfile -File Tools/regression/verify-scene-gc.ps1 -Configuration Debug -Iterations 20
-pwsh -NoProfile -File Tools/regression/verify-scene-gc.ps1 -Configuration Release -Iterations 20
-```
+## 아직 별도 증거가 필요한 범위
 
-Play 검사는 `Tools/regression/verify-play-roundtrip.ps1`에 구성별 `-Exe`와 절대 경로 `-Work`를 전달한다.
-이번 실행의 원본 로그와 소스/바이너리 SHA-256은 `Artifacts/gc-validation-20261009`에 보관했다.
-기존 dirty `active.workspace`와 `.rejected` 파일은 검증 전후 SHA-256이 동일했다.
+- shipping/runtime package에서 단일 GCCE DLL·CRT·debug-check 구성이 일치하는지
+- NativeAOT/CLR 경계, sanitizer, 긴 반복·메모리 압력·큰 tracer의 실제 pause 분포
+- 실제 prefab/Inspector/Scene 전환 UI, callback 재진입과 예외, pending 작업이 있는 shutdown
+- worker join, root 해제, 서비스 종료 뒤 domain 마지막 파괴의 전체 제품 경로
 
-## 관찰된 경고와 한계
+이 문서 갱신에서는 도구를 실행하지 않았다. 해당 스크립트는 실행·환경 변경을 수반하므로 현재의 정적 문서 검사와 구분한다.
 
-- 첫 Debug Build는 reflgen overlay port 갱신 후 재실행을 요구하는 저장소 보호 장치로 중단됐다.
-  새 도구로 다시 Build하여 통과했다.
-- 첫 Debug Play 호출은 상대 Work 경로 때문에 입력 파일을 찾지 못했다. 절대 경로로 재실행하여 통과했다.
-- Release 링크에 `Utility_Framework.pdb` 형식 레코드 손상 `LNK4020` 경고가 남는다.
-  실행 검사는 통과했지만 일부 debugger symbol/type 접근은 제한될 수 있다.
-- GC 호스트의 stderr에 `[profiler] shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]`가 남는다.
-  이 경고의 profiler 수명 원인은 이번 GC fixture로 검증하지 않았다.
-- 일부 문자 변환·매크로 재정의·지역 이름 가림·관리 코드 trimming 경고가 빌드 로그에 남는다.
-- 250μs는 연성 예산이다. step 횟수는 지연시간/성능 수용이나 메모리 사용량 절감 증거가 아니다.
-- packaged Player/Shipping, NativeAOT publish, ASan, 대규모 장시간 부하, prefab UI 반복,
-  GC cleanup callback의 재진입/예외 주입, 종료 시 pending work 주입은 실행하지 않았다.
+## 구현 근거
 
-이번 검증은 검사한 GC 그래프와 Play 복원 범위에서 통과했다. 남은 제품 수용 범위는
-`docs/design/GCCEIntegration.md`의 경계에 계속 남는다.
+- [`Tools/regression/verify-scene-gc.ps1`](../../Tools/regression/verify-scene-gc.ps1)
+- [`Editor/RenderTests/Tasks/SceneGCSelfTest.cpp`](../../Editor/RenderTests/Tasks/SceneGCSelfTest.cpp)
+- [`Editor/EngineEntry/Commands/RenderTestCommands.cpp`](../../Editor/EngineEntry/Commands/RenderTestCommands.cpp)
+- [`Engine/SceneRuntime/SceneManager.cpp`](../../Engine/SceneRuntime/SceneManager.cpp)
+- [`Engine/SceneRuntime/Component.cpp`](../../Engine/SceneRuntime/Component.cpp)

@@ -1,65 +1,26 @@
-# GPU-driven geometry: static review checkpoint
+# GPU geometry 정적 검토 기준
 
-Baseline: `ef829373c41138b8f47dd4011b076e1ec4d5829f`.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-## Integrated source paths
+## 현재 구현
 
-- Opt-in meshlets/LOD are built before CEMC hashing/staging, and model generation
-  publication remains atomic. (At review time v11 kept v9/v10 readers; `bf3fe4f3` removed
-  them before merge, so only v11 is accepted.)
-- DX12/Vulkan expose optional mesh pipelines, capability limits, generation-owned uploads,
-  typed dispatch checks and completion-owned resource retirement
-- Standard static opaque GBuffer uses GPU meshlet visibility, projected-error LOD and
-  indirect mesh dispatch; other supported geometry retains indexed paths
-- Native current-frame HZB has matching opaque donor topology, shared fragment discard,
-  separate depth and a shared max pyramid. Recheck filters actual prior GPU-selected work
-- LX consumes its earlier native depth version. Native shadow visibility uses independent
-  per-cascade receiver cylinders and indexed indirect commands, never camera HZB
+SceneHost는 sealed geometry와 material을 받아 mesh-indirect 경로를 요구한다. 현재 CEMC15/geometry artifact4와 cooked replacement hierarchy가 소비되므로 static opaque의 선택적 native GBuffer만 GPU-driven이라는 이전 범위가 아니다. Surface·Shadow·Blended·Temporal은 각 목적의 명시적 producer/consumer를 가진다.
 
-## Reviewed invariants and corrected findings
+## 확인해야 할 경계
 
-- Stream ownership, overflow/count limits, exact triangle corner/primitive mapping,
-  geometry/settings digests, conservative spheres and disabled unsafe cone rejection
-- Coarse indices reference base-used vertices; original index arrays remain unchanged
-- Invalid optional runtime data has observable indexed fallback; staged new generations
-  and cook export reject derived-data decode warnings
-- Shader ID-indirection semantics belong to immutable shader generations, not layout IDs
-- Current pose palettes, active bone ranges, zero-weight sentinels, double-precision
-  bounds and conservative unknown-input handling
-- Vertex/index/meshlet states, indirect barriers, optional Vulkan entry points, PSO kinds,
-  compiler profiles, rollback and retirement
-- Both production paths establish the upload-prefix boundary before recording-owned
-  palette/visibility preparation, including CPU-only/custom fallback views
-- Failures after donor depth recording abort rather than leave phantom occluders
-- UI counters distinguish prepared/submitted work from unknown GPU-visible counts
-- Editor controls use queued game-thread commands, native/UTF-8 paths and the same
-  identity-preserving transaction as CLI authoring
+cook→decoder→geometry partition→GPU payload→shader 접근→실제 pass 연결까지 대조한다. 일반 visibility helper의 fallback을 제품 SceneHost의 fallback으로 확대하지 않는다. prepared count와 GPU survivor를 구분한다.
 
-## Deliberately unrun acceptance
+## 정본과 이전 기록
 
-No C++ build, shader compilation, tests, executable probes, renderer, captures, image
-comparisons or GPU measurements were run. Source review is not proof of executable
-correctness, visual parity, performance or hardware compatibility. Project XML/source
-registrations and whitespace/diff checks were inspected only.
+전체 geometry 계약은 [GPU 메시렛 배선](../design/GpuDrivenMeshletDxrWiring.md), 라이브 연결은 [파이프라인 흐름](RenderPipelineFlow.md)을 따른다. 이 날짜 문서는 주제와 경로를 보존한 호환 안내다. 과거 선택 스위치·형식 버전·로컬 실행 수치는 현행 제품 계약으로 재사용하지 않는다. 이번 개정의 확인 범위는 소스와 호출 경로이며 GPU 실행·성능 수용은 미실행이다.
 
-Future authorized execution should cover both backends, capability fallback, old CEMC,
-malformed acceleration data, cuts/resize/multiple views, skin animation, masked coverage,
-mixed indexed/mesh batches, LOD transitions, shadow cascades, upload/submission failure
-and resource pressure.
+## 소스 근거
 
-## Explicit coverage limits
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp](../../Engine/RenderEngine/MaterialGraphSceneHost.cpp)
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp](../../Engine/RenderEngine/MaterialGraphMeshSurface.cpp)
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp](../../Engine/RenderEngine/GpuGeometryVisibility.cpp)
+- [Engine/RenderEngine/Experiment/Cooked/CookedModelFormat.h](../../Engine/RenderEngine/Experiment/Cooked/CookedModelFormat.h)
 
-GPU LOD is limited to eligible mesh-shader assets/devices. Indexed fallback uses GPU
-instance visibility with LOD0. Skinned mesh shading/LOD, arbitrary custom deformation,
-ordered transparency, DXR and cone culling are outside this checkpoint. Malformed legacy
-skin fit and extreme-coordinate meshoptimizer conditioning are not new correctness
-promises. Extra prepass/compute/allocation costs and any benefit remain unmeasured.
+## 이전 기록
 
-## Material coverage extension
-
-The initial checkpoint's transparency/custom direct-route limits are superseded by the
-[material coverage extension](GpuDrivenMaterialCoverage.md). Accepted materials retain
-original shaders/effects on GPU-produced indexed/nonindexed indirect paths. Generic custom
-streams are preserved rather than compacted; CPU global ordering and submission remain.
-Mesh-stage/LOD restrictions and hardware compatibility are separate from material routing.
-The same no-build/no-test/no-runtime verification limit applies.
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/GpuDrivenGeometryStaticReview.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

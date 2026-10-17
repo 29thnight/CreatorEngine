@@ -1,17 +1,27 @@
-# RG5-6 Lookup 소유자 버전 핸들 — 완료
+# Lookup 캡처·Bake·공개 버전
 
-SceneLookupFrame::DeclareCaptureOutputs가 범위·graph/epoch/upload/descriptor 소유권을 검사하고 캡처할 입력 맵의 Write 버전을 만들어 반환한다. SceneHost LookupCapture는 FindImportedTexture로 imported v0를 다시 찾는 대신 이 출력 핸들을 소비한다. 입력·decal 자원은 Read, 캡처 목적지는 Write를 선언한다.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-Lookup Bake는 graphInputs_의 최신 버전을 읽고 sample/statistic buffer를 Write로 갱신한다. GraphSamples/GraphStatistics 및 Ready는 현재 소유 핸들을 전달한다. imported 물리 자원·풀·제출 후 공개·완료 수명 계약은 유지한다.
+## 이 문서의 역할
 
-실제 SceneLookupCache::Prepare를 호출하는 계획 검사는 두 순서 정책에서 11개 입력 맵의 캡처/Bake/Ready를 두 번 선언한다. 출력 v1/v2·이전 독자 WAR·잘못된 캡처 범위 거부를 확인한다. 입력 캡처는 합성 pass이며 실제 Lookup GPU 셰이딩 실행 수용으로 계산하지 않는다.
+Lookup 캡처·Bake·공개 버전에 관한 과거 단계별 기록을 현행 계약으로 다시 정리한다. 공통 용어·수명·실행 모델은 [RenderGraph 정본](../plans/RenderGraphDependencySchedulingPlan.md)을 따른다. 날짜가 붙은 파일명은 링크 호환을 위해 유지한다.
 
-Forward Graph guard는 유지한다. 나머지 Refraction/Subsurface/Volume/GraphSurface·Draw 자원 선언·중복 읽기 정리 및 DeclareBlended 갱신 출력 계약이 남아 있다. 이후 실제 혼합 GPU 검증과 guard 제거를 수행한다. RG5 전체와 RG6 기본 전환은 열려 있다.
+## 현재 구현과 호출 경로
 
-SceneHost와 Lookup 소유자 파일의 namespace 들여쓰기 및 if/for 스코프를 함께 정리했다. 최종 Debug/Release 빌드는 모두 통과했다. Debug 제품 회귀는 독립 2회 정상 종료로 통과했다. Release-regression-v1은 native 명령 성공 후 전체 프로세스 종료 120초 제한으로 실패했으며 기록을 보존한다. Build/verify-rg5-lookup-retry.ps1은 원본 검증 스크립트의 경로와 소스 해시 대상을 유지하고 해당 종료 제한만 240초로 늘려 Release-regression-v2를 실행한다. 이미지 기준은 변경하지 않는다.
+SceneLookupFrame은 graph·epoch·upload recording·descriptor 신원을 확인한다. DeclareCaptureOutputs는 요청 범위의 새 input 버전을 반환하고 Bake는 그 GraphInputs를 읽어 samples/statistics를 갱신한다. GraphSamples/GraphStatistics가 현재 owner의 핸들을 제공한다.
 
-최종 검증: Build/rg5-lookup-Debug-final-build.log 및 Release-final-build.log 빌드 통과. 최종 바이너리의 Debug-regression-v1과 Release-regression-v2에서 native Lookup marker와 RG1~RG4 GPU 검사 통과, 각각 독립 프로세스 2회 × 캡처 2회 정상 종료·실패 0·강제 종료 없음. 변경 전후 Debug/Release 및 구성 간 비교는 각각 16개 이미지의 maxError/RMSE/changedPixels/exceededPixels가 모두 0이다. current-baseline-phase-complete-v1.json은 현행 소스·실행 파일·runtime 해시와 구성 간 identity를 확인하여 phaseComplete=true다.
+## 변경·검증 기준
 
-증거 루트: Build/Obj/RenderRG5Lookup. rg5-lookup-completion-v1.json의 sliceComplete=true, rg5Complete=false, versionedProductGpuAcceptance=false를 유지한다. declaration-inventory.json은 제품 59·게이트 209 호출이다. 대시보드 RG5는 progress/earnedDays 0, 전체 공수 355·기성 88을 유지한다.
+물리 texture를 FindImportedTexture로 다시 찾은 v0가 최신 capture 결과라는 가정을 금지한다. 잘못된 범위·다른 recording·반복 Declare를 검사하고 cache 공개는 submit/완료 계약과 함께 확인한다.
 
-다음 구현: Refraction/Subsurface/Volume 소유자 버전 핸들 → GraphSurface 및 Draw 자원 접근 선언·중복 읽기 정리 → DeclareBlended 갱신 색상 반환 → 실제 Code/Graph 혼합 GPU 검증과 guard 제거. 이후 나머지 소비자/ReadWrite·legacy 추론 제거 및 RG6 기본 전환을 검증한다.
+과거 로컬 Build/Artifacts 경로의 수치와 완료·기성 표시는 이번 소스 감사에서 재검증하지 않았으므로 현재 통과 결과로 옮기지 않는다. 제품 기본값, 특정 fixture 성공, 여러 backend의 제품 수용은 각각 판정한다.
+
+## 소스 근거
+
+- [Engine/RenderEngine/MaterialGraphSceneLookup.cpp](../../Engine/RenderEngine/MaterialGraphSceneLookup.cpp)
+- [Engine/RenderEngine/MaterialGraphSceneEffectStage.inl](../../Engine/RenderEngine/MaterialGraphSceneEffectStage.inl)
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp](../../Engine/RenderEngine/MaterialGraphSceneHost.cpp)
+
+## 이전 기록
+
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/RenderRg5LookupMigration.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

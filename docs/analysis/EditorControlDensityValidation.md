@@ -1,50 +1,26 @@
-# Editor 입력 컨트롤·메뉴 간격 보정 (2026-09-12)
+# 본문·탭·컴포넌트·메뉴의 밀도 계약
 
-## 원인과 수정
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 등록 경로를 2026-10-15에 대조했다. 이 개정에서는 빌드·실행·화면 검증을 하지 않았다. 과거 결과와 현재 구현의 존재를 구분한다.
 
-| 증상 | 원인 | 수정 |
-|---|---|---|
-| 체크박스·드롭다운·float 입력이 큼 | 글꼴 16px에 상하 padding 4px가 더해져 컨트롤 높이 24px. 사용자/모니터 배율이 각각 150%이면 약 54 physical px | 상하 padding 2px, 컨트롤 높이 20 logical px. 일반 행 간격 8→4px, 본문 글꼴 16px 유지 |
-| 탭 핸들 크기 유지 | ImGui 탭과 입력칸이 FramePadding을 공유해 함께 축소됨 | TabStyleScope로 NewFrame의 floating dock, DockSpace, 창 Begin, Animator의 명시적 탭에 기존 4px padding 적용. 본문은 2px로 복원하며 탭 높이는 기존 24px 유지 |
-| 컴포넌트 활성 체크박스가 제목보다 큼 | ImGui Checkbox가 GetFrameHeight() 전체를 사각형 크기로 사용 | 해당 체크박스에만 padding.y=0을 적용해 16px. 예약 칸도 16px, 제목과 간격 6px로 조정 |
-| Add Component 문구가 잘림 | 배율과 문구 길이에 관계없는 고정 물리 폭 180px | CalcTextSize+실제 padding으로 최소 폭 산정. 내용 영역 안에서 가운데 배치. 부족하면 Add/Component 두 줄 표시 |
-| 메뉴 항목이 붙음 | 제목 줄에서 사용하는 ItemSpacing.y=0이 열린 팝업까지 상속됨 | 메뉴 간격 x=10/y=6px, 팝업 WindowPadding=8×6px. 제목 행 높이 20px 유지 |
+## 하나의 padding으로 해결하지 않는 이유
 
-컴포넌트 헤더의 접기 버튼은 체크박스 사각형 위에서 반응하지 않도록 분리했다.
-ImGui Checkbox와 기존 Component::SetEnabled 경로를 계속 사용한다.
-메뉴는 표준 BeginMenu/MenuItem, 입력값 편집은 기존 ImGui 및 Inspector 숫자 위젯을 사용한다.
+EditorThemeTokens는 BodyFontSize=16, ControlHeight/RowHeight=20, TabHeight=24, ItemGapY=4 logical px을 사용한다. 본문 control을 조밀하게 만들면서 같은 FramePadding을 쓰는 dock tab까지 줄이면 창 손잡이와 본문이 함께 변한다. TabStyleScope는 NewFrame의 floating dock tab, dockspace 및 window Begin 경계에서 tab padding을 적용하고 본문으로 돌아갈 때 복원한다.
 
-## 검증
+컴포넌트 header는 EditorInspectorPanel의 별도 metrics를 따른다. enabled checkbox는 제목 텍스트와 맞는 16 logical px 슬롯을 갖고 toggle 클릭과 fold 영역을 분리한다. Add Component는 문구 실제 폭/padding과 남은 영역으로 배치해 좁으면 줄바꿈하며 고정 physical width를 신뢰하지 않는다.
 
-증거 디렉터리: `Artifacts/phase21-control-density/`.
+## 메뉴와 제목 행
 
-- Debug x64 `CreatorEditor.vcxproj /t:Build` 통과. 기존 `/DELAYLOAD:vulkan-1.dll` LNK4229 경고는 남는다.
-  도중 커서 모듈의 변경된 호출부와 기존 라이브러리가 달라 LNK2019가 발생했고,
-  해당 모듈을 포함한 재빌드로 통과했다. 이 작업에서 커서 소스는 수정하지 않았다.
-- 최종 실행 파일의 `editor.selftest`: **916 checks, 0 failures**. `editor.theme`의
-  geometry/theme mapping, DPI, Inter/Material Symbols 검사 모두 통과.
-- 실제 DX12 화면(사용자 150%, OS DPI 150%)에서 Scene/Game, Hierarchy, Inspector,
-  Content Browser 탭이 기존 높이를 유지하고 본문 입력칸은 축소된 것을 확인했다.
-  기본 16px 글꼴은 그대로이며 배율을 적용한 탭은 54 physical px,
-  입력칸은 ImGui padding 절삭을 포함해 44 physical px이다.
-- Main Camera의 Transform float3, Camera float4/float1, Tag/Layer 콤보와 체크박스 표시 확인.
-  float2 전용 화면 및 모든 전용 드로어를 전수 조작한 결과는 아니다.
-- LightComponent 체크박스 끄기/켜기와 헤더 접기를 각각 조작했다.
-  체크박스 클릭으로 본문이 함께 접히지 않았고, 마지막에 활성 상태를 복원했다.
-- Add Component 전체 문구 표시와 기존 컴포넌트 선택 팝업 열기 확인.
-  창을 2880×1665 → 850×1245 → 720×1245 → 2880×1665로 변경하면서,
-  마지막 좁은 폭에서 Add/Component 두 줄 표시를 확인했다. 컴포넌트 추가/씬 저장은 하지 않았다.
-- Edit 드롭다운의 행 간격과 팝업 가장자리 여백을 실제 화면에서 확인했다.
-- `verify-editor-theme.ps1 -Backends dx12`: **3회 기동, 64 checks 통과**.
-  사용자 배율 100→150→100% 왕복이며 실제 OS DPI는 150%였다.
-  물리 모니터 간 이동 검증은 포함하지 않는다.
-- 검증용 Editor 종료 후 EngineSettings.asset와 imgui.ini를 시작 전 바이트로 복원했다.
-  변경 파일 `git diff --check` 및 대시보드 JavaScript 구문 검사 통과.
+MenuGapX/Y=10/6, MenuPaddingX/Y=8/6은 popup의 읽기 간격이다. 제목 행의 조밀한 ItemSpacing을 열린 popup에 그대로 상속하지 않는다. 현재 title row는 최소 45 physical px이며 과거의 20 logical px 제목 높이를 density 문서에서 재도입해서는 안 된다. [제목표시줄 계약](EditorTitleBarValidation.md)을 따른다.
 
-최종 탭/숫자 입력 화면: [tabs-restored-camera.png](../../Artifacts/phase21-control-density/tabs-restored-camera.png).
-좁은 패널: [add-component-wrapped.png](../../Artifacts/phase21-control-density/add-component-wrapped.png).
-메뉴 간격: [edit-menu.png](../../Artifacts/phase21-control-density/edit-menu.png).
-메뉴/LightComponent 동작 캡처는 탭 높이 복원 전 중간 빌드의 증거이며,
-최종 빌드의 탭과 입력칸 크기는 `tabs-restored-camera.png`를 기준으로 한다.
+## 검증 기준
 
-Vulkan은 사용자 결정에 따라 보류한다. 이 작업은 W2-I 전체나 비동기 썸네일 W7의 완료를 의미하지 않는다.
+실제 control 높이, 글자 clipping, checkbox와 fold의 클릭 분리, tab grab area, menu popup 간격을 DPI/user scale 조합별로 확인한다. theme token 값의 일치만으로 interaction 수용을 선언하지 않는다. 과거 2026-09-12 캡처와 build log는 그때의 밀도 수정 증거이며 현재 host/Inspector 변경의 통과를 뜻하지 않는다. 기능 mutation은 표준 ImGui와 기존 component operation을 사용하고 새 input framework를 도입하지 않는다.
+
+## 구현 근거
+
+- [Editor/EngineGUIWindow/EditorTheme.h](../../Editor/EngineGUIWindow/EditorTheme.h)
+- [Editor/EngineGUIWindow/EditorTheme.cpp](../../Editor/EngineGUIWindow/EditorTheme.cpp)
+- [Editor/ImGuiHelper/EditorInspectorPanel.cpp](../../Editor/ImGuiHelper/EditorInspectorPanel.cpp)
+- [Editor/EngineGUIWindow/InspectorWindow.cpp](../../Editor/EngineGUIWindow/InspectorWindow.cpp)
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp](../../Editor/EngineGUIWindow/MenuBarWindow.cpp)
+- [Editor/EngineGUIWindow/EditorRenderer.cpp](../../Editor/EngineGUIWindow/EditorRenderer.cpp)

@@ -1,114 +1,62 @@
-# CreatorEngine 문서
+# CreatorEngine 구현 문서
 
-엔지니어링 문서 트리. 루트에 흩어져 있던 30개 문서를 2026-08-17에 여기로 옮겼다.
+이 문서 트리는 **master `493536e300e274cbf59989cdd62b20310c8ae64f` (2026-10-15)**의 소스와 실제 호출 경로를 기준으로 읽는다. 문서 재작성 과정에서는 엔진 빌드, Editor/Player 실행, GPU 측정이나 이미지 비교를 수행하지 않았다. 코드에 경로가 있다는 사실과 해당 환경에서 실행 검증을 통과했다는 사실은 다르다.
 
-- **[TechnicalGuide.md](TechnicalGuide.md)** — 커밋된 master 기준의 기술설명서.
-  엔진 구조·소유권·렌더링·콘텐츠·스크립팅·빌드 흐름과 구현·검증 경계를 설명한다.
-- **[CONTRIBUTING.md](../CONTRIBUTING.md)** · **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)** — 기여 절차와 참여 기준.
+## 읽는 순서
 
-- **[RefactoringPlanDashboard.html](RefactoringPlanDashboard.html)** — 전체 리팩터링 페이즈 색인.
-  진행 상태·의존 관계·슬라이스 단위를 한 눈에 본다. **여기서 시작하는 것이 빠르다.**
+1. [기술 안내](TechnicalGuide.md): Editor/Player 진입, 공통 초기화, 씬 갱신, 렌더 제출, 자산·스크립트·패키징 경계
+2. [문서 지도](RefactoringPlanDashboard.html): 분야별 문서와 현재 구현을 찾는 출발점. 과거 단계의 완료율을 제품 지원율로 환산하지 않는다
+3. [웹 문서 운영](WEBSITE.md): React API 레퍼런스, 정적 문서, GitHub Pages 배포의 실제 연결
+4. [기여 절차](../CONTRIBUTING.md), [참여 기준](../CODE_OF_CONDUCT.md): 저장소 전반의 기여 규칙
 
-## 구성
+## 문서의 상태를 해석하는 법
 
-| 디렉터리 | 성격 | 판별 기준 |
+- **구현됨:** 선언만이 아니라 소비자·호스트·프로젝트 편입 경로를 소스에서 확인한 기능. 실행 성공·성능·모든 backend 지원을 뜻하지 않는다
+- **제한적 구현:** 특정 backend, 기기 capability, 입력 형태 또는 모드에서만 연결된 경로. fallback과 오류를 함께 읽는다
+- **계획/미연결:** 설계 의도, 선언, 실험 도구가 있어도 제품 호출 경로로 연결되었다는 근거가 없는 범위
+- **역사 측정:** 기록 당시 commit·설정·장면·장치에 귀속되는 수치와 이미지. 현재 HEAD의 성능이나 품질 판정으로 승격하지 않는다
+- **미검증:** 이번 재작성에서 실행하지 않은 빌드·런타임·GUI·GPU·패키징 검증
+
+`plans/`나 `archive/`라는 경로 이름, 과거 PHASE 이름, 완료 체크박스는 현재 구현의 근거가 아니다. 각 문서의 현재 계약과 남은 요구사항을 우선한다. 열려 있는 다른 브랜치의 구현도 이 master 스냅샷에 포함하지 않는다.
+
+## 실제 진입점
+
+| 관심사 | 코드의 출발점 | 다음 문서 |
 |---|---|---|
-| [`plans/`](plans) | 활성·미래 계획 | 진행·대기·차단·미래 범위를 갱신한다 |
-| [`plans/archive/`](plans/archive/README.md) | 종료·대체 계획 | 완료·선택 중단·승계 근거와 검증 한계를 보존한다 |
-| [`design/`](design) | 설계 결정 | 무엇을 왜 그렇게 짓는가. 결정과 기각 근거가 본문이다 |
-| [`analysis/`](analysis) | 실측·분석 | 특정 시점의 측정 기록. 사후 갱신하지 않는다 |
+| Editor 호스트 | [App.cpp](../Editor/EngineEntry/App.cpp), [EditorMain.cpp](../Editor/EngineEntry/EditorMain.cpp) | [Editor 작업 공간](plans/EditorWorkspaceRedesignPlan.md) |
+| Player 호스트 | [PlayerApp.cpp](../Player/PlayerApp.cpp), [PlayerMain.cpp](../Player/PlayerMain.cpp) | [Player 표시](design/PlayerNativePresentation.md) |
+| 공통 부팅·종료 | [EngineBootstrap.h](../Engine/RuntimeHost/EngineBootstrap.h) | [계층 경계](plans/EngineLayerSeparationPlan.md) |
+| 시뮬레이션 순서 | [RuntimeFrame.cpp](../Engine/SceneRuntime/RuntimeFrame.cpp) | [씬 수명](plans/archive/SceneGraphRedesignPlan.md) |
+| 렌더 조립 | [EnhancedSceneRenderer.cpp](../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp) | [렌더 흐름](analysis/RenderPipelineFlow.md) |
+| 그래프 실행 | [EnhancedRenderGraph.cpp](../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp) | [RenderGraph 계약](plans/RenderGraphDependencySchedulingPlan.md) |
+| C# 표면 | [ScriptCore](../ScriptCore/) | [스크립트 표면](plans/ScriptSurfacePlan.md) |
+| 빌드 도구 | [Program.cs](../BuildTool/Program.cs) | [빌드 파이프라인](plans/BuildPipelinePlan.md) |
 
-`index.html`·`style.css`는 GitHub Pages 소개 페이지, `generate_scriptbinder_docs.py`는
-ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하다.
+Editor는 DX12 renderer와 ImGui host presentation을 연결한다. Player는 `RuntimeSettings`의 backend 선택을 받아 native presentation을 연결한다. 두 호스트가 같은 시뮬레이션 함수를 사용한다는 이유로 편집 기능이나 backend 수용 결과까지 동일하다고 보지 않는다.
 
-## plans/
+## 파일 종류와 보존 범위
 
-현재 계획과 이력 문서. 진행 상태는 [대시보드](RefactoringPlanDashboard.html#doc-index)를 함께 본다.
-
-| 문서 | 대상 |
+| 경로 | 읽는 방법 |
 |---|---|
-| [PBRWiringStabilizationPlan.md](plans/PBRWiringStabilizationPlan.md) | PHASE 4 · DX12 완료 — W0~W9 제품 배선·실장면 게이트. Vulkan 교차 판정은 PHASE 4.9. |
-| [BlenderMaterialGraphPlan.md](plans/BlenderMaterialGraphPlan.md) | PHASE 4.25 · MAT-0 완료 — Blender 5.1.1 재질 기준 장면과 선형 HDR golden 고정. Principled ABI와 Material Graph 제품 작업은 후속. |
-| [RenderPhaseRoadmap.md](plans/RenderPhaseRoadmap.md) | PHASE 4 계열 · 정본 — DAG 우선 순서, 분리 완료선, 현재 공수 원장. |
-| [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.3 · RG — 공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환. |
-| [CSharpRenderPipelinePlan.md](plans/CSharpRenderPipelinePlan.md) | PHASE 4.6 · CSRP — C# 저작·불변 IR·native Pass 연결. 공수 미산정. |
-| [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.7 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
-| [RendererQualityPlan.md](plans/RendererQualityPlan.md) | PHASE 4.75 · RND — probe/AO·shadow·display/post의 독립 품질 게이트. |
-| [GpuFeaturePlanningPlan.md](plans/GpuFeaturePlanningPlan.md) | PHASE 4.8 · GPU — GPU-driven·확률 조명·DXR 설계 및 구현 공수 확정. |
-| [LatticeAdoptionPlan.md](plans/LatticeAdoptionPlan.md) | LX-0~6 · 공수 미산정 — LX-2 독립 게이트 통과, Material Editor·열린 문서 HTTP 제품 연결 진행. MAT-0~8 완료, LX-3/3H의 전체 조작 게이트·새 BT/Animator 창·`imgui-node-editor` 제거는 후속. |
-| [BackendParityPlan.md](plans/BackendParityPlan.md) | PHASE 4.9 — DX12/Vulkan 교차 판정 복귀. 공수 미산정. |
-| [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류. |
-| [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
-| [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
-| [ModelGeometryTextureImprovementPlan.md](plans/ModelGeometryTextureImprovementPlan.md) | 비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분 |
-| [TexturePipelinePlan.md](plans/TexturePipelinePlan.md) | PHASE 12 · 구현·부분 수용 — 텍스처 import 설정·mip·cook·Player 소비와 편집 자동 처리. 전체 품질·성능 및 잔여 게이트는 계획과 검증 기록 참조. |
-| [BuildPipelinePlan.md](plans/BuildPipelinePlan.md) | PHASE 12.5 · 진행 — 게임 빌드·cook·stage·managed·CI 파이프라인. B/L 잔여 유지. |
-| [EngineLayerSeparationPlan.md](plans/EngineLayerSeparationPlan.md) | E0~E7 · 잔여 있음 — Runtime Core·Editor·Host 경계. E2 writer와 E7 잔여 유지. |
-| [AnimationSchedulerPlan.md](plans/AnimationSchedulerPlan.md) | PHASE 13 — 애니메이션 스케줄러·LOD·CPU 버짓 재설계. |
-| [TaskSchedulerUnificationPlan.md](plans/TaskSchedulerUnificationPlan.md) | PHASE 13 S0.5·S6 부속 — 태스크 스케줄러 enkiTS 이관의 실태 조사·측정. fork-join만 옮기고 장기 블로킹 스레드 18곳은 존치. |
-| [ProfilingCapturePlan.md](plans/ProfilingCapturePlan.md) | PHASE 14 P0~P6 · 진행 — CPU/GPU/GC 시간축 수집·녹화·구간 분석. |
-| [MemoryProfilerPlan.md](plans/MemoryProfilerPlan.md) | PHASE 14 MP0~MP6 · 진행 — Memory 탭 수동 스냅샷·A/B 분석과 객체별 네이티브/관리/GPU 계측 확장. |
-| [RenderFrameDebuggerPlan.md](plans/RenderFrameDebuggerPlan.md) | 14-7 독립 트랙 · 미착수 — 원하는 뷰의 다음 완료 제출 하나를 수동 캡처하고 이벤트/상태/리소스·출력을 조사(RF0~RF7). |
-| [UtilityFrameworkModernizationPlan.md](plans/UtilityFrameworkModernizationPlan.md) | PHASE 15 · 진행 — 유틸리티의 실제 소비·계약을 기준으로 정리. |
-| [MathematicsMigrationPlan.md](plans/MathematicsMigrationPlan.md) | 구조 완료 · 검증 잔여 — 수학 라이브러리 이주. pixel·Physics runtime gate가 남아 있다. |
-| [UISystemRedesignPlan.md](plans/UISystemRedesignPlan.md) | PHASE 16 · 진행 — Scene 소유 UI Runtime과 값 타입 렌더 제출. 9-15 개정에서 텍스트 렌더(트랙 T)가 U1 앞으로 서고, UI 저작의 소유 레이어를 C++로 확정했다(D-5). |
-| [SerializationPlan.md](plans/SerializationPlan.md) | PHASE 17 · 진행 — 저작 텍스트·쿠킹 바이너리 경계와 잔여 성능 판정. |
-| [PhysicsRedesignPlan.md](plans/PhysicsRedesignPlan.md) | PHASE 19 — 물리 컴포넌트·backend·스레딩 전면 재설계. |
-| [NetworkFrameworkPlan.md](plans/NetworkFrameworkPlan.md) | PHASE 20 — 네트워크 신원·fixed tick·replication 기반. |
-| [EditorWorkspaceRedesignPlan.md](plans/EditorWorkspaceRedesignPlan.md) | PHASE 21 — 테마·도킹·ViewportHost와 편집·플레이 전환. |
-| [AudioBackendModernizationPlan.md](plans/AudioBackendModernizationPlan.md) | PHASE 22 — FMOD 은퇴와 miniaudio 통합·오디오 회귀. |
-| [EngineDistributionAndLauncherPlan.md](plans/EngineDistributionAndLauncherPlan.md) | PHASE 23 — 엔진 배포·Launcher·프로젝트 관리와 설치 회귀. |
-| [SimulationEffectContractPlan.md](plans/SimulationEffectContractPlan.md) | PHASE 24 · 현재 리팩토링 이후의 미래 계획 · 구현 미착수 |
+| `design/` | 코드가 실현하는 데이터·수명·오류 계약과 아직 연결되지 않은 의도를 구분한 상세 설명 |
+| `plans/` | 현행 구현에 대비한 범위·잔여 요구사항. 과거 일정이나 공수는 현재 완료의 증거가 아님 |
+| `plans/archive/` | 이전 주소를 유지하는 주제별 현재 계약/승계 안내. 오래된 계획 원문은 Git 이력에서 확인 |
+| `analysis/`의 Markdown/HTML | 분석 주제의 현재 구현·관측 지점·검증 한계를 새로 설명 |
+| `analysis/`의 측정 JSON, PNG, GIF | 원래 bytes를 보존한 역사 자료. 최신 실행 결과로 재생성하지 않음 |
+| `design/`의 SVG·PNG | 당시 UI/스타일 구상·미리보기. 현재 창의 스크린샷이나 기능 완료 증거가 아님 |
+| `resource/` | 2026-09-14 Editor 캡처. 웹 소개가 사용하지만 최신 UI를 보증하지 않음 |
+| `api/reference.json` | 웹 UI가 직접 읽는 선별 API 설명 데이터. 측정 JSON과 달리 코드에 맞춰 갱신하는 문서 |
+| `src/`, `index.html`, `api/index.html`, `style.css`, `site-assets/` | 문서를 표시하는 웹 소스와 정적 리소스 |
+| `.nojekyll` | 정적 배포용 표식 |
 
-이전 PHASE 4 계열 원장과 Asset-first SRP 판단은
-[Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md),
-[ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md)에 이력으로 보존한다.
+## API 생성기 주의
 
-## plans/archive/
+[generate_scriptbinder_docs.py](generate_scriptbinder_docs.py)는 저장소 루트의 `ScriptBinder/**/*.h`를 정규식으로 읽고 루트 `API_DOCS/`에 Markdown을 쓰는 과거 도구다. 이 기준 commit에는 그 입력 디렉터리가 없으며, 스크립트는 헤더가 없으면 메시지를 출력하고 반환한다. 현재 `ScriptCore`나 웹의 `api/reference.json`을 생성하지 않는다. 이 스크립트를 실행해 현재 C# API 문서가 갱신된다고 안내하지 않는다.
 
-완료·중단·대체된 **19개 문서**는 [보관 색인](plans/archive/README.md)으로 옮겼다.
-대시보드의 [종료 페이즈 이력](RefactoringPlanDashboard.html#closed-phases)은 기본으로 접혀 있으며,
-기존 페이즈 링크를 열면 해당 이력이 펼쳐진다. 열린 페이즈 요약 집계에서는 종료 페이즈를 제외한다.
+## 갱신할 때
 
-보관 원문에는 과거 측정·폐기된 제안·미검증 범위가 남아 있다. 보관일을 새 구현·검증일로 해석하지 않는다.
+문서를 바꿀 때는 public 선언, 구현 본문, 호출자, 프로젝트/호스트 편입을 함께 확인한다. 지원 조건·실패·취소·교체·종료 경로를 생략하지 않는다. 실행 결과가 필요하면 정확한 commit과 명령, 환경, 결과 파일을 남긴다. 기존 기록의 통과 표시를 새로운 검증으로 복사하지 않는다.
 
-## design/
+## 감사 범위와 재검사
 
-| 문서 | 대상 |
-|---|---|
-| [RenderPipelineTargetArchitecture.md](design/RenderPipelineTargetArchitecture.md) | C# `Build()` 저작·불변 IR·기존 C++ Pass 실행의 현재 설계 정본 |
-| [LatticeNodeSystem.md](design/LatticeNodeSystem.md) | Lattice(LX) 공통 그래프 계약·편집 UI 초안과 [화면 와이어프레임](design/LatticeEditorWireframe.svg) |
-| [EngineVersionPolicy.md](design/EngineVersionPolicy.md) | 확정 — 제품 세대·기능 릴리스·네 자리 엔진 빌드·API 계약·채널. 적용은 PHASE 23 DL5·DL6·DL10 |
-| [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | `ce::dynamic_array` — 자체 컨테이너 설계와 기각 근거 |
-| [RhiGpuMemoryLifetimeDesign.md](design/RhiGpuMemoryLifetimeDesign.md) | RHI GPU 메모리 수명 |
-| [ResourceOwnershipDesign.html](design/ResourceOwnershipDesign.html) | 자원 소유권 |
-| [ReflectionDesign.md](design/ReflectionDesign.md) | 리플렉션 현재 설계 정본 — reflgen 서술·빌드 연동·런타임 등록소·소비자와 기각 근거 |
-| [ReflectionRetentionDecision.md](design/ReflectionRetentionDecision.md) | 리플렉션 존치 결정 |
-
-## analysis/
-
-| 문서 | 대상 |
-|---|---|
-| [Phase475AxisClassification.md](analysis/Phase475AxisClassification.md) | 분리 전 PHASE 4.75의 22개 활성 행을 분류한 당시 정적 점검(2026-09-23) |
-| [CreatorBuildToolValidation.md](analysis/CreatorBuildToolValidation.md) | 독립 BuildTool EXE·private runtime·패키징 검증과 기존 모델 씬 제한(2026-09-13) |
-| [EngineStructureAnalysis.html](analysis/EngineStructureAnalysis.html) | 엔진 구조 전반 |
-| [ReflectionSystemAnalysis.md](analysis/ReflectionSystemAnalysis.md) | 리플렉션 시스템 실측 |
-| [MAT9BlenderImageComparison.md](analysis/MAT9BlenderImageComparison.md) | Core/Layered 동일 입력 24장·Debug/Release 일치·박막 잔여 차이와 기준 노이즈(2026-09-30) |
-| [MAT9MaterialScenePerformance.md](analysis/MAT9MaterialScenePerformance.md) | 모델 배치 후 Debug/Release 렌더 CPU 회귀와 청크·LOD·binding 개선(2026-09-30) |
-| [MAT9NodeEditorPerformance.md](analysis/MAT9NodeEditorPerformance.md) | 다른 세션의 캔버스·Scene 잠금 대기·Inspector preview 실측 통합(2026-09-30) |
-| [ReflgenPhase425Integration.md](analysis/ReflgenPhase425Integration.md) | reflgen PR #114·VS 확장 설치, 4.25 충돌 해결과 통합 검증(2026-09-30) |
-| [PPLContainerMigrationAnalysis.md](analysis/PPLContainerMigrationAnalysis.md) | PPL 컨테이너 이관 |
-| [RectTransformAnalysis.html](analysis/RectTransformAnalysis.html) | RectTransform |
-| [RendererPortingLog.html](analysis/RendererPortingLog.html) | 렌더러 포팅 이력 |
-| [EditorMenuSurfaceAndPhase21Preflight.md](analysis/EditorMenuSurfaceAndPhase21Preflight.md) | 에디터 메뉴 표면 CLI↔GUI 대조 · 메뉴 확장성 · PHASE 21 재정찰(2026-09-10) |
-| [EditorWidgetInheritanceW2.md](analysis/EditorWidgetInheritanceW2.md) | PHASE 21 W2 승계 결정표 확정 — ImGuiHelper 자산의 소비자 실측(2026-09-11) |
-
-## 문서를 추가할 때
-
-- **계획**이면 `plans/`. 슬라이스와 완료 기준, 판정 수치를 반드시 넣는다.
-- **계획이 종료·대체**되면 `plans/archive/`로 이동하고 보관 색인·내부 상대 링크·대시보드를 함께 갱신한다. 보류·차단·미래 계획은 종료로 처리하지 않는다.
-- **결정**이면 `design/`. 채택뿐 아니라 **기각한 대안과 그 근거**를 함께 적는다 —
-  이 저장소는 같은 후보를 반복해서 재검토하는 비용이 컸다.
-- **측정**이면 `analysis/`. 측정 시점을 명시하고 이후 갱신하지 않는다.
-- 어느 쪽이든 **틀린 것으로 드러난 판단은 지우지 말고 정정 이력으로 남긴다.**
-  이 저장소의 관례이며, 실제로 그 기록이 재실수를 막았다.
+[재작성 감사 보고](DocumentationAudit.md)는 기준 파일 전체의 처리 결과와 검증 범위를 설명한다. [파일별 근거 목록](DocumentationCoverage.json)은 문서별 확인한 행동·소스·한계와 원본/결과 blob을 기록한다. 정적 무결성 검사는 `python docs/check_documentation.py`로 실행한다. 이 검사는 링크·anchor·hash를 확인하며 문서 의미의 정확성이나 엔진 실행 성공을 자동으로 증명하지 않는다.

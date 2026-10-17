@@ -1,77 +1,27 @@
-# RG8 normal timing history: SSGI ping-pong identity fix
+# 측정 history의 구조 신원
 
-Base: `d5a6a26a`, with preserved local changes described in
-[the initial measurement](RenderRg8Pr168Measurement20261009.md). VS 2026 Release,
-DX12, RTX 4070 Ti, TestShadow 1496 x 692. No RG8 completion or adoption claimed.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-## Proven cause and correction
+## 이 문서의 역할
 
-Temporary evidence-only diagnostics showed that the immediately preceding
-submission was stored and passed `FindFresh`, but its structural signature did
-not match the next graph. The first differing byte was consistently offset
-11558. Decoding both signatures identified `SSGI.History0`'s version count,
-followed by the history/depth indices used by `SSGI.Resolve` and
-`SSGI.StoreHistory`.
+측정 history의 구조 신원에 관한 과거 단계별 기록을 현행 계약으로 다시 정리한다. 공통 용어·수명·실행 모델은 [RenderGraph 정본](../plans/RenderGraphDependencySchedulingPlan.md)을 따른다. 날짜가 붙은 파일명은 링크 호환을 위해 유지한다.
 
-SSGI imported both textures in physical slot 0/1 order while alternating which
-slot it reads/writes. Thus equivalent consecutive frames had different declared
-resource/version topology. The history cache correctly rejected the mismatch;
-its latest-sample replacement meant the usable parity was usually overwritten.
+## 현재 구현과 호출 경로
 
-`EnhancedSSGIPass::Declare` now imports by logical role relative to the current
-write slot. Role0 is the current destination and Role1 the previous history.
-The physical handles, states, writeback pointers, read/write array indexing and
-retirement rules are unchanged. Structural matching and freshness thresholds are
-unchanged. Temporary signature dumps were removed before the final build.
+EnhancedGpuMeasurementHistory는 normal/capture domain을 구분하고 정확한 graph signature·view·frame·신선도를 확인한다. SSGI는 물리 ping-pong slot과 현재 read/write 역할이 다르다. 구조 key가 frame마다 불필요하게 바뀌면 유효 비용이 있어도 다음 계획에서 거부될 수 있다.
 
-## Remeasurement
+## 변경·검증 기준
 
-The same-process forward 0/1/2 and reverse 2/1/0 runs each collected 64 ordinary
-candidates after 16 warmup frames. Every segment accepted its first 32 eligible
-samples with **zero rejected candidates**, totaling 192 accepted frames.
-Actual schedule and calibrated intervals were independently verified using the
-existing audit functions. This resolves the earlier history-input failure.
+signature 차이를 실제 declaration 순서·버전·입력 의미로 추적한다. 일치시키려고 서로 다른 graph variant의 비용을 합치지 않는다. reset/resize/provider 변경 뒤의 stale 측정은 그대로 거부해야 한다.
 
-| Order / mode | GPU median / p95 ms | Full-view CPU median / p95 ms | Record-submit CPU median ms |
-|---|---:|---:|---:|
-| Forward 0 | 2.2031 / 4.5978 | 10.9135 / 14.7043 | 1.3226 |
-| Forward 1 | 1.6640 / 2.8959 | 7.2981 / 12.8352 | 1.5368 |
-| Forward 2 | 3.0300 / 4.9868 | 13.4318 / 15.5975 | 7.2631 |
-| Reverse 2 | 2.2129 / 4.3346 | 14.2176 / 18.2816 | 6.6644 |
-| Reverse 1 | 2.2267 / 2.7658 | 9.0580 / 11.3100 | 1.8869 |
-| Reverse 0 | 2.7561 / 3.4017 | 7.1646 / 11.7650 | 0.9039 |
+과거 로컬 Build/Artifacts 경로의 수치와 완료·기성 표시는 이번 소스 감사에서 재검증하지 않았으므로 현재 통과 결과로 옮기지 않는다. 제품 기본값, 특정 fixture 성공, 여러 backend의 제품 수용은 각각 판정한다.
 
-Mode2 submitted compute in 55/64 accepted frames; the remaining nine had complete
-cost history and selected `insufficient-gain`. All 64 measured overlaps were zero.
-Mode2 scheduling CPU alone was median **4.2045 ms forward / 3.8823 ms reverse**,
-with recording at 1.5986 / 1.5967 ms and submission at 0.5987 / 0.6248 ms.
-Therefore fixing the history exposes a material scheduling cost; it does not
-establish async gain. Clocks were not locked, evidence serialization remains
-enabled, and forward/reverse GPU rankings are inconsistent.
+## 소스 근거
 
-Examples of executed compute work include Geometry.Visibility reset/cull,
-Geometry.Occlusion mip construction, and SSAO. Compute submissions must not be
-equated with concurrent GPU work. The absence of measured overlap is confirmed;
-its specific remaining cause is not established by this change.
+- [Engine/RenderEngine/Render/Graph/EnhancedGpuMeasurementHistory.h](../../Engine/RenderEngine/Render/Graph/EnhancedGpuMeasurementHistory.h)
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp](../../Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp)
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp](../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp)
 
-## Validation and remaining work
+## 이전 기록
 
-Release build passed (existing PDB LNK4020 warnings retained). The final binary
-passed native execution 428 checks, queue planning 111 checks, full RenderGraph
-regression and the native GPU-validation gate. Product capture comparisons are
-collected separately from timing: 384 logical attachment/stage comparisons across
-pre-fix versus fixed mode0 and fixed mode0 versus modes1/2 were exactly equal,
-with matched controlled inputs, no nonfinite values and maximum error zero.
-Shared stage readbacks are counted by logical stage name, not as independent GPU
-work. Both timing processes and all six capture processes exited normally.
-Product GPU validation, Debug/Vulkan execution,
-and broader workload acceptance are not claimed here.
-
-Keep default OFF. Next investigate the per-frame candidate search cost and the
-actual waits/batches/pass intervals that prevent selected queues from overlapping.
-Do not relax measurement completeness or structural equality to force compute.
-
-Evidence: `Build/Verification/Phase43/RG8History20261009/` contains `probe`,
-`signature-probe`, decoded `signature-difference.txt`, `fixed-normal`,
-`fixed-native`, `fixed-captures`, binary identities, `summarize-fixed.py`, and
-`fixed-performance-summary.json`. Build log: `Build/rg8-history-fixed.log`.
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/RenderRg8HistoryFix20261009.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

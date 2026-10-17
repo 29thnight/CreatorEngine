@@ -1,240 +1,26 @@
-# 자산 GPU 상주 관리 — 해제 통보 경로 설계
+# 보관: 자산 GPU 상주 계획의 현재 후계
 
-> **보관 · 완료 (정리: 2026-09-06).** 2026-08-15 갱신: DX12/Vulkan 상주·퇴출·completion 수명 경로 완료. 후속 메모리 설계는 별도 범위.
-> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+> 기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스 정적 조사. 이 문서의 재작성에서 빌드·실행·성능 측정은 하지 않았다.
 
-작성: 2026-08-08 · 계기: "콘텐츠에 대한 힙은 어떻게 관리하나"에 대한 답이
-"관리하지 않는다"였다.
+## 유지할 결정
 
-2026-08-15 갱신: 신원 키, 상주량 계측, 120프레임 미사용 은퇴와 completion 묘지에
-더해 device memory-pressure 기반 3프레임 LRU 퇴출까지 DX12/Vulkan 공통 경로로 완료했다.
+자산 identity, CPU descriptor 소유권, GPU residency와 native allocation은 다른 층이다. 주소 재사용을 identity로 삼지 않고 exact generation을 잡는다는 옛 계획의 동기는 여전히 유효하다. 현재 CPU 준비는 AssetDepot, GPU cache의 퇴출 정책은 RHIAssetEvictionPolicy, 완료 대기는 RHICompletionRetireQueue가 소유한다.
 
----
+## 현재 정책을 읽는 방법
 
-## 1. 지금 무엇이 일어나는가 — 실측
+기본 normal retire threshold는 120 frames, pressure threshold는 3 frames이고 최소 pressure target은 64MiB다. 정책은 정상 미사용 후보를 고르고 pressure에서는 최근 사용을 보호하며 last-used 순으로 추가 후보를 고른다. 이는 wall-clock 시간이나 즉시 VRAM 회수량을 보장하지 않는다.
 
-| | |
-|---|---|
-| 할당 방식 | `DX12MeshCache`·`DX12TextureCache` 전부 `CreateCommittedResource`. 자산 쪽에 `CreatePlacedResource`·`CreateHeap` **0건** |
-| 항목 제거 | 두 캐시 어디에도 `erase`·`Remove`·`Evict` **0건** |
-| 유일한 비우기 | `Shutdown()` — 호출자는 `ShutdownLive` 하나이고 **엔진 종료 시점**이다 |
-| 잔량 관측 | `Stats`에 `uploads`·`bytesUploaded`(누적)만 있고 **보유량이 없다** |
-| 예산 관리 | `MakeResident`/`Evict` **0건** — 드라이버에 통째로 맡긴다 |
+retiredBytes는 cache에서 completion 대기 영역으로 이동한 논리 바이트다. 실제 native budget 감소는 GPU 완료 뒤 persistent segment trim 등에 달려 있다. retire completion 값 0은 일반 Collect가 회수하지 않는 quarantine이다. producer/consumer가 모두 멈춘 teardown에서만 Drain할 수 있다.
 
-즉 **씬을 열 번 바꾸면 열 번 분량이 VRAM에 쌓이고, 종료할 때까지 안 돌아온다.**
+## 옛 완료 문구의 제한
 
-### 1.1 ★ 더 급한 것 — 주소 재사용
+2026-08 보고의 “모든 cache가 종료 때만 해제”와 raw pointer key 설명은 당시 문제이며 현행 전체 구현 설명으로 사용할 수 없다. 반대로 당시 완료 표기가 모든 texture·mesh·display lease·device-loss 경로를 검증했다는 뜻도 아니다.
 
-두 캐시의 키가 **`Texture*` / `Mesh*` 원시 포인터**다.
+현재 상세 계약은 [AssetDepot](../AssetDepotImplementationPlan.md), [OwnedBoundedPresentation](../../design/OwnedBoundedPresentation.md), [MemoryProfiler](../MemoryProfilerPlan.md)에 있다. 메모리 계측 수치를 더할 때 CPU live, retired logical, OS/device usage를 구분한다.
 
-자산 수명은 `shared_ptr` 공동 소유다(PHASE 2-2~2-5). `DataSystem::UnloadUnusedAssets`는
-자기 참조만 놓고, 실제 파괴는 **마지막 참조가 사라질 때** 일어난다 — 컴포넌트·프록시·
-Model 중 누가 마지막인지 정해져 있지 않고, 따라서 **어느 스레드에서 언제 죽는지도
-정해져 있지 않다.**
+## 구현 근거
 
-그 뒤 같은 주소에 새 자산이 올라오면 **캐시가 이전 것의 GPU 데이터를 돌려준다.**
-지금은 캐시가 자산보다 오래 살아 잘 드러나지 않지만, 씬 전환을 반복하면 성립하는
-조건이다. 증상은 "가끔 다른 텍스처가 보인다"이고, 검증 레이어는 조용하다.
-
-★ **이것은 누수보다 먼저 고쳐야 한다.** 누수는 느려질 뿐이고 이쪽은 틀린 그림이다.
-
-## 2. 제약 — 설계를 정하는 것들
-
-1. **파괴 시점·스레드가 자유롭다.** `shared_ptr` 마지막 참조가 게임 스레드일 수도,
-   렌더 스레드(프록시 스냅샷 폐기)일 수도 있다. 파괴자에서 D3D12 객체를 놓으면 안 된다.
-2. **GPU가 아직 쓰고 있을 수 있다.** 슬롯이 뷰당 3개이므로 마지막 사용 이후 최대
-   3프레임은 살아 있어야 한다.
-3. **이미 있는 장치**: `LiveState::graveyard` — 즉시 못 놓는 것을 모아 두는 자리.
-   다만 지금은 `ShutdownLive`가 한 번 비우는 용도라 **프레임 단위 회수가 없다.**
-4. **식별자**: `Mesh`는 `HashedGuid m_hashingMesh{ make_guid() }`를 이미 든다.
-   **`Texture`는 없다** — 이름(`m_name`)뿐이고 그건 유일하지 않다.
-
-## 3. 설계 — 세 조각
-
-### 3.1 키를 주소에서 신원으로 (correctness) — 2026-08-08 완료
-
-`Texture`에 `HashedGuid m_assetId{ make_guid() }`를 주고, 두 캐시의 키를
-주소에서 그 값으로 바꿨다. `Mesh`는 `m_hashingMesh`를 이미 들고 있어
-새로 만들 것이 없었다(그쪽 이동 생성자도 이미 신원을 옮기고 있었다 —
-`Mesh.cpp:105`).
-
-바뀐 것:
-
-| | 전 | 후 |
-|---|---|---|
-| `DX12TextureCache::m_entries`·`m_descriptions` | `Texture*` | `HashedGuid` |
-| `DX12MeshCache::m_entries` | `Mesh*` | `HashedGuid` |
-
-`Texture`의 이동 생성자에 `m_assetId` 전달을 넣었다 — 이동은 "같은 자산이
-자리를 옮긴 것"이지 새 자산이 아니다. 안 옮기면 같은 그림을 두 번 올린다.
-복사 생성자는 원래 `delete`라 신원이 복제될 길이 없다.
-
-★ **이것이 누수를 고치지는 않는다.** 죽은 자산의 항목은 여전히 남는다 —
-그것은 ③이 푼다. 여기서 없앤 것은 *틀린 그림*이고 남은 것은 *느려짐*이다.
-
-### 3.1-원안 — 키를 주소에서 신원으로 (correctness)
-
-`Texture`에 `Mesh`와 같은 형태의 `HashedGuid`를 준다. 캐시 키를 그 값으로 바꾼다.
-
-```cpp
-// Texture.h — Mesh::m_hashingMesh와 같은 규약
-HashedGuid m_assetId{ make_guid() };
-```
-
-이것만으로 **주소 재사용 오염이 성립하지 않는다.** 죽은 자산의 항목은 남아 있어도
-새 자산이 그것을 집어 가지 못한다(신원이 다르다). 남는 것은 누수뿐이고, 그건 3.2가 푼다.
-
-★ **이 조각을 먼저 넣는 이유**: 3.2·3.3보다 작고, 넣는 순간 조용히 틀리는 부류가
-사라진다. 3.2가 늦어져도 값이 있다.
-
-### 3.2 안 쓰는 것을 버린다 (leak)
-
-두 캐시가 항목마다 **마지막 사용 프레임**을 든다. `GetOrUpload`가 히트할 때 갱신한다
-(이미 `++m_stats.hits` 하는 자리다).
-
-프레임 경계에서 `Sweep(currentFrame)`을 부른다 — `lastUsedFrame + kRetireAfterFrames`
-보다 오래된 항목을 **묘지로 보낸다.**
-
-```
-kRetireAfterFrames = 슬롯 수(3) + 여유
-```
-
-구현된 정상 임계값은 120프레임이다. 실제 device budget이 90%에 도달해 pressure가
-켜지면 공통 정책이 임계값을 3프레임으로 낮추고 LRU 순으로 고른다. texture와 mesh는
-80% 해제선까지의 부족량을 같은 회수 target으로 공유한다. 이번 프레임 사용 자산과
-아직 Recording/Queued인 업로드는 제외하며, pressure가 자산 파괴의 안전 조건을
-바꾸지는 않는다. 선택 뒤에도 3.3의 completion 묘지를 반드시 거친다.
-
-★ **왜 통보가 아니라 미사용 기반인가.** 통보(파괴자 → 캐시 큐)를 먼저 검토했고
-버렸다. 이유 셋:
-
-- **파괴 시점이 자유롭다**(제약 1). 파괴자에서 전역 싱크를 건드리면 스레드 계약이
-  파괴자마다 생긴다 — `Texture`가 렌더 계통을 알게 되는 방향이기도 하다(T6과 반대).
-- **통보만으로는 부족하다.** 자산이 살아 있어도 씬에서 빠져 안 쓰이는 경우가
-  훨씬 흔하다(`DataSystem`이 캐시로 붙들고 있다). 통보는 그것을 못 잡는다.
-- **미사용 기반은 통보를 포함한다.** 죽은 자산은 당연히 안 쓰이므로 같은 경로로 걸린다.
-
-즉 통보는 회수를 *빠르게* 할 뿐이고, 필요해지면 나중에 얹을 수 있다(3.4).
-
-### 3.3 회수 가능한 묘지 (safety)
-
-지금 묘지는 `ShutdownLive`가 한 번 비운다. 프레임 단위 회수를 붙인다 —
-`Grave`에 **제출 펜스 값**을 달고, 프레임 시작에 완료된 것만 놓는다.
-
-```cpp
-struct Grave { ComPtr<ID3D12Resource> resource; uint64_t fenceValue; };
-```
-
-이미 `DisplaySlot`이 `fenceValue`로 같은 판정을 하고 있으므로(2196행 부근) 규약이
-같다 — **"펜스가 지나야 놓는다"** 하나다.
-
-### 3.4 나중에: 즉시 통보 (선택)
-
-씬 전환처럼 한 번에 많이 버려야 할 때는 미사용 카운트를 기다리는 것이 아깝다.
-`DataSystem`이 `UnloadUnusedAssets` 뒤에 **"이번에 놓은 자산 id 목록"** 을 렌더 측
-큐에 밀어 주면 그 프레임에 바로 은퇴시킬 수 있다. 자산 → 렌더 **한 방향**이고
-id만 오가므로 T6이 걷으려는 결합과 무관하다.
-
-3.2가 있으면 이것이 없어도 정확하다 — **최적화이지 정확성이 아니다.**
-
-## 4-완료. 관측 (② · 2026-08-08)
-
-두 캐시의 `Stats`에 상주량을 달고 `dx12.live status`에 한 줄로 냈다.
-
-```
-자산 상주 — 텍스처 N개 X.X MB · 메시 N개 X.X MB · 스테이징 N개 X.X MB · 합계 X.X MB
-```
-
-| 잰 것 | 방법 |
-|---|---|
-| 텍스처 상주 | `GetResourceAllocationInfo(...).SizeInBytes` — **실제 커밋 크기** |
-| 메시 상주 | 정점+인덱스 바이트 합 |
-| 스테이징 | 링 용량을 넘어 전용 버퍼로 간 것(`ReleaseStagingBuffers`가 0으로 되돌린다) |
-
-★ **`bytesUploaded`를 쓰지 않은 이유**: 그 값은 업로드 **풋프린트** 총합이라
-행 정렬 패딩이 섞여 있고, 무엇보다 **누적**이라 "지금 얼마나 먹고 있나"를
-답하지 못한다. 캐시가 항목을 안 버린다는 사실도 그 수로는 안 보였다.
-
-★ **바이트를 항목마다 저장한다**(`Resident::bytes` · `Buffers::bytes`).
-③이 뺄 때 desc로 다시 계산하면 생성 시점과 어긋날 수 있어서다.
-
-★ **`Shutdown`이 상주 수치도 0으로 되돌린다.** 안 그러면 "다 놓았는데 수치는
-남아 있다"가 되어 ③의 판정이 성립하지 않는다.
-
-**지금 기대되는 결과**: ③이 없으므로 **단조 증가가 정상**이다. 씬을 왕복해도
-안 줄어드는 것이 관측되면 그 증가폭이 곧 ③이 회수할 양이다.
-
-## 4-원안. 관측 — 이것이 없으면 판단이 안 된다
-
-`Stats`에 셋을 더한다. 지금 `bytesUploaded`는 **누적**이라 보유량이 아니다.
-
-| 지표 | 뜻 |
-|---|---|
-| `residentCount` · `residentBytes` | 지금 캐시가 들고 있는 양 |
-| `retired` · `retiredBytes` | 이번 프레임 은퇴시킨 양 |
-| `graveyardCount` · `graveyardBytes` | 펜스 대기 중인 양 |
-
-`dx12.live status`에 한 줄, `gpu.delta`에 씬 전환 전후 비교로 낸다.
-
-**판정**: 씬 A → B → A를 왕복해 `residentBytes`가 기준선으로 **돌아오는가**.
-지금은 단조 증가한다.
-
-## 5. 순서
-
-```
-① Texture에 자산 id + 캐시 키 교체        (작음 · 조용히 틀리는 부류를 없앤다)
-② 관측 지표 셋                            (작음 · 이후 판단의 근거)
-③ 미사용 기반 은퇴 + 펜스 회수 묘지        (본체)
-④ (선택) DataSystem의 즉시 통보           (씬 전환 반응성)
-```
-
-①②는 동작을 바꾸지 않는다 — ③ 전에 넣어 기준선을 먼저 찍는다.
-
-## 6. 하지 않을 것
-
-- **`MakeResident`/`Evict` 잔여 관리** — 예산 초과를 우리가 다루기 전에, 우리가
-  안 버려서 초과하는 것부터 없앤다. 그 뒤에도 초과하면 그때 본다.
-- **자산 힙 서브할로케이션**(placed resource 풀) — ③이 끝나야 상주량이 안정되고,
-  안정돼야 조각화가 문제인지 알 수 있다. 순서가 반대면 측정이 흔들린다.
-- **`Texture`가 렌더 캐시를 알게 하는 어떤 것** — T6이 걷으려는 방향과 반대다.
-
-## 7. 참고 사례 — 자체 엔진 방송과의 구조 비교 (2026-08-08)
-
-[기술방송 - D3D12 리소스 수명 관리](https://www.youtube.com/watch?v=RRA26w2m5Y8)
-(기술 파트 ~1:52, 이후 Q&A·잡담). DXR 기반 복셀 엔진을 오래 운용한 화자의
-실전 구조다. 문제 인식은 이 문서와 완전히 겹치고, 갈리는 지점이 이 계획의
-선택을 검증하거나 미래 단계의 힌트가 된다.
-
-### 7.1 그쪽 구조
-
-| 장치 | 내용 |
-|---|---|
-| 디퍼드 릴리즈 매니저 | `Release`를 직접 안 부르고 (포인터, 라이프 카운터) 등록. 매 프레임 끝 카운터 감소, 0에서 해제 — **프레임 카운트 기반** |
-| 펜딩 → 프리 리스트 이원화 | 해제 요청은 펜딩 리스트에서 카운트를 소진한 뒤에야 프리 리스트로. 재할당은 프리 리스트에서만 |
-| 커스텀 힙 | 64KB `CreateCommittedResource` 블록 안에서 바이트 단위 서브할당(bump + 해제 시 앞뒤 병합 + 프리 리스트). 텍스처는 placed가 아니라 **아틀라스**(가로 고정·세로 적재·UV 보정). 버퍼의 ~90%가 이 방식 |
-| 디스크립터 힙 | DXR SBT 로컬 루트 아규먼트 탓에 연속 요청 개수가 가변(3·5·60…) → 버퍼 힙과 유사한 **영속 할당기** + 같은 이원화 리스트 |
-
-### 7.2 차이와 판정
-
-| 지점 | 그쪽 | 이 계획 | 판정 |
-|---|---|---|---|
-| 해제 안전 판정 | 고정 라이프 카운트(프레임 수 = GPU 완료라고 가정) | **제출 펜스 값**(3.3) — 가정을 직접 검증 | 유지. GPU가 밀리는 프레임에서 프레임 카운트는 이론상 구멍. `DisplaySlot` 규약과도 일치 |
-| 회수 트리거 | 명시적 해제 호출(통보 기반) — 소유권이 명확한 엔진의 전제 | **미사용 기반**(3.2) — `shared_ptr` 공동 소유라 파괴 시점·스레드가 비결정(제약 1) | 유지. 통보 기반을 이식하면 제약 1과 정면 충돌. 3.2의 기각 논증이 맞았다는 방증 |
-| 서브할당 | 본체 | §6 보류(측정 먼저) | 유지하되 7.3의 힌트 반영 |
-| 디스크립터 | 영속 할당기 + 이원화 리스트 | 트랜지언트 링(프레임 3분할+펜스, RhiBoundaryPlan) — 수명 문제가 성립 안 함 | 유지. 영속 모델의 "해제 직후 재할당 오염" 부류가 우리에겐 없다. DXR 도입 시 그쪽 구조가 참고 대상 |
-
-### 7.3 실패 사례에서 얻은 힌트
-
-- **디스크립터 오염의 증상은 조용하다.** 그쪽도 이원화 리스트를 빠뜨렸을 때
-  검증 레이어가 아니라 "복셀 파괴 시 메시 깜빡임"으로 나타났다. §1.1의 주소
-  재사용 오염과 같은 부류 — *조용히 틀리는 것을 먼저 막는다*는 이 계획의
-  순서(① 먼저)를 지지한다.
-- **서브할당 단계에 오면**, 조각화 측정 전에 두 가지부터 센다:
-  `CreateCommittedResource`가 **대량 반복되는 경로**(그쪽 실측: D3D11 대비
-  체감 10배+ 비용)와 **64KB 정렬 낭비**(1바이트에 64KB). 그쪽은 라이트맵
-  1만 장 개별 생성으로 iOS에서 크래시했다 — 우리 관측 지표(②)로 이미 감지
-  가능한 부류다.
-- **핀드 메모리(업로드 힙)는 커맨드 순서 보장이 없다.** 그쪽은 SBT를 GPU가
-  읽는 중 CPU가 덮어써 방송 중 크래시했다. 업로드 링의 프레임 분할이 지키는
-  불변식의 실증 사례.
-- **DRED**는 이미 보유(`DX12DeviceResources` · `Tools/dx12-validation`) — 차이 없음.
+- [Engine/RenderEngine/RHI/RHIAssetEvictionPolicy.h](../../../Engine/RenderEngine/RHI/RHIAssetEvictionPolicy.h)
+- [Engine/RenderEngine/RHI/RHIAssetEvictionPolicy.cpp](../../../Engine/RenderEngine/RHI/RHIAssetEvictionPolicy.cpp)
+- [Engine/RenderEngine/RHI/RHICompletionRetireQueue.h](../../../Engine/RenderEngine/RHI/RHICompletionRetireQueue.h)
+- [Engine/RenderEngine/AssetDepot/AssetDepot.cpp](../../../Engine/RenderEngine/AssetDepot/AssetDepot.cpp)

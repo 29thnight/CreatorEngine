@@ -1,83 +1,48 @@
-# CSM correctness and optimization
+# CSM 정확도와 최적화의 현재 기준
 
-Base: `033858a7d22451ff93aa54a3947c6990b59f53a7`.
+기준: master `493536e300e274cbf59989cdd62b20310c8ae64f`의 소스와 실제 호출 배선. 이번 개정에서는 빌드·테스트·GPU 실행을 하지 않았다. 구현 존재와 실행 수용을 구분한다.
 
-## Implemented scope
+## 수신 영역과 그림자 후보
 
-- Keep a separate legacy shadow-caster input before camera-frustum rejection. Select the union of camera-visible objects and conservative shadow casters before the bounded Graph seal, using the same receiver planner and settings as CSM. Unrelated offscreen objects do not consume the Graph draw budget; relevant offscreen casters retain shared geometry preparation. Diagnostic visible-draw pose replay also updates the corresponding shadow inputs.
-- Validate sealed mesh layout and palette before reading them for bounds. Carry local bounds centers. Enclose affine transforms (including shear) and the convex hull of bone-transformed source bounds. Cache legacy world bounds once per view preparation. Typed fixtures without supplied bounds derive them from their immutable POSITION bytes.
-- Keep stable sphere fitting, snap in light-space XY, pad the fit for snapping, overlap receiver ranges for cascade blending with matching CPU/shader behavior at positive, negative and zero splits, and include upstream caster bounds in the light-depth range. Unproject corners correctly for perspective and orthographic cameras.
-- Separate shadow distance from camera far plane: default 200 world units, configurable with `SetShadowDistance`. This is an engine default, not a measurement of the user's scene scale.
-- Default constant bias is 0.5 shadow texels, converted to world distance and then normalized by each light-depth range. `SetBiasTexels` uses these units. The existing `SetBias` entry point retains compatibility with the old normalized-depth knob at a four-radius depth span, including diagnostic negative bias. Slope tangent remains bounded in the shaders.
-- Pack the selected directional-light index plus one in `splitDepths.w`; deferred, forward, graph surface, and graph volume consumers apply CSM only to that light. Zero preserves first-light ownership in old isolated fixtures. Surface shadow sampling stops beyond the configured shadow distance.
-- Graph draws carry conservative cascade visibility. Skip constants for rejected cascades and avoid repeated pipeline/material binding for consecutive compatible chunks. Do not instance unrelated world-geometry buffers.
-- Legacy sort, batch boundaries, work partition boundaries, and cost estimate share geometry/skinning/alpha-texture grouping. Partition on complete groups and whole cascade multiples.
-- Vulkan render-target tables belong to frame slots. Owned slice views survive until the owning slot's fence completes; shutdown releases all tables after GPU retirement.
+ShadowMath::ReceiverCascades는 세 cascade의 수신 영역을 만든다. perspective split은 로그/균등 혼합, orthographic split은 균등이며 camera far와 설정 distance로 범위를 제한한다. sphere fit을 양자화하고 light-space XY texel snap을 적용한다. cascade blend 구간까지 포함한 수신 영역을 pre-budget 선택과 shadow projection이 공유한다.
 
-## Fog review
+화면 밖 caster도 수신 영역에 그림자를 만들 수 있다. CastsInto는 광원 방향의 보수적 cylinder 관련성을 사용하며, 알 수 없는 반지름은 조용히 버리지 않는다. affine scale·shear의 bound는 ScaleBound와 ShadowCasterBounds를 통해 다루며 skin bounds는 실제 sealed geometry/palette 계약을 확인해야 한다.
 
-The legacy volumetric fog path deliberately receives the last-cascade matrix and samples layer 2. In `FogScatter.slang`, the computed shadow/cloud visibility currently feeds only a commented-out sun term; the active light loop does not consume it. Changing that policy would introduce new fog lighting behavior and is outside this surface-CSM correction. The separate MaterialGraph volume path actively samples CSM and now respects selected-light ownership.
+## 깊이 범위와 bias
 
-## Deferred phase: persistent shadow-depth cache
+EnhancedShadowPass::PrepareGraphFrame은 identified caster stream과 재질 그래프 입력을 요구한다. 각 cascade에서 관련 caster가 광원 쪽으로 멀리 있으면 backOff를 늘려 orthographic depth span에 포함한다. camera frustum 밖이라는 이유로 caster를 제거하거나 backOff 확장을 빼면 멀리 있는 가림체의 그림자를 잃을 수 있다.
 
-No shadow-content cache is enabled by this change. `EnhancedShadowPass::Declare` creates a graph texture and clears its layers every frame. Texture allocation pooling and shared skinned geometry are not depth-content reuse.
+bias는 cascade의 world texel과 depth span에 연결되고, splitDepths.w는 선택한 광원 index+1을 표현한다. Fog와 forward/material 조명의 shader가 같은 cascade·bias 의미를 읽어야 한다. 조명 또는 shadow matrix를 캡처할 때 index와 단위를 함께 기록한다.
 
-The bounded follow-up belongs to the shadow renderer owner and needs:
+## 현재 GPU 소비
 
-1. A persistent depth-map owner per view/light with explicit graph import state and GPU retirement. The graph's transient texture identity cannot act as a content-validity token.
-2. Exact invalidation for camera/view identity, cascade matrices and coverage, light identity/direction, caster addition/removal, world transform, palette content, geometry generation and LOD, alpha/coverage/material texture content, and shadow settings. Graph program/instance changes must participate too.
-3. A deliberately small first mode: full-map reuse only when every dependency is unchanged, otherwise redraw all cascades. Partial static/dynamic composition requires a separate depth-composition design.
-4. Cache-on/off image equivalence across each invalidator, multiple views and frames in flight, plus measured hit rate, memory and GPU time. Acceptance requires a benefit over invalidation/bookkeeping cost.
+ShadowStage가 Geometry table을 받고 cascade별 meshlet culling·command producer와 METEOR.Scene.Shadow.C0/C1/C2를 소유한다. 각 출력은 3-slice D32Float shadow map의 Modify 버전이다. survivor list는 현재 posed geometry와 각 light projection을 기준으로 생성하며 camera HZB와는 독립적이다.
 
-This needs a separate implementation and validation slice; silently retaining pooled depth would produce stale shadows.
+논리 caster count, meshlet 후보, 실제 survivor, bucket submission과 최종 깊이 coverage를 구분한다. prepared count만으로 그림자 누락이 없다는 결론을 내리지 않는다. 과거 indexed/meshlet 선택 옵션은 현행 SceneHost 필수 meshlet 경로의 사용자 설정으로 제공하지 않는다.
 
-### Bounded implementation proposal
+## 수용해야 하는 사례
 
-The owner is `EnhancedShadowPass`, with one cache entry per stable render-view identity and selected-light identity. Entry states are Empty, PendingSubmission, Valid and Retiring. A miss records and clears a persistent three-layer D32 texture; the entry becomes reusable only after successful recording/submission, never after an aborted frame. A hit imports that texture into the new graph and skips depth recording, while current-frame light ownership and sampling constants are still refreshed. Track the actual final resource state and submission completion point. Retire replaced/resized resources after their last reader completes. Device/backend changes discard all entries.
+- 광원 쪽으로 멀리 떨어진 caster, 카메라 바깥 caster와 빈 cascade
+- split 경계·blend band, camera 이동·회전과 texel snapping
+- 정적·skin pose, 음수/비균일 scale·shear와 양면 재질
+- alpha cutoff의 통과·동일·거부 경계와 여러 meshlet에 걸친 topology
+- 실제 보이는 meshlet 하나를 누락시킨 변이가 depth/최종 shadow oracle에서 실패하는지
 
-Start with whole-map reuse only, opt-in, capped at one view (48 MiB for 3 x 2048 x 2048 x 4 bytes). Use the existing ordered graphics queue for read/write sequencing; unsupported queue ownership or missing dependency generations forces a miss. Do not add partial-cascade reuse, static/dynamic depth composition, approximate matrix comparisons or camera-motion heuristics in this first mode.
+동치 검사는 같은 frame·view·pose·light matrix와 세 cascade attachment를 대조한다. 성능은 GPU validation/capture를 켠 정확도 실행과 일반 프레임을 나눠 반복 측정한다. 이번 감사에서는 위 사례를 실행하지 않았다.
 
-The exact key comprises view/projection and all cascade matrices/coverage/settings; selected producer light identity/direction; ordered caster identities and add/remove membership; world transforms; palette contents/pose versions; immutable model generation, mesh and LOD; coverage flags/cutoff/sidedness; material/program/instance generation; and alpha texture/sampler/content generation. Keep strong owners for immutable dependencies to prevent pointer reuse from masquerading as identity. A resource handle or `Texture*` alone is not a content version. Any producer without reliable immutable identity must supply a version (or force redraw); introducing those producer contracts is an explicit prerequisite, not a guessed cache key.
+## 남겨 둔 설계 의도
 
-Acceptance has two stages: (1) cache disabled, collect proposed hit/miss reasons without changing rendering; (2) enable reuse and require depth plus final-color equivalence against cache-off for every invalidator, first frame, aborted submissions, view destruction/recreation, two alternating views and three frames in flight on DX12/Vulkan. Measure key construction CPU cost, warm static-scene shadow GPU time, hit rate and peak retained memory. Keep caching disabled by default unless the saved depth work exceeds bookkeeping cost. This plan is independent of the correctness PR and requires its own reviewed implementation.
+지속 shadow-depth cache는 현재 라이브 조립에 독립 cache invalidation 계약으로 연결되어 있지 않다. 도입한다면 caster geometry·pose·world·material alpha, 광원, cascade fitting과 scene generation을 key에 포함하고 실패·퇴출·GPU 완료 수명을 정의해야 한다. 정적인 장면의 과거 결과만으로 동적인 장면의 cache 적합성을 판정하지 않는다.
 
-## Validation record
+## 소스 근거
 
-The baseline worktree is detached at the base SHA above. The main worktree is isolated from the user's dirty checkout, binaries and running editor. Existing dependency outputs are read without restoring or modifying them.
+- [Engine/RenderEngine/Render/Graph/ShadowMath.h](../../Engine/RenderEngine/Render/Graph/ShadowMath.h)
+- [Engine/RenderEngine/Render/Graph/ShadowCasterBounds.h](../../Engine/RenderEngine/Render/Graph/ShadowCasterBounds.h)
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp](../../Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp)
+- [Engine/RenderEngine/MaterialGraphSceneShadowStage.inl](../../Engine/RenderEngine/MaterialGraphSceneShadowStage.inl)
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp](../../Engine/RenderEngine/MaterialGraphSceneHost.cpp)
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp](../../Engine/RenderEngine/GpuGeometryVisibility.cpp)
 
-- Standalone `csm_math_probe.cpp`: passed perspective/orthographic corner reprojection, light-space microtranslation and integer-texel stepping, conservative clip intersection, offscreen caster distinction, negative and zero split boundaries, and pre-budget receiver selection.
-- Revised isolated DX12 Debug and Release builds: passed. Revised Vulkan Debug probe build: passed.
-- Baseline control: the original shadow test failed fixture 3 with depth `0.4` instead of `1.0`. Its fixture mutates source vertices/indices while retaining the same immutable model generation. With only a distinct generation per fixture, unchanged baseline engine code passed all 42 shadow frames and 114 decal frames, including fixture 6, with validation zero. The revised test preserves the original pixel assertions and adds sealed-index identity assertions.
-- Expanded Vulkan Debug and Release shadow/decal aggregates: each exit 0, 45 shadow frames and 114 decal frames, validation zero and encoder drops zero. The queue-gated lifetime regression verified three genuinely pending frames and nine retained depth slices before readback. Logs: `csm-partition-vulkan-Debug.log`, `csm-partition-vulkan-Release.log`.
-- Expanded DX12 Debug and Release shadow/decal aggregates: each exit 0, 45 shadow frames and 114 decal frames, validation zero with GPU validation enabled. Logs: `csm-partition-dx12-Debug.log`, `csm-partition-dx12-Release.log`.
-- All four expanded runs use workers 0/2/4/5/6/8 with actual shadow slice counts 1/2/4/5/6/6. The six- and eight-worker cases assert seven graph record units (six shadow slices plus one readback), proving two partitions per cascade. Spatially separated geometry groups retain 384 instances / 192 batches in every mode, and every depth-map pixel matches serial output. This replaces the earlier four-worker-only coverage, which did not exercise intra-cascade partitioning.
-- Pre-budget selection sealed two relevant draws from 4100 candidates. Malformed layout/palette rejection and bounds/bias/ownership/overlap contracts passed. Renderer code is unchanged from independently reviewed `cac4817687fd1e45d3d412e0cfc7927f438bcb97`; subsequent changes concern tests, gate expectations and this evidence. `git diff --check` passed.
-### Native contact and moving-camera acceptance
+## 이전 기록
 
-An owned 640 x 480 DX12 fixture renders a floor and two foot/ankle proxy meshes through the actual Shadow, GBuffer and Deferred passes. Baseline and revised executables use the same geometry, light, camera and shader-on/off pairs. Each completed 32 frames with validation zero. The close view uses a 55-degree perspective camera, near 0.05 / far 1000; the boundary view uses far 60. Eight close samples move the camera in 0.002-unit increments. Eight boundary samples place the ground receiver at view depths 5.13319 through 5.68202, crossing the measured split 5.40683.
-
-Coverage is measured on reconstructed floor pixels against independent ray/box intersections. A pixel counts as shadowed when luminance drops by more than 10% relative to the paired shadow-disabled render. The contact region is within 0.1 world units of the foot footprint. This is a controlled proxy scene, not a claim to reproduce the user's original screenshot assets or scale.
-
-| Measurement (mean over eight frames) | Baseline | Revised |
-|---|---:|---:|
-| Close-view expected shadow detected | 1.27% | 100% |
-| Close foot-contact shadow detected | 2.88% | 100% |
-| Boundary-view expected shadow detected | 69.59% | 99.94% |
-| Boundary foot-contact shadow detected | 51.13% | 100% |
-| Near-cascade constant bias, world units | 0.507 | 0.00846163 |
-| Near-cascade texel width, world units | 0.0825195 | 0.0169233 |
-
-Revised contact detection is 100% in every close and boundary frame; baseline boundary contact detection ranges from 23.89% to 90.57%. Visual inspection of both full frames and nearest-neighbor enlarged crops confirms the baseline contact gap and the restored revised shadow. Pixel-sized shadow edge steps remain visible. Revised shadowed pixels outside the geometric hard-shadow reference occupy 0.32% of the close floor ROI and 0.25% of the boundary ROI; this includes the PCF footprint and should not be interpreted as an acne-only measure.
-
-![Native close contact: baseline on the left, revised on the right](csm-contact-comparison.png)
-
-![Camera sweep across the first cascade boundary: baseline on the left, revised on the right](csm-boundary-comparison.gif)
-
-Local evidence: `Build/CsmAcceptance.cpp`, `Build/analyze_csm_acceptance.py`, `Build/CsmAcceptanceVisual/frames.csv`, and `Build/CsmAcceptanceComparison/` (paired PNGs, close/boundary GIFs and `coverage.json`). The baseline worktree has the identical native fixture. Functional captures ran with GPU validation and overlapping owned workloads; their timestamp columns are retained for diagnostics but are not performance evidence.
-### Remaining acceptance limits
-
-Functional GPU readbacks and submission counts do not establish a measured performance speedup. No before/after GPU timing claim is made. The user's original near-foot/ankle artifact has not been reproduced in an isolated scene with matched camera, geometry scale, lighting and material settings. The controlled native contact and boundary comparison above is complete; original-user-scene validation and isolated before/after performance capture remain outstanding. The current tests cover projection/bias contracts, GPU depth pixels, alpha/skinning and serial/parallel equivalence instead.
-
-DX12 Debug volume (33 frames), refraction (24), subsurface (12) and full raster aggregates completed with exit zero and their pixel assertions intact. The shadow/decal gate had stale raster expectations (56 composition / 12 generation frames): unchanged baseline source intentionally validates generation step 11 without submitting a GPU frame, producing 55 / 11. The gate now expects those exact counts and documents the skipped submission; no pixel assertion was relaxed. Additional Release aggregate results are reported in PR #115 without altering renderer/test inputs. The isolated AddressSanitizer engine compile completed, but the probe link failed with LNK2038 `annotate_optional` (existing ryml/c4core libraries use 0; instrumented MSVC code uses 1). No ASan runtime pass is claimed and existing dependencies were not rebuilt. Malformed layout/palette rejection is covered by the native Scene input regression. Vulkan Debug and Release expanded shadow/decal executions both passed with validation zero and encoder drops zero.
-
-Graph camera visibility is conservative: relevant offscreen graph casters may still incur shared surface preparation. A separate per-pass surface visibility contract can remove that work without losing shadow casters.
+[기준 커밋의 개정 전 원문](https://github.com/29thnight/CreatorEngine/blob/493536e300e274cbf59989cdd62b20310c8ae64f/docs/analysis/CsmCorrectnessOptimization.md)에 당시 단계·세부 앵커·측정 이력이 남아 있다. 그 실행 결과를 현재 커밋의 수용으로 승계하지 않는다.

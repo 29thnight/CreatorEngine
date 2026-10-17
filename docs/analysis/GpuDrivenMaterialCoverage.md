@@ -1,74 +1,35 @@
-# GPU-driven material coverage extension
+# GPU-driven 재질 coverage와 세대별 geometry 계약
 
-This source checkpoint extends the GPU geometry milestone without replacing material
-programs, disabling effects, or changing the globally merged Code/Graph depth order.
-Merged in PR #123. The merge-time DX12 checks covered the opaque meshlet/HZB path only
-(see the [implementation plan](../plans/GpuDrivenGeometryImplementationPlan.md#merge-and-first-execution-2026-10-06));
-the material routes below still have no executed parity check.
+> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
 
-## Supported geometry routing
+## 현재 제품과 보조 경로
 
-| Existing route | GPU-produced submission on capable devices | Preserved semantics |
-|---|---|---|
-| Native opaque/masked GBuffer | Indexed indirect; eligible standard geometry may use mesh dispatch | Original shaders, topology and material bindings |
-| Native custom GBuffer | Indexed indirect, zero or complete original instance count | Raw instance IDs, original instance stream and custom identity-buffer extent |
-| Native Forward, including transparent/custom/skinned | One indexed indirect command per original merged segment/batch intersection | Original CPU depth order, instance ordinals, PSOs, flow and palette data |
-| LX GBuffer/ordered surface/color | One zero-or-one indexed command per owner | Original owner ID and program |
-| LX refraction/lookup/SSS/runtime-special captures | The same zero-or-one command at every raster consumer | Per-draw background snapshots, capture clears, effects and final color coverage |
-| Native/LX shadow geometry | Independent per-cascade indexed indirect | Existing caster domain, alpha/sidedness and shadow topology; no camera HZB |
-| Native indexed occluder prepass | Independent frustum-only indirect arguments | No dependency cycle with main HZB arguments |
-| Decals and simple world sprites | Nonindexed indirect | Adjacent blend/canvas order and procedural vertex IDs; explicit shader instance base |
+live Scene 재질은 [Scene host](../design/MaterialGraphSceneHost.md)의 graph-only 입력을 사용한다. 예전 native Code/LX 혼합 draw에 대한 GPU-driven 보고서를 현재 제품의 Code admission 근거로 사용할 수 없다. Code graphics helper와 회귀 fixture는 남아 있지만 arbitrary Code shader가 live Scene에서 허용된다는 뜻은 아니다.
 
-Unknown native position semantics conservatively retain the complete draw. The GPU still
-writes its executable count, but this does not imply useful culling for that shader.
-Preserved bins write the complete identity sequence and emit only zero or the original
-count. They never compact/reorder an arbitrary custom instance stream.
+공통 GPU geometry 코드는 실제 shader의 position/instance 의미를 모르는 경우 안전하게 원래 draw를 보존해야 한다. reflection에서 buffer가 보인다는 이유만으로 shader가 compacted visible ID를 올바르게 읽거나 동일한 변형을 계산한다고 가정하지 않는다.
 
-CPU ordering, PSO/material binding, and command submission remain intentional. GPU sorting
-alone cannot change arbitrary PSOs, and no CPU readback or claim of GPU-only submission is
-introduced. Per-turn refraction background captures remain at their original positions.
+## 보존과 압축의 다른 계약
 
-## Availability versus material fallback
+`GpuGeometryVisibility`는 preserved bin의 개수와 원본 대응을 검증한다. original ID는 유효 범위 안에서 중복 없이 원본을 덮어야 한다. compacted 경로는 별도로 visible instance ID와 indirect argument를 만든다. 두 경우의 instance ID 의미를 섞으면 재질·transform·skin palette가 다른 객체를 참조할 수 있다.
 
-Direct geometry compatibility remains for unavailable indexed/nonindexed indirect
-capabilities. A missing prepared bin on a capable device is an error, not permission to
-silently switch a material to another shader or disable its effects. Mesh shaders/LOD are
-still optional optimizations; an accepted material can remain indexed GPU-driven.
+`GraphicsCompileIdentity`는 `visibleInstanceIds`, `geometryVisibility`, 실제 vertex mask와 permutation을 정확한 accepted generation에 보관한다. root-layout ID를 공유한다는 사실은 이 의미 계약을 공유한다는 증거가 아니다. 알 수 없는 native position 의미는 full draw 보존으로 제한하며 임의의 culling opt-in을 만들지 않는다.
 
-Fullscreen and compute operations, including volume integration/composite, lookup bakes,
-SSS filters and runtime depth copies, are algorithms rather than CPU-direct material
-fallbacks. Their existing work is not forced through geometry indirect commands.
+## 선택적 skin extent ABI
 
-Pre-existing unsupported features stay explicit: ShaderMeta material pipelines do not
-expose hull/domain/geometry stages, and scene media require the existing static closed
-boundary contract/budgets. This extension does not claim new tessellation or skinned media.
+`GBufferSkinPaletteExtentV1`은 엄격히 반사 검증한 b4의 4개 uint, 16-byte uniform이다. root index는 shader generation에 귀속된다. 이 opt-in은 palette 범위를 전달하는 계약이며, 자체적으로 deformation/culling 동등성을 인증하거나 custom instance bytes를 바꾸지 않는다.
 
-## Included standard skinning shader contract
+Graph 제품은 immutable topology와 현재 pose를 분리해 봉인하고 object-space geometry를 여러 instance에서 소비한다. [mesh surface](../design/MaterialGraphMeshSurface.md)와 [shared depth](../design/MaterialGraphSharedDepth.md)의 owner·pose·visibility 조건을 함께 확인해야 한다.
 
-The standard GBuffer shader and source wrappers that include it expose the optional
-`GBufferSkinPaletteExtentV1` constant buffer at b4/space0. Its reflected 16-byte layout is
-four uint32 fields: matrix count, version, and two reserved zero fields. The renderer
-accepts the exact field names/types/offsets and retains the optional root index with the
-immutable shader generation. It supplies version 1 and the actual sealed matrix count,
-not upload-allocation padding. Programs without this contract retain their prior layout.
+## coverage 판정 기준
 
-This uniform preserves standard skinning in non-compacted include wrappers without
-rewriting arbitrary custom instance padding or inferring semantics from filenames.
-Explicit instance bone counts are clamped to the available palette extent; legacy wrappers
-use the remaining extent. Active indices are checked before any matrix fetch. Declaring
-this storage-safety contract does not establish safe deformation bounds or enable culling.
+새 geometry opt-in에는 direct/indirect 결과의 ID·depth·색상 대응, 빈/전부 visible 집합, skin bounds, stale generation 거부, 현재 pose와 multi-instance를 포함한다. 보존 경로의 픽셀 통과와 압축 효율, occlusion의 보수성, 전체 모델 성능은 별도 판정이다.
 
-## Diagnostics and static review
+이전 PR 단계의 fixture 통과는 당시 backend와 입력에 한정된 기록이다. 현재 코드 연결을 확인했지만 GPU culling 정확성·성능 또는 모든 material permutation을 다시 실행하지 않았다.
 
-The debug view separately reports backend indirect capabilities, prepared compaction bins,
-preserved-stream bins, and conservative keep-visible inputs. These are preparation categories,
-not GPU-visible counts, culling rates or performance measurements.
+## 구현 근거
 
-Independent source reviews covered native instance identity and range preservation,
-Code/Graph ordering, empty special-effect captures, sealed skin inputs, procedural command
-ABI, graph dependencies and recording ownership. The nonindexed 16-byte command deliberately
-uses the compatible prefix of GPU-written 20-byte records with zero vertex/base-instance
-fields, one command per call and its original 20-byte record offset.
-
-No builds, tests, shader compilation, renderer execution, image comparisons or GPU timings
-were run. Runtime correctness, effect parity and performance acceptance remain unrun.
+- [`Engine/RenderEngine/GpuGeometryVisibility.cpp`](../../Engine/RenderEngine/GpuGeometryVisibility.cpp)
+- [`Engine/RenderEngine/GpuGeometryVisibility.h`](../../Engine/RenderEngine/GpuGeometryVisibility.h)
+- [`Engine/RenderEngine/LXMaterialPipeline.h`](../../Engine/RenderEngine/LXMaterialPipeline.h)
+- [`Engine/RenderEngine/MaterialGraphSceneHost.cpp`](../../Engine/RenderEngine/MaterialGraphSceneHost.cpp)
+- [`Engine/RenderEngine/MaterialGraphMeshSurface.cpp`](../../Engine/RenderEngine/MaterialGraphMeshSurface.cpp)

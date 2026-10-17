@@ -1,185 +1,39 @@
-# MAT-9 Blender / native image comparison
+# MAT-9 Blender 이미지 비교: 재현·판정·현재 범위
 
-2026-09-30. Matched **Core / Layered constant-input** image measurement, updated
-after the visible-spectrum thin-film implementation.
-MAT-9 remains in progress; these results do not close Special transport, the
-textured area-light/HDRI grid, route parity or performance acceptance.
+> 기준: `493536e300e274cbf59989cdd62b20310c8ae64f`의 코드·호출 연결 정적 검토. 이 문서 갱신에서는 빌드·GPU 실행·성능 측정을 수행하지 않았다.
 
-## Shared inputs and capture
+## 비교 대상
 
-- Blender **5.1.1 Cycles** (build `b70da489d7f4`), 64×64 perspective view, eye (0,0,3), 45° FOV,
-  no denoising, exposure zero, Raw view, 1,024 samples.
-- One shared imported sphere: Blender exports the exact triangle corner positions,
-  normals, active UV tangents and UVs consumed by native raster.
-- Twelve cases under a unit-irradiance directional light with no environment, then
-  under a unit-radiance white environment with no direct lights: **24 images**.
-- Ten MAT-0 Core/Layered authored constant-value cases plus an emission-only control
-  and a diffuse white / IOR=1 control. The `core_normal` case uses the default
-  geometry normal here; the MAT-0 normal texture is excluded from this measurement.
-- Native DX12 Release uses actual graph generation, complete Scene compilation,
-  immutable material instance, geometry sealing, SceneHost GBuffer/lookup/color and
-  shared depth. AO is neutral white; shadows, decals and post effects are excluded.
-- Native half-float lighting is read back and converted to bottom-up RGBA32F for
-  comparison with Blender scene-linear EXR pixels. No display transform is used
-  for metrics. The contact sheet applies the same sRGB display transform to both.
-- A common emission-control mask is eroded by two pixels. Every material uses this
-  same interior mask; highlight pixels are retained. Nonfinite values and changed
-  input/reference identities are rejected before error measurement.
+MAT-9의 목적은 Blender와 비슷한 노드 이름을 제공하는 것에서 더 나아가, 같은 geometry·normal/tangent·camera·light·material 입력의 pre-tone scene-linear 출력을 비교하는 것이다. tone mapping, display 변환, screenshot의 외관만으로 BSDF 오차를 판단하지 않는다. 고정 Cycles fixture, EEVEE/Material Preview, 실제 live split-sum renderer는 서로 다른 대상이다.
 
-The original `material-reference-5.1.1` area-light/HDRI fixture is preserved.
-The supplemental frozen reference is `Tools/blender/fixtures/material-matched-5.1.1`.
+현재 live Scene은 최종 split-sum lookup을 사용한다. 과거의 고비용 directional reference bake 이미지가 통과했다고 현재 화면이 같은 적분을 수행한다고 주장할 수 없다. [live/reference 차이](MAT9SplitSumLiveLookupDifference.md)를 함께 읽는다.
 
-## Comparison setup corrections
+## 측정 파이프라인
 
-Two apparent rendering errors came from differing inputs:
+`material_matched_reference.py`는 고정 Blender 입력과 manifest/geometry/reference pixels를 만든다. `measure-material-blender-images.ps1`은 manifest와 sphere 입력을 확인하고 고유 output directory를 요구하며 native probe를 빌드·실행한 뒤 Python 비교기를 부른다. 기존 label을 덮어쓰지 않는다. 이 스크립트는 읽기 전용 문서 검사 도구가 아니다.
 
-1. Blender BOX reconstruction ignores its RNA width and always uses a one-pixel
-   box. Native raster evaluates pixel centers. A 0.01-width Gaussian reference
-   isolates point shading; it does not verify anti-aliasing equivalence.
-2. Blender's unconnected anisotropy tangent is not the engine's imported UV tangent.
-   The matched reference explicitly links the active UV tangent. Generated/default
-   Blender tangent semantics are outside this particular comparison.
+`compare-material-blender-images.py`는 reference/native metadata와 hashes, 공통 emission-control coverage, normal/view 진단을 대조한다. 재질마다 유리한 mask를 고르지 않고 공통 내부를 2픽셀 침식한 영역을 사용한다. `reference-repeat`는 독립 seed의 noise를 구분하는 입력이다. 측정 완료 marker와 `materialAcceptance=pending`은 서로 모순이 아니다. 정상 측정과 목표 수용은 다른 단계다.
 
-Source checks used the pinned Blender
-[film synchronization](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/blender/sync.cpp),
-[shader nodes](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/scene/shader_nodes.cpp)
-and [closure setup](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/svm/closure.h).
-The geometry diagnostic additionally captures normal/view fields from the native
-lookup and emits Blender geometry normal/incoming fields independently.
+## 고정 공학 목표
 
-## Measured results
+relative RGB RMS ≤1%, normalized p95 ≤1%, normalized max ≤5%, 독립 reference seed RMS ≤0.25%를 유지한다. normalized error는 `abs(native-reference)/max(1,abs(reference))`다. 이 수치는 이 프로젝트의 고정 공학 gate이며 보편적인 지각/JND 기준이나 FPS 동등성 기준이 아니다.
 
-Relative RMS is `sqrt(sum((native-reference)^2) / sum(reference^2))` over the common
-interior RGB samples. It is not a frame-rate metric. Final results use
-345 interior pixels per image. Native DX12 **Debug and Release each** completed
-24 captures, 400,495 checks, zero GPU validation messages and normal shutdown.
-All 393,216 RGBA components of the 24 images are byte-identical across configurations.
+`assess-hdri-material-images.py`와 `assess-special-material-images.py`는 실제 pixel hash와 수치를 다시 확인하고, 다른 seed이되 같은 setup을 요구한다. diagnostic shader root, MIS 비활성화 또는 편의상 바꾼 subset을 제품 수용으로 올리지 않는다. exit 2는 정상 측정 뒤 목표 미달일 수 있으며 compile/GPU 실패와 구분한다.
 
-| Case | Directional relative RMS | Furnace relative RMS |
-|---|---:|---:|
-| Core base | 0.697% | 0.284% |
-| Core metal | 0.269% | 0.365% |
-| Core rough | 1.941% | 0.136% |
-| Core geometry normal | 0.760% | 0.119% |
-| Core emission | 0.045% | 0.104% |
-| Coat | 0.182% | 0.147% |
-| Sheen | 0.090% | 0.176% |
-| Anisotropy, explicit UV tangent | 0.937% | 1.019% |
-| Thin film, current Fourier LUT / F82 | **2.835%** | **1.352%** |
-| Mixed layers | 0.071% | 0.120% |
-| Emission-only control | **0.000%** | **0.000%** |
-| Diffuse white control | 0.045% | 0.066% |
+## 보존된 결과와 해석
 
-Small differences include the native BRDF/integration approximations, Monte Carlo
-noise and half-float lighting quantization. They must not all be attributed to one
-of those terms without an additional isolation test.
+- [GGX/박막 고정 on/off](MAT9GgxClosureComparison.md): 당시 제한된 조명·시야 범위의 수용
+- [HDRI 최종 고정 26조건](MAT9HdriConvergence.md): constant Core/Layered, 두 HDRI의 당시 수용
+- [Special Surface](MAT9SpecialProfileCorrection.md): 7/18, 전체 미수용
+- [bounded Volume](MAT9SpecialTransportComparison.md): 고정 단일 산란 사례의 당시 수용
 
-The historical RGB 650/550/450nm film baseline was **18.348% / 15.646%**.
-The current LUT, dielectric diffuse weighting and substrate Fss corrections reduce
-that difference to the table above. Non-film cases retain their previous values.
-See [thin-film implementation, dense spectral reference and GPU cost](MAT9ThinFilmAndEnvironment.md)
-for the separately measured contributions and approximation limits.
+JSON·PNG·numeric golden은 역사적 증거로 보존한다. 현재 revision/host/backend의 새 결과로 덮어쓰지 않았다. 원본 area-light grid, texture/factor/normal-map, Deferred/Forward route parity, extreme grazing, live split-sum과 실제 모델 품질·성능은 별도 gate로 남는다.
 
-### Reference noise isolation
+## 구현 근거
 
-A second complete Blender render used seed **11** instead of **0**, retaining the
-same mesh, inputs, 1,024 samples and render settings. Over the same comparison mask:
-
-- Directional maximum seed-to-seed relative RMS: **0.05802%** (Core metal).
-- Furnace maximum seed-to-seed relative RMS: **0.22359%** (thin film).
-- Thin film seed-to-seed: **0.00636%** directional / **0.22359%** furnace, compared
-  with current native/reference differences of 2.835% / 1.352% (historically
-  18.348% / 15.646% for RGB 3 wavelengths).
-- Core rough directional seed-to-seed: **0.00132%**, compared with 1.941% native
-  difference. That remaining direct-light difference cannot be explained by the
-  measured reference noise alone. Its BRDF/energy approximation needs separate judgment.
-
-This is one independent seed pair, not a statistical confidence interval or a
-universal convergence bound. It identifies the measured film difference as much
-larger than this reference's sampling variation.
-
-The current engine uses visible-spectrum Fourier sensitivity, three Airy orders
-and an F82 model at the film/metal interface. The residual difference remains above
-the measured seed variation. This is **not accepted rendered parity**; spectral
-order truncation, RGB optical reconstruction and the remaining BRDF approximations
-need material-specific acceptance bounds.
-See the pinned [Cycles Fresnel implementation](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_util.h)
-and [microfacet Fresnel](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_microfacet.h).
-
-## Reproduction and evidence
-
-```powershell
-& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup `
-  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/Mat9NewReference
-& Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label comparison
-# Independent reference noise measurement:
-& 'C:\Program Files\Blender Foundation\Blender 5.1\blender.exe' --background --factory-startup `
-  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/Mat9Repeat --seed 11
-& 'C:\Python313\python.exe' Tools/regression/compare-material-blender-images.py `
-  Tools/blender/fixtures/material-matched-5.1.1 Build/Obj/Mat9Images-Release-comparison/Native `
-  Build/Obj/Mat9Images-Release-comparison/comparison-with-noise.json --reference-repeat Build/Obj/Mat9Repeat
-```
-
-The script reports **measurement completion**, leaving material acceptance pending.
-It rejects existing output directories, uses the native GPU validation layer,
-restores its environment and never launches or modifies the user's live Editor.
-Reference and captured native triangle bytes and parsed graph values are checked
-against the manifest before comparison, in addition to the reference image hashes.
-
-Local evidence:
-
-- `Tools/blender/fixtures/material-matched-5.1.1`: frozen Blender source images and setup.
-- `Build/Obj/Mat9Images-Release-frozen-final` and `Mat9Images-Debug-frozen-final`:
-  historical RGB-3 native captures, inputs/geometry, build and validation logs.
-- `Build/Obj/Mat9Images-Release-film-spectral-v4` and
-  `Mat9Images-Debug-film-spectral-final`: current LUT captures and regression evidence.
-- `Build/Obj/Mat9MatchedReference-repeat-11`: independent seed-11 reference.
-- `Build/Obj/mat9-blender-comparison-frozen-final.json` and `.png`: metrics, reference
-  noise measurements and contact sheet.
-- Identity rejection checks: modified input value, triangle bytes, reference pixels
-  and an added case were all rejected; frozen input files were preserved.
-- Dashboard full parse: 435 entries, no malformed rows, all progress values finite.
-
-## Film sweep follow-up — 2026-10-01
-
-The [fixed eight-pair film sweep](MAT9ThinFilmAcceptance.md) adds 36 captures and an
-independent seed repeat. Only 4 of 16 film conditions meet the declared image target.
-The subnanometer double blend and 0.1nm cutoff have been corrected; the original
-550nm measurements above are unchanged. Mixed-metal film-off controls also show
-large residuals. Common metal/dielectric attenuation and GGX compensation must be
-resolved before rendered acceptance; increasing a tolerance is not a fix.
-
-The subsequent [GGX closure comparison](MAT9GgxClosureComparison.md) resolves those
-common terms and the Scene Core fallback. The same fixed film/off inputs now pass
-16/16 film and 16/16 off conditions under the unchanged targets. The values above
-remain the earlier measurement, not the current shader result.
-
-## Next required work
-
-The historical [HDRI follow-up](MAT9HdriImageComparison.md) did not accept parity.
-The subsequent [full HDRI convergence](MAT9HdriConvergence.md) passes the fixed
-forest/autumn constant-material 26 conditions under the unchanged image/noise targets.
-This does not close the original textured grid or the unimplemented area-light consumer.
-
-The [Special follow-up](MAT9SpecialTransportComparison.md) accepts eight fixed
-homogeneous single-scattering Volume conditions after matching the reference transport
-and capturing the final product Volume composite. Transmission/SSS remain unaccepted;
-the initial 24-condition reference is diagnostic, and Scene alpha blending is rejected.
-
-The subsequent [Special Surface correction](MAT9SpecialProfileCorrection.md) fixes
-Scene artist-radius units and grazing-angle residency rejection. Two 131072-sample
-references converge under the existing noise bound; the final product passes only
-7/18 fixed Surface conditions. Directional SSS RMS improves from 6.2598% to 4.1009%,
-while mixed directional SSS slightly worsens and furnace SSS is unchanged. Full-image
-zero-scale/off controls pass after removing the edge error colors. Transmission and
-SSS spatial-response acceptance remain pending.
-
-1. Correct transmission boundary and SSS spatial-response differences, converge their
-   independent references and recheck the same image/noise targets. Verify a real
-   blended-composition path for the existing alpha/transmission criterion.
-2. Measure texture-only, factor-times-texture and normal-map reference scenes with
-   shared supported geometry/background/transport conditions and explicit approximation limits.
-3. Continue Deferred/Forward parity and moving-camera/tier/cold-warm performance
-   acceptance, including the increased environment integration cost on actual models.
-4. Implement and measure the original area-light ABI/consumer and grid. Fixed constant
-   film/off, HDRI and bounded Volume results do not establish parity at every scene/angle.
+- [`Tools/blender/material_matched_reference.py`](../../Tools/blender/material_matched_reference.py)
+- [`Tools/regression/measure-material-blender-images.ps1`](../../Tools/regression/measure-material-blender-images.ps1)
+- [`Tools/regression/compare-material-blender-images.py`](../../Tools/regression/compare-material-blender-images.py)
+- [`Tools/regression/assess-hdri-material-images.py`](../../Tools/regression/assess-hdri-material-images.py)
+- [`Tools/regression/assess-special-material-images.py`](../../Tools/regression/assess-special-material-images.py)
+- [`Tools/regression/material_matched_image_probe.cpp`](../../Tools/regression/material_matched_image_probe.cpp)
