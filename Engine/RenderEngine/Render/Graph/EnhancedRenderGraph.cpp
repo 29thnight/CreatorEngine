@@ -2748,9 +2748,9 @@ void EnhancedRenderGraph::DeclareRecordingIndependent(RGPassId pass)
 {
     RequireQueueIdle();
     if (!pass.IsValid() || pass.index >= m_passes.size() || m_compiled ||
-        m_passes[pass.index].recordingSideEffect || m_passes[pass.index].splitExecute)
+        m_passes[pass.index].recordingSideEffect)
     {
-        throw std::logic_error("Independent recording requires an unsplit pass without external CPU side effects before compilation");
+        throw std::logic_error("Independent recording requires a pass without external CPU side effects before compilation");
     }
     m_passes[pass.index].recordingIndependent = true;
 }
@@ -3878,12 +3878,12 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                 predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
             }
             std::vector<uint32_t> passWave(m_passes.size()), targetWave(workers);
-            std::vector<uint32_t> passSingleTarget(m_passes.size());
+            std::vector<uint32_t> passCompletionTarget(m_passes.size());
             const auto planWaves = [&](const std::vector<uint32_t>& targets, std::vector<uint32_t>& waves)
             {
                 std::ranges::fill(std::span{passWave}, 0u);
                 std::ranges::fill(std::span{targetWave}, 0u);
-                std::ranges::fill(std::span{passSingleTarget}, UINT32_MAX);
+                std::ranges::fill(std::span{passCompletionTarget}, UINT32_MAX);
                 uint32_t count = 1;
                 for (size_t begin = 0; begin < unitCount;)
                 {
@@ -3894,19 +3894,32 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     }
                     const auto pass = executeOrder[units[begin].order];
                     uint32_t wave = 0;
-                    const uint32_t singleTarget = end - begin == 1 ? targets[begin] : UINT32_MAX;
+                    // 배분은 연속 블록이다. 여러 조각도 한 리스트에 모였으면 앞선
+                    // 콜백이 같은 워커에서 먼저 끝나므로 별도 합류가 필요 없다.
+                    const uint32_t singleTarget = targets[begin] == targets[end - 1] ? targets[begin] : UINT32_MAX;
                     for (const auto producer : std::span{predecessors[pass]})
                     {
-                        // Unannotated/split consumers retain CPU joins. Independent
-                        // GPU consumers still keep all GPU list order/barriers.
-                        const uint32_t join = singleTarget != UINT32_MAX &&
-                            (passSingleTarget[producer] == singleTarget || m_passes[pass].recordingIndependent) ? 0u : 1u;
+                        // 분할 가능 여부와 CPU 독립성은 다른 계약이다. 작성자가 모든
+                        // 조각의 독립성을 보장할 때만 GPU 의존성의 추가 CPU 합류를 뺀다.
+                        const uint32_t join = m_passes[pass].recordingIndependent ||
+                            (singleTarget != UINT32_MAX && passCompletionTarget[producer] == singleTarget) ? 0u : 1u;
                         wave = (std::max)(wave, passWave[producer] + join);
                     }
-                    passSingleTarget[pass] = singleTarget;
                     for (size_t i = begin; i < end; ++i)
                     {
                         wave = (std::max)(wave, targetWave[targets[i]]);
+                    }
+                    // 독립 콜백을 사이에 둔 선행 CPU 작업도 보존한다. 같은 차례의
+                    // 선행 패스가 다른 target에 남아 있으면, 뒤의 미선언 소비자는
+                    // 자기 직전 콜백과 같은 target이어도 전체 합류가 필요하다.
+                    passCompletionTarget[pass] = singleTarget;
+                    for (const auto producer : std::span{predecessors[pass]})
+                    {
+                        if (passWave[producer] == wave && passCompletionTarget[producer] != singleTarget)
+                        {
+                            passCompletionTarget[pass] = UINT32_MAX;
+                            break;
+                        }
                     }
                     for (size_t i = begin; i < end; ++i)
                     {

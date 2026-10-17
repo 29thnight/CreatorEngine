@@ -1,6 +1,7 @@
 #include "material_owner_checks.h"
 #include "MaterialGraphMeshSurface.h"
 #include "support/MaterialGraphScenePacket.h"
+#include "support/CookedMeshFixture.h"
 #include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -435,14 +436,28 @@ Geometry LargeGeometry(unsigned mask)
 
 void VerifyPartition(const Geometry& geometry, const MeshSurfacePlan& plan, unsigned limit)
 {
+    const auto& sourceView = geometry.draw.modelMeshView;
+    Check(sourceView.IsComplete(), "Partition source has a complete admitted geometry view");
     unsigned triangle = 0;
     std::uint64_t points = 0;
     for (const auto& chunk : plan.Chunks())
     {
         const auto& input = *chunk.input;
         const auto& local = input.Geometry();
-        Check(local.IsComplete() && input.Count() <= limit && chunk.sourceVertices.size() == input.Count(),
+        // 봉인된 청크는 바이트를 복사하고 원래 자산의 빌린 포인터를 제거한다.
+        // 외부 descriptor/payload의 admission 대신 복사본의 배치와 소유권을 검사한다.
+        Check(local.vertexData && local.indexData && input.Count() > 0 && input.Count() <= limit &&
+                  local.vertexBytes == uint64_t(input.Count()) * sourceView.vertexStride &&
+                  local.vertexStride == sourceView.vertexStride &&
+                  local.vertexAttributeMask == sourceView.vertexAttributeMask &&
+                  local.vertexLayoutHash == sourceView.vertexLayoutHash &&
+                  local.indexCount > 0 && local.indexCount % 3 == 0 &&
+                  chunk.sourceVertices.size() == input.Count(),
               "Complete bounded partition");
+        Check(!local.sourceGeneration && !local.sourceDescriptor && !local.sourcePayload &&
+                  local.sourceMeshIndex == UINT32_MAX && local.vertexData != sourceView.vertexData &&
+                  local.indexData != sourceView.indexData,
+              "Partition owns copied bytes without borrowed asset provenance");
         Check(chunk.firstTriangle == triangle, "Contiguous original triangle order");
         Check(local.handle == geometry.draw.modelMeshView.handle, "Partition generation identity");
         for (unsigned i = 0; i < input.Count(); ++i)
@@ -484,6 +499,13 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
               "Deterministic partition identity");
         std::vector<float> sceneLods(geometry.lods.size(), 0.f);
         std::shared_ptr<const MeshSurfacePlan> sceneFirst, sceneNext;
+        const auto looseDraw = geometry.draw;
+        Check(!MeshSurfacePlan::BuildForScene(looseDraw, view, sceneLods, {}, sceneFirst, error) && !sceneFirst,
+              "Scene admission rejects uncooked fixture topology");
+        CookedMeshFixture cooked;
+        const bool cookedScene = CookMeshFixture(looseDraw.modelMeshView, cooked, error);
+        Check(cookedScene, "Scene partition fixture cooking: " + error);
+        geometry.draw.modelMeshView = cooked.view;
         Check(MeshSurfacePlan::BuildForScene(geometry.draw, view, sceneLods, {}, sceneFirst, error),
               "Scene partition first seal: " + error);
         auto nextView = view;
@@ -527,6 +549,7 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
         Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, rasterBudget, same, error),
               "IBL batch retains its original compute point limit");
         geometry.lods = originalLods;
+        geometry.draw = looseDraw;
         MeshSurfacePlanBudget budget;
         budget.maxCpuPayloadBytes = large->Cost().cpuPayloadBytes;
         budget.maxGpuPayloadBytes = large->Cost().gpuPayloadBytes;
@@ -830,6 +853,20 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
     std::fill(geometry.lods.begin(), geometry.lods.end(), 0.f);
     const auto baseline = evaluator.CacheStats();
     std::string error;
+    std::array<CookedMeshFixture, 2> cookedGeometry;
+    for (auto& cooked : cookedGeometry)
+    {
+        const bool cookedScene = CookMeshFixture(geometry.draw.modelMeshView, cooked, error);
+        Check(cookedScene, "Resident fixture cooking: " + error);
+    }
+    // 새 granular 신원은 별도 descriptor로 게시한다. handle.generation만 바꾸면
+    // 유효한 교체 신원이 아니라 원본 descriptor와 불일치하는 입력이 된다.
+    ++cookedGeometry[1].descriptor->origin.resolverRevision;
+    Check(BuildRHIModelMeshView(*cookedGeometry[1].descriptor, *cookedGeometry[1].payload, cookedGeometry[1].view),
+          "Resident replacement has a valid new cooked identity");
+    Check(cookedGeometry[0].view.handle != cookedGeometry[1].view.handle,
+          "Resident replacement changes geometry identity without changing bytes");
+    geometry.draw.modelMeshView = cookedGeometry[0].view;
     thread_pool recordingThreads;
     job_scheduler recordingJobs(recordingThreads);
     recordingJobs.start(4);
@@ -841,7 +878,10 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
     {
         if (frame == 2) geometry.draw.worldMatrix.m[3][0] += .25f;
         if (frame == 3) geometry.bones[0].m[3][1] += .4f;
-        if (frame == 5) ++geometry.draw.modelMeshView.handle.generation;
+        if (frame == 5)
+        {
+            geometry.draw.modelMeshView = cookedGeometry[1].view;
+        }
         ++view.viewRevision;
         view.eye[0] += .1f;
         std::shared_ptr<const MeshSurfacePlan> plan;
@@ -862,7 +902,7 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
         if (frame == 1 || frame == 4)
             Check(batch->Buffer() == previousOutput, "Unchanged pose reuses completed world geometry across views");
         else if (frame)
-            Check(batch->Buffer() != previousOutput, "World, bones and generation invalidate transformed output");
+            Check(batch->Buffer() != previousOutput, "World, bones and cooked identity invalidate transformed output");
         Check(batch->View().viewRevision == view.viewRevision && batch->View().eye == view.eye,
               "Reused geometry retains fresh view metadata");
         previousOutput = batch->Buffer();
@@ -919,7 +959,7 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
         device.ReleaseReadback(indices);
     }
     Check(evaluator.CacheStats().uploads == baseline.uploads + 2 && evaluator.CacheStats().hits >= baseline.hits + 4,
-          "Only geometry generation changes reupload static input");
+          "Only cooked geometry identity changes reupload static input");
     Check(evaluator.CacheStats().transforms == baseline.transforms + 4 &&
           evaluator.CacheStats().transformHits == baseline.transformHits + 2,
           "Transform cache dispatches only changed geometry/pose/world");
@@ -1478,19 +1518,27 @@ void GraphAdmissionTests(RecordingChangeDevice& device)
         {
             Check(device.CreateBuffer(description, buffer, error), "Recording dependency buffer");
         }
-        std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>, 2> schedules;
-        for (unsigned iteration = 0; iteration < 4; ++iteration)
+        std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>, 6> schedules;
+        for (unsigned iteration = 0; iteration < 12; ++iteration)
         {
-            const bool independent = iteration % 2 != 0;
+            const unsigned policy = iteration % static_cast<unsigned>(schedules.size());
+            const bool transitive = policy >= 4;
+            const bool independent = transitive || (policy & 1) != 0;
+            const bool split = policy == 2 || policy == 3 || policy == 5;
+            const uint32_t requestedSlices = split ? (transitive ? 2u : 4u) : 1u;
+            const uint32_t requestedWorkers = transitive ? 2u : 4u;
             Check(device.BeginFrame(error), "Recording dependency begin");
             pool.BeginFrame(iteration);
             auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
-            graph->SetRecordingWorkloadBalance(true);
+            // 연속 target 두 개로 A와 B→C를 분리해, 독립 B가 같은 target의
+            // 미선언 C에게 A의 CPU 완료를 대신 보장할 수 없음을 강제한다.
+            graph->SetRecordingWorkloadBalance(!transitive);
             graph->SetParallelRecordCostThreshold(0);
-            graph->InheritStructuralSchedule(schedules[independent ? 1 : 0] ? schedules[independent ? 1 : 0] :
-                schedules[independent ? 0 : 1]);
+            graph->InheritStructuralSchedule(schedules[policy] ? schedules[policy] : schedules[policy ^ 1]);
             std::array<RGHandle, 8> handles{};
-            std::array<unsigned, 8> calls{};
+            std::array<unsigned, 7> producerCalls{};
+            std::array<unsigned, 4> consumerCalls{};
+            unsigned tailCalls = 0;
             std::atomic<unsigned> published{0};
             for (unsigned index = 0; index < handles.size(); ++index)
             {
@@ -1508,35 +1556,89 @@ void GraphAdmissionTests(RecordingChangeDevice& device)
                         std::this_thread::sleep_for(std::chrono::milliseconds(1));
                         published.store(7, std::memory_order_release);
                     }
-                    ++calls[index];
+                    ++producerCalls[index];
                 }, 1, true, 1);
             }
-            const auto consumer = graph->AddPass("Dependency.Consumer", {
-                {handles[0], RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {handles[7], RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [&, independent](const auto&)
+            const auto recordConsumer = [&](uint32_t slice)
             {
                 if (!independent && published.load(std::memory_order_acquire) != 7)
                 {
                     throw std::runtime_error("CPU producer was not joined before its dependent callback");
                 }
-                ++calls[7];
+                ++consumerCalls[slice];
+            };
+            std::vector<EnhancedRenderGraph::RGPassUsage> consumerUsages{
+                {handles[0], RHIResourceState::ShaderResource, RGAccessMode::Read},
+                {handles[7], RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
+            const auto consumer = split ? graph->AddSplitPass("Dependency.Consumer", std::move(consumerUsages),
+                [&](const auto&, uint32_t slice, uint32_t sliceCount)
+            {
+                if (sliceCount != requestedSlices || slice >= requestedSlices)
+                {
+                    throw std::runtime_error("Recording dependency fixture requires its declared disjoint slices");
+                }
+                recordConsumer(slice);
+            }, requestedSlices, true) :
+                graph->AddPass("Dependency.Consumer", std::move(consumerUsages), [&](const auto&)
+            {
+                recordConsumer(0);
             }, true);
             if (independent)
             {
                 graph->DeclareRecordingIndependent(consumer);
+                bool rejected = false;
+                try
+                {
+                    graph->DeclareRecordingSideEffect(consumer);
+                }
+                catch (const std::logic_error&)
+                {
+                    rejected = true;
+                }
+                Check(rejected, "Independent callbacks and slices cannot declare external CPU side effects");
+            }
+            if (transitive)
+            {
+                graph->AddPass("Dependency.TransitiveConsumer", {
+                    {handles[7], RHIResourceState::ShaderResource, RGAccessMode::Read}}, [&](const auto&)
+                {
+                    if (published.load(std::memory_order_acquire) != 7)
+                    {
+                        throw std::runtime_error("Independent intermediate callback lost an ancestor CPU join");
+                    }
+                    ++tailCalls;
+                }, true);
             }
             Check(graph->Compile(error), "Recording dependency compile: " + error);
-            schedules[independent ? 1 : 0] = graph->SnapshotStructuralSchedule();
+            if (iteration >= schedules.size())
+            {
+                Check(graph->GetStats().structuralScheduleReused,
+                      "Unsplit/split CPU dependency policies reuse only their exact structural schedule");
+            }
+            schedules[policy] = graph->SnapshotStructuralSchedule();
             RHIRecordedBatchDesc batchDescription;
             batchDescription.frameId = iteration + 1;
             batchDescription.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&device);
             batchDescription.lifetimeToken = graph;
             RHIRecordedBatch batch;
-            Check(graph->RecordParallel(pool, 4, batchDescription, batch, error), "Recording dependency record: " + error);
-            Check(graph->GetStats().recordingWaveCount == (independent ? 1u : 2u),
-                  "Cold/reused recording plans preserve CPU joins and changed independence contracts");
-            Check(std::ranges::all_of(calls, [](unsigned count) { return count == 1; }),
-                  "Critical-path partition records every callback exactly once");
+            Check(graph->RecordParallel(pool, requestedWorkers, batchDescription, batch, error),
+                  "Recording dependency record: " + error);
+            const auto& stats = graph->GetStats();
+            const uint32_t expectedUnits = 7u + requestedSlices + (transitive ? 1u : 0u);
+            Check(stats.recordingWaveCount == (independent && !transitive ? 1u : 2u) &&
+                      stats.recordUnits == expectedUnits && stats.recordWorkers == requestedWorkers,
+                  "Cold/reused unsplit and split recording plans preserve explicit CPU joins");
+            Check(!independent || stats.recordingJobDispatchCount == (transitive ? 2u : 1u),
+                  "Independent slices avoid extra dispatches while unannotated descendants retain ancestor joins");
+            Check(std::ranges::all_of(producerCalls, [](unsigned count) { return count == 1; }),
+                  "Critical-path partition records every producer exactly once");
+            bool exactConsumer = true;
+            for (size_t slice = 0; slice < consumerCalls.size(); ++slice)
+            {
+                exactConsumer = exactConsumer && consumerCalls[slice] == (slice < requestedSlices ? 1u : 0u);
+            }
+            Check(exactConsumer && tailCalls == (transitive ? 1u : 0u),
+                  "Every consumer slice has one private observation after the full recording join");
             RHISubmissionTicket ticket;
             Check(GetRHISubmissionThread().EnqueueRecordedBatch(&device, device, std::move(batch), ticket, error),
                   "Recording dependency enqueue: " + error);
@@ -1685,6 +1787,10 @@ void Run(const std::filesystem::path& root)
         const auto partition = PartitionTests(view);
         VerifyPartitionGpu(device, meshEvaluator, *partition);
         auto rasterGeometry = LargeGeometry(assets::kModelVertexMasks.back());
+        CookedMeshFixture cookedRaster;
+        const bool cookedScene = CookMeshFixture(rasterGeometry.draw.modelMeshView, cookedRaster, error);
+        Check(cookedScene, "Large raster fixture cooking: " + error);
+        rasterGeometry.draw.modelMeshView = cookedRaster.view;
         MeshSurfacePlanBudget rasterBudget;
         rasterBudget.maxChunkPoints = rasterBudget.maxSourceVertices;
         std::shared_ptr<const MeshSurfacePlan> rasterPlan;

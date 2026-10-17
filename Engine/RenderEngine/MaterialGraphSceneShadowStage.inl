@@ -68,7 +68,7 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     NormalizeSceneReads(graph, uses);
     const auto statisticsSlot = cascade * 2 + (staticCasters ? 0 : 1);
     const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
-    graph.AddSplitPass(name, std::move(uses),
+    const auto pass = graph.AddSplitPass(name, std::move(uses),
         [frame, commands, depth, slice, count, statisticsSlot](const auto& execution,
                                                             uint32_t recordSlice, uint32_t sliceCount) {
         frame->CheckCurrent(execution.graph);
@@ -119,7 +119,10 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
             statistics.buckets += recordedBuckets;
             statistics.commands += recordedCommands;
         }
-    }, (std::min)(FrameInput::kMaxRasterRecordingSlices, (std::max)(1u, bucketCount)), false, bucketCount);
+    }, FrameInput::RasterRecordingSlices(bucketCount), false, bucketCount);
+    // 명령/기하 입력은 밀봉되어 있다. 통계는 cascade/static/slice 전용 슬롯에
+    // 기록하며 occluder는 통계를 쓰지 않는다. 합산은 전체 recording join 뒤다.
+    graph.DeclareRecordingIndependent(pass);
     return depth;
 }
 

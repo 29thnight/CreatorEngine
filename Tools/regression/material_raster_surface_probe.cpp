@@ -12,6 +12,7 @@
 #include "support/CookedMeshFixture.h"
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphSceneHost.h"
+#include "MaterialGraphSceneAccess.h"
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphSceneCompiler.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
@@ -1700,12 +1701,90 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
     }
 }
 
+void VerifySceneReadNormalization(RecordingChangeDevice& device)
+{
+    using Usage = EnhancedRenderGraph::RGPassUsage;
+    const auto sameUsage = [](const Usage& left, const Usage& right) {
+        return left.handle.index == right.handle.index && left.handle.version == right.handle.version &&
+            left.handle.kind == right.handle.kind && left.handle.epoch == right.handle.epoch &&
+            left.state == right.state && left.access == right.access;
+    };
+    EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
+    for (const uint16_t count : {uint16_t{1}, uint16_t{32}, uint16_t{257}})
+    {
+        std::vector<Usage> expected;
+        for (uint16_t index = 0; index < count; ++index)
+        {
+            expected.push_back({RGHandle{index, uint16_t(index % 3), RGResourceKind::Texture, 31},
+                                RHIResourceState::ShaderResource, RGAccessMode::Read});
+        }
+        auto uses = expected;
+        for (auto& use : uses)
+        {
+            use.state = RHIResourceState::PixelShaderResource;
+        }
+        for (size_t remaining = expected.size(); remaining > 0; --remaining)
+        {
+            uses.push_back(expected[remaining - 1]);
+        }
+        NormalizeSceneReads(graph, uses);
+        Check(std::ranges::equal(uses, expected, sameUsage),
+              "Scene reads preserve first order and merge compatible states across small and large pass sets");
+    }
+    const std::vector<Usage> identities{
+        {RGHandle{7, 2, RGResourceKind::Texture, 31}, RHIResourceState::ShaderResource, RGAccessMode::Read},
+        {RGHandle{7, 3, RGResourceKind::Texture, 31}, RHIResourceState::ShaderResource, RGAccessMode::Read},
+        {RGHandle{7, 2, RGResourceKind::Buffer, 31}, RHIResourceState::ShaderResource, RGAccessMode::Read},
+        {RGHandle{7, 2, RGResourceKind::Texture, 32}, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+    auto uses = identities;
+    uses.insert(uses.end(), identities.begin(), identities.end());
+    NormalizeSceneReads(graph, uses);
+    Check(std::ranges::equal(uses, identities, sameUsage),
+          "Scene reads retain distinct versions, kinds and epochs for graph validation");
+    for (unsigned failure = 0; failure < 2; ++failure)
+    {
+        auto invalid = identities;
+        auto duplicate = identities.front();
+        if (failure == 0)
+        {
+            duplicate.access = RGAccessMode::ReadWrite;
+        }
+        else
+        {
+            duplicate.state = RHIResourceState::CopySource;
+        }
+        invalid.push_back(duplicate);
+        const auto original = invalid;
+        bool rejected = false;
+        try
+        {
+            NormalizeSceneReads(graph, invalid);
+        }
+        catch (const std::runtime_error&)
+        {
+            rejected = true;
+        }
+        Check(rejected && std::ranges::equal(invalid, original, sameUsage),
+              "Scene read normalization rejects conflicting access/state without changing the input");
+    }
+    EnhancedRenderGraph legacy(device, RGSchedulingMode::DeclarationOrder);
+    uses = {identities.front(), identities.front()};
+    uses[1].access = RGAccessMode::Write;
+    const auto original = uses;
+    NormalizeSceneReads(legacy, uses);
+    Check(std::ranges::equal(uses, original, sameUsage), "Declaration-order scene usages remain unchanged");
+    uses.clear();
+    NormalizeSceneReads(graph, uses);
+    Check(uses.empty(), "Empty scene usage normalization is valid");
+}
+
 void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                           RenderBindingCache& bindings, RasterSurfaceCollector& collector, SurfaceEvaluator& evaluator,
                           IblBaker& baker, own::shared_owner<const Instance> instance, own::shared_owner<const Texture> cube,
                           const RasterSurfaceRequest& request,
                           std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources)
 {
+    VerifySceneReadNormalization(device);
     for (unsigned failure = 0; failure < 6; ++failure)
     {
         std::string error;

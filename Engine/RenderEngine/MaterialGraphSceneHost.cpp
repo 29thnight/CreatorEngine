@@ -346,6 +346,14 @@ struct SceneHost::FrameInput
         uint32_t buckets{};
     };
     static constexpr uint32_t kMaxRasterRecordingSlices = 4;
+    static uint32_t RasterRecordingSlices(uint32_t bucketCount)
+    {
+        // 작은 버킷 묶음을 쪼개면 encoder 설정과 recording unit만 늘어난다.
+        // 기존 전체 병렬 진입 기준을 조각당 최소 배치 수로 보수적으로 재사용한다.
+        // 최적 교차점의 실측값은 아니며, 다른 패스와의 병렬 기록은 유지한다.
+        const auto slices = bucketCount / EnhancedRenderGraph::kParallelRecordCostThreshold;
+        return std::clamp(slices, 1u, kMaxRasterRecordingSlices);
+    }
     // Each split callback owns one cache line. Readers reduce only after the
     // graph joins; static-cache and final dynamic raster keep separate slots.
     mutable std::array<std::array<ShadowRecordingStats, kMaxRasterRecordingSlices>, 6> shadowRecordingStats{};
@@ -2622,7 +2630,7 @@ void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own:
     }
     NormalizeSceneReads(graph, uses);
     const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
-    graph.AddSplitPass(
+    const auto pass = graph.AddSplitPass(
         hybrid->name + ".HW", std::move(uses),
         [frame, hybrid, list, commands, occluder](const auto& execution, uint32_t slice, uint32_t sliceCount) {
             frame->CheckCurrent(execution.graph);
@@ -2670,7 +2678,10 @@ void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own:
                          recordedPipeline.id, submitted.geometry->MeshletCount(), true, true});
                 }
             }
-        }, (std::min)(FrameInput::kMaxRasterRecordingSlices, (std::max)(1u, bucketCount)), false, bucketCount);
+        }, FrameInput::RasterRecordingSlices(bucketCount), false, bucketCount);
+    // GPU 목록/명령은 제출 순서로 동기화한다. CPU 입력은 밀봉되어 있고,
+    // final HW만 slice별 audit에 쓰며 관측자는 전체 recording join 뒤에 읽는다.
+    graph.DeclareRecordingIndependent(pass);
 }
 
 std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::CameraMeshletWork() const

@@ -442,6 +442,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                 predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
             }
             std::vector<uint32_t> passWave(m_passes.size(), 0), targetWave(targets.size(), 0);
+            std::vector<uint32_t> passCompletionTarget(m_passes.size(), UINT32_MAX);
             uint32_t waveCount = 1;
             for (size_t begin = 0; begin < units.size();)
             {
@@ -452,11 +453,17 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                 }
                 const uint16_t pass = units[begin].pass;
                 uint32_t wave = 0;
+                const uint32_t singleTarget = units[begin].target == units[end - 1].target
+                    ? units[begin].target : UINT32_MAX;
                 if (pass != UINT16_MAX)
                 {
-                    for (const auto producer : predecessors[pass])
+                    for (const auto producer : std::span{predecessors[pass]})
                     {
-                        wave = (std::max)(wave, passWave[producer] + 1);
+                        // 단일 큐 기록과 같은 작성자 계약이다. GPU 큐 대기와 제출
+                        // 순서는 유지하고, 독립 조각 때문에 CPU 합류만 늘리지 않는다.
+                        const uint32_t join = m_passes[pass].recordingIndependent ||
+                            (singleTarget != UINT32_MAX && passCompletionTarget[producer] == singleTarget) ? 0u : 1u;
+                        wave = (std::max)(wave, passWave[producer] + join);
                     }
                 }
                 for (size_t index = begin; index < end; ++index)
@@ -470,6 +477,17 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                 }
                 if (pass != UINT16_MAX)
                 {
+                    // 독립 패스가 선행 CPU 작업의 완료를 대신하지 않는다. 뒤의
+                    // 미선언 소비자까지 같은 차례의 모든 선행 target을 전파한다.
+                    passCompletionTarget[pass] = singleTarget;
+                    for (const auto producer : std::span{predecessors[pass]})
+                    {
+                        if (passWave[producer] == wave && passCompletionTarget[producer] != singleTarget)
+                        {
+                            passCompletionTarget[pass] = UINT32_MAX;
+                            break;
+                        }
+                    }
                     passWave[pass] = wave;
                 }
                 waveCount = (std::max)(waveCount, wave + 1);
