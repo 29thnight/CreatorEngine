@@ -86,7 +86,36 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 <nav><a href="#validation-current">현재 검증</a> · <a href="#pipeline-overview">배선도</a> · <a href="#shadow-wiring">그림자</a> · <a href="#gpu-distribution">GPU 작업 분배</a> · <a href="#geometry-compression">기하 압축</a> · <a href="#remaining-work">남은 작업</a></nav>
 </header>
 <details id="performance-debug-20261017"><summary>이전 호스트의 최초 성능 측정 · 보관</summary><h2>Debug CreatorRobot 플레이 성능 · 120 FPS 미달</h2><p>2026-10-17: 1186×514 Scene+Game 두 뷰·unlimited·native·15초 기록. Game 뷰 CPU 제출 빈도 3.21회/초, 제출 중앙값 107.78ms / p95 125.87ms. GPU 계측 구간 합집합 중앙값 34.75ms. 빈 장면 Game 제출 빈도는 50.12회/초. 실제 화면 표시 FPS·단일 뷰·1080p 수용은 별도다. CPU MaterialGraphScenePrepare 58.16ms와 RenderGraphBuild 25.89ms, GPU 그림자 컬링을 우선 조사한다. 기록·모델 출력 검사와 정상 종료는 통과했다. <a href="../../Artifacts/performance-debug-20261017/report.html">측정 조건·결과·증거</a></p></details>
-<section id="validation-current"><div id="performance-scheduler-quantum-20261018"><h2>2026-10-18 · Quantum·CPU 배치·전경·엔진 풀 검증</h2>
+<section id="validation-current">
+<div id="performance-resync5-followup-20261018">
+<h2>2026-10-18 · 5차 재분석과 준비·조회·ETW 경계 보완</h2>
+<p><b>기준은 PR #179 병합 뒤 진단·측정 결과를 반영한 <code>9af4d7649f09a060d60ce22dd1167625b7d28744</code>다.</b> 저장소의 <a href="#performance-resync4-repeat-20261018">PR #179 후 재측정</a>, <a href="#performance-ready-delay-20261018">Ready 경계 정정</a>, <a href="#performance-scheduler-quantum-20261018">최종 전경·worker·우선순위 실험</a>을 현재 소스와 대조했다. 저장소에 없는 원본 ETL·덤프를 다시 읽은 결과는 아니다. 기존 구조 캐시 8개·기록 계획 16개·usage 저장 공간 재사용·null SRV 일괄 복사와 사용자가 추가한 진단은 이 기준에 포함된다.</p>
+<h3>기존 수정의 확인과 남은 비용</h3>
+<p>PR #179 반영 후 비추적 Game p50/p95/최대는 <b>14.380/16.059/18.339ms</b>, 기록 ON/OFF의 두 뷰 완료 합계는 <b>50.241/51.037회/초</b>였다. 새 null 표 회귀도 두 장치 수명·네 recording·8개 표의 <b>131,072 GPU 성분, validation=0</b>으로 통과했다. 시간상 직전 표본보다 수치는 좋아졌지만, 같은 세션 기준 A/B·개별 수정의 단독 효과·장시간 최대 지연 제거를 입증한 측정은 아니다.</p>
+<p>이전 75.854ms 프레임의 정확한 native 경계는 <b>Running 20.250 + Ready 51.739 + Waiting 3.865ms</b>다. WPA 주변 창의 Ready 52.575ms를 이 프레임의 값으로 쓰지 않는다. 별도 29.672ms Ready 구간의 외부 CPU 경쟁도 관측됐지만, 당시 affinity/CPU sets·전경의 전체 이력이나 고정 quantum·동순위 Ready 큐 선택은 확정되지 않았다. 이 증거를 이전 ETW OFF 172.473ms 프레임의 원인으로 소급하지 않는다.</p>
+<div class="table-wrap"><table><thead><tr><th>동일 최종 DLL · 기본 8 worker · 실제 Editor 전경 · override auto</th><th>ETW OFF Game p50 / p95 / 최대 ms</th><th>ETW OFF 기록 ON / OFF · 완료 뷰/s</th><th>ETW ON 기록 ON / OFF · 완료 뷰/s</th></tr></thead><tbody>
+<tr><td>Normal</td><td>14.608 / 16.707 / 19.563</td><td>48.791 / 51.839</td><td>44.360 / 47.369</td></tr>
+<tr><td>AboveNormal</td><td>14.611 / 16.809 / 19.340</td><td>48.385 / 52.044</td><td>43.719 / 47.792</td></tr>
+<tr><td>Normal 반복</td><td>14.522 / 17.116 / 21.581</td><td>48.521 / 51.274</td><td>미수집</td></tr>
+</tbody></table></div>
+<p><b>worker 축소와 우선순위 상승은 제품 정책으로 채택하지 않는다.</b> 최종 ETW는 기록 ON 30초/OFF 15초, 비추적 ON/OFF는 각 15초이고 Normal 반복은 ETW가 없다. 이전 60초 수집의 최대값과 단순 비교하지 않는다. 완료 뷰/s는 Scene+Game 합계이며 표시 FPS가 아니다. 기본 worker <code>max(1,H)</code>, 우선순위와 본문 §5의 Scene·Game 두 뷰 수요/스케줄링 정책 제외를 유지한다.</p>
+<p>최종 Normal의 Game p50은 14.608ms, ScenePrepare/Declare/Compile/Record p50은 <b>3.880/3.724/0.679/2.881ms</b>다. RenderThread sampled inclusive 비율은 준비 23.73%, 선언 22.63%, 컴파일 4.08%였다. 중첩 scope와 서로 다른 프레임의 중앙값을 합산하지 않는다. 최종 최대 Game 구간은 <b>27.179 = Running 23.886 + Ready 0.291 + Waiting 3.002ms</b>이고, DPC/ISR 겹침 1.184ms를 뺀 residency는 22.702ms다. 전체 ETW의 DPC/ISR 제외 평균 코어는 RenderThread 0.7919, 8 worker 합계 0.2721, dispatcher 0.0089로 지속적인 worker 과점유의 근거가 없다. 최악 기록 창의 Waiting 4.121ms는 마지막 worker의 실제 실행이 대부분이므로 준비·선언·기록의 CPU 작업을 소스에서 줄이는 방향을 택한다. 이번 변경은 해당 최대 구간의 직접 원인 해결을 입증한 것이 아니다.</p>
+<h3>이번 소스 변경</h3>
+<div class="table-wrap"><table><thead><tr><th>경로</th><th>변경</th><th>유지하는 계약과 효과의 한계</th></tr></thead><tbody>
+<tr><td>SceneHost::Prepare</td><td>Seal이 합산한 불변 chunk 수로 draw 저장 공간을 예약한다. 기하 records/geometry는 기존 배경 슬롯을 포함한 <code>size()+chunks</code>를 예약하고 더하기 전 용량을 검사한다.</td><td>프레임을 넘겨 저장 공간이나 GPU 자원을 재사용하지 않는다. 최종 원소까지 vector 성장에 따른 중간 이동을 피하는 소스 변경이며 절감 ms는 미측정이다.</td></tr>
+<tr><td>뷰 공통 상수</td><td>뷰·temporal·세 그림자 행렬과 공통 조명 필드를 뷰당 한 번 구성하고 draw별 값 복사본을 사용한다. 그림자 world 전치는 draw당 한 번 계산한다.</td><td>draw별 owner/identity/coverage/ordered lightCount, chunk별 현재·이전 world와 primitive 주소는 계속 갱신한다. 4800 B 장면 상수·208 B 그림자 상수 ABI, 복사·업로드 크기와 업로드 횟수는 유지한다.</td></tr>
+<tr><td>LiveBlackboard::Get/GetList</td><td><code>std::string_view</code>와 같은 길이·내용 기준의 투명 hash/equality로 조회하여 임시 소유 문자열 생성을 제거한다.</td><td>저장 키는 계속 <code>std::string</code>으로 소유한다. Set/SetList/Reset과 GetList의 vector 값 복사는 그대로다. 키를 다음 프레임까지 보관하는 캐시는 추가하지 않는다.</td></tr>
+</tbody></table></div>
+<p>상수 조립은 기존 draw별 <code>zero-init + 필드 덮어쓰기</code>를 뷰 값의 복사로 바꾼다. 뷰 공통 행렬 전치 6회와 유효한 temporal 카메라의 행렬곱 최대 2회를 draw마다 반복하지 않지만, 4800 B 상수의 draw별 복사·chunk별 업로드와 조명 바이트 이동 자체가 사라지는 것은 아니다. 슬롯 조회의 소유 문자열 생성 제거도 실제 비용의 후보다. inclusive 비율이나 정적 호출 수를 이 변경의 프레임 개선율로 바꾸지 않는다.</p>
+<h3>ETW 분석기의 불완전한 근거 처리</h3>
+<p><code>analyze-scheduler-ready.py</code>에서 상태를 확정하는 두 조건을 보강했다. 요청 창 밖에 있더라도 두 근거 CSwitch 사이에서 같은 TID의 종료·재생성이 관측되면 이전 스레드의 Ready/Waiting/Running을 새 스레드에 이어 붙이지 않는다. Running도 동일 CPU의 검증된 연속 switch 쌍일 때만 인정한다. 끊긴 CPU 소유권이나 근거 구간의 수명 변경은 <b>Unknown과 경고</b>로 남긴다. 정상적인 Ready/Waiting 뒤 CPU 이동과 새 수명의 이후 확정된 실행은 계속 허용한다.</p>
+<p>이 보강은 불완전 입력이 확정 결과로 보이는 두 정적 반례에 대한 수정이다. <b>기존 여덟 exact window의 Unknown/warning=0이나 기존 시간 수치를 임의로 정정하지 않는다.</b> 원본 이벤트를 수정된 분석기로 다시 확인해야 한다. 원본 CSV의 false 표기가 확인되지 않은 <code>inDpc</code> 파싱과 quantum·우선순위 정책은 변경하지 않았다.</p>
+<h3>검토 완료와 실행 대기</h3>
+<p><b>이번 변경의 빌드·셰이더 컴파일·테스트·GPU 실행·벤치마크는 수행하지 않았다.</b> 소유권, 상수의 모든 필드, 예약 크기와 배경 슬롯, 투명 조회와 반환값 수명, ETW 경계 처리를 독립 정적 검토했다. 기존 최종 바이너리의 메시 GPU 1,264,204개·worker 10,767개 및 초기 후보의 그래프 3,131개·문자열 192개·Hybrid 결과는 업로드된 기준 검증이다.</p>
+<p>작성한 회귀는 블랙보드의 키 원본 변경·파괴, 다른 주소의 같은 텍스트, 종료 문자 없는 부분 문자열, 중간 NUL, 빈 키·목록, 다중 값 단일 조회 거부, 목록 복사와 Reset을 확인한다. 기존 LivePipelineDesc selftest 8개에 6개를 더해 기대 총계는 14개다. 스케줄러 회귀에는 CPU 소유권 끊김, 모순된 Running의 CPU, 근거 bracket 안의 TID 재사용과 동일 timestamp, 정상 Ready/Waiting 후 CPU 이동 및 새 수명의 정상 실행을 추가했다. 테스트 수는 작성 범위이며 통과 수가 아니다.</p>
+<p>Windows 후속 확인은 LivePipelineDesc selftest, 기존 Scene composition·shadow correctness·temporal transmission·object-space 회귀와 동일 카메라/포즈의 6출력 비교를 사용한다. 새로운 상수 레이아웃 복제용 테스트 API는 추가하지 않았다. 스케줄러 단위 회귀와 기존 exact window 재분석도 수행한다. 성능은 빌드·검사·GPU validation을 끝낸 뒤 기준/수정 바이너리의 실제 Editor 전경·override auto·같은 worker/priority에서 반복 수집한다. Game p50/p95/최대, 준비·선언·컴파일·기록과 완료 뷰/s를 함께 보고 <b>Debug 120 FPS 및 이번 변경의 성능 효과는 새 측정 전까지 미수용</b>으로 둔다.</p>
+</div>
+<div id="performance-scheduler-quantum-20261018"><h2>2026-10-18 · Quantum·CPU 배치·전경·엔진 풀 검증</h2>
 <p><b>기존 29.672ms Ready 구간에는 외부 CPU 경쟁이 관찰됐지만, 엔진 풀 결함이나 고정 quantum 길이를 확정하지 못했다.</b> 렌더는 priority 8로 CPU 1에서 WrDispatchInt/Ready 상태가 된 뒤 CPU 6에서 재개했다. 이 구간의 8 CPU residency는 ChatGPT renderer 186.051 CPU-ms·WmiPrvSE 29.561·CreatorEditor 전체 1.351이었다. 실제 실행 CPU는 확인되지만 당시 affinity/CPU sets·전경의 전체 이력과 동순위 Ready 큐 선택은 복원하지 못한다. WrDispatchInt만으로 quantum 만료를 단정하지 않는다.</p>
 <p><b>채택한 수정은 진단·측정 경로다.</b> 엄격한 CREATOR_JOB_WORKERS override, worker/dispatcher/render OS 이름, 1/2/4/8/default 회귀를 추가했다. 하네스는 표시 창의 실제 전경 HWND/PID와 50ms history, worker 이름 기반 실제 수, priority/affinity/CPU sets 경계를 확인하고 DPC/ISR를 분리한다. 엔진 전경 off는 false 강제였으므로 최종 실행은 OS Editor 전경·override auto·PlayingPossessed로 검증했다. 제품 기본 worker 수 max(1,H)와 렌더 우선순위는 유지한다.</p>
 <p><b>H−2 worker 축소와 AboveNormal 우선순위 상승은 효과가 확인되지 않아 채택하지 않았다.</b> 8 배경/8 전경/6 전경/4 전경의 비추적 Game CPU 평균은 14.440/14.877/14.347/14.485ms였다. 아래 최종 Normal→AboveNormal→Normal 반복은 같은 DLL(9206CCAF…D618FB), 기본 8워커·실제 Editor 전경·auto에서 수행했다. 초기 4/6/8 비교와 최종 바이너리를 구분한다.</p>

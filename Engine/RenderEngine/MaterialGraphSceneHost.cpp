@@ -1554,6 +1554,55 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
 
     if (!device_->GetMeshShaderCapabilities().meshIndirect)
         return Fail(error, "METEOR Scene requires GPU indirect work; no CPU/direct surface route.");
+
+    // Seal의 불변 chunk 수와 기존 배경 슬롯을 함께 예약해 마지막 레코드까지 이동을 피한다.
+    // 이전 프레임의 용량이나 GPU 완료 상태를 준비 중인 프레임으로 넘기지 않는다.
+    const auto chunkCount = candidate->input->Cost().chunks;
+    if (chunkCount > candidate->draws.max_size() ||
+        chunkCount > geometryTable->records.max_size() - geometryTable->records.size() ||
+        chunkCount > geometryTable->geometry.max_size() - geometryTable->geometry.size())
+    {
+        return Fail(error, "METEOR Scene chunk storage exceeds CPU container capacity.");
+    }
+    const auto preparedChunks = static_cast<std::size_t>(chunkCount);
+    candidate->draws.reserve(preparedChunks);
+    geometryTable->records.reserve(geometryTable->records.size() + preparedChunks);
+    geometryTable->geometry.reserve(geometryTable->geometry.size() + preparedChunks);
+
+    // 뷰에서 고정된 행렬과 조명 필드는 한 번 구성한다. 각 draw는 값 복사본을 받아
+    // ID, coverage, owner와 chunk별 현재/이전 world를 독립적으로 덮어쓴다.
+    SceneConstants viewConstants{};
+    viewConstants.viewProjection = math::transpose(candidate->input->ViewProjection());
+    const auto& eye = candidate->input->Surface().eye;
+    viewConstants.eye = math::vector4(eye[0], eye[1], eye[2], 1);
+    viewConstants.width = context.width;
+    viewConstants.height = context.height;
+    const auto& temporal = candidate->input->View().temporalFrame;
+    const auto currentView = std::bit_cast<math::matrix4x4>(temporal.camera.viewMatrix);
+    const auto currentProjection = std::bit_cast<math::matrix4x4>(temporal.camera.projectionMatrix);
+    const auto currentToPrevious = std::bit_cast<math::matrix4x4>(temporal.camera.clipToPreviousClip);
+    const auto currentVP = temporal.camera.valid ? currentView * currentProjection : candidate->input->ViewProjection();
+    viewConstants.temporalCurrentProjection = math::transpose(currentVP);
+    viewConstants.temporalPreviousProjection =
+        math::transpose(temporal.camera.valid ? currentVP * currentToPrevious : currentVP);
+    viewConstants.padding[1] =
+        (context.width + EnhancedForwardLighting::TileSize - 1) / EnhancedForwardLighting::TileSize;
+    viewConstants.environment = environment.IsValid();
+    viewConstants.hasShadow = shadow.enabled;
+    viewConstants.shadowBlend = shadow.cascadeBlendBand;
+    viewConstants.shadowSplits = shadow.splitDepths;
+    viewConstants.shadowBias = shadow.bias;
+    viewConstants.cameraForward = shadow.cameraForward;
+    for (unsigned cascade = 0; cascade < 3; ++cascade)
+    {
+        viewConstants.shadowProjection[cascade] = math::transpose(shadow.lightViewProjection[cascade]);
+    }
+    const auto lightCount = context.lights ? context.lights->size() : std::size_t{};
+    const auto storedLights = (std::min)(lightCount, std::size_t{64});
+    if (context.lights)
+    {
+        std::copy_n(context.lights->begin(), storedLights, viewConstants.lights);
+    }
     for (const auto& draw : candidate->input->Draws())
     {
         ce::profile_scope drawProfile{ce::marker<"MaterialSceneDrawPrepare">()};
@@ -1585,10 +1634,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
             }
             candidate->effectStage.volume.bindings.push_back(std::move(volume));
         }
-        SceneConstants constants{};
-        constants.viewProjection = math::transpose(candidate->input->ViewProjection());
-        const auto& eye = candidate->input->Surface().eye;
-        constants.eye = math::vector4(eye[0], eye[1], eye[2], 1);
+        SceneConstants constants = viewConstants;
         constants.owner = ++owner;
         constants.geometryIdentity = {draw.geometryKey,
                                       draw.temporalObjectId,
@@ -1599,41 +1645,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                                           ? UINT32_MAX
                                           : draw.geometry->Source()->Geometry().sourceLodIndex,
                                       draw.geometry->Source()->SourcePrimitiveCount()};
-        constants.width = context.width;
-        constants.height = context.height;
-        const auto& temporal = candidate->input->View().temporalFrame;
-        const auto currentView = std::bit_cast<math::matrix4x4>(temporal.camera.viewMatrix);
-        const auto currentProjection = std::bit_cast<math::matrix4x4>(temporal.camera.projectionMatrix);
-        const auto currentToPrevious = std::bit_cast<math::matrix4x4>(temporal.camera.clipToPreviousClip);
-        const auto currentVP =
-            temporal.camera.valid ? currentView * currentProjection : candidate->input->ViewProjection();
-        constants.temporalCurrentProjection = math::transpose(currentVP);
-        constants.temporalPreviousProjection =
-            math::transpose(temporal.camera.valid ? currentVP * currentToPrevious : currentVP);
         constants.temporalHistoryValid = draw.temporalHistoryValid && !temporal.reset;
         constants.coverage = draw.coverage.flags;
         const bool ordered = program->hasSurface && (draw.queue == SceneCoverage::Blended || program->hasTransmission);
         constants.padding[0] = ordered ? 1u : 0u;
-        constants.padding[1] =
-            (context.width + EnhancedForwardLighting::TileSize - 1) / EnhancedForwardLighting::TileSize;
         constants.padding[2] = ordered ? (draw.queue == SceneCoverage::Blended ? 1u : 2u) : 0u;
         constants.cutoff = draw.coverage.cutoff;
-        constants.environment = environment.IsValid();
-        constants.hasShadow = shadow.enabled;
-        constants.shadowBlend = shadow.cascadeBlendBand;
-        constants.shadowSplits = shadow.splitDepths;
-        constants.shadowBias = shadow.bias;
-        constants.cameraForward = shadow.cameraForward;
-        for (unsigned i = 0; i < 3; ++i)
-        {
-            constants.shadowProjection[i] = math::transpose(shadow.lightViewProjection[i]);
-        }
-        if (context.lights)
-        {
-            const auto stored = (std::min)(context.lights->size(), std::size_t{64});
-            constants.lightCount = static_cast<std::uint32_t>(ordered ? context.lights->size() : stored);
-            std::copy_n(context.lights->begin(), stored, constants.lights);
-        }
+        constants.lightCount = static_cast<std::uint32_t>(ordered ? lightCount : storedLights);
         const auto visibleOwner = device_->AllocateUpload({sizeof(constants.owner), RHIUploadUsage::BufferCopy, 256});
         if (!visibleOwner.IsValid() || !visibleOwner.IsWritable())
         {
@@ -1651,21 +1669,22 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                 return false;
             }
             shadowEnabled = true;
+            SceneShadowConstants shadowValues;
+            shadowValues.coverage = draw.coverage.flags;
+            shadowValues.cutoff = draw.coverage.cutoff;
+            shadowValues.geometryIdentity = {draw.geometryKey,
+                                             draw.temporalObjectId,
+                                             draw.temporalIncarnation,
+                                             draw.temporalInstanceId,
+                                             draw.materialSlot,
+                                             draw.geometry->Source()->Hierarchy().groupCount ? UINT32_MAX : 0,
+                                             draw.geometry->Source()->SourcePrimitiveCount()};
+            // draw의 world는 cascade마다 같으며, 광원 행렬은 위 뷰 상수와 같은 전치값을 쓴다.
+            shadowValues.world = math::transpose(draw.geometry->Source()->World());
             for (unsigned cascade = 0; cascade < shadowConstants.size(); ++cascade)
             {
-                SceneShadowConstants shadowValues;
-                shadowValues.viewProjection = math::transpose(shadow.lightViewProjection[cascade]);
-                shadowValues.coverage = draw.coverage.flags;
-                shadowValues.cutoff = draw.coverage.cutoff;
-                shadowValues.geometryIdentity = {draw.geometryKey,
-                                                 draw.temporalObjectId,
-                                                 draw.temporalIncarnation,
-                                                 draw.temporalInstanceId,
-                                                 draw.materialSlot,
-                                                 draw.geometry->Source()->Hierarchy().groupCount ? UINT32_MAX : 0,
-                                                 draw.geometry->Source()->SourcePrimitiveCount()};
+                shadowValues.viewProjection = viewConstants.shadowProjection[cascade];
                 // Camera and each light select LOD independently from the same sealed hierarchy.
-                shadowValues.world = math::transpose(draw.geometry->Source()->World());
                 shadowConstants[cascade] = device_->UploadConstants(&shadowValues, sizeof(shadowValues));
                 if (!shadowConstants[cascade].IsValid())
                 {
