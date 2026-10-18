@@ -271,6 +271,8 @@ class LXDocument
 
     Id DocumentId() const { return documentId_; }
     std::uint64_t Revision() const { return revision_; }
+    // 표시 배치와 뷰 변경은 소스 준비를 무효화하지 않는다.
+    std::uint64_t ContentRevision() const { return contentRevision_; }
     const std::string& Path() const { return path_; }
     bool Dirty() const { return dirty_; }
     bool HasActivePreview() const { return previewActive_; }
@@ -293,6 +295,7 @@ class LXDocument
   private:
     Id documentId_ = 0;
     std::uint64_t revision_ = 0;
+    std::uint64_t contentRevision_ = 0;
     std::string path_;
     LXGraph graph_;
     LXGraph saved_;

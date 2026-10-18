@@ -648,7 +648,7 @@ void Core::App::Run(CoreWindow& window)
 		m_main->Update();
 
 		// 콘솔/스크립트 명령은 프레임 경계에서만 실행한다(게임 스레드 규약).
-		editor::material_editing::TickAutomaticChanges();
+		editor::material_editing::TickPendingRequests();
 		auto& cli = ConsoleCommandSystem::Get();
         cli.Pump([this] { return m_main->LockSceneStructure(); });
 

@@ -2,6 +2,7 @@
 
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
+#include "Ownership.h"
 
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
 
@@ -101,8 +102,17 @@ public:
 	ModelRecoveryStats GetModelRecoveryStats() const;
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
-    bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph, const file::path& graphPath,
-                           FileGuid graphGuid, std::string& error);
+    struct MaterialGraphSaveResult
+    {
+        own::shared_owner<const Material> publishedMaterial;
+        bool catalogRegistered{};
+        std::string warning;
+    };
+    // 파일 저장과 런타임 게시가 성공한 뒤의 카탈로그 오류는 경고로 따로 전달한다.
+    bool SaveMaterialGraph(own::shared_owner<Material> preparedMaterial,
+                           const own::shared_owner<const Material>& expectedMaterial,
+                           const LX::LXMaterialAsset& graph, const file::path& graphPath, FileGuid graphGuid,
+                           MaterialGraphSaveResult& result, std::string& error);
 	bool CreateSceneRenderProfile(const file::path& directory, std::string_view name,
 		file::path& createdPath, std::string& error);
     bool CreateFolder(const file::path& parent, std::string_view name,

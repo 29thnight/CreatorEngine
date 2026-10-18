@@ -3542,12 +3542,16 @@ bool DataSystem::ReloadMaterialAsset(FileGuid guid, std::string& error)
         return false;
     }
     auto generation = ResolveMaterialGraphGeneration(graphGuid);
-    const auto program = LX::GenerateMaterialSlang(*source);
-    if (!generation || !program || program->slang != generation->cooked.product.program.slang ||
-        LX::WriteMaterialProgramMetadata(*program) != generation->cooked.metadata)
+    std::string sourceKey;
+    if (!LX::ComputeMaterialSourceKey(*source, sourceKey, error))
+    {
+        return false;
+    }
+    const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
+    if (!generation || !CanReuseMaterialGraphAuthoring(*generation, sourceKey, shaderDirectory, error))
     {
         generation = CompileMaterialGraphAuthoring(*source, graphGuid,
-            PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+            shaderDirectory, PathFinder::CachePath("Lattice"), error);
     }
     if (!generation)
     {
@@ -3567,8 +3571,13 @@ bool DataSystem::ReloadMaterialAsset(FileGuid guid, std::string& error)
 }
 
 bool DataSystem::PublishMaterialAsset(own::shared_owner<Material> candidate,
-                                      const own::shared_owner<const Material>& expectedCurrent, std::string& error)
+                                      const own::shared_owner<const Material>& expectedCurrent, std::string& error,
+                                      own::shared_owner<const Material>* published)
 {
+    if (published)
+    {
+        published->reset();
+    }
     if (!PathFinder::IsAssetAuthoringEnabled() || !candidate || !candidate->HasMaterialGraph() ||
         !candidate->m_fileGuid.IsRandomV4() || (expectedCurrent && std::addressof(*candidate) == std::addressof(*expectedCurrent)))
     {
@@ -3589,7 +3598,16 @@ bool DataSystem::PublishMaterialAsset(own::shared_owner<Material> candidate,
         candidate->m_materialGraphInstance = std::move(instance);
         generation = expectedGeneration;
     }
-    return PublishMaterialGraphGeneration(generation, expectedGeneration, std::move(candidate), expectedCurrent, error);
+    own::shared_owner<const Material> accepted = candidate;
+    if (!PublishMaterialGraphGeneration(generation, expectedGeneration, std::move(candidate), expectedCurrent, error))
+    {
+        return false;
+    }
+    if (published)
+    {
+        *published = std::move(accepted);
+    }
+    return true;
 }
 
 bool DataSystem::PublishMaterialGraphReload(own::shared_owner<const material_graph::Generation> generation,
@@ -4066,35 +4084,41 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 
 namespace
 {
-// 재질 캐시는 Slang 이 이 재질을 컴파일하며 **실제로 읽은 파일**만으로 판정한다.
-// 예전 키는 DefaultPassShader 아래 .slang 전부였다. 그래서 그림자 셰이더 하나만 고쳐도
-// 모든 재질이 다시 컴파일됐고(재질당 ~5.5초, 게임 스레드 직렬), 재질마다 셰이더 폴더
-// 전체를 다시 읽었다(7개에 ~110 ms). 의존 목록은 컴파일러가 보고한 것을 그대로 쓴다 —
-// #include 를 따로 따라가 짐작하지 않는다.
-//
-// 놓치는 경우 하나: 이미 해석된 포함 파일보다 검색 경로 앞쪽에 같은 이름의 새 파일이
-// 생기면(가림) 기록된 파일은 그대로라 맞힌다. 생성 소스가 놓이는 캐시 폴더에는 생성
-// 파일만 있어 이 일이 생기지 않는다.
-constexpr std::array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','H','2'};
+// 코드 생성 전 원본 키를 비교하되 실제 include 내용과 도구 신원 검사는 생략하지 않는다.
+// 생성 소스의 임시 경로는 캐시 수명에 포함하지 않고 include 가림 검사는 하위 RHI와 공유한다.
+constexpr std::array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','H','3'};
 constexpr std::uint32_t kMaterialGraphCacheMaxDependencies = 4096;
 
-// 생성 소스 자체를 정하는 것: 프로그램 본문·메타·호스트 셰이더. 호스트는 #include 가
-// 아니라 생성 소스 뒤에 이어 붙으므로 Slang 의존 목록에 나오지 않는다 — 직접 넣는다.
-std::string MaterialGraphCacheHeader(const LX::LXMaterialProgram& program,
-                                     const file::path& shaderDirectory)
+std::string MaterialGraphCacheHeader(std::string_view sourceKey, const file::path& shaderDirectory,
+                                    std::optional<RHIShaderBinary> backend, std::string& error)
 {
+    error.clear();
     std::ifstream host(shaderDirectory / "Includes/MaterialGraphSceneHost.slang", std::ios::binary);
     const std::string hostText{std::istreambuf_iterator<char>(host), {}};
-    if (hostText.empty()) return {};
-    std::string header = "lx-scene-authoring-cache-v3-graph-shadermeta-" +
+    if (!host || hostText.empty() || hostText.size() > 16u * 1024u * 1024u)
+    {
+        error = "Material Scene host is missing or exceeds its source budget.";
+        return {};
+    }
+    std::string compilerIdentity;
+    if (!RHIShaderCompiler::GetCompilerIdentity(compilerIdentity, error))
+    {
+        return {};
+    }
+    std::string header = "lx-scene-authoring-input-cache-v4-graph-shadermeta-" +
         std::to_string(ShaderGeneratedMaterial::kAdapterVersion);
     const auto append = [&](std::string_view value) {
         const std::uint64_t size = value.size();
         header.append(reinterpret_cast<const char*>(&size), sizeof(size));
         header.append(value);
     };
-    append(program.slang);
-    append(LX::WriteMaterialProgramMetadata(program));
+    append(sourceKey);
+    append(compilerIdentity);
+    append(material_graph::SceneHostIdentity);
+    append(std::to_string(material_graph::CookedProgramVersion));
+    append(backend ? std::to_string(static_cast<unsigned>(*backend)) : "all-backends");
+    // CompileSceneProduct의 고정 정책을 상위 캐시에도 보관한다. 정책 변경 때 이 버전도 올린다.
+    append("scene-options-v1:strictMath,fineDerivatives,quadOperations,bufferInt64Atomics,pixelFootprint");
     append(hostText);
     return header;
 }
@@ -4117,17 +4141,99 @@ bool HashMaterialGraphDependency(const file::path& path, Hash::Sha256Digest& res
 
 // 셰이더 폴더 안의 파일은 상대 경로로 적어 프로젝트를 옮겨도 캐시가 산다.
 // 폴더 밖이면 절대 경로로 남긴다(그 경우만 위치에 묶인다).
-std::string MaterialGraphDependencyKey(const file::path& dependency, const file::path& shaderDirectory)
+std::string MaterialGraphDependencyKey(const file::path& dependency, const file::path& canonicalShaderDirectory)
 {
     std::error_code ignored;
-    const file::path root = std::filesystem::weakly_canonical(shaderDirectory, ignored);
-    const file::path relative = dependency.lexically_relative(root);
+    file::path canonical = std::filesystem::weakly_canonical(dependency, ignored);
+    if (ignored)
+    {
+        canonical = dependency.lexically_normal();
+    }
+    const file::path relative = canonical.lexically_relative(canonicalShaderDirectory);
     if (!relative.empty() && *relative.begin() != "..") return relative.generic_string();
-    return dependency.generic_string();
+    return canonical.generic_string();
 }
 
-bool ReadMaterialGraphCache(const file::path& path, std::string_view header,
-                            const file::path& shaderDirectory, material_graph::CookedProgram& result)
+using MaterialGraphDependencyDigests = std::vector<std::pair<std::string, Hash::Sha256Digest>>;
+
+std::string MaterialGraphEnvironmentKey(std::string_view header, const MaterialGraphDependencyDigests& dependencies)
+{
+    Hash::Sha256 hash;
+    const auto append = [&](std::string_view value) {
+        const auto length = std::to_string(value.size()) + ':';
+        hash.Update(length.data(), length.size());
+        hash.Update(value.data(), value.size());
+    };
+    append(header);
+    append(std::to_string(dependencies.size()));
+    for (const auto& [key, digest] : dependencies)
+    {
+        append(key);
+        hash.Update(digest.data(), digest.size());
+    }
+    return Hash::ToHex(hash.Finish());
+}
+
+bool CaptureMaterialGraphDependencies(std::span<const file::path> paths, const file::path& shaderDirectory,
+                                      MaterialGraphDependencyDigests& result, std::string& error)
+{
+    result.clear();
+    if (paths.empty() || paths.size() > kMaterialGraphCacheMaxDependencies)
+    {
+        error = "Material authoring requires its bounded, verified include dependency list.";
+        return false;
+    }
+    std::error_code filesystemError;
+    const auto shaderRoot = std::filesystem::weakly_canonical(shaderDirectory, filesystemError);
+    if (filesystemError)
+    {
+        error = "Material shader directory cannot be resolved: " + filesystemError.message();
+        return false;
+    }
+    result.reserve(paths.size());
+    for (const auto& path : paths)
+    {
+        Hash::Sha256Digest digest{};
+        if (!HashMaterialGraphDependency(path, digest))
+        {
+            error = "Material include dependency cannot be read: " + path.string();
+            return false;
+        }
+        result.emplace_back(MaterialGraphDependencyKey(path, shaderRoot), digest);
+    }
+    std::ranges::sort(result, {}, &MaterialGraphDependencyDigests::value_type::first);
+    for (std::size_t index = 0; index < result.size(); ++index)
+    {
+        if (result[index].first.empty() || result[index].first.size() > 4096 ||
+            (index && result[index - 1].first == result[index].first))
+        {
+            error = "Material include dependency identity is empty, duplicated or oversized.";
+            return false;
+        }
+    }
+    return true;
+}
+
+bool MaterialGraphDependenciesResolve(std::span<const file::path> dependencies, const file::path& shaderDirectory,
+                                      const file::path& sourceDirectory, const file::path& nextCacheDirectory = {})
+{
+    if (sourceDirectory.empty())
+    {
+        return false;
+    }
+    // 공통 include뿐 아니라 생성 소스 옆/상위 경로도 원래 RHI 검사와 같은 후보로 확인한다.
+    std::vector<file::path> includeDirectories{shaderDirectory / "Includes", sourceDirectory};
+    if (!nextCacheDirectory.empty())
+    {
+        // 기존 직접 생성 경로에서 다음 요청의 isolated scratch 경로로 옮기는 경우도 포함한다.
+        includeDirectories.push_back(nextCacheDirectory);
+    }
+    return RHIShaderCompiler::CanReuseDependencyResolution(dependencies, includeDirectories);
+}
+
+bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, std::string_view header,
+                            const file::path& shaderDirectory, const file::path& sourceDirectory,
+                            material_graph::CookedProgram& result)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file) return false;
@@ -4143,6 +4249,10 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view header,
     std::uint32_t dependencyCount{};
     file.read(reinterpret_cast<char*>(&dependencyCount), sizeof(dependencyCount));
     if (!file || dependencyCount == 0 || dependencyCount > kMaterialGraphCacheMaxDependencies) return false;
+    MaterialGraphDependencyDigests dependencies;
+    std::vector<file::path> paths;
+    dependencies.reserve(dependencyCount);
+    paths.reserve(dependencyCount);
     for (std::uint32_t index = 0; index < dependencyCount; ++index)
     {
         std::uint32_t keySize{};
@@ -4158,6 +4268,16 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view header,
         if (!HashMaterialGraphDependency(stored.is_absolute() ? stored : shaderDirectory / stored, actual) ||
             actual != expected)
             return false;
+        if (!dependencies.empty() && dependencies.back().first >= key)
+        {
+            return false;
+        }
+        dependencies.emplace_back(key, expected);
+        paths.push_back(stored.is_absolute() ? stored : shaderDirectory / stored);
+    }
+    if (!MaterialGraphDependenciesResolve(paths, shaderDirectory, sourceDirectory))
+    {
+        return false;
     }
 
     std::uint64_t productSize{};
@@ -4167,26 +4287,24 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view header,
     file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     if (!file || file.peek() != std::char_traits<char>::eof()) return false;
     std::string validation;
-    return material_graph::ReadCookedProgram(bytes, {}, result, validation);
+    material_graph::CookedProgram candidate;
+    if (!material_graph::ReadCookedProgram(bytes, {}, candidate, validation))
+    {
+        return false;
+    }
+    // 원본 증명은 이 캐시의 입력·환경 검증 뒤에만 복구한다. 일반 cooked loader에는 남기지 않는다.
+    candidate.product.dependencies = std::move(paths);
+    candidate.authoringSourceKey = sourceKey;
+    candidate.authoringEnvironmentKey = MaterialGraphEnvironmentKey(header, dependencies);
+    candidate.authoringSourceDirectory = std::filesystem::absolute(sourceDirectory).lexically_normal();
+    result = std::move(candidate);
+    return true;
 }
 
 void WriteMaterialGraphCache(const file::path& path, std::string_view header,
-                             const file::path& shaderDirectory, const material_graph::VerifiedProduct& product,
-                             const file::path& generatedSource)
+                             const MaterialGraphDependencyDigests& dependencies,
+                             const material_graph::VerifiedProduct& product)
 {
-    std::vector<std::pair<std::string, Hash::Sha256Digest>> dependencies;
-    dependencies.reserve(product.dependencies.size());
-    std::error_code ignored;
-    const auto generated = std::filesystem::weakly_canonical(generatedSource, ignored);
-    for (const auto& dependency : product.dependencies)
-    {
-        // The generated source is the header's own content in a scratch file that
-        // may already be gone; recording it would make every later read miss.
-        if (std::filesystem::weakly_canonical(dependency, ignored) == generated) continue;
-        Hash::Sha256Digest digest{};
-        if (!HashMaterialGraphDependency(dependency, digest)) return;
-        dependencies.emplace_back(MaterialGraphDependencyKey(dependency, shaderDirectory), digest);
-    }
     // 의존 목록이 비면 무엇이 바뀌어도 맞히는 캐시가 된다. 그런 캐시는 쓰지 않는다.
     if (dependencies.empty() || dependencies.size() > kMaterialGraphCacheMaxDependencies) return;
     std::vector<std::uint8_t> bytes;
@@ -4230,7 +4348,8 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view header,
 // The verified-product cache lives in cacheDirectory and survives compiles. The
 // generated source is written to scratchDirectory (cacheDirectory when empty);
 // an isolated authoring compile deletes its scratch afterwards, and the cache
-// never depends on that file because the header already holds its contents.
+// never depends on that file because the header identifies its canonical source
+// and compiler recipe before source generation.
 bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
                               std::string& error, const file::path& shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader"),
                               const file::path& cacheDirectory = PathFinder::CachePath("Lattice"),
@@ -4238,22 +4357,20 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
 {
     ce::profile_scope profile{ ce::marker<"Material.CompileAuthoring">() };
     error.clear();
-    std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"Material.GenerateSlang">() };
-    const auto program = LX::GenerateMaterialSlang(asset, &diagnostics);
-    step.reset();
-    if (!program)
+    std::string sourceKey;
+    std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"Material.SourceKey">() };
+    if (!LX::ComputeMaterialSourceKey(asset, sourceKey, error))
     {
-        for (const auto& diagnostic : diagnostics)
-        {
-            error += diagnostic.code + ": " + diagnostic.message + "\n";
-        }
         return false;
     }
-    const std::string cacheHeader = MaterialGraphCacheHeader(*program, shaderDirectory);
-    const std::string sourceIdentity = cacheHeader.empty()
-        ? material_graph::BuildBoundSource(*program) + LX::WriteMaterialProgramMetadata(*program) : cacheHeader;
-    const auto sourceRevision = Hash::ToHex(Hash::Sha256::Compute(sourceIdentity.data(), sourceIdentity.size()));
+    step.reset();
+    const auto backend = material_graph::AuthoringSceneBackend();
+    const std::string cacheHeader = MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error);
+    if (cacheHeader.empty())
+    {
+        return false;
+    }
+    const auto sourceRevision = Hash::ToHex(Hash::Sha256::Compute(cacheHeader.data(), cacheHeader.size()));
     const auto source = (scratchDirectory.empty() ? cacheDirectory : scratchDirectory) /
                         (guid.ToString() + "-" + sourceRevision + ".slang");
     std::error_code filesystemError;
@@ -4265,7 +4382,6 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
         return false;
     }
     // 렌더러가 시작됐으면 그 백엔드만 컴파일한다. 다른 쪽은 이 프로세스에서 쓰이지 않는다.
-    const auto backend = material_graph::AuthoringSceneBackend();
     const auto carriesWanted = [&](const material_graph::VerifiedProduct& product) {
         return backend ? material_graph::HasSceneBackend(product, *backend)
                        : material_graph::HasSceneBackend(product, RHIShaderBinary::Dxil) &&
@@ -4273,17 +4389,29 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     };
     const auto cachePath = cacheDirectory / (guid.ToString() + ".slang.scene-cache");
     step.emplace(ce::marker<"Material.CacheRead">());
-    if (!cacheHeader.empty() && ReadMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result) &&
-        result.product.program.slang == program->slang &&
-        result.metadata == LX::WriteMaterialProgramMetadata(*program) &&
+    if (ReadMaterialGraphCache(cachePath, sourceKey, cacheHeader, shaderDirectory, source.parent_path(), result) &&
         result.product.materialShader &&
+        result.product.materialShader->meta.guid == guid &&
         result.product.program.semanticKey.ends_with(material_graph::SceneHostIdentity) &&
         carriesWanted(result.product))
     {
         return true;
     }
     step.reset();
+    step.emplace(ce::marker<"Material.GenerateSlang">());
+    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    const auto program = LX::GenerateMaterialSlang(asset, &diagnostics);
+    if (!program)
+    {
+        for (const auto& diagnostic : diagnostics)
+        {
+            error += diagnostic.code + ": " + diagnostic.message + "\n";
+        }
+        return false;
+    }
+    step.reset();
     step.emplace(ce::marker<"Material.CompileSceneProduct">());
+    result = {};
     if (!material_graph::CompileSceneProduct(*program, shaderDirectory, source, {},
                                              result.product, error, guid, backend))
     {
@@ -4293,9 +4421,57 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     result.boundSource = material_graph::BuildBoundSource(result.product.program);
     step.reset();
     step.emplace(ce::marker<"Material.CacheWrite">());
-    if (!cacheHeader.empty()) WriteMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result.product, source);
+    if (MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error) != cacheHeader)
+    {
+        error = "Material compile environment changed while preparing the candidate. Compile again.";
+        return false;
+    }
+    MaterialGraphDependencyDigests dependencies;
+    if (!CaptureMaterialGraphDependencies(result.product.dependencies, shaderDirectory, dependencies, error))
+    {
+        return false;
+    }
+    result.authoringSourceKey = std::move(sourceKey);
+    result.authoringEnvironmentKey = MaterialGraphEnvironmentKey(cacheHeader, dependencies);
+    result.authoringSourceDirectory = std::filesystem::absolute(source.parent_path()).lexically_normal();
+    WriteMaterialGraphCache(cachePath, cacheHeader, dependencies, result.product);
     return true;
 }
+}
+
+bool DataSystem::CanReuseMaterialGraphAuthoring(const material_graph::Generation& generation,
+    std::string_view sourceKey, const file::path& shaderDirectory, std::string& error,
+    const file::path& cacheDirectory)
+{
+    error.clear();
+    if (sourceKey.empty() || generation.authoringSourceKey != sourceKey ||
+        generation.authoringEnvironmentKey.empty() || generation.cooked.authoringSourceDirectory.empty() ||
+        !generation.cooked.product.materialShader ||
+        !generation.cooked.product.program.semanticKey.ends_with(material_graph::SceneHostIdentity))
+    {
+        return false;
+    }
+    const auto backend = material_graph::AuthoringSceneBackend();
+    const auto& product = generation.cooked.product;
+    if ((backend && !material_graph::HasSceneBackend(product, *backend)) ||
+        (!backend && (!material_graph::HasSceneBackend(product, RHIShaderBinary::Dxil) ||
+                      !material_graph::HasSceneBackend(product, RHIShaderBinary::SpirV))))
+    {
+        return false;
+    }
+    const auto header = MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error);
+    const auto nextCacheDirectory = cacheDirectory.empty() ? PathFinder::CachePath("Lattice") : cacheDirectory;
+    if (header.empty() || !MaterialGraphDependenciesResolve(product.dependencies, shaderDirectory,
+        generation.cooked.authoringSourceDirectory, nextCacheDirectory))
+    {
+        return false;
+    }
+    MaterialGraphDependencyDigests dependencies;
+    if (!CaptureMaterialGraphDependencies(product.dependencies, shaderDirectory, dependencies, error))
+    {
+        return false;
+    }
+    return generation.authoringEnvironmentKey == MaterialGraphEnvironmentKey(header, dependencies);
 }
 
 own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialGraphAuthoring(
@@ -6169,14 +6345,15 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
             {
                 // Self-save and duplicate watcher events preserve accepted owner
                 // identity, including unsaved material defaults already applied.
-                const auto program = LX::GenerateMaterialSlang(*source);
-                if (program && program->slang == current->cooked.product.program.slang &&
-                    LX::WriteMaterialProgramMetadata(*program) == current->cooked.metadata)
+                std::string sourceKey;
+                const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
+                if (LX::ComputeMaterialSourceKey(*source, sourceKey, error) &&
+                    CanReuseMaterialGraphAuthoring(*current, sourceKey, shaderDirectory, error))
                 {
                     return true;
                 }
                 const auto generation = CompileMaterialGraphAuthoring(*source, guid,
-                    PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+                    shaderDirectory, PathFinder::CachePath("Lattice"), error);
                 if (generation && PublishMaterialGraphGeneration(generation, current, {}, {}, error))
                 {
                     return true;

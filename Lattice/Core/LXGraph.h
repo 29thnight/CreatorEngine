@@ -214,8 +214,9 @@ class LXGraph
     Id CreateGroupInstance(Id group, float x, float y);
     Id CollapseToGroup(const std::vector<Id>& nodes, std::string name, Id idFloor = 0,
                        LXGroupCollapseMapping* mapping = nullptr);
-    bool ReplaceGroupBody(Id group, const LXGraph& body);
-    bool UpdateGroup(Id group, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets);
+    bool ReplaceGroupBody(Id group, const LXGraph& body, bool* contentChanged = nullptr);
+    bool UpdateGroup(Id group, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets,
+                     bool* contentChanged = nullptr);
     bool RemoveNode(Id id);
     bool RemoveNodes(const std::vector<Id>& ids);
     Id AddDynamicPin(Id node, const std::string& name);
@@ -240,14 +241,15 @@ class LXGraph
     std::optional<Id> ReplaceInputConnection(Id first, Id second, std::string* reason = nullptr);
     bool Disconnect(Id link);
     std::vector<Issue> Validate(bool checkSharedCopies = true) const;
-    bool Undo();
-    bool Redo();
+    bool Undo(bool* contentChanged = nullptr);
+    bool Redo(bool* contentChanged = nullptr);
     bool CanUndo() const { return !undo_.empty(); }
     bool CanRedo() const { return !redo_.empty(); }
     bool Save(const std::string& path, std::string* error = nullptr) const;
     static std::optional<LXGraph> Load(const std::string& path, std::string* error = nullptr,
                                        std::shared_ptr<const LXNodeDefinitionRegistry> definitions = nullptr);
     bool Equals(const LXGraph& other) const;
+    bool ContentEquals(const LXGraph& other) const;
 
   private:
     friend class LXMaterialArchive;
@@ -261,6 +263,7 @@ class LXGraph
         Id nextId;
     };
     Snapshot Capture() const;
+    bool HasSameContent(const Snapshot& snapshot) const;
     void Commit();
     void Restore(const Snapshot& snapshot);
     bool WouldCycle(Id outputNode, Id inputNode) const;

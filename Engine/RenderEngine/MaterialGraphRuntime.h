@@ -32,6 +32,9 @@ namespace material_graph
         std::uint64_t generation{};
         CookedProgram cooked;
         experiment::cooked::Sha256Digest contentDigest{};
+        // 명시적 컴파일·저장 경계의 원본 증명이다. 런타임 패키지에는 원본 그래프가 필요 없다.
+        std::string authoringSourceKey;
+        std::string authoringEnvironmentKey;
         // Verified graph source carries active-surface routing through cooked loading.
         std::optional<std::string> surfaceBlendMode;
         // AssetDepot pins the exact artifact and resolved default Texture

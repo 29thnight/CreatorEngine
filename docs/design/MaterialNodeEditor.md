@@ -12,7 +12,8 @@ window registry에 `###Editor.MaterialGraph`로 등록되며 일반 docking/work
   그 graph로 렌더링한다. 이전 모델 generation에 graph가 없으면 Editor가 source에서 재저작한다.
 - 모델 외의 graph 없는 재질은 Principled BSDF → Material Output의 새 문서를 만든다.
   이 경우 Apply 전까지 기존 바인딩을 유지한다.
-- 중앙 재질 드롭다운의 `New Material Graph`와 새 문서 아이콘은 현재 MeshRenderer용 별도 문서를 만든다.
+- 중앙 재질 드롭다운의 `New Material Graph`와 새 문서 아이콘은 별도 자산 초안을 만든다.
+  새 자산을 만드는 데 MeshRenderer 선택은 필요하지 않다.
 - 같은 드롭다운의 `Open Materials` 목록은 열린 문서들을 전환한다. 창을 숨겨도 미저장 문서를 유지한다.
 
 모델 재질의 SoT는 프로젝트
@@ -23,7 +24,7 @@ model generation의 PBR 데이터는 최초 graph 생성의 seed이고, 재impor
 
 Base Color factor × sRGB Base Color Texture, ORM의 Green/Blue × Roughness/Metallic factor,
 data Normal Texture → Normal Map, Emission factor × sRGB Emission Texture를 연결한다.
-AO는 별도 Occlusion Texture가 있으면 그것의 Red, 없으면 ORM Red와 strength를 사용한다.
+AO는 명시적인 Occlusion Texture의 Red와 strength를 사용한다. ORM의 Red만으로 AO를 추정하지 않는다.
 Opaque/Masked/Transparent 정책과 texture alpha, alpha cutoff도 graph에 보존한다.
 sampler의 min/mag·mip filter와 U/V address 및 UV0 offset/scale/rotation을 유지한다.
 현재 Scene graph transport에는 UV0만 있으므로 UV1 재질의 자동 생성은 명시적으로 실패한다.
@@ -37,21 +38,28 @@ MeshRenderer Inspector는 graph 재질 이름과 source, 연결된 texture의 �
 노출된 color/scalar/vector/bool/int parameter를 표시한다. Inspector 변경은 instance override이며
 global Undo/Redo와 Scene 저장에 포함된다. 기존 C# Material API도 identifier로 같은 graph parameter를
 변경한다. 캔버스는 source 기본값을 편집하고, 같은 GUID의 Apply는 instance override를 보존한다.
-재질 구체/조명 환경을 갖춘 별도 sphere preview는 아직 제공하지 않는다.
+별도 sphere preview는 마지막으로 준비된 instance를 같은 Scene shader 경로로 렌더한다.
+새 문서를 여는 것만으로 초안을 컴파일하지 않으며, 미리보기 바닥도 표시 수요가 생길 때 준비한다.
 
 model cooking은 material graph를 자동으로 포함한다. model/mesh/material의 manifest 의존성이
 graph와 graph resource에 이어지며, BuildTool은 graph가 빠진 오래된 model library를 재저작한다.
 
-저작 순서는 **Save → Apply to Mesh → Save Scene**이다.
+2026-10-18 변경의 기본 저작 흐름은 **초안 편집 → 명시적 Apply 또는 Save**다.
+자동 미리보기는 기본적으로 꺼져 있다. 노드 편집·idle·창 숨김·종료만으로 자산을 적용하거나 저장하지 않는다.
+새 자산을 MeshRenderer에 처음 연결할 때는 Save 완료 후 Assign하고 Scene을 저장한다.
 
 | 동작 | 저장/게시하는 내용 |
 | --- | --- |
-| Save | graph, pin 기본값, property, layout, header 접힘, view와 기존 group/Blackboard/active output metadata를 제품 `.shadergraph`로 저장 |
-| Apply to Mesh | 저장한 graph를 검증·컴파일하고 성공한 instance를 MeshRenderer에 적용. global Editor Undo의 한 변경으로 기록 |
-| Save Scene | MeshRenderer의 새 inline material 바인딩을 Scene에 저장 |
+| Apply / Compile | 현재 초안의 입력 키·컴파일 환경·의존성을 확인하고 필요한 경우만 컴파일한 뒤 material 자산과 그 사용처에 게시. 디스크에는 저장하지 않음 |
+| Save | 같은 준비 단계를 거친 뒤 graph·material과 각각의 `.meta`를 저장하고 런타임에 게시. 별도 Apply 선행 불필요 |
+| Automatic Preview | 사용자가 켠 세션에서만 초안 미리보기 준비를 허용. 자산 게시·저장은 수행하지 않음 |
+| Assign to Selected Mesh | 저장·적용한 material 자산 참조를 선택한 MeshRenderer에 연결. global Editor Undo의 한 변경으로 기록 |
+| Save Scene | MeshRenderer의 material 자산 참조와 instance override를 Scene에 저장 |
 
 새 graph의 기본 경로는 프로젝트 `Assets/Materials/Material_<GUID>.shadergraph`다.
 `.meta`는 GUID 등록에 계속 사용하며 graph 내용은 `.shadergraph`가 소유한다.
+graph의 `.meta`에는 `materialGraph.sourceKeyVersion`과 `materialGraph.sourceKey`도 기록한다.
+이 값은 저장한 소스의 참고 정보이며, 값이 같다는 이유만으로 캐시를 신뢰하지 않는다.
 저장 후에도 문서 Undo 이력을 유지하고 저장된 snapshot과 같은 내용으로 Redo하면
 dirty가 해제된다. 외부 파일 변경 충돌과 진행 중인 drag preview는 저장을 거부한다.
 미저장 문서의 Reload는 UI에서 명시적 버리기 확인을 받으며 HTTP에서는 거부한다.
@@ -59,7 +67,7 @@ dirty가 해제된다. 외부 파일 변경 충돌과 진행 중인 drag preview
 ## 2. Blender형 표현과 LX 경계
 
 상단은 한 줄로 구성한다. 왼쪽에 Editor/Object 선택과 View/Select/Add/Node 메뉴,
-중앙에 slot/material 선택·이름·Save/New/Close 아이콘 묶음과 Apply 핀 아이콘,
+중앙에 slot/material 선택·이름·Save/New/Close 아이콘 묶음과 Apply·자동 미리보기 아이콘,
 오른쪽에 스냅과 overlay 토글·드롭다운을 배치한다. Reload는 재질 드롭다운,
 Frame All은 View 메뉴와 Home 키에 둔다. Close는 창만 숨기며 문서를 유지한다.
 Object → 실제 mesh 이름 → Material breadcrumb는
@@ -82,6 +90,8 @@ overlay는 `join_inner`, 편집기 선택은 `blur_circular`다. 기존 `contras
 `view_in_ar`, `close`, `expand_more`, `chevron_right`도 재사용한다. 스냅에는 기존
 `grid_on`을 사용하며 고정한 원본 폰트에는 자석 글리프가 없다.
 아이콘은 실제 glyph bounds를 기준으로 중앙에 놓고 DPI/사용자 배율을 한 번 적용한다.
+Apply·Save·자동 미리보기는 기존 공통 아이콘 버튼과 툴팁을 사용한다. 동작을 설명하는
+텍스트 버튼이나 별도 도구줄을 추가하지 않는다.
 독립 예제도 Inter와 같은 subset을 실행 파일 옆에 배포하고 공통 merge helper를 사용한다.
 
 Material Node Editor의 창 제목에도 기존 `EditorIcon::Material` 글리프를 표시한다.
@@ -126,25 +136,71 @@ Material의 기본 배경은 30 논리 픽셀 간격의 작은 점이다. LXCanv
 ## 3. 문서·제품 자원 소유권
 
 ```mermaid
-flowchart LR
-    Inspector[MeshRenderer Inspector] --> Window[MaterialGraphWindow session]
-    HTTP[Authenticated HTTP command] --> Window
-    Window --> Document[LXDocument / LXCanvas]
-    Document --> Archive[LXMaterialAsset .shadergraph]
-    Archive --> Authoring[DataSystem authoring compile]
-    Authoring --> Accepted[Accepted material generation]
-    Accepted --> Mesh[MeshRenderer / Scene render]
+flowchart TD
+    Document["LXDocument 초안"] --> Request["Apply 또는 Save 요청"]
+    Request --> Prepare["입력 키·환경 확인 / 필요한 경우 컴파일"]
+    Prepare --> Apply["Apply: 런타임 게시"]
+    Prepare --> Save["Save: 파일 저장 후 런타임 게시"]
+    Apply --> Accepted["수락된 material generation"]
+    Save --> Accepted
 ```
 
-세션은 EntityHandle과 component instance ID로 대상 MeshRenderer를 매번 해석한다.
-삭제되거나 잠긴 대상은 편집/Apply를 거부한다. Save는 LX 예제의 `.lxg` 직렬화가
-아닌 `LXMaterialAsset::Save`의 staged roundtrip/backup 경로를 사용한다.
-Apply 실패는 현재 정상 material/Scene generation을 바꾸지 않는다.
+세션은 편집 중인 자산과 마지막으로 수락한 material owner를 보관한다. Mesh 할당은
+EntityHandle과 component instance ID로 대상을 다시 해석하고 잠금·삭제 여부를 검사한다.
+Apply/Save 요청은 document ID, 소스 revision, instance 설정 revision, 요청 serial과
+수락된 owner를 고정한다. 이후 의미 변경이나 새 요청으로 낡아진 결과는 게시하지 않는다.
+노드 이동·접힘·view 변경은 유효한 셰이더 준비 결과를 폐기하지 않는다.
+
+`EditorAssetDatabase::SaveMaterialGraph`는 준비된 material과 저장할 graph의 소스 키를
+비교한다. `.shadergraph`, `.shadergraph.meta`, `.asset`, `.asset.meta`의 원본을 보관한 뒤
+네 파일을 쓰고, 예상 owner가 여전히 현재 자산일 때 런타임에 게시한다. 파일 쓰기나 게시가
+실패하면 실패한 파일까지 포함해 복구한다. 복구 실패는 오류에 명시한다. 파일 저장과 런타임
+게시 뒤의 catalog 등록 오류는 별도 경고로 반환하므로 이미 성공한 저장을 실패 상태로 표시하지 않는다.
+이 경계는 실패 시 복구를 제공하며, 네 파일을 한 번에 바꾸는 filesystem transaction은 아니다.
 
 새 graph는 Editor authoring 경로에서 결정적 Slang과 Scene target bytecode를 생성한다.
 Editor를 재시작해도 저장한 source를 authoring compile로 읽을 수 있다.
 Player는 기존 cooked catalog/bytecode 경로를 유지한다. 이 저작 fallback은
 Player source compile 허용이나 MAT-7의 쿠킹 경계 변경을 의미하지 않는다.
+
+### 변경 판별과 컴파일 재사용
+
+`LXDocument::Revision()`은 기존 편집 충돌·Undo·dirty 계약을 유지하고,
+`ContentRevision()`은 셰이더 의미가 바뀐 편집만 추적한다. 배치·view·접힘·frame 변경은
+후자를 증가시키지 않는다. 세션은 graph/metadata의 소스 변경과 instance 기본값·표시 설정을
+구분한다. 평상시 owner tick은 revision과 진행 중인 요청만 확인하며 graph 직렬화·전체 해시·
+검증·IR 생성·Slang 생성·의존 파일 해시를 매 프레임 수행하지 않는다.
+
+`ComputeMaterialSourceKey`는 코드 생성 전에 SHA-256 입력 키를 만든다. 키에는 노드와 연결,
+컴파일에 영향을 주는 소켓 값·property·group 본문·Blackboard·active output·schema가 들어간다.
+노드 위치·접힘·frame·pan/zoom과 다음 ID 할당값은 제외한다. 따라서 배치 정리만으로 컴파일
+캐시를 무효화하지 않는다. 유효하지 않은 graph도 키를 만들 수 있으므로 키 계산 성공은 컴파일
+성공을 뜻하지 않는다.
+
+명시적 Apply/Save는 한 번의 worker 요청에서 이전 검증 결과를 확인한다. 소스 키가 같아도
+host/adapter, 컴파일 정책, 컴파일러 identity, 의존 파일 또는 include 해석이 달라지면 재사용하지 않는다.
+include 가림 검사는 공통 include 디렉터리와 실제 생성 소스의 검색 위치, 다음 요청의 cache 위치를
+함께 확인한다. 임시 디렉터리의 무작위 이름은 키에 넣지 않아 캐시를 매번 무효화하지 않는다.
+유효한 메모리 결과 또는 `.scene-cache`는 `GenerateSlang`보다 먼저 확인한다. cache hit을
+확인하기 위해 Slang global session을 새로 만들지 않는다. 실제 bytecode와 dependency 검증은 유지한다.
+Save의 최종 소스 일치 검사는 키 비교이며 코드 생성을 다시 호출하지 않는다.
+
+| 변경 또는 상태 | 수행하는 작업 |
+| --- | --- |
+| 새 문서 열기, 요청 없는 idle | 기본 2노드·1연결 초안 유지. 셰이더 준비 작업을 예약하지 않음 |
+| 노드 위치·접힘·view·frame 편집 | 문서 revision/dirty만 갱신. Save 시 동일 소스와 현재 환경을 worker에서 확인 |
+| 노드·연결·컴파일용 기본값 변경 | 초안만 변경. Apply/Save 또는 사용자가 켠 자동 미리보기에서 준비 |
+| 편집기 instance 기본값 변경 | 초안만 변경. Apply/Save 또는 자동 미리보기 요청 시 기존 generation을 재사용할 수 있음 |
+| 컴파일 실패 | 마지막 정상 material 유지. 같은 실패 초안을 idle에서 자동 재시도하지 않음 |
+| 창 숨김·종료 | 새 컴파일·자산 게시·저장 요청을 만들지 않음. 이미 수락한 작업의 수명만 정리 |
+
+authoring source/environment 증명은 runtime-only 데이터다. cooked 파일 포맷과 런타임
+`contentDigest`에는 넣지 않는다. 다른 소스가 동일한 제품을 만들면 기존 generation 공유를
+유지하면서 세션이 검증한 authoring 결과는 별도로 보관한다. parameter 기본값 lookup은 소스
+revision마다 한 번 구성하며, 각 위젯을 그릴 때 graph/group을 반복 순회하지 않는다.
+동일한 준비 결과를 재검증한 경우에는 instance와 preview revision도 유지하므로 Apply 뒤 Save가
+변하지 않은 미리보기의 GPU 결과를 무효화하지 않는다.
+Material Status도 준비된 program 또는 해당 요청의 실패 진단을 사용한다.
 
 ## 4. 열린 문서의 HTTP 편집
 
@@ -159,12 +215,13 @@ material.editor <operation> <document-id> <revision> <args...>
 ```
 
 `state`는 document ID, revision, dirty, uiFrames, graph GUID, path,
-node/pin/link 목록과 표시 geometry를 반환한다. 수정 요청은 **문서 ID와 revision을
+node/pin/link 목록과 표시 geometry를 반환한다. `sourceRevision`과 `instanceRevision`은
+준비 결과의 의미 변경 경계를 구분한다. 수정 요청은 **문서 ID와 revision을
 모두 일치시켜야** 한다. Reload는 새 문서 ID를 발급해 이전 요청을 무효화한다.
 
 | operation | args |
 | --- | --- |
-| save / apply / reload / undo / redo | 없음 |
+| save / apply / compile / reload / undo / redo | 없음 (`compile`은 `apply`의 별칭) |
 | add | node type |
 | connect | output pin ID, input pin ID |
 | disconnect | link ID |
@@ -176,7 +233,30 @@ node/pin/link 목록과 표시 geometry를 반환한다. 수정 요청은 **문�
 타입 불일치, 잘못된 document/revision, 비유한 수, 존재하지 않는 ID는 무변경 오류다.
 변경은 Undo transaction, revision과 dirty를 갱신하며 자동 저장하지 않는다.
 
+`apply`/`compile`/`save`의 성공 응답은 비동기 요청 수락이다. 반환된 `requestSerial`을
+보관하고 `state`에서 `requestSerial`이 여전히 그 값인지 확인한다. `requestPending`이 false이고
+`completedRequestSerial`도 같은 값일 때 `requestSucceeded`와 `requestError`로 완료 결과를 판정한다.
+다른 요청이 교체했다면 그 결과로 이전 요청의 성공을 판정하지 않는다. `requestPending`과
+`requestAction`은 현재 요청 상태이고, `lastPreparationReused`는 마지막 준비 결과의 재사용 여부다.
+`catalogRegistered`와 `saveWarning`은 저장·게시 후 catalog 등록 결과를 구분한다.
+자동 미리보기는 `material.editor auto-preview on|off`로 설정하며 `automaticPreview`로 확인한다.
+`preview on|off|refresh`는 미리보기 수요/명시적 새로고침이며 자동 적용·저장 명령이 아니다.
+
 ## 5. 검증과 남은 범위
+
+### 2026-10-18 변경의 검증 상태
+
+소스 비교로 revision 분리, 명시적 요청 수명, source/environment 증명, 저장 실패 복구,
+단일 owner tick과 미리보기 지연 준비의 연결을 검토했다. 사용자 지시에 따라 이 변경에서는
+빌드·셰이더 컴파일·회귀 테스트·분석기·GPU 실행·성능 측정을 실행하지 않았다.
+
+`material_codegen_probe.cpp`에는 배치/ID 할당 제외, 의미 변경·group·schema invalidation과
+document/content revision의 Undo/Redo·drag 사례를 추가했다. 세 Editor 회귀 스크립트에는
+명시적 요청 완료 대기, 자동 적용/저장 금지, 배치 편집 재사용, 잘못된 초안의 기존 결과 보존과
+파일 쓰기 실패 복구 사례를 갱신했다. 이들은 다음 허가된 Windows 검증에서 실행할 코드이며
+이번 변경의 통과 결과가 아니다. 아래 과거 실행 기록도 이번 변경의 실행 증거로 사용하지 않는다.
+
+### 이전 구현의 검증 기록
 
 `Tools/regression/verify-material-node-editor.ps1`는 격리한 프로젝트의 실제 Editor를
 숨긴 창으로 실행하고 인증 HTTP로 조작한다. 실제 창의 ImGui frame 진행,
@@ -378,24 +458,25 @@ sample 수와 texture resource 수, 현재 하나의 graph specialization도 표
 Special은 추가 조명·화면 점유 비용을 문장으로 설명하고 Transparent 재질에는 중첩 위험을 알린다.
 내부 register, descriptor, MRT, PSO 선택은 노출하지 않는다.
 
-Material Node Editor의 Material Status는 초안 graph를 분석해 예상 tier·route·샘플 수를 보여
-준다. 지원하지 않는 소켓·노드·named UV 등은 실패 이유와 가능한 수정 방향을 표시하고,
-실패한 초안을 조용히 다른 재질로 대체하지 않는다. 이 값은 초안의 추정치이며 실제 제품
-shader 검증은 Apply가 수행한다. pan/zoom과 값 편집이 document revision을 바꾸므로 분석은
-조작이 멈춘 뒤 갱신한다.
+Material Node Editor의 Material Status는 준비된 program의 tier·route·샘플 수를 보여 준다.
+2026-10-18 변경부터 상태 표시를 위해 `GenerateSlang`을 별도로 호출하지 않는다. 현재 초안이
+아직 준비되지 않았으면 Apply/Save가 필요하다고 표시하고, 실패한 요청은 원인과 수정 방향을
+표시한다. 실패한 초안을 조용히 다른 재질로 대체하지 않는다.
 
 Material Preview는 별도의 논리 live view(viewId=3)에서 내장 UV sphere를 렌더한다. Scene Material의
 실제 적용 instance/texture owner/generation을 그대로 밀봉하고 동일 Scene shader 경로를 사용한다.
 Scene object·sprite·decal·UI는 제외하고 고정 key light와 현재 Scene의 환경을 사용한다.
 Surface의 조명·형상은 Scene object와 다르므로 픽셀 일치를 뜻하지 않는다.
-Save/Apply 전 초안은 미리보기에 반영되지 않는다. 완료된 요청 instance의 GPU 결과를 캐시하고,
+기본 모드에서 초안은 Apply/Save 요청 뒤 준비된다. 사용자가 자동 미리보기를 켰거나 명시적으로
+미리보기를 새로고침하면 저장·게시 없이 준비할 수 있다. 완료된 요청 instance의 GPU 결과를 캐시하고,
 재질/coverage 변경·Refresh·리사이즈 때 갱신한다. 숨긴 뒤 다시 열면 동일 결과를 재게시한다.
 Transparent coverage에는 아직 제품 Scene graph replacement가 없어 지원 한계를 설명한다.
 Apply/import 실패는 마지막 정상 재질을 유지하며 원인과 수정 방향을 표시한다.
 
-현재 UI의 미리보기는 MeshRenderer Inspector의 기본 접힘 `Preview` 섹션에 있다.
-구체와 격자 바닥을 표시하며 노드 창을 닫아도 Inspector의 수요가 유지된다.
-노드 창의 보조 패널은 선택 노드 설명과 소켓 정보를 표시한다.
+미리보기는 노드 창의 초안 패널과 MeshRenderer Inspector의 기본 접힘 `Preview` 섹션에서
+요청할 수 있다. 구체와 격자 바닥을 표시하며 노드 창을 닫아도 Inspector의 수요가 유지된다.
+새 초안을 여는 것만으로 바닥 graph 컴파일을 요청하지 않고, 준비된 표시 소스가 실제로 필요할 때
+한 번 준비한다. 노드 창의 보조 패널은 선택 노드 설명과 소켓 정보도 표시한다.
 초기 노드 창 미리보기 UI를 이 구성으로 변경한 실제 실행 증거는
 [MAT9NodeEditorPerformance](../analysis/MAT9NodeEditorPerformance.md)에 보존한다.
 
@@ -408,15 +489,10 @@ Debug CreatorEditor 전체 빌드와 기존 Material Node Editor 제품 회귀�
 1,337개 검사(`LX_MATERIAL_NODE_EDITOR_OK`, source drift 0, 정상 종료)다.
 구체의 실제 draw/픽셀 변경·완료 이미지 재사용·숨김 후 재게시·실패한 Apply의 정상 generation 보존을 검사했다. 실제 Windows UI로 File Load Scene→Ground Inspector→노드 창 진입과 preview 열기/Refresh를 확인했다. 메뉴는 씬 소유 스레드에 scene.switch를 큐잉하며, 작은 창의 상태/preview 설명은 줄바꿈한다. 증거: Build/Obj/mat8-preview-regression4.log, mat8-preview-menu-build.log, mat8-preview-wrap-build.log 및 MaterialProductProbe/NodeEditor-Debug-5736845a10e7의 5개 최종 capture. Release·성능·Blender rendered parity는 MAT-9에서 판정한다.
 
-## Scene context 변경 (2026-10-01)
+## Scene context와 자산 문서
 
-성공한 `activeSceneChangedEvent`와 Open/Draw/Preview/HTTP 접근의 context guard가
-active Scene ID를 비교한다. 다른 Scene이면 active document·selection·pinned/Inspector preview를
-해제한다. Open Materials는 현재 Scene에서 resolve되는 EntityHandle/component 문서만 보여준다.
-실패한 Scene load가 Scene을 교체하지 않으면 기존 문서는 유지한다. 삭제된 대상도 새 Scene에 바인딩하지 않는다.
-
-미저장 문서는 메모리에 유지하고 `Saved/Editor/MaterialDrafts/Scene_<id>_Document_<id>.shadergraph`에
-복구 사본을 쓴다. 원 자산을 자동으로 덮어쓰거나 새 Scene에 Apply하지 않는다.
-사본 쓰기 실패는 문서를 유지하고 빈 창의 안내에 표시한다. 명시적 복구 열기/새 자산 저장 UX는 W9에 남는다.
-`material.editor sessions`는 활성 여부/current scene·visible 문서/retained draft 신원을 보고한다.
-Scene 외 직접 자산 편집은 별도 context 모드로 계획하며 이번 scene-bound 창에 암묵적으로 섞지 않는다.
+현재 문서는 자산이 소유한다. Scene 선택 없이 새 material 자산을 만들거나 기존 자산을 열 수 있다.
+Scene context guard는 active Scene ID가 달라지면 Inspector 미리보기와 세션의 이전 Mesh 대상
+handle/component를 해제한다. 열린 자산 문서와 미저장 초안은 유지하고 새 Scene에 자동 할당하지 않는다.
+Assign은 현재 선택한 MeshRenderer를 다시 검사한다. 종료는 별도의 Apply/Save를 만들지 않으므로
+보존할 변경은 종료 전에 Save를 요청해야 한다.

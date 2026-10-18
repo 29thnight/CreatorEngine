@@ -21,6 +21,7 @@
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "Material.h"
+#include "../../Lattice/Material/LXMaterialCompiler.h"
 #include "Sha256.h"
 #include "PathFinder.h"
 #include "AuthoringParsedDocument.h"
@@ -2341,27 +2342,44 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		return CreateMetaLocked(destination, preferredGuid);
 	}
 
-    bool SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
-                           const file::path& requestedGraphPath, FileGuid graphGuid, std::string& error)
+    bool SaveMaterialGraph(own::shared_owner<Material> preparedMaterial,
+                           const own::shared_owner<const Material>& expectedMaterial,
+                           const LX::LXMaterialAsset& graph, const file::path& requestedGraphPath, FileGuid graphGuid,
+                           EditorAssetDatabase::MaterialGraphSaveResult& result, std::string& error)
     {
         std::lock_guard lock(m_authoringMutex);
+        result = {};
         error.clear();
-        const auto accepted = DataSystems->FindCachedMaterial(material.m_fileGuid);
-        const auto& instance = material.GetMaterialGraphInstance();
-        const auto acceptedGeneration = DataSystems->ResolveMaterialGraphGeneration(graphGuid);
-        if (!PathFinder::IsAssetAuthoringEnabled() || !accepted || std::addressof(*accepted) != &material || !instance ||
-            !material.m_fileGuid.IsRandomV4() || instance->description.graphId.value != graphGuid.m_guid ||
-            !acceptedGeneration || !instance->generation ||
-            std::addressof(*acceptedGeneration) != std::addressof(*instance->generation))
+        if (!preparedMaterial)
         {
-            error = "Apply the current material draft before saving; its accepted asset changed.";
+            error = "Save requires a completed material compilation.";
             return false;
         }
-        const auto program = LX::GenerateMaterialSlang(graph);
-        if (!program || program->slang != instance->generation->cooked.product.program.slang ||
-            LX::WriteMaterialProgramMetadata(*program) != instance->generation->cooked.metadata)
+        // 완료된 요청의 값을 고정한 뒤 파일과 런타임에 같은 후보를 전달한다.
+        auto candidate = own::make_shared<Material>(*preparedMaterial);
+        const auto& material = *candidate;
+        const auto accepted = DataSystems->FindCachedMaterial(material.m_fileGuid);
+        const auto& instance = material.GetMaterialGraphInstance();
+        if (!PathFinder::IsAssetAuthoringEnabled() || !instance ||
+            static_cast<bool>(accepted) != static_cast<bool>(expectedMaterial) ||
+            (accepted && std::addressof(*accepted) != std::addressof(*expectedMaterial)) ||
+            !material.m_fileGuid.IsRandomV4() || instance->description.graphId.value != graphGuid.m_guid ||
+            material.m_fileGuid == graphGuid || !instance->generation ||
+            instance->generation->assetId != instance->description.graphId)
         {
-            error = "The graph draft differs from the accepted material. Apply it before saving.";
+            error = "The prepared material or accepted asset changed. Compile the current draft before saving.";
+            return false;
+        }
+        std::string sourceKey;
+        if (!LX::ComputeMaterialSourceKey(graph, sourceKey, error))
+        {
+            return false;
+        }
+        if (instance->generation->authoringSourceKey.empty() ||
+            instance->generation->authoringEnvironmentKey.empty() ||
+            instance->generation->authoringSourceKey != sourceKey)
+        {
+            error = "The graph draft differs from the completed compilation. Compile it before saving.";
             return false;
         }
         std::error_code pathError;
@@ -2397,7 +2415,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         Material serializedMaterial(material);
         if (!DataSystems->SerializeMaterialPayload(serializedMaterial, materialDocument.Root()))
         {
-            error = "The accepted material cannot be serialized.";
+            error = "The prepared material cannot be serialized.";
             return false;
         }
         const auto prepare = [&](const file::path& path, FileGuid guid, std::string payload) {
@@ -2425,6 +2443,13 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             }
             metadata.Root().Child("guid").SetScalar(guid.ToString());
             metadata.Root().Child("importSettings").Child("extension").SetScalar(path.extension().string());
+            if (path == graphPath)
+            {
+                // 저장된 키는 참고 정보다. 컴파일 재사용은 메모리의 검증된 증명을 사용한다.
+                auto source = metadata.Root().Child("materialGraph");
+                source.Child("sourceKeyVersion").SetScalar(LX::kMaterialSourceKeyVersion);
+                source.Child("sourceKey").SetScalar(sourceKey);
+            }
             files.push_back({metaPath, {}, metadata.Dump(), false});
             files.push_back({path, {}, std::move(payload), false});
             return true;
@@ -2482,38 +2507,79 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 }
             }
         };
-        std::size_t completed = 0;
-        for (; completed < files.size(); ++completed)
-        {
-            if (!write(files[completed].path, files[completed].next))
-            {
-                break;
-            }
-        }
-        if (completed != files.size())
-        {
-            error = "Material/graph save failed; the previous files were restored.";
+        std::size_t attempted = 0;
+        const auto restore = [&]() noexcept {
             bool restored = true;
-            while (completed != 0)
+            while (attempted != 0)
             {
-                const auto& saved = files[--completed];
-                if (saved.existed)
+                const auto& saved = files[--attempted];
+                try
                 {
-                    restored = write(saved.path, saved.previous) && restored;
+                    if (saved.existed)
+                    {
+                        std::ifstream input(saved.path, std::ios::binary);
+                        const std::string current{std::istreambuf_iterator<char>(input),
+                                                  std::istreambuf_iterator<char>{}};
+                        const bool unchanged = input && current == saved.previous;
+                        input.close();
+                        restored = (unchanged || write(saved.path, saved.previous)) && restored;
+                    }
+                    else
+                    {
+                        std::error_code removeError;
+                        file::remove(saved.path, removeError);
+                        restored = !removeError && restored;
+                    }
                 }
-                else
+                catch (...)
                 {
-                    std::error_code removeError;
-                    file::remove(saved.path, removeError);
-                    restored = !removeError && restored;
+                    restored = false;
                 }
             }
             rememberFinal();
+            return restored;
+        };
+        const auto failAndRestore = [&]() {
+            if (!restore())
+            {
+                error += " File rollback was incomplete. Inspect both asset files before retrying.";
+            }
+            return false;
+        };
+        try
+        {
+            while (attempted < files.size())
+            {
+                // 실패한 쓰기 자체도 원복한다. 쓰기 함수가 교체 후 실패했을 수 있다.
+                const auto& saved = files[attempted++];
+                if (!write(saved.path, saved.next))
+                {
+                    error = "Material/graph save failed; the accepted runtime material is unchanged.";
+                    return failAndRestore();
+                }
+            }
+            // 게시 경쟁이나 의존 머티리얼 검증 실패 시 카탈로그를 건드리기 전에 파일을 되돌린다.
+            if (!DataSystems->PublishMaterialAsset(candidate, expectedMaterial, error, &result.publishedMaterial))
+            {
+                return failAndRestore();
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            // 메시지 할당도 실패할 수 있으므로 파일 복원을 먼저 마친다.
+            const bool restored = restore();
+            error = std::string("Material/graph save failed: ") + exception.what();
             if (!restored)
             {
-                error = "Material/graph save failed and rollback was incomplete. Inspect both asset files before "
-                    "retrying.";
+                error += " File rollback was incomplete. Inspect both asset files before retrying.";
             }
+            return false;
+        }
+        catch (...)
+        {
+            const bool restored = restore();
+            error = restored ? "Material/graph save failed; the previous files were restored."
+                             : "Material/graph save failed and file rollback was incomplete. Inspect both assets.";
             return false;
         }
         rememberFinal();
@@ -2523,17 +2589,22 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 RuntimeAssetType::MaterialGraph, graphGuid, graphPath});
             const bool registeredMaterial = DataSystems->ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert,
                 RuntimeAssetType::Material, material.m_fileGuid, materialPath});
-            if (!registeredGraph || !registeredMaterial)
+            result.catalogRegistered = registeredGraph && registeredMaterial;
+            if (!result.catalogRegistered)
             {
-                error = "Both files were saved, but an asset catalog identity conflict prevented registration.";
-                return false;
+                result.warning = "Saved and applied, but an asset catalog identity conflict prevented registration.";
             }
         }
         catch (const std::exception& exception)
         {
-            error = "Both files were saved, but catalog registration failed: " + std::string(exception.what());
-            return false;
+            result.warning = "Saved and applied, but catalog registration failed: " + std::string(exception.what());
         }
+        catch (...)
+        {
+            result.warning = "Saved and applied, but catalog registration failed.";
+        }
+        // 이 시점에는 파일과 런타임이 모두 같은 후보를 채택했다. 등록 경고로 성공을 되돌리지 않는다.
+        error.clear();
         return true;
     }
 
@@ -4566,9 +4637,12 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
     return true;
 }
 
-bool EditorAssetDatabase::SaveMaterialGraph(const Material& material, const LX::LXMaterialAsset& graph,
-                                            const file::path& graphPath, FileGuid graphGuid, std::string& error)
+bool EditorAssetDatabase::SaveMaterialGraph(own::shared_owner<Material> preparedMaterial,
+                                            const own::shared_owner<const Material>& expectedMaterial,
+                                            const LX::LXMaterialAsset& graph, const file::path& graphPath,
+                                            FileGuid graphGuid, MaterialGraphSaveResult& result, std::string& error)
 {
+    result = {};
     if (!m_impl)
     {
         error = "The Editor asset database is unavailable.";
@@ -4576,11 +4650,35 @@ bool EditorAssetDatabase::SaveMaterialGraph(const Material& material, const LX::
     }
     try
     {
-        return m_impl->SaveMaterialGraph(material, graph, graphPath, graphGuid, error);
+        return m_impl->SaveMaterialGraph(std::move(preparedMaterial), expectedMaterial, graph, graphPath,
+                                         graphGuid, result, error);
     }
     catch (const std::exception& exception)
     {
+        if (result.publishedMaterial)
+        {
+            // 게시 뒤 경고 문자열 구성에 실패해도 호출자는 저장된 런타임 소유자를 채택해야 한다.
+            try
+            {
+                result.warning = std::string("Saved and applied; catalog status is unavailable: ") + exception.what();
+            }
+            catch (...)
+            {
+            }
+            error.clear();
+            return true;
+        }
         error = exception.what();
+        return false;
+    }
+    catch (...)
+    {
+        if (result.publishedMaterial)
+        {
+            error.clear();
+            return true;
+        }
+        error = "Material/graph save failed before publication.";
         return false;
     }
 }

@@ -1,4 +1,5 @@
 #include "../../Lattice/Material/LXMaterialCompiler.h"
+#include "../../Lattice/Core/LXDocument.h"
 #include "material_probe_compiler.h"
 #include "material_probe_gpu.h"
 
@@ -629,6 +630,148 @@ void NativeTests(const LXMaterialDefinitions& definitions, const std::vector<Cas
           "Live default participates in key");
 }
 
+void AuthoringKeyTests(const LXMaterialDefinitions& definitions, const std::vector<Case>& cases)
+{
+    const auto key = [](const LXMaterialAsset& asset) {
+        std::string result, error;
+        const bool valid = ComputeMaterialSourceKey(asset, result, error);
+        Check(valid, "Material source key: " + error);
+        Check(result.size() == 64 && std::ranges::all_of(result, [](char character) {
+            return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f');
+        }), "Material source key uses SHA-256");
+        return result;
+    };
+    const auto source = Surface(definitions, "authoring-input");
+    const auto original = key(source.asset);
+    auto layout = source.asset;
+    Check(layout.graph.SetNodePosition(source.surface, 321.f, 123.f), "Move authoring node");
+    Check(layout.graph.SetNodeCollapsed(source.surface, true), "Collapse authoring node");
+    Check(layout.graph.SetView({true, 40.f, -90.f, 1.5f}), "Change authoring view");
+    Check(layout.graph.AddFrame("Layout only", 0.f, 0.f, 800.f, 600.f, {source.surface}) != 0,
+          "Create authoring frame and advance ID allocator");
+    Check(key(layout) == original, "Layout and allocator changes do not invalidate the shader input");
+    std::string restoreError;
+    const auto restoredLayout = LXMaterialArchive::Read(LXMaterialArchive::Write(layout), definitions, &restoreError);
+    Check(restoredLayout && key(*restoredLayout) == original,
+          "Saving and reopening layout does not change effective source defaults: " + restoreError);
+    for (const auto& fixture : cases)
+    {
+        const auto restored = LXMaterialArchive::Read(LXMaterialArchive::Write(fixture.asset), definitions,
+                                                      &restoreError);
+        Check(restored && key(*restored) == key(fixture.asset),
+              "Source key survives the material archive roundtrip: " + fixture.name + ": " + restoreError);
+    }
+
+    auto changed = source.asset;
+    Set(changed.graph, source.surface, "Roughness", .75);
+    Check(key(changed) != original, "Compile-time socket value invalidates the shader input");
+    Check(changed.graph.Undo() && key(changed) == original, "Undo restores the prior shader input key");
+    Check(changed.graph.Disconnect(changed.graph.Links().front().id), "Disconnect material output");
+    Check(key(changed) != original, "Connections participate before code generation");
+
+    changed = source.asset;
+    changed.scopes[0].nodes[source.surface].schemaRevision += 1;
+    Check(key(changed) != original, "Invalid node schema cannot reuse an older valid input");
+    changed = source.asset;
+    changed.scopes[0].sockets[PinId(changed.graph, source.surface, "Base Color")].colorSpace = LXColorSpace::SRGB;
+    Check(key(changed) != original, "Socket color interpretation participates in source identity");
+
+    const auto parameter = std::ranges::find(cases, std::string("runtime-parameters"), &Case::name);
+    Check(parameter != cases.end() && !parameter->asset.blackboard.empty(), "Parameter key fixture exists");
+    changed = parameter->asset;
+    const auto parameterKey = key(changed);
+    changed.blackboard.front().exposed = !changed.blackboard.front().exposed;
+    Check(key(changed) != parameterKey, "Parameter contract changes invalidate the shader input");
+
+    auto grouped = source.asset;
+    LXGraph body("material", definitions.nodes);
+    const auto multiply = body.CreateNode("LXMultiplyFloat", 0.f, 0.f);
+    Set(body, multiply, "B", .5);
+    const auto group = grouped.graph.CreateGroup("Key group", body,
+        {{0, "factor", "Factor", Direction::Input, PinType::Float, PinId(body, multiply, "A"), 1.0},
+         {0, "result", "Result", Direction::Output, PinType::Float,
+          PinId(body, multiply, "Result", Direction::Output)}});
+    Check(group != 0, "Create source key group fixture");
+    const auto groupKey = key(grouped);
+    Check(body.SetNodePosition(multiply, 700.f, 300.f) && grouped.graph.ReplaceGroupBody(group, body),
+          "Move a node inside a shared group");
+    Check(key(grouped) == groupKey, "Nested layout is excluded from source identity");
+    Set(body, multiply, "B", .25);
+    Check(grouped.graph.ReplaceGroupBody(group, body) && key(grouped) != groupKey,
+          "Nested group implementation changes invalidate source identity");
+}
+
+void AuthoringRevisionTests(const LXMaterialDefinitions& definitions)
+{
+    const auto source = Surface(definitions, "authoring-revisions");
+    LXDocument document(source.asset.graph, {}, true);
+    const auto execute = [&](const LXCommand& command) {
+        const auto result = document.Execute(command, document.Revision());
+        Check(result.applied, "Authoring revision command: " + result.code);
+    };
+    const auto initial = document.ContentRevision();
+    execute(LXSetNodePosition{source.surface, 321.f, 123.f});
+    Check(document.Revision() != 0 && document.Dirty() && document.ContentRevision() == initial,
+          "Layout changes document revision and dirty state without changing content revision");
+    execute(LXUndo{});
+    Check(!document.Dirty() && document.ContentRevision() == initial,
+          "Layout Undo restores the saved graph without a content revision");
+    execute(LXRedo{});
+    Check(document.Dirty() && document.ContentRevision() == initial,
+          "Layout Redo remains a document-only change");
+    execute(LXSetNodeCollapsed{source.surface, true});
+    execute(LXSetView{{true, 80.f, -20.f, 1.5f}});
+    const auto frame = document.Execute(LXAddFrame{"Presentation", 0.f, 0.f, 800.f, 600.f, {source.surface}},
+                                        document.Revision());
+    Check(frame.applied && document.ContentRevision() == initial, "Frame allocation is presentation-only");
+    execute(LXUndo{});
+    execute(LXRedo{});
+    Check(document.ContentRevision() == initial, "Frame Undo and Redo do not invalidate content");
+
+    execute(LXSetSocketValue{PinId(document.Graph(), source.surface, "Roughness"), .75});
+    const auto valueRevision = document.ContentRevision();
+    Check(valueRevision > initial, "Shader input edit advances content revision");
+    execute(LXUndo{});
+    Check(document.ContentRevision() > valueRevision, "Semantic Undo invalidates a pending shader result");
+    const auto undone = document.ContentRevision();
+    execute(LXRedo{});
+    Check(document.ContentRevision() > undone, "Semantic Redo advances content revision");
+
+    const auto content = document.ContentRevision();
+    const auto revision = document.Revision();
+    const auto start = *document.Graph().FindLayout(source.surface);
+    Check(document.PreviewNodePositions({{source.surface, start.x + 10.f, start.y + 20.f}}),
+          "Preview an authoring node drag");
+    Check(document.HasActivePreview() && document.Revision() == revision && document.ContentRevision() == content,
+          "Drag preview does not invalidate a pending shader result");
+    Check(document.FinishNodePositionPreview({{source.surface, start.x, start.y}},
+              {{source.surface, start.x + 10.f, start.y + 20.f}}).applied,
+          "Commit authoring node drag");
+    Check(!document.HasActivePreview() && document.ContentRevision() == content && document.Revision() > revision,
+          "Committed drag changes only the document revision");
+
+    auto grouped = source.asset.graph;
+    LXGraph body("material", definitions.nodes);
+    const auto multiply = body.CreateNode("LXMultiplyFloat", 0.f, 0.f);
+    const auto group = grouped.CreateGroup("Revision group", body,
+        {{0, "factor", "Factor", Direction::Input, PinType::Float, PinId(body, multiply, "A"), 1.0},
+         {0, "result", "Result", Direction::Output, PinType::Float,
+          PinId(body, multiply, "Result", Direction::Output)}});
+    Check(group != 0, "Create nested revision fixture");
+    LXDocument nested(std::move(grouped), {}, true);
+    const auto nestedContent = nested.ContentRevision();
+    Check(body.SetNodePosition(multiply, 90.f, 140.f), "Move nested revision fixture node");
+    Check(nested.Execute(LXReplaceGroupBody{group, body}, nested.Revision()).applied &&
+          nested.ContentRevision() == nestedContent, "Nested layout edit keeps content revision");
+    Check(nested.Execute(LXUndo{}, nested.Revision()).applied &&
+          nested.ContentRevision() == nestedContent, "Nested layout Undo keeps content revision");
+    Check(nested.Execute(LXRedo{}, nested.Revision()).applied &&
+          nested.ContentRevision() == nestedContent, "Nested layout Redo keeps content revision");
+    Set(body, multiply, "B", .25);
+    Check(nested.Execute(LXReplaceGroupBody{group, body}, nested.Revision()).applied &&
+          nested.ContentRevision() > nestedContent, "Nested semantic edit advances content revision");
+}
+
 void CheckSpirvBindings(const std::vector<std::uint8_t>& bytes, const LXMaterialProgram& program)
 {
     Check(bytes.size() >= 20 && bytes.size() % 4 == 0, "SPIR-V extent");
@@ -799,6 +942,8 @@ int main(int argc, char** argv)
         const auto definitions = CreateMaterialDefinitions();
         const auto cases = Cases(definitions);
         NativeTests(definitions, cases);
+        AuthoringKeyTests(definitions, cases);
+        AuthoringRevisionTests(definitions);
         MaterialProbe::CompilerRuntime compiler;
         compiler.Initialize(root);
         std::vector<Input> inputs{{{.25f, .25f, 0, 0}, {.25f, 0, 0, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}},

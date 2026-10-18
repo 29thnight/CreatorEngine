@@ -26,6 +26,7 @@ namespace editor::material_editing
         None,
         Save,
         Apply,
+        ToggleAutomaticPreview,
         NewGraph,
         SaveAs,
         Assign,
@@ -48,7 +49,7 @@ namespace editor::material_editing
     void DrawMaterialContextSelector();
     MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editable, bool showGrid, bool snapToGrid,
                                           const std::function<void()>& materialMenu,
-                                          const std::function<void()>& overlayMenu);
+                                          const std::function<void()>& overlayMenu, bool automaticPreview = false);
     void DrawMaterialBreadcrumb(ImVec2 origin, ImVec2 size, const std::string& object, const std::string& mesh,
                                 const std::string& material, const std::string& status = {});
 } // namespace editor::material_editing

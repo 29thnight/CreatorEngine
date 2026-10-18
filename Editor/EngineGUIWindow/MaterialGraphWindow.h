@@ -12,7 +12,7 @@ namespace editor::material_editing
     void OnActiveSceneChanged();
     void Shutdown();
     void Draw();
-    void TickAutomaticChanges();
+    void TickPendingRequests();
     void DrawInspectorPreview(MeshRenderer& renderer);
     bool CapturePreviewRequest(EnhancedLiveViewRequest& request);
     CommandCore::CommandResult Command(const std::vector<std::string>& parts);

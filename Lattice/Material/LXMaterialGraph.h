@@ -102,11 +102,14 @@ class LXMaterialArchive
   public:
     static constexpr std::uint32_t SchemaVersion = 1;
     static std::string Write(const LXMaterialAsset& asset);
+    // 실행 입력의 정규 표현이다. 배치·화면 상태와 ID 할당기는 포함하지 않는다.
+    static std::string WriteSource(const LXMaterialAsset& asset);
     static std::optional<LXMaterialAsset> Read(const std::string& text, const LXMaterialDefinitions& definitions,
                                                std::string* error = nullptr);
 
   private:
     friend class LXMaterialAsset;
+    static std::string WriteDocument(const LXMaterialAsset& asset, bool includeLayout);
     struct Reader;
 };
 

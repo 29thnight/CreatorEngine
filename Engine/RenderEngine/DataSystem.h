@@ -519,7 +519,7 @@ public:
     }
     bool ReloadMaterialAsset(FileGuid guid, std::string& error);
     bool PublishMaterialAsset(own::shared_owner<Material> candidate, const own::shared_owner<const Material>& expectedCurrent,
-                              std::string& error);
+                              std::string& error, own::shared_owner<const Material>* published = nullptr);
 	std::vector<std::pair<std::string, own::shared_owner<const Material>>> SnapshotMaterials();
 	own::shared_owner<const Material> RegisterImportedMaterial(
 		own::shared_owner<const Material> material, std::string_view baseName);
@@ -600,6 +600,11 @@ public:
     static own::shared_owner<const material_graph::Generation> CompileMaterialGraphAuthoring(
         const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
         const file::path& cacheDirectory, std::string& error);
+    // 명시적 요청의 작업 스레드에서만 호출한다. 원본뿐 아니라 현재 도구·include 내용도 다시 확인한다.
+    // 다음 요청의 scratch 부모도 검사한다. 빈 cacheDirectory는 기본 Lattice 캐시를 뜻한다.
+    static bool CanReuseMaterialGraphAuthoring(const material_graph::Generation& generation,
+        std::string_view sourceKey, const file::path& shaderDirectory, std::string& error,
+        const file::path& cacheDirectory = {});
     bool PublishMaterialGraphReload(own::shared_owner<const material_graph::Generation> generation,
         const own::shared_owner<const material_graph::Generation>& expected, std::string& error);
     bool PublishCodeShaderReload(const own::shared_owner<const LX::Runtime::ShaderGeneration>& expected,

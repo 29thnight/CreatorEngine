@@ -205,6 +205,8 @@ namespace material_graph
         }
         generation.contentDigest = digest;
         generation.surfaceBlendMode = std::move(surfaceBlendMode);
+        generation.authoringSourceKey = loaded.authoringSourceKey;
+        generation.authoringEnvironmentKey = loaded.authoringEnvironmentKey;
         return true;
     }
 
@@ -313,6 +315,11 @@ namespace material_graph
         charge.Add(sizeof(Generation));
         charge.AddString(cooked.metadata);
         charge.AddString(cooked.boundSource);
+        charge.AddString(cooked.authoringSourceKey);
+        charge.AddString(cooked.authoringEnvironmentKey);
+        charge.AddPath(cooked.authoringSourceDirectory);
+        charge.AddString(authoringSourceKey);
+        charge.AddString(authoringEnvironmentKey);
         if (surfaceBlendMode)
         {
             charge.AddString(*surfaceBlendMode);

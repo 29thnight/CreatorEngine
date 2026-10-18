@@ -314,31 +314,46 @@ void WriteSocketState(std::ostream& out, const LXMaterialSocketState& state)
         << ",\"colorSpace\":" << Quote(SpaceName(state.colorSpace));
 }
 
-void WriteGraph(std::ostream& out, const LXMaterialAsset& asset, const LXGraph& graph, Id scope, unsigned depth)
+void WriteGraph(std::ostream& out, const LXMaterialAsset& asset, const LXGraph& graph, Id scope, unsigned depth,
+                bool includeLayout)
 {
     const std::string indent(depth * 2, ' ');
     out << "{\n"
-        << indent << "  \"domain\":" << Quote(graph.Domain()) << ",\"nextId\":" << graph.NextId() << ",\n"
-        << indent << "  \"nodes\":[";
+        << indent << "  \"domain\":" << Quote(graph.Domain());
+    if (includeLayout)
+    {
+        out << ",\"nextId\":" << graph.NextId();
+    }
+    out << ",\n" << indent << "  \"nodes\":[";
     bool first = true;
     for (const Node& node : graph.Nodes())
     {
         out << (first ? "\n" : ",\n") << indent << "    ";
         first = false;
         const auto state = asset.NodeState(scope, node);
-        if (!state.unknownPayload.empty())
+        if (includeLayout && !state.unknownPayload.empty())
         {
             out << state.unknownPayload;
             continue;
         }
         out << "{\"id\":" << node.id << ",\"definition\":" << Quote(node.type)
-            << ",\"schemaRevision\":" << state.schemaRevision << ",\"title\":" << Quote(node.title)
-            << ",\"groupId\":" << node.groupId << ",\"sockets\":[";
+            << ",\"schemaRevision\":" << state.schemaRevision;
+        if (!includeLayout)
+        {
+            // 보존용 원문이 실제 노드와 소켓 입력을 가려 캐시 검증을 우회하지 않게 한다.
+            out << ",\"unknownPayload\":" << Quote(state.unknownPayload);
+        }
+        out << ",\"title\":" << Quote(node.title) << ",\"groupId\":" << node.groupId << ",\"sockets\":[";
         bool firstPin = true;
         for (const Pin& pin : node.pins)
         {
-            out << (firstPin ? "\n" : ",\n") << indent << "      {\"id\":" << pin.id
-                << ",\"identifier\":" << Quote(pin.Identifier()) << ",\"name\":" << Quote(pin.name)
+            out << (firstPin ? "\n" : ",\n") << indent << "      {\"id\":" << pin.id;
+            if (!includeLayout)
+            {
+                out << ",\"owner\":" << pin.node << ",\"directionValue\":" << static_cast<unsigned>(pin.direction)
+                    << ",\"typeValue\":" << static_cast<unsigned>(pin.type);
+            }
+            out << ",\"identifier\":" << Quote(pin.Identifier()) << ",\"name\":" << Quote(pin.name)
                 << ",\"direction\":" << Quote(pin.direction == Direction::Input ? "input" : "output")
                 << ",\"type\":" << Quote(PinTypeName(pin.type)) << ",\"multiple\":" << pin.multiple
                 << ",\"dynamic\":" << pin.dynamic << ",\"interfaceId\":" << pin.interfaceId << ",\"default\":";
@@ -358,7 +373,13 @@ void WriteGraph(std::ostream& out, const LXMaterialAsset& asset, const LXGraph& 
         if (node.dynamicPins)
         {
             const auto& rule = *node.dynamicPins;
-            out << "{\"direction\":" << Quote(rule.direction == Direction::Input ? "input" : "output")
+            out << '{';
+            if (!includeLayout)
+            {
+                out << "\"directionValue\":" << static_cast<unsigned>(rule.direction)
+                    << ",\"typeValue\":" << static_cast<unsigned>(rule.type) << ',';
+            }
+            out << "\"direction\":" << Quote(rule.direction == Direction::Input ? "input" : "output")
                 << ",\"type\":" << Quote(PinTypeName(rule.type)) << ",\"multiple\":" << rule.multiple
                 << ",\"maxCount\":" << rule.maxCount << '}';
         }
@@ -380,14 +401,23 @@ void WriteGraph(std::ostream& out, const LXMaterialAsset& asset, const LXGraph& 
     first = true;
     for (const auto& [id, group] : graph.Groups())
     {
-        out << (first ? "\n" : ",\n") << indent << "    {\"id\":" << id << ",\"name\":" << Quote(group.name)
-            << ",\"interface\":[";
+        out << (first ? "\n" : ",\n") << indent << "    {\"id\":" << id;
+        if (!includeLayout)
+        {
+            out << ",\"definitionId\":" << group.id;
+        }
+        out << ",\"name\":" << Quote(group.name) << ",\"interface\":[";
         first = false;
         bool firstSocket = true;
         for (const auto& socket : group.sockets)
         {
-            out << (firstSocket ? "\n" : ",\n") << indent << "      {\"id\":" << socket.id
-                << ",\"identifier\":" << Quote(socket.identifier) << ",\"name\":" << Quote(socket.name)
+            out << (firstSocket ? "\n" : ",\n") << indent << "      {\"id\":" << socket.id;
+            if (!includeLayout)
+            {
+                out << ",\"directionValue\":" << static_cast<unsigned>(socket.direction)
+                    << ",\"typeValue\":" << static_cast<unsigned>(socket.type);
+            }
+            out << ",\"identifier\":" << Quote(socket.identifier) << ",\"name\":" << Quote(socket.name)
                 << ",\"direction\":" << Quote(socket.direction == Direction::Input ? "input" : "output")
                 << ",\"type\":" << Quote(PinTypeName(socket.type)) << ",\"internalPin\":" << socket.internalPin
                 << ",\"default\":";
@@ -396,8 +426,17 @@ void WriteGraph(std::ostream& out, const LXMaterialAsset& asset, const LXGraph& 
             out << '}';
         }
         out << "],\"body\":";
-        WriteGraph(out, asset, *group.body, id, depth + 3);
+        if (!group.body || depth > 64)
+        {
+            throw ArchiveError("Material group body is missing or too deep");
+        }
+        WriteGraph(out, asset, *group.body, id, depth + 3, includeLayout);
         out << '}';
+    }
+    if (!includeLayout)
+    {
+        out << "\n" << indent << "  ]\n" << indent << '}';
+        return;
     }
     out << "\n" << indent << "  ],\n" << indent << "  \"layout\":{\"nodes\":[";
     first = true;
@@ -976,6 +1015,16 @@ bool LXMaterialAsset::Equals(const LXMaterialAsset& other) const
 
 std::string LXMaterialArchive::Write(const LXMaterialAsset& asset)
 {
+    return WriteDocument(asset, true);
+}
+
+std::string LXMaterialArchive::WriteSource(const LXMaterialAsset& asset)
+{
+    return WriteDocument(asset, false);
+}
+
+std::string LXMaterialArchive::WriteDocument(const LXMaterialAsset& asset, bool includeLayout)
+{
     std::ostringstream out;
     out.imbue(std::locale::classic());
     out << std::boolalpha << std::setprecision(std::numeric_limits<double>::max_digits10);
@@ -994,7 +1043,7 @@ std::string LXMaterialArchive::Write(const LXMaterialAsset& asset)
             << '}';
     }
     out << "\n  ],\n  \"graph\":";
-    WriteGraph(out, asset, asset.graph, 0, 1);
+    WriteGraph(out, asset, asset.graph, 0, 1, includeLayout);
     out << "\n}\n";
     return out.str();
 }

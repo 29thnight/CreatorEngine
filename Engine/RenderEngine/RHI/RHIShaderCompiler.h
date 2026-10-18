@@ -74,6 +74,12 @@ namespace RHIShaderCompiler
     RHIShaderBinary GetOutput();
     void SetOutput(RHIShaderBinary output);
 
+    // 상위 산출물 캐시도 현재 Slang/DXC/DXIL 번들의 변경을 식별한다. 셰이더를 컴파일하지 않는다.
+    bool GetCompilerIdentity(std::string& result, std::string& error);
+    // includeDirectories에는 생성 소스의 검색 디렉터리도 함께 전달한다.
+    bool CanReuseDependencyResolution(std::span<const std::filesystem::path> dependencies,
+                                      std::span<const std::filesystem::path> includeDirectories);
+
     class ScopedOutput final
     {
     public:
