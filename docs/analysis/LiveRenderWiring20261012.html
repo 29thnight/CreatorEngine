@@ -86,7 +86,62 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 <nav><a href="#validation-current">현재 검증</a> · <a href="#pipeline-overview">배선도</a> · <a href="#shadow-wiring">그림자</a> · <a href="#gpu-distribution">GPU 작업 분배</a> · <a href="#geometry-compression">기하 압축</a> · <a href="#remaining-work">남은 작업</a></nav>
 </header>
 <details id="performance-debug-20261017"><summary>이전 호스트의 최초 성능 측정 · 보관</summary><h2>Debug CreatorRobot 플레이 성능 · 120 FPS 미달</h2><p>2026-10-17: 1186×514 Scene+Game 두 뷰·unlimited·native·15초 기록. Game 뷰 CPU 제출 빈도 3.21회/초, 제출 중앙값 107.78ms / p95 125.87ms. GPU 계측 구간 합집합 중앙값 34.75ms. 빈 장면 Game 제출 빈도는 50.12회/초. 실제 화면 표시 FPS·단일 뷰·1080p 수용은 별도다. CPU MaterialGraphScenePrepare 58.16ms와 RenderGraphBuild 25.89ms, GPU 그림자 컬링을 우선 조사한다. 기록·모델 출력 검사와 정상 종료는 통과했다. <a href="../../Artifacts/performance-debug-20261017/report.html">측정 조건·결과·증거</a></p></details>
-<section id="validation-current"><div id="performance-remeasure-6-20261018"><h2>2026-10-18 · 동기화 재측정 6 및 추가 spin 검증</h2>
+<section id="validation-current">
+<div id="performance-recording-cleanup-20261018">
+<h2>2026-10-18 · 추가 spin 정리·바인딩 중복 제거·완료 경로 진단 구현</h2>
+<p><b>기준 master는 <code>55b865fee8debb924eeb91ea89eefe12bb51aec0</code>다.
+이 절은 재분석에 따른 소스 구현이며 새 성능 결과가 아니다.</b>
+저장소에 기록된 재측정 6 요약과 해당 소스를 대조했다. 연결된 원본 ETL/JSON은 저장소에 없어
+재실행·재분석한 원자료로 취급하지 않았다. 빌드·셰이더 컴파일·테스트·분석기·GPU·벤치마크를 실행하지 않았다.</p>
+<h3>측정에 따른 결정</h3>
+<p><a href="#performance-remeasure-6-20261018">재측정 6</a>에서 worker 25µs 재검증은
+기록 p50 2.366→2.397ms, p95 3.014→3.115ms, Game 24.577→24.353회/s로 개선되지 않았다.
+ETW의 worker 평균 CPU 코어도 ON 0.2836→0.2893, OFF 0.2846→0.2880이었다.
+따라서 추가 spin의 코드·설정·전용 enki ABI를 걷어내고 기존 native DAG는 유지한다.
+이전 전체 병렬/직렬 비교 및 일괄 제출의 수치를 이번 정리의 효과로 재사용하지 않는다.</p>
+<p>최악 기록의 owner Waiting 3.477/3.848ms에 비해 Ready는 0.024/0.022ms였다.
+Waiting 전체가 worker의 순수 CPU 실행 시간이라는 뜻은 아니다. 마지막으로 완료되는 작업의
+본문·선행 경로·게시 이후 경과를 확인할 진단을 보강한다. OS 상태 귀속에는 동일 실행과 시간축의 ETW가 필요하다.</p>
+<table><thead><tr><th>항목</th><th>구현</th><th>검토 경계</th></tr></thead><tbody>
+<tr><td>추가 spin 정리</td><td>owner wait overload·완료 hint atomic, worker scope/controller,
+4개 spin 환경 변수·runtime JSON 필드와 <code>ports/enkits</code> 6개 파일을 제거했다.</td>
+<td>일반 <code>wait()</code>의 완료 mutex/CV, native DAG gate·참조 수명,
+callback/observer 해제 후 완료 게시, 실패/종료 drain은 유지한다.</td></tr>
+<tr><td>visibility SRV 중복 제거</td><td>Material.Resolve와 Temporal.Resolve의
+동일 visibility texture용 단일 SRV table을 callback 내부 첫 적격 draw에서 한 번 만들고 재사용한다.</td>
+<td>대상 draw가 없으면 0회다. 각 draw의 pipeline·root·나머지 bindings와 GPU 수명은 유지하며
+프레임/다른 callback 사이에 table을 보관하지 않는다.</td></tr>
+<tr><td>DAG 완료 경로</td><td>schema 2에 node의 선행 ID·이유, unit/pass/slice 역매핑,
+마지막 <code>completeNs</code> 최댓값과 동률인 모든 node를 넣었다.</td>
+<td>native batch + trace에서만 구성하며 캐시를 포함한 실행 DAG와 일치해야 공개한다.
+4,096 unit/node·16,384 unique edge 상한을 넘으면 부분 topology를 제공하지 않는다.</td></tr>
+<tr><td>Prepare/Declare 분해</td><td>기존 profiler를 사용해 indirect/tile template과 upload,
+visibility buffer·upload 예약·bindings, meshlet 및 shared build 선언을 구분했다.</td>
+<td>기존 per-draw 준비 marker를 재사용한다. 새 draw별 marker·장기 캐시·GPU 분할 정책은 추가하지 않았다.</td></tr>
+<tr><td>분석기·회귀 소스</td><td>schema 1의 과거 spin 파일은 계속 읽고 schema 2는 제거된 필드를
+손실로 세지 않는다. 경로의 동률·시간 인과·역매핑·잘림을 검증한다.</td>
+<td>기존 실패/수명/wave 변이 프로브와 실제 SceneComposition·Temporal GPU readback 소스에
+진단 경계 및 callback당 SRV 생성 수 검증을 보강했다. 실행 통과를 주장하지 않는다.</td></tr>
+</tbody></table>
+<h3>현재 설정과 후속 검증</h3>
+<p><code>CREATOR_RECORDING_BATCH_SUBMIT=1</code>, <code>CREATOR_RECORDING_JOB_TRACE=0</code>이 기본값이다.
+제거된 4개 spin 변수는 남아 있어도 동작하지 않는다. <code>policy.ownerWaitMode=blocking</code>은
+대기 방식이며 OS sleep 카운터가 아니다. 원본 enki의 대기 정책은 기존 vcpkg baseline을 따른다.</p>
+<p><b>원본 enki 헤더·라이브러리·DLL과 모든 소비자를 같은 구성으로 다시 설치·빌드해야 한다.</b>
+이전 패치 DLL과 원본 헤더를 혼용하지 않는다. 다른 port의 overlay 설정과 enki 의존성 선언은 유지했다.
+이 환경에서는 해당 설치·빌드 및 실행 검증을 수행하지 않았다.</p>
+<p>분석기의 완료 경로는 마지막 완료에서 가장 늦은 선행 완료를 따라가는 관측 경로다.
+순수 CPU critical path나 wake 지연으로 이름 붙이지 않는다. topology와 시간 coverage를 나누고,
+중복/상충하는 조회·미제공·잘린 표본은 실제 전체 프레임 분포와 구분한다.
+<code>RenderCommandRecord.Diagnostics</code>는 추적 구성의 비용을 따로 보여 준다.</p>
+<p>후속 성능 비교는 trace OFF에서 동일 입력·의존성·실행 구성을 맞춰 반복하고,
+정확성·실패/종료·동일 입력 GPU 출력과 함께 수용한다. 원인 분석용 trace/ETW는 별도로 수집한다.
+Scene/Game 수요·pacing, worker 수와 우선순위 정책은 이번 수정 범위에 넣지 않았다.
+완료 뷰/s는 Scene+Game 합계이며 표시 FPS가 아니다. 새로운 속도 개선율과 120 FPS 수용은 미확인이다.</p>
+<p>API와 schema 상세는
+<a href="../design/JobSchedulerDesign.md#명령-기록-dag완료-경로-진단-2026-10-18">공용 스케줄러 설계</a>를 따른다.</p>
+</div>
+<div id="performance-remeasure-6-20261018"><h2>2026-10-18 · 동기화 재측정 6 및 추가 spin 검증</h2>
 <p><b>b02466df4 동기화·Debug 재빌드 후 기본 일괄 DAG는 소폭 개선됐으나 120 FPS 목표는 여전히 미달이다. 추가 spin은 다섯 설정을 켜서 측정했고, 후보 재검증에서도 성능 이득을 확인하지 못했다.</b> PR #181의 일괄 제출 기본 ON과 새 enkiTS 의존성을 포함한다. 기본값의 비추적 Game 처리/s는 24.678/24.745, 기록 p50은 2.401/2.384ms다. 직전 50cc903f2 병렬 실행은 24.124/23.330회/s, 2.554/2.678ms였다. 소스·의존성·실행 시점이 달라 특정 수정 하나의 효과로 단정하지 않는다.</p>
 <div class="table-wrap"><table><thead><tr><th>ETW OFF · 실행</th><th>기록 p50/p95 ms</th><th>Game 처리/s · 기록 ON</th><th>완료 뷰/s · 기록 ON/OFF</th></tr></thead><tbody><tr><td>spin 0 · 최초</td><td>2.401 / 3.108</td><td>24.678</td><td>49.541 / 52.771</td></tr><tr><td>spin 0 · 반복</td><td>2.384 / 2.995</td><td>24.745</td><td>49.536 / 53.947</td></tr><tr><td>owner 25</td><td>2.380 / 2.989</td><td>24.812</td><td>49.823 / 51.902</td></tr><tr><td>worker 25</td><td>2.413 / 3.069</td><td>24.516</td><td>49.124 / 53.034</td></tr><tr><td>owner/worker 25</td><td>2.395 / 3.022</td><td>24.950</td><td>49.935 / 52.110</td></tr><tr><td>owner/worker 100</td><td>2.441 / 3.167</td><td>24.442</td><td>49.039 / 52.085</td></tr><tr><td>worker 200 · 허가 2명</td><td>2.607 / 3.435</td><td>23.233</td><td>46.887 / 51.940</td></tr><tr><td>spin 0 · 재검증</td><td>2.366 / 3.014</td><td>24.577</td><td>49.170 / 54.448</td></tr><tr><td>worker 25 · 재검증</td><td>2.397 / 3.115</td><td>24.353</td><td>48.738 / 54.034</td></tr></tbody></table></div>
 <p>일반 spin 조건은 동시 worker 허가 최대 1명·프레임 예약 예산 200µs다. 추가로 worker 200µs·허가 2명·예약 한도 2ms도 시험했다. 비추적 ON/OFF는 각각 15초다. 선별은 기록 OFF 완료 뷰 처리율로 했고, 최고 비영 설정인 worker 25µs를 새 spin 0과 별도로 재검증했다. 재검증에서 기록 p50 2.366→2.397ms, Game 처리/s 24.577→24.353, OFF 완료 뷰/s 54.448→54.034로 이득은 재현되지 않았다. 작은 차이에는 세션 편차가 남으므로 기본값은 바꾸지 않았다. 완료 뷰/s는 Scene+Game 합계이며 표시 FPS가 아니다.</p>
@@ -95,6 +150,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 <p>동일 DLL/PDB·실제로 로드된 새 enkiTS 해시, 8워커·Normal·실제 Editor 전경/auto·CreatorRobot 62 entities PlayingPossessed·host 1920×1080·두 뷰 1186×514·warmup 5초·FG/upscale/NIS/DVC OFF 조건이다. 9개 실행의 입력·드로 순서·6출력 bit-exact·정상 종료·native 손실/오류 0을 확인했다. 별도 GPU validation ON 전체 메시 1,264,204 checks, DAG/완료/spin 정책 254 checks 및 wave 합류 변형 검출, 기록 진단 분석기 36·ETW 분석기 22·환경 23 검사를 통과했다. 성능 창은 GPU validation OFF이며 3개 ETW trace 손실 0·6개 exact window Unknown/warning 0·interrupt 독립 대조를 통과했다. Release·실제 표시 FPS·자동 spin 최적화는 수용 범위 밖이다.</p>
 <p><a href="../../Artifacts/remeasure-6-20261018/report.html">동기화·spin 비교·타임라인 HTML</a> · <a href="../../Artifacts/remeasure-6-20261018/spin-summary.json">spin 전체 검증</a> · <a href="../../Artifacts/remeasure-6-20261018/verdict.json">수용 범위</a> · <a href="../../Artifacts/remeasure-6-20261018/scheduler-summary.json">ETW 상태</a></p></div>
 
+<details><summary>이전 구현: 일괄 DAG·추가 spin · 현재 spin 제거 전 기록</summary>
 <div id="performance-recording-batch-spin-20261018">
 <h2>2026-10-18 · 기록 DAG 일괄 제출·상세 진단·구간 spin 구현</h2>
 <p><b>소스 구현·정적 검토 기록이며 새 실행 결과가 아니다.</b>
@@ -134,7 +190,7 @@ OS wake 횟수나 성능 개선율의 실측값은 아니다.</td></tr>
 <p>worker는 원본 enki spin을 먼저 수행하고 실제 큐를 반복 확인한다. 작업을 찾으면 callback 실행 전에
 spin 허가를 반납한다. 빈 큐·허위 깨움은 deadline을 갱신하지 않는다. 예약 예산은 사용하지 않은 부분도
 돌려주지 않으며, 이전 frame의 범위나 선점된 worker가 남아 있으면 새 frame spin을 비활성 처리한다.
-새 <a href="../../ports/enkits/README.md">enkiTS 1.12 오버레이</a>의 헤더와 라이브러리/DLL을 함께
+새 <a href="https://github.com/29thnight/CreatorEngine/blob/55b865fee8debb924eeb91ea89eefe12bb51aec0/ports/enkits/README.md">enkiTS 1.12 오버레이</a>의 헤더와 라이브러리/DLL을 함께
 설치하고 소비자를 다시 빌드해야 한다. 원본 헤더/라이브러리 혼용을 매크로와 별도 export로 거절한다.</p>
 <h3>계측값의 의미와 남은 실행 검증</h3>
 <p>게시 앞뒤는 실제 큐 삽입 시각이 아니다. 다른 worker가 먼저 가져가거나 큐 포화 시 inline 실행하면
@@ -145,12 +201,13 @@ worker의 값이 뒤늦게 반영될 수 있다.</p>
 <p><code>Tools/regression/analyze-recording-jobs.py</code>는 저장한 JSON/NDJSON의 중복 조회를 제거하고
 준비·게시·실행·완료 구간과 긴 callback을 요약한다. 미제공·잘린 표본을 정상 시간으로 꾸미지 않는다.
 실제 모든 프레임의 수집기를 대신하지 않는다. 자세한 API·회귀·비교 절차는
-<a href="../design/JobSchedulerDesign.md#명령-기록-dag한정-spin-2026-10-18">공용 스케줄러 설계</a>에 적었다.</p>
+<a href="https://github.com/29thnight/CreatorEngine/blob/55b865fee8debb924eeb91ea89eefe12bb51aec0/docs/design/JobSchedulerDesign.md#명령-기록-dag한정-spin-2026-10-18">공용 스케줄러 설계</a>에 적었다.</p>
 <p>직전 의존성 A/B의 callback 겹침과 기록 중앙값 개선은 유지할 근거지만 전체 처리율·tail 개선은
 확정되지 않았다. 새 비교는 DAG와 분할을 고정하고 spin 0·trace 0에서 batch 0/1을 먼저 반복한다.
 그 뒤 owner와 worker spin을 각각 비교한다. 진단 모드 자체의 시계·이름 복사·JSON 비용은 처리율
 측정과 구분한다. 기존 문자열 수명·기록/실패 회귀, 동일 입력 GPU 출력, 정상 종료와 함께 수용해야 한다.</p>
 </div>
+</details>
 <div id="performance-single-recording-20261018"><h2>2026-10-18 · 한 워커 직렬 기록 A/B 검증</h2>
 <p><b>현재 CreatorRobot 구성에서는 전체 기록을 한 워커에 묶으면 더 느렸다.</b> 동일 Debug DLL/PDB에서 병렬→직렬→직렬 반복→병렬 반복으로 비교했다. 기록 p50은 병렬 2.554/2.678ms, 직렬 4.498/4.397ms로 두 실행 p50 평균 비율상 직렬이 약 70% 느렸다. Game 처리/s는 병렬 24.124/23.330, 직렬 22.009/22.326이다. 기록 OFF 완료 뷰/s도 병렬 54.195/51.563, 직렬 48.746/47.049로 병렬이 더 높았다. 완료 뷰는 Scene+Game 합계이며 표시 FPS가 아니다.</p>
 <p>CREATOR_RECORDING_SINGLE_TARGET=1은 기존 직렬 계약을 사용해 조각·명령 target을 하나로 되돌린다. 직렬 스냅샷에서 wave/target/job 각 1개, 병렬은 wave 3개·target 4개·job 6개를 확인했다. 풀은 8워커를 유지했고 owner 직접 기록은 측정하지 않았다. 작은 모든 그래프의 직렬 임계값을 일반화하지 않으며 기본 병렬 정책은 유지한다.</p>
@@ -653,7 +710,7 @@ flowchart LR
 <tr><td>검증</td><td><code>Tools/regression/verify-meteor-scene-cutover.ps1</code> · <code>Editor/RenderTests/.../Geometry/EnhancedBlendedStreamTest.cpp</code>(<code>dx12.blended</code>)</td></tr>
 </tbody></table></div>
 
-<footer>CreatorEngine · 2026-10-18 · 50cc903f 기준 기록 DAG 일괄 제출·구간 spin 구현 · 새 실행 검증 대기 · 기존 측정 기록 보존</footer>
+<footer>CreatorEngine · 2026-10-18 · 55b865fe 기준 추가 spin 정리·SRV 재사용·완료 경로 진단 · 실행 검증 대기</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>

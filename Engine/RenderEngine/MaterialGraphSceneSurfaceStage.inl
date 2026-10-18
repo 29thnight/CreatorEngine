@@ -4,6 +4,7 @@ SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shar
                                                                  const SceneFinalCullOutputs& cull,
                                                                  const SceneSurfaceTargets::Outputs& incoming) const
 {
+    ce::profile_scope profile{ce::marker<"MaterialSceneVisibilityDeclare">()};
     const auto frame = prepared;
     if (!frame || frame->draws.empty())
     {
@@ -38,6 +39,7 @@ std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_
                                                               EnhancedRenderGraph& graph, RGHandle expectedVisibility,
                                                               RGHandle visibility) const
 {
+    ce::profile_scope profile{ce::marker<"MaterialSceneWorkDeclare">()};
     if (!prepared || prepared->draws.empty())
     {
         return {};
@@ -60,6 +62,7 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(
     const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle expectedVisibility,
     const SceneSurfaceTargets::Outputs& incoming, const std::array<RGHandle, 2>& material) const
 {
+    ce::profile_scope profile{ce::marker<"MaterialSceneResolveDeclare">()};
     const auto frame = prepared;
     gbuffer = incoming;
     if (!frame || frame->draws.empty())
@@ -129,13 +132,20 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(
         }
         encoder.BindRenderTargets(targets);
         encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+        // 같은 callback의 visibility SRV만 공유한다. 적격 draw가 없으면 할당하지 않고
+        // descriptor를 다음 recording이나 다른 callback의 수명으로 넘기지 않는다.
+        RHIBindingTable visibility{};
         for (const auto& draw : frame->RasterDrawsFor())
         {
             if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
             {
                 continue;
             }
-            frame->BindReconstruction(execution, draw, inputs.visibility,
+            if (!visibility.IsValid())
+            {
+                visibility = frame->CreateReconstructionVisibility(execution, inputs.visibility);
+            }
+            frame->BindReconstruction(encoder, draw, visibility,
                                       draw.program->gbuffer[draw.doubleSided].GetHandle());
             std::string error;
             if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))

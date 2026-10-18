@@ -51,11 +51,20 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
                     throw std::runtime_error("Temporal material packet targets unavailable.");
                 encoder.BindRenderTargets(binding);
                 encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+                // 이 callback 안의 적격 bucket만 공유한다. 다른 패스나 recording의
+                // descriptor를 재사용하지 않아 기존 GPU 수명 경계를 유지한다.
+                RHIBindingTable reconstructionVisibility{};
                 for (const auto& draw : frame->RasterDrawsFor())
                 {
                     if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
+                    {
                         continue;
-                    frame->BindReconstruction(execution, draw, visibility,
+                    }
+                    if (!reconstructionVisibility.IsValid())
+                    {
+                        reconstructionVisibility = frame->CreateReconstructionVisibility(execution, visibility);
+                    }
+                    frame->BindReconstruction(encoder, draw, reconstructionVisibility,
                                               draw.program->temporal[draw.doubleSided].GetHandle());
                     std::string error;
                     if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,

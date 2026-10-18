@@ -1,7 +1,6 @@
 #include "ThreadPool.h"
 #include <enkiTS/TaskScheduler.h>
 #include "StandardLibrary.h"
-#include "ThreadPoolSpin.h"
 #if defined(_WIN32)
 #include <Windows.h>
 #endif
@@ -412,8 +411,6 @@ struct thread_pool::state
         void Execute() override {}
     };
 
-    // 초기화 실패로 멤버가 역순 소멸해도 scheduler가 worker를 join할 때까지 콜백 문맥이 산다.
-    std::unique_ptr<thread_pool_spin_control> spin_;
     enki::TaskScheduler scheduler_;
     std::mutex submit_mutex_, done_mutex_;
     std::condition_variable done_;
@@ -438,11 +435,9 @@ struct thread_pool::state
         {
             throw std::invalid_argument("thread_pool worker count overflow");
         }
-        spin_ = std::make_unique<thread_pool_spin_control>(workers_ + kDispatcherThreads + 1);
         enki::TaskSchedulerConfig config;
         config.numTaskThreadsToCreate = workers_;
         config.numExternalTaskThreads = kDispatcherThreads;
-        config.idleSpinCallbacks = spin_->callbacks();
         // 워커 수명을 밖으로 알린다. enkiTS 콜백은 함수 포인터라 userData 가
         // 없으므로 트램펄린이 정적 훅을 읽는다.
         config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
@@ -561,8 +556,6 @@ struct thread_pool::state
             std::lock_guard lock(submit_mutex_);
             accepting_ = false;
         }
-        // 대기자를 drain하기 전에 모든 기록 scope의 추가 spin을 종료한다.
-        spin_->stop();
         {
             std::unique_lock lock(done_mutex_);
             done_.wait(lock, [this] { return pending_ == 0; });
@@ -606,28 +599,6 @@ std::size_t thread_pool::size() const
 bool thread_pool::is_worker_thread() noexcept
 {
     return executing_pool_work;
-}
-job_spin_scope thread_pool::recording_spin_scope(job_spin_options options)
-{
-    auto state = snapshot();
-    if (!state)
-    {
-        return {};
-    }
-    std::lock_guard lock(state->submit_mutex_);
-    if (!state->accepting_)
-    {
-        return {};
-    }
-    return state->spin_->begin_scope(options);
-}
-void thread_pool::stop_recording_spin() noexcept
-{
-    auto state = snapshot();
-    if (state)
-    {
-        state->spin_->stop();
-    }
 }
 void thread_pool::shutdown() noexcept
 {

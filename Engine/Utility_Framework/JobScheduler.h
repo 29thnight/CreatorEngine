@@ -9,15 +9,6 @@ struct completion_state;
 struct scheduler_state;
 } // namespace job_detail
 
-struct job_wait_statistics
-{
-    uint64_t spin_elapsed_ns{};
-    bool spin_attempted{};
-    bool completed_during_spin{};
-    // CV 조건 검사에서 미완료였다는 뜻이며 OS의 실제 sleep 횟수는 아니다.
-    bool blocking_path_entered{};
-};
-
 // Copyable completion token. Dropping it never cancels or waits for the work.
 class job_handle
 {
@@ -28,8 +19,6 @@ class job_handle
     // Reports this job's error, after its callbacks/captures have been released.
     // An incomplete wait from a pool worker is rejected; use submit_after instead.
     void wait() const;
-    // 기록 합류처럼 명시한 호출만 짧게 확인한다. 0은 기존 대기이며 최대 1ms로 제한한다.
-    void wait(std::chrono::microseconds spin_budget, job_wait_statistics* statistics = nullptr) const;
 
   private:
     friend class job_scheduler;
@@ -80,7 +69,6 @@ class job_scheduler
     void start(std::size_t worker_count = 0);
     void shutdown() noexcept;
     bool is_running() const;
-    job_spin_scope recording_spin_scope(job_spin_options options);
     job_handle submit(job_group group);
     template<class F>
     job_handle submit(F&& task)

@@ -1,6 +1,6 @@
 param([ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug')
 $ErrorActionPreference = 'Stop'
-# worker spin 예산은 주입한 시계로 검증한다. 실제 지연 시간·처리율을 판정하는 벤치마크가 아니다.
+# DAG 순서·수명·완료 대기와 종료를 검증한다. 실제 지연 시간·처리율을 판정하는 벤치마크가 아니다.
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . "$PSScriptRoot/Resolve-EnkiDependencies.ps1"
 $dependencies = Resolve-EnkiDependencies $repo
@@ -44,7 +44,7 @@ foreach ($mutant in @($false, $true))
     else
     {
         $expected = 'RECORDING_TASK_GRAPH_OK checks=\d+ workers=1,4 policies=legacy,native ' +
-            'bounded-wait=0,25us spin-policy=scope,budget,shutdown'
+            'wait=cv lifetime=callback,observer shutdown=drain topology=bounded'
         if ($process.ExitCode -ne 0 -or $stdout -notmatch $expected)
         {
             throw "Recording task graph regression failed: $stderr"

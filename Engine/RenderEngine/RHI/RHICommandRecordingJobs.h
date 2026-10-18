@@ -6,9 +6,7 @@
 struct RHIRecordingExecutionOptions
 {
     bool batchSubmit{true};
-    std::chrono::microseconds ownerSpinBudget{0};
     std::shared_ptr<job_graph_diagnostics> diagnostics;
-    job_wait_statistics* waitStatistics{nullptr};
     uint64_t* waitBeginNanoseconds{nullptr};
 };
 
@@ -70,7 +68,7 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
         {
             *options.waitBeginNanoseconds = job_timestamp_ns();
         }
-        handle.wait(options.ownerSpinBudget, options.waitStatistics);
+        handle.wait();
         return;
     }
     std::vector<job_handle> handles;
@@ -95,7 +93,7 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
         {
             *options.waitBeginNanoseconds = job_timestamp_ns();
         }
-        handle.wait(options.ownerSpinBudget, options.waitStatistics);
+        handle.wait();
     }
     catch (...)
     {

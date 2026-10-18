@@ -1,26 +1,8 @@
 #include "JobScheduler.h"
 #include "StandardLibrary.h"
-#if defined(_MSC_VER)
-#include <intrin.h>
-#elif defined(__i386__) || defined(__x86_64__)
-#include <immintrin.h>
-#endif
 
 namespace
 {
-void completion_spin_pause() noexcept
-{
-#if defined(_M_IX86) || defined(_M_X64) || defined(__i386__) || defined(__x86_64__)
-    _mm_pause();
-#elif defined(_M_ARM64)
-    __yield();
-#elif defined(__aarch64__) || defined(__arm__)
-    __asm__ __volatile__("yield");
-#else
-    std::atomic_signal_fence(std::memory_order_seq_cst);
-#endif
-}
-
 // Completion propagation is iterative: long empty/failed dependency chains must
 // not recurse through thousands of finish() calls on a worker's stack.
 void notify_dependents(std::vector<std::function<void(std::exception_ptr)>> ready, std::exception_ptr error)
@@ -78,7 +60,6 @@ struct completion_state : std::enable_shared_from_this<completion_state>
     mutable std::mutex mutex_;
     std::condition_variable done_;
     bool complete_{}, completing_{}, dispatched_{};
-    std::atomic<bool> ready_hint_{false};
     std::size_t remaining_{};
     std::exception_ptr failure_;
     std::vector<std::function<void()>> tasks_;
@@ -122,10 +103,9 @@ struct completion_state : std::enable_shared_from_this<completion_state>
         {
             std::lock_guard lock(mutex_);
             failure_ = error;
+            // callback/observer 캡처 해제와 최종 오류 저장보다 앞서 완료를 보이면 안 된다.
             complete_ = true;
             ready = std::move(continuations_);
-            // callback/observer 캡처 해제와 최종 오류 저장보다 앞서 완료를 보이면 안 된다.
-            ready_hint_.store(true, std::memory_order_release);
         }
         done_.notify_all();
         notify_dependents(std::move(ready), error);
@@ -186,56 +166,21 @@ bool job_handle::is_complete() const
 }
 void job_handle::wait() const
 {
-    wait(std::chrono::microseconds::zero());
-}
-void job_handle::wait(std::chrono::microseconds spin_budget, job_wait_statistics* statistics) const
-{
-    if (statistics)
-    {
-        *statistics = {};
-    }
     if (!state_)
     {
         return;
     }
-    // worker가 잠깐 기다려 우연히 완료되는 경우에도 중첩 합류를 허용하지 않는다.
-    if (thread_pool::is_worker_thread() && !state_->ready_hint_.load(std::memory_order_acquire))
+    std::unique_lock lock(state_->mutex_);
+    // 완료 게시와 같은 mutex로 판단해 미완료 worker 합류를 거절하고 캡처 수명을 보존한다.
+    if (!state_->complete_ && thread_pool::is_worker_thread())
     {
         throw std::logic_error("pool workers must express dependencies, not block on job_handle::wait");
     }
-    const auto bounded = (std::min)(std::chrono::microseconds(1000),
-                                   (std::max)(std::chrono::microseconds::zero(), spin_budget));
-    if (bounded.count() && !state_->ready_hint_.load(std::memory_order_acquire))
-    {
-        const auto begin = std::chrono::steady_clock::now();
-        const auto deadline = begin + bounded;
-        bool completed_during_spin = false;
-        while (std::chrono::steady_clock::now() < deadline)
-        {
-            if (state_->ready_hint_.load(std::memory_order_acquire))
-            {
-                completed_during_spin = true;
-                break;
-            }
-            completion_spin_pause();
-        }
-        if (statistics)
-        {
-            statistics->spin_elapsed_ns = static_cast<uint64_t>(std::chrono::duration_cast<
-                std::chrono::nanoseconds>(std::chrono::steady_clock::now() - begin).count());
-            statistics->spin_attempted = true;
-            statistics->completed_during_spin = completed_during_spin;
-        }
-    }
-    // spin 중 도착한 알림도 같은 mutex 아래의 조건 재검사로 처리하고 예외 경로를 공유한다.
-    std::unique_lock lock(state_->mutex_);
-    if (statistics)
-    {
-        statistics->blocking_path_entered = !state_->complete_;
-    }
     state_->done_.wait(lock, [this] { return state_->complete_; });
     if (state_->failure_)
+    {
         std::rethrow_exception(state_->failure_);
+    }
 }
 
 job_scheduler::job_scheduler(thread_pool& pool) : state_(std::make_shared<job_detail::scheduler_state>(pool))
@@ -271,15 +216,12 @@ void job_scheduler::start(std::size_t worker_count)
 void job_scheduler::shutdown() noexcept
 {
     if (thread_pool::is_worker_thread())
-        std::terminate();
     {
-        std::lock_guard lock(state_->mutex_);
-        state_->accepting_ = false;
+        std::terminate();
     }
-    // 수락된 그래프를 기다리기 전에 spin 허가를 닫는다. pool 접근 중에는 이 mutex를 잡지 않는다.
-    state_->pool_.stop_recording_spin();
     {
         std::unique_lock lock(state_->mutex_);
+        state_->accepting_ = false;
         state_->done_.wait(lock, [this] { return state_->pending_ == 0; });
     }
     state_->pool_.shutdown();
@@ -288,15 +230,6 @@ bool job_scheduler::is_running() const
 {
     std::lock_guard lock(state_->mutex_);
     return state_->accepting_;
-}
-job_spin_scope job_scheduler::recording_spin_scope(job_spin_options options)
-{
-    std::lock_guard lock(state_->mutex_);
-    if (!state_->accepting_)
-    {
-        return {};
-    }
-    return state_->pool_.recording_spin_scope(options);
 }
 job_handle job_scheduler::submit(job_group group)
 {

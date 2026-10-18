@@ -216,6 +216,7 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     batch->jobs = static_cast<std::uint32_t>(jobs);
     batch->bins = static_cast<std::uint32_t>(bins.size());
     const auto upload = [&](const void* data, std::size_t bytes, RHIUploadUsage usage = RHIUploadUsage::Raw) {
+        ce::profile_scope uploadProfile{ce::marker<"GpuVisibility.SharedUpload">()};
         const auto slice = batch->device->AllocateUpload({bytes, usage, 256});
         if (!slice.IsWritable())
         {
@@ -261,16 +262,20 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     }
     const RHIBindingDesc outputs[]{RHIBindingDesc::UavBuffer(batch->queue, kWorkRingHeaderWords + kWorkRingSlots, 4),
                                    arguments.front()};
-    batch->outputs = batch->device->CreateBindings(outputs);
-    batch->vertices = batch->device->CreateBindings(vertices);
-    batch->topologies = batch->device->CreateBindings(topologies);
-    batch->ids = batch->device->CreateBindings(ids);
-    batch->arguments = batch->device->CreateBindings(arguments);
-    batch->first = batch->device->CreateBindings(first);
-    if (!batch->outputs.IsValid() || !batch->vertices.IsValid() || !batch->topologies.IsValid() ||
-        !batch->ids.IsValid() || !batch->arguments.IsValid() || !batch->first.IsValid())
     {
-        throw std::runtime_error("Shared visibility descriptor table allocation failed.");
+        // CPU 배열 조립과 descriptor 테이블 생성은 같은 Declare 안에서도 별도 비용이다.
+        ce::profile_scope bindingsProfile{ce::marker<"GpuVisibility.SharedBindings">()};
+        batch->outputs = batch->device->CreateBindings(outputs);
+        batch->vertices = batch->device->CreateBindings(vertices);
+        batch->topologies = batch->device->CreateBindings(topologies);
+        batch->ids = batch->device->CreateBindings(ids);
+        batch->arguments = batch->device->CreateBindings(arguments);
+        batch->first = batch->device->CreateBindings(first);
+        if (!batch->outputs.IsValid() || !batch->vertices.IsValid() || !batch->topologies.IsValid() ||
+            !batch->ids.IsValid() || !batch->arguments.IsValid() || !batch->first.IsValid())
+        {
+            throw std::runtime_error("Shared visibility descriptor table allocation failed.");
+        }
     }
     const bool occlusion = std::ranges::any_of(batch->pyramids, [](const auto& pyramid) { return bool(pyramid); });
     batch->cull = occlusion ? firstFrame.m_sharedOcclusion : firstFrame.m_sharedCull;

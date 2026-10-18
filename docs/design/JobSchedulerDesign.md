@@ -5,9 +5,9 @@
 
 ## 결정
 
-목표는 실행 기반의 통일이다. 백엔드는 enkiTS 1.12로 고정한다. 2026-10-18의
-기록 구간 spin은 [저장소 오버레이](../../ports/enkits/README.md)의 명시적인 확장이다. 성능 비교는 최초 통일의
-완료 조건에서 제외한다. 애니메이션의 워커 수 기준 청크와 제출 저장소 정리는
+목표는 실행 기반의 통일이다. 백엔드는 기존 vcpkg baseline의 enkiTS 1.12로 고정한다.
+2026-10-18 추가 기록 spin은 재측정에서 이득이 재현되지 않아 전용 오버레이와 함께 제거했다.
+성능 비교는 최초 통일의 완료 조건에서 제외한다. 애니메이션의 워커 수 기준 청크와 제출 저장소 정리는
 PHASE 13 S6에서 완료했다. 워커 수 정책 자체와 다른 소비자의 최적화는 후속이다.
 
 엔진이 시작 때 워커를 만들고 종료 때 회수한다. Editor와 Player 모두
@@ -45,10 +45,6 @@ PHASE 13 S6에서 완료했다. 워커 수 정책 자체와 다른 소비자의 
   노드 ID만 받으며 잘못된 그래프는 일부 본문이 시작되기 전에 거절한다.
   후속 노드는 enki 의존성으로 직접 게시한다. 선행 실패의 후손은 본문을 건너뛰고
   독립 가지는 끝까지 실행한다. 최종 토큰은 공유 콜백 캡처를 해제한 뒤 완료한다.
-- `job_handle::wait(spin_budget, statistics)`: 명시한 합류에서만 완료 atomic을
-  확인하고 deadline이 지나면 기존 조건 변수 대기로 돌아간다. 일반 API 상한은
-  1ms이며 렌더 환경 설정은 200µs까지 받는다. 0은 시계 조회 없는 기존 대기다.
-  미완료 토큰에 대한 worker의 중첩 대기 금지와 예외 전달은 동일하다.
 
 각 그룹은 첫 예외를 보존하고 나머지 그룹 구성원은 끝까지 실행한다. `wait()`가
 그룹 오류를 다시 던진다. 버린 토큰의 오류는 별도 전역 오류 큐로 전달하지 않으므로,
@@ -72,7 +68,7 @@ dispatcher 또는 선행 완료 worker가 본문을 inline 실행할 수 있다.
 스레드가 직렬화하며 워커에서 종료할 수 없다. 한 풀의 제출·종료 소유자는 한
 스케줄러다. 풀은 스케줄러보다 오래 살아야 한다.
 
-종료 시 새 제출을 막고 기록 구간의 추가 spin을 먼저 중단한다. 이미 접수한 미실행 의존 작업까지 완료한 다음 enkiTS
+종료 시 새 제출을 막고 이미 접수한 미실행 의존 작업까지 완료한 다음 enkiTS
 워커를 join한다. 중지 중 제출과 시작 전/종료 후 제출은 실패하며 inline fallback은 없다.
 Editor/Player는 새 프레임 생산이 끝난 뒤 씬 로드와 Scene의 AI 작업을 먼저 회수하고 CLR을
 종료한다. 씬 해체는 공용 풀이 살아 있는 동안 끝내고, 공용 풀은 DataSystem보다 먼저
@@ -194,140 +190,126 @@ ProxyCommand의 팔레트 할당·복사 시간도 render commit의 부분집합
 소유하며 각 제출의 `wait()` 이후에만 재사용한다. 결과와 증거는
 [AnimationSchedulerPlan §45](../plans/AnimationSchedulerPlan.md#45-s6-완료--워커-수-기준-청크와-sceneruntime-소유-2026-09-27)에 기록한다.
 
-## 명령 기록 DAG·한정 spin (2026-10-18)
+## 명령 기록 DAG·완료 경로 진단 (2026-10-18)
 
-구현 기준은 `50cc903f2ad44419182161f08704e4c38540d2d2`다. 이 절은 새 소스의
-계약이며 **이번 변경의 빌드·실행 테스트·GPU 검사·성능 측정 결과가 아니다.**
-직전 의존성 기록의 A/B 측정은 [렌더 배선 기록](../analysis/LiveRenderWiring20261012.html#performance-recording-dependencies-20261018)에
-보존한다. 직전 결과에서 기록 중앙값과 callback 겹침은 개선됐으나 전체 Game 처리율과
-tail 개선은 확정되지 않았으므로 추가 변경의 효과를 수치로 가정하지 않는다.
+구현 기준은 `55b865fee8debb924eeb91ea89eefe12bb51aec0`다.
+[동기화 재측정 6](../analysis/LiveRenderWiring20261012.html#performance-remeasure-6-20261018)의
+추가 spin 후보는 재검증에서 기록 p50/p95와 Game 처리율 개선을 재현하지 못했다.
+추가 owner/worker spin과 전용 enki 오버레이를 제거하고 native DAG 실행은 유지한다.
+이 절은 소스 계약이며 **이 정리의 빌드·테스트·GPU·성능 측정 결과가 아니다.**
+이전 실행 파일의 검증을 새 소스의 통과 결과로 옮기지 않는다.
 
 ### 일괄 제출과 수명
 
 CPU 기록의 target 배분·분할 callback·선행 간선·최종 GPU 제출 순서는 유지한다.
-기록 DAG 전체를 고정한 뒤 한 번 게시하여 기존 노드별 `submit_after`의 완료 상태,
-continuation, dispatcher 왕복을 줄인다. 준비된 후속 노드는 선행 완료 스레드의
-enki pipe에 직접 게시한다. 같은 target의 노드는 직전 노드에 의존하므로 같은
-allocator/list에 두 callback이 동시에 기록하지 않는다.
+기록 DAG 전체를 고정한 뒤 한 번 게시하여 노드별 완료 상태·continuation·dispatcher
+왕복을 줄이는 구조다. 준비된 후속 노드는 enki 의존성으로 게시한다. 같은 target의
+노드는 직전 노드에 의존하므로 같은 allocator/list에 두 callback이 동시에 기록하지 않는다.
 
-native 작업과 간선 저장소는 최종 본문뿐 아니라 enki의 의존성 완료 순회와
-게시 호출이 모두 반환할 때까지 참조로 보관한다. 큐가 가득 차 inline 실행이
-발생해도 게시 호출의 뒤쪽이 남은 상태에서 해제하지 않는다. 모든 참조가 빠진
-뒤 공유 사용자 callback을 먼저 해제하고, 그 뒤 완료 atomic·조건 변수·오류를
-게시한다. CPU 완료 뒤 encoder를 닫으며 GPU 자원 회수는 기존 GPU 완료 계약을 따른다.
+native 작업과 간선 저장소는 enki의 의존성 완료 순회와 게시 호출이 모두 반환할 때까지
+참조로 보관한다. 큐가 가득 차 inline 실행이 발생해도 게시 호출의 뒤쪽이 남아 있는
+상태에서 해제하지 않는다. 공유 사용자 callback 및 observer 캡처를 해제한 뒤 완료를
+게시하며 실패한 후손은 건너뛰고 독립 가지는 끝까지 회수한다. GPU 자원 회수는 기존
+GPU 완료 경계에 남는다. 이번 정리는 이 native 실행·완료 gate 구현을 변경하지 않는다.
 
-이 경로의 `nativeRecord.jobDispatches`와 `dispatcherHandoffs`는 기록 DAG당 1,
-`ownerJoins`는 1이다. `workerJobs`는 실제 노드 수다. 예전 7노드 스냅샷이면
-handoff는 구조적으로 7→1이지만 callback 실행 수는 7이다. **OS wake 횟수나
-측정 시간이 같은 비율로 줄었다는 뜻은 아니다.** wave/단일 target 경로의 카운터도
-실제 `RunParallel` 호출과 제출 작업 수를 기록한다. 단일 target은 사용하지 않을
+`job_handle::wait()`는 완료를 게시하는 mutex 아래에서 완료 여부를 확인하고 조건 변수로
+기다린다. 같은 mutex 아래에서 미완료 worker 대기를 거절하며, 이미 완료된 worker 대기와
+예외 전달은 허용한다. 추가 완료 atomic, spin overload, worker scope·controller는 제거했다.
+enki 원본의 유휴 대기·작업 스틸링 정책은 기존 baseline에 맡긴다.
+
+native DAG의 `jobDispatches`·`dispatcherHandoffs`·`ownerJoins`는 각 1이고
+`workerJobs`는 실제 노드 수다. **이는 OS wake 횟수나 성능 개선율의 측정값이 아니다.**
+wave/단일 target 경로도 실제 제출 횟수를 유지하며 단일 target에서는 사용하지 않는
 pass 의존성 임시 배열을 만들지 않는다.
 
 ### 실행 옵션
 
-설정은 프로세스에서 처음 읽은 뒤 고정한다. 비교 조건을 바꿀 때 Editor를 재시작한다.
-값은 부호·공백 없는 십진 정수여야 한다. 범위를 벗어나거나 잘못된 값은 기본값으로
-돌아간다. 기존 `CREATOR_RECORDING_TASK_GRAPH=0`은 wave 비교 경로,
+설정은 프로세스에서 처음 읽은 뒤 고정한다. 값을 바꿀 때 Editor를 재시작한다.
+부호·공백 없는 십진 정수만 허용하고 범위 밖/잘못된 값은 기본값으로 돌아간다.
+기존 `CREATOR_RECORDING_TASK_GRAPH=0`은 wave 비교 경로,
 `CREATOR_RECORDING_SINGLE_TARGET=1`은 분할 없는 단일 target 비교 경로다.
 
 | 환경 변수 | 기본값 | 허용 범위 | 동작 |
 |---|---:|---:|---|
 | `CREATOR_RECORDING_BATCH_SUBMIT` | 1 | 0–1 | DAG의 native 일괄 제출. 0이면 기존 노드별 제출 |
-| `CREATOR_RECORDING_JOB_TRACE` | 0 | 0–1 | 작업별 게시/실행과 개별 callback wall 시간 |
-| `CREATOR_RECORDING_OWNER_SPIN_US` | 0 | 0–200 | 기록 DAG의 마지막 owner 합류에서만 추가 확인 |
-| `CREATOR_RECORDING_WORKER_SPIN_US` | 0 | 0–200 | 기록 범위에서 실제 작업 이후 유휴 구간의 추가 spin 한도 |
-| `CREATOR_RECORDING_SPIN_FRAME_US` | 200 | 0–2000 | 같은 frame ID의 모든 worker·Scene/Game이 공유하는 예약 예산 |
-| `CREATOR_RECORDING_SPIN_WORKERS` | 1 | 0–8 | 동시에 추가 spin을 허용할 worker 수, 풀 크기로 제한 |
+| `CREATOR_RECORDING_JOB_TRACE` | 0 | 0–1 | 작업·pass/slice 시간과 제한된 DAG 연결 정보 |
 
-owner 예산은 DAG 합류 **호출당** 한도다. worker의 **프레임 전체** 예약 예산과
-별개다. owner spin이 적용되지 않는 wave/단일 target/외부 CPU 부작용 경로의
-진단에는 유효 owner 예산을 0으로 표시한다. 기록 부작용으로 owner에서 직접
-실행하는 경로에는 worker 범위도 열지 않는다.
+`CREATOR_RECORDING_OWNER_SPIN_US`, `CREATOR_RECORDING_WORKER_SPIN_US`,
+`CREATOR_RECORDING_SPIN_FRAME_US`, `CREATOR_RECORDING_SPIN_WORKERS`는 제거했다.
+설정이 남아 있어도 추가 spin을 활성화하지 않는다.
 
-worker spin은 `RecordParallel`의 DispatchJoin 안에서만 범위를 연다. 잠든
-worker를 범위 개방만으로 깨우지 않으며 첫 제출의 정상 wake 경로를 유지한다.
-실제 작업이 끝나고 원본 enki의 기본 spin까지 소진한 유휴 구간에서 추가 예산을
-받는다. 빈 큐 확인·허위 깨움은 deadline을 갱신하지 않는다. 추가 반복은 실제
-공용 큐를 확인하고, 작업을 찾으면 사용자 callback 실행 전에 허가와 spin 계측을
-끝낸다. 원본 대기자 등록·최종 큐 재검사·semaphore 순서는 보존한다.
+### 진단과 연결 정보
 
-예산은 허가 때 남은 프레임 예산에서 미리 차감한다. 사용하지 않은 부분도
-돌려주지 않으므로 짧은 작업이 반복되어도 예약 합계가 프레임 한도를 넘지 않는다.
-같은 프레임의 중첩/연속 뷰는 예산을 공유하며 마지막 범위가 닫히면 추가 허가를
-막는다. 이전 프레임의 scope 또는 선점된 worker 참조가 남으면 새 프레임의
-spin은 비활성 처리한다. 이전 예산을 재충전하거나 그 worker를 기다리지 않는다.
+`dx12.live`의 마지막 성공 CPU 기록에 있는 `nativeRecord.schedulingTrace`는
+**schemaVersion 2**다. trace가 꺼지면 상세 스냅샷·노드별 시계·topology 재구성을 하지 않는다.
+최대 4,096개 unit과 4,096개 node의 시간 슬롯을 제출 전에 마련하고 worker가 자기 슬롯에
+기록한다. unit 한도는 잘린 prefix로, node 한도는 작업 trace 전체 미제공으로 표시한다.
+작업 실행 자체는 생략하지 않는다. 이름은 소유 문자열이고 callback·encoder·GPU 소유자를
+보관하지 않는다. trace 구성 비용은 `RenderCommandRecord.Diagnostics` marker로 구분한다.
 
-### 진단과 해석
+| 필드 | 계약 |
+|---|---|
+| `policy.ownerWaitMode` | `blocking`. 대기 방식이며 실제 OS sleep 관측값이 아님 |
+| `jobs.topologyAvailable` | native batch의 완전한 unit/node 정보와 실제 선택 DAG의 일치를 확인한 경우만 true |
+| `jobs.topologyTruncated` | 4,096 unit/node 또는 16,384 unique dependency 상한 초과 |
+| `jobs.lastCompletedNodes` | 양수 `completeNs` 최댓값과 동률인 모든 node ID. 미제공이면 빈 배열 |
+| node `dependencies` | 이전 node ID 및 `same-target`/`cpu-producer` 이유. 동일 간선의 두 이유는 병합 |
+| node `units` / unit `unit`, `node` | pass/slice를 실제 실행 node에 대응하는 양방향 매핑. unit ID는 배열 순서 |
 
-`dx12.live`의 마지막 성공 CPU 기록 스냅샷에서
-`nativeRecord.schedulingTrace`를 읽는다. 시간 계측과 spin이 모두 꺼지면 이
-상세 스냅샷과 노드별 시계 조회를 만들지 않는다. 시간 계측이 켜지면 최대
-4,096개 callback과 4,096개 작업의 값을 준비하고 worker가 자기 슬롯에 기록한다.
-callback 한도를 넘으면 잘린 prefix임을 표시하며, 작업 수가 한도를 넘으면
-node trace 전체를 미제공 처리한다. 작업 실행 자체를 생략하지 않는다.
-게시된 이름은 소유 문자열이며 callback·encoder·GPU 소유자를 보관하지 않는다.
+연결 정보는 같은 빌더로 현재 unit과 pass 의존성을 재구성하고, 캐시를 포함한 선택 DAG의
+node target·wave·선행 목록과 일치할 때만 공개한다. 진단 때문에 실행 계획을 교체하지 않는다.
+상한 초과·불일치·wave/기존 노드별 제출에서는 부분 topology를 공개하지 않는다.
+`unit` ID는 항상 제공하되 `node` 역매핑과 node의 간선·unit 목록은 topology가 있을 때만 제공한다.
+
+분석기는 마지막 완료 node에서 `completeNs`가 가장 늦은 선행 node를 따라 관측된 완료 경로를
+복원한다. 완료 시각이 같은 마지막 node와 선행 후보는 모두 표시하며 대표 경로의 선택 규칙을
+명시한다. 이는 CPU 실행 시간 합이 가장 긴 경로나 OS Ready 경로가 아니다. 같은 target의
+직전 간선, unit 소속의 유일성, 양방향 매핑, 시간 인과를 검증하지 못하면 경로를 만들지 않는다.
 
 | 값/차이 | 의미 | 해석의 한계 |
 |---|---|---|
-| `registeredNs → readyNs` | 노드 등록 이후 CPU 의존성 준비까지 | 등록·첫 dispatcher 전달도 포함할 수 있음 |
-| `readyNs → publishBeginNs` | 준비 gate에서 게시 호출까지 | 후속 전달의 일부, 순수 OS Ready 아님 |
-| `publishBeginNs → publishEndNs` | enki 게시 호출의 앞뒤 | 실제 큐 삽입 시각이 아니며 inline callback도 포함 가능 |
-| `publishBeginNs → startNs` | 게시 호출 시작부터 노드 실행 시작 | enqueue·선점·큐 대기가 섞인 경과, 순수 wake 지연 아님 |
-| `startNs → bodyEndNs` | 노드 실행과 기록 처리 | barrier/encoder 처리 등을 포함 |
-| unit `beginNs → endNs` | 개별 pass/slice의 `RecordPassBody` 전체 | 반복 phase barrier·루프 포함, 바깥 pre/final barrier 제외 |
-| unit `callbackNs` / `callbackInvocations` | 실제 callback 호출의 누적 wall 시간 / 호출 수 | 반복 callback은 합계이며 CPU 점유·GPU 시간이 아님 |
-| `bodyEndNs → completeNs` | 본문 이후 native 완료 gate까지 | enki 완료 처리·선점이 포함될 수 있음 |
-| jobs `completedNs → returnNs` | 최종 CPU 완료부터 owner 반환까지 | owner 깨움뿐 아니라 완료 게시/반환 처리도 포함 |
+| `registeredNs → readyNs` | 등록부터 CPU 의존성 준비까지 | 등록·첫 dispatcher 전달도 포함 가능 |
+| `readyNs → publishBeginNs` | 준비 gate부터 게시 호출까지 | 순수 OS Ready가 아님 |
+| `publishBeginNs → publishEndNs` | enki 게시 호출 앞뒤 | 실제 큐 삽입 시각이 아니며 inline callback 포함 가능 |
+| `publishBeginNs → startNs` | 게시 시작부터 실행 시작 | enqueue·선점·큐 대기가 섞인 경과 |
+| `startNs → bodyEndNs` | 노드 실행과 기록 처리 | barrier/encoder 처리를 포함 |
+| unit `beginNs → endNs` | `RecordPassBody` 전체 | 반복 phase barrier 포함, 바깥 pre/final barrier 제외 |
+| unit `callbackNs` / `callbackInvocations` | callback의 누적 wall 시간 / 호출 수 | 반복 호출 합계이며 CPU 점유·GPU 시간이 아님 |
+| `bodyEndNs → completeNs` | 본문 이후 native 완료 gate까지 | 완료 처리·선점 포함 가능 |
+| jobs `completedNs → returnNs` | graph callback 캡처 해제부터 owner 반환까지 | observer·완료 게시·통지도 포함 |
 
-`startNs < publishEndNs`는 유효하다. 큐 포화 시 게시 호출 안에서 실행하거나
-다른 worker가 먼저 가져갈 수 있다. enki 스레드 인덱스와 Windows OS TID를
-별도 제공한다. steady-clock ns를 ETW QPC와 근거 없이 직접 같은 축으로 더하지
-않는다. OS Ready·sleep 귀속은 동일 실행 파일·스레드·시간축을 맞춘 ETW로 확인한다.
+`node.completeNs`는 native complete gate에서 후속 의존성 알림 전에 기록한다.
+`jobs.completedNs`는 native 순회와 게시 참조가 빠지고 공유 graph callback 캡처를 해제한 뒤다.
+그 다음 observer 처리·캡처 해제·handle 완료 상태 게시·CV 통지가 이어질 수 있다.
+따라서 어느 시각도 실제 OS sleep 종료나 모든 완료 처리의 종료로 읽지 않는다.
 
-`ownerWait.available`이 false인 wave/단일 target 경로에서는 owner 대기 카운터를
-관측값으로 해석하지 않는다. `ownerWait.blockingPathEntered`는 완료 mutex 아래에서 CV predicate가 false였다는
-뜻이다. 실제 OS sleep 횟수와 다르다. `workerSpin.scopeAccepted`는 해당 뷰의
-범위가 열렸는지 표시한다. `attempts`는 허가된 추가 spin 횟수이고 `taskHits`는
-공용 큐의 어떤 작업이든 찾은 횟수다. 특정 기록 작업의 wake 회피로 단정하지 않는다.
-`reservedBudgetNs`는 예약 합계, `wallNs`는 실제 spin 경과다. 후자는 OS 선점과
-poll 간격의 초과분을 포함할 수 있어 예약 상한과 같은 시간 축의 보장이 아니다.
+`startNs < publishEndNs`는 inline 실행 또는 다른 worker의 빠른 실행에서 유효하다.
+enki 스레드 인덱스와 Windows OS TID는 별도로 제공한다. steady-clock ns와 ETW QPC를
+근거 없이 동일 축으로 합산하지 않는다. OS Ready·sleep 귀속에는 시간축과 스레드를 맞춘 ETW가 필요하다.
 
-worker 통계는 **프레임 누적 atomic snapshot**이다. Scene과 Game 값을 더하지
-않는다. `activeSpinners > 0`이면 닫힌 범위를 빠져나오는 worker의 후속 값이
-아직 반영되지 않을 수 있다. 0이어도 뒤쪽 뷰가 시작할 수 있어 프레임 최종값을
-보장하지 않는다. 카운터들을 한 원자적 트랜잭션으로 읽는 것도 아니다.
+### 분석기 호환성과 검증 경계
 
-저장한 명령 응답 JSON 또는 NDJSON은 다음 도구로 분석한다.
+`Tools/regression/analyze-recording-jobs.py`는 저장한 JSON/NDJSON을 받는다.
+기존 schema 1의 spin 통계 해석과 엄격한 결측 검증은 이전 파일을 위해 유지한다.
+schema 2에서는 제거된 `ownerWait`/`workerSpin` 객체의 부재를 진단 손실로 세지 않으며,
+서로 다른 스키마·정책을 같은 비교 집단으로 섞지 않는다. 중복 조회, 상충하는 동일 표본,
+미제공·잘린 시간·skipped node를 정상 실행 표본으로 꾸미지 않는다. topology coverage와
+시간 coverage를 구분한다. 마지막 성공 기록 조회는 전체 프레임 수집기가 아니므로 표본의
+p95/max를 전체 실행의 p95/max로 확대하지 않는다.
 
-```powershell
-python Tools/regression/analyze-recording-jobs.py trace.json
-python Tools/regression/analyze-recording-jobs.py trace.json --json
-```
+오버레이 제거는 enki C++ ABI를 원본으로 되돌린다. 검증 환경에서는 기존 vcpkg baseline의
+헤더·정적/import 라이브러리·DLL을 함께 다시 설치하고 소비자를 모두 다시 빌드해야 한다.
+이전 패치 DLL과 원본 헤더 또는 그 반대의 혼용을 수용하지 않는다. 다른 port를 위한
+`overlay-ports` 설정과 `enkits` 의존성 선언은 유지한다.
 
-반복 조회한 같은 기록은 중복 표본으로 세지 않는다. 미제공·0·잘린 시간·skipped
-노드는 정상 실행 시간으로 꾸미지 않는다. 이 스냅샷 조회는 모든 프레임을 보존하는
-수집기가 아니므로 표본의 p95/max를 전체 실행의 p95/max로 확대하지 않는다.
-trace가 켜지면 이름 복사·시계 조회·JSON 처리 비용이 생기므로 처리율 비교는
-trace를 끄고, 원인 분석 수집은 같은 계측 조건끼리 별도로 비교한다.
+회귀 소스는 `verify-recording-task-graph.ps1`, `recording_task_graph_probe.cpp`,
+`test-recording-jobs.py`에 있다. native/기존 제출의 같은 target 직렬화·분할 생산자 합류·
+한 worker 진행, callback/observer 캡처 해제, 실패/종료 drain과 wave 장벽 변이를 유지한다.
+추가로 topology 이유 병합·독립 pass를 거친 선행 전달·매핑·크기 상한 및 schema 1/2를 다룬다.
+**빌드·분석기·테스트·GPU·벤치마크는 실행하지 않았다.** 정적 검토를 실행 통과로 기록하지 않는다.
 
-### 검증과 비교 순서
-
-새 [enkiTS 오버레이](../../ports/enkits/README.md)의 헤더와 라이브러리/DLL을 함께
-설치하고 모든 소비자를 다시 빌드해야 한다. 원본 헤더는 API 매크로 검사로,
-원본 라이브러리 혼용은 새 export symbol로 링크/로드 단계에서 거절한다.
-이 작성 환경에서는 빌드나 실행을 수행하지 않았다.
-
-작성한 회귀 검사는 `verify-recording-task-graph.ps1` 및
-`test-recording-jobs.py`에 있다. native/기존 제출의 선행 조건·같은 target
-직렬화·한 worker 진행, 실패 가지 건너뛰기와 독립 가지 완료, 캡처 해제 후
-완료, 게시 타임스탬프, 종료 중 접수 거절·drain을 다룬다. 주입한 가짜 시계로
-worker 예산·동시 허가·중첩 범위·epoch·재충전 금지·종료를 검사하도록 작성했다.
-유효 DAG에 불필요한 전체 wave barrier를 넣는 변이가 실제 합류 회귀를 잡는지도
-검사한다. **검사 코드 작성과 정적 검토를 실행 통과로 기록하지 않는다.**
-
-Windows 검증에서는 먼저 기존 문자열·기록 수명·GPU 정확성 회귀를 확인한다.
-그 뒤 같은 DLL에서 DAG 유지·spin 0·trace 0인 상태로 batch 0/1을 반복 비교한다.
-다음으로 batch 1을 고정하고 owner만 20/50/100µs, worker만 20/50/100µs와
-프레임 예산·동시 worker 수를 독립적으로 비교한 후 필요한 조합을 판단한다.
-두 뷰 완료/초, Game 및 Record p50/p95/max, CPU 사용·ETW Ready/대기,
-spin 예약·발견 수를 함께 본다. spin 기본값은 측정 근거가 생길 때까지 0이다.
+후속 측정은 trace OFF에서 동일 입력·소비자·baseline 의존성을 맞춘 전후 반복 비교를 한다.
+Game 및 Record p50/p95/max, 완료 뷰/s, CPU 사용을 비교하고 원인 분석만 trace ON/ETW로
+별도 수집한다. 완료 뷰/s는 Scene+Game 합계이며 실제 표시 FPS가 아니다. Material/Temporal의
+callback 내부 visibility SRV 재사용과 Prepare/Declare 하위 marker는
+[정리 구현 기록](../analysis/LiveRenderWiring20261012.html#performance-recording-cleanup-20261018)을 따른다.

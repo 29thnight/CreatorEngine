@@ -15,6 +15,34 @@ struct RHIRecordingTaskNode
     std::vector<uint32_t> dependencies;
 };
 
+enum class RHIRecordingDependencyReason : uint8_t
+{
+    SameTarget = 1,
+    CpuProducer = 2
+};
+
+struct RHIRecordingTaskDependency
+{
+    uint32_t node{0};
+    uint8_t reasons{0};
+};
+
+struct RHIRecordingTaskDetails
+{
+    std::vector<RHIRecordingTaskDependency> dependencies;
+    std::vector<uint32_t> units;
+};
+
+// 진단을 요청한 경우에만 연결 이유와 역매핑을 보관한다. 상한을 넘으면 부분 그래프를 공개하지 않는다.
+struct RHIRecordingTaskTopology
+{
+    static constexpr size_t kMaximumEntries = 4096;
+    static constexpr size_t kMaximumDependencies = 16384;
+    bool available{false}, truncated{false};
+    std::vector<RHIRecordingTaskDetails> nodes;
+    std::vector<uint32_t> unitNodes;
+};
+
 struct RHIRecordingTaskGraph
 {
     std::vector<RHIRecordingTaskNode> nodes;
@@ -61,13 +89,51 @@ struct RHIRecordingTaskGraph
 inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, std::span<const uint32_t> unitWaves,
                                        std::span<const uint32_t> unitPasses, std::span<const uint64_t> unitWork,
                                        std::span<const RHIRecordingPassDependencies> passes, uint32_t targetCount,
-                                       RHIRecordingTaskGraph& result)
+                                       RHIRecordingTaskGraph& result, RHIRecordingTaskTopology* topology = nullptr)
 {
+    if (topology)
+    {
+        *topology = {};
+    }
     if (unitTargets.size() != unitWaves.size() || unitTargets.size() != unitPasses.size() ||
         (!unitWork.empty() && unitWork.size() != unitTargets.size()) || targetCount == 0)
     {
         return false;
     }
+    RHIRecordingTaskTopology details;
+    bool captureTopology = topology && unitTargets.size() <= RHIRecordingTaskTopology::kMaximumEntries;
+    details.truncated = topology && !captureTopology;
+    // 일부 STL은 빈 map도 sentinel을 할당하므로 trace 없는 빌더에서는 생성하지 않는다.
+    std::optional<std::map<std::pair<uint32_t, uint32_t>, uint8_t>> dependencyReasons;
+    if (captureTopology)
+    {
+        dependencyReasons.emplace();
+    }
+    const auto recordDependency = [&](uint32_t node, uint32_t dependency, RHIRecordingDependencyReason reason)
+    {
+        if (!captureTopology)
+        {
+            return;
+        }
+        const auto key = std::pair{node, dependency};
+        auto& recorded = *dependencyReasons;
+        const auto found = recorded.find(key);
+        if (found == recorded.end())
+        {
+            if (recorded.size() >= RHIRecordingTaskTopology::kMaximumDependencies)
+            {
+                captureTopology = false;
+                details.truncated = true;
+                dependencyReasons.reset();
+                return;
+            }
+            recorded.emplace(key, static_cast<uint8_t>(reason));
+        }
+        else
+        {
+            found->second |= static_cast<uint8_t>(reason);
+        }
+    };
     RHIRecordingTaskGraph graph;
     std::map<std::pair<uint32_t, uint32_t>, uint32_t> groups;
     for (size_t unit = 0; unit < unitTargets.size(); ++unit)
@@ -88,6 +154,7 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
         if (previous[node.target] != UINT32_MAX)
         {
             node.dependencies.push_back(previous[node.target]);
+            recordDependency(index, previous[node.target], RHIRecordingDependencyReason::SameTarget);
         }
         previous[node.target] = index;
         graph.nodes.push_back(std::move(node));
@@ -142,6 +209,7 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
                         return false;
                     }
                     graph.nodes[node].dependencies.push_back(dependency);
+                    recordDependency(node, dependency, RHIRecordingDependencyReason::CpuProducer);
                 }
             }
             frontier.push_back(node);
@@ -152,6 +220,24 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
     for (auto& node : graph.nodes)
     {
         unique(node.dependencies);
+    }
+    if (captureTopology)
+    {
+        details.available = true;
+        details.nodes.resize(graph.nodes.size());
+        for (const auto& [key, reasons] : *dependencyReasons)
+        {
+            details.nodes[key.first].dependencies.push_back({key.second, reasons});
+        }
+        for (size_t unit = 0; unit < unitNodes.size(); ++unit)
+        {
+            details.nodes[unitNodes[unit]].units.push_back(static_cast<uint32_t>(unit));
+        }
+        details.unitNodes = std::move(unitNodes);
+    }
+    if (topology)
+    {
+        *topology = std::move(details);
     }
     result = std::move(graph);
     return true;
