@@ -179,6 +179,10 @@ struct RHIDescriptorRange
     RHIDescriptorType type{ RHIDescriptorType::ShaderResource };
     uint32_t          count{ 0 };
     uint32_t          baseRegister{ 0 };
+    // A shader declaration resource[N] occupies one Vulkan binding with N
+    // array elements. A Table keeps the original N distinct-register contract.
+    // DX12 represents both forms with the same contiguous descriptor range.
+    bool              shaderArray{ false };
 };
 
 enum class RHILayoutParamKind
@@ -305,5 +309,37 @@ namespace RHILayout
         RHIShaderVisibility visibility = RHIShaderVisibility::All)
     {
         return Table(RHIDescriptorType::Sampler, count, baseRegister, visibility);
+    }
+
+    constexpr RHIPipelineLayoutParam Array(RHIDescriptorType type, uint32_t count,
+        uint32_t baseRegister = 0, RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        auto param = Table(type, count, baseRegister, visibility);
+        param.table.shaderArray = true;
+        return param;
+    }
+
+    constexpr RHIPipelineLayoutParam SrvArray(uint32_t count, uint32_t baseRegister = 0,
+        RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        return Array(RHIDescriptorType::ShaderResource, count, baseRegister, visibility);
+    }
+
+    constexpr RHIPipelineLayoutParam SrvBufferArray(uint32_t count, uint32_t baseRegister = 0,
+        RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        return Array(RHIDescriptorType::ShaderResourceBuffer, count, baseRegister, visibility);
+    }
+
+    constexpr RHIPipelineLayoutParam UavBufferArray(uint32_t count, uint32_t baseRegister = 0,
+        RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        return Array(RHIDescriptorType::UnorderedAccessBuffer, count, baseRegister, visibility);
+    }
+
+    constexpr RHIPipelineLayoutParam SamplerArray(uint32_t count, uint32_t baseRegister = 0,
+        RHIShaderVisibility visibility = RHIShaderVisibility::All)
+    {
+        return Array(RHIDescriptorType::Sampler, count, baseRegister, visibility);
     }
 }

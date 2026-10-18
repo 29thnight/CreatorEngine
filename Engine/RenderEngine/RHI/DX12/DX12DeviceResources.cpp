@@ -262,6 +262,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     m_meshBatchSignatures.clear();
     m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
+    m_shaderArrayCapabilities = {};
     m_lastAdmittedFenceValue = 0;
 
     const ValidationMode validationMode = ReadValidationMode();
@@ -475,6 +476,21 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // Mesh support is optional. Feature level alone is not sufficient: require
     // shader model, hardware tier and the interfaces used by pipeline/dispatch.
     m_atomicCapabilities = {};
+    m_shaderArrayCapabilities = {};
+    D3D12_FEATURE_DATA_D3D12_OPTIONS bindingOptions{};
+    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS,
+        &bindingOptions, sizeof(bindingOptions))))
+    {
+        const bool fullHeap = bindingOptions.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_2;
+        m_shaderArrayCapabilities.sampledImageNonUniformIndexing = true;
+        m_shaderArrayCapabilities.storageBufferNonUniformIndexing = true;
+        m_shaderArrayCapabilities.partiallyBoundSrvArrays = fullHeap;
+        m_shaderArrayCapabilities.maxSampledImages = fullHeap ?
+            D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1 : D3D12_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT;
+        m_shaderArrayCapabilities.maxStorageBuffers = m_shaderArrayCapabilities.maxSampledImages;
+        m_shaderArrayCapabilities.maxSamplers = fullHeap ?
+            D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE : D3D12_COMMONSHADER_SAMPLER_SLOT_COUNT;
+    }
     D3D12_FEATURE_DATA_SHADER_MODEL atomicModel{D3D_SHADER_MODEL_6_6};
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 integerOptions{};
     if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &atomicModel, sizeof(atomicModel))) &&
@@ -733,6 +749,7 @@ void DX12DeviceResources::Shutdown()
     m_meshBatchSignatures.clear();
     m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
+    m_shaderArrayCapabilities = {};
     for (auto& lists : m_retiredCommandLists) lists.clear();
     m_immediateEncoder.reset();
 

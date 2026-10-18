@@ -721,6 +721,7 @@
     <ClInclude Include="RHI\RHIGraphicsPipelineRequest.h" />
     <ClInclude Include="RHI\Vulkan\VulkanFormat.h" />
     <ClInclude Include="RHI\Vulkan\VulkanBindingModel.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanDescriptorLayout.h" />
     <ClInclude Include="RHI\Vulkan\VulkanPipelineCache.h" />
     <ClInclude Include="RHI\Vulkan\VulkanResourceTable.h" />
     <ClInclude Include="RHI\Vulkan\VulkanRenderTargetTable.h" />
@@ -773,6 +774,9 @@
     <ClInclude Include="MaterialGraphMeshSurface.h" />
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />
+    <ClInclude Include="MaterialGraphPacketWork.h" />
+    <ClInclude Include="MaterialGraphResidentBuffer.h" />
+    <ClInclude Include="MaterialGraphSceneGpuData.h" />
     <ClInclude Include="MaterialGraphWork.h" />
     <ClInclude Include="MaterialGraphRasterSurface.h" />
     <ClInclude Include="MaterialGraphSceneCoverage.h" />

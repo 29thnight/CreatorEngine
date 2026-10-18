@@ -27,7 +27,8 @@ namespace material_graph
 // 37: stable sparse cluster addresses and GPU LOD demand feedback.
 // 38: bounded component decoding and vector CGQ descriptors for shader preparation.
 // 39: authenticated thin geometry metadata and paged GPU connectivity.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:39";
+// 40: record-addressed GPU bucket packets and shared scene/material tables.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:40";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
@@ -232,7 +233,8 @@ struct CookedProgram
 
 // Scene mesh shaders consume GPU-compacted meshlet IDs and 2D indirect work.
 // Previous products cannot be rebound to this host; assets must be recooked.
-inline constexpr std::uint32_t CookedProgramVersion = 12;
+// 13: packet material byte loads share the verified reflected uniform packing.
+inline constexpr std::uint32_t CookedProgramVersion = 13;
 bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,

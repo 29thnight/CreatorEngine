@@ -82,6 +82,8 @@ struct VulkanBufferEntry
 
     /// 생성 때 INDIRECT_BUFFER 용도를 실제로 켠 버퍼만 indirect로 읽는다.
     bool allowIndirectArguments{ false };
+    // Preserve the RHI creation intent for imported atomic-min validation.
+    bool allowUnorderedAccess{ false };
 
     bool IsValid() const { return VK_NULL_HANDLE != buffer; }
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include "VulkanLoader.h"
+#include "VulkanDescriptorLayout.h"
 
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIFormat.h"
@@ -79,6 +80,7 @@ struct VulkanLayoutSlot
     uint32_t binding{0};
     uint32_t count{0};
     VkDescriptorType type{VK_DESCRIPTOR_TYPE_MAX_ENUM};
+    bool shaderArray{false};
 
     bool IsValid() const { return 0 != count && VK_DESCRIPTOR_TYPE_MAX_ENUM != type; }
 };
@@ -110,6 +112,7 @@ struct VulkanPipelineLayoutEntry
 
     /// 루트 파라미터 번호 → binding·종류 (5c-4d). 인덱스가 곧 슬롯 번호다.
     std::vector<VulkanLayoutSlot> paramSlots;
+    VulkanDescriptorRequirements descriptorRequirements;
     bool allowInputAssembler{false};
 
     bool IsValid() const { return VK_NULL_HANDLE != layout; }
@@ -129,6 +132,13 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     void SetMeshShaderCapabilities(RHIMeshShaderCapabilities capabilities)
     {
         m_meshShaderCapabilities = capabilities;
+    }
+    void SetShaderArrayCapabilities(RHIShaderArrayCapabilities capabilities,
+        const VkPhysicalDeviceDescriptorIndexingProperties& indexing)
+    {
+        m_shaderArrayCapabilities = capabilities;
+        m_descriptorIndexing = indexing;
+        m_descriptorIndexing.pNext = nullptr;
     }
 
     /// ★ 여기가 수명이 갈리는 자리다. `DX12PSOManager` 는 `ComPtr` 로 들고
@@ -165,6 +175,7 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     /// 슬롯 번호 → binding·종류 (5c-4d). 위 `Resolve` 로도 되지만 그쪽은
     /// 벡터 둘을 복사해 돌려주므로 드로우마다 부를 것이 못 된다.
     VulkanLayoutSlot ResolveParam(RHIPipelineLayoutHandle handle, uint32_t param) const;
+    VulkanDescriptorRequirements ResolveDescriptorRequirements(RHIPipelineLayoutHandle handle) const;
 
     struct Stats
     {
@@ -205,6 +216,9 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
 
     VkDevice m_device{VK_NULL_HANDLE};
     RHIMeshShaderCapabilities m_meshShaderCapabilities;
+    RHIShaderArrayCapabilities m_shaderArrayCapabilities;
+    VkPhysicalDeviceDescriptorIndexingProperties m_descriptorIndexing{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     job_scheduler& m_scheduler;
     // The worker captures only PendingGraphics. Layout/device stay alive until Shutdown joins every job.
     std::unordered_map<uint64_t, std::shared_ptr<PendingGraphics>> m_pendingGraphics;

@@ -130,6 +130,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
                 std::string error;
                 if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
                     throw std::runtime_error(error);
+                frame->BindLayerGeometry(encoder, draw);
                 replay->Draw(encoder, bucket);
                 frame->temporalBucketSubmissions.fetch_add(1, std::memory_order_relaxed);
             }

@@ -2,6 +2,7 @@
 
 #include "GpuGeometryVisibility.h"
 #include "MaterialGraphTransientBufferPool.h"
+#include "MaterialGraphPacketWork.h"
 #include "../Utility_Framework/StandardLibrary.h"
 
 namespace material_graph
@@ -10,6 +11,11 @@ namespace material_graph
 // writes dispatch dimensions. Raster consumers submit one command range per PSO.
 struct IndirectMaterialBatch
 {
+    struct PacketDraw
+    {
+        uint32_t record{}, visibleOffset{}, bucket{}, capacity{};
+    };
+    static_assert(sizeof(PacketDraw) == 16);
     struct Bucket
     {
         std::size_t representative{};
@@ -20,6 +26,8 @@ struct IndirectMaterialBatch
     std::shared_ptr<TransientBufferPool> pool;
     std::shared_ptr<const GpuGeometryVisibility::Frame> visibility;
     std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline;
+    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6> packetPipelines;
+    std::unique_ptr<PacketDispatchWork> packetWork;
     std::vector<Bucket> buckets;
     RHIBufferSlice templates, commands, constants;
     RHIBufferHandle output;
@@ -32,9 +40,50 @@ struct IndirectMaterialBatch
 
     ~IndirectMaterialBatch()
     {
-        if (device)
+        if (device && !packetWork)
             ReleaseSceneBuffer(*device, pool, output);
     }
+
+    bool UploadPackets(std::span<const PacketDraw> draws, std::string& error)
+    {
+        if (!device || !visibility || draws.empty() || draws.size() > UINT32_MAX || buckets.empty() ||
+            std::ranges::any_of(packetPipelines, [](const auto& item) { return !item; }))
+        {
+            error = "METEOR mesh packet inputs are incomplete.";
+            return false;
+        }
+        std::vector<uint32_t> capacities(buckets.size());
+        uint64_t capacity{};
+        for (const auto& draw : draws)
+        {
+            if (!draw.record || draw.bucket >= buckets.size() ||
+                uint64_t(capacities[draw.bucket]) + draw.capacity > UINT32_MAX ||
+                (capacity += draw.capacity) > UINT32_MAX)
+            {
+                error = "METEOR mesh packet capacities exceed their address range.";
+                return false;
+            }
+            capacities[draw.bucket] += draw.capacity;
+        }
+        commandCount = static_cast<uint32_t>(draws.size());
+        commands = device->AllocateUpload(draws.size_bytes(), 16);
+        if (!commands.IsWritable())
+        {
+            error = "METEOR mesh packet input upload failed.";
+            return false;
+        }
+        std::memcpy(commands.cpuAddress, draws.data(), draws.size_bytes());
+        packetWork = std::make_unique<PacketDispatchWork>();
+        if (!packetWork->Prepare(*device, pool, commandCount, static_cast<uint32_t>(capacity), capacities,
+                                 0, 0, name, error))
+            return false;
+        output = packetWork->arguments;
+        return true;
+    }
+    bool PacketMode() const { return bool(packetWork); }
+    RHIBufferHandle PacketBuffer() const { return packetWork ? packetWork->packets : RHIBufferHandle{}; }
+    RHIBufferHandle RangeBuffer() const { return packetWork ? packetWork->ranges : RHIBufferHandle{}; }
+    uint32_t PacketCapacity() const { return packetWork ? packetWork->values.packetCapacity : 0; }
 
     bool Upload(std::span<const std::uint32_t> words, std::span<const std::array<std::uint32_t, 4>> records,
                 std::uint32_t outputBytes, std::string& error)
@@ -68,7 +117,7 @@ struct IndirectMaterialBatch
         };
         templates = upload(words.data(), words.size_bytes());
         commands = upload(records.data(), records.size_bytes());
-        const std::array<std::uint32_t, 4> values{commandCount, 0u, 0, 0};
+        const std::array<std::uint32_t, 16> values{commandCount};
         constants = device->UploadConstants(values.data(), sizeof(values));
         RHIBufferDesc desc;
         desc.bytes = outputBytes;
@@ -88,6 +137,25 @@ struct IndirectMaterialBatch
     {
         if (!commandCount)
             return;
+        if (packetWork)
+        {
+            packetWork->Declare(graph, owner, packetPipelines, name, false,
+                [&graph, owner](auto& uses) { owner->visibility->AddVisibleIdsRead(graph, uses); },
+                [owner](auto& encoder, const auto&, uint32_t stage) {
+                    if (stage == 1 || stage == 5)
+                    {
+                        encoder.SetRootBuffer(RHIBindPoint::Compute, 1, owner->commands);
+                        encoder.SetRootBuffer(RHIBindPoint::Compute, 2,
+                                              RHIBufferSlice::Whole(owner->visibility->VisibleIdBuffer()));
+                    }
+                    if (stage == 4)
+                        encoder.SetRootBuffer(RHIBindPoint::Compute, 3, owner->packetWork->plans);
+                });
+            graphOwner = &graph;
+            graphEpoch = graph.ResourceEpoch();
+            graphOutput = packetWork->graphArguments;
+            return;
+        }
         if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
             return;
         if (graphOwner)
@@ -135,14 +203,28 @@ struct IndirectMaterialBatch
     void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, RGHandle input) const
     {
         ValidateInput(graph, input);
+        if (packetWork)
+        {
+            packetWork->AddRead(uses);
+            return;
+        }
         if (input.IsValid())
             uses.push_back({input, RHIResourceState::IndirectArgument, RGAccessMode::Read});
     }
     void Draw(RHIEncoder& encoder, std::size_t bucket) const
     {
+        if (packetWork)
+            throw std::runtime_error("METEOR packet draw requires its selector root slot.");
         const auto& range = buckets.at(bucket);
         if (!encoder.DispatchMeshIndirectBatch(output, range.offset, range.count, range.roots))
             throw std::runtime_error("METEOR material bucket indirect submission failed.");
+    }
+    void Draw(RHIEncoder& encoder, std::size_t bucket, uint32_t selectorRoot) const
+    {
+        if (packetWork)
+            packetWork->Draw(encoder, bucket, selectorRoot);
+        else
+            Draw(encoder, bucket);
     }
 };
 } // namespace material_graph

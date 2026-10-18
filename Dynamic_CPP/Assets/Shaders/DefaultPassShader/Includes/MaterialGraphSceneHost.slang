@@ -66,6 +66,66 @@ cbuffer LXSceneConstants : register(b0)
 StructuredBuffer<float4> lx_vertices : register(t0);
 ByteAddressBuffer lx_meshlets : register(t155);
 #include "MeshletGeometryAccess.slang"
+#include "LxMeshletGpuContract.slang"
+#include "MaterialGraphSceneRecord.slang"
+StructuredBuffer<LXSceneGpuRecord> lx_sceneRecords : register(t170);
+StructuredBuffer<uint2> lx_scenePackets : register(t171);
+StructuredBuffer<uint4> lx_scenePacketRanges : register(t173);
+cbuffer LXScenePacketSelector : register(b8) { uint4 lx_packetSelector; };
+StructuredBuffer<float4> lx_packetVertices[64] : register(t256);
+ByteAddressBuffer lx_packetTopology[64] : register(t512);
+StructuredBuffer<float4> lx_previousVertices : register(t156);
+
+uint LXSceneOwner(uint record) { return record != 0u ? lx_sceneRecords[record].material.z : lx_drawOwner; }
+uint LXSceneCoverage(uint record) { return record != 0u ? lx_sceneRecords[record].material.w : lx_coverage; }
+float LXSceneCutoff(uint record) { return record != 0u ? asfloat(lx_sceneRecords[record].surface.x) : lx_cutoff; }
+uint LXSceneBlended(uint record) { return record != 0u ? 0u : lx_blended; }
+uint LXSceneHistoryValid(uint record) { return record != 0u ? lx_sceneRecords[record].history.x : lx_temporalHistoryValid; }
+uint3 LXSceneIdentity(uint record)
+{
+    return record != 0u ? uint3(lx_sceneRecords[record].surface.y, lx_sceneRecords[record].identity.reserved.yz)
+                        : lx_geometryIdentityPadding;
+}
+float4x4 LXSceneWorld(uint record, bool previous = false)
+{
+    if (record == 0u) return previous ? lx_previousWorld : lx_world;
+    const LXSceneGpuRecord value = lx_sceneRecords[record];
+    const float4 c0 = previous ? value.previousWorldColumns[0] : value.worldColumns[0];
+    const float4 c1 = previous ? value.previousWorldColumns[1] : value.worldColumns[1];
+    const float4 c2 = previous ? value.previousWorldColumns[2] : value.worldColumns[2];
+    return transpose(float4x4(c0, c1, c2, float4(0, 0, 0, 1)));
+}
+LXGeneratedMaterial LXSceneGenerateMaterial(LXMaterialContext context, uint record)
+{
+    if (record == 0u) return LXGenerateMaterial(context, LXBoundMaterialParameters());
+    const uint2 bytes = lx_sceneRecords[record].material.xy;
+    return LXGeneratePacketMaterial(context, LXBoundMaterialParameters(bytes.x, bytes.y));
+}
+LXSurfacePoint LXSceneGeometryPoint(uint record, uint vertex, bool previous = false)
+{
+    if (record == 0u)
+        return previous ? MeteorGeometryPoint(lx_previousVertices, lx_meshlets, vertex)
+                        : MeteorGeometryPoint(lx_vertices, lx_meshlets, vertex);
+    const uint4 geometry = lx_sceneRecords[record].geometry;
+    const uint pose = previous ? geometry.y : geometry.x;
+    return MeteorGeometryPoint(lx_packetVertices[NonUniformResourceIndex(pose)],
+                               lx_packetTopology[NonUniformResourceIndex(geometry.z)], vertex);
+}
+LXMeshletDescriptor LXSceneMeshlet(uint record, uint meshlet)
+{
+    if (record == 0u) return LXLoadMeshlet(lx_meshlets, meshlet);
+    return LXLoadMeshlet(lx_packetTopology[NonUniformResourceIndex(lx_sceneRecords[record].geometry.z)], meshlet);
+}
+uint LXSceneMeshletVertex(uint record, LXMeshletDescriptor descriptor, uint vertex)
+{
+    if (record == 0u) return LXMeshletVertex(lx_meshlets, descriptor, vertex);
+    return LXMeshletVertex(lx_packetTopology[NonUniformResourceIndex(lx_sceneRecords[record].geometry.z)], descriptor, vertex);
+}
+LXGeometryPrimitive LXScenePrimitiveAt(uint record, LXMeshletDescriptor descriptor, uint triangle)
+{
+    if (record == 0u) return LXLoadGeometryPrimitive(lx_meshlets, descriptor, triangle);
+    return LXLoadGeometryPrimitive(lx_packetTopology[NonUniformResourceIndex(lx_sceneRecords[record].geometry.z)], descriptor, triangle);
+}
 // GPU compaction emits the original draw owners; direct paths bind one owner.
 StructuredBuffer<uint> lx_visibleOwners : register(t138);
 TextureCube<float4> gEnvironment : register(t1);
@@ -207,18 +267,21 @@ struct LXSceneVertex
     float2 uv : TEXCOORD4;
     nointerpolation uint owner : TEXCOORD5;
     nointerpolation uint reconstruction : TEXCOORD15;
+    // 0 is the ordered/direct ABI; packet dispatches carry a frame record ID.
+    nointerpolation uint record : TEXCOORD14;
     float4 previousClip : TEXCOORD6;
 };
 
 LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFace);
 #include "MeteorVisibilityContract.slang"
 Texture2D<uint2> lx_visibility : register(t159);
-uint2 LXSceneLoadVisibility(uint2 pixel)
+uint2 LXSceneLoadVisibility(uint2 pixel, uint record)
 {
     const uint address = lx_visibility.Load(int3(pixel, 0)).x;
-    const uint begin = lx_geometryIdentityPadding.y, end = lx_geometryIdentityPadding.z;
+    const uint3 identity = LXSceneIdentity(record);
+    const uint begin = identity.y, end = identity.z;
     if (address < begin || address >= end || begin == 0u) return uint2(0u);
-    return uint2(lx_geometryIdentityPadding.x, address - begin);
+    return uint2(identity.x, address - begin);
 }
 
 // Object-space stream point -> world space (position and PBR frame).
@@ -234,9 +297,9 @@ LXSurfacePoint LXSceneWorldPoint(LXSurfacePoint source, float4x4 world)
     return result;
 }
 
-LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection, float4x4 world)
+LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection, float4x4 world, uint record = 0u)
 {
-    const LXSurfacePoint source = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,index), world);
+    const LXSurfacePoint source = LXSceneWorldPoint(LXSceneGeometryPoint(record, index), world);
     LXSceneVertex output = (LXSceneVertex)0;
     output.clip = mul(float4(source.position.xyz, 1), viewProjection);
     output.position = source.position.xyz;
@@ -246,6 +309,7 @@ LXSceneVertex LXSceneVertexAt(uint index, uint owner, float4x4 viewProjection, f
     output.uv = source.uvLod.xy;
     output.owner = owner;
     output.reconstruction = 0u;
+    output.record = record;
     return output;
 }
 
@@ -302,24 +366,33 @@ void LXSceneVisibilityMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126],
     out primitives LXScenePrimitive primitives[126])
 {
-    const uint work = group.y * 65535u + group.x;
-    const bool validWork = work < lx_shadowMeshletIds[0];
-    const uint meshlet = lx_shadowMeshletIds[1u + (validWork ? work : 0u)];
-    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, meshlet);
-    const uint enabled = uint(validWork) & uint(lx_visibleOwners[0] == lx_drawOwner) &
-        uint(lx_rasterRoutes[(lx_geometryIdentityPadding.y - 1u) / 128u + meshlet] == 1u);
+    const uint64_t flatWork = uint64_t(lx_packetSelector.z) + uint64_t(group.y) * lx_packetSelector.y + group.x;
+    const uint work = uint(flatWork);
+    const uint4 range = lx_scenePacketRanges[lx_packetSelector.x];
+    const bool validWork = flatWork < range.y;
+    uint record = 0u, meshlet = 0u, enabled = 0u;
+    LXMeshletDescriptor descriptor = (LXMeshletDescriptor)0;
+    if (validWork)
+    {
+        const uint2 packet = lx_scenePackets[range.x + work];
+        record = packet.x;
+        meshlet = packet.y;
+        descriptor = LXSceneMeshlet(record, meshlet);
+        enabled = uint(lx_rasterRoutes[(LXSceneIdentity(record).y - 1u) / 128u + meshlet] == 1u);
+    }
     const uint vertexCount = descriptor.vertexCount * enabled;
     const uint triangleCount = descriptor.triangleCount * enabled;
     // A single straight-line output count avoids DXC duplicating the mesh intrinsic.
     SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
-        LXSceneVertex vertex = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), lx_drawOwner, lx_viewProjection, lx_world);
+        LXSceneVertex vertex = LXSceneVertexAt(LXSceneMeshletVertex(record, descriptor, lane),
+            LXSceneOwner(record), lx_viewProjection, LXSceneWorld(record), record);
         vertices[lane] = vertex;
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
-        triangles[triangle] = LXLoadGeometryPrimitive(lx_meshlets, descriptor, triangle).corners;
+        triangles[triangle] = LXScenePrimitiveAt(record, descriptor, triangle).corners;
         primitives[triangle].address = (meshlet << 7u) | triangle;
     }
 }
@@ -390,21 +463,30 @@ LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
 void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
     out vertices LXSceneVertex vertices[64], out indices uint3 triangles[126])
 {
-    const uint work = group.y * 65535u + group.x;
-    const bool validWork = work < lx_shadowMeshletIds[0];
-    const uint meshlet = lx_shadowMeshletIds[1u + (validWork ? work : 0u)];
-    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, meshlet);
+    const uint64_t flatWork = uint64_t(lx_packetSelector.z) + uint64_t(group.y) * lx_packetSelector.y + group.x;
+    const uint work = uint(flatWork);
+    const uint4 range = lx_scenePacketRanges[lx_packetSelector.x];
+    const bool validWork = flatWork < range.y;
+    uint record = 0u;
+    LXMeshletDescriptor descriptor = (LXMeshletDescriptor)0;
+    if (validWork)
+    {
+        const uint2 packet = lx_scenePackets[range.x + work];
+        record = packet.x;
+        descriptor = LXSceneMeshlet(record, packet.y);
+    }
     const uint enabled = uint(validWork);
     const uint vertexCount = descriptor.vertexCount * enabled;
     const uint triangleCount = descriptor.triangleCount * enabled;
     SetMeshOutputCounts(vertexCount, triangleCount);
     if (lane < vertexCount)
     {
-        vertices[lane] = LXSceneVertexAt(LXMeshletVertex(lx_meshlets, descriptor, lane), 0u, lx_shadowViewProjection, lx_shadowWorld);
+        vertices[lane] = LXSceneVertexAt(LXSceneMeshletVertex(record, descriptor, lane), 0u,
+            lx_shadowViewProjection, LXSceneWorld(record), record);
     }
     for (uint triangle = lane; triangle < triangleCount; triangle += 64u)
     {
-        triangles[triangle] = LXLoadGeometryPrimitive(lx_meshlets, descriptor, triangle).corners;
+        triangles[triangle] = LXScenePrimitiveAt(record, descriptor, triangle).corners;
     }
 }
 
@@ -412,8 +494,10 @@ void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
 void LXSceneShadowPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
     const LXMaterialContext context = LXSceneContext(input);
-    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
-    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_shadowCutoff, lx_shadowCoverage, frontFace);
+    const LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
+    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha),
+        input.record != 0u ? LXSceneCutoff(input.record) : lx_shadowCutoff,
+        input.record != 0u ? LXSceneCoverage(input.record) : lx_shadowCoverage, frontFace);
 }
 
 MaterialInputs LXSceneDecalInputs(MaterialInputs raw, LXSceneVertex input, bool frontFace)
@@ -435,7 +519,7 @@ MaterialInputs LXSceneDecalInputs(MaterialInputs raw, LXSceneVertex input, bool 
     if (any(normal != lx_beforeDecalNormal.Load(pixel).rgb))
     {
         raw.normal = PrincipledUnitNormal(normal * 2.0 - 1.0, raw.normal);
-        if ((lx_coverage & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace)
+        if ((LXSceneCoverage(input.record) & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace)
             raw.normal = -raw.normal;
     }
     return raw;
@@ -444,32 +528,32 @@ MaterialInputs LXSceneDecalInputs(MaterialInputs raw, LXSceneVertex input, bool 
 PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
 {
     const LXMaterialContext context = LXSceneContext(input);
-    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    const LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
     const MaterialInputs raw = LXSceneDecalInputs(generated.surfaceInputs, input, frontFace);
     const float3 normal = PrincipledUnitNormal(raw.normal, context.normal);
     // Preserve authored IOR/level and the unrotated tangent. The compute baker
     // applies material evaluation once, exactly as the evaluated-point path.
     PrincipledIblBakePoint point;
-    point.baseAlpha = float4(raw.baseColor, input.reconstruction != 0u ? 1.0 : ApplyPbrCoverage(saturate(raw.alpha), lx_cutoff, lx_coverage, frontFace));
-    point.normalRoughness = float4(OrientPbrNormal(normal, lx_coverage, frontFace), raw.roughness);
+    point.baseAlpha = float4(raw.baseColor, input.reconstruction != 0u ? 1.0 : ApplyPbrCoverage(saturate(raw.alpha), LXSceneCutoff(input.record), LXSceneCoverage(input.record), frontFace));
+    point.normalRoughness = float4(OrientPbrNormal(normal, LXSceneCoverage(input.record), frontFace), raw.roughness);
     point.metalIorLevelAo = float4(raw.metallic, raw.ior, raw.specularIorLevel, raw.occlusion);
     point.tintAnisotropy = float4(raw.specularTint, raw.anisotropy);
     point.emissionColorStrength = float4(raw.emissionColor, raw.emissionStrength);
     point.coatWeightRoughIorFilmThickness = float4(raw.coatWeight, raw.coatRoughness, raw.coatIor, raw.thinFilmThickness);
     point.coatTintFilmIor = float4(raw.coatTint, raw.thinFilmIor);
     point.coatNormalSheenWeight = float4(OrientPbrNormal(PrincipledUnitNormal(raw.coatNormal, context.normal),
-                                                      lx_coverage, frontFace), raw.sheenWeight);
+                                                      LXSceneCoverage(input.record), frontFace), raw.sheenWeight);
     point.sheenTintRoughness = float4(raw.sheenTint, raw.sheenRoughness);
     const float3 tangent = PrincipledUnitNormal(raw.tangent - normal * dot(raw.tangent, normal),
                                                PrincipledProjectedTangent(context.tangent, normal));
-    const bool flipped = (lx_coverage & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace;
+    const bool flipped = (LXSceneCoverage(input.record) & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace;
     point.tangentRotation = float4(tangent, flipped ? -raw.anisotropyRotation : raw.anisotropyRotation);
     point.viewTier = float4(PrincipledUnitNormal(lx_eye.xyz - input.position, normal),
                             (LX_MATERIAL_FEATURE_MASK & 0x17C0u) != 0 ? 1 : 0);
     // Principled core graphs use the same GGX closures with film/coat disabled.
     // This lookup tag describes the evaluation model, not the authoring tier.
     // Fine UV derivatives and graph evaluation precede this divergent owner test.
-    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && LXSceneBlended(input.record) == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != LXSceneOwner(input.record))
         discard;
     return point;
 }
@@ -521,18 +605,18 @@ LXSceneLookup0 LXSceneLookup0PSEvaluate(LXSceneVertex input, bool frontFace)
 LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
     if (input.reconstruction == 0u) return LXSceneLookup0PSEvaluate(input, frontFace);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     LXSceneLookup0 output = (LXSceneLookup0)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if (identity.x == lx_geometryIdentityPadding.x) {
+        if (identity.x == LXSceneIdentity(input.record).x) {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
             const LXSceneLookup0 value = LXSceneLookup0PSEvaluate(restored, face);
             if (all(own == identity)) output = value;
         }
     }
-    if (own.x != lx_geometryIdentityPadding.x) discard;
+    if (own.x != LXSceneIdentity(input.record).x) discard;
     return output;
 }
 
@@ -550,18 +634,18 @@ LXSceneLookup1 LXSceneLookup1PSEvaluate(LXSceneVertex input, bool frontFace)
 LXSceneLookup1 LXSceneLookup1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
     if (input.reconstruction == 0u) return LXSceneLookup1PSEvaluate(input, frontFace);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     LXSceneLookup1 output = (LXSceneLookup1)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if (identity.x == lx_geometryIdentityPadding.x) {
+        if (identity.x == LXSceneIdentity(input.record).x) {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
             const LXSceneLookup1 value = LXSceneLookup1PSEvaluate(restored, face);
             if (all(own == identity)) output = value;
         }
     }
-    if (own.x != lx_geometryIdentityPadding.x) discard;
+    if (own.x != LXSceneIdentity(input.record).x) discard;
     return output;
 }
 
@@ -578,12 +662,12 @@ LXMaterialContext LXSceneContext(LXSceneVertex input)
     return context;
 }
 
-PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMaterialContext context, bool frontFace, bool reconstructed)
+PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMaterialContext context, bool frontFace, bool reconstructed, uint record)
 {
     PrincipledSurface surface = LXEvaluateGeneratedSurface(generated, context);
-    surface.alpha = reconstructed ? 1.0 : ApplyPbrCoverage(surface.alpha, lx_cutoff, lx_coverage, frontFace);
-    surface.normal = OrientPbrNormal(surface.normal, lx_coverage, frontFace);
-    surface.coatNormal = OrientPbrNormal(surface.coatNormal, lx_coverage, frontFace);
+    surface.alpha = reconstructed ? 1.0 : ApplyPbrCoverage(surface.alpha, LXSceneCutoff(record), LXSceneCoverage(record), frontFace);
+    surface.normal = OrientPbrNormal(surface.normal, LXSceneCoverage(record), frontFace);
+    surface.coatNormal = OrientPbrNormal(surface.coatNormal, LXSceneCoverage(record), frontFace);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
     if (!frontFace)
     {
@@ -600,16 +684,16 @@ PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMater
 PrincipledSurface LXSceneUndecaledMaterial(LXSceneVertex input, bool frontFace)
 {
     const LXMaterialContext context = LXSceneContext(input);
-    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
-    return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u);
+    const LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
+    return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u, input.record);
 }
 
 PrincipledSurface LXSceneMaterial(LXSceneVertex input, bool frontFace)
 {
     const LXMaterialContext context = LXSceneContext(input);
-    LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
     generated.surfaceInputs = LXSceneDecalInputs(generated.surfaceInputs, input, frontFace);
-    return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u);
+    return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u, input.record);
 }
 
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
@@ -624,7 +708,7 @@ LXSceneRefractionCapture LXSceneRefractionPS(LXSceneVertex input, bool frontFace
 {
     input=LXScenePixelCenter(input);
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
-    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && LXSceneBlended(input.record) == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != LXSceneOwner(input.record))
     {
         discard;
     }
@@ -648,7 +732,7 @@ LXSceneGBuffer LXSceneEvaluateSurface(LXSceneVertex input, bool frontFace)
 {
     input=LXScenePixelCenter(input);
     const PrincipledSurface surface = LXSceneUndecaledMaterial(input, frontFace);
-    if (lx_blended == 1u && surface.alpha <= 0.0) discard;
+    if (LXSceneBlended(input.record) == 1u && surface.alpha <= 0.0) discard;
     LXSceneGBuffer output;
     output.diffuse = float4(surface.baseColor, surface.alpha);
     output.metalRough = float4(surface.occlusion, surface.roughness, surface.metallic, 1);
@@ -681,12 +765,12 @@ uint LXSceneUniqueQuadIdentityLanes(uint2 own)
 LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
     if (input.reconstruction == 0u) return LXSceneGBufferPSEvaluate(input, frontFace);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     const uint uniqueLanes = LXSceneUniqueQuadIdentityLanes(own);
     LXSceneGBuffer output = (LXSceneGBuffer)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == lx_geometryIdentityPadding.x)
+        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == LXSceneIdentity(input.record).x)
         {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
@@ -694,7 +778,7 @@ LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFront
             if (all(own == identity)) output = value;
         }
     }
-    if (own.x != lx_geometryIdentityPadding.x) discard;
+    if (own.x != LXSceneIdentity(input.record).x) discard;
     return output;
 }
 
@@ -709,18 +793,17 @@ void LXSceneVisibilityPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace,
 {
     input = LXScenePixelCenter(input);
     const LXMaterialContext context = LXSceneContext(input);
-    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
-    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_cutoff, lx_coverage, frontFace);
+    const LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
+    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), LXSceneCutoff(input.record), LXSceneCoverage(input.record), frontFace);
     if (input.clip.z >= 0.0 && input.clip.z < 1.0) {
         const uint2 pixel = uint2(input.clip.xy);
         uint64_t ignored;
         InterlockedMin(lx_visibilityKeys[pixel.y * lx_width + pixel.x],
-            MeteorVisibilityKey(input.clip.z, lx_geometryIdentityPadding.y + primitiveAddress), ignored);
+            MeteorVisibilityKey(input.clip.z, LXSceneIdentity(input.record).y + primitiveAddress), ignored);
     }
 }
 
-// One mesh group covers one compacted material tile, never a full viewport.
-StructuredBuffer<uint> lx_materialWork : register(t160);
+// One mesh group consumes one record/tile packet from the selected PSO bucket.
 [shader("mesh")]
 [numthreads(32, 1, 1)]
 [outputtopology("triangle")]
@@ -728,15 +811,14 @@ void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
     out vertices LXSceneVertex vertices[4], out indices uint3 triangles[2],
     out primitives LXScenePrimitive primitives[2])
 {
-    const uint record = lx_geometryIdentityPadding.x;
-    const uint recordCount = lx_materialWork[2];
-    const uint index = group.x + group.y * 65535u;
-    const uint count = lx_materialWork[4 + record];
-    const bool valid = index < count;
+    const uint64_t flatWork = uint64_t(lx_packetSelector.z) + group.x + uint64_t(group.y) * lx_packetSelector.y;
+    const uint index = uint(flatWork);
+    const uint4 range = lx_scenePacketRanges[lx_packetSelector.x];
+    const bool valid = flatWork < range.y;
     SetMeshOutputCounts(4u * uint(valid), 2u * uint(valid));
     if (!valid) return;
-    const uint offset = lx_materialWork[4 + recordCount + record];
-    const uint tile = lx_materialWork[4 + 3 * recordCount + offset + index];
+    const uint2 packet = lx_scenePackets[range.x + index];
+    const uint record = packet.x, tile = packet.y;
     const uint grid = (lx_width + 7u) / 8u;
     const uint2 origin = uint2(tile % grid, tile / grid) * 8u;
     if (lane < 4u) {
@@ -744,6 +826,8 @@ void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
         const float2 pixel = min(origin + uint2(lane & 1u, lane >> 1u) * 8u, uint2(lx_width,lx_height));
         v.clip = float4(pixel / float2(lx_width,lx_height) * float2(2,-2) + float2(-1,1),0,1);
         v.reconstruction = 1u;
+        v.record = record;
+        v.owner = LXSceneOwner(record);
         vertices[lane] = v;
     }
     if (lane == 0u) { triangles[0] = uint3(0,1,2); triangles[1] = uint3(2,1,3); primitives[0].address=0; primitives[1].address=0; }
@@ -751,12 +835,13 @@ void LXSceneReconstructMS(uint lane : SV_GroupIndex, uint3 group : SV_GroupID,
 
 LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFace)
 {
-    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, identity.y >> 7u);
-    const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, identity.y & 127u);
-    // Reconstruction runs per record with that record's constants and world.
-    const LXSurfacePoint a = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.x), lx_world);
-    const LXSurfacePoint b = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.y), lx_world);
-    const LXSurfacePoint c = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.z), lx_world);
+    const uint record = identity.x;
+    const LXMeshletDescriptor descriptor = LXSceneMeshlet(record, identity.y >> 7u);
+    const LXGeometryPrimitive primitive = LXScenePrimitiveAt(record, descriptor, identity.y & 127u);
+    const float4x4 world = LXSceneWorld(record);
+    const LXSurfacePoint a = LXSceneWorldPoint(LXSceneGeometryPoint(record, primitive.vertices.x), world);
+    const LXSurfacePoint b = LXSceneWorldPoint(LXSceneGeometryPoint(record, primitive.vertices.y), world);
+    const LXSurfacePoint c = LXSceneWorldPoint(LXSceneGeometryPoint(record, primitive.vertices.z), world);
     const float4 ca = mul(float4(a.position.xyz, 1), lx_viewProjection);
     const float4 cb = mul(float4(b.position.xyz, 1), lx_viewProjection);
     const float4 cc = mul(float4(c.position.xyz, 1), lx_viewProjection);
@@ -777,14 +862,14 @@ LXSceneVertex LXSceneReconstruct(float4 pixel, uint2 identity, out bool frontFac
     v.tangent = a.tangent.xyz * w.x + b.tangent.xyz * w.y + c.tangent.xyz * w.z;
     v.bitangent = a.bitangent.xyz * w.x + b.bitangent.xyz * w.y + c.bitangent.xyz * w.z;
     v.uv = a.uvLod.xy * w.x + b.uvLod.xy * w.y + c.uvLod.xy * w.z;
-    v.owner = lx_frameGeometry[identity.x].owner;
+    v.owner = LXSceneOwner(record);
     v.reconstruction = 1u;
+    v.record = record;
     frontFace = determinant < 0.0;
     return v;
 }
 
 // Current/previous posed streams share topology; worlds remain instance inputs.
-StructuredBuffer<float4> lx_previousVertices : register(t156);
 [shader("vertex")]
 LXSceneVertex LXSceneTemporalVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
 {
@@ -808,38 +893,40 @@ LXTemporalOutput LXSceneTemporalPS(LXSceneVertex input, bool frontFace : SV_IsFr
     LXSceneVertex centered;
     uint address = primitiveAddress;
     if (reconstructed) {
-        const uint2 identity = LXSceneLoadVisibility(uint2(input.clip.xy));
+        const uint2 identity = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
         if (identity.x == 0u) discard;
         centered = LXSceneReconstruct(input.clip, identity, frontFace);
         address = identity.y;
     } else centered = LXScenePixelCenter(input);
     // The selected current topology also indexes the retained previous pose.
     // A LOD transition never reads the previous frame's different topology.
-    const LXMeshletDescriptor descriptor = LXLoadMeshlet(lx_meshlets, address >> 7u);
-    const LXGeometryPrimitive primitive = LXLoadGeometryPrimitive(lx_meshlets, descriptor, address & 127u);
-    const float3 a = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.x), lx_world).position.xyz;
-    const float3 b = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.y), lx_world).position.xyz;
-    const float3 c = LXSceneWorldPoint(MeteorGeometryPoint(lx_vertices,lx_meshlets,primitive.vertices.z), lx_world).position.xyz;
+    const uint record = centered.record;
+    const LXMeshletDescriptor descriptor = LXSceneMeshlet(record, address >> 7u);
+    const LXGeometryPrimitive primitive = LXScenePrimitiveAt(record, descriptor, address & 127u);
+    const float4x4 world = LXSceneWorld(record);
+    const float3 a = LXSceneWorldPoint(LXSceneGeometryPoint(record, primitive.vertices.x), world).position.xyz;
+    const float3 b = LXSceneWorldPoint(LXSceneGeometryPoint(record, primitive.vertices.y), world).position.xyz;
+    const float3 c = LXSceneWorldPoint(LXSceneGeometryPoint(record, primitive.vertices.z), world).position.xyz;
     const float3 x=b-a, y=c-a, delta=centered.position-a;
     const float xx=dot(x,x), xy=dot(x,y), yy=dot(y,y), determinant=xx*yy-xy*xy;
     const float2 uv=float2(dot(delta,x)*yy-dot(delta,y)*xy,dot(delta,y)*xx-dot(delta,x)*xy)/determinant;
     const float3 weights=float3(1-uv.x-uv.y,uv);
-    const float3 previous=MeteorGeometryPoint(lx_previousVertices,lx_meshlets,primitive.vertices.x).position.xyz*weights.x +
-        MeteorGeometryPoint(lx_previousVertices,lx_meshlets,primitive.vertices.y).position.xyz*weights.y +
-        MeteorGeometryPoint(lx_previousVertices,lx_meshlets,primitive.vertices.z).position.xyz*weights.z;
-    const float4 previousClip=mul(mul(float4(previous,1),lx_previousWorld),lx_temporalPreviousProjection);
+    const float3 previous=LXSceneGeometryPoint(record, primitive.vertices.x, true).position.xyz*weights.x +
+        LXSceneGeometryPoint(record, primitive.vertices.y, true).position.xyz*weights.y +
+        LXSceneGeometryPoint(record, primitive.vertices.z, true).position.xyz*weights.z;
+    const float4 previousClip=mul(mul(float4(previous,1),LXSceneWorld(record, true)),lx_temporalPreviousProjection);
     const float4 currentClip=mul(float4(centered.position,1),lx_temporalCurrentProjection);
     // Opaque coverage is already fixed by final visibility; only replay evaluates alpha.
     float alpha=1;
     if(!reconstructed) alpha=LXSceneUndecaledMaterial(centered, frontFace).alpha;
-    if (lx_blended == 1u && alpha <= 0.01) discard;
+    if (LXSceneBlended(input.record) == 1u && alpha <= 0.01) discard;
     LXTemporalOutput output;
-    const bool valid = lx_temporalHistoryValid != 0u && currentClip.w > 0.000001 &&
+    const bool valid = LXSceneHistoryValid(input.record) != 0u && currentClip.w > 0.000001 &&
         previousClip.w > 0.000001 && all(isfinite(previousClip));
     output.motion = valid ? (previousClip.xy / previousClip.w -
         currentClip.xy / currentClip.w) * float2(0.5 * lx_width, -0.5 * lx_height) : float2(0);
-    output.transparency = lx_blended != 0u ? saturate(alpha) : 0;
-    output.reactive = lx_blended != 0u ? 1 : 0;
+    output.transparency = LXSceneBlended(input.record) != 0u ? saturate(alpha) : 0;
+    output.reactive = LXSceneBlended(input.record) != 0u ? 1 : 0;
     output.responsive = valid ? 0 : 1;
     const float4 rasterClip=mul(float4(centered.position,1),lx_viewProjection);
     output.depth=rasterClip.z/rasterClip.w;
@@ -1025,7 +1112,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePSEvaluate(LXSceneVertex input, bool f
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
     const PrincipledIblBakeSample sample = LXSceneReadIbl(input, frontFace, index);
-    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && LXSceneBlended(input.record) == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != LXSceneOwner(input.record))
     {
         discard;
     }
@@ -1059,23 +1146,23 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePSEvaluate(LXSceneVertex input, bool f
 LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
     if (input.reconstruction == 0u) return LXSceneSubsurfacePSEvaluate(input, frontFace);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     LXSceneSubsurfaceCapture output = (LXSceneSubsurfaceCapture)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if (identity.x == lx_geometryIdentityPadding.x) {
+        if (identity.x == LXSceneIdentity(input.record).x) {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
             const LXSceneSubsurfaceCapture value = LXSceneSubsurfacePSEvaluate(restored, face);
             if (all(own == identity)) output = value;
         }
     }
-    if (own.x != lx_geometryIdentityPadding.x) discard;
+    if (own.x != LXSceneIdentity(input.record).x) discard;
     return output;
 }
 
 float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 position, uint index,
-    PrincipledIblBakeSample sample)
+    PrincipledIblBakeSample sample, uint record)
 {
     if (sample.baseAverage.w < 0 || LXSceneReadReflection(index).metalAverage.w != 1.0)
     {
@@ -1127,10 +1214,10 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
             shadowLight.color.rgb * shadowLight.color.a);
         return float4(LXSceneShadowDebugColor(shadowDebug, position, surface.layers.material.normal,
                           shadowToLight, color, selected.local + selected.transmission),
-                      lx_blended == 1u ? material.alpha : 1);
+                      LXSceneBlended(record) == 1u ? material.alpha : 1);
     }
-    return float4(lx_blended != 0u ? LXForwardVolume(pixel, position, color) : color,
-                  lx_blended == 1u ? material.alpha : 1);
+    return float4(LXSceneBlended(record) != 0u ? LXForwardVolume(pixel, position, color) : color,
+                  LXSceneBlended(record) == 1u ? material.alpha : 1);
 }
 #endif
 
@@ -1140,20 +1227,20 @@ float4 LXSceneColorPSEvaluate(LXSceneVertex input, bool frontFace)
     PrincipledSurface material = LXSceneMaterial(input, frontFace);
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
     const PrincipledIblBakeSample sample = LXSceneReadIbl(input, frontFace, index);
-    if (lx_blended == 1u && material.alpha <= 0.0) discard;
+    if (LXSceneBlended(input.record) == 1u && material.alpha <= 0.0) discard;
     // Fine derivatives must be evaluated before the per-pixel owner branch.
-    if (input.reconstruction == 0u && lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (input.reconstruction == 0u && LXSceneBlended(input.record) == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != LXSceneOwner(input.record))
         discard;
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) == 0
     // SSAO is half resolution. Sample with full-view UVs, as Deferred does.
-    if (lx_blended == 0u) material.occlusion *= saturate(lx_ao.SampleLevel(gEnvironmentSampler,
+    if (LXSceneBlended(input.record) == 0u) material.occlusion *= saturate(lx_ao.SampleLevel(gEnvironmentSampler,
         input.clip.xy / float2(lx_width, lx_height), 0).r);
 #endif
     // Scene SSAO describes the opaque background before refraction. A
     // transmitting surface uses its authored AO instead of that other surface.
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
-    return LXSceneSpecialColor(material, input.clip.xy, input.position, index, sample);
+    return LXSceneSpecialColor(material, input.clip.xy, input.position, index, sample, input.record);
 #else
     if (sample.baseAverage.w < 0)
         return float4(1, 0, 1, 1);
@@ -1223,22 +1310,22 @@ float4 LXSceneColorPSEvaluate(LXSceneVertex input, bool frontFace)
             : float3(0);
 #endif
         return float4(LXSceneShadowDebugColor(shadowDebug, input.position, material.normal, shadowToLight,
-                          color, selected), lx_blended == 1u ? material.alpha : 1);
+                          color, selected), LXSceneBlended(input.record) == 1u ? material.alpha : 1);
     }
-    return float4(lx_blended != 0u ? LXForwardVolume(input.clip.xy, input.position, color) : color,
-                  lx_blended == 1u ? material.alpha : 1);
+    return float4(LXSceneBlended(input.record) != 0u ? LXForwardVolume(input.clip.xy, input.position, color) : color,
+                  LXSceneBlended(input.record) == 1u ? material.alpha : 1);
 #endif
 }
 [shader("fragment")]
 float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV_Target
 {
     if (input.reconstruction == 0u) return LXSceneColorPSEvaluate(input, frontFace);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     const uint uniqueLanes = LXSceneUniqueQuadIdentityLanes(own);
     float4 output = (float4)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == lx_geometryIdentityPadding.x)
+        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == LXSceneIdentity(input.record).x)
         {
             bool face;
             const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
@@ -1246,6 +1333,6 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
             if (all(own == identity)) output = value;
         }
     }
-    if (own.x != lx_geometryIdentityPadding.x) discard;
+    if (own.x != LXSceneIdentity(input.record).x) discard;
     return output;
 }

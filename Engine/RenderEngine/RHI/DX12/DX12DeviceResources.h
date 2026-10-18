@@ -488,6 +488,10 @@ public:
     {
         return m_meshShaderCapabilities;
     }
+    RHIShaderArrayCapabilities GetShaderArrayCapabilities() const override
+    {
+        return m_shaderArrayCapabilities;
+    }
     ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const
     {
         return m_dispatchMeshIndirectSignature.Get();
@@ -618,6 +622,7 @@ private:
     std::map<MaterialBatchSignatureKey, MaterialBatchSignature> m_meshBatchSignatures;
     RHIAtomicCapabilities             m_atomicCapabilities;
     RHIMeshShaderCapabilities          m_meshShaderCapabilities;
+    RHIShaderArrayCapabilities         m_shaderArrayCapabilities;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.

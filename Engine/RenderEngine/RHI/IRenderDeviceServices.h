@@ -332,6 +332,11 @@ public:
         return {};
     }
 
+    virtual RHIShaderArrayCapabilities GetShaderArrayCapabilities() const
+    {
+        return {};
+    }
+
     virtual bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) = 0;
 

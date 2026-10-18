@@ -2703,17 +2703,37 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 "Frame geometry index separates two instances and partitioned chunks");
             const auto materialWork = host.MaterialWork();
             Check(bool(materialWork), "GPU material tile work exists");
-            RHIReadback tileReadback, tileArguments;
-            Check(device.CreateBufferReadback(materialWork->commandBytes,tileArguments,error), "Material indirect readback");
-            graph->AddPass("Probe.Material.Arguments", {{materialWork->graphArguments,RHIResourceState::CopySource,
+            Check(materialWork->packetWork && materialWork->sceneRecordsOwner &&
+                materialWork->recordCount == frameGeometry->records.size() &&
+                materialWork->width == context.width && materialWork->height == context.height,
+                "Material packet plan matches the exact frame geometry and viewport");
+            const auto materialInputs = materialWork->GraphInputs(*graph);
+            RHIReadback tileReadback, tileArguments, tileRanges, tileRecords;
+            Check(device.CreateBufferReadback(uint64_t(materialWork->packetWork->argumentWords) * 4,
+                tileArguments,error), "Material indirect readback");
+            graph->AddPass("Probe.Material.Arguments", {{materialInputs[1],RHIResourceState::CopySource,
                 currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}}, [materialWork,tileArguments](const auto& execution) {
                     execution.encoder->CopyBufferToReadback(tileArguments,materialWork->arguments);
                 },true);
             Check(device.CreateBufferReadback(materialWork->workBytes, tileReadback, error), "Material tile work readback");
-            graph->AddPass("Probe.Material.Tiles", {{materialWork->graphWork, RHIResourceState::CopySource,
+            graph->AddPass("Probe.Material.Tiles", {{materialInputs[0], RHIResourceState::CopySource,
                 currentFrameDepth ? RGAccessMode::Read : RGAccessMode::LegacyState}},
                 [materialWork,tileReadback](const auto& execution) {
                     execution.encoder->CopyBufferToReadback(tileReadback,materialWork->work);
+                },true);
+            Check(device.CreateBufferReadback(uint64_t(materialWork->commandCount) * 16, tileRanges, error),
+                "Material bucket range readback");
+            graph->AddPass("Probe.Material.Ranges", {{materialWork->packetWork->graphRanges,
+                RHIResourceState::CopySource, RGAccessMode::Read}},
+                [materialWork,tileRanges](const auto& execution) {
+                    execution.encoder->CopyBufferToReadback(tileRanges,materialWork->ranges);
+                },true);
+            Check(device.CreateBufferReadback(uint64_t(materialWork->recordCount) * sizeof(SceneGpuData::Record),
+                tileRecords, error), "Material resident record readback");
+            graph->AddPass("Probe.Material.Records", {{materialWork->sceneRecordsOwner->GraphBuffer(*graph),
+                RHIResourceState::CopySource, RGAccessMode::Read}},
+                [materialWork,tileRecords](const auto& execution) {
+                    execution.encoder->CopyBufferToReadback(tileRecords,materialWork->sceneRecordsOwner->Buffer());
                 },true);
             RHIReadback geometryReadback;
             const auto geometryBytes = frameGeometry->records.size() * sizeof(SceneFrameGeometry::Record);
@@ -3152,48 +3172,120 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             }
             for (unsigned i = 0; i < readbacks.size(); ++i)
                 Check(device.MapReadback(readbacks[i], mapped[i], error), "Scene readback map");
-            RHIReadbackImage tileImage;
+            RHIReadbackImage tileImage, rangeImage, recordImage;
             Check(device.MapReadback(tileReadback,tileImage,error), "Material tile list map");
+            Check(device.MapReadback(tileRanges,rangeImage,error), "Material bucket range map");
+            Check(device.MapReadback(tileRecords,recordImage,error), "Material resident record map");
             const auto tileWord = [&](size_t index) {
                 uint32_t value{}; Check((index+1)*4 <= tileImage.data.size(), "Material tile list bounds");
                 std::memcpy(&value,tileImage.data.data()+index*4,4); return value;
             };
-            Check(tileWord(0)==context.width && tileWord(1)==context.height &&
-                tileWord(2)==frameGeometry->records.size(), "Material tile header matches frame");
+            Check(recordImage.data.size() >= uint64_t(materialWork->recordCount) * sizeof(SceneGpuData::Record),
+                "Complete resident material record table");
+            std::vector<SceneGpuData::Record> gpuRecords(materialWork->recordCount);
+            std::memcpy(gpuRecords.data(),recordImage.data.data(),gpuRecords.size()*sizeof(SceneGpuData::Record));
+            std::vector<uint32_t> bucketRecords(materialWork->commandCount);
+            for (uint32_t recordIndex=1; recordIndex<gpuRecords.size(); ++recordIndex) {
+                const auto& record=gpuRecords[recordIndex];
+                const auto& geometryRecord=frameGeometry->records[recordIndex];
+                auto expectedIdentity=geometryRecord.identity;
+                expectedIdentity.reserved[0]=recordIndex;
+                Check(std::memcmp(&record.identity,&expectedIdentity,sizeof(expectedIdentity))==0 &&
+                    record.surface[1]==recordIndex && record.surface[2]==geometryRecord.chunkIndex &&
+                    record.surface[3]==geometryRecord.meshletCount && record.material[2]==geometryRecord.owner &&
+                    record.geometry[3]==geometryRecord.vertexCount &&
+                    std::memcmp(record.worldColumns.data(),geometryRecord.worldColumns,sizeof(geometryRecord.worldColumns))==0,
+                    "GPU material records retain exact geometry, instance, primitive namespace and world transform");
+                Check(record.geometry[0]<SceneGpuData::kGeometryPageSize &&
+                    record.geometry[1]<SceneGpuData::kGeometryPageSize &&
+                    record.geometry[2]<SceneGpuData::kGeometryPageSize,
+                    "Material packet geometry uses bounded current, previous and topology descriptors");
+                const auto sourceIndex=geometryRecord.owner-0x80000001u;
+                Check(sourceIndex<input->Draws().size(), "Material record maps to an exact sealed input");
+                const auto& source=input->Draws()[sourceIndex];
+                Check(record.material[3]==source.coverage.flags &&
+                    record.surface[0]==std::bit_cast<uint32_t>(source.coverage.cutoff),
+                    "Material packet coverage and cutoff retain their instance values");
+                const auto& program=source.material->generation->cooked.product.program;
+                const bool needsTiles=program.surface && (program.features&0x0800u)==0 &&
+                    source.queue!=SceneCoverage::Blended;
+                Check(needsTiles ? record.history[2]<materialWork->commandCount : record.history[2]==UINT32_MAX,
+                    "Only opaque material surfaces enter tile buckets; ordered surfaces retain their own route");
+                if(needsTiles) ++bucketRecords[record.history[2]];
+            }
+            for(uint32_t bucket=0; bucket<bucketRecords.size(); ++bucket)
+                Check(bucketRecords[bucket]==materialWork->buckets[bucket].count,
+                    "Material bucket counts retain every source record exactly once");
             std::vector<std::set<uint32_t>> expectedTiles(frameGeometry->records.size());
             for (unsigned y=0; y<context.height; ++y) for (unsigned x=0; x<context.width; ++x) {
                 uint32_t record{};
                 std::memcpy(&record,mapped[5].data.data()+y*mapped[5].rowPitch+x*8,4);
                 record = frameGeometry->FindRecord(record);
                 Check(record<expectedTiles.size(), "Visibility tile owner is in frame");
-                if(record) expectedTiles[record].insert((y/8)*((context.width+7)/8)+x/8);
+                if(record && gpuRecords[record].history[2]!=UINT32_MAX)
+                    expectedTiles[record].insert((y/8)*((context.width+7)/8)+x/8);
             }
+            using MaterialTile=std::pair<uint32_t,uint32_t>;
+            std::vector<std::set<MaterialTile>> expectedBuckets(materialWork->commandCount);
+            for(uint32_t record=1; record<expectedTiles.size(); ++record)
+                for(const auto tile:expectedTiles[record])
+                    expectedBuckets.at(gpuRecords[record].history[2]).emplace(record,tile);
             uint32_t prefix{};
-            const auto records = expectedTiles.size();
-            for(size_t record=0; record<records; ++record) {
-                const auto count=tileWord(4+record), offset=tileWord(4+records+record);
-                Check(count==expectedTiles[record].size() && offset==prefix && tileWord(4+2*records+record)==count,
-                    "Exact GPU material tile count, prefix and scatter cursor");
-                std::set<uint32_t> actual;
-                for(uint32_t i=0;i<count;++i) Check(actual.insert(tileWord(4+3*records+offset+i)).second,
-                    "No duplicate material tile work");
-                Check(actual==expectedTiles[record], "GPU tile list exactly matches visible pixels; no missing or extra tiles");
+            for(uint32_t bucket=0; bucket<expectedBuckets.size(); ++bucket) {
+                std::array<uint32_t,4> range{};
+                Check((uint64_t(bucket)+1)*sizeof(range)<=rangeImage.data.size(), "Material bucket range bounds");
+                std::memcpy(range.data(),rangeImage.data.data()+uint64_t(bucket)*sizeof(range),sizeof(range));
+                const auto count=static_cast<uint32_t>(expectedBuckets[bucket].size());
+                Check(range==std::array<uint32_t,4>{prefix,count,count,0},
+                    "Exact GPU material bucket count, prefix and scatter cursor");
+                Check(uint64_t(prefix)+count<=materialWork->PacketCapacity(),
+                    "Material packet ranges fit their conservative capacity without truncation");
+                std::set<MaterialTile> actual;
+                for(uint32_t i=0;i<count;++i) {
+                    const auto index=uint64_t(prefix+i)*2;
+                    const MaterialTile packet{tileWord(index),tileWord(index+1)};
+                    Check(packet.first>0 && packet.first<gpuRecords.size() &&
+                        gpuRecords[packet.first].history[2]==bucket, "Every packet retains its exact material bucket and record");
+                    Check(actual.insert(packet).second, "No duplicate material record/tile work");
+                }
+                Check(actual==expectedBuckets[bucket],
+                    "GPU record/tile packets exactly match visible pixels; no missing or extra work");
                 prefix+=count;
             }
             RHIReadbackImage argumentImage;
             Check(device.MapReadback(tileArguments,argumentImage,error), "Material indirect argument map");
-            for(uint32_t index=0; index<materialWork->commandCount; ++index) {
-                std::array<uint32_t,4> command;
-                std::memcpy(command.data(),static_cast<const uint8_t*>(materialWork->records.cpuAddress)+index*16,16);
-                const auto count=static_cast<uint32_t>(expectedTiles.at(command[3]).size());
-                std::array<uint32_t,3> dispatch;
-                std::memcpy(dispatch.data(),argumentImage.data.data()+command[1]+command[2]*4,12);
-                Check(dispatch==std::array<uint32_t,3>{(std::min)(count,65535u),(std::max)(1u,(count+65534u)/65535u),1u},
-                    "Visible tile counts alone drive indirect mesh work");
-                Check(std::memcmp(argumentImage.data.data()+command[1],
-                    static_cast<const uint8_t*>(materialWork->templates.cpuAddress)+command[0],command[2]*4)==0,
-                    "GPU material commands retain exact geometry and material roots");
+            const auto& packetPlan=*materialWork->packetWork;
+            uint32_t nextSlice{};
+            for(uint32_t bucket=0; bucket<materialWork->commandCount; ++bucket) {
+                const auto count=static_cast<uint32_t>(expectedBuckets[bucket].size());
+                const auto& bucketPlan=packetPlan.buckets.at(bucket);
+                Check(bucketPlan.first==nextSlice && bucketPlan.count>0 &&
+                    uint64_t(bucketPlan.count)*packetPlan.values.sliceCapacity>=count,
+                    "Fixed material slices cover every visible packet in bucket order");
+                for(uint32_t slice=0; slice<bucketPlan.count; ++slice) {
+                    const auto& plan=packetPlan.slices.at(bucketPlan.first+slice);
+                    const auto begin=uint64_t(slice)*packetPlan.values.sliceCapacity;
+                    const auto remaining=begin<count ? static_cast<uint32_t>((std::min)(uint64_t(count)-begin,
+                        uint64_t(packetPlan.values.sliceCapacity))) : 0u;
+                    const auto width=packetPlan.values.dispatchWidth;
+                    Check(plan.argumentOffset==uint64_t(nextSlice)*12 && plan.argumentOffset+12<=argumentImage.data.size(),
+                        "Material dispatch arguments contain only contiguous 12-byte mesh commands");
+                    std::array<uint32_t,3> dispatch{};
+                    std::memcpy(dispatch.data(),argumentImage.data.data()+plan.argumentOffset,sizeof(dispatch));
+                    Check(dispatch==std::array<uint32_t,3>{(std::min)(remaining,width),
+                        remaining ? 1u+(remaining-1)/width : 1u,1u},
+                        "Visible packet counts alone drive each indirect slice, including empty work");
+                    const std::array<uint32_t,4> selector{bucket,width,static_cast<uint32_t>(begin),0};
+                    Check(plan.selector.cpuAddress && plan.selector.size>=sizeof(selector) &&
+                        std::memcmp(plan.selector.cpuAddress,selector.data(),sizeof(selector))==0,
+                        "Material slices retain their exact bucket, dispatch width and packet base");
+                    ++nextSlice;
+                }
             }
+            Check(nextSlice==packetPlan.slices.size() && uint64_t(nextSlice)*12==uint64_t(packetPlan.argumentWords)*4,
+                "No material indirect command is omitted or retained from the old root-template ABI");
+            device.ReleaseReadback(tileRecords);
+            device.ReleaseReadback(tileRanges);
             device.ReleaseReadback(tileArguments);
             device.ReleaseReadback(tileReadback);
             std::array<unsigned, 2> visible{};

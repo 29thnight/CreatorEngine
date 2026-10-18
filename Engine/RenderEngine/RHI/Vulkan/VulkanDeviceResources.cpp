@@ -153,7 +153,8 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     }
     RefreshUploadBudget();
     RefreshPersistentMemoryBudgets();
-    if (!m_descriptorRecycler.Initialize(m_device, kFrameCount, outError))
+    if (!m_descriptorRecycler.Initialize(m_device, kFrameCount, outError,
+        m_descriptorIndexing.maxUpdateAfterBindDescriptorsInAllPools))
     {
         Shutdown();
         return false;
@@ -504,23 +505,31 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
 {
     m_indirectDrawCapabilities = {};
     m_meshShaderCapabilities = {};
+    m_shaderArrayCapabilities = {};
+    m_atomicCapabilities = {};
+    VkPhysicalDeviceVulkan12Features available12{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     VkPhysicalDeviceMeshShaderFeaturesEXT availableMesh{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
     VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    availableFeatures.pNext = &available12;
     if (m_meshShaderExtensionSupported)
     {
-        availableFeatures.pNext = &availableMesh;
+        available12.pNext = &availableMesh;
     }
     vkGetPhysicalDeviceFeatures2(m_physicalDevice, &availableFeatures);
 
     VkPhysicalDeviceMeshShaderPropertiesEXT meshProperties{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT };
+    m_descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     if (m_meshShaderExtensionSupported && VK_TRUE == availableMesh.meshShader)
     {
-        VkPhysicalDeviceProperties2 properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-        properties.pNext = &meshProperties;
-        vkGetPhysicalDeviceProperties2(m_physicalDevice, &properties);
+        m_descriptorIndexing.pNext = &meshProperties;
     }
+    VkPhysicalDeviceProperties2 properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+    properties.pNext = &m_descriptorIndexing;
+    vkGetPhysicalDeviceProperties2(m_physicalDevice, &properties);
+    m_descriptorIndexing.pNext = nullptr;
     // Publish no partial capability: the mesh-only path needs all dispatch/output limits.
     const bool enableMesh = m_meshShaderExtensionSupported && VK_TRUE == availableMesh.meshShader &&
         meshProperties.maxMeshWorkGroupTotalCount && meshProperties.maxMeshWorkGroupCount[0] &&
@@ -583,6 +592,17 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     features12.timelineSemaphore = VK_TRUE;
+    // Fixed shader arrays are fully populated and immutable until completion.
+    // Nonuniform indexing is optional and reported only after device creation.
+    features12.shaderSampledImageArrayNonUniformIndexing =
+        available12.shaderSampledImageArrayNonUniformIndexing;
+    features12.shaderStorageBufferArrayNonUniformIndexing =
+        available12.shaderStorageBufferArrayNonUniformIndexing;
+    // Hybrid visibility uses uint64 buffer atomic-min from compute and fragment
+    // stages. Do not advertise the route from version/mesh support alone.
+    const bool enableBufferAtomics = availableFeatures.features.shaderInt64 &&
+        available12.shaderBufferInt64Atomics && availableFeatures.features.fragmentStoresAndAtomics;
+    features12.shaderBufferInt64Atomics = enableBufferAtomics ? VK_TRUE : VK_FALSE;
     features12.pNext = &features13;
 
     // Slang의 SPIR-V lowering은 SV_InstanceID를 gl_InstanceIndex로 옮기며
@@ -605,6 +625,12 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     features2.features.textureCompressionBC = VK_TRUE;
     // 선택 기능이 없는 장치도 firstInstance=0인 단건 경로는 사용할 수 있다.
     features2.features.drawIndirectFirstInstance = availableFeatures.features.drawIndirectFirstInstance;
+    features2.features.shaderSampledImageArrayDynamicIndexing =
+        availableFeatures.features.shaderSampledImageArrayDynamicIndexing;
+    features2.features.shaderStorageBufferArrayDynamicIndexing =
+        availableFeatures.features.shaderStorageBufferArrayDynamicIndexing;
+    features2.features.shaderInt64 = enableBufferAtomics ? VK_TRUE : VK_FALSE;
+    features2.features.fragmentStoresAndAtomics = enableBufferAtomics ? VK_TRUE : VK_FALSE;
     features2.pNext = &features11;
 
     void* featureChain = &features2;
@@ -698,6 +724,27 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     }
 
     m_indirectDrawCapabilities.indexedDraw = nullptr != vkCmdDrawIndexedIndirect;
+    m_shaderArrayCapabilities.sampledImageNonUniformIndexing =
+        VK_TRUE == features12.shaderSampledImageArrayNonUniformIndexing &&
+        VK_TRUE == features2.features.shaderSampledImageArrayDynamicIndexing;
+    m_shaderArrayCapabilities.storageBufferNonUniformIndexing =
+        VK_TRUE == features12.shaderStorageBufferArrayNonUniformIndexing &&
+        VK_TRUE == features2.features.shaderStorageBufferArrayDynamicIndexing;
+    m_atomicCapabilities.bufferInt64Min = VK_TRUE == features2.features.shaderInt64 &&
+        VK_TRUE == features12.shaderBufferInt64Atomics &&
+        VK_TRUE == features2.features.fragmentStoresAndAtomics;
+    const auto descriptorLimit = [](uint32_t stage, uint32_t set) {
+        return (std::min)(stage, set);
+    };
+    m_shaderArrayCapabilities.maxSampledImages = descriptorLimit(
+        m_descriptorIndexing.maxPerStageDescriptorUpdateAfterBindSampledImages,
+        m_descriptorIndexing.maxDescriptorSetUpdateAfterBindSampledImages);
+    m_shaderArrayCapabilities.maxStorageBuffers = descriptorLimit(
+        m_descriptorIndexing.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+        m_descriptorIndexing.maxDescriptorSetUpdateAfterBindStorageBuffers);
+    m_shaderArrayCapabilities.maxSamplers = descriptorLimit(
+        m_descriptorIndexing.maxPerStageDescriptorUpdateAfterBindSamplers,
+        m_descriptorIndexing.maxDescriptorSetUpdateAfterBindSamplers);
     m_indirectDrawCapabilities.nonIndexedDraw = nullptr != vkCmdDrawIndirect;
     m_indirectDrawCapabilities.nonZeroFirstInstance =
         (m_indirectDrawCapabilities.indexedDraw || m_indirectDrawCapabilities.nonIndexedDraw) &&
@@ -730,6 +777,7 @@ void VulkanDeviceResources::SetPipelineCache(VulkanPipelineCache* cache)
     if (cache)
     {
         cache->SetMeshShaderCapabilities(m_meshShaderCapabilities);
+        cache->SetShaderArrayCapabilities(m_shaderArrayCapabilities, m_descriptorIndexing);
     }
 }
 
@@ -856,6 +904,9 @@ void VulkanDeviceResources::Shutdown()
     m_meshShaderExtensionSupported = false;
     m_indirectDrawCapabilities = {};
     m_meshShaderCapabilities = {};
+    m_shaderArrayCapabilities = {};
+    m_atomicCapabilities = {};
+    m_descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     m_viewportLimits = {};
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();

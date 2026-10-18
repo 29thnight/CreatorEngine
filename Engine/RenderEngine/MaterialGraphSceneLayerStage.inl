@@ -121,25 +121,9 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
                                            const std::shared_ptr<const LX::Runtime::ComputeGeneration>& generation,
                                            std::string& error)
 {
-    // Back to front. Equal depths keep a stable geometry/draw order.
-    std::vector<ForwardDraw> order;
-    for (size_t i = 0; i < frame.input->Draws().size(); ++i)
-    {
-        const auto& draw = frame.input->Draws()[i];
-        const auto& p = draw.material->generation->cooked.product.program;
-        if (p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u)))
-            order.push_back({i, draw.geometryKey, draw.viewDepth});
-    }
-    for (const auto& draw : order)
-        if (!std::isfinite(draw.depth))
-            throw std::runtime_error("METEOR blended sorting depth is non-finite.");
-    std::stable_sort(order.begin(), order.end(), [](const ForwardDraw& a, const ForwardDraw& b) {
-        if (a.depth != b.depth)
-            return a.depth > b.depth;
-        if (a.geometryKey != b.geometryKey)
-            return a.geometryKey < b.geometryKey;
-        return a.index < b.index;
-    });
+    // Prepared from the sealed input while the owner prepared native resources.
+    // Capture/transmission boundaries below still split adjacent sorted runs.
+    const auto& order = frame.blendedOrder;
     const auto mergePipeline = [&](std::size_t input) {
         RHIPipelineHandle result{};
         if (alphaLookup->RequiresCapture())

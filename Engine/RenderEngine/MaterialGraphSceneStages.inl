@@ -9,9 +9,10 @@ struct SceneShadingInputs
 struct SceneHost::GeometryStage
 {
     std::shared_ptr<const SceneFrameGeometry> geometryTable;
-    bool Prepare(std::shared_ptr<SceneFrameGeometry> table, std::string& error)
+    bool Prepare(std::shared_ptr<SceneFrameGeometry> table, std::string& error,
+                 ResidentBufferCache* cache = nullptr, ResidentBufferCache::Key key = {})
     {
-        if (!table->Upload(error))
+        if (!table->Upload(error, cache, key))
             return false;
         geometryTable = std::move(table);
         return true;

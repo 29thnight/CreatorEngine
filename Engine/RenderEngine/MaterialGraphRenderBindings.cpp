@@ -122,7 +122,8 @@ bool CreatePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& mat
             continue;
         }
         const auto& table = parameter.table;
-        if ((table.type == RHIDescriptorType::ShaderResource && textures &&
+        if (((table.type == RHIDescriptorType::ShaderResource ||
+              table.type == RHIDescriptorType::ShaderResourceBuffer) && textures &&
              Overlaps(TextureRegister, BindlessTextureCapacity, table.baseRegister, table.count)) ||
             (table.type == RHIDescriptorType::Sampler && samplers &&
              Overlaps(SamplerRegister, BindlessSamplerCapacity, table.baseRegister, table.count)))
@@ -150,12 +151,12 @@ bool CreatePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& mat
     if (textures)
     {
         candidate.textureSlot = static_cast<std::uint32_t>(parameters.size());
-        parameters.push_back(RHILayout::SrvTable(BindlessTextureCapacity, TextureRegister));
+        parameters.push_back(RHILayout::SrvArray(BindlessTextureCapacity, TextureRegister));
     }
     if (samplers)
     {
         candidate.samplerSlot = static_cast<std::uint32_t>(parameters.size());
-        parameters.push_back(RHILayout::SamplerTable(BindlessSamplerCapacity, SamplerRegister));
+        parameters.push_back(RHILayout::SamplerArray(BindlessSamplerCapacity, SamplerRegister));
     }
     if (textures || samplers)
     {
@@ -190,6 +191,14 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
     if (!MatchingSlots(layout))
     {
         return Fail(error, "Material pass layout omits or adds a reflected binding slot.");
+    }
+    const auto shaderArrays = device.GetShaderArrayCapabilities();
+    if (((layout.textureSlot || layout.samplerSlot) &&
+         !shaderArrays.sampledImageNonUniformIndexing) ||
+        (layout.textureSlot && shaderArrays.maxSampledImages < BindlessTextureCapacity) ||
+        (layout.samplerSlot && shaderArrays.maxSamplers < BindlessSamplerCapacity))
+    {
+        return Fail(error, "Material descriptor arrays exceed enabled device indexing features or limits.");
     }
     const auto recording = device.GetCurrentUploadRecordingId();
     if (recording == 0)
@@ -392,6 +401,7 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
             descriptorIndices[resource.slot] = index;
         }
     }
+    candidate->descriptorIndexValues = descriptorIndices;
     if (layout.descriptorIndexSlot)
     {
         candidate->descriptorIndices = device.UploadConstants(descriptorIndices.data(), sizeof(descriptorIndices));

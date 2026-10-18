@@ -210,6 +210,56 @@ MeshletViewData MeshletView(uint bin)
     return view;
 #endif
 }
+bool MeshletHasGroups(uint bin)
+{
+    return (geometryVisibilityCandidates[bin].flags & 64u) != 0u;
+}
+uint MeshletGroupOwner(uint bin) { return uint(geometryVisibilityCandidates[bin].sphere.z); }
+uint MeshletGroupCount(uint bin) { return uint(geometryVisibilityBins[bin].baseVertex); }
+uint MeshletGroupMaskWords(uint bin) { return (MeshletGroupCount(bin) + 15u) / 16u; }
+uint MeshletGroupMasks(uint bin)
+{
+    bin = MeshletGroupOwner(bin);
+    return geometryVisibilityBins[bin].firstIndex + 1u + geometryVisibilityBins[bin].indexCount * 2u;
+}
+uint MeshletFeedbackWords(uint bin)
+{
+    return (geometryVisibilityCandidates[bin].flags & 32u) != 0u ? (MeshletGroupCount(bin) + 31u) / 32u : 0u;
+}
+uint MeshletFeedbackOffset(uint bin)
+{
+    bin = MeshletGroupOwner(bin);
+    return MeshletGroupMasks(bin) + MeshletGroupMaskWords(bin) * 2u;
+}
+uint MeshletScanOffset(uint bin)
+{
+    const uint local = geometryVisibilityBins[bin].firstIndex + 1u + geometryVisibilityBins[bin].indexCount * 2u;
+    return local + ((geometryVisibilityCandidates[bin].flags & 256u) != 0u ? 0u :
+        MeshletGroupMaskWords(bin) * 2u + MeshletFeedbackWords(bin));
+}
+uint MeshletTileCount(uint bin) { return (geometryVisibilityBins[bin].indexCount + 63u) / 64u; }
+uint MeshletAcceptedGroup(uint bin, uint group)
+{
+    bin = MeshletGroupOwner(bin);
+    return (MESHLET_IDS(bin)[MeshletGroupMasks(bin) + group / 16u] >> ((group & 15u) * 2u)) & 3u;
+}
+uint MeshletSelectedGroup(uint bin, uint group)
+{
+    bin = MeshletGroupOwner(bin);
+    const uint address = MeshletGroupMasks(bin) + MeshletGroupMaskWords(bin) + group / 16u;
+    uint flags;
+#if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
+    if ((geometryVisibilityCandidates[bin].flags & 128u) != 0u)
+        flags = meshletViewFirst[NonUniformResourceIndex(geometryVisibilityCandidates[bin].bin)][address];
+    else
+#elif defined(GEOMETRY_VISIBILITY_RECOVERY)
+    if ((geometryVisibilityCandidates[bin].flags & 128u) != 0u)
+        flags = meshletFirstStage[address];
+    else
+#endif
+        flags = MESHLET_IDS(bin)[address];
+    return (flags >> ((group & 15u) * 2u)) & 3u;
+}
 uint MeshletJobBase(uint bin)
 {
 #if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
@@ -230,6 +280,10 @@ uint MeshletWorkQueueBase()
 #if defined(GEOMETRY_VISIBILITY_SHARED_VIEWS)
     return 0u;
 #else
+    const uint bin = geometryVisibilityBinCount - 1u;
+    if (MeshletHasGroups(bin))
+        return MeshletScanOffset(bin) +
+            ((geometryVisibilityCandidates[bin].flags & 16u) != 0u ? MeshletTileCount(bin) : 0u);
     const GeometryVisibilityBin last = geometryVisibilityBins[geometryVisibilityBinCount - 1u];
     const bool feedback = (geometryVisibilityCandidates[geometryVisibilityBinCount - 1u].flags & 32u) != 0u;
     return last.firstIndex + last.indexCount * (feedback ? 3u : 2u) + 1u;
@@ -266,10 +320,19 @@ uint MeshletClaimWork(uint queue)
     return 0xffffffffu;
 }
 
+void GeometryGroupReset(uint bin, uint lane);
+
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void ShadowMeshletResetCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
+    if (geometryVisibilityBinCount == 0u) return;
+    if (MeshletHasGroups(0u))
+    {
+        const uint bin = group.y * 65535u + group.x;
+        if (bin < geometryVisibilityBinCount) GeometryGroupReset(bin, lane);
+        return;
+    }
     uint bin;
     if (!GeometryVisibilityIndex(group, lane, geometryVisibilityBinCount, bin)) return;
     GeometryIndirectArguments args;
@@ -448,6 +511,112 @@ bool GeometryClusterSelected(uint bin, uint group, bool demand)
     return false; // Cooker rejects excessive depth/cycles before GPU upload.
 }
 
+uint GeometryGroupAcceptance(uint bin, uint group)
+{
+    const uint base = shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(76u);
+    if (base == 0u) return group == 0u ? 3u : 0u;
+    if (group >= shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(base)) return 0u;
+    // Projected error is evaluated once for this view/instance/group. Resident
+    // acceptance differs only in complete-child fallback, not in its metric.
+    const bool desired = GeometryAcceptClusterGroup(bin, base, group, true);
+    bool resident = false;
+    if (MeteorGroupResident(shadowMeshletTopology[NonUniformResourceIndex(bin)], group))
+    {
+        const uint node = base + 16u + group * 64u;
+        const uint child = shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(node + 8u);
+        const uint second = shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(node + 12u);
+        resident = desired || (child != 0xffffffffu &&
+            (!MeteorGroupResident(shadowMeshletTopology[NonUniformResourceIndex(bin)], child) ||
+             !MeteorGroupResident(shadowMeshletTopology[NonUniformResourceIndex(bin)], second)));
+    }
+    return uint(desired) | (uint(resident) << 1u);
+}
+
+uint GeometrySelectedGroupFlags(uint bin, uint group);
+
+void GeometryGroupReset(uint bin, uint lane)
+{
+    if (lane == 0u)
+    {
+        GeometryIndirectArguments args;
+        args.indexCount = 0u; args.instanceCount = 1u; args.firstIndex = 1u;
+        args.baseVertex = 0; args.firstInstance = 0u;
+        MESHLET_ARGS(bin) = args;
+        MESHLET_IDS(bin)[geometryVisibilityBins[bin].firstIndex] = 0u;
+    }
+    if (bin == 0u && MeshletUsesWorkQueue())
+    {
+        const uint queue = MeshletWorkQueueBase();
+        if (lane < 16u) geometryVisibleIds[queue + lane] = lane == 9u ? MeshletRingCapacity() : 0u;
+        for (uint slot = lane; slot < MeshletRingCapacity(); slot += 64u)
+            geometryVisibleIds[queue + 16u + slot] = 0u;
+    }
+    // Clear before the cull dispatch, not in a producer immediately before a
+    // ring CAS: the ring publishes only its atomic job word, not other payload.
+    for (uint meshlet = lane; meshlet < geometryVisibilityBins[bin].indexCount; meshlet += 64u)
+        MESHLET_IDS(bin)[geometryVisibilityBins[bin].firstIndex + 1u +
+            geometryVisibilityBins[bin].indexCount + meshlet] = 0u;
+    // First/recovery share immutable LOD masks and feedback. Their classification
+    // and visible IDs stay separate because their occlusion tests differ.
+    if ((geometryVisibilityCandidates[bin].flags & (128u | 256u)) != 0u) return;
+    const uint maskWords = MeshletGroupMaskWords(bin);
+    for (uint word = lane; word < maskWords * 2u + MeshletFeedbackWords(bin); word += 64u)
+        MESHLET_IDS(bin)[MeshletGroupMasks(bin) + word] = 0u;
+    DeviceMemoryBarrierWithGroupSync();
+    for (uint group = lane; group < MeshletGroupCount(bin); group += 64u)
+    {
+        const uint accepted = GeometryGroupAcceptance(bin, group);
+        if (accepted != 0u)
+            InterlockedOr(MESHLET_IDS(bin)[MeshletGroupMasks(bin) + group / 16u], accepted << ((group & 15u) * 2u));
+    }
+    // One threadgroup owns the complete group's masks. A local device-memory
+    // barrier replaces another dispatch; other bins consume only after Reset.
+    DeviceMemoryBarrierWithGroupSync();
+    for (uint group = lane; group < MeshletGroupCount(bin); group += 64u)
+    {
+        const uint selected = GeometrySelectedGroupFlags(bin, group);
+        if (selected != 0u)
+            InterlockedOr(MESHLET_IDS(bin)[MeshletGroupMasks(bin) + MeshletGroupMaskWords(bin) + group / 16u],
+                selected << ((group & 15u) * 2u));
+    }
+}
+
+uint GeometrySelectedGroupFlags(uint bin, uint group)
+{
+    uint flags = MeshletAcceptedGroup(bin, group);
+    if (flags == 0u) return 0u;
+    const uint base = shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(76u);
+    if (base == 0u) return flags;
+    uint parent = shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(base + 16u + group * 64u + 16u);
+    [loop] for (uint depth = 0u; depth < 8u; ++depth)
+    {
+        if (parent == 0xffffffffu) return flags;
+        if (parent >= MeshletGroupCount(bin)) return 0u;
+        flags &= ~MeshletAcceptedGroup(bin, parent);
+        if (flags == 0u) return 0u;
+        parent = shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(base + 16u + parent * 64u + 16u);
+    }
+    return 0u; // Preserve the cooked hierarchy's bounded-depth contract.
+}
+
+bool GeometryPrepareMeshlet(uint bin, uint meshlet)
+{
+    if (!MeshletHasGroups(bin)) return true; // Fixed-range legacy oracle.
+    const LXMeshletDescriptor descriptor = LXLoadMeshlet(shadowMeshletTopology[NonUniformResourceIndex(bin)], meshlet);
+    if (descriptor.groupId >= MeshletGroupCount(bin)) return false;
+    const uint owner = MeshletGroupOwner(bin);
+    const uint selected = MeshletSelectedGroup(owner, descriptor.groupId);
+    if ((geometryVisibilityCandidates[bin].flags & (32u | 128u)) == 32u && (selected & 1u) != 0u)
+    {
+        // One bit per group, including resident keepalive. No view/stage-sized
+        // list of per-meshlet uint demands crosses back to the CPU.
+        InterlockedOr(MESHLET_IDS(owner)[MeshletFeedbackOffset(owner) + descriptor.groupId / 32u],
+            1u << (descriptor.groupId & 31u));
+    }
+    return (selected & 2u) != 0u &&
+        MeteorClusterResident(shadowMeshletTopology[NonUniformResourceIndex(bin)], meshlet);
+}
+
 void GeometryCullMeshlet(uint bin, uint meshlet)
 {
     const MeshletViewData view = MeshletView(bin);
@@ -455,22 +624,19 @@ void GeometryCullMeshlet(uint bin, uint meshlet)
     const uint classification = geometryVisibilityBins[bin].firstIndex + 1u +
         geometryVisibilityBins[bin].indexCount + meshlet;
     const bool classify = (geometryVisibilityCandidates[bin].flags & 8u) != 0u;
-    if (classify) MESHLET_IDS(bin)[classification] = 0u;
     const LXMeshletDescriptor descriptor = LXLoadMeshlet(shadowMeshletTopology[NonUniformResourceIndex(bin)], meshlet);
-    if ((geometryVisibilityCandidates[bin].flags & 32u) != 0u)
+    if (!MeshletHasGroups(bin))
     {
-        // Demand uses the desired GPU LOD cut independently of current residency.
-        // The conservative request includes offscreen/skinned clusters; raster
-        // selection below still uses the complete resident ancestor fallback.
-        const uint feedback = geometryVisibilityBins[bin].firstIndex + 1u +
-            geometryVisibilityBins[bin].indexCount * 2u + meshlet;
-        MESHLET_IDS(bin)[feedback] = GeometryClusterSelected(bin, descriptor.groupId, true) ? 1u : 0u;
+        if (classify) MESHLET_IDS(bin)[classification] = 0u;
+        if ((geometryVisibilityCandidates[bin].flags & 32u) != 0u)
+        {
+            const uint feedback = geometryVisibilityBins[bin].firstIndex + 1u +
+                geometryVisibilityBins[bin].indexCount * 2u + meshlet;
+            MESHLET_IDS(bin)[feedback] = GeometryClusterSelected(bin, descriptor.groupId, true) ? 1u : 0u;
+        }
+        if (!MeteorClusterResident(shadowMeshletTopology[NonUniformResourceIndex(bin)], meshlet) ||
+            !GeometryClusterSelected(bin, descriptor.groupId, false)) return;
     }
-    if (!MeteorClusterResident(shadowMeshletTopology[NonUniformResourceIndex(bin)],meshlet))
-    {
-        return;
-    }
-    if (!GeometryClusterSelected(bin, descriptor.groupId, false)) return;
     const uint count = descriptor.vertexCount;
     uint outside = view.valid != 0u ? 63u : 0u;
 #if defined(GEOMETRY_VISIBILITY_OCCLUSION)
@@ -534,7 +700,7 @@ void GeometryCullMeshlet(uint bin, uint meshlet)
 #endif
 #endif
         if (classify) MESHLET_IDS(bin)[classification] = 1u;
-        // Ordered lists keep source meshlet order; MeshletFinalizeCS compacts them.
+        // The later ordered compaction chain preserves source meshlet order.
         if ((geometryVisibilityCandidates[bin].flags & 16u) != 0u) return;
         uint slot;
         const uint outputOffset = geometryVisibilityBins[bin].firstIndex;
@@ -569,7 +735,9 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
                 high = middle;
             }
         }
-        GeometryCullMeshlet(low, (workGroup - geometryVisibilityCandidates[low].sourceIndex) * 64u + lane);
+        const uint meshlet = (workGroup - geometryVisibilityCandidates[low].sourceIndex) * 64u + lane;
+        if (meshlet < geometryVisibilityBins[low].indexCount && GeometryPrepareMeshlet(low, meshlet))
+            GeometryCullMeshlet(low, meshlet);
         return;
     }
 #if defined(GEOMETRY_VISIBILITY_QUEUE_PARTIAL_WAVE)
@@ -675,7 +843,12 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
                 const uint batch = min(sourceRemaining, workerWidth);
                 if (workerLane < batch)
                 {
-                    pending = MeshletJobBase(sourceBin) + 1u + sourceOffset + workerLane;
+                    const uint meshlet = sourceOffset + workerLane;
+                    // The GPU group cut removes unselected/nonresident work
+                    // before it contends for the bounded ring. Demand still
+                    // records the desired cut, including resident keepalive.
+                    if (GeometryPrepareMeshlet(sourceBin, meshlet))
+                        pending = MeshletJobBase(sourceBin) + 1u + meshlet;
                 }
                 sourceOffset += batch;
                 sourceRemaining -= batch;
@@ -785,10 +958,111 @@ void ShadowMeshletCullCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
     }
 }
 
+groupshared uint geometryCompactScan[64];
+groupshared uint geometryCompactCarry;
+
+uint GeometryCompactPrefix(uint lane, uint value)
+{
+    geometryCompactScan[lane] = value;
+    GroupMemoryBarrierWithGroupSync();
+    [unroll] for (uint stride = 1u; stride < 64u; stride <<= 1u)
+    {
+        const uint previous = lane >= stride ? geometryCompactScan[lane - stride] : 0u;
+        GroupMemoryBarrierWithGroupSync();
+        geometryCompactScan[lane] += previous;
+        GroupMemoryBarrierWithGroupSync();
+    }
+    return geometryCompactScan[lane];
+}
+
+bool GeometryCompactTile(uint3 group, out uint bin, out uint tile)
+{
+    bin = 0u; tile = 0u;
+    if (geometryVisibilityBinCount == 0u) return false;
+    const uint work = group.y * 65535u + group.x;
+    const uint last = geometryVisibilityBinCount - 1u;
+    if (work >= geometryVisibilityBins[last].preservedInstanceCount + MeshletTileCount(last)) return false;
+    uint high = geometryVisibilityBinCount;
+    [loop] while (bin + 1u < high)
+    {
+        const uint middle = bin + (high - bin) / 2u;
+        if (geometryVisibilityBins[middle].preservedInstanceCount <= work) bin = middle;
+        else high = middle;
+    }
+    tile = work - geometryVisibilityBins[bin].preservedInstanceCount;
+    return MeshletHasGroups(bin) && (geometryVisibilityCandidates[bin].flags & 16u) != 0u;
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void MeshletCountCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
+{
+    uint bin, tile;
+    if (!GeometryCompactTile(group, bin, tile)) return;
+    const uint meshlet = tile * 64u + lane;
+    const uint total = geometryVisibilityBins[bin].indexCount;
+    const uint first = geometryVisibilityBins[bin].firstIndex;
+    const uint visible = meshlet < total ? uint(MESHLET_IDS(bin)[first + 1u + total + meshlet] != 0u) : 0u;
+    const uint prefix = GeometryCompactPrefix(lane, visible);
+    if (lane == 63u) MESHLET_IDS(bin)[MeshletScanOffset(bin) + tile] = prefix;
+}
+
+void GeometryWriteMeshletArguments(uint bin, uint count)
+{
+    MESHLET_ARGS(bin).indexCount = min(count, 65535u);
+    MESHLET_ARGS(bin).instanceCount = max(1u, (count + 65534u) / 65535u);
+    MESHLET_ARGS(bin).firstIndex = 1u;
+}
+
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void MeshletFinalizeCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
 {
+    if (geometryVisibilityBinCount == 0u) return;
+    if (MeshletHasGroups(0u))
+    {
+        // Unordered views keep the compact 64-bins-per-group finalizer.
+        if ((geometryVisibilityPlaneMask & 0x40000000u) == 0u)
+        {
+            uint bin;
+            if (GeometryVisibilityIndex(group, lane, geometryVisibilityBinCount, bin))
+                GeometryWriteMeshletArguments(bin, MESHLET_IDS(bin)[geometryVisibilityBins[bin].firstIndex]);
+            return;
+        }
+        const uint bin = group.y * 65535u + group.x;
+        if (bin >= geometryVisibilityBinCount) return;
+        const uint first = geometryVisibilityBins[bin].firstIndex;
+        if ((geometryVisibilityCandidates[bin].flags & 16u) != 0u)
+        {
+            // Scan only tile totals here. Individual meshlets scatter in a
+            // subsequent parallel dispatch; the classification remains intact
+            // for first/recovery and source-order consumers.
+            const uint tiles = MeshletTileCount(bin);
+            if (lane == 0u) geometryCompactCarry = 0u;
+            GroupMemoryBarrierWithGroupSync();
+            for (uint begin = 0u; begin < tiles; begin += 64u)
+            {
+                const uint tile = begin + lane;
+                const uint value = tile < tiles ? MESHLET_IDS(bin)[MeshletScanOffset(bin) + tile] : 0u;
+                const uint inclusive = GeometryCompactPrefix(lane, value);
+                const uint carry = geometryCompactCarry;
+                GroupMemoryBarrierWithGroupSync();
+                if (tile < tiles) MESHLET_IDS(bin)[MeshletScanOffset(bin) + tile] = carry + inclusive - value;
+                if (lane == 0u) geometryCompactCarry = carry + geometryCompactScan[63];
+                GroupMemoryBarrierWithGroupSync();
+            }
+            if (lane == 0u)
+            {
+                MESHLET_IDS(bin)[first] = geometryCompactCarry;
+                GeometryWriteMeshletArguments(bin, geometryCompactCarry);
+            }
+        }
+        else if (lane == 0u)
+            GeometryWriteMeshletArguments(bin, MESHLET_IDS(bin)[first]);
+        return;
+    }
+    // Preserve the direct shader oracle's original compact ABI. Production
+    // uses the group layout and the Count -> prefix -> Scatter chain above.
     uint bin;
     if (!GeometryVisibilityIndex(group, lane, geometryVisibilityBinCount, bin)) return;
     const uint first = geometryVisibilityBins[bin].firstIndex;
@@ -804,7 +1078,23 @@ void MeshletFinalizeCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
         MESHLET_IDS(bin)[first] = visible;
     }
     const uint count = MESHLET_IDS(bin)[first];
-    MESHLET_ARGS(bin).indexCount = min(count, 65535u);
-    MESHLET_ARGS(bin).instanceCount = max(1u, (count + 65534u) / 65535u);
-    MESHLET_ARGS(bin).firstIndex = 1u;
+    GeometryWriteMeshletArguments(bin, count);
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void MeshletScatterCS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex)
+{
+    uint bin, tile;
+    if (!GeometryCompactTile(group, bin, tile)) return;
+    const uint meshlet = tile * 64u + lane;
+    const uint total = geometryVisibilityBins[bin].indexCount;
+    const uint first = geometryVisibilityBins[bin].firstIndex;
+    const uint visible = meshlet < total ? uint(MESHLET_IDS(bin)[first + 1u + total + meshlet] != 0u) : 0u;
+    const uint inclusive = GeometryCompactPrefix(lane, visible);
+    if (visible != 0u)
+    {
+        const uint offset = MESHLET_IDS(bin)[MeshletScanOffset(bin) + tile];
+        MESHLET_IDS(bin)[first + 1u + offset + inclusive - 1u] = meshlet;
+    }
 }

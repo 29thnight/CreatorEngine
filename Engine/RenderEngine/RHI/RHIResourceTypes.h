@@ -722,6 +722,20 @@ struct RHIIndirectDrawCapabilities
     bool nonIndexedDraw{ false };
 };
 
+// Fixed-size shader arrays with NonUniformResourceIndex. Limits describe one
+// array; the backend also validates the complete layout's stage/set aggregate.
+// Descriptors remain immutable for their recording/completion lifetime.
+struct RHIShaderArrayCapabilities
+{
+    bool sampledImageNonUniformIndexing{ false }; // includes sampler arrays
+    bool storageBufferNonUniformIndexing{ false };
+    // SRV tables may omit an unaccessed suffix. Does not apply to UAV arrays.
+    bool partiallyBoundSrvArrays{ false };
+    uint32_t maxSampledImages{};
+    uint32_t maxStorageBuffers{};
+    uint32_t maxSamplers{};
+};
+
 /// Native D3D12_DISPATCH_ARGUMENTS / VkDispatchIndirectCommand ABI.
 /// The GPU producer bounds all dimensions; zero work uses a zero X dimension.
 struct RHIDispatchIndirectArguments

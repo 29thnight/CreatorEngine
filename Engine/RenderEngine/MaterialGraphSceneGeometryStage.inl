@@ -19,8 +19,8 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
     std::vector<const MeshSurfaceBatch*> geometry;
     for (const auto& draw : frame->draws)
     {
-        declaredGeometry.insert(draw.geometry.get());
-        geometry.push_back(draw.geometry.get());
+        if (declaredGeometry.insert(draw.geometry.get()).second)
+            geometry.push_back(draw.geometry.get());
         if (draw.previousGeometry && declaredGeometry.insert(draw.previousGeometry.get()).second)
         {
             geometry.push_back(draw.previousGeometry.get());
@@ -48,6 +48,8 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
         throw std::runtime_error(error);
     }
     this->geometryTable->Declare(graph, this->geometryTable);
+    if (frame->sceneData)
+        frame->sceneData->Declare(graph);
     frame->graph = &graph;
     frame->graphEpoch = graph.ResourceEpoch();
     return this->geometryTable->GraphTable(graph);

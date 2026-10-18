@@ -51,6 +51,8 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     std::vector<EnhancedRenderGraph::RGPassUsage> uses{{depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}};
     commands->visibility->AddVisibleIdsRead(graph, uses);
     commands->AddRead(graph, uses, commands->GraphOutput(graph));
+    frame->sceneData->AddRead(graph, uses);
+    uses.push_back({frame->raster->geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
     for (const auto& draw : frame->shadowDraws)
     {
         if (!draw.shadowEnabled || draw.staticShadow != staticCasters)
@@ -69,7 +71,7 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     const auto statisticsSlot = cascade * 2 + (staticCasters ? 0 : 1);
     const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
     const auto pass = graph.AddSplitPass(name, std::move(uses),
-        [frame, commands, depth, slice, count, statisticsSlot](const auto& execution,
+        [frame, commands, depth, cascade, slice, count, statisticsSlot](const auto& execution,
                                                             uint32_t recordSlice, uint32_t sliceCount) {
         frame->CheckCurrent(execution.graph);
         auto& encoder = *execution.encoder;
@@ -106,7 +108,9 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
             {
                 throw std::runtime_error(error);
             }
-            commands->Draw(encoder, bucket);
+            frame->BindPacketResources(encoder, draw, frame->packetBindings.at(commands.get()),
+                                         draw.program->shadowPacketRoots, cascade);
+            commands->Draw(encoder, bucket, draw.program->shadowPacketRoots.selector);
             if (count)
             {
                 ++recordedBuckets;

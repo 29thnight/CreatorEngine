@@ -63,6 +63,10 @@ uint64_t DX12RootSignatureCache::ComputeHash(const RHIPipelineLayoutDesc& desc)
             hash = RootSigHashValue(param.table.type, hash);
             hash = RootSigHashValue(param.table.count, hash);
             hash = RootSigHashValue(param.table.baseRegister, hash);
+            // Preserve existing fixed-table cache keys; distinguish new shader
+            // array contracts without hashing structure padding.
+            if (param.table.shaderArray)
+                hash = RootSigHashValue(uint32_t{0x41525259}, hash);
             continue;
         }
 
@@ -135,6 +139,53 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
             // ★ 같은 핸들을 돌려준다. 새로 발급하면 표가 자라고, 무엇보다
             //   desc 해시가 달라져 PSO 디스크 캐시가 논다.
             return found->second.handle;
+        }
+    }
+
+    if (std::any_of(desc.params.begin(), desc.params.end(), [](const auto& param) {
+        return param.kind == RHILayoutParamKind::DescriptorTable && param.table.shaderArray;
+    }))
+    {
+        const auto caps = m_resources->GetShaderArrayCapabilities();
+        std::array<uint64_t, 4> resources{}, samplers{};
+        constexpr std::array<RHIShaderVisibility, 4> stages{
+            RHIShaderVisibility::All, RHIShaderVisibility::Vertex,
+            RHIShaderVisibility::Pixel, RHIShaderVisibility::Mesh,
+        };
+        const auto add = [&](auto& counts, RHIShaderVisibility visibility, uint32_t count) {
+            for (size_t stage = 0; stage < stages.size(); ++stage)
+                if (visibility == RHIShaderVisibility::All || visibility == stages[stage])
+                    counts[stage] += count;
+        };
+        for (const auto& param : desc.params)
+        {
+            if (param.kind == RHILayoutParamKind::ShaderResourceBuffer)
+                add(resources, param.visibility, 1);
+            if (param.kind != RHILayoutParamKind::DescriptorTable) continue;
+            const auto& table = param.table;
+            const bool sampled = table.type == RHIDescriptorType::ShaderResource;
+            const bool storage = table.type == RHIDescriptorType::ShaderResourceBuffer;
+            const bool sampler = table.type == RHIDescriptorType::Sampler;
+            if (table.shaderArray && (!table.count ||
+                ((sampled || sampler) && !caps.sampledImageNonUniformIndexing) ||
+                ((storage || table.type == RHIDescriptorType::UnorderedAccessBuffer) &&
+                 !caps.storageBufferNonUniformIndexing)))
+            {
+                outError = "DX12 shader array requires enabled descriptor indexing.";
+                return {};
+            }
+            if (sampled || storage) add(resources, param.visibility, table.count);
+            if (sampler) add(samplers, param.visibility, table.count);
+        }
+        for (const auto& sampler : desc.staticSamplers)
+            add(samplers, sampler.visibility, 1);
+        for (size_t stage = 0; stage < stages.size(); ++stage)
+        {
+            if (resources[stage] > caps.maxSampledImages || samplers[stage] > caps.maxSamplers)
+            {
+                outError = "DX12 shader arrays exceed the aggregate resource-binding-tier limit.";
+                return {};
+            }
         }
     }
 

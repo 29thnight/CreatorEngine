@@ -1182,6 +1182,9 @@
     <ClInclude Include="RHI\Vulkan\VulkanBindingModel.h">
       <Filter>RHI\Vulkan\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanDescriptorLayout.h">
+      <Filter>RHI\Vulkan\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanBindingTable.h">
       <Filter>RHI\Vulkan\Pipeline</Filter>
     </ClInclude>
@@ -1570,6 +1573,15 @@
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
     <ClInclude Include="MaterialGraphWork.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphPacketWork.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphResidentBuffer.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphSceneGpuData.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
     <ClInclude Include="MeshletSparseStorage.inl">

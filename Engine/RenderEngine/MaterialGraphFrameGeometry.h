@@ -3,6 +3,7 @@
 #include "MaterialGraphVisibilityContract.h"
 #include "MaterialGraphMeshSurface.h"
 #include "MaterialGraphTransientBufferPool.h"
+#include "MaterialGraphResidentBuffer.h"
 #include <stddef.h>
 #include <stdint.h>
 #include "../Utility_Framework/StandardLibrary.h"
@@ -56,16 +57,17 @@ struct SceneFrameGeometry final
     }
     RHIBufferSlice staging;
     RHIBufferHandle buffer;
+    std::shared_ptr<const ResidentBufferFrame> resident;
     mutable RGHandle graphTable;
     mutable const EnhancedRenderGraph* graphOwner{};
     mutable uint64_t graphEpoch{};
     ~SceneFrameGeometry()
     {
-        if (device)
+        if (device && !resident)
             ReleaseSceneBuffer(*device, pool, buffer);
     }
 
-    bool Upload(std::string& error)
+    bool Upload(std::string& error, ResidentBufferCache* cache = nullptr, ResidentBufferCache::Key key = {})
     {
         if (records.size() != geometry.size())
         {
@@ -73,6 +75,14 @@ struct SceneFrameGeometry final
             return false;
         }
         const auto bytes = records.size() * sizeof(Record);
+        if (cache)
+        {
+            if (!cache->Prepare(key, std::as_bytes(std::span{records}), sizeof(Record),
+                                 "METEOR.Scene.Geometry.Table", resident, error))
+                return false;
+            buffer = resident->Buffer();
+            return true;
+        }
         staging = device->AllocateUpload({bytes, RHIUploadUsage::BufferCopy, 16});
         if (!staging.IsWritable())
         {
@@ -93,6 +103,12 @@ struct SceneFrameGeometry final
             throw std::runtime_error("METEOR geometry table cannot cross frame graphs.");
         graphOwner = &graph;
         graphEpoch = graph.ResourceEpoch();
+        if (resident)
+        {
+            resident->Declare(graph, resident);
+            graphTable = resident->GraphBuffer(graph);
+            return;
+        }
         graphTable = graph.ImportBuffer(buffer, RHIResourceState::Common, "METEOR.Scene.Geometry.Table");
         if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
             throw std::runtime_error("METEOR geometry table requires an ExplicitVersioned graph.");

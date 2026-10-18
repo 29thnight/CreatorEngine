@@ -173,7 +173,11 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     {
         return Fail(error, "METEOR Scene shader cache directory failed: " + ioError.message());
     }
-    std::string hostSource = BuildBoundSource(program) + suffix;
+    auto sceneProgram = program;
+    if (!sceneProgram.semanticKey.ends_with(SceneHostIdentity))
+        sceneProgram.semanticKey += SceneHostIdentity;
+    const auto hostStampOffset = sceneProgram.semanticKey.size() - SceneHostIdentity.size();
+    std::string hostSource = BuildBoundSource(sceneProgram) + suffix;
     if (program.volume)
         hostSource += "\n#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
     if (!PublishSceneSource(sourceFile, hostSource, error))
@@ -198,7 +202,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     VerifiedProduct candidate;
     std::vector<RHIShaderReflection> reflections;
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    if (!VerifyProduct(program, sourceFile, SceneCompileTargets(program, backend), permutation, options, capabilities,
+    if (!VerifyProduct(sceneProgram, sourceFile, SceneCompileTargets(sceneProgram, backend), permutation, options, capabilities,
                        budget, candidate, diagnostics, &reflections))
     {
         error.clear();
@@ -208,6 +212,10 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
         }
         return false;
     }
+    // Verify appends dependency identities. Move the source-selection stamp to
+    // the end even when the caller supplied an already cooked Scene program.
+    // Existing dependency provenance stays intact; the host stamp is not doubled.
+    candidate.program.semanticKey.erase(hostStampOffset, SceneHostIdentity.size());
     candidate.program.semanticKey += SceneHostIdentity;
     if (graphGuid != FileGuid{})
     {
