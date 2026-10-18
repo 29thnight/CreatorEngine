@@ -105,17 +105,16 @@ def analyze(events, thread, begin, end):
     if not target_events:
         raise ValueError(f'No context switches for thread {thread}')
     # 같은 TID가 재사용되면 번호만으로 분석할 스레드 수명을 선택할 수 없다.
-    births = [event for event in events['lifetimes'] if event['tid'] == thread and event['kind'] == 'T-Start'
-              and begin < event['timeUs'] < end]
-    deaths = [event for event in events['lifetimes'] if event['tid'] == thread and event['kind'] == 'T-End'
-              and begin < event['timeUs'] < end]
-    if births or deaths:
+    lifetime_boundaries = [event for event in events['lifetimes'] if event['tid'] == thread
+                           and event['kind'] in ('T-Start', 'T-End')]
+    if any(begin < event['timeUs'] < end for event in lifetime_boundaries):
         raise ValueError('Target thread lifetime changes inside the window; choose one thread incarnation')
 
     cpu_events = collections.defaultdict(list)
     for event in switches:
         cpu_events[event['cpu']].append(event)
     running = []
+    validated_running_brackets = set()
     warnings = []
     for cpu, rows in cpu_events.items():
         for first, second in zip(rows, rows[1:]):
@@ -125,6 +124,8 @@ def analyze(events, thread, begin, end):
                 continue
             running.append(dict(beginUs=first['timeUs'], endUs=second['timeUs'], cpu=cpu,
                                 tid=first['newTid'], process=first['newProcess'], priority=first['newPriority']))
+            if first['newTid'] == thread:
+                validated_running_brackets.add((id(first), id(second)))
 
     intervals = []
     target_priority = []
@@ -133,9 +134,19 @@ def analyze(events, thread, begin, end):
         if not overlap(begin, end, interval_begin, interval_end):
             continue
         state, readier = 'Unknown', None
-        if first['newTid'] == thread and second['oldTid'] == thread:
-            if process_key(first['newProcess']) == process_key(second['oldProcess']):
+        # 요청 창 밖의 종료·재생성도 양쪽 switch가 같은 스레드의 증거인지 바꾼다.
+        # 같은 마이크로초의 선후는 확증할 수 없으므로 bracket 양 끝의 경계도 보수적으로 거부한다.
+        if any(interval_begin <= event['timeUs'] <= interval_end for event in lifetime_boundaries):
+            warnings.append(f'Target thread lifetime boundary in state bracket {interval_begin}..{interval_end} us')
+        elif first['newTid'] == thread and second['oldTid'] == thread:
+            # target 이벤트만 연결하면 다른 CSwitch에서 발견한 CPU 정체성 단절을 건너뛸 수 있다.
+            # 같은 CPU에서 검증한 연속 switch 쌍만 실제 실행 상태의 근거로 사용한다.
+            if (first['cpu'] == second['cpu']
+                    and process_key(first['newProcess']) == process_key(second['oldProcess'])
+                    and (id(first), id(second)) in validated_running_brackets):
                 state = 'Running'
+            else:
+                warnings.append(f'Unverified target Running bracket {interval_begin}..{interval_end} us')
         elif first['oldTid'] == thread and second['newTid'] == thread:
             if process_key(first['oldProcess']) == process_key(second['newProcess']):
                 if first['oldState'] in READY_STATES:
@@ -206,6 +217,7 @@ def analyze(events, thread, begin, end):
                 limits=['CPU ownership is scheduler residency including unseparated interrupt/DPC time.',
                         'CPU milliseconds sum across observed logical CPUs; they are not wall milliseconds.',
                         'An initial replacement thread does not own the entire subsequent Ready delay.',
+                        'Target state is Unknown across thread lifetime boundaries, including equal-time boundaries.',
                         'Process lifetime is unknown when no lifecycle event was exported.',
                         'Observed CPU IDs do not establish the machine CPU count.'])
 

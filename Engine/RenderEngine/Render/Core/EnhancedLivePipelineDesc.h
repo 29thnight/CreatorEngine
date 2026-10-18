@@ -118,25 +118,44 @@ public:
 
     /// 없으면 무효 핸들. 슬롯 이름 오타는 여기서 조용히 무효가 되지만,
     /// Validate가 파이프라인을 세울 때 이미 잡았어야 하는 종류다.
-    RGHandle Get(const std::string& slot) const
+    RGHandle Get(std::string_view slot) const
     {
         const auto found = m_slots.find(slot);
-        if (found == m_slots.end() || found->second.empty()) return {};
-        if (found->second.size() != 1) throw std::runtime_error("A resource-list slot requires GetList.");
+        if (found == m_slots.end() || found->second.empty())
+        {
+            return {};
+        }
+        if (found->second.size() != 1)
+        {
+            throw std::runtime_error("A resource-list slot requires GetList.");
+        }
         return found->second.front();
     }
 
     // One slot may publish several independently versioned command buffers.
     // They remain real resource handles, never a dummy join token or hidden producer.
     void SetList(const std::string& slot, std::vector<RGHandle> handles) { m_slots[slot] = std::move(handles); }
-    std::vector<RGHandle> GetList(const std::string& slot) const
+    std::vector<RGHandle> GetList(std::string_view slot) const
     {
         const auto found = m_slots.find(slot);
         return found == m_slots.end() ? std::vector<RGHandle>{} : found->second;
     }
 
 private:
-    std::unordered_map<std::string, std::vector<RGHandle>> m_slots;
+    struct SlotHash
+    {
+        using is_transparent = void;
+
+        std::size_t operator()(std::string_view slot) const noexcept
+        {
+            return std::hash<std::string_view>{}(slot);
+        }
+    };
+
+    // 174d073에서 고친 빌린 키 저장 뒤 원본 문자열 변경 문제가 재발하지 않도록 저장 키는 std::string으로 소유한다.
+    // 조회 view와 iterator는 호출 안에서만 쓰며 보관하지 않는다. 핸들과 목록도 값으로 반환한다.
+    // 저장 키와 조회 view에 같은 해시·문자 비교를 적용해 주소와 종료 문자에 의존하지 않는다.
+    std::unordered_map<std::string, std::vector<RGHandle>, SlotHash, std::equal_to<>> m_slots;
 };
 
 /// 프레임마다 달라지는 값. 노드 정의는 정적이어야 하므로 이런 것은 캡처가
@@ -298,6 +317,7 @@ public:
     /// GPU·활성 scene 없이 Validate와 Dump의 계약을 독립 검증한다.
     /// 정상 기술, 이름 없음, 비활성 가능 노드의 새 슬롯 발행, 미발행
     /// read/modify, 중복 발행, declare 누락과 덤프 순서·상태·슬롯을 검사한다.
+    /// 블랙보드의 부분 문자열·키 소유·목록 복사·Reset 계약도 GPU 없이 확인한다.
     static bool RunSelfTest(std::string& outLog);
 
 private:

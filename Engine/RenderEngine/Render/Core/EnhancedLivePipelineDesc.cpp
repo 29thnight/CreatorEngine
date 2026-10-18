@@ -268,6 +268,7 @@ std::string LivePipelineDesc::Dump() const
 bool LivePipelineDesc::RunSelfTest(std::string& outLog)
 {
     outLog.clear();
+    constexpr uint32_t kSelfTestCases = 15;
     uint32_t passed = 0;
     uint32_t total = 0;
 
@@ -275,7 +276,7 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
     {
         ++total;
         if (ok) ++passed;
-        outLog += "[" + std::to_string(total) + "/8] " + label + " — "
+        outLog += "[" + std::to_string(total) + "/" + std::to_string(kSelfTestCases) + "] " + label + " — "
             + (ok ? "통과" : "실패");
         if (!detail.empty()) outLog += " (" + detail + ")";
         outLog += "\n";
@@ -368,8 +369,151 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
           "writes: scene", "modifies: scene", "reads: scene", "writes: display" }),
         "덤프 순서·활성 상태·슬롯 연결", "");
 
+    // 조회 문자열의 수명과 저장 키의 수명을 분리해도 핸들 값과 목록 소유권은 같아야 한다.
+    const RGHandle first{17, 3, RGResourceKind::Buffer, 41};
+    const RGHandle second{23, 9, RGResourceKind::Texture, 43};
+    const auto sameHandle = [](RGHandle left, RGHandle right)
+    {
+        return left.index == right.index && left.version == right.version &&
+            left.kind == right.kind && left.epoch == right.epoch;
+    };
+    const auto sameSlot = [&](const LiveBlackboard& board, std::string_view slot, RGHandle expected)
+    {
+        const auto handles = board.GetList(slot);
+        return sameHandle(board.Get(slot), expected) && handles.size() == 1 &&
+            sameHandle(handles.front(), expected);
+    };
+    LiveBlackboard blackboard;
+    {
+        const std::string key = "METEOR.Test.OwnedSlotNameAfterSourceDestruction";
+        std::string query;
+        {
+            std::string source = key;
+            blackboard.Set(source, first);
+            query = source;
+            source.assign(source.size(), 'x');
+        }
+        record(sameSlot(blackboard, key, first) && sameSlot(blackboard, query, first) &&
+                sameSlot(blackboard, "METEOR.Test.OwnedSlotNameAfterSourceDestruction", first) &&
+                !blackboard.Get("missing-slot").IsValid() && blackboard.GetList("missing-slot").empty(),
+            "블랙보드 키 소유·다른 주소의 같은 이름·누락 조회", "");
+    }
+    {
+        const std::string key = "METEOR.Test.BoundedView";
+        const std::string padded = "prefix/" + key + "/suffix";
+        const std::string_view query{padded.data() + 7, key.size()};
+        blackboard.Set(key, first);
+        record(sameSlot(blackboard, query, first) && !blackboard.Get(padded).IsValid() &&
+                blackboard.GetList(padded).empty() && !blackboard.Get(query.substr(0, query.size() - 1)).IsValid() &&
+                blackboard.GetList(query.substr(0, query.size() - 1)).empty(),
+            "블랙보드 종료 문자 없는 부분 문자열의 정확한 범위", "");
+    }
+    {
+        const std::string key{"METEOR\0Slot", 11};
+        blackboard.Set(key, first);
+        blackboard.Set("METEOR", second);
+        const std::string differentAddress = key;
+        record(sameSlot(blackboard, differentAddress, first) && sameSlot(blackboard, "METEOR", second),
+            "블랙보드 중간 NUL을 포함한 이름과 접두 이름 구분", "");
+    }
+    {
+        const std::string_view empty;
+        const bool missing = !blackboard.Get(empty).IsValid() && blackboard.GetList(empty).empty();
+        blackboard.Set("", first);
+        record(missing && sameSlot(blackboard, empty, first) && sameSlot(blackboard, "", first),
+            "블랙보드 비어 있는 view의 누락·발행 조회", "");
+    }
+    {
+        const std::string padded = "prefix/METEOR.Test.List/suffix";
+        const std::string_view query{padded.data() + 7, 16};
+        blackboard.SetList("METEOR.Test.List", {first, second});
+        auto copied = blackboard.GetList(query);
+        const bool copiedValues = copied.size() == 2 && sameHandle(copied[0], first) && sameHandle(copied[1], second);
+        copied.clear();
+        const auto preserved = blackboard.GetList(query);
+        bool rejected = false;
+        try
+        {
+            (void)blackboard.Get(query);
+        }
+        catch (const std::runtime_error&)
+        {
+            rejected = true;
+        }
+        blackboard.SetList("empty-list", {});
+        record(copiedValues && preserved.size() == 2 && sameHandle(preserved[0], first) &&
+                sameHandle(preserved[1], second) && rejected && blackboard.GetList("empty-list").empty() &&
+                !blackboard.Get("empty-list").IsValid(),
+            "블랙보드 목록 값 복사·다중 값의 단일 조회 거부·빈 목록", "");
+    }
+    {
+        blackboard.Reset();
+        bool cleared = true;
+        const std::array<std::string_view, 7> keys{
+            "METEOR.Test.OwnedSlotNameAfterSourceDestruction", "METEOR.Test.BoundedView",
+            std::string_view{"METEOR\0Slot", 11}, "METEOR", "", "METEOR.Test.List", "empty-list"};
+        for (const auto key : keys)
+        {
+            if (blackboard.Get(key).IsValid() || !blackboard.GetList(key).empty())
+            {
+                cleared = false;
+            }
+        }
+        blackboard.Set("METEOR.Test.OwnedSlotNameAfterSourceDestruction", second);
+        record(cleared && sameSlot(blackboard, "METEOR.Test.OwnedSlotNameAfterSourceDestruction", second),
+            "블랙보드 Reset 뒤 이전 슬롯 제거·새 핸들 발행", "");
+    }
+    {
+        const std::string scalarKey = "METEOR.Test.OwnedScalarAfterQueryDestruction";
+        const std::string listKey = "METEOR.Test.OwnedListAfterQueryDestruction";
+        std::vector<RGHandle> copiedList;
+        bool preserved = true;
+        {
+            LiveBlackboard board;
+            for (uint32_t index = 0; index < 300; ++index)
+            {
+                board.Set("METEOR.Test.Warmup." + std::to_string(index), first);
+            }
+            // 큰 표의 버킷을 유지한 채 소수 슬롯만 발행해도 조회 문자열의 수명을 빌려서는 안 된다.
+            board.Reset();
+            for (uint32_t cycle = 0; cycle < 3; ++cycle)
+            {
+                const RGHandle current = cycle % 2 == 0 ? first : second;
+                const RGHandle other = cycle % 2 == 0 ? second : first;
+                board.Set(scalarKey, current);
+                board.SetList(listKey, {current, other});
+                {
+                    std::string scalarQuery = scalarKey;
+                    std::string listQuery = listKey;
+                    preserved = sameSlot(board, scalarQuery, current) &&
+                        sameHandle(board.Get(std::string{scalarKey}), current) && preserved;
+                    copiedList = board.GetList(listQuery);
+                    const auto temporaryList = board.GetList(std::string{listKey});
+                    preserved = temporaryList.size() == 2 && sameHandle(temporaryList[0], current) &&
+                        sameHandle(temporaryList[1], other) && preserved;
+                    // 같은 버퍼의 내용 변경과 용량을 넘는 재할당을 거친 뒤 조회 원본을 파괴한다.
+                    scalarQuery[0] = 'x';
+                    listQuery[0] = 'y';
+                    scalarQuery.assign(scalarQuery.capacity() + 1, 'x');
+                    listQuery.assign(listQuery.capacity() + 1, 'y');
+                }
+                const auto storedList = board.GetList(listKey);
+                preserved = sameSlot(board, scalarKey, current) && storedList.size() == 2 &&
+                    sameHandle(storedList[0], current) && sameHandle(storedList[1], other) && preserved;
+                board.Reset();
+                preserved = !board.Get(scalarKey).IsValid() && board.GetList(scalarKey).empty() &&
+                    board.GetList(listKey).empty() && copiedList.size() == 2 &&
+                    sameHandle(copiedList[0], current) && sameHandle(copiedList[1], other) && preserved;
+            }
+        }
+        record(preserved && copiedList.size() == 2 && sameHandle(copiedList[0], first) &&
+                sameHandle(copiedList[1], second),
+            "블랙보드 조회 원본 변경·재할당·파괴 뒤 Reset 반복·보드 파괴 뒤 목록 보존", "");
+    }
+
+    const bool complete = passed == total && total == kSelfTestCases;
     outLog += "LivePipelineDesc selftest " + std::to_string(passed) + "/"
-        + std::to_string(total) + (passed == total ? " 통과\n" : " 실패\n");
-    return passed == total;
+        + std::to_string(total) + (complete ? " 통과\n" : " 실패\n");
+    return complete;
 }
 
