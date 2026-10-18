@@ -109,7 +109,7 @@ const·연산자 오버로드)은 C++대로 적는다.
 | 클래스 · 구조체 · 열거형 | `PascalCase` | `AnimationController`, `GameObjectType` |
 | 열거형 값 | `PascalCase` | `ScenePhase::Playing` |
 | 메서드 | `PascalCase` | `GetComponent`, `AttachComponentLifecycle` |
-| 공개 상수 | `PascalCase` | `Entity::SceneRootIndex` |
+| 공개 상수 | `k` 접두 + `PascalCase` (§3.4) | `Entity::kSceneRootIndex` |
 | 네임스페이스 | `PascalCase` | `Authoring`, `CommandService`, `Lifecycle` |
 | 멤버 변수 | `m_camelCase` | `m_components`, `m_prefabOverrides` |
 | 지역 변수 · 매개변수 | `camelCase` | `parentIndex`, `component` |
@@ -374,6 +374,30 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
   이 층의 목적이므로.
 
 ### 7.1 포매팅 — `.clang-format` (9-3 (a) 확정)
+
+**필수 본문·들여쓰기 규칙(2026-10-18 추가):**
+
+- 모든 `for`(range-for 포함)와 `if`의 본문은 반드시 중괄호로 감싸고 여러 줄로 쓴다.
+  본문이 한 문장이어도 중괄호를 생략하거나 `if (condition) { DoWork(); }`처럼
+  한 줄에 모아 쓰지 않는다. 여는 중괄호와 닫는 중괄호는 각각 별도 줄에 둔다.
+- 네임스페이스 내부의 모든 선언과 정의는 바깥보다 공백 4칸 들여쓴다.
+  중첩·익명 네임스페이스에도 같은 규칙을 적용한다.
+
+```cpp
+namespace Authoring
+{
+    void UpdateEntities()
+    {
+        for (auto& entity : entities)
+        {
+            if (entity.IsActive())
+            {
+                entity.Update();
+            }
+        }
+    }
+}
+```
 
 기준 도구는 **VS 2022 동봉 clang-format 19.1.5**
 (`VC/Tools/Llvm/bin/clang-format.exe`)다. 스타일 기본값은 버전마다 바뀌므로

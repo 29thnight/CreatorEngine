@@ -18,6 +18,18 @@
 Language: Cpp
 BasedOnStyle: Microsoft
 
+# for(range-for 포함)·if는 중괄호를 삽입하고 본문을 여러 줄로 펼친다.
+InsertBraces: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+BreakBeforeBraces: Allman
+
+# 중첩·익명 네임스페이스 내부도 단계마다 공백 4칸 들여쓴다.
+IndentWidth: 4
+NamespaceIndentation: All
+CompactNamespaces: false
+
 # ★ Microsoft 기본은 Right(`Entity *entity`)다. 이 저장소는 정반대로
 #   `Entity* entity` 가 포인터 4,361 대 77(98%), 참조 8,269 대 26(99.7%).
 #   명시하지 않으면 재포맷이 12,700여 곳의 선언을 뒤집는다.
