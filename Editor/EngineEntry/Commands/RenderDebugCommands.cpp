@@ -460,6 +460,7 @@ namespace ConsoleCmd
         nativeRecord.Set("ms", CommandData::Double(snapshot.nativeRecordMs));
         nativeRecord.Set("recordingWaves", CommandData::Int(snapshot.nativeRecordWaves));
         nativeRecord.Set("jobDispatches", CommandData::Int(snapshot.nativeRecordDispatches));
+        nativeRecord.Set("ownerJoins", CommandData::Int(snapshot.nativeRecordOwnerJoins));
         nativeRecord.Set("workerJobs", CommandData::Int(snapshot.nativeRecordJobs));
         nativeRecord.Set("commandTargets", CommandData::Int(snapshot.nativeRecordTargets));
         nativeRecord.Set("recordUnits", CommandData::Int(snapshot.nativeRecordUnits));

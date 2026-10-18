@@ -1926,8 +1926,8 @@ void GraphAdmissionTests(RecordingChangeDevice& device)
             Check(stats.recordingWaveCount == (independent && !transitive ? 1u : 2u) &&
                       stats.recordUnits == expectedUnits && stats.recordWorkers == requestedWorkers,
                   "Cold/reused unsplit and split recording plans preserve explicit CPU joins");
-            Check(!independent || stats.recordingJobDispatchCount == (transitive ? 2u : 1u),
-                  "Independent slices avoid extra dispatches while unannotated descendants retain ancestor joins");
+            Check(!independent || stats.recordingOwnerJoinCount == 1,
+                  "Independent slices and transitive CPU prerequisites need only one owner join");
             Check(std::ranges::all_of(producerCalls, [](unsigned count) { return count == 1; }),
                   "Critical-path partition records every producer exactly once");
             bool exactConsumer = true;

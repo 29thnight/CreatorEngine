@@ -3949,7 +3949,27 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     const bool recordingSideEffects = std::any_of(executeOrder.begin(), executeOrder.end(),
         [&](uint16_t pass) { return m_passes[pass].recordingSideEffect; });
     const bool bindingAware = m_recordingWorkloadBalance && m_scheduling == RGSchedulingMode::ExplicitVersioned;
-    const bool declineParallel = recordingSideEffects ||
+    // 동일 바이너리의 진단 비교용이다. 미지정은 의존 작업 그래프를 사용한다.
+    static const bool kDependencyRecordingEnabled = []
+    {
+        char* value = nullptr;
+        size_t length = 0;
+        const bool read = _dupenv_s(&value, &length, "CREATOR_RECORDING_TASK_GRAPH") == 0;
+        const bool enabled = !read || !value || std::string_view{value} != "0";
+        std::free(value);
+        return enabled;
+    }();
+    // 동일 바이너리에서 조각·target 하나의 기록 비용을 병렬 정책과 비교한다.
+    static const bool kSingleTargetRecording = []
+    {
+        char* value = nullptr;
+        size_t length = 0;
+        const bool read = _dupenv_s(&value, &length, "CREATOR_RECORDING_SINGLE_TARGET") == 0;
+        const bool enabled = read && value && std::string_view{value} == "1";
+        std::free(value);
+        return enabled;
+    }();
+    const bool declineParallel = recordingSideEffects || kSingleTargetRecording ||
         (0 != totalRecordCost && totalRecordCost < m_parallelCostThreshold &&
             (!bindingAware || estimatedRecordingWork < m_parallelCostThreshold));
 
@@ -4026,6 +4046,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         std::vector<RecordingShape> shapes;
         std::vector<uint32_t> unitWorker, unitWave;
         std::vector<std::vector<size_t>> workerUnits;
+        RHIRecordingTaskGraph taskGraph;
     };
     // CPU metadata only: no callbacks, encoders, native handles or frame owners.
     // A bounded owner-thread cache also serves graph storage in other frame slots.
@@ -4072,6 +4093,21 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     if (!selectedPlan)
     {
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.Plan">()};
+        std::vector<RHIRecordingPassDependencies> recordingPasses(m_passes.size());
+        for (size_t pass = 0; pass < m_passes.size(); ++pass)
+        {
+            recordingPasses[pass].independent = m_passes[pass].recordingIndependent;
+        }
+        for (const auto& edge : std::span{VersionEdges()})
+        {
+            recordingPasses[edge.consumer].producers.push_back(edge.producer);
+        }
+        std::vector<uint32_t> unitPasses;
+        unitPasses.reserve(unitCount);
+        for (const auto& unit : units)
+        {
+            unitPasses.push_back(executeOrder[unit.order]);
+        }
         auto& unitWorker = scratch.unitWorker;
         unitWorker.assign(unitCount, 0);
         for (size_t i = 0; i < unitCount; ++i)
@@ -4084,11 +4120,6 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         m_stats.recordingBalanced = false;
         if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
         {
-            std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
-            for (const auto& edge : std::span{VersionEdges()})
-            {
-                predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
-            }
             std::vector<uint32_t> passWave(m_passes.size()), targetWave(workers);
             std::vector<uint32_t> passCompletionTarget(m_passes.size());
             const auto planWaves = [&](const std::vector<uint32_t>& targets, std::vector<uint32_t>& waves)
@@ -4109,7 +4140,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     // 배분은 연속 블록이다. 여러 조각도 한 리스트에 모였으면 앞선
                     // 콜백이 같은 워커에서 먼저 끝나므로 별도 합류가 필요 없다.
                     const uint32_t singleTarget = targets[begin] == targets[end - 1] ? targets[begin] : UINT32_MAX;
-                    for (const auto producer : std::span{predecessors[pass]})
+                    for (const auto producer : recordingPasses[pass].producers)
                     {
                         // 분할 가능 여부와 CPU 독립성은 다른 계약이다. 작성자가 모든
                         // 조각의 독립성을 보장할 때만 GPU 의존성의 추가 CPU 합류를 뺀다.
@@ -4125,7 +4156,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     // 선행 패스가 다른 target에 남아 있으면, 뒤의 미선언 소비자는
                     // 자기 직전 콜백과 같은 target이어도 전체 합류가 필요하다.
                     passCompletionTarget[pass] = singleTarget;
-                    for (const auto producer : std::span{predecessors[pass]})
+                    for (const auto producer : recordingPasses[pass].producers)
                     {
                         if (passWave[producer] == wave && passCompletionTarget[producer] != singleTarget)
                         {
@@ -4182,9 +4213,17 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                 // Minimize the wave critical path, not the largest lifetime sum
                 // for a target: separate target blocks may still execute serially.
                 const uint32_t maximumWaves = waveCount;
-                const auto criticalWork = [&](const std::vector<uint32_t>& targets,
-                                              const std::vector<uint32_t>& waves, uint32_t count)
+                const auto criticalWork =
+                    [&](const std::vector<uint32_t>& targets, const std::vector<uint32_t>& waves, uint32_t count)
                 {
+                    RHIRecordingTaskGraph graph;
+                    if (kDependencyRecordingEnabled &&
+                        RHIBuildRecordingTaskGraph(targets, waves, unitPasses, costs, recordingPasses, workers,
+                                                   graph) &&
+                        graph.ReplacesWaveJoins())
+                    {
+                        return graph.CriticalWork();
+                    }
                     std::vector<uint64_t> sums(size_t(count) * workers, 0);
                     for (size_t i = 0; i < unitCount; ++i)
                     {
@@ -4268,6 +4307,13 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
             workerUnits[unitWorker[i]].push_back(i);
         }
         scratch.waveCount = waveCount;
+        if (!recordingSideEffects && m_scheduling == RGSchedulingMode::ExplicitVersioned && waveCount > 1 &&
+            !RHIBuildRecordingTaskGraph(unitWorker, unitWave, unitPasses, {}, recordingPasses, workers,
+                                        scratch.taskGraph))
+        {
+            outError = "명령 기록 CPU 의존 그래프를 구성할 수 없다";
+            return false;
+        }
         scratch.balanced = m_stats.recordingBalanced;
         scratch.workers = workers;
         if (cacheEligible)
@@ -4299,9 +4345,10 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     m_stats.recordingBalanced = selectedPlan->balanced;
     m_stats.recordingWaveCount = waveCount;
     m_stats.recordingJobDispatchCount = 0;
+    m_stats.recordingOwnerJoinCount = 0;
     m_stats.recordingWorkerJobCount = 0;
     std::vector<size_t> workerCursors(workers, 0);
-    uint32_t activeWave=0; // owner changes only after every recording Job has joined
+    uint32_t activeWave = 0;
 
     const auto discardRecording = [&]
     {
@@ -4338,7 +4385,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         ce::marker<"RenderCommandRecord.Worker4">(), ce::marker<"RenderCommandRecord.Worker5">(),
         ce::marker<"RenderCommandRecord.Worker6">(), ce::marker<"RenderCommandRecord.Worker7">()};
 
-    const auto recordRange = [&](uint32_t worker)
+    const auto recordRange = [&](uint32_t worker, uint32_t recordingWave)
     {
 #if !CE_SHIPPING
         ce::profile_context_scope contextScope{recordingContext};
@@ -4357,7 +4404,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
             {
                 const size_t i = indices[cursor];
                 // Waves are nondecreasing for each worker (targetWave above).
-                if (unitWave[i] != activeWave)
+                if (unitWave[i] != recordingWave)
                 {
                     break;
                 }
@@ -4399,7 +4446,10 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     RecordPassFinalBarriers(encoder, pass);
                 }
 
-                if (nullptr != m_profiler) m_profiler->EndPass(encoder, timerSlot);
+                if (nullptr != m_profiler)
+                {
+                    m_profiler->EndPass(encoder, timerSlot);
+                }
             }
         }
         catch (const std::exception& e)
@@ -4423,7 +4473,25 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         {
             // The entire graph is one unsplit target in this uncommon path.
             // Keep explicitly declared external CPU effects on the owner thread.
-            recordRange(0);
+            recordRange(0, activeWave);
+        }
+        else if (kDependencyRecordingEnabled && selectedPlan->taskGraph.ReplacesWaveJoins())
+        {
+            // 다음 작업을 미리 제출한다. 같은 target과 실제 CPU 선행 작업만 기다린다.
+            ce::profile_scope dependencyProfile{ce::marker<"RenderCommandRecord.DependencyGraph">()};
+            const auto& graph = selectedPlan->taskGraph;
+            m_stats.recordingJobDispatchCount = static_cast<uint32_t>(graph.nodes.size());
+            m_stats.recordingOwnerJoinCount = 1;
+            m_stats.recordingWorkerJobCount = static_cast<uint32_t>(graph.nodes.size());
+            pool.RunTaskGraph(graph,
+                              [&](uint32_t node)
+                              {
+                                  const auto& task = graph.nodes[node];
+                                  if (!failed.load(std::memory_order_relaxed))
+                                  {
+                                      recordRange(task.target, task.wave);
+                                  }
+                              });
         }
         else
         {
@@ -4459,9 +4527,10 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                             active.push_back(worker);
                     }
                     m_stats.recordingJobDispatchCount += 1;
+                    m_stats.recordingOwnerJoinCount += 1;
                     m_stats.recordingWorkerJobCount += static_cast<uint32_t>(active.size());
-                    pool.RunParallel([&](uint32_t job) { recordRange(active[job]); },
-                        static_cast<uint32_t>(active.size()));
+                    pool.RunParallel([&](uint32_t job) { recordRange(active[job], activeWave); },
+                                     static_cast<uint32_t>(active.size()));
                     continue;
                 }
                 const uint32_t runBegin = wave;
@@ -4471,6 +4540,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                 }
                 const uint32_t runEnd = wave;
                 ++m_stats.recordingJobDispatchCount;
+                ++m_stats.recordingOwnerJoinCount;
                 ++m_stats.recordingWorkerJobCount;
                 pool.RunParallel([&](uint32_t)
                 {
@@ -4482,7 +4552,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                         {
                             if (0 != (mask & (1u << worker)))
                             {
-                                recordRange(worker);
+                                recordRange(worker, activeWave);
                             }
                         }
                     }

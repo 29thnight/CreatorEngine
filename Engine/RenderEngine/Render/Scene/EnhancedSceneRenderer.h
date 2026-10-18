@@ -836,6 +836,7 @@ struct EnhancedLiveDebugSnapshot
     double nativeRecordMs{ 0.0 };
     uint64_t nativeRecordSamples{ 0 };
     uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
+    uint32_t nativeRecordOwnerJoins{0};
     uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
     uint64_t nativeRecordEstimatedWork{0};
     bool nativeRecordParallelDeclined{false};

@@ -2856,6 +2856,7 @@ namespace
         double   lastNativeRecordMs{ 0.0 };
         TemporalMeasurementProvenance nativeRecordProvenance;
         uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
+        uint32_t nativeRecordOwnerJoins{0};
         uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
         uint64_t nativeRecordEstimatedWork{0};
         bool nativeRecordParallelDeclined{false};
@@ -2871,6 +2872,7 @@ namespace
             nativeRecordProvenance = provenance;
             nativeRecordWaves = stats.recordingWaveCount;
             nativeRecordDispatches = stats.recordingJobDispatchCount;
+            nativeRecordOwnerJoins = stats.recordingOwnerJoinCount;
             nativeRecordJobs = stats.recordingWorkerJobCount;
             nativeRecordTargets = stats.recordWorkers;
             nativeRecordUnits = stats.recordUnits;
@@ -3050,6 +3052,7 @@ namespace
             debugSnapshot.nativeRecordSamples = nativeRecordSamples;
             debugSnapshot.nativeRecordWaves = nativeRecordWaves;
             debugSnapshot.nativeRecordDispatches = nativeRecordDispatches;
+            debugSnapshot.nativeRecordOwnerJoins = nativeRecordOwnerJoins;
             debugSnapshot.nativeRecordJobs = nativeRecordJobs;
             debugSnapshot.nativeRecordTargets = nativeRecordTargets;
             debugSnapshot.nativeRecordUnits = nativeRecordUnits;

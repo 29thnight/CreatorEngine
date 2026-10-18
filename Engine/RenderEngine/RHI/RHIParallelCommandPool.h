@@ -4,7 +4,6 @@
 
 #include "../../Utility_Framework/StandardLibrary.h"
 
-
 class RHIEncoder;
 class RHISubmissionTicket;
 
@@ -16,11 +15,10 @@ class RHISubmissionTicket;
 /// 호출이 batch에 보존된 worker 순서를 그대로 queue 순서로 넘긴다(3-15A).
 class IRHIParallelCommandPool
 {
-public:
+  public:
     static constexpr uint32_t kMaxWorkers = 8;
 
-    explicit IRHIParallelCommandPool(job_scheduler& scheduler = ce::get_job_scheduler())
-        : m_scheduler(scheduler) {}
+    explicit IRHIParallelCommandPool(job_scheduler& scheduler = ce::get_job_scheduler()) : m_scheduler(scheduler) {}
     virtual ~IRHIParallelCommandPool() = default;
     IRHIParallelCommandPool(const IRHIParallelCommandPool&) = delete;
     IRHIParallelCommandPool& operator=(const IRHIParallelCommandPool&) = delete;
@@ -73,11 +71,35 @@ public:
         RHIRunCommandRecordingJobs(m_scheduler, job, workerCount);
     }
 
+    void RunTaskGraph(const RHIRecordingTaskGraph& graph, const std::function<void(uint32_t)>& job)
+    {
+        if (!IsInitialized())
+        {
+            throw std::logic_error("command recording pool is not initialized");
+        }
+        std::array<uint32_t, kMaxWorkers> previous;
+        previous.fill(UINT32_MAX);
+        for (uint32_t index = 0; index < graph.nodes.size(); ++index)
+        {
+            const auto& node = graph.nodes[index];
+            if (node.target >= GetWorkerCount() || node.target >= kMaxWorkers)
+            {
+                throw std::invalid_argument("recording task target is outside the pool");
+            }
+            if (previous[node.target] != UINT32_MAX &&
+                std::ranges::find(node.dependencies, previous[node.target]) == node.dependencies.end())
+            {
+                throw std::invalid_argument("recording tasks must serialize each command target");
+            }
+            previous[node.target] = index;
+        }
+        RHIRunCommandRecordingTaskGraph(m_scheduler, graph, job);
+    }
+
     /// 열린 command target을 닫고 workerOrder를 복사해 이동 전용 batch로 만든다.
     /// 이 메서드는 queue에 아무것도 제출하지 않는다.
-    bool FinalizeRecordedBatch(std::span<const uint32_t> workerOrder,
-        const RHIRecordedBatchDesc& desc, RHIRecordedBatch& outBatch,
-        std::string& outError)
+    bool FinalizeRecordedBatch(std::span<const uint32_t> workerOrder, const RHIRecordedBatchDesc& desc,
+                               RHIRecordedBatch& outBatch, std::string& outError)
     {
         if (!IsInitialized())
         {
@@ -111,7 +133,10 @@ public:
             seen[worker] = true;
         }
 
-        if (!CloseAll(outError)) return false;
+        if (!CloseAll(outError))
+        {
+            return false;
+        }
 
         RHIRecordedBatch batch;
         batch.m_pool = this;
@@ -131,8 +156,7 @@ public:
 
     /// producer thread에서 native queue 호출 없이 completion을 예약하고 upload /
     /// descriptor recording을 밀봉한다. 이 뒤 batch 자체를 bounded queue로 옮긴다.
-    bool PrepareRecordedBatchSubmission(RHIRecordedBatch& batch,
-        std::string& outError)
+    bool PrepareRecordedBatchSubmission(RHIRecordedBatch& batch, std::string& outError)
     {
         if (batch.m_pool != this || batch.m_admitted || !batch.IsReadyForSubmit())
         {
@@ -172,9 +196,8 @@ public:
         }
         if (!batch.IsReadyForSubmit())
         {
-            outError = batch.IsSubmitted()
-                ? "RHIRecordedBatch를 두 번 제출하려 했다"
-                : "제출할 RHIRecordedBatch가 비어 있다";
+            outError =
+                batch.IsSubmitted() ? "RHIRecordedBatch를 두 번 제출하려 했다" : "제출할 RHIRecordedBatch가 비어 있다";
             return false;
         }
         if (!batch.m_completion.IsValid())
@@ -185,8 +208,7 @@ public:
 
         // Execute 뒤 Signal 실패도 재시도할 수 없다. 예외가 나도 Started가 남는다.
         batch.m_state = RHIRecordedBatchState::SubmissionStarted;
-        if (!SubmitRecordedCommands(batch.m_frameSlot, batch.m_commandOrder,
-            batch.m_completion, outError))
+        if (!SubmitRecordedCommands(batch.m_frameSlot, batch.m_commandOrder, batch.m_completion, outError))
         {
             batch.m_state = RHIRecordedBatchState::SubmissionFailed;
             return false;
@@ -195,7 +217,7 @@ public:
         return true;
     }
 
-private:
+  private:
     friend class RHISubmissionThread;
 
     void RejectPreparedRecordedBatch(RHIRecordedBatch& batch)
@@ -218,20 +240,18 @@ private:
 
     job_scheduler& m_scheduler; // Engine-owned; injected schedulers must outlive this pool.
 
-protected:
+  protected:
     virtual uint32_t GetCurrentFrameSlot() const = 0;
     virtual uint64_t GetCurrentRecordingId() const { return 0; }
     virtual void RejectPreparedCommands(uint64_t, RHICompletionPoint) {}
     virtual void AcceptPreparedCommands(RHICompletionPoint, const RHISubmissionTicket&) {}
 
     /// producer-side bookkeeping only. queue API를 호출하면 안 된다.
-    virtual bool PrepareRecordedCommands(uint32_t frameSlot,
-        RHICompletionPoint& outCompletion, std::string& outError) = 0;
+    virtual bool PrepareRecordedCommands(uint32_t frameSlot, RHICompletionPoint& outCompletion,
+                                         std::string& outError) = 0;
 
     /// workerOrder 순서가 곧 graph 선언 순서다. frameSlot은 batch가 기록 당시
     /// 캡처했으므로 제출 스레드가 바뀌어도 mutable current slot을 다시 읽지 않는다.
-    virtual bool SubmitRecordedCommands(uint32_t frameSlot,
-        std::span<const uint32_t> workerOrder, RHICompletionPoint completion,
-        std::string& outError) = 0;
+    virtual bool SubmitRecordedCommands(uint32_t frameSlot, std::span<const uint32_t> workerOrder,
+                                        RHICompletionPoint completion, std::string& outError) = 0;
 };
-

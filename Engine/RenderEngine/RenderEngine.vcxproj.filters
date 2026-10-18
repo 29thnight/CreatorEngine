@@ -1140,6 +1140,9 @@
     <ClInclude Include="RHI\RHICommandRecordingJobs.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHIRecordingTaskGraph.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\RHIPersistentHeapPolicy.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>

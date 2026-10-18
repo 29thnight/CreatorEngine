@@ -317,6 +317,7 @@ public:
         uint64_t estimatedRecordingWork{0}; // Callbacks + declared batches + binding contracts; CPU work hint only.
         uint32_t dependencyWaveCount{0}; // DAG depth in passes, not elapsed GPU time.
         uint32_t recordingJobDispatchCount{0};
+        uint32_t recordingOwnerJoinCount{0}; // CPU 소유자의 대기 경계 수이며 선행 의존 간선 수가 아니다.
         uint32_t recordingWorkerJobCount{0};
         uint32_t recordingWaveCount{0}; // Includes command-target append constraints.
         bool recordingBalanced{false}; // CPU work hint used without adding joins.
