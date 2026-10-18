@@ -3,6 +3,15 @@
 #include "RHIRecordingTaskGraph.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
+struct RHIRecordingExecutionOptions
+{
+    bool batchSubmit{true};
+    std::chrono::microseconds ownerSpinBudget{0};
+    std::shared_ptr<job_graph_diagnostics> diagnostics;
+    job_wait_statistics* waitStatistics{nullptr};
+    uint64_t* waitBeginNanoseconds{nullptr};
+};
+
 // RG4 and owned queue recording share the same engine jobs and join contract.
 // A completed handle has released every callback, including on job failure.
 inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const std::function<void(uint32_t)>& job,
@@ -24,7 +33,8 @@ inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const std::func
 
 // 독립 작업은 먼저 진행하고 target·CPU 선행 조건만 합류한다. 소유자는 마지막에 한 번 기다린다.
 inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIRecordingTaskGraph& graph,
-                                            const std::function<void(uint32_t)>& job)
+                                            const std::function<void(uint32_t)>& job,
+                                            const RHIRecordingExecutionOptions& options = {})
 {
     if (graph.nodes.empty())
     {
@@ -44,6 +54,25 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
             }
         }
     }
+    if (options.batchSubmit)
+    {
+        // 전체 의존 관계를 한 번에 수락한다. 후속 작업은 enki 의존성으로 이어져
+        // 준비될 때마다 별도 dispatcher handoff를 다시 만들지 않는다.
+        std::vector<job_graph_node> nodes;
+        nodes.reserve(graph.nodes.size());
+        for (const auto& node : graph.nodes)
+        {
+            nodes.push_back(job_graph_node{node.dependencies});
+        }
+        auto handle = scheduler.submit_graph(nodes, [&job](size_t node) { job(static_cast<uint32_t>(node)); },
+                                              options.diagnostics);
+        if (options.waitBeginNanoseconds)
+        {
+            *options.waitBeginNanoseconds = job_timestamp_ns();
+        }
+        handle.wait(options.ownerSpinBudget, options.waitStatistics);
+        return;
+    }
     std::vector<job_handle> handles;
     handles.reserve(graph.nodes.size());
     std::exception_ptr failure;
@@ -61,7 +90,12 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
             group.add([&job, node] { job(node); });
             handles.push_back(scheduler.submit_after(dependencies, std::move(group)));
         }
-        scheduler.submit_after(handles, job_group{}).wait();
+        auto handle = scheduler.submit_after(handles, job_group{});
+        if (options.waitBeginNanoseconds)
+        {
+            *options.waitBeginNanoseconds = job_timestamp_ns();
+        }
+        handle.wait(options.ownerSpinBudget, options.waitStatistics);
     }
     catch (...)
     {

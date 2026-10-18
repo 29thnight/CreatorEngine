@@ -3807,8 +3807,32 @@ void EnhancedRenderGraph::RecordPassBarriers(RHIEncoder& encoder, const Pass& pa
 }
 
 void EnhancedRenderGraph::RecordPassBody(const ExecuteContext& context, const Pass& pass,
-    uint32_t slice, uint32_t sliceCount) const
+    uint32_t slice, uint32_t sliceCount, RHIRecordingUnitTiming* timing) const
 {
+    // 실제 콜백 호출만 누적한다. 반복 phase 배리어는 제외하고 예외로 끝난 호출도 포함한다.
+    struct CallbackTiming
+    {
+        RHIRecordingUnitTiming* timing;
+        uint64_t beginNanoseconds{0};
+
+        explicit CallbackTiming(RHIRecordingUnitTiming* value) noexcept : timing(value)
+        {
+            if (timing)
+            {
+                ++timing->callbackInvocations;
+                beginNanoseconds = job_timestamp_ns();
+            }
+        }
+
+        ~CallbackTiming()
+        {
+            if (timing)
+            {
+                timing->callbackNanoseconds += job_timestamp_ns() - beginNanoseconds;
+            }
+        }
+    };
+
     if (pass.repeated)
     {
         for (uint32_t iteration = 0; iteration < pass.repeatCount; ++iteration)
@@ -3826,16 +3850,19 @@ void EnhancedRenderGraph::RecordPassBody(const ExecuteContext& context, const Pa
                 {
                     context.encoder->ResourceBarriers(barriers);
                 }
+                CallbackTiming callbackTiming{timing};
                 pass.repeatedExecute(context, iteration, phase);
             }
         }
     }
     else if (pass.splitExecute)
     {
+        CallbackTiming callbackTiming{timing};
         pass.splitExecute(context, slice, sliceCount);
     }
     else if (pass.execute)
     {
+        CallbackTiming callbackTiming{timing};
         pass.execute(context);
     }
 }
@@ -4093,20 +4120,25 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     if (!selectedPlan)
     {
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.Plan">()};
-        std::vector<RHIRecordingPassDependencies> recordingPasses(m_passes.size());
-        for (size_t pass = 0; pass < m_passes.size(); ++pass)
-        {
-            recordingPasses[pass].independent = m_passes[pass].recordingIndependent;
-        }
-        for (const auto& edge : std::span{VersionEdges()})
-        {
-            recordingPasses[edge.consumer].producers.push_back(edge.producer);
-        }
+        std::vector<RHIRecordingPassDependencies> recordingPasses;
         std::vector<uint32_t> unitPasses;
-        unitPasses.reserve(unitCount);
-        for (const auto& unit : units)
+        // 단일 target에서는 의존 계획을 소비하지 않으므로 매 기록의 임시 배열도 만들지 않는다.
+        if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
         {
-            unitPasses.push_back(executeOrder[unit.order]);
+            recordingPasses.resize(m_passes.size());
+            for (size_t pass = 0; pass < m_passes.size(); ++pass)
+            {
+                recordingPasses[pass].independent = m_passes[pass].recordingIndependent;
+            }
+            for (const auto& edge : std::span{VersionEdges()})
+            {
+                recordingPasses[edge.consumer].producers.push_back(edge.producer);
+            }
+            unitPasses.reserve(unitCount);
+            for (const auto& unit : units)
+            {
+                unitPasses.push_back(executeOrder[unit.order]);
+            }
         }
         auto& unitWorker = scratch.unitWorker;
         unitWorker.assign(unitCount, 0);
@@ -4346,9 +4378,68 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     m_stats.recordingWaveCount = waveCount;
     m_stats.recordingJobDispatchCount = 0;
     m_stats.recordingOwnerJoinCount = 0;
+    m_stats.recordingDispatcherHandoffCount = 0;
+    m_stats.recordingNativeGraph = false;
+    m_stats.recordingDiagnostics.reset();
     m_stats.recordingWorkerJobCount = 0;
     std::vector<size_t> workerCursors(workers, 0);
     uint32_t activeWave = 0;
+
+    const auto& recordingPolicy = RHIRecordingPolicy::Get();
+    const bool dependencyRecording = kDependencyRecordingEnabled &&
+        selectedPlan->taskGraph.ReplacesWaveJoins() && !recordingSideEffects;
+    const uint32_t ownerSpinMicroseconds = dependencyRecording ? recordingPolicy.ownerSpinMicroseconds : 0;
+    const uint32_t workerSpinMicroseconds = recordingSideEffects ? 0 : recordingPolicy.workerSpinMicroseconds;
+    // 뷰마다 선택한 target 수는 달라도 공용 풀의 같은 프레임 예산·동시 허가는 고정한다.
+    const uint32_t spinWorkers = (std::min)(pool.GetWorkerCount(), recordingPolicy.spinWorkers);
+    std::shared_ptr<RHIRecordingDiagnostics> recordingDiagnostics;
+    if (recordingPolicy.timingEnabled || ownerSpinMicroseconds || workerSpinMicroseconds)
+    {
+        recordingDiagnostics = std::make_shared<RHIRecordingDiagnostics>();
+        recordingDiagnostics->frameId = batchDesc.frameId;
+        recordingDiagnostics->timingEnabled = recordingPolicy.timingEnabled;
+        recordingDiagnostics->dependencyGraph = dependencyRecording;
+        recordingDiagnostics->batchSubmit = dependencyRecording && recordingPolicy.batchSubmit;
+        recordingDiagnostics->ownerSpinMicroseconds = ownerSpinMicroseconds;
+        recordingDiagnostics->workerSpinMicroseconds = workerSpinMicroseconds;
+        recordingDiagnostics->frameSpinMicroseconds = recordingPolicy.frameSpinMicroseconds;
+        recordingDiagnostics->spinWorkers = spinWorkers;
+        if (recordingPolicy.timingEnabled)
+        {
+            constexpr size_t kMaximumTimingEntries = 4096;
+            recordingDiagnostics->units.resize((std::min)(unitCount, kMaximumTimingEntries));
+            recordingDiagnostics->unitTimingsTruncated = unitCount > kMaximumTimingEntries;
+            for (size_t index = 0; index < recordingDiagnostics->units.size(); ++index)
+            {
+                const auto& unit = units[index];
+                const uint32_t passIndex = executeOrder[unit.order];
+                const auto& pass = m_passes[passIndex];
+                auto& timing = recordingDiagnostics->units[index];
+                timing.pass = passIndex;
+                timing.target = unitWorker[index];
+                timing.wave = unitWave[index];
+                timing.slice = unit.slice;
+                timing.sliceCount = unit.sliceCount;
+                timing.name = pass.name;
+                timing.estimatedWork = 1 + uint64_t(pass.recordCost) / unit.sliceCount +
+                    (unit.slice == 0 ? bindingWork(pass) : 0);
+            }
+            if (dependencyRecording)
+            {
+                const auto& nodes = selectedPlan->taskGraph.nodes;
+                recordingDiagnostics->jobTimingsTruncated = nodes.size() > kMaximumTimingEntries;
+                for (size_t node = 0; node < (std::min)(nodes.size(), kMaximumTimingEntries); ++node)
+                {
+                    recordingDiagnostics->tasks.push_back({nodes[node].target, nodes[node].wave});
+                }
+                if (recordingPolicy.batchSubmit && !recordingDiagnostics->jobTimingsTruncated)
+                {
+                    recordingDiagnostics->jobs = std::make_shared<job_graph_diagnostics>();
+                }
+            }
+        }
+        m_stats.recordingDiagnostics = recordingDiagnostics;
+    }
 
     const auto discardRecording = [&]
     {
@@ -4439,7 +4530,27 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     RecordPassBarriers(encoder, pass);
                 }
 
-                RecordPassBody(context, pass, unit.slice, unit.sliceCount);
+                {
+                    // 본문 wall 시간은 반복 phase 배리어를 포함한다. 실제 콜백 시간은 별도로 누적한다.
+                    RHIRecordingUnitTiming* timing = recordingDiagnostics && i < recordingDiagnostics->units.size()
+                        ? &recordingDiagnostics->units[i] : nullptr;
+                    struct RecordBodyTiming
+                    {
+                        RHIRecordingUnitTiming* timing;
+                        ~RecordBodyTiming()
+                        {
+                            if (timing)
+                            {
+                                timing->endNanoseconds = job_timestamp_ns();
+                            }
+                        }
+                    } recordBodyTiming{timing};
+                    if (timing)
+                    {
+                        timing->beginNanoseconds = job_timestamp_ns();
+                    }
+                    RecordPassBody(context, pass, unit.slice, unit.sliceCount, timing);
+                }
 
                 if (unit.slice + 1 == unit.sliceCount)
                 {
@@ -4469,20 +4580,51 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     try
     {
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.DispatchJoin">()};
+        job_spin_scope spinScope;
+        if (workerSpinMicroseconds)
+        {
+            spinScope = pool.RecordingSpinScope(job_spin_options{
+                batchDesc.frameId, std::chrono::microseconds{workerSpinMicroseconds},
+                std::chrono::microseconds{recordingPolicy.frameSpinMicroseconds},
+                spinWorkers});
+        }
+        if (recordingDiagnostics)
+        {
+            recordingDiagnostics->workerSpinScopeAccepted = static_cast<bool>(spinScope);
+        }
+        if (recordingDiagnostics && recordingPolicy.timingEnabled)
+        {
+            recordingDiagnostics->dispatchBeginNanoseconds = job_timestamp_ns();
+        }
         if (recordingSideEffects)
         {
             // The entire graph is one unsplit target in this uncommon path.
             // Keep explicitly declared external CPU effects on the owner thread.
             recordRange(0, activeWave);
         }
-        else if (kDependencyRecordingEnabled && selectedPlan->taskGraph.ReplacesWaveJoins())
+        else if (dependencyRecording)
         {
             // 다음 작업을 미리 제출한다. 같은 target과 실제 CPU 선행 작업만 기다린다.
             ce::profile_scope dependencyProfile{ce::marker<"RenderCommandRecord.DependencyGraph">()};
             const auto& graph = selectedPlan->taskGraph;
-            m_stats.recordingJobDispatchCount = static_cast<uint32_t>(graph.nodes.size());
+            m_stats.recordingJobDispatchCount = recordingPolicy.batchSubmit
+                ? 1u : static_cast<uint32_t>(graph.nodes.size());
+            m_stats.recordingDispatcherHandoffCount = m_stats.recordingJobDispatchCount;
+            m_stats.recordingNativeGraph = recordingPolicy.batchSubmit;
             m_stats.recordingOwnerJoinCount = 1;
             m_stats.recordingWorkerJobCount = static_cast<uint32_t>(graph.nodes.size());
+            RHIRecordingExecutionOptions options;
+            options.batchSubmit = recordingPolicy.batchSubmit;
+            options.ownerSpinBudget = std::chrono::microseconds{ownerSpinMicroseconds};
+            if (recordingDiagnostics)
+            {
+                options.diagnostics = recordingDiagnostics->jobs;
+                options.waitStatistics = &recordingDiagnostics->ownerWait;
+                if (recordingPolicy.timingEnabled)
+                {
+                    options.waitBeginNanoseconds = &recordingDiagnostics->waitBeginNanoseconds;
+                }
+            }
             pool.RunTaskGraph(graph,
                               [&](uint32_t node)
                               {
@@ -4491,7 +4633,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                                   {
                                       recordRange(task.target, task.wave);
                                   }
-                              });
+                              }, options);
         }
         else
         {
@@ -4527,6 +4669,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                             active.push_back(worker);
                     }
                     m_stats.recordingJobDispatchCount += 1;
+                    m_stats.recordingDispatcherHandoffCount += 1;
                     m_stats.recordingOwnerJoinCount += 1;
                     m_stats.recordingWorkerJobCount += static_cast<uint32_t>(active.size());
                     pool.RunParallel([&](uint32_t job) { recordRange(active[job], activeWave); },
@@ -4540,6 +4683,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                 }
                 const uint32_t runEnd = wave;
                 ++m_stats.recordingJobDispatchCount;
+                ++m_stats.recordingDispatcherHandoffCount;
                 ++m_stats.recordingOwnerJoinCount;
                 ++m_stats.recordingWorkerJobCount;
                 pool.RunParallel([&](uint32_t)
@@ -4558,6 +4702,15 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     }
                 }, 1);
             }
+        }
+        if (recordingDiagnostics)
+        {
+            if (recordingPolicy.timingEnabled)
+            {
+                recordingDiagnostics->returnNanoseconds = job_timestamp_ns();
+            }
+            spinScope.close();
+            recordingDiagnostics->workerSpin = spinScope.statistics();
         }
     }
     catch (const std::exception& e)

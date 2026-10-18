@@ -392,6 +392,116 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    static CommandCore::CommandData RecordingDiagnosticsData(const RHIRecordingDiagnostics& trace)
+    {
+        using namespace CommandCore;
+        auto data = CommandData::Object();
+        data.Set("schemaVersion", CommandData::Int(1));
+        data.Set("clock", CommandData::String("steady-clock-nanoseconds"));
+        data.Set("axis", CommandData::String("cpu-recording-wall-not-cpu-residency-or-gpu"));
+        data.Set("unitsAxis", CommandData::String("record-body-including-repeat-phase-barriers"));
+        data.Set("frameId", CommandData::Int(trace.frameId));
+        data.Set("timingEnabled", CommandData::Bool(trace.timingEnabled));
+        data.Set("dependencyGraph", CommandData::Bool(trace.dependencyGraph));
+        data.Set("batchSubmit", CommandData::Bool(trace.batchSubmit));
+        data.Set("unitTimingsTruncated", CommandData::Bool(trace.unitTimingsTruncated));
+        data.Set("jobTimingsTruncated", CommandData::Bool(trace.jobTimingsTruncated));
+        data.Set("dispatchBeginNs", CommandData::Int(trace.dispatchBeginNanoseconds));
+        data.Set("waitBeginNs", CommandData::Int(trace.waitBeginNanoseconds));
+        data.Set("returnNs", CommandData::Int(trace.returnNanoseconds));
+        auto policy = CommandData::Object();
+        policy.Set("ownerSpinUs", CommandData::Int(trace.ownerSpinMicroseconds));
+        policy.Set("workerSpinUs", CommandData::Int(trace.workerSpinMicroseconds));
+        policy.Set("frameSpinUs", CommandData::Int(trace.frameSpinMicroseconds));
+        policy.Set("spinWorkers", CommandData::Int(trace.spinWorkers));
+        data.Set("policy", std::move(policy));
+
+        auto wait = CommandData::Object();
+        wait.Set("available", CommandData::Bool(trace.dependencyGraph));
+        wait.Set("spinElapsedNs", CommandData::Int(trace.ownerWait.spin_elapsed_ns));
+        wait.Set("spinAttempted", CommandData::Bool(trace.ownerWait.spin_attempted));
+        wait.Set("completedDuringSpin", CommandData::Bool(trace.ownerWait.completed_during_spin));
+        wait.Set("blockingPathEntered", CommandData::Bool(trace.ownerWait.blocking_path_entered));
+        wait.Set("blockingAxis", CommandData::String("cv-predicate-false-not-proven-os-sleep"));
+        data.Set("ownerWait", std::move(wait));
+
+        const auto& spin = trace.workerSpin;
+        auto workerSpin = CommandData::Object();
+        workerSpin.Set("frameId", CommandData::Int(spin.frame_id));
+        workerSpin.Set("attempts", CommandData::Int(spin.spin_attempts));
+        workerSpin.Set("taskHits", CommandData::Int(spin.task_hits));
+        workerSpin.Set("budgetExhaustions", CommandData::Int(spin.budget_exhaustions));
+        workerSpin.Set("scopeExits", CommandData::Int(spin.scope_exits));
+        workerSpin.Set("scopeAccepted", CommandData::Bool(trace.workerSpinScopeAccepted));
+        workerSpin.Set("shutdownExits", CommandData::Int(spin.shutdown_exits));
+        workerSpin.Set("wallNs", CommandData::Int(spin.spin_wall_ns));
+        workerSpin.Set("reservedBudgetNs", CommandData::Int(spin.reserved_budget_ns));
+        workerSpin.Set("activeSpinners", CommandData::Int(spin.active_spinners));
+        workerSpin.Set("maxActiveSpinners", CommandData::Int(spin.max_active_spinners));
+        workerSpin.Set("axis", CommandData::String("frame-cumulative-snapshot-inflight-exits-may-follow"));
+        data.Set("workerSpin", std::move(workerSpin));
+
+        auto jobs = CommandData::Object();
+        jobs.Set("available", CommandData::Bool(bool(trace.jobs)));
+        auto nodes = CommandData::Array();
+        if (trace.jobs)
+        {
+            jobs.Set("submittedNs", CommandData::Int(trace.jobs->submitted_ns));
+            jobs.Set("dispatcherBeginNs", CommandData::Int(trace.jobs->dispatcher_begin_ns));
+            jobs.Set("completedNs", CommandData::Int(trace.jobs->completed_ns));
+            jobs.Set("dispatcherHandoffs", CommandData::Int(trace.jobs->dispatcher_handoffs));
+            jobs.Set("nativeTasks", CommandData::Int(trace.jobs->native_task_count));
+            for (size_t index = 0; index < trace.jobs->nodes.size(); ++index)
+            {
+                const auto& timing = trace.jobs->nodes[index];
+                auto node = CommandData::Object();
+                node.Set("node", CommandData::Int(index));
+                if (index < trace.tasks.size())
+                {
+                    node.Set("target", CommandData::Int(trace.tasks[index].target));
+                    node.Set("wave", CommandData::Int(trace.tasks[index].wave));
+                }
+                node.Set("registeredNs", CommandData::Int(timing.registered_ns));
+                node.Set("readyNs", CommandData::Int(timing.ready_ns));
+                node.Set("publishBeginNs", CommandData::Int(timing.publish_begin_ns));
+                node.Set("publishEndNs", CommandData::Int(timing.publish_end_ns));
+                node.Set("startNs", CommandData::Int(timing.start_ns));
+                node.Set("bodyEndNs", CommandData::Int(timing.body_end_ns));
+                node.Set("completeNs", CommandData::Int(timing.complete_ns));
+                node.Set("publishEnkiThread", CommandData::Int(timing.publish_thread));
+                node.Set("executeEnkiThread", CommandData::Int(timing.execute_thread));
+                node.Set("publishOsThread", CommandData::Int(timing.publish_os_thread));
+                node.Set("executeOsThread", CommandData::Int(timing.execute_os_thread));
+                node.Set("dispatcherRoute", CommandData::Bool(timing.dispatcher_route));
+                node.Set("skipped", CommandData::Bool(timing.skipped));
+                nodes.Append(std::move(node));
+            }
+        }
+        jobs.Set("nodes", std::move(nodes));
+        jobs.Set("publicationAxis", CommandData::String("enqueue-call-bracket-not-exact-queue-insertion"));
+        data.Set("jobs", std::move(jobs));
+
+        auto units = CommandData::Array();
+        for (const auto& timing : trace.units)
+        {
+            auto unit = CommandData::Object();
+            unit.Set("pass", CommandData::Int(timing.pass));
+            unit.Set("name", CommandData::String(timing.name));
+            unit.Set("target", CommandData::Int(timing.target));
+            unit.Set("wave", CommandData::Int(timing.wave));
+            unit.Set("slice", CommandData::Int(timing.slice));
+            unit.Set("sliceCount", CommandData::Int(timing.sliceCount));
+            unit.Set("estimatedWork", CommandData::Int(timing.estimatedWork));
+            unit.Set("callbackNs", CommandData::Int(timing.callbackNanoseconds));
+            unit.Set("callbackInvocations", CommandData::Int(timing.callbackInvocations));
+            unit.Set("beginNs", CommandData::Int(timing.beginNanoseconds));
+            unit.Set("endNs", CommandData::Int(timing.endNanoseconds));
+            units.Append(std::move(unit));
+        }
+        data.Set("units", std::move(units));
+        return data;
+    }
+
     static CommandCore::CommandData LiveTemporalProvenanceData(
         const TemporalMeasurementProvenance& temporal)
     {
@@ -461,6 +571,8 @@ namespace ConsoleCmd
         nativeRecord.Set("recordingWaves", CommandData::Int(snapshot.nativeRecordWaves));
         nativeRecord.Set("jobDispatches", CommandData::Int(snapshot.nativeRecordDispatches));
         nativeRecord.Set("ownerJoins", CommandData::Int(snapshot.nativeRecordOwnerJoins));
+        nativeRecord.Set("dispatcherHandoffs", CommandData::Int(snapshot.nativeRecordDispatcherHandoffs));
+        nativeRecord.Set("batchedNativeGraph", CommandData::Bool(snapshot.nativeRecordBatched));
         nativeRecord.Set("workerJobs", CommandData::Int(snapshot.nativeRecordJobs));
         nativeRecord.Set("commandTargets", CommandData::Int(snapshot.nativeRecordTargets));
         nativeRecord.Set("recordUnits", CommandData::Int(snapshot.nativeRecordUnits));
@@ -471,6 +583,10 @@ namespace ConsoleCmd
         nativeRecord.Set("samples", CommandData::Int(snapshot.nativeRecordSamples));
         nativeRecord.Set("axis", CommandData::String("native-graph-record-cpu-not-full-frame"));
         nativeRecord.Set("temporalProvenance", LiveTemporalProvenanceData(snapshot.nativeRecordProvenance));
+        if (snapshot.nativeRecordDiagnostics)
+        {
+            nativeRecord.Set("schedulingTrace", RecordingDiagnosticsData(*snapshot.nativeRecordDiagnostics));
+        }
         data.Set("nativeRecord", std::move(nativeRecord));
 
         // 진입 나이는 실프레임 packet 캡처 이후 시간이며 입력-광자 지연이 아니다.

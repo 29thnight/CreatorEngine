@@ -71,7 +71,13 @@ class IRHIParallelCommandPool
         RHIRunCommandRecordingJobs(m_scheduler, job, workerCount);
     }
 
-    void RunTaskGraph(const RHIRecordingTaskGraph& graph, const std::function<void(uint32_t)>& job)
+    job_spin_scope RecordingSpinScope(const job_spin_options& options)
+    {
+        return m_scheduler.recording_spin_scope(options);
+    }
+
+    void RunTaskGraph(const RHIRecordingTaskGraph& graph, const std::function<void(uint32_t)>& job,
+                      const RHIRecordingExecutionOptions& options = {})
     {
         if (!IsInitialized())
         {
@@ -93,7 +99,7 @@ class IRHIParallelCommandPool
             }
             previous[node.target] = index;
         }
-        RHIRunCommandRecordingTaskGraph(m_scheduler, graph, job);
+        RHIRunCommandRecordingTaskGraph(m_scheduler, graph, job, options);
     }
 
     /// 열린 command target을 닫고 workerOrder를 복사해 이동 전용 batch로 만든다.

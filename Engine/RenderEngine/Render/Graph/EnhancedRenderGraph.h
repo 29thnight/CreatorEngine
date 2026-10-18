@@ -14,6 +14,7 @@
 #include "../../RHI/RHIQueueContract.h"
 #include "../../RHI/RHIQueueRecorder.h"
 #include "../../RHI/RHIResourceState.h"
+#include "../../RHI/RHIRecordingDiagnostics.h"
 
 /// 그래프는 backend-neutral device service만 보며 포인터·참조만 보관한다.
 /// 완전 정의는 구현 파일에서 포함한다.
@@ -318,6 +319,9 @@ public:
         uint32_t dependencyWaveCount{0}; // DAG depth in passes, not elapsed GPU time.
         uint32_t recordingJobDispatchCount{0};
         uint32_t recordingOwnerJoinCount{0}; // CPU 소유자의 대기 경계 수이며 선행 의존 간선 수가 아니다.
+        uint32_t recordingDispatcherHandoffCount{0};
+        bool recordingNativeGraph{false};
+        std::shared_ptr<const RHIRecordingDiagnostics> recordingDiagnostics;
         uint32_t recordingWorkerJobCount{0};
         uint32_t recordingWaveCount{0}; // Includes command-target append constraints.
         bool recordingBalanced{false}; // CPU work hint used without adding joins.
@@ -944,7 +948,7 @@ private:
     void RecordPassBarriers(RHIEncoder& encoder, const Pass& pass) const;
     void RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const;
     void RecordPassBody(const ExecuteContext& context, const Pass& pass,
-        uint32_t slice, uint32_t sliceCount) const;
+        uint32_t slice, uint32_t sliceCount, RHIRecordingUnitTiming* timing = nullptr) const;
 
     Resource& AppendResource();
     // Pass처럼 완료된 기록 사이에 메타데이터 컨테이너를 유지한다.

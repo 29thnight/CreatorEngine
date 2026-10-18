@@ -144,6 +144,15 @@
     <ClInclude Include="JobScheduler.h">
       <Filter>Core.Thread</Filter>
     </ClInclude>
+    <ClInclude Include="JobGraph.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="JobSpin.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadPoolSpin.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
     <ClInclude Include="WindowsCoreWindow.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>

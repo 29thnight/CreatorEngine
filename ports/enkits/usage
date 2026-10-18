@@ -1,0 +1,7 @@
+ enkits provides CMake targets:
+
+    find_package(enkiTS CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE enkiTS::enkiTS)
+
+ CreatorEngine overlay: enkiTS v1.12 with ENKITS_CREATOR_IDLE_SPIN_API=1.
+ Rebuild enkiTS and its consumers together; TaskSchedulerConfig has an extended C++ ABI.

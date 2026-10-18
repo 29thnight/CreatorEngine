@@ -1,6 +1,7 @@
 #include "ThreadPool.h"
 #include <enkiTS/TaskScheduler.h>
 #include "StandardLibrary.h"
+#include "ThreadPoolSpin.h"
 #if defined(_WIN32)
 #include <Windows.h>
 #endif
@@ -18,6 +19,15 @@ namespace
     // 배정 스레드 하나가 enkiTS 외부 스레드 번호 1 을 차지해 워커 번호가 하나씩
     // 밀린다. 훅에는 예전과 같은 1..N 을 넘겨 프로파일러 레인 이름이 그대로 선다.
     constexpr uint32_t kDispatcherThreads = 1;
+
+    uint32_t thread_pool_os_thread_id() noexcept
+    {
+#if defined(_WIN32)
+        return GetCurrentThreadId();
+#else
+        return 0;
+#endif
+    }
 
     void thread_pool_worker_thread_start(uint32_t threadnum)
     {
@@ -107,7 +117,8 @@ struct thread_pool::state
 
     // One handoff per batch, not per item. Publishing from any host thread never
     // executes the user's callback there, even when an enkiTS pipe is full.
-    // Every handoff goes to the dispatcher thread, which only runs pinned tasks.
+    // 전달은 dispatcher에서 처리한다. enkiTS pipe가 가득 차면 그 dispatcher가
+    // 본문을 실행할 수 있지만 일반 제출 스레드는 본문을 실행하지 않는다.
     // It was pinned to the next worker in turn; a worker inside a long task
     // cannot run pinned tasks, so the batch waited for that task to finish
     // while the other workers sat idle (animation joins waited up to 33 ms).
@@ -145,6 +156,255 @@ struct thread_pool::state
         }
     };
 
+    // 모든 native 의존성을 한 번에 고정한 뒤 하나의 pinned root만 게시한다.
+    // 후속 노드는 선행 완료 스레드의 enki pipe로 바로 전달하므로 dispatcher 왕복이 없다.
+    struct graph_work
+    {
+        enum class gate_kind
+        {
+            admission,
+            ready,
+            complete,
+            terminal
+        };
+
+        struct gate : enki::ICompletable
+        {
+            graph_work& graph_;
+            gate_kind kind_;
+            std::size_t index_{};
+
+            gate(graph_work& graph, gate_kind kind, std::size_t index = 0)
+                : graph_(graph), kind_(kind), index_(index)
+            {
+            }
+
+            void OnDependenciesComplete(enki::TaskScheduler* scheduler, uint32_t thread) noexcept override
+            {
+                // enki의 마지막 dependency counter RMW가 읽은 release sequence를 획득한다.
+                std::atomic_thread_fence(std::memory_order_acquire);
+                const bool previous = std::exchange(executing_pool_work, true);
+                // enki는 완료 알림 중 다음 간선 포인터를 보관한다. 마지막 본문이 끝났어도
+                // 이 순회가 반환할 때까지 전체 간선과 노드의 수명을 유지해야 한다.
+                auto* lifetime = &graph_;
+                lifetime->retain();
+                auto* diagnostics = graph_.diagnostics_.get();
+                if (diagnostics)
+                {
+                    if (kind_ == gate_kind::ready)
+                    {
+                        auto& timing = diagnostics->nodes[index_];
+                        timing.ready_ns = job_timestamp_ns();
+                        timing.publish_thread = thread;
+                        timing.publish_os_thread = thread_pool_os_thread_id();
+                        timing.dispatcher_route = thread == dispatcher_thread_;
+                        timing.publish_begin_ns = job_timestamp_ns();
+                    }
+                    else if (kind_ == gate_kind::complete)
+                    {
+                        diagnostics->nodes[index_].complete_ns = job_timestamp_ns();
+                    }
+                }
+                enki::ICompletable::OnDependenciesComplete(scheduler, thread);
+                if (diagnostics && kind_ == gate_kind::ready)
+                {
+                    diagnostics->nodes[index_].publish_end_ns = job_timestamp_ns();
+                }
+                if (kind_ == gate_kind::terminal)
+                {
+                    // 다른 완료 콜백과 제출 스레드의 참조까지 빠진 뒤 소멸자가 최종 완료를 게시한다.
+                    graph_.release();
+                }
+                lifetime->release();
+                executing_pool_work = previous;
+            }
+        };
+
+        struct node : enki::ITaskSet
+        {
+            graph_work& graph_;
+            std::size_t index_;
+            std::vector<uint32_t> prerequisites_;
+            std::atomic<bool> failed_{false};
+            gate ready_;
+            gate complete_;
+
+            node(graph_work& graph, std::size_t index, const job_graph_node& description)
+                : enki::ITaskSet(1), graph_(graph), index_(index), prerequisites_(description.dependencies),
+                  ready_(graph, gate_kind::ready, index), complete_(graph, gate_kind::complete, index)
+            {
+            }
+
+            void ExecuteRange(enki::TaskSetPartition, uint32_t thread) override
+            {
+                const bool previous = std::exchange(executing_pool_work, true);
+                auto* timing = graph_.diagnostics_ ? &graph_.diagnostics_->nodes[index_] : nullptr;
+                if (timing)
+                {
+                    timing->start_ns = job_timestamp_ns();
+                    timing->execute_thread = thread;
+                    timing->execute_os_thread = thread_pool_os_thread_id();
+                }
+                bool skipped = false;
+                for (const auto prerequisite : prerequisites_)
+                {
+                    if (graph_.nodes_[prerequisite]->failed_.load(std::memory_order_acquire))
+                    {
+                        skipped = true;
+                        break;
+                    }
+                }
+                if (skipped)
+                {
+                    failed_.store(true, std::memory_order_release);
+                }
+                else
+                {
+                    try
+                    {
+                        graph_.execute_(index_);
+                    }
+                    catch (...)
+                    {
+                        graph_.remember_failure(std::current_exception());
+                        failed_.store(true, std::memory_order_release);
+                    }
+                }
+                if (timing)
+                {
+                    timing->skipped = skipped;
+                    timing->body_end_ns = job_timestamp_ns();
+                }
+                executing_pool_work = previous;
+            }
+        };
+
+        struct delivery : enki::IPinnedTask
+        {
+            graph_work& graph_;
+            explicit delivery(graph_work& graph) : enki::IPinnedTask(dispatcher_thread_), graph_(graph)
+            {
+            }
+            void Execute() override
+            {
+                if (graph_.diagnostics_)
+                {
+                    graph_.diagnostics_->dispatcher_begin_ns = job_timestamp_ns();
+                }
+            }
+        };
+
+        state& owner_;
+        std::function<void(std::size_t)> execute_;
+        std::function<void(std::exception_ptr)> complete_;
+        std::shared_ptr<job_graph_diagnostics> diagnostics_;
+        // 수락된 그래프와 제출 호출이 각각 하나씩 보관한다. 완료 순회는 진입/반환 때 증감한다.
+        std::atomic<uint64_t> references_{2};
+        std::mutex failure_mutex_;
+        std::exception_ptr failure_;
+        bool admitted_{};
+        delivery delivery_{*this};
+        gate admission_{*this, gate_kind::admission};
+        gate terminal_{*this, gate_kind::terminal};
+        std::vector<std::unique_ptr<node>> nodes_;
+        // 마지막 멤버로 두어 모든 노드를 파괴하기 전에 간선을 먼저 해제한다.
+        std::vector<enki::Dependency> dependencies_;
+
+        graph_work(state& owner, std::span<const job_graph_node> nodes,
+                   std::function<void(std::size_t)> execute,
+                   std::function<void(std::exception_ptr)> complete,
+                   std::shared_ptr<job_graph_diagnostics> diagnostics)
+            : owner_(owner), execute_(std::move(execute)), complete_(std::move(complete)),
+              diagnostics_(std::move(diagnostics))
+        {
+            nodes_.reserve(nodes.size());
+            std::size_t edge_count = 2;
+            for (std::size_t index = 0; index < nodes.size(); ++index)
+            {
+                const auto prerequisite_count = (std::max)(std::size_t(1), nodes[index].dependencies.size());
+                const auto maximum_edges = (std::numeric_limits<std::size_t>::max)();
+                if (prerequisite_count > maximum_edges - 3 ||
+                    edge_count > maximum_edges - (prerequisite_count + 3))
+                {
+                    throw std::invalid_argument("job graph edge count overflow");
+                }
+                edge_count += prerequisite_count + 3;
+                nodes_.push_back(std::make_unique<node>(*this, index, nodes[index]));
+                if (diagnostics_)
+                {
+                    diagnostics_->nodes[index].registered_ns = job_timestamp_ns();
+                }
+            }
+            dependencies_.resize(edge_count);
+            std::size_t edge = 0;
+            const auto connect = [&](const enki::ICompletable* from, enki::ICompletable* to)
+            {
+                dependencies_[edge++].SetDependency(from, to);
+            };
+            connect(&delivery_, &admission_);
+            connect(&admission_, &terminal_);
+            for (const auto& task : nodes_)
+            {
+                // native task마다 완료 gate 하나만 둬 내부 순회에서 수명을 보호한다.
+                connect(task.get(), &task->complete_);
+                connect(&task->complete_, &terminal_);
+                connect(&task->ready_, task.get());
+                if (task->prerequisites_.empty())
+                {
+                    connect(&admission_, &task->ready_);
+                }
+                else
+                {
+                    for (const auto prerequisite : task->prerequisites_)
+                    {
+                        connect(&nodes_[prerequisite]->complete_, &task->ready_);
+                    }
+                }
+            }
+        }
+
+        ~graph_work()
+        {
+            if (!admitted_)
+            {
+                return;
+            }
+            // 모든 native 콜백 순회가 돌아온 뒤 공유 사용자 캡처를 먼저 해제한다.
+            execute_ = {};
+            if (diagnostics_)
+            {
+                diagnostics_->completed_ns = job_timestamp_ns();
+            }
+            auto complete = std::move(complete_);
+            complete(failure_);
+            complete = {};
+            owner_.finish();
+        }
+
+        void remember_failure(std::exception_ptr error)
+        {
+            std::lock_guard lock(failure_mutex_);
+            if (!failure_)
+            {
+                failure_ = error;
+            }
+        }
+
+        void retain() noexcept
+        {
+            references_.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        void release() noexcept
+        {
+            // 마지막 감소는 이전 모든 콜백의 쓰기를 획득한다. publish_end도 최종 handle보다 앞선다.
+            if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
+            {
+                delete this;
+            }
+        }
+    };
+
     // Wakes the dispatcher for shutdown; it has nothing to publish.
     struct wake : enki::IPinnedTask
     {
@@ -152,14 +412,16 @@ struct thread_pool::state
         void Execute() override {}
     };
 
+    // 초기화 실패로 멤버가 역순 소멸해도 scheduler가 worker를 join할 때까지 콜백 문맥이 산다.
+    std::unique_ptr<thread_pool_spin_control> spin_;
     enki::TaskScheduler scheduler_;
     std::mutex submit_mutex_, done_mutex_;
     std::condition_variable done_;
     std::size_t pending_{};
     uint32_t workers_{};
     bool accepting_{true};
-    // Registered enkiTS external thread that only waits for and runs pinned
-    // handoffs, so it is never inside user work when a batch arrives.
+    // pinned 전달을 위한 enkiTS 외부 스레드다. 평소 루프는 배정만 하지만
+    // pipe가 가득 차면 enkiTS가 이 스레드에서 본문을 실행할 수 있다.
     static constexpr uint32_t dispatcher_thread_ = enki::TaskScheduler::GetNumFirstExternalTaskThread();
     std::thread dispatcher_;
     std::atomic<bool> dispatcher_stop_{false};
@@ -167,14 +429,20 @@ struct thread_pool::state
 
     explicit state(std::size_t workers)
     {
-        if (workers > (std::numeric_limits<uint32_t>::max)() - 1)
+        if (workers > (std::numeric_limits<uint32_t>::max)() - kDispatcherThreads - 1)
         {
             throw std::invalid_argument("thread_pool worker count overflow");
         }
         workers_ = workers ? static_cast<uint32_t>(workers) : (std::max)(1u, enki::GetNumHardwareThreads());
+        if (workers_ > (std::numeric_limits<uint32_t>::max)() - kDispatcherThreads - 1)
+        {
+            throw std::invalid_argument("thread_pool worker count overflow");
+        }
+        spin_ = std::make_unique<thread_pool_spin_control>(workers_ + kDispatcherThreads + 1);
         enki::TaskSchedulerConfig config;
         config.numTaskThreadsToCreate = workers_;
         config.numExternalTaskThreads = kDispatcherThreads;
+        config.idleSpinCallbacks = spin_->callbacks();
         // 워커 수명을 밖으로 알린다. enkiTS 콜백은 함수 포인터라 userData 가
         // 없으므로 트램펄린이 정적 훅을 읽는다.
         config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
@@ -250,6 +518,35 @@ struct thread_pool::state
         scheduler_.AddPinnedTask(submitted);
         submitted->release_submission();
     }
+    void dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
+                        std::function<void(std::exception_ptr)> complete,
+                        std::shared_ptr<job_graph_diagnostics> diagnostics)
+    {
+        auto graph = std::make_unique<graph_work>(*this, nodes, std::move(execute), std::move(complete),
+                                                std::move(diagnostics));
+        graph_work* submitted = nullptr;
+        {
+            std::lock_guard lock(submit_mutex_);
+            if (!accepting_)
+            {
+                throw std::runtime_error("thread_pool is stopped");
+            }
+            {
+                std::lock_guard count_lock(done_mutex_);
+                ++pending_;
+            }
+            graph->admitted_ = true;
+            if (graph->diagnostics_)
+            {
+                graph->diagnostics_->dispatcher_handoffs = 1;
+                graph->diagnostics_->native_task_count = static_cast<uint32_t>(nodes.size());
+            }
+            submitted = graph.release();
+            scheduler_.AddPinnedTask(&submitted->delivery_);
+        }
+        // 완료가 제출보다 빨랐어도 graph 소멸자의 후속 제출이 submit_mutex_와 교착하지 않게 한다.
+        submitted->release();
+    }
     void finish()
     {
         std::lock_guard lock(done_mutex_);
@@ -264,6 +561,8 @@ struct thread_pool::state
             std::lock_guard lock(submit_mutex_);
             accepting_ = false;
         }
+        // 대기자를 drain하기 전에 모든 기록 scope의 추가 spin을 종료한다.
+        spin_->stop();
         {
             std::unique_lock lock(done_mutex_);
             done_.wait(lock, [this] { return pending_ == 0; });
@@ -308,6 +607,28 @@ bool thread_pool::is_worker_thread() noexcept
 {
     return executing_pool_work;
 }
+job_spin_scope thread_pool::recording_spin_scope(job_spin_options options)
+{
+    auto state = snapshot();
+    if (!state)
+    {
+        return {};
+    }
+    std::lock_guard lock(state->submit_mutex_);
+    if (!state->accepting_)
+    {
+        return {};
+    }
+    return state->spin_->begin_scope(options);
+}
+void thread_pool::stop_recording_spin() noexcept
+{
+    auto state = snapshot();
+    if (state)
+    {
+        state->spin_->stop();
+    }
+}
 void thread_pool::shutdown() noexcept
 {
     if (is_worker_thread())
@@ -333,4 +654,16 @@ void thread_pool::dispatch(std::size_t count, std::function<void(std::size_t)> e
         throw std::runtime_error("thread_pool is stopped");
     }
     state->dispatch(count, std::move(execute), std::move(complete));
+}
+void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes,
+                                 std::function<void(std::size_t)> execute,
+                                 std::function<void(std::exception_ptr)> complete,
+                                 std::shared_ptr<job_graph_diagnostics> diagnostics)
+{
+    auto state = snapshot();
+    if (!state)
+    {
+        throw std::runtime_error("thread_pool is stopped");
+    }
+    state->dispatch_graph(nodes, std::move(execute), std::move(complete), std::move(diagnostics));
 }
