@@ -1079,14 +1079,23 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
     return instance;
 }
 
-bool LXGraph::ReplaceGroupBody(Id groupId, const LXGraph& body)
+bool LXGraph::ReplaceGroupBody(Id groupId, const LXGraph& body, bool* contentChanged)
 {
+    if (contentChanged)
+    {
+        *contentChanged = false;
+    }
     const LXGroupDefinition* existing = FindGroup(groupId);
-    return existing && UpdateGroup(groupId, existing->name, body, existing->sockets);
+    return existing && UpdateGroup(groupId, existing->name, body, existing->sockets, contentChanged);
 }
 
-bool LXGraph::UpdateGroup(Id groupId, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets)
+bool LXGraph::UpdateGroup(Id groupId, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets,
+                          bool* contentChanged)
 {
+    if (contentChanged)
+    {
+        *contentChanged = false;
+    }
     LXGraph candidate(*this);
     if (!candidate.UpdateGroupLocal(groupId, std::move(name), body, std::move(sockets)))
     {
@@ -1101,6 +1110,10 @@ bool LXGraph::UpdateGroup(Id groupId, std::string name, const LXGraph& body, std
                     [](const Issue& issue) { return issue.severity == Issue::Severity::Error; }))
     {
         return false;
+    }
+    if (contentChanged)
+    {
+        *contentChanged = !ContentEquals(candidate);
     }
     Commit();
     nodes_ = std::move(candidate.nodes_);
@@ -2202,22 +2215,38 @@ std::vector<Issue> LXGraph::Validate(bool checkSharedCopies) const
     return issues;
 }
 
-bool LXGraph::Undo()
+bool LXGraph::Undo(bool* contentChanged)
 {
+    if (contentChanged)
+    {
+        *contentChanged = false;
+    }
     if (undo_.empty())
     {
         return false;
+    }
+    if (contentChanged)
+    {
+        *contentChanged = !HasSameContent(undo_.back());
     }
     redo_.push_back(Capture());
     Restore(undo_.back());
     undo_.pop_back();
     return true;
 }
-bool LXGraph::Redo()
+bool LXGraph::Redo(bool* contentChanged)
 {
+    if (contentChanged)
+    {
+        *contentChanged = false;
+    }
     if (redo_.empty())
     {
         return false;
+    }
+    if (contentChanged)
+    {
+        *contentChanged = !HasSameContent(redo_.back());
     }
     undo_.push_back(Capture());
     Restore(redo_.back());
@@ -2660,56 +2689,81 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
     return graph;
 }
 
-bool LXGraph::Equals(const LXGraph& other) const
+namespace
 {
-    if (domain_ != other.domain_ || nextId_ != other.nextId_ || layout_ != other.layout_ ||
-        nodes_.size() != other.nodes_.size() || links_.size() != other.links_.size() ||
-        groups_.size() != other.groups_.size())
+    bool SameGraphContent(const std::vector<Node>& nodes, const std::vector<Node>& otherNodes,
+        const std::vector<Link>& links, const std::vector<Link>& otherLinks,
+        const std::map<Id, LXGroupDefinition>& groups, const std::map<Id, LXGroupDefinition>& otherGroups,
+        bool includeLayout)
     {
-        return false;
-    }
-    for (const auto& [id, group] : groups_)
-    {
-        const auto found = other.groups_.find(id);
-        if (found == other.groups_.end() || group.name != found->second.name ||
-            group.sockets != found->second.sockets || !group.body || !found->second.body ||
-            !group.body->Equals(*found->second.body))
+        if (nodes.size() != otherNodes.size() || links.size() != otherLinks.size() ||
+            groups.size() != otherGroups.size())
         {
             return false;
         }
-    }
-    for (std::size_t index = 0; index < nodes_.size(); ++index)
-    {
-        const Node& a = nodes_[index];
-        const Node& b = other.nodes_[index];
-        if (a.id != b.id || a.type != b.type || a.title != b.title || a.properties != b.properties ||
-            a.dynamicPins != b.dynamicPins || a.groupId != b.groupId || a.pins.size() != b.pins.size())
+        for (const auto& [id, group] : groups)
         {
-            return false;
-        }
-        for (std::size_t pinIndex = 0; pinIndex < a.pins.size(); ++pinIndex)
-        {
-            const Pin& first = a.pins[pinIndex];
-            const Pin& second = b.pins[pinIndex];
-            if (first.id != second.id || first.node != second.node || first.name != second.name ||
-                first.direction != second.direction || first.type != second.type || first.multiple != second.multiple ||
-                first.dynamic != second.dynamic || first.Identifier() != second.Identifier() ||
-                first.value != second.value || first.interfaceId != second.interfaceId)
+            const auto found = otherGroups.find(id);
+            if (found == otherGroups.end() || group.name != found->second.name ||
+                group.sockets != found->second.sockets || !group.body || !found->second.body ||
+                !(includeLayout ? group.body->Equals(*found->second.body)
+                                 : group.body->ContentEquals(*found->second.body)))
             {
                 return false;
             }
         }
-    }
-    for (std::size_t index = 0; index < links_.size(); ++index)
-    {
-        const Link& a = links_[index];
-        const Link& b = other.links_[index];
-        if (a.id != b.id || a.output != b.output || a.input != b.input)
+        for (std::size_t index = 0; index < nodes.size(); ++index)
         {
-            return false;
+            const Node& a = nodes[index];
+            const Node& b = otherNodes[index];
+            if (a.id != b.id || a.type != b.type || a.title != b.title || a.properties != b.properties ||
+                a.dynamicPins != b.dynamicPins || a.groupId != b.groupId || a.pins.size() != b.pins.size())
+            {
+                return false;
+            }
+            for (std::size_t pinIndex = 0; pinIndex < a.pins.size(); ++pinIndex)
+            {
+                const Pin& first = a.pins[pinIndex];
+                const Pin& second = b.pins[pinIndex];
+                if (first.id != second.id || first.node != second.node || first.name != second.name ||
+                    first.direction != second.direction || first.type != second.type ||
+                    first.multiple != second.multiple || first.dynamic != second.dynamic ||
+                    first.Identifier() != second.Identifier() || first.value != second.value ||
+                    first.interfaceId != second.interfaceId)
+                {
+                    return false;
+                }
+            }
         }
+        for (std::size_t index = 0; index < links.size(); ++index)
+        {
+            const Link& a = links[index];
+            const Link& b = otherLinks[index];
+            if (a.id != b.id || a.output != b.output || a.input != b.input)
+            {
+                return false;
+            }
+        }
+        return true;
     }
-    return true;
+} // namespace
+
+bool LXGraph::Equals(const LXGraph& other) const
+{
+    return domain_ == other.domain_ && nextId_ == other.nextId_ && layout_ == other.layout_ &&
+        SameGraphContent(nodes_, other.nodes_, links_, other.links_, groups_, other.groups_, true);
+}
+
+bool LXGraph::ContentEquals(const LXGraph& other) const
+{
+    return domain_ == other.domain_ &&
+        SameGraphContent(nodes_, other.nodes_, links_, other.links_, groups_, other.groups_, false);
+}
+
+bool LXGraph::HasSameContent(const Snapshot& snapshot) const
+{
+    // Undo 이력 전체를 복사하지 않고 복원될 소스와 현재 소스만 비교한다.
+    return SameGraphContent(nodes_, snapshot.nodes, links_, snapshot.links, groups_, snapshot.groups, false);
 }
 
 } // namespace LX

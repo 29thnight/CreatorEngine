@@ -90,7 +90,9 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             targets=host.DeclareTemporal(*graph,visible.visibility,packets?packets->GraphInputs(*graph):std::array<RGHandle,2>{},final.blendedList,targets);
             for(unsigned i=0;i<5;++i) graph->AddPass("Probe.Temporal.Read",{{targets[i],RHIResourceState::CopySource,RGAccessMode::Read}},
                 [target=targets[i],readback=readbacks[i]](const auto& execution){execution.encoder->CopyToReadback(readback,execution.ResolveHandle(target));},true);
+            RecordingChangeDevice::VisibilityBindingAudit visibilityBindings{device, *graph, visible.visibility};
             SubmitShadowDecal(device,pool,graph,host,context.frameId,workers,false);
+            visibilityBindings.Verify();
             EnhancedRenderGraph::DiagnosticSnapshot snapshot;
             Check(graph->CaptureDiagnosticSnapshot(snapshot),"Temporal packet snapshot");
             const auto countPass=[&](const char* name){return std::ranges::count(snapshot.passes,std::string(name),&EnhancedRenderGraph::DiagnosticPass::name);};

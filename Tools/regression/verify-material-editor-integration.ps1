@@ -194,6 +194,7 @@ try {
     Invoke-Gate 'material.graph' @('Ground', 'set', '900', '1.3') | Out-Null
     $changed = State
     Assert ($changed.generation -eq $original.generation) 'Uniform edit must preserve the generation'
+    Assert (($changed.uniformBytes -join ',') -ne ($original.uniformBytes -join ',')) 'Runtime parameter overrides must remain immediate without a graph Compile or Save request'
     $edited = Capture 'edited'
     Assert ([LXEditorPixels]::Difference((Join-Path $baseline 'preToneHdr.f32'), (Join-Path $edited 'preToneHdr.f32')) -gt 0.003) 'IOR edit must affect actual pixels'
     Invoke-Gate 'undo' | Out-Null

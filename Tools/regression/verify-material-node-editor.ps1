@@ -173,8 +173,26 @@ function Wait-Preview {
         Start-Sleep -Milliseconds 200
     } while ($true)
 }
+function Wait-MaterialRequest([UInt64]$Serial, [switch]$Reject) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(150)
+    do {
+        $state = Doc
+        if ($state.requestSerial -ne $Serial) { throw 'A different request must not satisfy this compilation wait' }
+        if (!$state.requestPending -and $state.completedRequestSerial -eq $Serial) {
+            Assert ($state.requestSucceeded -ne [bool]$Reject) "Material request failed expectation: $($state.requestError)"
+            return $state
+        }
+        if ([DateTime]::UtcNow -ge $deadline) { throw 'Explicit material compilation did not complete' }
+        Start-Sleep -Milliseconds 100
+    } while ($true)
+}
 function Edit([string]$Operation, [string[]]$Arguments = @(), [switch]$Reject) {
     $document = Doc
+    if ($Operation -in @('save', 'apply')) {
+        $request = Invoke-Gate 'material.editor' (@($Operation, [string]$document.document, [string]$document.revision) + $Arguments)
+        Assert ($request.data.requestSerial -gt $document.requestSerial) 'Save and Apply must issue an explicit request'
+        return Wait-MaterialRequest $request.data.requestSerial -Reject:$Reject
+    }
     Invoke-Gate 'material.editor' (@($Operation, [string]$document.document, [string]$document.revision) + $Arguments) -Reject:$Reject
 }
 function Stop-Editor {
@@ -193,6 +211,7 @@ try {
     Wait-Canvas
     $initial = Doc
     Assert ($initial.nodes.Count -eq 2 -and $initial.links.Count -eq 1 -and $initial.dirty) 'New Blender material must contain Principled linked to Output'
+    Assert (!$initial.automaticPreview -and !$initial.requestPending -and $initial.requestSerial -eq 0) 'New drafts must wait for an explicit compile or save request'
     $bsdf = @($initial.nodes | Where-Object type -EQ 'ShaderNodeBsdfPrincipled')[0]
     $color = @($bsdf.pins | Where-Object name -EQ 'Base Color')[0]
     $roughness = @($bsdf.pins | Where-Object name -EQ 'Roughness')[0]
@@ -207,6 +226,8 @@ try {
     Edit 'value' @([string]$roughness.id, 'NaN') -Reject | Out-Null
     Edit 'save' | Out-Null
     $savedDoc = Doc
+    Assert ($savedDoc.applied -and !$savedDoc.dirty -and $savedDoc.catalogRegistered) 'Save must finish persistence, publication and catalog registration'
+    Edit 'assign' @('Ground') | Out-Null
     $graphSource = $savedDoc.path
     $graphBytes = [IO.File]::ReadAllBytes($graphSource)
     $graphJson = Get-Content $graphSource -Raw | ConvertFrom-Json
@@ -253,8 +274,13 @@ try {
     Assert ($previewAfter.revision -gt $previewBefore.revision) 'Applied instance replacement must invalidate sphere preview'
     $previewChanged = Capture 'sphere-linked-color' 'material'
     Assert ([LXEditorPixels]::Difference((Join-Path $previewCapture 'baseColor.f32'), (Join-Path $previewChanged 'baseColor.f32')) -gt 0.01) 'Same Scene graph instance must change actual sphere pixels'
+    $layoutSource = (Doc).sourceRevision
+    $layoutKey = (Doc).preparedSourceKey
+    $layoutGeneration = (State).generation
     Edit 'collapse' @([string]$rgb.id, 'true') | Out-Null
     Edit 'save' | Out-Null
+    Assert ((Doc).sourceRevision -eq $layoutSource -and (Doc).preparedSourceKey -eq $layoutKey) 'Layout-only save must preserve the compiled source key'
+    Assert ((Doc).lastPreparationReused -and (State).generation -eq $layoutGeneration) 'Layout-only save must reuse the verified generation'
     Edit 'reload' | Out-Null
     Assert (@((Doc).nodes | Where-Object id -EQ $rgb.id)[0].collapsed) 'Node collapse state must round-trip'
     $currentBytes = [IO.File]::ReadAllBytes($graphSource)
@@ -295,6 +321,8 @@ try {
     SamePixels $changed (Capture 'external-reimport-restored')
     $previewAfter = Wait-Preview
     $beforeBroken = State
+    $beforeBrokenGraph = [IO.File]::ReadAllBytes($graphSource)
+    $beforeBrokenMaterial = [IO.File]::ReadAllBytes((Doc).materialPath)
     $baseLink = @((Doc).links | Where-Object input -EQ $color.id)[0]
     Edit 'disconnect' @([string]$baseLink.id) | Out-Null
     Edit 'add' @('ShaderNodeTexImage') | Out-Null
@@ -302,9 +330,11 @@ try {
     $imageColor = @($image.pins | Where-Object { !$_.input -and $_.name -eq 'Color' })[0]
     Edit 'connect' @([string]$imageColor.id, [string]$color.id) | Out-Null
     Edit 'reload' -Reject | Out-Null
-    Edit 'save' | Out-Null
+    Edit 'save' -Reject | Out-Null
     Edit 'apply' -Reject | Out-Null
     Assert ((State).generation -eq $beforeBroken.generation) 'Failed graph compilation must retain accepted Scene generation'
+    Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes($graphSource)) -eq [Convert]::ToBase64String($beforeBrokenGraph)) 'Failed Save compilation must preserve the graph file'
+    Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Doc).materialPath)) -eq [Convert]::ToBase64String($beforeBrokenMaterial)) 'Failed Save compilation must preserve the material file'
     Assert ((Wait-Preview).revision -eq $previewAfter.revision) 'Rejected Apply must retain the accepted sphere material'
     Invoke-Gate 'material.editor' @('preview', 'off') | Out-Null
     Edit 'undo' | Out-Null

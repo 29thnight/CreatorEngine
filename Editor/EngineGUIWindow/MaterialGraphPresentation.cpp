@@ -40,6 +40,7 @@ enum class HeaderIcon
     New,
     Close,
     Apply,
+    AutomaticPreview,
     FrameAll,
     Snap,
     Overlays
@@ -65,6 +66,8 @@ const char* HeaderGlyph(HeaderIcon icon)
         return EditorIcon::Close;
     case HeaderIcon::Apply:
         return EditorIcon::Pin;
+    case HeaderIcon::AutomaticPreview:
+        return EditorIcon::Lit;
     case HeaderIcon::FrameAll:
         return EditorIcon::FrameAll;
     case HeaderIcon::Snap:
@@ -315,14 +318,14 @@ void DrawMaterialContextSelector()
 
 MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editable, bool showGrid, bool snapToGrid,
                                       const std::function<void()>& materialMenu,
-                                      const std::function<void()>& overlayMenu)
+                                      const std::function<void()>& overlayMenu, bool automaticPreview)
 {
     const float scale = LX::CanvasUiScale();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{});
     const float tile = ImGui::GetFrameHeight();
     const float right = ImGui::GetWindowWidth() - 2.0f * tile - 23.0f * scale;
     const float left = ImGui::GetCursorPosX() + 12.0f * scale;
-    const float fixed = 114.0f * scale + 4.0f * tile + 10.0f * scale;
+    const float fixed = 114.0f * scale + 5.0f * tile + 10.0f * scale;
     const float nameWidth = std::clamp(right - left - fixed - 8.0f * scale, 44.0f * scale, 128.0f * scale);
     const float group = fixed + nameWidth;
     ImGui::SetCursorPosX(std::max(left, std::min((ImGui::GetWindowWidth() - group) * 0.5f, right - group)));
@@ -354,7 +357,7 @@ MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editab
     MaterialBarAction action = MaterialBarAction::None;
     ImGui::SameLine();
     if (IconButton("##save_graph", HeaderIcon::Save,
-        dirty ? "Save Material Asset (unsaved edits)" : "Save Material Asset"))
+        dirty ? "Save Material Asset (compile and apply unsaved changes)" : "Save Material Asset"))
     {
         action = MaterialBarAction::Save;
     }
@@ -371,9 +374,19 @@ MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editab
     }
     ImGui::SameLine(0.0f, 6.0f * scale);
     ImGui::BeginDisabled(!editable);
-    if (IconButton("##apply_graph", HeaderIcon::Apply, "Apply to Material Asset"))
+    if (IconButton("##apply_graph", HeaderIcon::Apply, "Compile and Apply to Material Asset"))
     {
         action = MaterialBarAction::Apply;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!editable);
+    DrawControlFrame(ImGui::GetCursorScreenPos(), tile, automaticPreview);
+    if (IconButton("##automatic_preview", HeaderIcon::AutomaticPreview,
+        automaticPreview ? "Automatic Draft Preview: On (does not apply or save)" :
+                           "Automatic Draft Preview: Off"))
+    {
+        action = MaterialBarAction::ToggleAutomaticPreview;
     }
     ImGui::EndDisabled();
     ImGui::SameLine();

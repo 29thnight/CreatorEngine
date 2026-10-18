@@ -24,6 +24,7 @@
 #include "PathFinder.h"
 #include "../../Lattice/Core/LXDocument.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
+#include "../../Lattice/Material/LXMaterialCompiler.h"
 #include <imgui_stdlib.h>
 #include <float.h>
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
@@ -35,25 +36,26 @@ namespace editor::material_editing
         using namespace LX;
         using namespace CommandCore;
 
+        enum class DraftAction
+        {
+            None,
+            Preview,
+            Apply,
+            Save
+        };
+
         struct PreviewWork
         {
             LXMaterialAsset graph;
             FileGuid graphGuid;
             std::filesystem::path shaderDirectory;
             std::filesystem::path cacheDirectory;
+            own::shared_owner<const material_graph::Generation> previousGeneration;
             own::shared_owner<const material_graph::Generation> generation;
+            std::string sourceKey;
+            bool reusedGeneration = false;
             std::string error;
         };
-
-        bool SameMaterial(const own::shared_owner<const Material>& left,
-                          const own::shared_owner<const Material>& right)
-        {
-            if (!left || !right)
-            {
-                return !left && !right;
-            }
-            return std::addressof(*left) == std::addressof(*right);
-        }
 
         std::uint64_t previewSerial = 0;
 
@@ -100,25 +102,45 @@ namespace editor::material_editing
             own::shared_owner<const Material> sourceMaterial;
             own::shared_owner<const Material> acceptedMaterial;
             own::shared_owner<Material> preparedMaterial;
+            own::shared_owner<const material_graph::Generation> preparedGeneration;
             material_graph::InstanceDescription defaults;
             std::uint64_t settingsRevision = 0;
+            std::uint64_t sourceSettingsRevision = 0;
             std::uint64_t savedSettingsRevision = 0;
-            std::uint64_t appliedRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t appliedSourceRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t appliedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
             std::uint64_t appliedDocument = 0;
-            std::uint64_t preparedRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t preparedSourceRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t preparedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
             std::uint64_t preparedDocument = 0;
-            std::uint64_t observedRevision = std::numeric_limits<std::uint64_t>::max();
-            std::uint64_t attemptedRevision = std::numeric_limits<std::uint64_t>::max();
-            std::uint64_t workRevision = 0;
+            std::uint64_t observedSourceRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t observedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t attemptedSourceRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t attemptedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
+            std::uint64_t workSourceRevision = 0;
             std::uint64_t workDocument = 0;
+            std::uint64_t workRequestSerial = 0;
             double changedAt = 0.0;
-            std::uint64_t automaticAttempt = std::numeric_limits<std::uint64_t>::max();
-            std::uint64_t automaticDocument = 0;
+            DraftAction requestedAction = DraftAction::None;
+            std::uint64_t requestSerial = 0;
+            std::uint64_t completedRequestSerial = 0;
+            std::uint64_t validatedRequestSerial = 0;
+            std::uint64_t requestedSourceRevision = 0;
+            std::uint64_t requestedSettingsRevision = 0;
+            std::uint64_t requestedDocument = 0;
+            own::shared_owner<const Material> requestedMaterial;
+            bool requestSucceeded = false;
+            bool lastPreparationReused = false;
+            bool catalogRegistered = false;
+            std::string requestError;
+            std::string saveWarning;
+            bool automaticPreview = false;
+            bool previewRequested = false;
             MaterialRenderingMode renderingMode = MaterialRenderingMode::Opaque;
             bool doubleSided = false;
             bool persistedMaterial = false;
             bool persistedGraph = false;
-            bool previewPending = true;
+            bool previewPending = false;
             std::string previewError;
             own::shared_owner<PreviewWork> previewWork;
             job_handle previewJob;
@@ -133,12 +155,8 @@ namespace editor::material_editing
             std::string search;
             std::string diskPayload;
             std::uint64_t uiFrames = 0;
-            std::uint64_t analysisRevision = std::numeric_limits<std::uint64_t>::max();
-            std::uint64_t analysisObservedRevision = std::numeric_limits<std::uint64_t>::max();
-            double analysisChangedAt = 0.0;
-            std::optional<LXMaterialProgram> analysisProgram;
-            std::optional<material_graph::Selection> analysisSelection;
-            std::vector<LXMaterialDiagnostic> analysisIssues;
+            std::uint64_t defaultsSourceRevision = std::numeric_limits<std::uint64_t>::max();
+            std::map<Id, LXSocketValue> resolvedDefaults;
             bool fit = true;
             bool diagnostics = false;
             bool materialDetails = true;
@@ -151,11 +169,12 @@ namespace editor::material_editing
             Session(FileGuid identity, std::filesystem::path source, LXMaterialAsset material,
                     own::shared_owner<const Material> base, bool graphOnDisk, bool materialOnDisk)
                 : guid(identity), materialGuid(base->m_fileGuid), sourceMaterial(base),
-                    persistedMaterial(materialOnDisk),
+                  persistedMaterial(materialOnDisk),
                   persistedGraph(graphOnDisk), path(std::move(source)), asset(std::move(material)),
                   document(asset.graph, {}, graphOnDisk), styles(BlenderStyles(asset.Definitions())),
                   items(MaterialItems(asset.Definitions())), name(base->m_name)
             {
+                catalogRegistered = graphOnDisk && materialOnDisk;
                 materialPath = materialOnDisk ? DataSystems->GetFilePath(materialGuid)
                                              : PathFinder::RelativeToMaterial("") / (name + ".asset");
                 if (graphOnDisk)
@@ -167,7 +186,7 @@ namespace editor::material_editing
                     ReadPayload(materialPath, materialDiskPayload);
                     acceptedMaterial = sourceMaterial;
                     // Disk and cached runtime graph versions can differ. Only
-                    // explicit Apply marks the opened draft as accepted.
+                    // explicit Apply or Save validates and accepts the opened draft.
                 }
                 if (const auto instance = sourceMaterial->GetMaterialGraphInstance())
                 {
@@ -268,40 +287,35 @@ namespace editor::material_editing
                 return result;
             }
 
-            void Analyze()
+            std::uint64_t SourceRevision() const
             {
-                ce::profile_scope profile{ce::marker<"MaterialNodeAnalysis">()};
-                if (analysisObservedRevision != Revision())
+                return document.ContentRevision() + sourceSettingsRevision;
+            }
+
+            bool AppliedMatchesCurrent() const
+            {
+                return acceptedMaterial && appliedDocument == document.DocumentId() &&
+                    appliedSourceRevision == SourceRevision() && appliedSettingsRevision == settingsRevision;
+            }
+
+            bool PreparedMatchesCurrent() const
+            {
+                return preparedMaterial && preparedGeneration && preparedDocument == document.DocumentId() &&
+                    preparedSourceRevision == SourceRevision() && preparedSettingsRevision == settingsRevision;
+            }
+
+            const char* RequestActionName() const
+            {
+                switch (requestedAction)
                 {
-                    analysisObservedRevision = Revision();
-                    analysisChangedAt = ImGui::GetTime();
-                }
-                if (analysisRevision == Revision())
-                {
-                    return;
-                }
-                // LXDocument revisions also cover pan, zoom and layout edits. Wait for
-                // interaction to settle instead of compiling the graph on every frame.
-                if (analysisRevision != std::numeric_limits<std::uint64_t>::max() &&
-                    ImGui::GetTime() - analysisChangedAt < 0.25)
-                {
-                    return;
-                }
-                analysisRevision = Revision();
-                analysisIssues.clear();
-                analysisSelection.reset();
-                analysisProgram = GenerateMaterialSlang(Snapshot(), &analysisIssues);
-                if (!analysisProgram)
-                {
-                    return;
-                }
-                material_graph::Capabilities capabilities;
-                capabilities.coreForward = capabilities.layeredLookup = capabilities.refraction =
-                    capabilities.subsurface = capabilities.volume = true;
-                material_graph::Selection selection;
-                if (material_graph::SelectRoute(*analysisProgram, capabilities, {}, selection, analysisIssues))
-                {
-                    analysisSelection = std::move(selection);
+                case DraftAction::Preview:
+                    return "preview";
+                case DraftAction::Apply:
+                    return "apply";
+                case DraftAction::Save:
+                    return "save";
+                default:
+                    return "none";
                 }
             }
 
@@ -343,99 +357,197 @@ namespace editor::material_editing
                 return true;
             }
 
-            bool Save()
+            void CompleteRequest(bool succeeded, std::string error = {})
             {
-                if (!Editable() || document.HasActivePreview())
+                completedRequestSerial = requestSerial;
+                requestSucceeded = succeeded;
+                requestError = std::move(error);
+                requestedAction = DraftAction::None;
+                requestedMaterial.reset();
+                previewPending = false;
+                if (!requestError.empty())
                 {
-                    message = "Finish the current edit before saving.";
-                    return false;
+                    message = requestError;
                 }
-                if (!acceptedMaterial || appliedDocument != document.DocumentId() || appliedRevision != Revision())
-                {
-                    message = "Apply the current draft first. Save persists the accepted material and graph.";
-                    return false;
-                }
-                if (!SameMaterial(DataSystems->FindCachedMaterial(materialGuid), acceptedMaterial))
-                {
-                    message = "The accepted asset changed. Reload its saved draft before saving.";
-                    return false;
-                }
-                if (!CheckDisk())
-                {
-                    return false;
-                }
-                if (!EditorAssetDatabase::Get().SaveMaterialGraph(*acceptedMaterial, Snapshot(), path, guid, message))
-                {
-                    return false;
-                }
-                if (!ReadPayload(path, diskPayload) || !ReadPayload(materialPath, materialDiskPayload))
-                {
-                    message = "Saved files could not be verified. Reload before saving again.";
-                    return false;
-                }
-                document.AcceptSavedSnapshot();
-                persistedGraph = persistedMaterial = true;
-                savedSettingsRevision = settingsRevision;
-                message = "Saved material asset and graph. Mesh assignment is separate.";
-                return true;
             }
 
-            bool Apply()
+            bool Request(DraftAction action)
             {
                 if (!Editable() || document.HasActivePreview())
                 {
-                    message = "Finish the current edit before applying.";
+                    message = "Finish the current edit before compiling.";
                     return false;
                 }
-                if (!acceptedMaterial && !ValidMaterialName(name))
+                if (action != DraftAction::Preview && !acceptedMaterial && !ValidMaterialName(name))
                 {
                     message = "Enter a valid material asset name.";
                     return false;
                 }
-                if (acceptedMaterial && name != acceptedMaterial->m_name)
+                if (action != DraftAction::Preview && acceptedMaterial && name != acceptedMaterial->m_name)
                 {
                     message = "Use Save As Copy to create a material with a different name.";
                     return false;
                 }
-                if (!preparedMaterial || preparedDocument != document.DocumentId() || preparedRevision != Revision())
+                // 요청 시점의 승인 대상과 소스 revision을 고정한다. 뒤늦은 작업은 새 요청을 게시할 수 없다.
+                ++requestSerial;
+                requestedAction = action;
+                requestedDocument = document.DocumentId();
+                requestedSourceRevision = SourceRevision();
+                requestedSettingsRevision = settingsRevision;
+                requestedMaterial = acceptedMaterial;
+                requestSucceeded = false;
+                requestError.clear();
+                saveWarning.clear();
+                previewError.clear();
+                previewPending = true;
+                previewRequested = true;
+                message = action == DraftAction::Save ? "Preparing the requested material for saving..." :
+                    action == DraftAction::Apply ? "Preparing the requested material for applying..." :
+                                                   "Preparing the requested draft preview...";
+                return true;
+            }
+
+            bool Save()
+            {
+                return Request(DraftAction::Save);
+            }
+
+            bool Apply()
+            {
+                return Request(DraftAction::Apply);
+            }
+
+            void SetAutomaticPreview(bool enabled)
+            {
+                automaticPreview = enabled;
+                if (enabled)
                 {
-                    message = previewError.empty() ? "Draft compilation is pending. Apply when the draft is ready."
-                              : "Apply failed; the accepted material is unchanged. " + previewError;
+                    previewRequested = true;
+                    attemptedSourceRevision = attemptedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
+                    changedAt = ImGui::GetTime();
+                }
+            }
+
+            bool PrepareInstance(const own::shared_owner<const material_graph::Generation>& generation,
+                std::string& error)
+            {
+                if (generation && PreparedMatchesCurrent() &&
+                    std::addressof(*generation) == std::addressof(*preparedGeneration))
+                {
+                    const auto instance = preparedMaterial->GetMaterialGraphInstance();
+                    if (instance && instance->generation &&
+                        std::addressof(*instance->generation) == std::addressof(*generation))
+                    {
+                        // 환경 재검증만 통과한 동일 초안은 instance와 완료된 GPU 미리보기를 유지한다.
+                        previewError.clear();
+                        return true;
+                    }
+                }
+                auto candidate = own::make_shared<Material>(*sourceMaterial);
+                candidate->m_name = name;
+                candidate->m_fileGuid = materialGuid;
+                candidate->m_doubleSided = doubleSided;
+                candidate->m_renderingMode = renderingMode;
+                if (!generation || !DataSystems->ConfigureMaterialGraph(*candidate, generation, defaults, error))
+                {
                     return false;
                 }
-                if (acceptedMaterial && appliedDocument == document.DocumentId() && appliedRevision == Revision() &&
-                    SameMaterial(DataSystems->FindCachedMaterial(materialGuid), acceptedMaterial))
+                // Publish의 runtime 중복 제거와 별도로 실제 검증한 authoring generation을 보관한다.
+                preparedGeneration = generation;
+                preparedMaterial = std::move(candidate);
+                preparedSourceRevision = SourceRevision();
+                preparedSettingsRevision = settingsRevision;
+                preparedDocument = document.DocumentId();
+                previewSource = material_graph::SceneMaterialSource::Capture(*preparedMaterial);
+                previewRevision = ++previewSerial;
+                previewError.clear();
+                return true;
+            }
+
+            void FinishRequestedAction()
+            {
+                if (!PreparedMatchesCurrent())
                 {
-                    message = "This draft is already applied. Save to retain it on disk.";
-                    return true;
+                    CompleteRequest(false, "The requested draft is no longer ready. Compile the latest draft again.");
+                    return;
+                }
+                if (requestedAction == DraftAction::Preview)
+                {
+                    message = "Draft preview is ready. Apply or Save to update the material asset.";
+                    CompleteRequest(true);
+                    return;
                 }
                 if (!persistedMaterial)
                 {
                     materialPath = PathFinder::RelativeToMaterial("") / (name + ".asset");
                 }
-                if (!CheckDisk() || !DataSystems->PublishMaterialAsset(preparedMaterial, acceptedMaterial, message))
+                if (!CheckDisk())
                 {
-                    return false;
+                    CompleteRequest(false, message);
+                    return;
                 }
-                acceptedMaterial = DataSystems->FindCachedMaterial(materialGuid);
-                if (!acceptedMaterial)
+                std::string error;
+                own::shared_owner<const Material> published;
+                if (requestedAction == DraftAction::Save)
                 {
-                    message = "The published material is no longer available. Reload before saving.";
-                    return false;
+                    EditorAssetDatabase::MaterialGraphSaveResult saved;
+                    if (!EditorAssetDatabase::Get().SaveMaterialGraph(preparedMaterial, requestedMaterial,
+                        Snapshot(), path, guid, saved, error))
+                    {
+                        CompleteRequest(false, std::move(error));
+                        return;
+                    }
+                    published = std::move(saved.publishedMaterial);
+                    catalogRegistered = saved.catalogRegistered;
+                    saveWarning = std::move(saved.warning);
+                    persistedGraph = persistedMaterial = true;
+                    if (ReadPayload(path, diskPayload) && ReadPayload(materialPath, materialDiskPayload))
+                    {
+                        document.AcceptSavedSnapshot();
+                        savedSettingsRevision = settingsRevision;
+                    }
+                    else
+                    {
+                        if (!saveWarning.empty())
+                        {
+                            saveWarning += " ";
+                        }
+                        saveWarning += "Saved files could not be verified. Reload before saving again.";
+                    }
                 }
+                else
+                {
+                    if (!DataSystems->PublishMaterialAsset(preparedMaterial, requestedMaterial, error, &published))
+                    {
+                        CompleteRequest(false, std::move(error));
+                        return;
+                    }
+                }
+                if (!published)
+                {
+                    CompleteRequest(false, "The published material is no longer available. Reload before continuing.");
+                    return;
+                }
+                acceptedMaterial = std::move(published);
                 sourceMaterial = acceptedMaterial;
-                appliedRevision = Revision();
+                appliedSourceRevision = SourceRevision();
+                appliedSettingsRevision = settingsRevision;
                 appliedDocument = document.DocumentId();
-                message = "Applied to the material asset and its users. Save to retain it on disk.";
-                return true;
+                message = requestedAction == DraftAction::Save ?
+                    "Saved and applied the material asset. Mesh assignment is separate." :
+                    "Applied to the material asset and its users. Save to retain it on disk.";
+                if (!saveWarning.empty())
+                {
+                    message += " " + saveWarning;
+                }
+                CompleteRequest(true);
             }
 
             bool Assign(MeshRenderer& renderer)
             {
-                if (!acceptedMaterial || !persistedMaterial || appliedDocument != document.DocumentId() ||
-                    appliedRevision != Revision() || Dirty())
+                if (!persistedMaterial || !AppliedMatchesCurrent() || Dirty())
                 {
-                    message = "Apply and Save this draft before assigning its asset reference.";
+                    message = "Save this draft before assigning its asset reference.";
                     return false;
                 }
                 auto* owner = renderer.GetOwner();
@@ -473,33 +585,80 @@ namespace editor::material_editing
                 return true;
             }
 
-            void TickAutomaticSave(bool flush = false)
+            void StartPreparation(std::uint64_t serial)
             {
-                const auto revision = Revision();
-                if (!Editable() || !Dirty() || document.HasActivePreview() || (!flush && ImGui::IsAnyItemActive())
-                    || preparedDocument != document.DocumentId() || preparedRevision != revision
-                    || (!flush && ImGui::GetTime() - changedAt < 0.6)
-                    || (automaticAttempt == revision && automaticDocument == document.DocumentId()))
+                auto work = own::make_shared<PreviewWork>();
+                work->graph = Snapshot();
+                work->graphGuid = guid;
+                work->shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
+                work->cacheDirectory = PathFinder::CachePath("Lattice/EditorDrafts");
+                work->previousGeneration = preparedGeneration;
+                if (!work->previousGeneration)
                 {
-                    return;
+                    const auto& instance = sourceMaterial->GetMaterialGraphInstance();
+                    if (instance)
+                    {
+                        work->previousGeneration = instance->generation;
+                    }
                 }
-                automaticAttempt = revision;
-                automaticDocument = document.DocumentId();
-                if (Apply())
+                workSourceRevision = SourceRevision();
+                workDocument = document.DocumentId();
+                workRequestSerial = serial;
+                attemptedSourceRevision = SourceRevision();
+                attemptedSettingsRevision = settingsRevision;
+                previewPending = true;
+                try
                 {
-                    Save();
+                    // 의존 파일 해시와 환경 확인도 요청 worker에서 수행한다. 평상시 UI tick은 revision만 본다.
+                    previewJob = ce::get_job_scheduler().submit([work] {
+                        if (!LX::ComputeMaterialSourceKey(work->graph, work->sourceKey, work->error))
+                        {
+                            return;
+                        }
+                        if (work->previousGeneration &&
+                            work->previousGeneration->assetId.value == work->graphGuid.m_guid &&
+                            DataSystem::CanReuseMaterialGraphAuthoring(
+                                *work->previousGeneration, work->sourceKey, work->shaderDirectory, work->error,
+                                work->cacheDirectory))
+                        {
+                            work->generation = work->previousGeneration;
+                            work->reusedGeneration = true;
+                        }
+                        else
+                        {
+                            work->error.clear();
+                            work->generation = DataSystem::CompileMaterialGraphAuthoring(
+                                work->graph, work->graphGuid, work->shaderDirectory, work->cacheDirectory, work->error);
+                        }
+                    });
+                    previewWork = std::move(work);
+                }
+                catch (const std::exception& failure)
+                {
+                    previewError = failure.what();
+                    previewPending = false;
+                    if (serial != 0 && serial == requestSerial)
+                    {
+                        CompleteRequest(false, previewError);
+                    }
                 }
             }
 
-            void TickPreview(bool flush = false)
+            void TickPreview(bool allowAutomaticPreview = true)
             {
-                const auto revision = Revision();
-                if (observedRevision != revision)
+                const auto sourceRevision = SourceRevision();
+                if (observedSourceRevision != sourceRevision || observedSettingsRevision != settingsRevision)
                 {
-                    observedRevision = revision;
+                    observedSourceRevision = sourceRevision;
+                    observedSettingsRevision = settingsRevision;
                     changedAt = ImGui::GetTime();
-                    previewPending = true;
                     previewError.clear();
+                }
+                if (requestedAction != DraftAction::None &&
+                    (requestedDocument != document.DocumentId() || requestedSourceRevision != sourceRevision ||
+                        requestedSettingsRevision != settingsRevision))
+                {
+                    CompleteRequest(false, "Draft changed after the request. Request the latest draft again.");
                 }
                 if (previewJob.valid())
                 {
@@ -515,70 +674,74 @@ namespace editor::material_editing
                     {
                         previewWork->error = failure.what();
                     }
-                    if (workDocument == document.DocumentId() && workRevision == revision)
+                    const bool currentSource = workDocument == document.DocumentId() &&
+                        workSourceRevision == sourceRevision;
+                    if (currentSource)
                     {
-                        auto candidate = own::make_shared<Material>(*sourceMaterial);
-                        candidate->m_name = name;
-                        candidate->m_fileGuid = materialGuid;
-                        candidate->m_doubleSided = doubleSided;
-                        candidate->m_renderingMode = renderingMode;
                         std::string error = previewWork->error;
-                        auto generation = previewWork->generation;
-                        if (generation && preparedMaterial)
+                        if (previewWork->generation &&
+                            previewWork->generation->authoringSourceKey == previewWork->sourceKey &&
+                            PrepareInstance(previewWork->generation, error))
                         {
-                            const auto& previous = preparedMaterial->GetMaterialGraphInstance();
-                            if (previous && previous->generation->assetId == generation->assetId &&
-                                previous->generation->contentDigest == generation->contentDigest)
+                            lastPreparationReused = previewWork->reusedGeneration;
+                            if (requestedAction != DraftAction::None && workRequestSerial == requestSerial)
                             {
-                                // Layout and asset-default edits can share the
-                                // program without repeating GPU preparation.
-                                generation = previous->generation;
+                                validatedRequestSerial = requestSerial;
                             }
-                        }
-                        if (generation && DataSystems->ConfigureMaterialGraph(*candidate, generation, defaults, error))
-                        {
-                            preparedMaterial = std::move(candidate);
-                            preparedRevision = revision;
-                            preparedDocument = document.DocumentId();
-                            previewSource = material_graph::SceneMaterialSource::Capture(*preparedMaterial);
-                            previewRevision = ++previewSerial;
-                            previewError.clear();
                         }
                         else
                         {
                             previewError = error.empty() ? "Draft compilation failed." : std::move(error);
+                            if (requestedAction != DraftAction::None && workRequestSerial == requestSerial)
+                            {
+                                CompleteRequest(false, previewError);
+                            }
                         }
-                        previewPending = false;
-                        attemptedRevision = revision;
                     }
                     previewJob = {};
                     previewWork.reset();
+                    previewPending = requestedAction != DraftAction::None;
                 }
-                if (document.HasActivePreview() || attemptedRevision == revision || (!flush && ImGui::GetTime() - changedAt < 0.25))
+                if (requestedAction != DraftAction::None)
+                {
+                    if (document.HasActivePreview())
+                    {
+                        return;
+                    }
+                    if (validatedRequestSerial == requestSerial)
+                    {
+                        FinishRequestedAction();
+                    }
+                    else
+                    {
+                        StartPreparation(requestSerial);
+                    }
+                    return;
+                }
+                const auto now = std::chrono::steady_clock::now();
+                const bool previewVisibleNow = previewPinned ||
+                    now - previewVisible <= std::chrono::milliseconds(250);
+                if (!allowAutomaticPreview || !automaticPreview || !Editable() || !previewVisibleNow ||
+                    document.HasActivePreview() || ImGui::IsAnyItemActive() || ImGui::GetTime() - changedAt < 0.25 ||
+                    (attemptedSourceRevision == sourceRevision && attemptedSettingsRevision == settingsRevision))
                 {
                     return;
                 }
-                auto work = own::make_shared<PreviewWork>();
-                work->graph = Snapshot();
-                work->graphGuid = guid;
-                work->shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
-                work->cacheDirectory = PathFinder::CachePath("Lattice/EditorDrafts");
-                workRevision = revision;
-                workDocument = document.DocumentId();
-                try
+                attemptedSourceRevision = sourceRevision;
+                attemptedSettingsRevision = settingsRevision;
+                if (preparedGeneration && preparedDocument == document.DocumentId() &&
+                    preparedSourceRevision == sourceRevision)
                 {
-                    previewJob = ce::get_job_scheduler().submit([work] {
-                        work->generation = DataSystem::CompileMaterialGraphAuthoring(
-                            work->graph, work->graphGuid, work->shaderDirectory, work->cacheDirectory, work->error);
-                    });
-                    previewWork = std::move(work);
-                }
-                catch (const std::exception& failure)
-                {
-                    previewError = failure.what();
+                    // 인스턴스 기본값만 바뀐 미리보기는 이미 검증한 프로그램으로 새 instance만 준비한다.
+                    std::string error;
+                    if (!PreparedMatchesCurrent() && !PrepareInstance(preparedGeneration, error))
+                    {
+                        previewError = std::move(error);
+                    }
                     previewPending = false;
-                    attemptedRevision = revision;
+                    return;
                 }
+                StartPreparation(0);
             }
 
             bool Reload(bool discard)
@@ -639,15 +802,25 @@ namespace editor::material_editing
                 diskPayload = std::move(graphPayload);
                 materialDiskPayload = std::move(materialPayload);
                 document = LXDocument(asset.graph, {}, true);
-                settingsRevision = savedSettingsRevision = 0;
+                settingsRevision = sourceSettingsRevision = savedSettingsRevision = 0;
                 appliedDocument = 0;
-                appliedRevision = std::numeric_limits<std::uint64_t>::max();
+                appliedSourceRevision = appliedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
                 preparedMaterial.reset();
-                observedRevision = attemptedRevision = std::numeric_limits<std::uint64_t>::max();
-                analysisRevision = analysisObservedRevision = std::numeric_limits<std::uint64_t>::max();
+                preparedGeneration.reset();
+                preparedDocument = 0;
+                preparedSourceRevision = preparedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
+                observedSourceRevision = observedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
+                attemptedSourceRevision = attemptedSettingsRevision = std::numeric_limits<std::uint64_t>::max();
+                defaultsSourceRevision = std::numeric_limits<std::uint64_t>::max();
+                resolvedDefaults.clear();
+                if (requestedAction != DraftAction::None)
+                {
+                    CompleteRequest(false, "The saved draft was reloaded. The previous request was cancelled.");
+                }
+                previewPending = previewJob.valid();
                 canvas = {};
                 fit = !asset.graph.Layout().view.saved;
-                message = "Reloaded the saved draft. Apply explicitly to replace the accepted asset.";
+                message = "Reloaded the saved draft. Apply or Save explicitly to replace the accepted asset.";
                 return true;
             }
 
@@ -818,12 +991,6 @@ namespace editor::material_editing
             return false;
         }
 
-        void RefreshPreview(Session& session)
-        {
-            session.TickPreview();
-            session.TickAutomaticSave();
-        }
-
         LXMaterialAsset NewGraph()
         {
             LXMaterialAsset asset;
@@ -949,8 +1116,21 @@ namespace editor::material_editing
             result.Set("material", CommandData::String(session.materialGuid.ToString()));
             result.Set("materialPath", CommandData::String(session.materialPath.string()));
             result.Set("draftRevision", CommandData::Int(session.Revision()));
-            result.Set("applied", CommandData::Bool(session.appliedDocument == session.document.DocumentId() &&
-                                                   session.appliedRevision == session.Revision()));
+            result.Set("applied", CommandData::Bool(session.AppliedMatchesCurrent()));
+            result.Set("sourceRevision", CommandData::Int(session.SourceRevision()));
+            result.Set("instanceRevision", CommandData::Int(session.settingsRevision));
+            result.Set("automaticPreview", CommandData::Bool(session.automaticPreview));
+            result.Set("requestPending", CommandData::Bool(session.requestedAction != DraftAction::None));
+            result.Set("requestAction", CommandData::String(session.RequestActionName()));
+            result.Set("requestSerial", CommandData::Int(session.requestSerial));
+            result.Set("completedRequestSerial", CommandData::Int(session.completedRequestSerial));
+            result.Set("requestSucceeded", CommandData::Bool(session.requestSucceeded));
+            result.Set("requestError", CommandData::String(session.requestError));
+            result.Set("lastPreparationReused", CommandData::Bool(session.lastPreparationReused));
+            result.Set("preparedSourceKey", CommandData::String(session.preparedGeneration ?
+                session.preparedGeneration->authoringSourceKey : std::string{}));
+            result.Set("catalogRegistered", CommandData::Bool(session.catalogRegistered));
+            result.Set("saveWarning", CommandData::String(session.saveWarning));
             result.Set("uiFrames", CommandData::Int(session.uiFrames));
             result.Set("editable", CommandData::Bool(session.Editable()));
             const auto preview =
@@ -1197,6 +1377,7 @@ namespace editor::material_editing
                     {
                         session.asset.blackboard.push_back(std::move(parameter));
                         ++session.settingsRevision;
+                        ++session.sourceSettingsRevision;
                     }
                 }
                 return;
@@ -1235,42 +1416,57 @@ namespace editor::material_editing
             if (changed)
             {
                 ++session.settingsRevision;
+                ++session.sourceSettingsRevision;
             }
         }
 
-        LXSocketValue EffectiveParameterDefault(const Session& session, const LXMaterialParameter& parameter)
+        LXSocketValue EffectiveParameterDefault(Session& session, const LXMaterialParameter& parameter)
         {
-            auto value = parameter.value;
-            std::set<Id> visited;
-            const auto visit = [&](auto&& self, const LXGraph& graph) -> void {
-                for (const auto& node : graph.Nodes())
+            const auto revision = session.SourceRevision();
+            if (session.defaultsSourceRevision != revision)
+            {
+                // 노출된 기본값은 소스 변경마다 한 번 수집한다. 각 UI 행에서 그룹을 다시 순회하지 않는다.
+                std::map<Id, LXSocketValue> resolved;
+                for (const auto& declaration : session.asset.blackboard)
                 {
-                    const auto source = node.properties.find("valueSource");
-                    const auto reference = node.properties.find("parameter");
-                    if (node.type.starts_with("LXParameter") && !node.pins.empty() &&
-                        source != node.properties.end() && source->second == "socket" &&
-                        reference != node.properties.end())
+                    resolved.emplace(declaration.id, declaration.value);
+                }
+                std::set<Id> visited;
+                const auto visit = [&](auto&& self, const LXGraph& graph) -> void {
+                    for (const auto& node : graph.Nodes())
                     {
+                        const auto source = node.properties.find("valueSource");
+                        const auto reference = node.properties.find("parameter");
+                        if (!node.type.starts_with("LXParameter") || node.pins.empty() ||
+                            source == node.properties.end() || source->second != "socket" ||
+                            reference == node.properties.end())
+                        {
+                            continue;
+                        }
                         Id identity{};
                         const auto& text = reference->second;
                         const auto parsed = std::from_chars(text.data(), text.data() + text.size(), identity);
+                        const auto found = resolved.find(identity);
                         if (parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size() &&
-                            identity == parameter.id)
+                            found != resolved.end())
                         {
-                            value = node.pins.front().value;
+                            found->second = node.pins.front().value;
                         }
                     }
-                }
-                for (const auto& [id, group] : graph.Groups())
-                {
-                    if (group.body && visited.insert(id).second)
+                    for (const auto& [id, group] : graph.Groups())
                     {
-                        self(self, *group.body);
+                        if (group.body && visited.insert(id).second)
+                        {
+                            self(self, *group.body);
+                        }
                     }
-                }
-            };
-            visit(visit, session.document.Graph());
-            return value;
+                };
+                visit(visit, session.document.Graph());
+                session.resolvedDefaults = std::move(resolved);
+                session.defaultsSourceRevision = revision;
+            }
+            const auto found = session.resolvedDefaults.find(parameter.id);
+            return found == session.resolvedDefaults.end() ? parameter.value : found->second;
         }
 
         void DrawMaterialDefaults(Session& session)
@@ -1356,9 +1552,14 @@ namespace editor::material_editing
                 return;
             }
             session.previewVisible = std::chrono::steady_clock::now();
+            if (!session.previewRequested)
+            {
+                ImGui::TextWrapped("Compile and Apply, Save, or enable automatic draft preview to prepare this draft.");
+                return;
+            }
             if (session.previewPending)
             {
-                ImGui::TextDisabled("Compiling latest draft... Last good preview is retained.");
+                ImGui::TextDisabled("Preparing the requested draft... Last good preview is retained.");
             }
             if (!session.previewError.empty())
             {
@@ -1366,13 +1567,23 @@ namespace editor::material_editing
             }
             if (!session.previewSource)
             {
-                ImGui::TextDisabled("Waiting for the first valid draft.");
+                ImGui::TextWrapped("Compile and Apply, Save, or enable automatic draft preview to prepare this draft.");
                 return;
+            }
+            if (!session.PreparedMatchesCurrent())
+            {
+                ImGui::TextWrapped("Preview shows the last prepared draft. Current edits are waiting for compilation.");
             }
             if (session.previewSource->coverage.flags & EnhancedMaterialCoverage::Blended)
             {
                 ImGui::TextWrapped("Transparent draft compiled. This preview renderer supports Opaque and Masked "
                     "surfaces.");
+                return;
+            }
+            if (!previewFloor[0] || !previewFloor[1])
+            {
+                ImGui::TextWrapped("%s", previewFloorError.empty() ? "Preparing preview environment..."
+                                                                  : previewFloorError.c_str());
                 return;
             }
             const auto state =
@@ -1494,7 +1705,7 @@ namespace editor::material_editing
                         {
                             action = MaterialBarAction::Save;
                         }
-                        if (ImGui::MenuItem("Apply to Material Asset", nullptr, false, session.Editable()))
+                        if (ImGui::MenuItem("Compile and Apply to Material Asset", nullptr, false, session.Editable()))
                         {
                             action = MaterialBarAction::Apply;
                         }
@@ -1536,9 +1747,8 @@ namespace editor::material_editing
                         }
                     };
                     const auto toolbarAction = DrawMaterialDataBar(session.name, session.Dirty(), session.Editable(),
-                                                                   session.styles.canvas.showGrid,
-                                                                       session.canvas.snapToGrid,
-                                                                   materialMenu, overlayMenu);
+                        session.styles.canvas.showGrid, session.canvas.snapToGrid, materialMenu, overlayMenu,
+                        session.automaticPreview);
                     if (toolbarAction != MaterialBarAction::None)
                     {
                         action = toolbarAction;
@@ -1565,8 +1775,7 @@ namespace editor::material_editing
                     active->defaults.graphId.value = active->guid.m_guid;
                     active->doubleSided = session.doubleSided;
                     active->renderingMode = session.renderingMode;
-                    active->message = "Independent copy created. Set its name, then Apply and Save. Nothing was "
-                        "assigned.";
+                    active->message = "Independent copy created. Set its name, then Save to compile and apply it.";
                 }
             }
             else if (action == MaterialBarAction::Assign)
@@ -1590,6 +1799,10 @@ namespace editor::material_editing
             else if (action == MaterialBarAction::Apply)
             {
                 session.Apply();
+            }
+            else if (action == MaterialBarAction::ToggleAutomaticPreview)
+            {
+                session.SetAutomaticPreview(!session.automaticPreview);
             }
             else if (action == MaterialBarAction::Reload)
             {
@@ -1674,11 +1887,18 @@ namespace editor::material_editing
                 {
                     ImGui::BeginChild("##material_diagnostics", ImVec2{0.0f, 100.0f * CanvasUiScale()},
                         ImGuiChildFlags_Borders);
-                    session.Analyze();
-                    for (const auto& issue : session.analysisIssues)
+                    // 컴파일 결과의 진단을 재사용한다. UI가 별도로 Slang을 다시 생성하지 않는다.
+                    if (!session.previewError.empty())
                     {
-                        ImGui::TextWrapped("Node %llu: %s", static_cast<unsigned long long>(issue.source.node),
-                                           issue.message.c_str());
+                        ImGui::TextWrapped("%s", session.previewError.c_str());
+                    }
+                    else if (session.PreparedMatchesCurrent())
+                    {
+                        ImGui::TextWrapped("The current draft passed material compilation and preparation.");
+                    }
+                    else
+                    {
+                        ImGui::TextWrapped("Compile the draft to validate its nodes and shader.");
                     }
                     ImGui::EndChild();
                 }
@@ -1725,8 +1945,6 @@ namespace editor::material_editing
                                    "Material Asset", "Draft", session.name, session.message);
             ImGui::EndChild();
             ImGui::EndChild();
-            session.TickPreview();
-            session.TickAutomaticSave();
             ++session.uiFrames;
             ImGui::PopID();
         }
@@ -1752,7 +1970,7 @@ namespace editor::material_editing
         ReconcileSceneLocked();
     }
 
-    void TickAutomaticChanges()
+    void TickPendingRequests()
     {
         std::lock_guard lock(sessionMutex);
         if (shuttingDown || !ImGui::GetCurrentContext())
@@ -1762,7 +1980,18 @@ namespace editor::material_editing
         ReconcileSceneLocked();
         for (const auto& session : sessions)
         {
-            RefreshPreview(*session);
+            session->TickPreview();
+        }
+        const auto now = std::chrono::steady_clock::now();
+        const bool draftDemand = active && active->previewRequested && active->previewSource &&
+            !(active->previewSource->coverage.flags & EnhancedMaterialCoverage::Blended) &&
+            (active->previewPinned || now - active->previewVisible <= std::chrono::milliseconds(250));
+        const bool inspectorDemand = (!active || !active->previewPinned) && inspectorPreview &&
+            !(inspectorPreview->coverage.flags & EnhancedMaterialCoverage::Blended) &&
+            now - inspectorPreviewVisible <= std::chrono::milliseconds(250);
+        if (draftDemand || inspectorDemand)
+        {
+            PreparePreviewFloor();
         }
     }
 
@@ -1788,7 +2017,6 @@ namespace editor::material_editing
                 "required.");
             return;
         }
-        PreparePreviewFloor();
         DrawSession(*active);
     }
 
@@ -1804,14 +2032,14 @@ namespace editor::material_editing
             }
             for (const auto& session : sessions)
             {
-                session->TickPreview(true);
+                session->TickPreview(false);
                 if (session->previewJob.valid())
                 {
                     pending.push_back(session->previewJob);
                 }
             }
         }
-        // Jobs own their inputs and never access a Session or DataSystem. Drain
+        // Jobs own their input snapshots and never dereference a Session. Drain
         // before the compiler, runtime paths or editor texture owners are destroyed.
         for (const auto& job : pending)
         {
@@ -1827,10 +2055,9 @@ namespace editor::material_editing
         std::lock_guard lock(sessionMutex);
         for (const auto& session : sessions)
         {
-            session->TickPreview(true);
-            // An older in-flight revision can finish after the last edit. Drain
-            // the final revision at shutdown while the compiler and scene still exist.
-            if (session->previewJob.valid())
+            session->TickPreview(false);
+            // 이미 요청한 작업만 회수한다. 미승인 초안의 컴파일이나 저장을 종료 시 새로 요청하지 않는다.
+            while (session->previewJob.valid())
             {
                 try
                 {
@@ -1839,9 +2066,8 @@ namespace editor::material_editing
                 catch (const std::exception&)
                 {
                 }
-                session->TickPreview(true);
+                session->TickPreview(false);
             }
-            session->TickAutomaticSave(true);
         }
         active = nullptr;
         sessions.clear();
@@ -1865,12 +2091,6 @@ namespace editor::material_editing
             return;
         }
         inspectorPreviewVisible = std::chrono::steady_clock::now();
-        if (!PreparePreviewFloor())
-        {
-            ImGui::TextWrapped("%s", previewFloorError.empty() ? "Preparing preview environment..."
-                                                               : previewFloorError.c_str());
-            return;
-        }
         auto source =
             renderer.m_Material ? material_graph::SceneMaterialSource::Capture(*renderer.m_Material) : nullptr;
         if (!source || !source->instance)
@@ -1886,14 +2106,21 @@ namespace editor::material_editing
             inspectorPreview = std::move(source);
             inspectorPreviewRevision = ++previewSerial;
         }
-        const auto state =
-            EnhancedSceneRenderer::GetLiveDisplaySnapshot().Get(EnhancedLiveDisplayTarget::MaterialPreview);
-        const auto texture = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::MaterialPreview);
         if (inspectorPreview->coverage.flags & EnhancedMaterialCoverage::Blended)
         {
             ImGui::TextWrapped("Preview is available for Opaque and Masked surfaces.");
+            return;
         }
-        else if (state.key.historyRevision != inspectorPreviewRevision || !state.previewComplete || !texture.textureId)
+        if (!previewFloor[0] || !previewFloor[1])
+        {
+            ImGui::TextWrapped("%s", previewFloorError.empty() ? "Preparing preview environment..."
+                                                               : previewFloorError.c_str());
+            return;
+        }
+        const auto state =
+            EnhancedSceneRenderer::GetLiveDisplaySnapshot().Get(EnhancedLiveDisplayTarget::MaterialPreview);
+        const auto texture = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::MaterialPreview);
+        if (state.key.historyRevision != inspectorPreviewRevision || !state.previewComplete || !texture.textureId)
         {
             ImGui::TextDisabled("Preparing material preview...");
         }
@@ -1923,7 +2150,8 @@ namespace editor::material_editing
         }
         ReconcileSceneLocked();
         const auto now = std::chrono::steady_clock::now();
-        if (active && (active->previewPinned || now - active->previewVisible <= std::chrono::milliseconds(250)) &&
+        if (active && active->previewRequested &&
+            (active->previewPinned || now - active->previewVisible <= std::chrono::milliseconds(250)) &&
             active->previewSource && !(active->previewSource->coverage.flags & EnhancedMaterialCoverage::Blended))
         {
             request = {};
@@ -2033,12 +2261,20 @@ namespace editor::material_editing
             parts[2] == "off" || parts[2] == "refresh"))
         {
             active->previewPinned = parts[2] != "off";
-            if (parts[2] == "refresh")
+            active->previewRequested = active->previewRequested || active->previewPinned;
+            if (parts[2] == "refresh" && !active->Request(DraftAction::Preview))
             {
-                active->attemptedRevision = std::numeric_limits<std::uint64_t>::max();
-                active->previewPending = true;
+                return Fail("material.editor.preview", active->message);
             }
-            RefreshPreview(*active);
+            return Ok({}, Describe(*active));
+        }
+        if (parts.size() == 3 && parts[1] == "auto-preview" && (parts[2] == "on" || parts[2] == "off"))
+        {
+            if (parts[2] == "on" && !active->Editable())
+            {
+                return PreconditionFailed("material.editor.read_only", "Material authoring is disabled");
+            }
+            active->SetAutomaticPreview(parts[2] == "on");
             return Ok({}, Describe(*active));
         }
         if (parts.size() == 2 && parts[1] == "state")
@@ -2069,7 +2305,7 @@ namespace editor::material_editing
             {
                 applied = active->Save();
             }
-            else if (parts[1] == "apply")
+            else if (parts[1] == "apply" || parts[1] == "compile")
             {
                 applied = active->Apply();
             }

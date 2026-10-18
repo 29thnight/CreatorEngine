@@ -1,7 +1,6 @@
 #pragma once
 #include "StandardLibrary.h"
 #include "JobGraph.h"
-#include "JobSpin.h"
 
 class job_scheduler;
 
@@ -36,12 +35,10 @@ class thread_pool
     bool is_running() const;
     std::size_t size() const;
     static bool is_worker_thread() noexcept;
-    job_spin_scope recording_spin_scope(job_spin_options options);
 
   private:
     friend class job_scheduler;
     struct state;
-    void stop_recording_spin() noexcept;
     void dispatch(std::size_t count, std::function<void(std::size_t)> execute,
                   std::function<void(std::exception_ptr)> complete);
     void dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,

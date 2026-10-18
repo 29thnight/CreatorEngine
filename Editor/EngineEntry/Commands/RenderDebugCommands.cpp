@@ -396,7 +396,7 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         auto data = CommandData::Object();
-        data.Set("schemaVersion", CommandData::Int(1));
+        data.Set("schemaVersion", CommandData::Int(2));
         data.Set("clock", CommandData::String("steady-clock-nanoseconds"));
         data.Set("axis", CommandData::String("cpu-recording-wall-not-cpu-residency-or-gpu"));
         data.Set("unitsAxis", CommandData::String("record-body-including-repeat-phase-barriers"));
@@ -410,39 +410,17 @@ namespace ConsoleCmd
         data.Set("waitBeginNs", CommandData::Int(trace.waitBeginNanoseconds));
         data.Set("returnNs", CommandData::Int(trace.returnNanoseconds));
         auto policy = CommandData::Object();
-        policy.Set("ownerSpinUs", CommandData::Int(trace.ownerSpinMicroseconds));
-        policy.Set("workerSpinUs", CommandData::Int(trace.workerSpinMicroseconds));
-        policy.Set("frameSpinUs", CommandData::Int(trace.frameSpinMicroseconds));
-        policy.Set("spinWorkers", CommandData::Int(trace.spinWorkers));
+        policy.Set("ownerWaitMode", CommandData::String("blocking"));
         data.Set("policy", std::move(policy));
-
-        auto wait = CommandData::Object();
-        wait.Set("available", CommandData::Bool(trace.dependencyGraph));
-        wait.Set("spinElapsedNs", CommandData::Int(trace.ownerWait.spin_elapsed_ns));
-        wait.Set("spinAttempted", CommandData::Bool(trace.ownerWait.spin_attempted));
-        wait.Set("completedDuringSpin", CommandData::Bool(trace.ownerWait.completed_during_spin));
-        wait.Set("blockingPathEntered", CommandData::Bool(trace.ownerWait.blocking_path_entered));
-        wait.Set("blockingAxis", CommandData::String("cv-predicate-false-not-proven-os-sleep"));
-        data.Set("ownerWait", std::move(wait));
-
-        const auto& spin = trace.workerSpin;
-        auto workerSpin = CommandData::Object();
-        workerSpin.Set("frameId", CommandData::Int(spin.frame_id));
-        workerSpin.Set("attempts", CommandData::Int(spin.spin_attempts));
-        workerSpin.Set("taskHits", CommandData::Int(spin.task_hits));
-        workerSpin.Set("budgetExhaustions", CommandData::Int(spin.budget_exhaustions));
-        workerSpin.Set("scopeExits", CommandData::Int(spin.scope_exits));
-        workerSpin.Set("scopeAccepted", CommandData::Bool(trace.workerSpinScopeAccepted));
-        workerSpin.Set("shutdownExits", CommandData::Int(spin.shutdown_exits));
-        workerSpin.Set("wallNs", CommandData::Int(spin.spin_wall_ns));
-        workerSpin.Set("reservedBudgetNs", CommandData::Int(spin.reserved_budget_ns));
-        workerSpin.Set("activeSpinners", CommandData::Int(spin.active_spinners));
-        workerSpin.Set("maxActiveSpinners", CommandData::Int(spin.max_active_spinners));
-        workerSpin.Set("axis", CommandData::String("frame-cumulative-snapshot-inflight-exits-may-follow"));
-        data.Set("workerSpin", std::move(workerSpin));
 
         auto jobs = CommandData::Object();
         jobs.Set("available", CommandData::Bool(bool(trace.jobs)));
+        const bool topologyAvailable = trace.jobs && trace.topology.available &&
+            trace.topology.nodes.size() == trace.jobs->nodes.size() &&
+            trace.topology.unitNodes.size() == trace.units.size();
+        jobs.Set("topologyAvailable", CommandData::Bool(topologyAvailable));
+        jobs.Set("topologyTruncated", CommandData::Bool(trace.topology.truncated));
+        auto lastCompletedNodes = CommandData::Array();
         auto nodes = CommandData::Array();
         if (trace.jobs)
         {
@@ -451,15 +429,51 @@ namespace ConsoleCmd
             jobs.Set("completedNs", CommandData::Int(trace.jobs->completed_ns));
             jobs.Set("dispatcherHandoffs", CommandData::Int(trace.jobs->dispatcher_handoffs));
             jobs.Set("nativeTasks", CommandData::Int(trace.jobs->native_task_count));
+            uint64_t lastCompletion = 0;
+            for (const auto& timing : trace.jobs->nodes)
+            {
+                lastCompletion = (std::max)(lastCompletion, timing.complete_ns);
+            }
             for (size_t index = 0; index < trace.jobs->nodes.size(); ++index)
             {
                 const auto& timing = trace.jobs->nodes[index];
+                if (lastCompletion != 0 && timing.complete_ns == lastCompletion)
+                {
+                    lastCompletedNodes.Append(CommandData::Int(index));
+                }
                 auto node = CommandData::Object();
                 node.Set("node", CommandData::Int(index));
                 if (index < trace.tasks.size())
                 {
                     node.Set("target", CommandData::Int(trace.tasks[index].target));
                     node.Set("wave", CommandData::Int(trace.tasks[index].wave));
+                }
+                if (topologyAvailable)
+                {
+                    auto dependencies = CommandData::Array();
+                    for (const auto& entry : trace.topology.nodes[index].dependencies)
+                    {
+                        auto dependency = CommandData::Object();
+                        dependency.Set("node", CommandData::Int(entry.node));
+                        auto reasons = CommandData::Array();
+                        if (entry.reasons & static_cast<uint8_t>(RHIRecordingDependencyReason::SameTarget))
+                        {
+                            reasons.Append(CommandData::String("same-target"));
+                        }
+                        if (entry.reasons & static_cast<uint8_t>(RHIRecordingDependencyReason::CpuProducer))
+                        {
+                            reasons.Append(CommandData::String("cpu-producer"));
+                        }
+                        dependency.Set("reasons", std::move(reasons));
+                        dependencies.Append(std::move(dependency));
+                    }
+                    node.Set("dependencies", std::move(dependencies));
+                    auto nodeUnits = CommandData::Array();
+                    for (const auto unit : trace.topology.nodes[index].units)
+                    {
+                        nodeUnits.Append(CommandData::Int(unit));
+                    }
+                    node.Set("units", std::move(nodeUnits));
                 }
                 node.Set("registeredNs", CommandData::Int(timing.registered_ns));
                 node.Set("readyNs", CommandData::Int(timing.ready_ns));
@@ -478,13 +492,20 @@ namespace ConsoleCmd
             }
         }
         jobs.Set("nodes", std::move(nodes));
+        jobs.Set("lastCompletedNodes", std::move(lastCompletedNodes));
         jobs.Set("publicationAxis", CommandData::String("enqueue-call-bracket-not-exact-queue-insertion"));
         data.Set("jobs", std::move(jobs));
 
         auto units = CommandData::Array();
-        for (const auto& timing : trace.units)
+        for (size_t index = 0; index < trace.units.size(); ++index)
         {
+            const auto& timing = trace.units[index];
             auto unit = CommandData::Object();
+            unit.Set("unit", CommandData::Int(index));
+            if (topologyAvailable)
+            {
+                unit.Set("node", CommandData::Int(trace.topology.unitNodes[index]));
+            }
             unit.Set("pass", CommandData::Int(timing.pass));
             unit.Set("name", CommandData::String(timing.name));
             unit.Set("target", CommandData::Int(timing.target));

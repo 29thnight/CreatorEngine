@@ -55,6 +55,7 @@ struct LXMaterialSourceRange
 
 struct LXMaterialProgram
 {
+    // 코드 생성·IR 의미가 바뀌면 올린다. 원본 입력 캐시는 이 버전으로 이전 산출물을 무효화한다.
     static constexpr std::uint32_t CompilerVersion = 3;
     std::string slang;
     // Exact canonical payload, not std::hash. MAT-7 adds common shader/compiler
@@ -79,6 +80,10 @@ struct LXMaterialCompilerOptions
     // Source stays identical; a changed dependency identity forces verification.
     std::string dependencies;
 };
+
+inline constexpr std::uint32_t kMaterialSourceKeyVersion = 1;
+// 명시적인 분석·컴파일·저장 요청에서만 계산한다. IR 생성이나 유효성 검사를 대신하지 않는다.
+bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result, std::string& error);
 
 std::optional<LXMaterialProgram> GenerateMaterialSlang(const LXMaterialAsset& asset,
                                                        std::vector<LXMaterialDiagnostic>* diagnostics = nullptr,

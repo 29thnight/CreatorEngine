@@ -96,6 +96,7 @@ bool LXDocument::Reload(std::string* error)
     unsavedInitial_ = false;
     dirty_ = false;
     ++revision_;
+    ++contentRevision_;
     return true;
 }
 
@@ -142,6 +143,7 @@ LXCommandResult LXDocument::Execute(const LXCommand& command, std::uint64_t expe
     }
 
     bool changed = false;
+    bool contentChanged = true;
     std::visit(
         [&](const auto& request) {
             using Request = std::decay_t<decltype(request)>;
@@ -172,11 +174,12 @@ LXCommandResult LXDocument::Execute(const LXCommand& command, std::uint64_t expe
             }
             else if constexpr (std::is_same_v<Request, LXReplaceGroupBody>)
             {
-                changed = graph_.ReplaceGroupBody(request.group, request.body);
+                changed = graph_.ReplaceGroupBody(request.group, request.body, &contentChanged);
             }
             else if constexpr (std::is_same_v<Request, LXUpdateGroup>)
             {
-                changed = graph_.UpdateGroup(request.group, request.name, request.body, request.sockets);
+                changed = graph_.UpdateGroup(request.group, request.name, request.body, request.sockets,
+                                            &contentChanged);
             }
             else if constexpr (std::is_same_v<Request, LXAddGroupBoundaryNode>)
             {
@@ -253,44 +256,54 @@ LXCommandResult LXDocument::Execute(const LXCommand& command, std::uint64_t expe
             }
             else if constexpr (std::is_same_v<Request, LXSetNodePosition>)
             {
+                contentChanged = false;
                 changed = graph_.SetNodePosition(request.node, request.x, request.y);
             }
             else if constexpr (std::is_same_v<Request, LXSetNodePositions>)
             {
+                contentChanged = false;
                 changed = graph_.SetNodePositions(request.positions);
             }
             else if constexpr (std::is_same_v<Request, LXSetNodeCollapsed>)
             {
+                contentChanged = false;
                 changed = graph_.SetNodeCollapsed(request.node, request.collapsed);
             }
             else if constexpr (std::is_same_v<Request, LXAddFrame>)
             {
+                contentChanged = false;
                 result.created = graph_.AddFrame(request.label, request.x, request.y, request.width, request.height,
                                                  request.members);
                 changed = result.created != 0;
             }
             else if constexpr (std::is_same_v<Request, LXRemoveFrame>)
             {
+                contentChanged = false;
                 changed = graph_.RemoveFrame(request.frame);
             }
             else if constexpr (std::is_same_v<Request, LXRenameFrame>)
             {
+                contentChanged = false;
                 changed = graph_.RenameFrame(request.frame, request.label);
             }
             else if constexpr (std::is_same_v<Request, LXMoveFrame>)
             {
+                contentChanged = false;
                 changed = graph_.MoveFrame(request.frame, request.x, request.y);
             }
             else if constexpr (std::is_same_v<Request, LXResizeFrame>)
             {
+                contentChanged = false;
                 changed = graph_.ResizeFrame(request.frame, request.width, request.height);
             }
             else if constexpr (std::is_same_v<Request, LXSetNodeFrame>)
             {
+                contentChanged = false;
                 changed = graph_.SetNodeFrame(request.node, request.frame);
             }
             else if constexpr (std::is_same_v<Request, LXSetView>)
             {
+                contentChanged = false;
                 changed = graph_.SetView(request.view);
             }
             else if constexpr (std::is_same_v<Request, LXAddDynamicPin>)
@@ -308,11 +321,11 @@ LXCommandResult LXDocument::Execute(const LXCommand& command, std::uint64_t expe
             }
             else if constexpr (std::is_same_v<Request, LXUndo>)
             {
-                changed = graph_.Undo();
+                changed = graph_.Undo(&contentChanged);
             }
             else if constexpr (std::is_same_v<Request, LXRedo>)
             {
-                changed = graph_.Redo();
+                changed = graph_.Redo(&contentChanged);
             }
         },
         command);
@@ -322,6 +335,10 @@ LXCommandResult LXDocument::Execute(const LXCommand& command, std::uint64_t expe
         return result;
     }
     ++revision_;
+    if (contentChanged)
+    {
+        ++contentRevision_;
+    }
     dirty_ = unsavedInitial_ || !graph_.Equals(saved_);
     result.applied = true;
     result.code = "ok";

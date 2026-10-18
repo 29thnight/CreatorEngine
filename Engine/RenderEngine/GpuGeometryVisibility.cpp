@@ -643,6 +643,7 @@ bool GpuGeometryVisibility::PrepareInternal(
     std::span<const Bin> bins, std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
     std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries)
 {
+    ce::profile_scope profile{ce::marker<"GpuVisibility.PrepareInternal">()};
     result.reset();
     if (!context.resources || (m_device && m_device != context.resources))
     {
@@ -818,13 +819,16 @@ bool GpuGeometryVisibility::PrepareInternal(
     }
     frame->m_visibleBytes = storageWords * sizeof(std::uint32_t);
     frame->m_argumentBytes = bins.size() * sizeof(RHIDrawIndexedIndirectArguments);
-    if (!m_bufferPool->Acquire(frame->m_visibleBytes, false, frame->m_visibleIds, error))
     {
-        return false;
-    }
-    if (!m_bufferPool->Acquire(frame->m_argumentBytes, true, frame->m_arguments, error))
-    {
-        return false;
+        ce::profile_scope bufferProfile{ce::marker<"GpuVisibility.PrepareBuffers">()};
+        if (!m_bufferPool->Acquire(frame->m_visibleBytes, false, frame->m_visibleIds, error))
+        {
+            return false;
+        }
+        if (!m_bufferPool->Acquire(frame->m_argumentBytes, true, frame->m_arguments, error))
+        {
+            return false;
+        }
     }
 
     auto constants = VisibilityConstants(viewProjection, frame->m_candidateCount, frame->m_binCount);
@@ -836,9 +840,12 @@ bool GpuGeometryVisibility::PrepareInternal(
         {bins.size_bytes(), RHIUploadUsage::Raw, 256},
         {sizeof(constants), RHIUploadUsage::ConstantBuffer, 256}};
     std::array<RHIBufferSlice, 3> uploads;
-    if (!m_device->ReserveUploadBatch(requests, uploads, error))
     {
-        return false;
+        ce::profile_scope uploadProfile{ce::marker<"GpuVisibility.PrepareUploadReserve">()};
+        if (!m_device->ReserveUploadBatch(requests, uploads, error))
+        {
+            return false;
+        }
     }
     for (const auto& upload : uploads)
     {
@@ -878,6 +885,7 @@ bool GpuGeometryVisibility::PrepareInternal(
     }
     if (!geometries.empty())
     {
+        ce::profile_scope bindingsProfile{ce::marker<"GpuVisibility.PrepareMeshletBindings">()};
         frame->m_meshletVertices = m_device->CreateBindings(vertices);
         frame->m_meshletTopologies = m_device->CreateBindings(topologies);
         if (!frame->m_meshletVertices.IsValid() || !frame->m_meshletTopologies.IsValid())
@@ -1070,6 +1078,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
                                                        std::span<const std::shared_ptr<const Frame>> frames,
                                                        const char* passPrefix)
 {
+    ce::profile_scope profile{ce::marker<"GpuVisibility.MeshletDeclare">()};
     if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
         throw std::runtime_error("METEOR meshlet visibility requires an ExplicitVersioned graph.");
     std::uint64_t totalBins{};

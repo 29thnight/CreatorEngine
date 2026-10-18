@@ -17,6 +17,9 @@ namespace
     constexpr std::uint32_t kCacheMagic = 0x43534852u; // RHSC
     constexpr std::uint32_t kCacheSchema = 10u;
     constexpr std::uint64_t kMaxCachedShaderBytes = 64ull * 1024ull * 1024ull;
+    constexpr std::string_view kCompilerCacheIdentity =
+        "CreatorEngine.RHIShaderCompiler.v13.Slang.O3.column-major.dx-layout."
+        "verified-layout-v1.include-paths.permutation-key";
 
     struct Hash128
     {
@@ -249,8 +252,10 @@ namespace
         SlangReflectionApi reflection;
         Slang::ComPtr<slang::IGlobalSession> globalSession;
         std::filesystem::path modulePath;
+        std::string binaryIdentity;
         std::string identity;
         std::string loadError;
+        std::once_flag compilerOnce;
         std::once_flag loadOnce;
         std::mutex slotsMutex;
         std::condition_variable slotFreed;
@@ -460,7 +465,7 @@ namespace
         return true;
     }
 
-    void LoadSlangOnce(SlangRuntime& runtime)
+    void LoadSlangCompilerOnce(SlangRuntime& runtime)
     {
         // 배포 호스트는 실행 파일 옆의 고정 번들만 허용한다. 에디터/테스트 같은
         // authoring 호스트만 저장소의 동일 번들을 직접 참조할 수 있다.
@@ -561,16 +566,6 @@ namespace
             return;
         }
 
-        SlangGlobalSessionDesc globalDesc{};
-        if (SLANG_FAILED(runtime.createGlobalSession(
-            &globalDesc, runtime.globalSession.writeRef())))
-        {
-            runtime.loadError = "Slang global session 생성 실패";
-            return;
-        }
-        runtime.slots.push_back(std::make_unique<SlangSlot>());
-        runtime.slots.back()->globalSession = runtime.globalSession;
-
         Hash128 slangHash;
         Hash128 dxcHash;
         Hash128 dxilHash;
@@ -581,10 +576,30 @@ namespace
             runtime.loadError = "Slang/DXC 번들 콘텐츠 identity 계산 실패";
             return;
         }
-        const char* buildTag = runtime.globalSession->getBuildTagString();
-        runtime.identity = "slang:" + std::string(nullptr == buildTag ? "unknown" : buildTag)
-            + ":" + slangHash.Hex() + ":dxc:" + dxcHash.Hex()
+        runtime.binaryIdentity = slangHash.Hex() + ":dxc:" + dxcHash.Hex()
             + ":dxil:" + dxilHash.Hex();
+    }
+
+    void LoadSlangOnce(SlangRuntime& runtime)
+    {
+        std::call_once(runtime.compilerOnce, [&runtime]() { LoadSlangCompilerOnce(runtime); });
+        if (runtime.binaryIdentity.empty())
+        {
+            return;
+        }
+        // 상위 캐시 검사에는 core module 로딩이 필요 없다. 실제 RHI 요청에서만 세션을 만든다.
+        SlangGlobalSessionDesc globalDesc{};
+        if (SLANG_FAILED(runtime.createGlobalSession(&globalDesc, runtime.globalSession.writeRef())))
+        {
+            runtime.loadError = "Slang global session 생성 실패";
+            return;
+        }
+        runtime.slots.push_back(std::make_unique<SlangSlot>());
+        runtime.slots.back()->globalSession = runtime.globalSession;
+        const char* buildTag = runtime.globalSession->getBuildTagString();
+        // 하위 RHI 캐시의 기존 완료키 형식은 유지한다.
+        runtime.identity = "slang:" + std::string(nullptr == buildTag ? "unknown" : buildTag)
+            + ":" + runtime.binaryIdentity;
     }
 
     bool EnsureSlang(std::string& outError)
@@ -1005,7 +1020,7 @@ namespace
         const std::vector<SourceUnit>& units, std::string_view compilerIdentity)
     {
         Hash128 hash;
-        hash.Add("CreatorEngine.RHIShaderCompiler.v13.Slang.O3.column-major.dx-layout.verified-layout-v1.include-paths.permutation-key");
+        hash.Add(kCompilerCacheIdentity);
         hash.Add(compilerIdentity);
         hash.Add(request.name);
         hash.Add(request.entryPoint);
@@ -1904,6 +1919,40 @@ RHIShaderBinary RHIShaderCompiler::GetOutput()
 void RHIShaderCompiler::SetOutput(RHIShaderBinary output)
 {
     g_output = output;
+}
+
+bool RHIShaderCompiler::GetCompilerIdentity(std::string& result, std::string& error)
+{
+    result.clear();
+    error.clear();
+    auto& runtime = GetSlangRuntime();
+    std::call_once(runtime.compilerOnce, [&runtime]() { LoadSlangCompilerOnce(runtime); });
+    if (runtime.binaryIdentity.empty())
+    {
+        error = runtime.loadError.empty() ? "Slang compiler identity initialization failed." : runtime.loadError;
+        return false;
+    }
+    result = std::string(kCompilerCacheIdentity) + "|slang-content:" + runtime.binaryIdentity;
+    return true;
+}
+
+bool RHIShaderCompiler::CanReuseDependencyResolution(std::span<const std::filesystem::path> dependencies,
+                                                    std::span<const std::filesystem::path> includeDirectories)
+{
+    if (dependencies.empty())
+    {
+        return false;
+    }
+    RHIShaderCompileRequest request;
+    request.options.includeDirectories.assign(includeDirectories.begin(), includeDirectories.end());
+    // 소스 파일의 수명과 별개로 호출자가 전달한 source/include 검색 위치를 함께 검사한다.
+    std::vector<SourceUnit> units(1);
+    units.reserve(dependencies.size() + 1);
+    for (const auto& path : dependencies)
+    {
+        units.push_back({NormalizePath(path), {}});
+    }
+    return !HasShadowCandidate(units, request);
 }
 
 RHIShaderCompiler::ScopedOutput::ScopedOutput(RHIShaderBinary output)

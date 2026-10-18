@@ -12,6 +12,8 @@ AXIS = "cpu-recording-wall-not-cpu-residency-or-gpu"
 CLOCK = "steady-clock-nanoseconds"
 UNIT_AXIS = "record-body-including-repeat-phase-barriers"
 SPIN_AXIS = "frame-cumulative-snapshot-inflight-exits-may-follow"
+COMPLETION_PATH_AXIS = "observed-latest-predecessor-completion-not-cpu-critical-path"
+DEPENDENCY_REASONS = {"same-target", "cpu-producer"}
 UINT64_MAX = (1 << 64) - 1
 NODE_STAMPS = (
     "registeredNs", "readyNs", "publishBeginNs", "publishEndNs", "startNs", "bodyEndNs", "completeNs"
@@ -32,7 +34,8 @@ METRIC_DESCRIPTIONS = {
     "skippedNodeBody": "Scheduler body of a skipped dependency; no user callback executed.",
     "bodyEndToComplete": "Body return to native completion notification.",
     "nodeCompleteToOwnerReturn": "Includes remaining independent jobs and owner resumption.",
-    "graphCompleteToOwnerReturn": "Final graph completion to owner return; not pure OS wake latency.",
+    "graphCompleteToOwnerReturn": "Graph callback teardown to owner return; includes observer/notification work.",
+    "lastNodeCompleteToGraphComplete": "Last native completion gate to graph callback teardown; includes native drain.",
     "unitRecordBody": "One pass/slice RecordPassBody wall interval, including repeated-phase barriers.",
     "unitCallbackTotal": "Sum of actual callback wall intervals in one unit; not an individual-callback percentile.",
     "ownerSpinWall": "Owner bounded-spin wall interval, including possible OS preemption.",
@@ -117,8 +120,16 @@ def read_policy(trace):
     policy = trace.get("policy")
     if not isinstance(policy, dict):
         raise ValueError("policy must be an object")
-    result = {name: unsigned(policy.get(name), f"policy.{name}")
-              for name in ("ownerSpinUs", "workerSpinUs", "frameSpinUs", "spinWorkers")}
+    if trace["schemaVersion"] == 1:
+        result = {name: unsigned(policy.get(name), f"policy.{name}")
+                  for name in ("ownerSpinUs", "workerSpinUs", "frameSpinUs", "spinWorkers")}
+    else:
+        if set(policy) != {"ownerWaitMode"} or policy.get("ownerWaitMode") != "blocking":
+            raise ValueError("schema 2 policy must contain only ownerWaitMode='blocking'")
+        if "ownerWait" in trace or "workerSpin" in trace:
+            raise ValueError("schema 2 must not contain removed ownerWait/workerSpin sections")
+        result = dict(ownerWaitMode="blocking")
+    result["schemaVersion"] = trace["schemaVersion"]
     result["dependencyGraph"] = boolean(trace.get("dependencyGraph"), "dependencyGraph")
     result["batchSubmit"] = boolean(trace.get("batchSubmit"), "batchSubmit")
     return result
@@ -213,18 +224,210 @@ def new_group(session, view, policy):
                 executedNodes=0, skippedNodes=0, invalidNodes=0, unavailableUnits=0, invalidUnits=0,
                 callbackTimingUnavailableUnits=0, invalidCallbackTimings=0, callbackInvocations=0,
                 ownerWaitUnavailable=0, invalidOwnerWaits=0, invalidJobSections=0,
+                topologyAvailableTraces=0, topologyUnavailableTraces=0, topologyTruncatedTraces=0,
+                invalidTopologyTraces=0, lastCompletionUnavailableTraces=0,
                 dispatcherHandoffs=0, nativeTasks=0, _samples=defaultdict(list),
                 _units=defaultdict(list), _nodeRows=[], _unitRows=[])
+
+
+def read_id_list(value, label):
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be an array")
+    ids = [unsigned(identity, label) for identity in value]
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"{label} contains duplicate identities")
+    return ids
+
+
+def analyze_completion_path(item, group, result, entry, valid_nodes, valid_units, unit_errors):
+    """완료시각으로 관측한 선행 경로다. 실제 CPU 실행량이나 ETW Ready 경로를 추정하지 않는다."""
+    if item["trace"]["schemaVersion"] == 1:
+        return
+    trace = item["trace"]
+    path = entry["completionPath"]
+    observation = dict(status="unavailable", lastCompletedNodes=None, lastCompleteNs=None)
+    entry["completionObservation"] = observation
+    try:
+        jobs = trace.get("jobs")
+        if not isinstance(jobs, dict):
+            raise ValueError("schema 2 jobs must be an object")
+        available = boolean(jobs.get("available"), "jobs.available")
+        topology = boolean(jobs.get("topologyAvailable"), "jobs.topologyAvailable")
+        truncated = boolean(jobs.get("topologyTruncated"), "jobs.topologyTruncated")
+        last_ids = read_id_list(jobs.get("lastCompletedNodes"), "jobs.lastCompletedNodes")
+        if topology and (truncated or trace["unitTimingsTruncated"] or trace["jobTimingsTruncated"]):
+            raise ValueError("available topology must not have truncated nodes, units, or topology")
+        group["topologyAvailableTraces" if topology else "topologyUnavailableTraces"] += 1
+        group["topologyTruncatedTraces"] += truncated
+        path.update(topologyAvailable=topology, topologyTruncated=truncated)
+        status = jobs.get("topologyStatus")
+        if isinstance(status, str):
+            path["reportedTopologyStatus"] = status
+        units = trace.get("units")
+        if not isinstance(units, list):
+            raise ValueError("schema 2 units must be an array")
+        for index, unit in enumerate(units):
+            if not isinstance(unit, dict) or unsigned(unit.get("unit"), "unit.unit") != index:
+                raise ValueError("schema 2 unit IDs must match their sequential array positions")
+            if not topology and "node" in unit:
+                raise ValueError("unit.node must be absent when topology is unavailable")
+        if not available:
+            if topology or last_ids:
+                raise ValueError("unavailable jobs cannot claim topology or last completed nodes")
+            observation["status"] = "unavailable-for-this-path"
+            group["lastCompletionUnavailableTraces"] += 1
+            path["status"] = "topology-truncated" if truncated else "unavailable-for-this-path"
+            return
+        if entry.get("jobsStatus") == "invalid":
+            raise ValueError("valid graph lifetime is required to verify last completion")
+        task_count = unsigned(jobs.get("nativeTasks"), "jobs.nativeTasks")
+        if any(identity >= task_count for identity in last_ids):
+            raise ValueError("jobs.lastCompletedNodes has an identity outside nativeTasks")
+        if len(valid_nodes) != task_count:
+            if trace["jobTimingsTruncated"] and not topology:
+                observation["status"] = "node-timings-truncated"
+                group["lastCompletionUnavailableTraces"] += 1
+                path["status"] = "topology-truncated" if truncated else "node-timings-truncated"
+                return
+            raise ValueError("complete valid native node timings are required to verify last completion")
+        completed = unsigned(jobs.get("completedNs"), "jobs.completedNs", positive=True)
+        latest = max((row["times"]["completeNs"] for row in valid_nodes.values()), default=None)
+        expected_last = sorted(identity for identity, row in valid_nodes.items()
+                               if row["times"]["completeNs"] == latest)
+        if sorted(last_ids) != expected_last:
+            raise ValueError("jobs.lastCompletedNodes must list every node tied at the maximum completeNs")
+        observation.update(status="available" if task_count else "empty-graph",
+                           lastCompletedNodes=expected_last, lastCompleteNs=latest)
+        if latest is not None:
+            observation["lastNodeCompleteToGraphCompleteNs"] = completed - latest
+            add_metric(group, "lastNodeCompleteToGraphComplete", completed - latest)
+        if not topology:
+            for row in valid_nodes.values():
+                if "dependencies" in row["source"] or "units" in row["source"]:
+                    raise ValueError("node topology fields must be absent when topology is unavailable")
+            path["status"] = "topology-truncated" if truncated else "unavailable-for-this-path"
+            return
+        if not trace["dependencyGraph"] or not trace["batchSubmit"]:
+            raise ValueError("native batched dependency graph is required for available topology")
+        if task_count > 4096 or len(units) > 4096:
+            raise ValueError("available topology exceeds the node/unit diagnostic cap")
+        dependencies = {}
+        previous_targets = {}
+        assigned_units = {}
+        edge_count = 0
+        for identity in range(task_count):
+            row = valid_nodes[identity]
+            node = row["source"]
+            target = unsigned(node.get("target"), f"node[{identity}].target")
+            wave = unsigned(node.get("wave"), f"node[{identity}].wave")
+            raw_edges = node.get("dependencies")
+            if not isinstance(raw_edges, list):
+                raise ValueError(f"node[{identity}].dependencies must be an array")
+            edges = {}
+            for edge in raw_edges:
+                if not isinstance(edge, dict):
+                    raise ValueError(f"node[{identity}] dependency must be an object")
+                predecessor = unsigned(edge.get("node"), f"node[{identity}].dependency.node")
+                if predecessor >= identity or predecessor in edges:
+                    raise ValueError(f"node[{identity}] dependencies must be unique strictly earlier IDs")
+                reasons = edge.get("reasons")
+                if not isinstance(reasons, list) or not reasons or any(
+                        not isinstance(reason, str) or reason not in DEPENDENCY_REASONS for reason in reasons):
+                    raise ValueError(f"node[{identity}] dependency has an empty or unsupported reason")
+                if len(set(reasons)) != len(reasons):
+                    raise ValueError(f"node[{identity}] dependency has duplicate reasons")
+                producer = valid_nodes[predecessor]
+                if "same-target" in reasons and producer["source"].get("target") != target:
+                    raise ValueError(f"node[{identity}] same-target dependency crosses targets")
+                if producer["times"]["completeNs"] > row["times"]["readyNs"]:
+                    raise ValueError(f"node[{identity}] became ready before a predecessor completed")
+                edges[predecessor] = reasons
+            if list(edges) != sorted(edges):
+                raise ValueError(f"node[{identity}] dependencies must be sorted by node ID")
+            previous = previous_targets.get(target)
+            if previous is not None and "same-target" not in edges.get(previous, []):
+                raise ValueError(f"node[{identity}] lacks its preceding same-target dependency")
+            previous_targets[target] = identity
+            dependencies[identity] = edges
+            edge_count += len(edges)
+            if edge_count > 16384:
+                raise ValueError("available topology exceeds the dependency edge diagnostic cap")
+            unit_ids = read_id_list(node.get("units"), f"node[{identity}].units")
+            for unit_id in unit_ids:
+                if unit_id >= len(units) or unit_id in assigned_units:
+                    raise ValueError(f"node[{identity}] unit mapping is duplicate or outside the unit array")
+                unit = units[unit_id]
+                if unsigned(unit.get("node"), f"unit[{unit_id}].node") != identity:
+                    raise ValueError(f"unit[{unit_id}] reverse node mapping does not match")
+                if any(unsigned(unit.get(key), f"unit[{unit_id}].{key}") != value
+                       for key, value in (("target", target), ("wave", wave))):
+                    raise ValueError(f"unit[{unit_id}] target/wave differs from its mapped node")
+                assigned_units[unit_id] = identity
+        if len(assigned_units) != len(units):
+            raise ValueError("every unit must map to exactly one native node")
+        if unit_errors:
+            raise ValueError("invalid unit timings prevent complete observed path reconstruction")
+        if not task_count:
+            path.update(status="empty-graph", nodeIds=[], steps=[], lastCompletedNodes=[])
+            return
+        # 동률 전체를 공개하되 대표 경로만 가장 작은 ID로 결정한다. 최장 CPU 경로라고 부르지 않는다.
+        selected = min(expected_last)
+        identity = selected
+        steps = []
+        ties = []
+        while True:
+            row = valid_nodes[identity]
+            predecessors = dependencies[identity]
+            predecessor_end = max((valid_nodes[key]["times"]["completeNs"] for key in predecessors), default=None)
+            candidates = sorted(key for key in predecessors
+                                if valid_nodes[key]["times"]["completeNs"] == predecessor_end)
+            predecessor = min(candidates) if candidates else None
+            if len(candidates) > 1:
+                ties.append(dict(node=identity, predecessors=candidates))
+            unit_rows = []
+            for unit_id in row["source"]["units"]:
+                unit = units[unit_id]
+                measured = valid_units.get(unit_id)
+                unit_rows.append(dict(unit=unit_id, passId=unit.get("pass"), name=unit.get("name"),
+                    slice=unit.get("slice"), sliceCount=unit.get("sliceCount"),
+                    recordBodyWallNs=measured["recordBodyWallNs"] if measured is not None else None,
+                    callbackTotalNs=measured["callbackTotalNs"] if measured is not None else None,
+                    callbackInvocations=measured["callbackInvocations"] if measured is not None else None))
+            steps.append(dict(node=identity, target=row["source"]["target"], wave=row["source"]["wave"],
+                selectedPredecessor=predecessor, latestPredecessorCandidates=candidates,
+                selectedPredecessorReasons=predecessors[predecessor] if predecessor is not None else [],
+                readyAfterLatestPredecessorNs=(row["times"]["readyNs"] - predecessor_end
+                                               if predecessor_end is not None else None),
+                timestampsNs=row["times"], durationsNs=row["durations"], skipped=row["skipped"],
+                executeEnkiThread=row["source"].get("executeEnkiThread"),
+                executeOsThread=row["source"].get("executeOsThread"), units=unit_rows))
+            if predecessor is None:
+                break
+            identity = predecessor
+        steps.reverse()
+        path.update(status="available", lastCompletedNodes=expected_last, selectedLastNode=selected,
+                    nodeIds=[step["node"] for step in steps], steps=steps,
+                    hasTies=len(expected_last) > 1 or bool(ties), predecessorTies=ties,
+                    tieSelection="smallest node ID; all local tied candidates are reported")
+    except ValueError as error:
+        group["invalidTopologyTraces"] += 1
+        path.update(status="invalid", nodeIds=None, steps=None)
+        add_warning(result, item, str(error))
 
 
 def analyze_trace(item, group, result):
     trace = item["trace"]
     entry = dict(session=item["session"], path=item["path"], viewId=item["viewId"],
-                 frameId=trace["frameId"], dispatchBeginNs=trace["dispatchBeginNs"])
+                 frameId=trace["frameId"], dispatchBeginNs=trace["dispatchBeginNs"],
+                 traceSchemaVersion=trace["schemaVersion"],
+                 completionPath=dict(status="unsupported-schema-1" if trace["schemaVersion"] == 1 else "unavailable",
+                                     axis=COMPLETION_PATH_AXIS, nodeIds=None, steps=None))
     enabled = boolean(trace.get("timingEnabled"), "timingEnabled")
     if not enabled:
         group["timingDisabled"] += 1
         entry["status"] = "timing-disabled"
+        if trace["schemaVersion"] == 2:
+            entry["completionPath"]["status"] = "timing-disabled"
         return entry
     begin = unsigned(trace.get("dispatchBeginNs"), "dispatchBeginNs", positive=True)
     returned = unsigned(trace.get("returnNs"), "returnNs", positive=True)
@@ -241,27 +444,30 @@ def analyze_trace(item, group, result):
         add_metric(group, "waitBeginToReturn", returned - wait_begin)
     entry.update(status="available", unitTimingsTruncated=unit_truncated,
                  jobTimingsTruncated=job_truncated, returnNs=returned)
-    wait = trace.get("ownerWait")
-    if not isinstance(wait, dict) or wait.get("available") is False or "available" not in wait:
-        group["ownerWaitUnavailable"] += 1
-    else:
-        try:
-            boolean(wait.get("available"), "ownerWait.available")
-            if not wait_begin:
-                raise ValueError("ownerWait is available without an observed wait interval")
-            elapsed = unsigned(wait.get("spinElapsedNs"), "ownerWait.spinElapsedNs")
-            boolean(wait.get("spinAttempted"), "ownerWait.spinAttempted")
-            boolean(wait.get("completedDuringSpin"), "ownerWait.completedDuringSpin")
-            boolean(wait.get("blockingPathEntered"), "ownerWait.blockingPathEntered")
-            if elapsed > returned - wait_begin:
-                raise ValueError("ownerWait spin wall is outside its measured wait interval")
-            add_metric(group, "ownerSpinWall", elapsed)
-        except ValueError as error:
-            group["invalidOwnerWaits"] += 1
-            add_warning(result, item, str(error))
+    if trace["schemaVersion"] == 1:
+        wait = trace.get("ownerWait")
+        if not isinstance(wait, dict) or wait.get("available") is False or "available" not in wait:
+            group["ownerWaitUnavailable"] += 1
+        else:
+            try:
+                boolean(wait.get("available"), "ownerWait.available")
+                if not wait_begin:
+                    raise ValueError("ownerWait is available without an observed wait interval")
+                elapsed = unsigned(wait.get("spinElapsedNs"), "ownerWait.spinElapsedNs")
+                boolean(wait.get("spinAttempted"), "ownerWait.spinAttempted")
+                boolean(wait.get("completedDuringSpin"), "ownerWait.completedDuringSpin")
+                boolean(wait.get("blockingPathEntered"), "ownerWait.blockingPathEntered")
+                if elapsed > returned - wait_begin:
+                    raise ValueError("ownerWait spin wall is outside its measured wait interval")
+                add_metric(group, "ownerSpinWall", elapsed)
+            except ValueError as error:
+                group["invalidOwnerWaits"] += 1
+                add_warning(result, item, str(error))
 
     jobs = trace.get("jobs")
     node_intervals = {}
+    valid_nodes = {}
+    valid_units = {}
     if isinstance(jobs, dict) and type(jobs.get("available")) is not bool:
         group["jobTimingUnavailable"] += 1
         group["invalidJobSections"] += 1
@@ -327,6 +533,7 @@ def analyze_trace(item, group, result):
                         executeEnkiThread=node.get("executeEnkiThread"),
                         publishOsThread=node.get("publishOsThread"), executeOsThread=node.get("executeOsThread"),
                         dispatcherRoute=node.get("dispatcherRoute")))
+                    valid_nodes[identity] = dict(source=node, times=times, durations=durations, skipped=skipped)
                     if type(node.get("target")) is int and type(node.get("wave")) is int:
                         node_intervals[(node["target"], node["wave"])] = (start, body_end, skipped)
                 except ValueError as error:
@@ -342,15 +549,20 @@ def analyze_trace(item, group, result):
     if trace.get("unitsAxis") != UNIT_AXIS:
         add_warning(result, item, "unit timing axis is unavailable or unsupported")
         group["invalidUnits"] += 1
+        if trace["schemaVersion"] == 2:
+            entry["completionPath"]["status"] = "invalid-unit-timings"
         return entry
     if not isinstance(units, list):
         add_warning(result, item, "units must be an array")
         group["invalidUnits"] += 1
+        if trace["schemaVersion"] == 2:
+            entry["completionPath"]["status"] = "invalid-unit-timings"
         return entry
+    unit_errors_before = group["invalidUnits"] + group["invalidCallbackTimings"]
     identity_fields = ("pass", "target", "wave", "slice", "sliceCount")
     unit_counts = Counter(tuple(unit[key] for key in identity_fields) for unit in units
                           if isinstance(unit, dict) and all(type(unit.get(key)) is int for key in identity_fields))
-    for unit in units:
+    for unit_index, unit in enumerate(units):
         try:
             if not isinstance(unit, dict):
                 raise ValueError("unit timing must be an object")
@@ -367,6 +579,12 @@ def analyze_trace(item, group, result):
             if unit_counts[identity] != 1 or identity[4] == 0 or identity[3] >= identity[4]:
                 raise ValueError("unit identity is duplicate or its slice is out of range")
             containing_node = node_intervals.get((identity[1], identity[2]))
+            if trace["schemaVersion"] == 2 and isinstance(jobs, dict) and jobs.get("topologyAvailable") is True:
+                unit_node = unsigned(unit.get("node"), "unit.node")
+                mapped = valid_nodes.get(unit_node)
+                if mapped is None:
+                    raise ValueError("unit node mapping has no valid native node timing")
+                containing_node = (mapped["times"]["startNs"], mapped["times"]["bodyEndNs"], mapped["skipped"])
             if containing_node is not None:
                 node_start, node_end, skipped = containing_node
                 if skipped or not node_start <= stamps["beginNs"] <= stamps["endNs"] <= node_end:
@@ -398,21 +616,28 @@ def analyze_trace(item, group, result):
                        beginNs=stamps["beginNs"], endNs=stamps["endNs"], recordBodyWallNs=wall, estimatedWork=work,
                        callbackTotalNs=callback_total, callbackInvocations=callback_count,
                        bodyWallPerEstimatedWorkNs=wall / work if work else None)
+            if trace["schemaVersion"] == 2:
+                row["unit"] = unit.get("unit")
+                row["node"] = unit.get("node")
             add_metric(group, "unitRecordBody", wall)
             group["_unitRows"].append(row)
             group["_units"][(identity[0], name)].append(row)
+            valid_units[unit_index] = row
         except ValueError as error:
             group["invalidUnits"] += 1
             add_warning(result, item, str(error))
+    unit_errors = group["invalidUnits"] + group["invalidCallbackTimings"] != unit_errors_before
+    analyze_completion_path(item, group, result, entry, valid_nodes, valid_units, unit_errors)
     return entry
 
 
 def analyze(documents, top=10):
     """documents는 (session 식별자, JSON 값)의 반복자다. CLI는 각 파일을 별도 session으로 둔다."""
-    result = dict(schemaVersion=1, axis=AXIS, clock=CLOCK, durationUnit="nanoseconds",
+    result = dict(schemaVersion=2, acceptedTraceSchemas=[1, 2], axis=AXIS, clock=CLOCK, durationUnit="nanoseconds",
                   percentileMethod="linear interpolation on sorted durations",
                   sessionRule="Each input file is a separate session; repeated queries within it are deduplicated.",
-                  unitsAxis=UNIT_AXIS, metricDescriptions=METRIC_DESCRIPTIONS,
+                  unitsAxis=UNIT_AXIS, completionPathAxis=COMPLETION_PATH_AXIS,
+                  metricDescriptions=METRIC_DESCRIPTIONS,
                   policies=[], traces=[], workerSpinFrames=[], warnings=[],
                   counts=dict(documents=0, foundTraces=0, uniqueTraces=0, duplicateTraces=0,
                               conflictingTraces=0, invalidTraces=0,
@@ -430,7 +655,7 @@ def analyze(documents, top=10):
             try:
                 if not isinstance(trace, dict):
                     raise ValueError("schedulingTrace must be an object")
-                if trace.get("schemaVersion") != 1 or type(trace.get("schemaVersion")) is not int:
+                if type(trace.get("schemaVersion")) is not int or trace.get("schemaVersion") not in (1, 2):
                     raise ValueError("unsupported schedulingTrace.schemaVersion")
                 if trace.get("clock") != CLOCK or trace.get("axis") != AXIS:
                     raise ValueError("unsupported recording clock or timing axis")
@@ -439,8 +664,9 @@ def analyze(documents, top=10):
                 enabled = boolean(trace.get("timingEnabled"), "timingEnabled")
                 policy = read_policy(trace)
                 key = (str(session), frame, dispatch, view)
-                fingerprint_data = {key: value for key, value in trace.items() if key != "workerSpin"}
-                if not enabled:
+                fingerprint_data = {key: value for key, value in trace.items()
+                                    if trace["schemaVersion"] != 1 or key != "workerSpin"}
+                if not enabled and trace["schemaVersion"] == 1:
                     fingerprint_data.pop("ownerWait", None)
                 fingerprint = json.dumps(fingerprint_data, sort_keys=True, separators=(",", ":"))
                 if key in unique:
@@ -463,16 +689,17 @@ def analyze(documents, top=10):
     for item in unique.values():
         policy_key = (item["session"], item["viewId"], json.dumps(item["policy"], sort_keys=True))
         group = groups.setdefault(policy_key, new_group(item["session"], item["viewId"], item["policy"]))
+        legacy_spin_count = len(item["snapshots"]) if item["trace"]["schemaVersion"] == 1 else 0
         if item["conflict"]:
             result["counts"]["invalidTraces"] += 1
             group["invalidTraces"] += 1
             invalid_sessions[item["session"]] += 1
-            result["counts"]["quarantinedSpinSnapshots"] += len(item["snapshots"])
+            result["counts"]["quarantinedSpinSnapshots"] += legacy_spin_count
             result["traces"].append(dict(session=item["session"], path=item["path"],
                                          status="conflicting-duplicate", frameId=item["trace"]["frameId"]))
             continue
         error_fields = ("invalidNodes", "invalidUnits", "invalidCallbackTimings", "invalidOwnerWaits",
-                        "invalidJobSections")
+                        "invalidJobSections", "invalidTopologyTraces")
         errors_before = sum(group[name] for name in error_fields)
         try:
             entry = analyze_trace(item, group, result)
@@ -480,9 +707,9 @@ def analyze(documents, top=10):
                 result["counts"]["invalidTraces"] += 1
                 group["invalidTraces"] += 1
                 invalid_sessions[item["session"]] += 1
-                result["counts"]["quarantinedSpinSnapshots"] += len(item["snapshots"])
+                result["counts"]["quarantinedSpinSnapshots"] += legacy_spin_count
                 entry["status"] = "partial-invalid"
-            else:
+            elif item["trace"]["schemaVersion"] == 1:
                 for snapshot in item["snapshots"]:
                     spin = read_worker_snapshot(snapshot, item, item["policy"], result)
                     if spin is not None:
@@ -492,7 +719,7 @@ def analyze(documents, top=10):
             result["counts"]["invalidTraces"] += 1
             group["invalidTraces"] += 1
             invalid_sessions[item["session"]] += 1
-            result["counts"]["quarantinedSpinSnapshots"] += len(item["snapshots"])
+            result["counts"]["quarantinedSpinSnapshots"] += legacy_spin_count
             add_warning(result, item, str(error))
             result["traces"].append(dict(session=item["session"], path=item["path"],
                                          status="invalid", frameId=item["trace"]["frameId"]))
@@ -502,7 +729,12 @@ def analyze(documents, top=10):
             group[name] for name in (
             "timingDisabled", "jobTimingUnavailable", "truncatedJobTraces", "truncatedUnitTraces",
             "invalidNodes", "unavailableUnits", "invalidUnits", "callbackTimingUnavailableUnits",
-            "ownerWaitUnavailable", "invalidOwnerWaits", "invalidCallbackTimings", "invalidJobSections"))
+            "ownerWaitUnavailable", "invalidOwnerWaits", "invalidCallbackTimings", "invalidJobSections",
+            "invalidTopologyTraces"))
+        group["completionPathCoverageComplete"] = (
+            group["policy"]["schemaVersion"] == 2 and group["coverageComplete"] and not any(
+                group[name] for name in ("topologyUnavailableTraces", "topologyTruncatedTraces",
+                                        "lastCompletionUnavailableTraces")))
         group["metricsNs"] = {name: distribution(values) for name, values in group.pop("_samples").items()}
         group["units"] = [
             dict(passId=identity[0], name=identity[1],
@@ -544,13 +776,22 @@ def format_text(result, top=10):
     ]
     for group in result["policies"]:
         policy = group["policy"]
+        policy_label = (f"Schema={policy['schemaVersion']} DAG={policy['dependencyGraph']} "
+                        f"native={policy['batchSubmit']}")
+        if policy["schemaVersion"] == 1:
+            policy_label += (f" ownerSpin={policy['ownerSpinUs']}us workerSpin={policy['workerSpinUs']}us"
+                             f" frameSpin={policy['frameSpinUs']}us spinWorkers={policy['spinWorkers']}")
+        else:
+            policy_label += " ownerWait=blocking"
         lines += ["", f"Session: {group['session']}  view={group['viewId'] or 'unknown'}",
-                  f"DAG={policy['dependencyGraph']} native={policy['batchSubmit']} "
-                  f"ownerSpin={policy['ownerSpinUs']}us workerSpin={policy['workerSpinUs']}us "
-                  f"frameSpin={policy['frameSpinUs']}us spinWorkers={policy['spinWorkers']}",
+                  policy_label,
                   f"Timed traces={group['traces']} disabled={group['timingDisabled']} invalid={group['invalidTraces']} "
                   f"job timing unavailable={group['jobTimingUnavailable']} "
                   f"truncated jobs/units={group['truncatedJobTraces']}/{group['truncatedUnitTraces']}"]
+        if policy["schemaVersion"] == 2:
+            lines.append(f"Topology: available={group['topologyAvailableTraces']} "
+                         f"unavailable={group['topologyUnavailableTraces']} "
+                         f"truncated={group['topologyTruncatedTraces']} invalid={group['invalidTopologyTraces']}")
         for name, stats in group["metricsNs"].items():
             lines.append(f"  {name}: n={stats['count']} p50={stats['p50'] / 1000:.3f}us "
                          f"p95={stats['p95'] / 1000:.3f}us max={stats['max'] / 1000:.3f}us")
@@ -565,9 +806,25 @@ def format_text(result, top=10):
                     invocations = row["callbackInvocations"]["total"]
                     lines.append(f"      actual callback sum={callbacks['total'] / 1000:.3f}us "
                                  f"invocations={invocations}; per-unit sums, not individual callback percentiles")
-    lines += ["", "Worker spin: one cumulative observation per frame, never a sum across views.",
-              "active>0 is in flight; active=0 does not establish the final frame total.",
-              "taskHits counts any shared-queue job found, not a proven recording wake avoided."]
+    paths = [entry for entry in result["traces"] if entry.get("traceSchemaVersion") == 2]
+    if paths:
+        lines += ["", "Observed completion paths: last node, then latest-completing predecessors.",
+                  "A representative tied path is selected by smallest node ID; JSON reports all local ties.",
+                  "This is not an exclusive CPU-time critical path, ETW Ready time, or a proven OS wake delay."]
+        for entry in paths[:top]:
+            path = entry["completionPath"]
+            prefix = f"  {entry['session']} frame={entry['frameId']} view={entry['viewId'] or 'unknown'}"
+            if path["status"] == "available":
+                node_ids = path["nodeIds"][:top]
+                suffix = f" ({len(path['nodeIds'])} nodes total)" if len(node_ids) < len(path["nodeIds"]) else ""
+                lines.append(f"{prefix}: last={path['lastCompletedNodes']} path={node_ids}{suffix} "
+                             f"ties={path['hasTies']}")
+            else:
+                lines.append(f"{prefix}: {path['status']}; no complete path inferred")
+    if any(group["policy"]["schemaVersion"] == 1 for group in result["policies"]):
+        lines += ["", "Legacy schema 1 worker spin: one cumulative observation per frame, never a sum across views.",
+                  "active>0 is in flight; active=0 does not establish the final frame total.",
+                  "taskHits counts any shared-queue job found, not a proven recording wake avoided."]
     for frame in result["workerSpinFrames"]:
         prefix = f"  {frame['session']} frame={frame['frameId']} {frame['status']}"
         stats = frame["statistics"]

@@ -475,18 +475,25 @@ struct SceneHost::FrameInput
         if (raster->material)
             raster->material->AddRead(graph, uses, materialInputs);
     }
-    void BindReconstruction(const EnhancedRenderGraph::ExecuteContext& execution, const Draw& draw,
-                            RGHandle visibilityTarget, RHIPipelineHandle source) const
+    RHIBindingTable CreateReconstructionVisibility(const EnhancedRenderGraph::ExecuteContext& execution,
+                                                   RGHandle visibilityTarget) const
     {
-        auto& encoder = *execution.encoder;
+        const auto desc = RHIBindingDesc::Srv2D(execution.ResolveHandle(visibilityTarget), RHIFormat::RG32Uint);
+        const auto visibility = device->CreateBindings({&desc, 1});
+        if (!visibility.IsValid())
+        {
+            throw std::runtime_error("METEOR reconstruction visibility target binding failed.");
+        }
+        return visibility;
+    }
+
+    void BindReconstruction(RHIEncoder& encoder, const Draw& draw, RHIBindingTable visibility,
+                            RHIPipelineHandle source) const
+    {
         encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->reconstructionPipelines.at(source.id));
         encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->geometryTableRoot,
                               RHIBufferSlice::Whole(raster->geometry->buffer));
-        const auto desc = RHIBindingDesc::Srv2D(execution.ResolveHandle(visibilityTarget), RHIFormat::RG32Uint);
-        const auto table = device->CreateBindings({&desc, 1});
-        if (!table.IsValid())
-            throw std::runtime_error("METEOR reconstruction visibility target binding failed.");
-        encoder.SetBindings(RHIBindPoint::Graphics, draw.program->visibilityRoot, table);
+        encoder.SetBindings(RHIBindPoint::Graphics, draw.program->visibilityRoot, visibility);
         encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->materialWorkRoot,
                               RHIBufferSlice::Whole(raster->material->work));
     }
@@ -2175,6 +2182,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
     if (!cameraGeometry.empty() || !shadowMeshletGeometry.empty() ||
         std::ranges::any_of(candidate->draws, [](const auto& draw) { return draw.program->hasSurface; }))
     {
+        ce::profile_scope indirectProfile{ce::marker<"MaterialSceneIndirectPrepare">()};
         if (!indirectCommands_.GetGeneration())
         {
             const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),
@@ -2211,6 +2219,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                                  std::optional<unsigned> cascade = {},
                                  std::shared_ptr<const GpuGeometryVisibility::Frame> shadowList = {},
                                  const char* shadowPhase = "Final") {
+            ce::profile_scope templateProfile{ce::marker<"MaterialSceneIndirectTemplate">()};
             auto batch = std::make_shared<IndirectMaterialBatch>();
             batch->name =
                 cascade ? "METEOR.Scene.Commands.Shadow." + std::string(shadowPhase) + "." + std::to_string(*cascade)
@@ -2298,8 +2307,14 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                 }
                 batch->buckets.push_back(std::move(bucket));
             }
-            if (!batch->Upload(words, records, outputBytes, error))
-                return false;
+            {
+                // template 조립의 exclusive 시간과 현재 recording의 업로드 비용을 구분한다.
+                ce::profile_scope uploadProfile{ce::marker<"MaterialSceneIndirectUpload">()};
+                if (!batch->Upload(words, records, outputBytes, error))
+                {
+                    return false;
+                }
+            }
             result = std::move(batch);
             return true;
         };
@@ -2323,6 +2338,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
         };
         if (std::ranges::any_of(groups, needsMaterialTiles))
         {
+            ce::profile_scope materialProfile{ce::marker<"MaterialSceneTileTemplate">()};
             constexpr const char* entries[]{"ResetMaterialWork", "CountMaterialTiles", "BuildMaterialRanges",
                                             "ScatterMaterialTiles"};
             auto work = std::make_shared<SceneMaterialWork>();
@@ -2424,8 +2440,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<c
                 }
                 work->buckets.push_back(std::move(bucket));
             }
-            if (!work->Upload(words, records, bytes, error))
-                return false;
+            {
+                ce::profile_scope uploadProfile{ce::marker<"MaterialSceneTileUpload">()};
+                if (!work->Upload(words, records, bytes, error))
+                {
+                    return false;
+                }
+            }
             candidate->materialWorkStage.materialWork = std::move(work);
         }
         for (const bool staticCasters : {true, false})

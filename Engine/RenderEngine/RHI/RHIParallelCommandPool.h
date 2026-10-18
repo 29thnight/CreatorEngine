@@ -71,11 +71,6 @@ class IRHIParallelCommandPool
         RHIRunCommandRecordingJobs(m_scheduler, job, workerCount);
     }
 
-    job_spin_scope RecordingSpinScope(const job_spin_options& options)
-    {
-        return m_scheduler.recording_spin_scope(options);
-    }
-
     void RunTaskGraph(const RHIRecordingTaskGraph& graph, const std::function<void(uint32_t)>& job,
                       const RHIRecordingExecutionOptions& options = {})
     {

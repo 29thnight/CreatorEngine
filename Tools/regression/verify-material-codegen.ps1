@@ -17,7 +17,7 @@ $output = Join-Path $repo 'Build\Obj\MaterialCodegenProbe'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $exe = Join-Path $output 'material_codegen_probe.exe'
 $sources = @('Tools/regression/material_codegen_probe.cpp', 'Lattice/Core/LXGraph.cpp',
-    'Lattice/Core/LXNodeDefinition.cpp', 'Lattice/Material/LXMaterialGraph.cpp',
+    'Lattice/Core/LXNodeDefinition.cpp', 'Lattice/Core/LXDocument.cpp', 'Lattice/Material/LXMaterialGraph.cpp',
     'Lattice/Material/LXMaterialIR.cpp', 'Lattice/Material/LXMaterialNodes.cpp',
     'Lattice/Material/LXMaterialOperators.cpp', 'Lattice/Material/LXMaterialCompiler.cpp')
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '

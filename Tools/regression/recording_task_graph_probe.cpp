@@ -1,8 +1,5 @@
 #include "RHI/RHICommandRecordingJobs.h"
 #include <iostream>
-#if !defined(RECORDING_WAVE_JOIN_MUTANT)
-#include "ThreadPoolSpin.h"
-#endif
 
 namespace
 {
@@ -18,10 +15,12 @@ namespace
     }
 
     RHIRecordingTaskGraph Build(std::vector<uint32_t> targets, std::vector<uint32_t> waves, std::vector<uint32_t> units,
-                                std::vector<uint64_t> work, std::vector<RHIRecordingPassDependencies> passes)
+                                std::vector<uint64_t> work, std::vector<RHIRecordingPassDependencies> passes,
+                                RHIRecordingTaskTopology* topology = nullptr)
     {
         RHIRecordingTaskGraph graph;
-        Require(RHIBuildRecordingTaskGraph(targets, waves, units, work, passes, 4, graph), "graph build failed");
+        Require(RHIBuildRecordingTaskGraph(targets, waves, units, work, passes, 4, graph, topology),
+                "graph build failed");
 #if defined(RECORDING_WAVE_JOIN_MUTANT)
         // 이전 전체 wave 합류를 되살리면 독립 후속 작업의 조기 실행 검사가 실패해야 한다.
         for (uint32_t node = 0; node < graph.nodes.size(); ++node)
@@ -168,131 +167,215 @@ namespace
     }
 
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
-    std::atomic<uint64_t> g_spinClockNanoseconds{1000000};
-
-    uint64_t ReadSpinClock() noexcept
+    void RequireSameExecutionGraph(const RHIRecordingTaskGraph& actual, const RHIRecordingTaskGraph& expected)
     {
-        return g_spinClockNanoseconds.load(std::memory_order_relaxed);
+        Require(actual.nodes.size() == expected.nodes.size(), "topology capture changed the execution node count");
+        for (size_t node = 0; node < actual.nodes.size(); ++node)
+        {
+            const auto& left = actual.nodes[node];
+            const auto& right = expected.nodes[node];
+            Require(left.target == right.target && left.wave == right.wave && left.work == right.work &&
+                        left.dependencies == right.dependencies,
+                    "topology capture changed execution work, order, or dependencies");
+        }
     }
 
-    void VerifySpinPolicy()
+    void RequireCompleteTopology(const RHIRecordingTaskGraph& graph, const RHIRecordingTaskTopology& topology)
     {
-        static_assert(!std::is_copy_constructible_v<job_spin_scope>);
-        static_assert(std::is_nothrow_move_constructible_v<job_spin_scope>);
-        static_assert(std::is_nothrow_move_assignable_v<job_spin_scope>);
-        thread_pool_spin_control control{6, &ReadSpinClock};
-        const auto hooks = control.callbacks();
-        job_spin_options options;
-        options.frame_id = 17;
-        options.idle_budget = std::chrono::microseconds{25};
-        options.frame_budget = std::chrono::microseconds{100};
-        options.max_workers = 2;
-        auto disabledOptions = options;
-        disabledOptions.idle_budget = std::chrono::microseconds::zero();
-        auto disabled = control.begin_scope(disabledOptions);
-        Require(!disabled && !hooks.begin(hooks.userData, 2), "zero-budget spin scope admitted a worker");
-
-        auto outer = control.begin_scope(options);
-        auto nested = control.begin_scope(options);
-        Require(outer && nested, "matching nested recording spin scopes were rejected");
-        auto changedOptions = options;
-        changedOptions.frame_budget = std::chrono::microseconds{200};
-        Require(!control.begin_scope(changedOptions), "nested recording scope increased its frame spin budget");
-        auto nextOptions = options;
-        ++nextOptions.frame_id;
-        Require(!control.begin_scope(nextOptions), "a new frame replaced an open recording spin scope");
-        Require(!hooks.begin(hooks.userData, 6), "spin controller accepted an out-of-range worker slot");
-        Require(hooks.begin(hooks.userData, 2) && hooks.begin(hooks.userData, 3),
-                "recording spin policy did not admit its allowed workers");
-        Require(!hooks.begin(hooks.userData, 4), "recording spin policy exceeded its simultaneous worker limit");
-        Require(hooks.poll(hooks.userData, 2) == enki::IdleSpinDecision::Continue,
-                "recording spin worker stopped before its injected deadline");
-        nested.close();
-        Require(hooks.poll(hooks.userData, 2) == enki::IdleSpinDecision::Continue,
-                "closing a nested scope canceled its still-open outer scope");
-        auto moved = std::move(outer);
-        Require(!outer && moved, "moving a spin scope duplicated or dropped its ownership");
-
-        // 실제 시계나 OS 스케줄링을 기다리지 않고 주입한 시각으로 예산 경계만 검증한다.
-        g_spinClockNanoseconds.fetch_add(25000, std::memory_order_relaxed);
-        Require(hooks.poll(hooks.userData, 2) == enki::IdleSpinDecision::BudgetExhausted &&
-                    hooks.poll(hooks.userData, 3) == enki::IdleSpinDecision::BudgetExhausted,
-                "recording spin continued past its per-idle deadline");
-        hooks.end(hooks.userData, 2, enki::IdleSpinResult::BudgetExhausted);
-        hooks.end(hooks.userData, 3, enki::IdleSpinResult::BudgetExhausted);
-        Require(hooks.begin(hooks.userData, 4) && hooks.begin(hooks.userData, 5),
-                "recording spin did not release finished worker slots");
-        g_spinClockNanoseconds.fetch_add(5000, std::memory_order_relaxed);
-        hooks.end(hooks.userData, 4, enki::IdleSpinResult::TaskFound);
-        moved.close();
-        auto reopened = control.begin_scope(options);
-        Require(reopened && !hooks.begin(hooks.userData, 2),
-                "reopening a recording scope refilled its consumed frame budget");
-        Require(hooks.poll(hooks.userData, 5) == enki::IdleSpinDecision::ScopeEnded,
-                "an old spinner continued into a reopened scope epoch");
-        reopened.close();
-        Require(!control.begin_scope(nextOptions), "a new frame replaced a spinner still leaving the previous epoch");
-        hooks.end(hooks.userData, 5, enki::IdleSpinResult::ScopeEnded);
-        const auto completed = moved.statistics();
-        Require(completed.frame_id == options.frame_id && completed.spin_attempts == 4 &&
-                    completed.reserved_budget_ns == 100000 && completed.active_spinners == 0 &&
-                    completed.max_active_spinners == 2,
-                "recording spin frame budget or worker-slot accounting changed");
-        Require(completed.task_hits == 1 && completed.budget_exhaustions == 2 && completed.scope_exits == 1 &&
-                    completed.shutdown_exits == 0,
-                "recording spin exit reasons were lost or counted twice");
-
-        auto next = control.begin_scope(nextOptions);
-        Require(next && next.statistics().reserved_budget_ns == 0,
-                "a fully retired frame prevented a fresh recording budget");
-        outer.reset();
-        moved.reset();
-        reopened.reset();
-        Require(hooks.begin(hooks.userData, 3) &&
-                    hooks.poll(hooks.userData, 3) == enki::IdleSpinDecision::Continue,
-                "resetting old scope tokens canceled the current frame");
-        control.stop();
-        Require(hooks.poll(hooks.userData, 3) == enki::IdleSpinDecision::Shutdown,
-                "spin policy ignored scheduler shutdown");
-        hooks.end(hooks.userData, 3, enki::IdleSpinResult::Shutdown);
-        next.close();
-        Require(next.statistics().shutdown_exits == 1 && next.statistics().active_spinners == 0 &&
-                    !hooks.begin(hooks.userData, 2) && !control.begin_scope(nextOptions),
-                "stopped spin policy retained a worker or admitted a new scope");
-        Require(moved.statistics().frame_id == options.frame_id &&
-                    moved.statistics().reserved_budget_ns == completed.reserved_budget_ns,
-                "closed spin statistics were overwritten by a later frame");
-
-        thread_pool_spin_control partial{4, &ReadSpinClock};
-        const auto partialHooks = partial.callbacks();
-        auto partialOptions = options;
-        partialOptions.frame_budget = std::chrono::microseconds{35};
-        partialOptions.max_workers = 1;
-        auto partialScope = partial.begin_scope(partialOptions);
-        Require(partialScope && partialHooks.begin(partialHooks.userData, 2),
-                "partial-budget spin scope failed to start");
-        partialHooks.end(partialHooks.userData, 2, enki::IdleSpinResult::TaskFound);
-        Require(partialHooks.begin(partialHooks.userData, 2), "remaining frame budget was discarded");
-        g_spinClockNanoseconds.fetch_add(9999, std::memory_order_relaxed);
-        Require(partialHooks.poll(partialHooks.userData, 2) == enki::IdleSpinDecision::Continue,
-                "partial spin allowance ended before its injected deadline");
-        g_spinClockNanoseconds.fetch_add(1, std::memory_order_relaxed);
-        Require(partialHooks.poll(partialHooks.userData, 2) == enki::IdleSpinDecision::BudgetExhausted,
-                "partial spin allowance exceeded the remaining frame budget");
-        partialHooks.end(partialHooks.userData, 2, enki::IdleSpinResult::BudgetExhausted);
-        Require(!partialHooks.begin(partialHooks.userData, 2) &&
-                    partialScope.statistics().reserved_budget_ns == 35000,
-                "an early task hit refunded and reused its reserved spin allowance");
-        partialScope.close();
-
-        job_spin_scope retained;
+        Require(topology.available && !topology.truncated && topology.nodes.size() == graph.nodes.size(),
+                "available topology omitted execution nodes");
+        std::vector<uint32_t> seen(topology.unitNodes.size());
+        for (size_t node = 0; node < graph.nodes.size(); ++node)
         {
-            thread_pool_spin_control temporary{4, &ReadSpinClock};
-            retained = temporary.begin_scope(options);
+            std::vector<uint32_t> dependencies;
+            for (const auto& dependency : topology.nodes[node].dependencies)
+            {
+                dependencies.push_back(dependency.node);
+                Require(dependency.reasons >= 1 && dependency.reasons <= 3,
+                        "topology published an absent or unknown dependency reason");
+            }
+            Require(dependencies == graph.nodes[node].dependencies,
+                    "topology did not describe every execution dependency exactly once");
+            for (const auto unit : topology.nodes[node].units)
+            {
+                Require(unit < topology.unitNodes.size(), "topology unit index is out of range");
+                Require(topology.unitNodes[unit] == node && ++seen[unit] == 1,
+                        "topology unit ownership disagreed with its reverse mapping");
+            }
         }
-        retained.reset();
-        Require(retained.statistics().frame_id == options.frame_id && retained.statistics().active_spinners == 0,
-                "spin scope outliving its pool lost safe access to final statistics");
+        Require(std::ranges::all_of(seen, [](uint32_t count) { return count == 1; }),
+                "topology omitted a recording unit");
+    }
+
+    void RequireUnavailableTopology(const RHIRecordingTaskTopology& topology, bool truncated)
+    {
+        Require(!topology.available && topology.truncated == truncated && topology.nodes.empty() &&
+                    topology.unitNodes.empty(),
+                "unavailable topology exposed a partial or stale mapping");
+    }
+
+    void VerifyTopologyReasonsAndMapping()
+    {
+        constexpr auto kSameTarget = static_cast<uint8_t>(RHIRecordingDependencyReason::SameTarget);
+        constexpr auto kCpuProducer = static_cast<uint8_t>(RHIRecordingDependencyReason::CpuProducer);
+        RHIRecordingTaskTopology topology;
+        auto graph = Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1},
+                           {{false, {}}, {false, {}}, {false, {0}}}, &topology);
+        const auto withoutTopology = Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1},
+                                           {{false, {}}, {false, {}}, {false, {0}}});
+        RequireSameExecutionGraph(graph, withoutTopology);
+        RequireCompleteTopology(graph, topology);
+        const auto& combined = topology.nodes[2].dependencies;
+        Require(combined.size() == 1 && combined[0].node == 0 &&
+                    combined[0].reasons == (kSameTarget | kCpuProducer),
+                "one execution edge lost or duplicated its overlapping dependency reasons");
+
+        graph = Build({0, 1, 1}, {0, 0, 1}, {0, 1, 2}, {},
+                      {{false, {}}, {true, {0}}, {false, {1}}}, &topology);
+        RequireCompleteTopology(graph, topology);
+        Require(topology.nodes.size() == 3, "independent pass topology changed its expected node count");
+        const auto& bridged = topology.nodes[2].dependencies;
+        Require(topology.nodes[1].dependencies.empty() && bridged.size() == 2 &&
+                    bridged[0].node == 0 && bridged[0].reasons == kCpuProducer && bridged[1].node == 1 &&
+                    bridged[1].reasons == (kSameTarget | kCpuProducer),
+                "independent pass topology lost its inherited CPU frontier or blocked its own callback");
+
+        // 입력 unit 순서와 target으로 정렬한 node 순서는 다르며, 같은 묶음의 두 unit도 각각 남아야 한다.
+        graph = Build({1, 0, 2, 2}, {0, 0, 1, 1}, {0, 0, 1, 1}, {5, 7, 11, 13},
+                      {{false, {}}, {false, {0}}}, &topology);
+        RequireCompleteTopology(graph, topology);
+        Require(topology.nodes.size() == 3, "split producer topology changed its expected node count");
+        Require(topology.unitNodes == std::vector<uint32_t>({1, 0, 2, 2}) &&
+                    topology.nodes[0].units == std::vector<uint32_t>{1} &&
+                    topology.nodes[1].units == std::vector<uint32_t>{0} &&
+                    topology.nodes[2].units == std::vector<uint32_t>({2, 3}),
+                "topology confused original recording units with sorted graph nodes");
+        Require(graph.nodes[0].work == 7 && graph.nodes[1].work == 5 && graph.nodes[2].work == 24,
+                "topology capture changed coalesced work estimates");
+        const auto& split = topology.nodes[2].dependencies;
+        Require(split.size() == 2 && split[0].node == 0 && split[1].node == 1 &&
+                    split[0].reasons == kCpuProducer && split[1].reasons == kCpuProducer,
+                "split producer topology omitted a slice or invented a same-target reason");
+
+        graph = Build({0, 0}, {0, 0}, {0, 1}, {}, {{false, {}}, {false, {0}}}, &topology);
+        RequireCompleteTopology(graph, topology);
+        Require(graph.nodes.size() == 1 && topology.nodes[0].dependencies.empty() &&
+                    topology.nodes[0].units == std::vector<uint32_t>({0, 1}),
+                "coalesced passes created a self dependency or lost a recording unit");
+        const auto previous = graph;
+        Require(!RHIBuildRecordingTaskGraph(std::array{0u, 0u}, std::array{0u, 1u}, std::array{0u, 1u}, {},
+                                            std::array{RHIRecordingPassDependencies{},
+                                                       RHIRecordingPassDependencies{false, {2}}},
+                                            1, graph, &topology),
+                "invalid producer accepted after building partial topology");
+        RequireUnavailableTopology(topology, false);
+        RequireSameExecutionGraph(graph, previous);
+        Require(RHIBuildRecordingTaskGraph({}, {}, {}, {}, {}, 1, graph, &topology),
+                "empty recording graph was rejected");
+        RequireCompleteTopology(graph, topology);
+        Require(graph.nodes.empty() && topology.unitNodes.empty(), "empty topology retained previous units");
+    }
+
+    void VerifyTopologyEntryLimit()
+    {
+        constexpr auto kMaximumEntries = static_cast<uint32_t>(RHIRecordingTaskTopology::kMaximumEntries);
+        std::vector<uint32_t> targets(kMaximumEntries), waves(kMaximumEntries), unitPasses(kMaximumEntries);
+        for (uint32_t unit = 0; unit < kMaximumEntries; ++unit)
+        {
+            targets[unit] = unit;
+        }
+        const std::array passes{RHIRecordingPassDependencies{}};
+        RHIRecordingTaskGraph graph, withoutTopology;
+        RHIRecordingTaskTopology topology;
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries, graph, &topology),
+                "recording topology rejected its exact entry limit");
+        Require(topology.available && !topology.truncated && topology.nodes.size() == kMaximumEntries &&
+                    topology.unitNodes == targets && graph.nodes.size() == kMaximumEntries,
+                "recording topology truncated at rather than above its entry limit");
+        targets.push_back(kMaximumEntries);
+        waves.push_back(0);
+        unitPasses.push_back(0);
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries + 1,
+                                           graph, &topology),
+                "diagnostic entry cap rejected valid execution work");
+        RequireUnavailableTopology(topology, true);
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries + 1,
+                                           withoutTopology),
+                "entry-cap comparison graph was rejected");
+        RequireSameExecutionGraph(graph, withoutTopology);
+
+        // node가 한 개로 합쳐져도 원래 unit의 수가 상한을 넘으면 역매핑 일부를 공개하면 안 된다.
+        std::ranges::fill(targets, 0u);
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, 1, graph, &topology),
+                "unit cap rejected a valid coalesced execution graph");
+        RequireUnavailableTopology(topology, true);
+        Require(graph.nodes.size() == 1 && graph.nodes[0].work == kMaximumEntries + 1,
+                "unit cap omitted execution work while suppressing topology");
+        const auto previous = graph;
+        unitPasses.back() = 1;
+        Require(!RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, 1, graph, &topology),
+                "topology truncation bypassed execution input validation");
+        RequireUnavailableTopology(topology, false);
+        RequireSameExecutionGraph(graph, previous);
+    }
+
+    void VerifyTopologyDependencyLimit()
+    {
+        constexpr uint32_t kNodes = 182;
+        // 앞의 181개 node 완전 DAG는 16290개 간선이다. 마지막 94개를 더하면 정확히 16384개다.
+        constexpr uint32_t kLastProducerPrefix = 93;
+        static_assert((kNodes - 1) * (kNodes - 2) / 2 + kLastProducerPrefix + 1 ==
+                      RHIRecordingTaskTopology::kMaximumDependencies);
+        std::vector<uint32_t> targets(kNodes), waves(kNodes), unitPasses(kNodes);
+        std::vector<RHIRecordingPassDependencies> passes(kNodes);
+        for (uint32_t node = 0; node < kNodes; ++node)
+        {
+            waves[node] = node;
+            unitPasses[node] = node;
+            const auto producerCount = node + 1 == kNodes ? kLastProducerPrefix : node;
+            for (uint32_t producer = 0; producer < producerCount; ++producer)
+            {
+                passes[node].producers.push_back(producer);
+            }
+        }
+        // 마지막 같은-target 간선은 CPU 간선과 겹친다. cap을 채운 뒤에도 중복 이유는 병합해야 한다.
+        passes.back().producers.push_back(kNodes - 2);
+        RHIRecordingTaskGraph graph, withoutTopology;
+        RHIRecordingTaskTopology topology;
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, 1, graph, &topology),
+                "recording topology rejected its exact unique-dependency limit");
+        RequireCompleteTopology(graph, topology);
+        size_t dependencies = 0;
+        for (const auto& node : topology.nodes)
+        {
+            dependencies += node.dependencies.size();
+        }
+        Require(dependencies == RHIRecordingTaskTopology::kMaximumDependencies && !topology.nodes.empty() &&
+                    !topology.nodes.back().dependencies.empty(),
+                "exact dependency cap omitted topology edges");
+        const auto& last = topology.nodes.back().dependencies.back();
+        Require(last.node == kNodes - 2 &&
+                    last.reasons == (static_cast<uint8_t>(RHIRecordingDependencyReason::SameTarget) |
+                                     static_cast<uint8_t>(RHIRecordingDependencyReason::CpuProducer)),
+                "dependency cap counted duplicate reasons as separate execution edges");
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, 1, withoutTopology),
+                "exact dependency-limit comparison graph was rejected");
+        RequireSameExecutionGraph(graph, withoutTopology);
+
+        passes.back().producers.push_back(kLastProducerPrefix);
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, 1, graph, &topology),
+                "diagnostic dependency cap rejected a valid execution graph");
+        RequireUnavailableTopology(topology, true);
+        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, 1, withoutTopology),
+                "over dependency-limit comparison graph was rejected");
+        RequireSameExecutionGraph(graph, withoutTopology);
+        dependencies = 0;
+        for (const auto& node : graph.nodes)
+        {
+            dependencies += node.dependencies.size();
+        }
+        Require(dependencies == RHIRecordingTaskTopology::kMaximumDependencies + 1,
+                "topology truncation dropped a required execution dependency");
     }
 
     void VerifyTargetSerialization(job_scheduler& scheduler, const RHIRecordingExecutionOptions& options)
@@ -405,7 +488,7 @@ namespace
                 calls[node].fetch_add(1, std::memory_order_release);
             },
             diagnostics);
-        handle.wait(std::chrono::microseconds{25});
+        handle.wait();
         Require(handle.is_complete() && diagnostics->nodes.size() == nodes.size(),
                 "native graph did not publish complete diagnostics");
         Require(diagnostics->dispatcher_handoffs == 1 && diagnostics->native_task_count == nodes.size(),
@@ -470,7 +553,7 @@ namespace
         }
         Require(rejected, "nonempty native graph accepted an empty callback");
         const auto empty = scheduler.submit_graph({}, {});
-        empty.wait(std::chrono::microseconds{-25});
+        empty.wait();
         Require(empty.valid() && empty.is_complete(), "empty native graph did not complete");
     }
 
@@ -510,7 +593,7 @@ namespace
         bool failed = false;
         try
         {
-            handle.wait(std::chrono::microseconds{25});
+            handle.wait();
         }
         catch (const std::runtime_error& error)
         {
@@ -528,13 +611,13 @@ namespace
         std::weak_ptr<uint32_t> successRetained = successCapture;
         auto success = scheduler.submit_graph(
             std::array{job_graph_node{}}, [capture = std::move(successCapture)](size_t) { (void)capture; });
-        success.wait(std::chrono::microseconds{25});
+        success.wait();
         Require(successRetained.expired(), "successful native graph retained shared callback captures");
     }
 
-    void VerifyBoundedOwnerWait(job_scheduler& scheduler)
+    void VerifyCompletionWait(job_scheduler& scheduler)
     {
-        for (const auto budget : {std::chrono::microseconds{0}, std::chrono::microseconds{25}})
+        for (const bool observerFails : {false, true})
         {
             ManualGate release;
             std::promise<void> observerEntered;
@@ -552,7 +635,10 @@ namespace
                     release.Wait();
                     Require(!error && bodyRetained.expired() && *capture == 2,
                             "terminal observer ran before task captures were released");
-                    throw std::runtime_error("terminal observer failure");
+                    if (observerFails)
+                    {
+                        throw std::runtime_error("terminal observer failure");
+                    }
                 });
             const auto handle = scheduler.submit(std::move(group));
             GateRelease cleanup{release};
@@ -562,15 +648,17 @@ namespace
             bool failed = false;
             try
             {
-                handle.wait(budget);
+                handle.wait();
             }
             catch (const std::runtime_error& error)
             {
-                failed = std::string_view{error.what()} == "terminal observer failure";
+                Require(std::string_view{error.what()} == "terminal observer failure",
+                        "completion wait reported an unexpected observer error");
+                failed = true;
             }
             Require(observerStarted && pending, "completion became ready while a terminal observer was running");
-            Require(failed && bodyRetained.expired() && observerRetained.expired(),
-                    "bounded wait lost an observer error or returned before capture destruction");
+            Require(failed == observerFails && bodyRetained.expired() && observerRetained.expired(),
+                    "completion wait lost an observer result or returned before capture destruction");
         }
 
         std::promise<void> release;
@@ -590,7 +678,7 @@ namespace
                         });
                     try
                     {
-                        child.wait(std::chrono::microseconds{25});
+                        child.wait();
                     }
                     catch (const std::logic_error&)
                     {
@@ -600,21 +688,15 @@ namespace
                 })
             .wait();
         child.wait();
-        Require(rejected, "bounded wait accepted an incomplete nested worker wait");
+        Require(rejected, "completion wait accepted an incomplete nested worker wait");
         const auto completed = scheduler.submit([] {});
-        completed.wait(std::chrono::microseconds{-25});
-        scheduler.submit([completed] { completed.wait(std::chrono::microseconds{25}); }).wait();
-        Require(completed.is_complete(), "completed worker wait or negative owner spin budget changed semantics");
+        completed.wait();
+        scheduler.submit([completed] { completed.wait(); }).wait();
+        Require(completed.is_complete(), "completed worker wait changed completion semantics");
     }
 
     void VerifyNativeShutdown(thread_pool& pool, job_scheduler& scheduler)
     {
-        job_spin_options spinOptions;
-        spinOptions.frame_id = 42;
-        spinOptions.idle_budget = std::chrono::microseconds{25};
-        spinOptions.frame_budget = std::chrono::microseconds{100};
-        spinOptions.max_workers = 2;
-        auto spinScope = scheduler.recording_spin_scope(spinOptions);
         std::vector<job_graph_node> nodes(2);
         nodes[1].dependencies = {0};
         ManualGate release;
@@ -659,16 +741,10 @@ namespace
         // enki 수명 API는 start와 같은 소유자에서 호출하고 관찰자만 별도 스레드로 둔다.
         scheduler.shutdown();
         const auto [admissionClosed, rejected] = observer.get();
-        handle.wait(std::chrono::microseconds{25});
+        handle.wait();
         Require(rootStarted && admissionClosed && rejected && calls == 2,
                 "shutdown did not stop admission and drain accepted native dependencies");
         Require(handle.is_complete() && !pool.is_running(), "native graph shutdown left pending work or workers");
-        spinScope.close();
-        const auto spinStatistics = spinScope.statistics();
-        Require(spinStatistics.frame_id == spinOptions.frame_id && spinStatistics.active_spinners == 0 &&
-                    spinStatistics.max_active_spinners <= 2 && spinStatistics.reserved_budget_ns <= 100000 &&
-                    !scheduler.recording_spin_scope(spinOptions),
-                "pool shutdown left an active recording spinner or allowed a new spin scope");
     }
 #endif
 } // namespace
@@ -679,7 +755,9 @@ int main()
     {
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
         VerifyPlanning();
-        VerifySpinPolicy();
+        VerifyTopologyReasonsAndMapping();
+        VerifyTopologyEntryLimit();
+        VerifyTopologyDependencyLimit();
 #endif
         thread_pool pool;
         job_scheduler scheduler{pool};
@@ -701,7 +779,6 @@ int main()
             {
                 RHIRecordingExecutionOptions options;
                 options.batchSubmit = batchSubmit;
-                options.ownerSpinBudget = std::chrono::microseconds{25};
                 VerifyExecution(scheduler, options);
 #if !defined(RECORDING_WAVE_JOIN_MUTANT)
                 VerifyTargetSerialization(scheduler, options);
@@ -716,14 +793,15 @@ int main()
             VerifyNativeSubmission(scheduler);
             VerifyNativeValidation(scheduler);
             VerifyNativeFailureAndLifetime(scheduler);
-            VerifyBoundedOwnerWait(scheduler);
+            VerifyCompletionWait(scheduler);
             VerifyNativeShutdown(pool, scheduler);
 #else
             scheduler.shutdown();
 #endif
         }
         std::cout << "RECORDING_TASK_GRAPH_OK checks=" << g_checks.load()
-                  << " workers=1,4 policies=legacy,native bounded-wait=0,25us spin-policy=scope,budget,shutdown\n";
+                  << " workers=1,4 policies=legacy,native wait=cv lifetime=callback,observer"
+                  << " shutdown=drain topology=bounded\n";
         return 0;
     }
     catch (const std::exception& error)

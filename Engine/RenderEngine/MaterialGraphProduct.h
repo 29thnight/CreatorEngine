@@ -223,6 +223,11 @@ struct CookedProgram
     VerifiedProduct product;
     std::string metadata;
     std::string boundSource;
+    // 소스 생산자가 검증한 입력과 환경이다. 패키지 바이트에서는 복원하지 않는다.
+    std::string authoringSourceKey;
+    std::string authoringEnvironmentKey;
+    // 생성 소스 자체는 보관하지 않아도 그 검색 위치에 새 include가 생겼는지는 다시 확인한다.
+    std::filesystem::path authoringSourceDirectory;
 };
 
 // Scene mesh shaders consume GPU-compacted meshlet IDs and 2D indirect work.

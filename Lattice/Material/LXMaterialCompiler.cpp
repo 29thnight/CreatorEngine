@@ -1,4 +1,5 @@
 #include "LXMaterialCompiler.h"
+#include "../../Engine/Utility_Framework/Sha256.h"
 
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
 
@@ -242,7 +243,7 @@ class Generator
         if (assignment != std::string::npos)
         {
             const std::string expression = text.substr(assignment + 1);
-            const std::regex identifiers("[A-Za-z_][A-Za-z_0-9]*");
+            static const std::regex identifiers("[A-Za-z_][A-Za-z_0-9]*");
             bool dependent = false;
             for (std::sregex_iterator token(expression.begin(), expression.end(), identifiers), end; token != end;
                  ++token)
@@ -252,7 +253,7 @@ class Generator
             if (dependent)
             {
                 const std::string target = text.substr(0, assignment);
-                const std::regex variable("lx(?:_g[0-9]+)*_n[0-9]+(?:_sample)?");
+                static const std::regex variable("lx(?:_g[0-9]+)*_n[0-9]+(?:_sample)?");
                 std::smatch match;
                 if (std::regex_search(target, match, variable))
                 {
@@ -401,10 +402,16 @@ class Generator
     {
         if (reference.empty())
             throw GenerationError({"material_resource", "Live resource reference is empty", source});
-        if (kind == LXMaterialResourceKind::Sampler &&
-            !std::regex_match(reference, std::regex("(linear|nearest)-(repeat|clamp)|(linear|nearest)-(linear|nearest)-"
-                                                    "(repeat|clamp|mirror)-(repeat|clamp|mirror)")))
-            throw GenerationError({"material_sampler", "Unsupported sampler description: " + reference, source});
+        if (kind == LXMaterialResourceKind::Sampler)
+        {
+            static const std::regex samplerDescription(
+                "(linear|nearest)-(repeat|clamp)|(linear|nearest)-(linear|nearest)-"
+                "(repeat|clamp|mirror)-(repeat|clamp|mirror)");
+            if (!std::regex_match(reference, samplerDescription))
+            {
+                throw GenerationError({"material_sampler", "Unsupported sampler description: " + reference, source});
+            }
+        }
         const std::string key = std::to_string(int(kind)) + "/" + std::to_string(parameter) + "/" +
                                 std::to_string(int(encoding)) + "/" + reference;
         if (!resources_.contains(key))
@@ -875,6 +882,99 @@ float3 LXGeneratedNormal(LXMaterialContext context, float3 color, float strength
     }
 };
 } // namespace
+
+bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result, std::string& error)
+{
+    result.clear();
+    error.clear();
+    try
+    {
+        if (!asset.Definitions().nodes)
+        {
+            error = "Material source key requires a node definition registry.";
+            return false;
+        }
+        Hash::Sha256 hash;
+        const auto append = [&](std::string_view value) {
+            const auto length = std::to_string(value.size()) + ':';
+            hash.Update(length.data(), length.size());
+            hash.Update(value.data(), value.size());
+        };
+        append("lx.material.source/" + std::to_string(kMaterialSourceKeyVersion));
+        append(std::to_string(LXMaterialProgram::CompilerVersion));
+        const auto source = LXMaterialArchive::WriteSource(asset);
+        if (source.size() > 16u * 1024u * 1024u)
+        {
+            error = "Material source key input exceeds its 16 MiB budget.";
+            return false;
+        }
+        append(source);
+        const auto socket = [&](const LXMaterialSocketState& state) {
+            append(state.enabled ? "1" : "0");
+            append(state.hidden ? "1" : "0");
+            append(state.hideValue ? "1" : "0");
+            append(std::to_string(static_cast<unsigned>(state.colorSpace)));
+        };
+        // 유효한 기본 상태는 WriteSource에서 정규화한다. 저장 때 채워지는 원시 scopes 맵은 중복 해싱하지 않는다.
+        // 같은 이름의 registry가 달라진 경우에도 이전에 검증한 노드 정의로 오인하지 않게 한다.
+        const auto registry = [&](auto&& self, const LXGraph& graph) -> void
+        {
+            const auto& definitions = graph.Definitions();
+            append(definitions == asset.Definitions().nodes ? "1" : "0");
+            append(definitions && definitions->HasDomain(graph.Domain()) ? "1" : "0");
+            append(std::to_string(graph.Nodes().size()));
+            for (const auto& node : graph.Nodes())
+            {
+                append(definitions && definitions->Find(node.type) ? "1" : "0");
+                append(definitions && definitions->MatchesNode(graph.Domain(), node) ? "1" : "0");
+                append(std::to_string(node.pins.size()));
+                for (const auto& pin : node.pins)
+                {
+                    append(definitions && definitions->AllowsPin(graph.Domain(), pin.type) ? "1" : "0");
+                }
+            }
+            append(std::to_string(graph.Groups().size()));
+            for (const auto& [id, group] : graph.Groups())
+            {
+                self(self, *group.body);
+            }
+        };
+        registry(registry, asset.graph);
+        for (const auto& parameter : asset.blackboard)
+        {
+            append(asset.Definitions().nodes->AllowsPin("material", parameter.type) ? "1" : "0");
+        }
+        append(std::to_string(asset.Definitions().schemas.size()));
+        for (const auto& [name, schema] : asset.Definitions().schemas)
+        {
+            append(name);
+            append(asset.Definitions().nodes->Find(name) ? "1" : "0");
+            append(std::to_string(schema.revision));
+            append(std::to_string(schema.sockets.size()));
+            for (const auto& state : schema.sockets)
+            {
+                socket(state);
+            }
+            append(std::to_string(schema.enumProperties.size()));
+            for (const auto& [property, values] : schema.enumProperties)
+            {
+                append(property);
+                append(std::to_string(values.size()));
+                for (const auto& value : values)
+                {
+                    append(value);
+                }
+            }
+        }
+        result = Hash::ToHex(hash.Finish());
+        return true;
+    }
+    catch (const std::exception& failure)
+    {
+        error = std::string("Material source key failed: ") + failure.what();
+        return false;
+    }
+}
 
 std::optional<LXMaterialProgram> GenerateMaterialSlang(const LXMaterialAsset& asset,
                                                        std::vector<LXMaterialDiagnostic>* diagnostics,

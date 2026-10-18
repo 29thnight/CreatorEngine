@@ -736,11 +736,70 @@ class RecordingChangeDevice : public ProbeDevice
         }
         return ProbeDevice::AllocateUpload(request);
     }
+    const EnhancedRenderGraph* visibilityBindingGraph{};
+    RGHandle visibilityBindingTarget{};
+    std::atomic<unsigned> visibilityBindingAllocations{};
+
+    struct VisibilityBindingAudit
+    {
+        RecordingChangeDevice& device;
+        const EnhancedRenderGraph& graph;
+
+        VisibilityBindingAudit(RecordingChangeDevice& device, const EnhancedRenderGraph& graph, RGHandle visibility)
+            : device(device), graph(graph)
+        {
+            Check(!device.visibilityBindingGraph, "Visibility descriptor audit must not overlap recordings");
+            device.visibilityBindingAllocations.store(0, std::memory_order_relaxed);
+            device.visibilityBindingTarget = visibility;
+            device.visibilityBindingGraph = &graph;
+        }
+
+        ~VisibilityBindingAudit()
+        {
+            // 기록 실패도 accepted 작업을 합류한 뒤 이 scope를 해제한다.
+            // 예외가 전파되어도 다음 recording에 graph 참조를 남기지 않는다.
+            device.visibilityBindingGraph = nullptr;
+            device.visibilityBindingTarget = {};
+        }
+
+        VisibilityBindingAudit(const VisibilityBindingAudit&) = delete;
+        VisibilityBindingAudit& operator=(const VisibilityBindingAudit&) = delete;
+
+        void Verify() const
+        {
+            Check(device.visibilityBindingGraph == &graph, "Visibility audit belongs to the recorded graph");
+            device.visibilityBindingGraph = nullptr;
+            device.visibilityBindingTarget = {};
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            Check(graph.CaptureDiagnosticSnapshot(snapshot), "Visibility descriptor consumer snapshot");
+            const auto consumers = std::ranges::count_if(snapshot.passes, [](const auto& pass)
+            {
+                return !pass.culled && (pass.name == "METEOR.Scene.Material.CountTiles" ||
+                    pass.name == "METEOR.Scene.Material.ScatterTiles" ||
+                    pass.name == "METEOR.Scene.Material.Resolve" || pass.name == "METEOR.Scene.Temporal.Resolve");
+            });
+            Check(device.visibilityBindingAllocations.load(std::memory_order_relaxed) ==
+                      static_cast<unsigned>(consumers),
+                  "Each live visibility consumer allocates one SRV table independent of material bucket count");
+        }
+    };
+
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descriptions) override
     {
         if (forbidAllocations)
         {
             throw std::runtime_error("A graph callback allocated descriptors.");
+        }
+        if (visibilityBindingGraph && descriptions.size() == 1)
+        {
+            const auto& desc = descriptions.front();
+            const EnhancedRenderGraph::ExecuteContext execution{visibilityBindingGraph};
+            if (desc.kind == RHIBindingDesc::Kind::ShaderResource && desc.dim == RHIBindingDesc::Dim::Texture2D &&
+                desc.format == RHIFormat::RG32Uint && desc.resource.IsValid() &&
+                desc.resource == execution.ResolveHandle(visibilityBindingTarget))
+            {
+                visibilityBindingAllocations.fetch_add(1, std::memory_order_relaxed);
+            }
         }
         return ProbeDevice::CreateBindings(descriptions);
     }
@@ -2852,6 +2911,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             RHICompletionPoint graphCompletion;
             RHISubmissionTicket graphTicket;
             std::unique_ptr<SceneSubmissionGate> submissionGate;
+            RecordingChangeDevice::VisibilityBindingAudit visibilityBindings{device, *graph, outputs.visibility};
             if (workers)
             {
                 graph->SetParallelRecordCostThreshold(0);
@@ -2870,7 +2930,10 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 graphCompletion = graphTicket.GetRecordedBatch()->GetCompletionPoint();
             }
             else
+            {
                 Check(graph->Execute(error), "Scene sequential graph execution " + error);
+            }
+            visibilityBindings.Verify();
             if (expanded == 4 && step == 5)
             {
                 auto newerDraws = graphDraws;

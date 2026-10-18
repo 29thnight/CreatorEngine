@@ -1,7 +1,6 @@
 #pragma once
 #include "JobGraph.h"
-#include "JobSpin.h"
-#include "JobScheduler.h"
+#include "RHIRecordingTaskGraph.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
 struct RHIRecordingUnitTiming
@@ -23,22 +22,16 @@ struct RHIRecordingDiagnostics
     uint64_t frameId{0};
     bool timingEnabled{false}, dependencyGraph{false}, batchSubmit{false};
     bool unitTimingsTruncated{false}, jobTimingsTruncated{false};
-    bool workerSpinScopeAccepted{false};
-    uint32_t ownerSpinMicroseconds{0}, workerSpinMicroseconds{0};
-    uint32_t frameSpinMicroseconds{0}, spinWorkers{0};
     uint64_t dispatchBeginNanoseconds{0}, waitBeginNanoseconds{0}, returnNanoseconds{0};
     std::shared_ptr<job_graph_diagnostics> jobs;
     std::vector<RHIRecordingTaskIdentity> tasks;
     std::vector<RHIRecordingUnitTiming> units;
-    job_wait_statistics ownerWait;
-    job_spin_statistics workerSpin;
+    RHIRecordingTaskTopology topology;
 };
 
 struct RHIRecordingPolicy
 {
     bool batchSubmit{true}, timingEnabled{false};
-    uint32_t ownerSpinMicroseconds{0}, workerSpinMicroseconds{0};
-    uint32_t frameSpinMicroseconds{200}, spinWorkers{1};
 
     static uint32_t ReadBounded(const char* name, uint32_t fallback, uint32_t maximum)
     {
@@ -84,10 +77,6 @@ struct RHIRecordingPolicy
             RHIRecordingPolicy value;
             value.batchSubmit = ReadBounded("CREATOR_RECORDING_BATCH_SUBMIT", 1, 1) != 0;
             value.timingEnabled = ReadBounded("CREATOR_RECORDING_JOB_TRACE", 0, 1) != 0;
-            value.ownerSpinMicroseconds = ReadBounded("CREATOR_RECORDING_OWNER_SPIN_US", 0, 200);
-            value.workerSpinMicroseconds = ReadBounded("CREATOR_RECORDING_WORKER_SPIN_US", 0, 200);
-            value.frameSpinMicroseconds = ReadBounded("CREATOR_RECORDING_SPIN_FRAME_US", 200, 2000);
-            value.spinWorkers = ReadBounded("CREATOR_RECORDING_SPIN_WORKERS", 1, 8);
             return value;
         }();
         return policy;
