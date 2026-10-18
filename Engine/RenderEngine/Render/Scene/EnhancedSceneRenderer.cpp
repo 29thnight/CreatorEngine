@@ -2857,6 +2857,9 @@ namespace
         TemporalMeasurementProvenance nativeRecordProvenance;
         uint32_t nativeRecordWaves{0}, nativeRecordDispatches{0}, nativeRecordJobs{0};
         uint32_t nativeRecordOwnerJoins{0};
+        uint32_t nativeRecordDispatcherHandoffs{0};
+        bool nativeRecordBatched{false};
+        std::shared_ptr<const RHIRecordingDiagnostics> nativeRecordDiagnostics;
         uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
         uint64_t nativeRecordEstimatedWork{0};
         bool nativeRecordParallelDeclined{false};
@@ -2873,6 +2876,9 @@ namespace
             nativeRecordWaves = stats.recordingWaveCount;
             nativeRecordDispatches = stats.recordingJobDispatchCount;
             nativeRecordOwnerJoins = stats.recordingOwnerJoinCount;
+            nativeRecordDispatcherHandoffs = stats.recordingDispatcherHandoffCount;
+            nativeRecordBatched = stats.recordingNativeGraph;
+            nativeRecordDiagnostics = stats.recordingDiagnostics;
             nativeRecordJobs = stats.recordingWorkerJobCount;
             nativeRecordTargets = stats.recordWorkers;
             nativeRecordUnits = stats.recordUnits;
@@ -3053,6 +3059,9 @@ namespace
             debugSnapshot.nativeRecordWaves = nativeRecordWaves;
             debugSnapshot.nativeRecordDispatches = nativeRecordDispatches;
             debugSnapshot.nativeRecordOwnerJoins = nativeRecordOwnerJoins;
+            debugSnapshot.nativeRecordDispatcherHandoffs = nativeRecordDispatcherHandoffs;
+            debugSnapshot.nativeRecordBatched = nativeRecordBatched;
+            debugSnapshot.nativeRecordDiagnostics = nativeRecordDiagnostics;
             debugSnapshot.nativeRecordJobs = nativeRecordJobs;
             debugSnapshot.nativeRecordTargets = nativeRecordTargets;
             debugSnapshot.nativeRecordUnits = nativeRecordUnits;

@@ -82,6 +82,12 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
         return false;
     }
     m_queueDiagnostics = {};
+    m_stats.recordingJobDispatchCount = 0;
+    m_stats.recordingOwnerJoinCount = 0;
+    m_stats.recordingDispatcherHandoffCount = 0;
+    m_stats.recordingWorkerJobCount = 0;
+    m_stats.recordingNativeGraph = false;
+    m_stats.recordingDiagnostics.reset();
     auto& diagnostic = m_queueDiagnostics;
     diagnostic.requestedExecutionMode = GetQueueExecutionMode();
     diagnostic.measurementDomain = GetMeasurementDomain();
@@ -547,6 +553,10 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             }
             else if (workers == 1)
             {
+                ++m_stats.recordingJobDispatchCount;
+                ++m_stats.recordingOwnerJoinCount;
+                ++m_stats.recordingDispatcherHandoffCount;
+                ++m_stats.recordingWorkerJobCount;
                 recorder.RunParallel([&](uint32_t) { recordSerial(); }, 1);
             }
             for (uint32_t wave = 0; workers > 1 && !recordingSideEffect && wave < waveCount;)
@@ -559,6 +569,10 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                         ++wave;
                     }
                     const uint32_t end = wave;
+                    ++m_stats.recordingJobDispatchCount;
+                    ++m_stats.recordingOwnerJoinCount;
+                    ++m_stats.recordingDispatcherHandoffCount;
+                    ++m_stats.recordingWorkerJobCount;
                     recorder.RunParallel([&](uint32_t)
                     {
                         for (uint32_t run = begin; run < end; ++run)
@@ -571,6 +585,10 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                 {
                     const auto& active = waveTargets[wave];
                     const uint32_t jobs = (std::min)(workers, static_cast<uint32_t>(active.size()));
+                    ++m_stats.recordingJobDispatchCount;
+                    ++m_stats.recordingOwnerJoinCount;
+                    ++m_stats.recordingDispatcherHandoffCount;
+                    m_stats.recordingWorkerJobCount += jobs;
                     recorder.RunParallel([&](uint32_t job)
                     {
                         for (size_t index = job; index < active.size(); index += jobs)

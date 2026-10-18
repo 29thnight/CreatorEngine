@@ -46,6 +46,9 @@
     <ClInclude Include="Core.Runtime.h" />
     <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="JobScheduler.h" />
+    <ClInclude Include="JobGraph.h" />
+    <ClInclude Include="JobSpin.h" />
+    <ClInclude Include="ThreadPoolSpin.h" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="WindowsCoreWindow.h" />
     <ClInclude Include="WindowsWindow.h" />

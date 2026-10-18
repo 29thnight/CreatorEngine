@@ -923,6 +923,7 @@
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
     <ClInclude Include="RHI\RHICommandRecordingJobs.h" />
     <ClInclude Include="RHI\RHIRecordingTaskGraph.h" />
+    <ClInclude Include="RHI\RHIRecordingDiagnostics.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />
     <ClInclude Include="RHI\RHISubmissionThread.h" />
     <ClInclude Include="TextureImage.h" />
