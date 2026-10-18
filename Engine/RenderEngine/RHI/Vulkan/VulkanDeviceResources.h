@@ -157,6 +157,17 @@ public:
     {
         return m_meshShaderCapabilities;
     }
+    RHIShaderArrayCapabilities GetShaderArrayCapabilities() const override
+    {
+        return m_shaderArrayCapabilities;
+    }
+    RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
+    bool IsAtomicMin64Buffer(RHIBufferHandle handle) const override
+    {
+        const auto entry = m_resourceTable.Resolve(handle);
+        return m_atomicCapabilities.bufferInt64Min && entry.IsValid() && entry.allowUnorderedAccess &&
+               entry.bytes != 0 && entry.bytes % 8 == 0;
+    }
     bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) override;
 
@@ -376,6 +387,10 @@ private:
     bool             m_meshShaderExtensionSupported{ false };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
     RHIMeshShaderCapabilities m_meshShaderCapabilities;
+    RHIShaderArrayCapabilities m_shaderArrayCapabilities;
+    RHIAtomicCapabilities m_atomicCapabilities;
+    VkPhysicalDeviceDescriptorIndexingProperties m_descriptorIndexing{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     VulkanViewportLimits m_viewportLimits;
     bool             m_uploadMemoryPressure{ false };
     RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;

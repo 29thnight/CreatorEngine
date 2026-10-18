@@ -56,6 +56,9 @@ struct RenderBindings
     RHISamplerTable samplers;
     std::shared_ptr<BindlessMaterialFrame> bindless;
     RHIBufferSlice descriptorIndices;
+    // CPU values for the recording's shared packet material table. GPU upload
+    // addresses are deliberately not persisted as material identity.
+    std::array<std::uint32_t, 128> descriptorIndexValues{};
     const IRenderDeviceServices* device{};
     std::uint64_t recordingId{};
     std::uint64_t descriptorVersion{};

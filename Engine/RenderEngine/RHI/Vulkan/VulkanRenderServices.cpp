@@ -1616,6 +1616,7 @@ bool VulkanDeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     VulkanBufferEntry entry{};
     entry.bytes = desc.bytes;
     entry.allowIndirectArguments = desc.allowIndirectArguments;
+    entry.allowUnorderedAccess = desc.allowUnorderedAccess;
 
     VkResult made = vkCreateBuffer(m_device, &info, nullptr, &entry.buffer);
     if (VK_SUCCESS != made)

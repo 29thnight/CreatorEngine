@@ -9,13 +9,8 @@ namespace
 {
     constexpr uint32_t kVkMaxSetsPerPool = 256;
 
-    const VkDescriptorPoolSize kVkPoolBudget[] = {
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 256 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 128 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  512 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  256 },
-        { VK_DESCRIPTOR_TYPE_SAMPLER,        128 },
-    };
+    // Same order as VulkanDescriptorTypes; larger layouts grow individual kinds.
+    constexpr VulkanDescriptorCounts kVkPoolMinimum{256, 128, 512, 256, 128};
 
     uint64_t VulkanUploadAlignUp(uint64_t value, uint64_t alignment)
     {
@@ -699,7 +694,7 @@ uint64_t VulkanUploadSegmentAllocator::GetRecordingUsedBytes() const
 
 bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device,
     uint32_t initialVersions,
-    std::string& outError)
+    std::string& outError, uint32_t maxIndexingPoolDescriptors)
 {
     if (VK_NULL_HANDLE == device || 0 == initialVersions)
     {
@@ -708,6 +703,7 @@ bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device,
     }
 
     Shutdown(device);
+    m_maxIndexingPoolDescriptors = maxIndexingPoolDescriptors;
     m_versions.Reset(initialVersions);
     m_pools.resize(initialVersions);
     for (uint32_t slot = 0; slot < initialVersions; ++slot)
@@ -724,7 +720,8 @@ bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device,
     return true;
 }
 
-bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, size_t page, std::string& outError)
+bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, size_t page, std::string& outError,
+    const VulkanDescriptorRequirements& requirements)
 {
     if (VK_NULL_HANDLE == device)
         return false;
@@ -740,10 +737,33 @@ bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, si
         return false;
     }
 
+    std::array<VkDescriptorPoolSize, VulkanDescriptorTypes.size()> budget{};
+    PoolPage candidate;
+    uint64_t descriptors{};
+    for (size_t type = 0; type < budget.size(); ++type)
+    {
+        budget[type] = { VulkanDescriptorTypes[type],
+            (std::max)(kVkPoolMinimum[type], requirements.counts[type]) };
+        candidate.capacity[type] = budget[type].descriptorCount;
+        descriptors += budget[type].descriptorCount;
+    }
+    if (m_maxIndexingPoolDescriptors &&
+        descriptors > uint64_t(m_maxIndexingPoolDescriptors) - m_allocatedPoolDescriptors)
+    {
+        outError = "Vulkan descriptor pools exceed maxUpdateAfterBindDescriptorsInAllPools.";
+        return false;
+    }
+    // Allocate owner storage before creating the native object.
+    m_pools[slot].reserve(page + 1);
+
     VkDescriptorPoolCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    // Layouts that select indexing limits require matching pools. Bindings
+    // remain immutable; this flag does not enable updates to a recorded set.
+    if (m_maxIndexingPoolDescriptors)
+        info.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
     info.maxSets = kVkMaxSetsPerPool;
-    info.poolSizeCount = static_cast<uint32_t>(std::size(kVkPoolBudget));
-    info.pPoolSizes = kVkPoolBudget;
+    info.poolSizeCount = static_cast<uint32_t>(budget.size());
+    info.pPoolSizes = budget.data();
     VkDescriptorPool pool = VK_NULL_HANDLE;
     const VkResult made = vkCreateDescriptorPool(device, &info, nullptr, &pool);
     if (VK_SUCCESS != made)
@@ -751,7 +771,9 @@ bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, si
         outError = "디스크립터 pool version 생성 실패 — " + ResultToString(made);
         return false;
     }
-    m_pools[slot].push_back(pool);
+    candidate.handle = pool;
+    m_pools[slot].push_back(candidate);
+    m_allocatedPoolDescriptors += descriptors;
     return true;
 }
 
@@ -761,13 +783,15 @@ void VulkanDescriptorPoolRecycler::Shutdown(VkDevice device)
     {
         for (const auto& version : m_pools)
         {
-            for (VkDescriptorPool pool : version)
+            for (const PoolPage& pool : version)
             {
-                vkDestroyDescriptorPool(device, pool, nullptr);
+                vkDestroyDescriptorPool(device, pool.handle, nullptr);
             }
         }
     }
     m_pools.clear();
+    m_allocatedPoolDescriptors = 0;
+    m_maxIndexingPoolDescriptors = 0;
     m_versions.Reset();
     m_activeVersion = {};
     m_activePool = VK_NULL_HANDLE;
@@ -802,9 +826,9 @@ bool VulkanDescriptorPoolRecycler::BeginRecording(VkDevice device, uint64_t reco
         return false;
     }
 
-    for (VkDescriptorPool pool : m_pools[acquired.handle.slot])
+    for (const PoolPage& pool : m_pools[acquired.handle.slot])
     {
-        const VkResult reset = vkResetDescriptorPool(device, pool, 0);
+        const VkResult reset = vkResetDescriptorPool(device, pool.handle, 0);
         if (VK_SUCCESS != reset)
         {
             m_versions.AbortRecording(recordingId);
@@ -815,7 +839,7 @@ bool VulkanDescriptorPoolRecycler::BeginRecording(VkDevice device, uint64_t reco
 
     m_activeVersion = acquired.handle;
     m_activePage = 0;
-    m_activePool = m_pools[acquired.handle.slot].front();
+    m_activePool = m_pools[acquired.handle.slot].front().handle;
     m_recordingSets = 0;
     return true;
 }
@@ -851,13 +875,15 @@ void VulkanDescriptorPoolRecycler::RecordPeak(uint32_t used)
         m_peakRecordingSets = used;
 }
 
-VkDescriptorSet VulkanDescriptorPoolRecycler::Allocate(VkDevice device, VkDescriptorSetLayout setLayout)
+VkDescriptorSet VulkanDescriptorPoolRecycler::Allocate(VkDevice device, VkDescriptorSetLayout setLayout,
+    const VulkanDescriptorRequirements& requirements)
 {
     // VkDescriptorPool은 host access가 externally synchronized다. 병렬 command
     // recording worker가 같은 version에서 set을 요청해도 native 호출은 직렬화한다.
     const std::lock_guard lock(m_allocationMutex);
     if (VK_NULL_HANDLE == device || VK_NULL_HANDLE == setLayout || VK_NULL_HANDLE == m_activePool ||
-        !m_versions.IsCurrent(m_activeVersion))
+        !m_versions.IsCurrent(m_activeVersion) ||
+        (requirements.indexingLimits && !m_maxIndexingPoolDescriptors))
     {
         ++m_allocationFailures;
         return VK_NULL_HANDLE;
@@ -869,6 +895,31 @@ VkDescriptorSet VulkanDescriptorPoolRecycler::Allocate(VkDevice device, VkDescri
 
     VkDescriptorSet set = VK_NULL_HANDLE;
     bool emptyPage = false;
+    const auto fits = [&](const PoolPage& page) {
+        for (size_t type = 0; type < requirements.counts.size(); ++type)
+            if (requirements.counts[type] > page.capacity[type]) return false;
+        return true;
+    };
+    const auto selectPage = [&](size_t page) {
+        const auto slot = m_activeVersion.slot;
+        // Pages after the active page are empty in this recording; retain
+        // undersized ones for other layouts in a future completed version.
+        while (page < m_pools[slot].size() && !fits(m_pools[slot][page])) ++page;
+        std::string error;
+        if (!EnsurePool(device, slot, page, error, requirements)) return false;
+        m_activePage = page;
+        m_activePool = m_pools[slot][page].handle;
+        return true;
+    };
+    if (!fits(m_pools[m_activeVersion.slot][m_activePage]))
+    {
+        if (!selectPage(m_activePage + 1))
+        {
+            ++m_allocationFailures;
+            return VK_NULL_HANDLE;
+        }
+        emptyPage = true;
+    }
     for (;;)
     {
         info.descriptorPool = m_activePool;
@@ -882,15 +933,11 @@ VkDescriptorSet VulkanDescriptorPoolRecycler::Allocate(VkDevice device, VkDescri
             ++m_allocationFailures;
             return VK_NULL_HANDLE;
         }
-        const size_t nextPage = m_activePage + 1;
-        std::string error;
-        if (!EnsurePool(device, m_activeVersion.slot, nextPage, error))
+        if (!selectPage(m_activePage + 1))
         {
             ++m_allocationFailures;
             return VK_NULL_HANDLE;
         }
-        m_activePage = nextPage;
-        m_activePool = m_pools[m_activeVersion.slot][nextPage];
         emptyPage = true;
     }
     ++m_allocations;

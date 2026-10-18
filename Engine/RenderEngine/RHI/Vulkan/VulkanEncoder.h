@@ -339,6 +339,7 @@ private:
         /// 확인해 binding을 확정한다.
         uint32_t               param{ UINT32_MAX };
         uint32_t               binding{ 0 };
+        uint32_t               arrayElement{ 0 };
         VkDescriptorType       type{ VK_DESCRIPTOR_TYPE_MAX_ENUM };
         Value                  value{ Value::Buffer };
         VkDescriptorBufferInfo buffer{};
@@ -346,6 +347,8 @@ private:
     };
 
     void UpsertBinding(size_t bindPointIndex, const PendingBinding& binding);
+    void ReplaceTableBindings(size_t bindPointIndex, uint32_t firstBinding,
+        uint32_t bindingCount, std::span<const PendingBinding> bindings);
 
     /// 미구현을 센다. 이름은 리터럴이라 수명 걱정이 없다.
     void NoteUnimplemented(const char* name)

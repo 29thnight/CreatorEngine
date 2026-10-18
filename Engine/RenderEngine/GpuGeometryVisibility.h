@@ -22,13 +22,19 @@ class MeshSurfaceBatch;
 class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 {
     struct BufferPool;
+    struct MeshletInputs;
     struct SharedBatch;
+    enum class MeshletStage : std::uint8_t { Reset, Cull, Count, Finalize, Scatter };
 
   public:
     static constexpr std::uint32_t kConservative = 1;
     static constexpr std::uint32_t kNoOcclusion = 2;
     // Meshlet bins: survivors keep source meshlet order (blended primitives).
     static constexpr std::uint32_t kOrderedMeshlets = 16;
+    // Meshlet-only layout bits. Instance visibility keeps its original ABI.
+    static constexpr std::uint32_t kGroupSelection = 64;
+    static constexpr std::uint32_t kReuseFirstGroups = 128;
+    static constexpr std::uint32_t kReuseBinGroups = 256;
     static constexpr std::uint32_t kWaveWorkQueue = 0x80000000u;
     static constexpr std::uint32_t kWorkRingHeaderWords = 16;
     static constexpr std::uint32_t kSharedViewCapacity = 8;
@@ -44,7 +50,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     struct Candidate
     {
         // Instance bins: world center/radius (nonpositive means unknown).
-        // Meshlet range bins (flags 8): {LOD width, height, 0, maxPixelError}.
+        // Meshlet range bins (flags 8): {LOD width, height, group owner bin,
+        // maxPixelError}. The owner is an exact integer for at most 4096 bins.
         math::vector4 sphere{};
         std::uint32_t bin{}, sourceIndex{}, outputOffset{}, flags{};
     };
@@ -53,10 +60,12 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     struct Bin
     {
         std::uint32_t indexCount{}, firstIndex{};
+        // Meshlet group layout: group count; ordinary draws: signed base vertex.
         std::int32_t baseVertex{};
         // Zero compacts visible IDs. Nonzero preserves the original complete
         // instance stream: count is N or 0, never a reordered subset. Candidates
         // must provide every original sourceIndex 0..N-1 exactly once.
+        // Meshlet group layout uses this word as its first 64-meshlet scan tile.
         std::uint32_t preservedInstanceCount{};
     };
     static_assert(sizeof(Bin) == 16);
@@ -117,6 +126,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::uint64_t WorkQueueByteOffset() const;
         RHIBufferHandle WorkQueueBuffer() const;
         RGHandle GraphWorkQueue(const EnhancedRenderGraph& graph) const;
+        // Source-task upper bound. GPU queue counters contain the scheduled
+        // resident LOD tasks after group selection, not this candidate bound.
         std::uint32_t WorkQueueTaskCount() const;
         std::uint32_t WorkQueuePartitionCount() const;
         std::uint32_t WorkQueueViewCount() const;
@@ -135,14 +146,15 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         Frame() = default;
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
         static std::shared_ptr<SharedBatch> BuildShared(std::span<const std::shared_ptr<const Frame>> frames);
+        void UploadMeshletInputs() const;
         void Dispatch(RHIEncoder& encoder, bool reset, RHIBindingTable depth = {}) const;
-        // Meshlet lists only: turns culled per-bin counts into draw arguments.
-        void DispatchMeshletFinalize(RHIEncoder& encoder) const;
-        void ConsumeStreamingFeedback() const;
+        void DispatchMeshletStage(RHIEncoder& encoder, MeshletStage stage, RHIBindingTable depth = {}) const;
+        static void ConsumeStreamingFeedback(std::span<const std::shared_ptr<const Frame>> frames);
 
         std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
         std::vector<std::uint32_t> m_meshletOffsets;
-        RHIBindingTable m_meshletVertices, m_meshletTopologies;
+        mutable RHIBindingTable m_meshletVertices, m_meshletTopologies;
+        std::shared_ptr<MeshletInputs> m_meshletInputs;
         std::uint32_t m_meshletGroups{}, m_meshletJobs{};
         PreparedStats m_preparedStats{};
         IRenderDeviceServices* m_device{};
@@ -155,14 +167,15 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::vector<RHIReadback> m_streamingFeedback;
         mutable std::atomic<bool> m_feedbackRecorded{};
         mutable std::atomic<bool> m_poolReusable{true};
-        RHIBufferSlice m_candidates, m_bins, m_constants;
-        RHIBindingTable m_outputs;
-        RHIBufferSlice m_historyProjection;
+        mutable RHIBufferSlice m_candidates, m_bins, m_constants;
+        mutable RHIBindingTable m_outputs;
+        mutable RHIBufferSlice m_historyProjection;
         std::shared_ptr<const Frame> m_firstStage;
         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_historyPyramid;
         bool m_ordered{};
-        RHIBufferSlice m_meshletWorlds;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletFinalize;
+        mutable RHIBufferSlice m_meshletWorlds;
+        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletCount,
+            m_meshletFinalize, m_meshletScatter;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_occlusionCull;
         GpuGeometryOcclusion::ViewKey m_occlusionView;
 
@@ -172,8 +185,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_graphVisibleIds, m_graphArguments;
         mutable std::shared_ptr<SharedBatch> m_sharedBatch;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_sharedReset, m_sharedCull, m_sharedOcclusion,
-            m_sharedFinalize;
+        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_sharedReset, m_sharedCull,
+            m_sharedOcclusion, m_sharedCount, m_sharedFinalize, m_sharedScatter;
     };
 
     GpuGeometryVisibility() = default;
@@ -191,6 +204,10 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     // Preflight during the caller's backend shader-output scope. Ordered range
     // bins can then be allocated during declaration without compiling new PSOs.
     bool PreparePipelines(const EnhancedFrameContext& context, std::string& error);
+    // Run on the owner before parallel PrepareMeshlets calls. Workers retain one
+    // recording/descriptor epoch; declaration, lifecycle and retirement stay on
+    // the owner after their join. This prewarms every meshlet stage/variant.
+    bool PrepareMeshletPipelines(const EnhancedFrameContext& context, std::string& error);
 
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                  std::span<const Candidate> candidates, std::span<const Bin> bins, std::shared_ptr<const Frame>& result,
@@ -237,12 +254,14 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 
     IRenderDeviceServices* m_device{};
     std::shared_ptr<BufferPool> m_bufferPool;
-    LX::Runtime::ComputePipeline m_reset, m_cull, m_meshletReset, m_meshletCull, m_meshletFinalize;
+    LX::Runtime::ComputePipeline m_reset, m_cull, m_meshletReset, m_meshletCull,
+        m_meshletCount, m_meshletFinalize, m_meshletScatter;
     LX::Runtime::ComputePipeline m_meshletOcclusionCull;
     LX::Runtime::ComputePipeline m_meshletHistoryCull, m_meshletRecoveryCull;
     LX::Runtime::ComputePipeline m_occlusionCull;
 
-    LX::Runtime::ComputePipeline m_sharedReset, m_sharedCull, m_sharedOcclusion, m_sharedFinalize;
+    LX::Runtime::ComputePipeline m_sharedReset, m_sharedCull, m_sharedOcclusion,
+        m_sharedCount, m_sharedFinalize, m_sharedScatter;
     std::mutex m_recordingMutex;
     std::map<std::uint64_t, Recording> m_recordings;
     std::uint64_t m_completed{};

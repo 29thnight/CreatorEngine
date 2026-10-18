@@ -16,6 +16,33 @@ constexpr std::uint32_t kVisibilityDispatchWidth = 65535;
 constexpr std::uint32_t kMeshletBinCapacity = 4096;
 // Root 6 of every meshlet layout: per-bin object-to-world columns.
 constexpr std::uint32_t kMeshletWorldRegister = 8211;
+constexpr std::uint32_t kOrderedScanDispatch = 0x40000000u;
+
+std::uint32_t GroupMaskWords(std::uint32_t groups) { return (groups + 15u) / 16u; }
+std::uint32_t FeedbackWords(std::uint32_t groups) { return (groups + 31u) / 32u; }
+
+std::uint32_t MeshletDescriptorCount(const IRenderDeviceServices& device, std::uint32_t bins)
+{
+    return device.GetShaderArrayCapabilities().partiallyBoundSrvArrays ? bins : kMeshletBinCapacity;
+}
+
+std::uint64_t MeshletOutputWords(const GpuGeometryVisibility::Candidate& candidate,
+                                  const GpuGeometryVisibility::Bin& bin)
+{
+    if ((candidate.flags & GpuGeometryVisibility::kGroupSelection) == 0)
+        return std::uint64_t(bin.indexCount) * ((candidate.flags & 32u) ? 3u : 2u) + 1u;
+    const auto groups = static_cast<std::uint32_t>(bin.baseVertex);
+    const auto groupWords = (candidate.flags & GpuGeometryVisibility::kReuseBinGroups) ? 0u :
+        GroupMaskWords(groups) * 2u + ((candidate.flags & 32u) ? FeedbackWords(groups) : 0u);
+    return std::uint64_t(bin.indexCount) * 2u + 1u + groupWords +
+           ((candidate.flags & GpuGeometryVisibility::kOrderedMeshlets) ? (bin.indexCount + 63u) / 64u : 0u);
+}
+
+std::uint64_t MeshletFeedbackOffset(const GpuGeometryVisibility::Bin& bin)
+{
+    return std::uint64_t(bin.firstIndex) + 1u + std::uint64_t(bin.indexCount) * 2u +
+           GroupMaskWords(static_cast<std::uint32_t>(bin.baseVertex)) * 2u;
+}
 
 std::uint32_t VisibilityGroups(std::uint32_t elements)
 {
@@ -108,6 +135,15 @@ GeometryVisibilityConstants VisibilityConstants(const math::matrix4x4& matrix, s
     return constants;
 }
 } // namespace
+
+// Sealed CPU input. Declaration chooses a single-view or shared upload once;
+// no intermediate per-view upload/descriptor table is built for shared work.
+struct GpuGeometryVisibility::MeshletInputs
+{
+    GeometryVisibilityConstants constants;
+    std::vector<Candidate> candidates;
+    std::vector<Bin> bins;
+};
 
 struct GpuGeometryVisibility::BufferPool
 {
@@ -313,13 +349,13 @@ bool GpuGeometryVisibility::InitializeMeshlets(const EnhancedFrameContext& conte
                                               RHILayout::Srv(0),
                                               RHILayout::Srv(1),
                                               RHILayout::UavBufferTable(2, 0),
-                                              RHILayout::SrvBufferTable(kMeshletBinCapacity, 18),
-                                              RHILayout::SrvBufferTable(kMeshletBinCapacity, 18 + kMeshletBinCapacity),
+                                              RHILayout::SrvBufferArray(kMeshletBinCapacity, 18),
+                                              RHILayout::SrvBufferArray(kMeshletBinCapacity, 18 + kMeshletBinCapacity),
                                               RHILayout::Srv(kMeshletWorldRegister)};
     const auto layout = context.rootSignatures->GetOrCreate({parameters, {}}, error);
     if (!layout.IsValid())
         return false;
-    LX::Runtime::ComputePipeline reset, cull;
+    LX::Runtime::ComputePipeline reset, cull, count, finalize, scatter;
     const auto compile = [&](const char* entry, LX::Runtime::ComputePipeline& pipeline) {
         LX::Runtime::CompiledCompute shader;
         if (!LX::Runtime::CompileCompute(source, entry, {}, options, shader, error))
@@ -330,19 +366,23 @@ bool GpuGeometryVisibility::InitializeMeshlets(const EnhancedFrameContext& conte
         desc.csSize = shader.stage.bytecode.Size();
         return pipeline.Create(*context.psoManager, desc, std::move(shader.description), error);
     };
-    LX::Runtime::ComputePipeline finalize;
     if (!compile("ShadowMeshletResetCS", reset) || !compile("ShadowMeshletCullCS", cull) ||
-        !compile("MeshletFinalizeCS", finalize))
+        !compile("MeshletCountCS", count) ||
+        !compile("MeshletFinalizeCS", finalize) || !compile("MeshletScatterCS", scatter))
         return false;
     m_meshletReset = std::move(reset);
     m_meshletCull = std::move(cull);
+    m_meshletCount = std::move(count);
     m_meshletFinalize = std::move(finalize);
+    m_meshletScatter = std::move(scatter);
     return true;
 }
 
 bool GpuGeometryVisibility::InitializeSharedMeshlets(const EnhancedFrameContext& context, std::string& error)
 {
-    if (m_sharedCull.GetGeneration())
+    if (m_sharedReset.GetGeneration() && m_sharedCull.GetGeneration() &&
+        m_sharedOcclusion.GetGeneration() && m_sharedCount.GetGeneration() && m_sharedFinalize.GetGeneration() &&
+        m_sharedScatter.GetGeneration())
     {
         return true;
     }
@@ -350,14 +390,14 @@ bool GpuGeometryVisibility::InitializeSharedMeshlets(const EnhancedFrameContext&
                                           RHILayout::Srv(0),
                                           RHILayout::Srv(1),
                                           RHILayout::UavBufferTable(2, 0),
-                                          RHILayout::SrvBufferTable(kMeshletBinCapacity, 18),
-                                          RHILayout::SrvBufferTable(kMeshletBinCapacity, 4114),
+                                          RHILayout::SrvBufferArray(kMeshletBinCapacity, 18),
+                                          RHILayout::SrvBufferArray(kMeshletBinCapacity, 4114),
                                           RHILayout::Srv(8211),
                                           RHILayout::Srv(8212),
-                                          RHILayout::UavBufferTable(kSharedViewCapacity, 2),
-                                          RHILayout::UavBufferTable(kSharedViewCapacity, 10),
-                                          RHILayout::SrvBufferTable(kSharedViewCapacity, 8213),
-                                          RHILayout::SrvTable(kSharedViewCapacity * kOcclusionLevels, 16384)};
+                                          RHILayout::UavBufferArray(kSharedViewCapacity, 2),
+                                          RHILayout::UavBufferArray(kSharedViewCapacity, 10),
+                                          RHILayout::SrvBufferArray(kSharedViewCapacity, 8213),
+                                          RHILayout::SrvArray(kSharedViewCapacity * kOcclusionLevels, 16384)};
     const auto layout = context.rootSignatures->GetOrCreate({params, {}}, error);
     if (!layout.IsValid())
     {
@@ -387,7 +427,9 @@ bool GpuGeometryVisibility::InitializeSharedMeshlets(const EnhancedFrameContext&
     return compile("ShadowMeshletResetCS", false, m_sharedReset) &&
            compile("ShadowMeshletCullCS", false, m_sharedCull) &&
            compile("ShadowMeshletCullCS", true, m_sharedOcclusion) &&
-           compile("MeshletFinalizeCS", false, m_sharedFinalize);
+           compile("MeshletCountCS", false, m_sharedCount) &&
+           compile("MeshletFinalizeCS", false, m_sharedFinalize) &&
+           compile("MeshletScatterCS", false, m_sharedScatter);
 }
 
 bool GpuGeometryVisibility::MeshletQueueStorageWords(std::uint64_t outputWords, std::uint64_t tasks, std::uint64_t bins,
@@ -419,12 +461,19 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     ce::profile_scope profile{ce::marker<"GeometryVisibilityPrepare">()};
     std::vector<Candidate> candidates;
     std::vector<Bin> bins;
+    // Direct-cluster chunks retain one immutable stream/hierarchy and residency
+    // snapshot. Identical transforms in this view share only their group masks;
+    // each chunk still owns its classification, IDs and indirect arguments.
+    using GroupKey = std::tuple<std::uintptr_t, std::uintptr_t, std::array<std::uint32_t, 16>>;
+    std::map<GroupKey, std::uint32_t> groupOwners;
     std::uint64_t offset{}, groups{};
     result.reset();
     if (geometries.size() > kMeshletBinCapacity)
         return VisibilityFail(error, "METEOR meshlet work exceeds 4096 bins; no per-bin dispatch route.");
     if (!context.resources)
         return VisibilityFail(error, "Meshlet work requires its current device.");
+    candidates.reserve(geometries.size());
+    bins.reserve(geometries.size());
     for (const auto& geometry : geometries)
     {
         if (!geometry || !geometry->MeshletCount() || geometry->Device() != context.resources)
@@ -437,31 +486,50 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         if (!context.resources->GetMeshShaderCapabilities().SupportsDispatch(dispatchX, dispatchY, 1))
             return VisibilityFail(error,
                                   "Meshlet range exceeds native 2D dispatch limits; split and recook the asset.");
-        // Three cascades have independently bounded allocations, never one
-        // committed resource per draw. Oversized views fail instead of truncating.
-        std::uint32_t storageWords{};
-        const auto stride = geometry->UsesDirectClusters() ? 3u : 2u;
-        if (!MeshletQueueStorageWords(offset + std::uint64_t(count) * stride + 1u,
-                                      groups + (std::uint64_t(count) + 63u) / 64u, bins.size() + 1u, storageWords))
-        {
-            return VisibilityFail(error, "Meshlet lists, work queue and arguments exceed the 32 MiB view budget.");
-        }
+        const auto groupCount = (std::max)(1u, geometry->Input()->Hierarchy().groupCount);
+        if (groupCount > static_cast<std::uint32_t>(INT32_MAX))
+            return VisibilityFail(error, "Meshlet group count exceeds its sealed GPU range.");
         const auto bin = static_cast<std::uint32_t>(bins.size());
+        auto groupOwner = bin;
+        if (geometry->UsesDirectClusters())
+        {
+            const auto stream = geometry->Input()->ClusterStream();
+            const auto& residency = geometry->ClusterResidency();
+            if (!stream || !residency)
+                return VisibilityFail(error, "Direct cluster groups require their sealed stream and residency.");
+            std::array<std::uint32_t, 16> worldBits;
+            const auto& world = geometry->ObjectToWorld();
+            for (unsigned row = 0; row < 4; ++row)
+                for (unsigned column = 0; column < 4; ++column)
+                    worldBits[row * 4u + column] = std::bit_cast<std::uint32_t>(world.m[row][column]);
+            const GroupKey key{reinterpret_cast<std::uintptr_t>(stream.get()),
+                               reinterpret_cast<std::uintptr_t>(residency.get()), worldBits};
+            const auto [owner, inserted] = groupOwners.try_emplace(key, bin);
+            groupOwner = owner->second;
+            if (!inserted && static_cast<std::uint32_t>(bins[groupOwner].baseVertex) != groupCount)
+                return VisibilityFail(error, "Shared cluster groups have incompatible hierarchy domains.");
+        }
         // One leading word contains the GPU survivor count; IDs follow it.
         // CPU seals only one range per material/geometry bin. Compute enumerates
         // the source meshlets; no CPU-sized list of individual work items exists.
         // sourceIndex is the first 64-thread group of this range. Padding each
         // range to a group keeps descriptor selection uniform across a wave.
-        // Meshlet ranges use the otherwise unused sphere words as {LOD width, height, 0, pixel error}.
+        // The unused sphere Z word identifies a same-view group owner.
         candidates.push_back({{float(lodWidth ? lodWidth : context.width),
-                               float(lodHeight ? lodHeight : context.height), 0, maxPixelError},
+                               float(lodHeight ? lodHeight : context.height), float(groupOwner), maxPixelError},
                               bin,
                               static_cast<uint32_t>(groups),
                               static_cast<uint32_t>(offset),
-                              8u | (ordered ? kOrderedMeshlets : 0u) | (geometry->UsesDirectClusters() ? 32u : 0u)});
+                              8u | kGroupSelection | (ordered ? kOrderedMeshlets : 0u) |
+                                  (groupOwner != bin ? kReuseBinGroups : 0u) |
+                                  (geometry->UsesDirectClusters() ? 32u : 0u)});
+        bins.push_back({count, static_cast<uint32_t>(offset), static_cast<std::int32_t>(groupCount),
+                        static_cast<std::uint32_t>(groups)});
         groups += (uint64_t(count) + kVisibilityThreads - 1) / kVisibilityThreads;
-        bins.push_back({count, static_cast<uint32_t>(offset), 0, 0});
-        offset += uint64_t(count) * stride + 1;
+        offset += MeshletOutputWords(candidates.back(), bins.back());
+        std::uint32_t storageWords{};
+        if (!MeshletQueueStorageWords(offset, groups, bins.size(), storageWords))
+            return VisibilityFail(error, "Meshlet lists, group masks and arguments exceed the 32 MiB view budget.");
     }
     if (history && firstStage)
         return VisibilityFail(error, "Meshlet stage cannot both read history and recover.");
@@ -473,51 +541,46 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     if (!result)
         return true;
     auto frame = std::const_pointer_cast<Frame>(result);
-    frame->m_streamingFeedback.resize(geometries.size());
-    for (std::size_t bin = 0; bin < geometries.size(); ++bin)
-    {
-        if (geometries[bin]->UsesDirectClusters() &&
-            !m_bufferPool->AcquireReadback(uint64_t(bins[bin].indexCount) * 4, frame->m_streamingFeedback[bin], error))
-            return false;
-    }
     frame->m_ordered = ordered;
-    // Vertex streams may be object space; culling tests world positions.
-    std::vector<math::vector4> worlds;
-    worlds.reserve(geometries.size() * 3);
-    for (const auto& geometry : geometries)
-    {
-        const auto& world = geometry->ObjectToWorld();
-        for (unsigned column = 0; column < 3; ++column)
-            worlds.emplace_back(world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]);
-    }
-    frame->m_meshletWorlds = m_device->AllocateUpload({worlds.size() * sizeof(math::vector4), RHIUploadUsage::Raw, 16});
-    if (!frame->m_meshletWorlds.IsWritable())
-        return VisibilityFail(error, "Meshlet world transform upload failed.");
-    std::memcpy(frame->m_meshletWorlds.cpuAddress, worlds.data(), worlds.size() * sizeof(math::vector4));
     if (history)
     {
         history->RequireView(frame->m_occlusionView);
         if (!history->HistoryOwner())
             return VisibilityFail(error, "First stage requires retained history.");
-        math::vector4 columns[4];
-        const auto& bits = history->HistoryOwner()->source.projectionBits;
-        for (unsigned column = 0; column < 4; ++column)
-            columns[column] = {std::bit_cast<float>(bits[column]), std::bit_cast<float>(bits[4 + column]),
-                               std::bit_cast<float>(bits[8 + column]), std::bit_cast<float>(bits[12 + column])};
-        frame->m_historyProjection = m_device->UploadConstants(columns, sizeof(columns));
-        if (!frame->m_historyProjection.IsValid())
-            return VisibilityFail(error, "History projection upload failed.");
         frame->m_historyPyramid = std::move(history);
         frame->m_occlusionCull = m_meshletHistoryCull.GetGeneration();
     }
+    bool reuseGroups = false;
     if (firstStage)
     {
         if (firstStage->m_occlusionView != frame->m_occlusionView ||
             firstStage->m_meshletGeometries != frame->m_meshletGeometries ||
             firstStage->m_meshletOffsets != frame->m_meshletOffsets)
             return VisibilityFail(error, "Meshlet recovery requires the same sealed first-stage geometry and view.");
+        // Occlusion history changes visibility, not desired/resident LOD.
+        // Include the explicit LOD metric in the first-stage reuse proof.
+        reuseGroups = !firstStage->m_firstStage && firstStage->m_meshletInputs &&
+                      firstStage->m_meshletInputs->candidates.size() == candidates.size();
+        for (std::size_t bin = 0; reuseGroups && bin < candidates.size(); ++bin)
+            reuseGroups = std::memcmp(&candidates[bin].sphere,
+                                      &firstStage->m_meshletInputs->candidates[bin].sphere,
+                                      sizeof(math::vector4)) == 0;
+        if (reuseGroups)
+            for (auto& candidate : frame->m_meshletInputs->candidates)
+                candidate.flags |= kReuseFirstGroups;
         frame->m_firstStage = std::move(firstStage);
         frame->m_occlusionCull = m_meshletRecoveryCull.GetGeneration();
+    }
+    if (!reuseGroups)
+    {
+        frame->m_streamingFeedback.resize(geometries.size());
+        for (std::size_t bin = 0; bin < geometries.size(); ++bin)
+        {
+            const auto words = FeedbackWords(static_cast<std::uint32_t>(bins[bin].baseVertex));
+            if (geometries[bin]->UsesDirectClusters() && (candidates[bin].flags & kReuseBinGroups) == 0 &&
+                !m_bufferPool->AcquireReadback(std::uint64_t(words) * 4u, frame->m_streamingFeedback[bin], error))
+                return false;
+        }
     }
     return true;
 }
@@ -533,8 +596,8 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
             RHILayout::Srv(0),
             RHILayout::Srv(1),
             RHILayout::UavBufferTable(2, 0),
-            RHILayout::SrvBufferTable(kMeshletBinCapacity, 18),
-            RHILayout::SrvBufferTable(kMeshletBinCapacity, 18 + kMeshletBinCapacity),
+            RHILayout::SrvBufferArray(kMeshletBinCapacity, 18),
+            RHILayout::SrvBufferArray(kMeshletBinCapacity, 18 + kMeshletBinCapacity),
             RHILayout::Srv(kMeshletWorldRegister),
             RHILayout::SrvTable(kOcclusionLevels, 2)};
         if (stage)
@@ -638,6 +701,15 @@ bool GpuGeometryVisibility::PreparePipelines(const EnhancedFrameContext& context
     return Initialize(context, error);
 }
 
+bool GpuGeometryVisibility::PrepareMeshletPipelines(const EnhancedFrameContext& context, std::string& error)
+{
+    if (!context.resources || !context.rootSignatures || !context.psoManager ||
+        !context.resources->GetCurrentUploadRecordingId())
+        return VisibilityFail(error, "Meshlet preflight requires pipeline services and an active recording.");
+    return Initialize(context, error) && InitializeMeshlets(context, error) &&
+           InitializeSharedMeshlets(context, error) && InitializeMeshletOcclusion(context, error);
+}
+
 bool GpuGeometryVisibility::PrepareInternal(
     const EnhancedFrameContext& context, const math::matrix4x4& viewProjection, std::span<const Candidate> candidates,
     std::span<const Bin> bins, std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
@@ -687,14 +759,19 @@ bool GpuGeometryVisibility::PrepareInternal(
         }
         range.offset = candidate.outputOffset;
         if (!geometries.empty())
-            range.count = bins[candidate.bin].indexCount * ((candidate.flags & 32u) ? 3u : 2u) + 1;
+        {
+            const auto words = MeshletOutputWords(candidate, bins[candidate.bin]);
+            if (words > maximum)
+                return VisibilityFail(error, "Meshlet group range exceeds 32-bit addressing.");
+            range.count = static_cast<std::uint32_t>(words);
+        }
         else
             ++range.count;
     }
     std::vector<std::vector<std::uint8_t>> preservedSources(bins.size());
     for (std::size_t bin = 0; bin < bins.size(); ++bin)
     {
-        if (bins[bin].preservedInstanceCount != 0u)
+        if (geometries.empty() && bins[bin].preservedInstanceCount != 0u)
         {
             if (ranges[bin].count != bins[bin].preservedInstanceCount)
             {
@@ -750,6 +827,8 @@ bool GpuGeometryVisibility::PrepareInternal(
     frame->m_sharedCull = m_sharedCull.GetGeneration();
     frame->m_sharedOcclusion = m_sharedOcclusion.GetGeneration();
     frame->m_sharedFinalize = m_sharedFinalize.GetGeneration();
+    frame->m_sharedCount = m_sharedCount.GetGeneration();
+    frame->m_sharedScatter = m_sharedScatter.GetGeneration();
     frame->m_recording = m_device->GetCurrentUploadRecordingId();
     frame->m_preparedStats.candidateCount = static_cast<std::uint32_t>(candidates.size());
     if (!geometries.empty())
@@ -760,7 +839,7 @@ bool GpuGeometryVisibility::PrepareInternal(
     }
     for (const auto& bin : bins)
     {
-        if (bin.preservedInstanceCount != 0u)
+        if (geometries.empty() && bin.preservedInstanceCount != 0u)
         {
             ++frame->m_preparedStats.preservedBins;
         }
@@ -785,7 +864,11 @@ bool GpuGeometryVisibility::PrepareInternal(
     frame->m_reset = !geometries.empty() ? m_meshletReset.GetGeneration() : m_reset.GetGeneration();
     frame->m_cull = !geometries.empty() ? m_meshletCull.GetGeneration() : m_cull.GetGeneration();
     if (!geometries.empty())
+    {
+        frame->m_meshletCount = m_meshletCount.GetGeneration();
         frame->m_meshletFinalize = m_meshletFinalize.GetGeneration();
+        frame->m_meshletScatter = m_meshletScatter.GetGeneration();
+    }
     if (currentFrameOcclusion)
     {
         frame->m_occlusionCull =
@@ -835,39 +918,6 @@ bool GpuGeometryVisibility::PrepareInternal(
     constants.width = frame->m_width;
     constants.height = frame->m_height;
     constants.occlusionLevels = frame->m_occlusionLevelCount;
-    const RHIUploadRequest requests[]{
-        {(std::max)(std::size_t{1}, candidates.size()) * sizeof(Candidate), RHIUploadUsage::Raw, 256},
-        {bins.size_bytes(), RHIUploadUsage::Raw, 256},
-        {sizeof(constants), RHIUploadUsage::ConstantBuffer, 256}};
-    std::array<RHIBufferSlice, 3> uploads;
-    {
-        ce::profile_scope uploadProfile{ce::marker<"GpuVisibility.PrepareUploadReserve">()};
-        if (!m_device->ReserveUploadBatch(requests, uploads, error))
-        {
-            return false;
-        }
-    }
-    for (const auto& upload : uploads)
-    {
-        if (!upload.IsWritable() || !upload.IsValid())
-        {
-            return VisibilityFail(error, "GPU visibility upload reservation is not writable.");
-        }
-    }
-    frame->m_candidates = uploads[0];
-    frame->m_bins = uploads[1];
-    frame->m_constants = uploads[2];
-    if (!candidates.empty())
-    {
-        std::memcpy(frame->m_candidates.cpuAddress, candidates.data(), candidates.size_bytes());
-    }
-    else
-    {
-        std::memset(frame->m_candidates.cpuAddress, 0, sizeof(Candidate));
-    }
-    std::memcpy(frame->m_bins.cpuAddress, bins.data(), bins.size_bytes());
-    std::memcpy(frame->m_constants.cpuAddress, &constants, sizeof(constants));
-    std::vector<RHIBindingDesc> vertices, topologies;
     for (std::uint32_t bin = 0; bin < geometries.size(); ++bin)
     {
         const auto& geometry = geometries[bin];
@@ -875,36 +925,51 @@ bool GpuGeometryVisibility::PrepareInternal(
         if (!topology.IsValid() || !topology.size || topology.offset % 4 || topology.size % 4 ||
             topology.offset / 4 > UINT32_MAX || topology.size / 4 > UINT32_MAX)
             return VisibilityFail(error, "METEOR meshlet topology cannot form a raw SRV range.");
-        vertices.push_back(RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
-                                                     material_graph::MeshSurfaceBatch::GeometryViewStride));
-        topologies.push_back(RHIBindingDesc::SrvBuffer(topology.buffer, static_cast<uint32_t>(topology.size / 4), 0,
-                                                       static_cast<uint32_t>(topology.offset / 4)));
         frame->m_meshletGroups += (geometry->MeshletCount() + kVisibilityThreads - 1) / kVisibilityThreads;
         frame->m_meshletJobs += geometry->MeshletCount();
-        frame->m_meshletOffsets.push_back(ranges[bin].offset);
+        frame->m_meshletOffsets.push_back(bins[bin].firstIndex);
     }
     if (!geometries.empty())
     {
-        ce::profile_scope bindingsProfile{ce::marker<"GpuVisibility.PrepareMeshletBindings">()};
-        frame->m_meshletVertices = m_device->CreateBindings(vertices);
-        frame->m_meshletTopologies = m_device->CreateBindings(topologies);
-        if (!frame->m_meshletVertices.IsValid() || !frame->m_meshletTopologies.IsValid())
-            return VisibilityFail(error, "METEOR meshlet input table allocation failed.");
         constants.padding = frame->m_meshletJobs;
         constants.planeMask |= kWaveWorkQueue;
-        std::memcpy(frame->m_constants.cpuAddress, &constants, sizeof(constants));
+        if ((candidates.front().flags & kOrderedMeshlets) != 0u)
+            constants.planeMask |= kOrderedScanDispatch;
+        frame->m_meshletInputs = std::make_shared<MeshletInputs>();
+        frame->m_meshletInputs->constants = constants;
+        frame->m_meshletInputs->candidates.assign(candidates.begin(), candidates.end());
+        frame->m_meshletInputs->bins.assign(bins.begin(), bins.end());
     }
-
-    const RHIBindingDesc outputs[]{
-        RHIBindingDesc::UavBuffer(frame->m_visibleIds, static_cast<std::uint32_t>(storageWords), sizeof(std::uint32_t)),
-        RHIBindingDesc::UavBuffer(frame->m_arguments, frame->m_binCount, sizeof(RHIDrawIndexedIndirectArguments))};
-    frame->m_outputs = m_device->CreateBindings(outputs);
-    if (!frame->m_outputs.IsValid() || frame->m_recording != m_device->GetCurrentUploadRecordingId() ||
-        (!geometries.empty() && (frame->m_meshletVertices.version != frame->m_outputs.version ||
-                                 frame->m_meshletTopologies.version != frame->m_outputs.version)))
+    else
     {
-        return VisibilityFail(error, "GPU visibility requires complete bindings in the same upload recording.");
+        const RHIUploadRequest requests[]{
+            {(std::max)(std::size_t{1}, candidates.size()) * sizeof(Candidate), RHIUploadUsage::Raw, 256},
+            {bins.size_bytes(), RHIUploadUsage::Raw, 256},
+            {sizeof(constants), RHIUploadUsage::ConstantBuffer, 256}};
+        std::array<RHIBufferSlice, 3> uploads;
+        if (!m_device->ReserveUploadBatch(requests, uploads, error))
+            return false;
+        for (const auto& upload : uploads)
+            if (!upload.IsWritable() || !upload.IsValid())
+                return VisibilityFail(error, "GPU visibility upload reservation is not writable.");
+        frame->m_candidates = uploads[0];
+        frame->m_bins = uploads[1];
+        frame->m_constants = uploads[2];
+        if (!candidates.empty())
+            std::memcpy(frame->m_candidates.cpuAddress, candidates.data(), candidates.size_bytes());
+        else
+            std::memset(frame->m_candidates.cpuAddress, 0, sizeof(Candidate));
+        std::memcpy(frame->m_bins.cpuAddress, bins.data(), bins.size_bytes());
+        std::memcpy(frame->m_constants.cpuAddress, &constants, sizeof(constants));
+        const RHIBindingDesc outputs[]{
+            RHIBindingDesc::UavBuffer(frame->m_visibleIds, static_cast<std::uint32_t>(storageWords), 4),
+            RHIBindingDesc::UavBuffer(frame->m_arguments, frame->m_binCount, sizeof(RHIDrawIndexedIndirectArguments))};
+        frame->m_outputs = m_device->CreateBindings(outputs);
+        if (!frame->m_outputs.IsValid())
+            return VisibilityFail(error, "GPU visibility output bindings are incomplete.");
     }
+    if (frame->m_recording != m_device->GetCurrentUploadRecordingId())
+        return VisibilityFail(error, "GPU visibility preparation changed upload recording.");
     frame->m_descriptors = m_device->GetDescriptorVersionToken();
     frame->m_occlusionView = GpuGeometryOcclusion::CaptureView(context, viewProjection);
 
@@ -955,6 +1020,11 @@ void GpuGeometryVisibility::Frame::CheckCurrent(const EnhancedRenderGraph* graph
 
 void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset, RHIBindingTable depth) const
 {
+    if (!m_meshletGeometries.empty())
+    {
+        DispatchMeshletStage(encoder, reset ? MeshletStage::Reset : MeshletStage::Cull, depth);
+        return;
+    }
     const auto count = reset ? m_binCount : m_candidateCount;
     if (!count)
         return;
@@ -964,35 +1034,21 @@ void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset, RHI
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, m_candidates);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 2, m_bins);
     encoder.SetBindings(RHIBindPoint::Compute, 3, m_outputs);
-    if (!m_meshletGeometries.empty())
-    {
-        encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
-        encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
-        encoder.SetRootBuffer(RHIBindPoint::Compute, 6, m_meshletWorlds);
-        if (reset)
-        {
-            DispatchGroups(encoder, VisibilityGroups(m_binCount));
-            return;
-        }
-        if (depth.IsValid())
-            encoder.SetBindings(RHIBindPoint::Compute, 7, depth);
-        if (m_historyProjection.IsValid())
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 8, m_historyProjection);
-        if (m_firstStage)
-            encoder.SetRootBuffer(RHIBindPoint::Compute, 8, m_firstStage->VisibleIds(0, m_firstStage->m_outputCount));
-        DispatchGroups(encoder, (std::min)(m_binCount * kInitialSubdivisions, kPersistentConsumerGroups));
-        return;
-    }
     if (!reset && depth.IsValid())
         encoder.SetBindings(RHIBindPoint::Compute, 4, depth);
     DispatchGroups(encoder, VisibilityGroups(count));
 }
 
-void GpuGeometryVisibility::Frame::DispatchMeshletFinalize(RHIEncoder& encoder) const
+void GpuGeometryVisibility::Frame::DispatchMeshletStage(RHIEncoder& encoder, MeshletStage stage,
+                                                        RHIBindingTable depth) const
 {
     if (!m_candidateCount)
         return;
-    encoder.SetPipeline(RHIBindPoint::Compute, m_meshletFinalize->GetHandle());
+    const auto& pipeline = stage == MeshletStage::Reset ? m_reset :
+                           stage == MeshletStage::Cull ? (depth.IsValid() ? m_occlusionCull : m_cull) :
+                           stage == MeshletStage::Count ? m_meshletCount :
+                           stage == MeshletStage::Finalize ? m_meshletFinalize : m_meshletScatter;
+    encoder.SetPipeline(RHIBindPoint::Compute, pipeline->GetHandle());
     encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, m_constants);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, m_candidates);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 2, m_bins);
@@ -1000,7 +1056,20 @@ void GpuGeometryVisibility::Frame::DispatchMeshletFinalize(RHIEncoder& encoder) 
     encoder.SetBindings(RHIBindPoint::Compute, 4, m_meshletVertices);
     encoder.SetBindings(RHIBindPoint::Compute, 5, m_meshletTopologies);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 6, m_meshletWorlds);
-    DispatchGroups(encoder, VisibilityGroups(m_binCount));
+    if (stage == MeshletStage::Cull)
+    {
+        if (depth.IsValid())
+            encoder.SetBindings(RHIBindPoint::Compute, 7, depth);
+        if (m_historyProjection.IsValid())
+            encoder.SetConstantBuffer(RHIBindPoint::Compute, 8, m_historyProjection);
+        if (m_firstStage)
+            encoder.SetRootBuffer(RHIBindPoint::Compute, 8, m_firstStage->VisibleIds(0, m_firstStage->m_outputCount));
+    }
+    DispatchGroups(encoder, stage == MeshletStage::Cull
+                                ? (std::min)(m_binCount * kInitialSubdivisions, kPersistentConsumerGroups)
+                            : stage == MeshletStage::Count || stage == MeshletStage::Scatter ? m_meshletGroups
+                            : stage == MeshletStage::Finalize && !m_ordered ? VisibilityGroups(m_binCount)
+                                                                                           : m_binCount);
 }
 
 void GpuGeometryVisibility::Frame::DeclareFirstStage(EnhancedRenderGraph& graph, const char* passPrefix) const
@@ -1115,15 +1184,18 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         return;
     }
     std::vector<std::shared_ptr<const Frame>> owners;
-    std::vector<EnhancedRenderGraph::RGPassUsage> resetUses, cullUses, finalizeUses;
+    std::vector<EnhancedRenderGraph::RGPassUsage> resetUses, cullUses, countUses, finalizeUses, scatterUses;
+    const bool ordered = std::ranges::any_of(frames, [](const auto& frame) {
+        return !frame->m_graph && frame->m_ordered;
+    });
     owners.reserve(frames.size());
     resetUses.reserve(frames.size() * 2u + 1u);
     finalizeUses.reserve(frames.size() * 2u);
     cullUses.reserve(static_cast<std::size_t>(totalBins) * 2u +
         frames.size() * (3u + GpuGeometryOcclusion::kMaximumLevels) + 1u);
-    std::set<std::pair<std::uint32_t, std::uint32_t>> geometryReads;
-    // Reset -> lane production/consumption -> Finalize share versioned UAV storage.
-    // Each step advances both versions, so the graph owns the UAV barriers between them.
+    std::set<std::pair<std::uint32_t, std::uint32_t>> geometryReads, topologyReads;
+    // Group reset/selection, lane work and stable compaction use separate RG
+    // versions. No shader relies on a cross-dispatch implicit UAV barrier.
     const auto advance = [&graph](const Frame& frame, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool first) {
         frame.m_graphArguments = first ? graph.Write(frame.m_graphArguments) : graph.Modify(frame.m_graphArguments);
         frame.m_graphVisibleIds = first ? graph.Write(frame.m_graphVisibleIds) : graph.Modify(frame.m_graphVisibleIds);
@@ -1154,9 +1226,16 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         advance(*frame, resetUses, true);
         advance(*frame, cullUses, false);
         for (const auto& geometry : frame->m_meshletGeometries)
-            for (auto handle : {geometry->GraphOutput(graph), geometry->GraphMeshlets(graph)})
+        {
+            const auto topology = geometry->GraphMeshlets(graph);
+            // Group selection reads the immutable hierarchy/residency and CPU
+            // world columns. Posed vertex output is needed only by the cull.
+            if (topologyReads.emplace(topology.index, topology.version).second)
+                resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
+            for (auto handle : {geometry->GraphOutput(graph), topology})
                 if (geometryReads.emplace(handle.index, handle.version).second)
                     cullUses.push_back({handle, RHIResourceState::ShaderResource, RGAccessMode::Read});
+        }
         if (frame->m_pyramid)
             frame->m_pyramid->AddReadUsages(graph, cullUses);
         if (frame->m_firstStage)
@@ -1165,12 +1244,18 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             cullUses.push_back(
                 {frame->m_firstStage->m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
         }
+        if (ordered)
+            advance(*frame, countUses, false);
         advance(*frame, finalizeUses, false);
+        if (ordered)
+            advance(*frame, scatterUses, false);
         owners.push_back(frame);
     }
     if (owners.empty())
         return;
     const auto shared = owners.size() > 1 ? BuildShared(owners) : std::shared_ptr<SharedBatch>{};
+    if (!shared)
+        owners.front()->UploadMeshletInputs();
     if (shared)
     {
         auto queue = graph.ImportBuffer(shared->queue, RHIResourceState::Common, "METEOR.SharedVisibility.Queue");
@@ -1185,63 +1270,32 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             owner->m_sharedBatch = shared;
         }
     }
-    const auto reset =
-        graph.AddPass(std::string(passPrefix) + ".Reset", std::move(resetUses), [owners, shared](const auto& execution) {
-            for (const auto& owner : owners)
-            {
-                owner->CheckCurrent(execution.graph);
-            }
-            if (shared)
-            {
-                shared->Dispatch(execution, 0);
-                return;
-            }
-            for (const auto& owner : owners)
-            {
-                owner->CheckCurrent(execution.graph);
-                owner->Dispatch(*execution.encoder, true);
-            }
-        });
-    const auto cull =
-        graph.AddPass(std::string(passPrefix) + ".Cull", std::move(cullUses), [owners, shared](const auto& execution) {
-            for (const auto& owner : owners)
-            {
-                owner->CheckCurrent(execution.graph);
-            }
-            if (shared)
-            {
-                shared->Dispatch(execution, 1);
-                return;
-            }
-            for (const auto& owner : owners)
-            {
-                owner->CheckCurrent(execution.graph);
-                owner->Dispatch(*execution.encoder, false,
-                                owner->m_pyramid ? owner->m_pyramid->Bindings(execution) : RHIBindingTable{});
-            }
-        });
-    const auto finalize =
-        graph.AddPass(std::string(passPrefix) + ".Finalize", std::move(finalizeUses), [owners, shared](const auto& execution) {
-            for (const auto& owner : owners)
-            {
-                owner->CheckCurrent(execution.graph);
-            }
-            if (shared)
-            {
-                shared->Dispatch(execution, 2);
-                return;
-            }
-            for (const auto& owner : owners)
-            {
-                owner->CheckCurrent(execution.graph);
-                owner->DispatchMeshletFinalize(*execution.encoder);
-            }
-        });
-    for (const auto pass : {reset, cull, finalize})
-    {
+    const auto declare = [&](const char* suffix, std::vector<EnhancedRenderGraph::RGPassUsage> uses,
+                             MeshletStage stage) {
+        const auto pass = graph.AddPass(std::string(passPrefix) + suffix, std::move(uses),
+            [owners, shared, stage](const auto& execution) {
+                for (const auto& owner : owners)
+                    owner->CheckCurrent(execution.graph);
+                if (shared)
+                {
+                    shared->Dispatch(execution, stage);
+                    return;
+                }
+                const auto& owner = owners.front();
+                owner->DispatchMeshletStage(*execution.encoder, stage,
+                    stage == MeshletStage::Cull && owner->m_pyramid
+                        ? owner->m_pyramid->Bindings(execution) : RHIBindingTable{});
+            });
         graph.DeclareComputeCompatible(pass);
         graph.DeclareRecordingIndependent(pass);
-    }
+    };
+    declare(".Reset", std::move(resetUses), MeshletStage::Reset);
+    declare(".Cull", std::move(cullUses), MeshletStage::Cull);
+    if (ordered)
+        declare(".CountTiles", std::move(countUses), MeshletStage::Count);
+    declare(".Finalize", std::move(finalizeUses), MeshletStage::Finalize);
+    if (ordered)
+        declare(".Scatter", std::move(scatterUses), MeshletStage::Scatter);
     for (const auto& owner : owners)
     {
         if (std::ranges::none_of(owner->m_streamingFeedback, [](const auto& r) { return r.buffer.IsValid(); }))
@@ -1255,8 +1309,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
                     const auto& readback = owner->m_streamingFeedback[bin];
                     if (!readback.buffer.IsValid())
                         continue;
-                    const auto count = owner->m_meshletGeometries[bin]->Input()->Meshlets().descriptors.size();
-                    const auto offset = (owner->m_meshletOffsets[bin] + 1 + count * 2) * sizeof(uint32_t);
+                    const auto offset = MeshletFeedbackOffset(owner->m_meshletInputs->bins[bin]) * sizeof(uint32_t);
                     execution.encoder->CopyBufferToReadback(readback, owner->m_visibleIds, offset);
                 }
                 owner->m_feedbackRecorded.store(true, std::memory_order_release);
@@ -1265,42 +1318,70 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     }
 }
 
-void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback() const
+void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const std::shared_ptr<const Frame>> frames)
 {
-    if (!m_feedbackRecorded.exchange(false, std::memory_order_acq_rel))
-        return;
-    for (uint32_t bin = 0; bin < m_streamingFeedback.size(); ++bin)
+    struct Pending
     {
-        const auto& readback = m_streamingFeedback[bin];
-        if (!readback.buffer.IsValid())
+        std::shared_ptr<assets::cluster::Stream> stream;
+        std::vector<std::uint32_t> words;
+        std::uint32_t groups{};
+    };
+    std::map<assets::cluster::Stream*, Pending> pending;
+    // The completion ledger has already detached these owners. Mapping, union
+    // and streaming admission run without its mutex or any GPU wait.
+    for (const auto& frame : frames)
+        frame->m_poolReusable.store(true, std::memory_order_release);
+    for (const auto& frame : frames)
+    {
+        if (!frame->m_feedbackRecorded.exchange(false, std::memory_order_acq_rel))
             continue;
-        RHIReadbackImage image;
-        std::string error;
-        if (!m_device->MapReadback(readback, image, error))
-            throw std::runtime_error("Completed streaming feedback readback: " + error);
-        const auto& input = m_meshletGeometries[bin]->Input();
-        const auto& descriptors = input->Meshlets().descriptors;
-        if (image.ElementCount<uint32_t>() != descriptors.size())
-            throw std::runtime_error("Streaming feedback extent mismatch");
-        // Meshlets of one group are adjacent, so skipping repeats keeps the list
-        // short; sort+unique then gives the same ascending set without per-node
-        // allocation.
-        const auto demands = image.Elements<uint32_t>();
-        const auto* meshlets = descriptors.data();
-        const auto meshletCount = descriptors.size();
-        std::vector<uint32_t> requests;
-        for (std::size_t meshlet = 0; meshlet < meshletCount; ++meshlet)
+        for (std::size_t bin = 0; bin < frame->m_streamingFeedback.size(); ++bin)
         {
-            const auto demand = demands[meshlet];
-            if (demand > 1)
-                throw std::runtime_error("Invalid GPU streaming demand bit");
-            const auto group = meshlets[meshlet].reserved;
-            if (demand && (requests.empty() || requests.back() != group))
-                requests.push_back(group);
+            const auto& readback = frame->m_streamingFeedback[bin];
+            if (!readback.buffer.IsValid())
+                continue;
+            RHIReadbackImage image;
+            std::string error;
+            if (!frame->m_device->MapReadback(readback, image, error))
+                throw std::runtime_error("Completed streaming feedback readback: " + error);
+            const auto groups = static_cast<std::uint32_t>(frame->m_meshletInputs->bins[bin].baseVertex);
+            const auto demands = image.Elements<std::uint32_t>();
+            if (demands.size() != FeedbackWords(groups))
+                throw std::runtime_error("Streaming group feedback extent mismatch.");
+            const auto& stream = frame->m_meshletGeometries[bin]->Input()->ClusterStream();
+            auto& collected = pending[stream.get()];
+            if (!collected.stream)
+            {
+                collected.stream = stream;
+                collected.groups = groups;
+                collected.words.resize(demands.size());
+            }
+            if (collected.groups != groups)
+                throw std::runtime_error("Streaming feedback mixed incompatible group domains.");
+            for (std::size_t word = 0; word < demands.size(); ++word)
+                collected.words[word] |= demands[word];
         }
-        std::ranges::sort(requests);
-        requests.erase(std::ranges::unique(requests).begin(), requests.end());
-        input->ClusterStream()->SubmitGpuRequests(requests);
+    }
+    for (auto& item : pending)
+    {
+        auto& collected = item.second;
+        std::vector<std::uint32_t> requests;
+        for (std::size_t word = 0; word < collected.words.size(); ++word)
+        {
+            auto bits = collected.words[word];
+            while (bits)
+            {
+                const auto group = static_cast<std::uint32_t>(word * 32u + std::countr_zero(bits));
+                if (group >= collected.groups)
+                    throw std::runtime_error("Streaming feedback set a padding group bit.");
+                requests.push_back(group);
+                bits &= bits - 1u;
+            }
+        }
+        // Includes desired resident groups: they refresh streaming keepalive.
+        // A word walk already yields one ascending group set across all views.
+        if (!requests.empty())
+            collected.stream->SubmitGpuRequests(requests);
     }
 }
 
@@ -1472,7 +1553,11 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
         m_completed = 0;
     }
     m_meshletReset = {};
+    m_meshletCount = {};
+    m_meshletScatter = {};
     m_sharedReset = {};
+    m_sharedCount = {};
+    m_sharedScatter = {};
     m_sharedCull = {};
     m_sharedOcclusion = {};
     m_sharedFinalize = {};
@@ -1491,43 +1576,46 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
 
 void GpuGeometryVisibility::OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion)
 {
-    std::lock_guard lock(m_recordingMutex);
-    const auto found = m_recordings.find(recording);
-    if (found != m_recordings.end())
+    std::vector<std::shared_ptr<const Frame>> ready;
     {
-        auto& entry = found->second;
-        for (const auto& owner : entry.owners)
-            owner->m_poolReusable.store(false, std::memory_order_release);
-        entry.submitted = true;
-        entry.completion = (std::max)(entry.completion, completion.value);
-        entry.quarantined = entry.quarantined || !completion.IsValid();
-        if (!entry.quarantined && entry.completion <= m_completed)
+        std::lock_guard lock(m_recordingMutex);
+        const auto found = m_recordings.find(recording);
+        if (found != m_recordings.end())
         {
+            auto& entry = found->second;
             for (const auto& owner : entry.owners)
+                owner->m_poolReusable.store(false, std::memory_order_release);
+            entry.submitted = true;
+            entry.completion = (std::max)(entry.completion, completion.value);
+            entry.quarantined = entry.quarantined || !completion.IsValid();
+            if (!entry.quarantined && entry.completion <= m_completed)
             {
-                owner->ConsumeStreamingFeedback();
-                owner->m_poolReusable.store(true, std::memory_order_release);
+                ready = std::move(entry.owners);
+                m_recordings.erase(found);
             }
-            m_recordings.erase(found);
         }
     }
+    Frame::ConsumeStreamingFeedback(ready);
 }
 
 void GpuGeometryVisibility::OnUploadCompleted(std::uint64_t completed)
 {
-    std::lock_guard lock(m_recordingMutex);
-    m_completed = (std::max)(m_completed, completed);
-    std::erase_if(m_recordings, [&](const auto& recording) {
-        const auto& entry = recording.second;
-        const bool ready = entry.submitted && !entry.quarantined && entry.completion && entry.completion <= m_completed;
-        if (ready)
-            for (const auto& owner : entry.owners)
-            {
-                owner->ConsumeStreamingFeedback();
-                owner->m_poolReusable.store(true, std::memory_order_release);
-            }
-        return ready;
-    });
+    if (!completed || completed == UINT64_MAX)
+        return; // Device loss does not certify feedback or reusable GPU storage.
+    std::vector<std::shared_ptr<const Frame>> ready;
+    {
+        std::lock_guard lock(m_recordingMutex);
+        m_completed = (std::max)(m_completed, completed);
+        std::erase_if(m_recordings, [&](const auto& recording) {
+            const auto& entry = recording.second;
+            const bool complete = entry.submitted && !entry.quarantined && entry.completion &&
+                                  entry.completion <= m_completed;
+            if (complete)
+                ready.insert(ready.end(), entry.owners.begin(), entry.owners.end());
+            return complete;
+        });
+    }
+    Frame::ConsumeStreamingFeedback(ready);
 }
 
 void GpuGeometryVisibility::OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion)

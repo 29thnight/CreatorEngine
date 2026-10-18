@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanLoader.h"
 #include "VulkanResourceTable.h"
+#include "VulkanDescriptorLayout.h"
 #include "../RHIDescriptorVersionPolicy.h"
 #include "../RHIResourceTypes.h"
 
@@ -167,7 +168,8 @@ struct VulkanDescriptorRecyclerStats
 class VulkanDescriptorPoolRecycler
 {
   public:
-    bool Initialize(VkDevice device, uint32_t initialVersions, std::string& outError);
+    bool Initialize(VkDevice device, uint32_t initialVersions, std::string& outError,
+        uint32_t maxIndexingPoolDescriptors = 0);
     void Shutdown(VkDevice device);
 
     void Collect(RHICompletionPoint completed);
@@ -177,7 +179,8 @@ class VulkanDescriptorPoolRecycler
     void AbortRecording(uint64_t recordingId);
 
     /// 셋 하나를 할당한다. pool 생성/native 할당 실패는 `VK_NULL_HANDLE`.
-    VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout setLayout);
+    VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout setLayout,
+        const VulkanDescriptorRequirements& requirements = {});
     VulkanDescriptorRecyclerStats GetStats() const;
 
     /// PBR-W0 — 지금 기록 중인 descriptor 버전의 토큰(generation·slot 인코딩).
@@ -190,10 +193,18 @@ class VulkanDescriptorPoolRecycler
     uint64_t GetCurrentVersionToken() const { return m_activeVersion.ToToken(); }
 
   private:
-    bool EnsurePool(VkDevice device, uint32_t slot, size_t page, std::string& outError);
+    bool EnsurePool(VkDevice device, uint32_t slot, size_t page, std::string& outError,
+        const VulkanDescriptorRequirements& requirements = {});
     void RecordPeak(uint32_t used);
 
-    std::vector<std::vector<VkDescriptorPool>> m_pools;
+    struct PoolPage
+    {
+        VkDescriptorPool handle{VK_NULL_HANDLE};
+        VulkanDescriptorCounts capacity{};
+    };
+    std::vector<std::vector<PoolPage>> m_pools;
+    uint64_t m_allocatedPoolDescriptors{};
+    uint32_t m_maxIndexingPoolDescriptors{};
     RHIDescriptorVersionPolicy m_versions;
     RHIDescriptorVersionHandle m_activeVersion{};
     VkDescriptorPool m_activePool{VK_NULL_HANDLE};

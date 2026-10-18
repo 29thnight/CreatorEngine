@@ -191,6 +191,99 @@ namespace
         }
     }
 
+    bool VkDescribeDescriptorLayout(std::span<const VkDescriptorSetLayoutBinding> bindings,
+        bool indexingLimits, const VkPhysicalDeviceDescriptorIndexingProperties& limits,
+        VulkanDescriptorRequirements& result, std::string& error)
+    {
+        constexpr std::array<VkShaderStageFlagBits, 8> stages{
+            VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+            VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
+            VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_COMPUTE_BIT,
+            VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
+        };
+        using Counts = std::array<uint64_t, VulkanDescriptorTypes.size()>;
+        Counts total{};
+        std::array<Counts, stages.size()> perStage{};
+        std::set<uint32_t> numbers;
+        for (const auto& binding : bindings)
+        {
+            const auto type = std::find(VulkanDescriptorTypes.begin(), VulkanDescriptorTypes.end(),
+                binding.descriptorType);
+            if (!binding.descriptorCount || type == VulkanDescriptorTypes.end() ||
+                !numbers.insert(binding.binding).second)
+            {
+                error = "Vulkan layout has an empty, unsupported or overlapping descriptor binding.";
+                return false;
+            }
+            const size_t index = static_cast<size_t>(type - VulkanDescriptorTypes.begin());
+            total[index] += binding.descriptorCount;
+            if (total[index] > UINT32_MAX)
+            {
+                error = "Vulkan layout descriptor count overflow.";
+                return false;
+            }
+            for (size_t stage = 0; stage < stages.size(); ++stage)
+                if (binding.stageFlags & stages[stage])
+                    perStage[stage][index] += binding.descriptorCount;
+        }
+        result = {};
+        result.indexingLimits = indexingLimits;
+        for (size_t type = 0; type < total.size(); ++type)
+            result.counts[type] = static_cast<uint32_t>(total[type]);
+        if (!indexingLimits) return true;
+
+        const Counts setLimits{
+            limits.maxDescriptorSetUpdateAfterBindUniformBuffers,
+            limits.maxDescriptorSetUpdateAfterBindStorageBuffers,
+            limits.maxDescriptorSetUpdateAfterBindSampledImages,
+            limits.maxDescriptorSetUpdateAfterBindStorageImages,
+            limits.maxDescriptorSetUpdateAfterBindSamplers,
+        };
+        const Counts stageLimits{
+            limits.maxPerStageDescriptorUpdateAfterBindUniformBuffers,
+            limits.maxPerStageDescriptorUpdateAfterBindStorageBuffers,
+            limits.maxPerStageDescriptorUpdateAfterBindSampledImages,
+            limits.maxPerStageDescriptorUpdateAfterBindStorageImages,
+            limits.maxPerStageDescriptorUpdateAfterBindSamplers,
+        };
+        for (size_t type = 0; type < total.size(); ++type)
+        {
+            if (total[type] > setLimits[type])
+            {
+                error = "Vulkan shader arrays exceed the complete layout descriptor-set limit (type " +
+                    std::to_string(VulkanDescriptorTypes[type]) + ", requested " +
+                    std::to_string(total[type]) + ", limit " + std::to_string(setLimits[type]) + ").";
+                return false;
+            }
+        }
+        for (size_t stage = 0; stage < stages.size(); ++stage)
+        {
+            uint64_t resources{};
+            for (size_t type = 0; type < total.size(); ++type)
+            {
+                if (perStage[stage][type] > stageLimits[type])
+                {
+                    error = "Vulkan shader arrays exceed the aggregate per-stage descriptor limit (stage " +
+                        std::to_string(stages[stage]) + ", type " +
+                        std::to_string(VulkanDescriptorTypes[type]) + ").";
+                    return false;
+                }
+                // Separate samplers do not count as shader resources.
+                if (VulkanDescriptorTypes[type] != VK_DESCRIPTOR_TYPE_SAMPLER)
+                    resources += perStage[stage][type];
+            }
+            // Layouts are shared by PSOs. Reserve the RHI's maximum eight MRTs
+            // so any raster PSO using this layout stays within the same limit.
+            if (stages[stage] == VK_SHADER_STAGE_FRAGMENT_BIT) resources += 8;
+            if (resources > limits.maxPerStageUpdateAfterBindResources)
+            {
+                error = "Vulkan shader arrays exceed the aggregate per-stage resource limit.";
+                return false;
+            }
+        }
+        return true;
+    }
+
     VkPolygonMode VkPolygon(RHIFillMode mode)
     {
         return (RHIFillMode::Wireframe == mode) ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
@@ -354,6 +447,8 @@ void VulkanPipelineCache::Initialize(VkDevice device)
 void VulkanPipelineCache::Shutdown()
 {
     m_meshShaderCapabilities = {};
+    m_shaderArrayCapabilities = {};
+    m_descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     if (VK_NULL_HANDLE == m_device) return;
 
     // This lifecycle boundary may wait. RequestGraphics and invalidation never do.
@@ -430,7 +525,10 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     {
         VkHashValue(hash, param.kind);
         VkHashValue(hash, param.visibility);
-        VkHashValue(hash, param.table);
+        VkHashValue(hash, param.table.type);
+        VkHashValue(hash, param.table.count);
+        VkHashValue(hash, param.table.baseRegister);
+        VkHashValue(hash, param.table.shaderArray);
         VkHashValue(hash, param.shaderRegister);
         VkHashValue(hash, param.constantCount);
     }
@@ -445,12 +543,8 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
         return it->second;
     }
 
-    // ★ 옮긴 것은 세 종류다 — ConstantBuffer(V8-a), DescriptorTable(V8-b),
-    //   ShaderResourceBuffer(GizmoIcon root SRV).
-    //   나머지 둘(UnorderedAccessBuffer · Constants)은
-    //   소비자가 없어 그대로 둔다. 안 쓰는 종류를 옮기면 **틀려도 아무도
-    //   모르는 대응표**가 된다(RHIPipelineState.h 의 규칙). 조용히 건너뛰지
-    //   않고 실패시키는 것이 요점이다.
+    // Root CBV/SRV/UAV and descriptor tables have concrete descriptor-backed
+    // consumers. Root constants remain unsupported and fail explicitly.
     //
     // ★ **binding 번호가 V8-b 에서 규약을 얻었다.** V8-a 는
     //   `binding.binding = param.shaderRegister` 였고 "지금은 b 하나뿐이라
@@ -463,6 +557,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     //   레이아웃마다 들어야 한다 — `VulkanLayoutSlot` 의 ★ 참고.
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     std::vector<VulkanLayoutSlot> paramSlots;
+    bool indexingLimits = false;
     for (const RHIPipelineLayoutParam& param : desc.params)
     {
         VkDescriptorSetLayoutBinding binding{};
@@ -487,16 +582,19 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
             paramSlots.push_back({ binding.binding, 1, binding.descriptorType });
             break;
 
+        case RHILayoutParamKind::UnorderedAccessBuffer:
+            // Root SRV/UAV both use storage descriptors; their register
+            // namespaces remain distinct and RG supplies the access barriers.
+            binding.binding = VulkanBindingModel::kUnorderedAccessShift + param.shaderRegister;
+            binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings.push_back(binding);
+            paramSlots.push_back({ binding.binding, 1, binding.descriptorType });
+            break;
+
         case RHILayoutParamKind::DescriptorTable:
         {
-            // ★ **여기가 DX12 와 가장 크게 갈리는 자리다.** DX12 의 테이블은
-            //   "연속한 레지스터 N개"를 루트 파라미터 **하나**로 묶는다
-            //   (디스크립터 힙 안의 연속 구간을 가리키는 핸들 하나).
-            //   Vulkan 에는 그 묶음이 없다 — 셋 레이아웃의 binding 을 N개
-            //   따로 적는다. 즉 **한 파라미터가 N개 binding 으로 펼쳐진다.**
-            //
-            //   그래서 A-5 의 `RHIBindingTable`(GPU 핸들 하나)이 Vulkan 에서
-            //   그대로 성립하지 않는다는 것이 여기서 실물로 확인된다.
+            // Distinct registers use N bindings. resource[N] uses one binding
+            // with N elements; both retain one RHI root-parameter slot.
             const RHIDescriptorRange& range = param.table;
             if (0 == range.count)
             {
@@ -531,24 +629,42 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
                 outError = "알 수 없는 디스크립터 종류다";
                 return {};
             }
-
-            for (uint32_t i = 0; i < range.count; ++i)
+            if (range.shaderArray)
+            {
+                const bool storage = binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                const bool sampled = binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+                    binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER;
+                if ((!storage && !sampled) ||
+                    (storage && !m_shaderArrayCapabilities.storageBufferNonUniformIndexing) ||
+                    (sampled && !m_shaderArrayCapabilities.sampledImageNonUniformIndexing))
+                {
+                    outError = "Vulkan shader array requires enabled nonuniform descriptor indexing.";
+                    return {};
+                }
+                indexingLimits = true;
+                binding.descriptorCount = range.count;
+            }
+            const uint32_t bindingCount = range.shaderArray ? 1u : range.count;
+            if (uint64_t(shift) + range.baseRegister + bindingCount - 1 > UINT32_MAX)
+            {
+                outError = "Vulkan descriptor binding range overflow.";
+                return {};
+            }
+            for (uint32_t i = 0; i < bindingCount; ++i)
             {
                 binding.binding = shift + range.baseRegister + i;
                 bindings.push_back(binding);
             }
 
-            // ★ 번호표에는 **첫 binding** 을 적는다. 계약이 테이블을 슬롯
-            //   하나로 걸기 때문이고(`SetBindings(slot, table)`), N개로
-            //   펼쳐지는 것은 백엔드 안쪽의 이야기다 — 나머지는 첫 번호에서
-            //   순서대로 이어진다.
+            // One RHI parameter maps to either consecutive fixed bindings or
+            // the elements of a single shader-array binding.
             paramSlots.push_back({ shift + range.baseRegister, range.count,
-                binding.descriptorType });
+                binding.descriptorType, range.shaderArray });
             break;
         }
 
         default:
-            outError = "아직 옮기지 않은 레이아웃 종류다 (루트 UAV · 루트 상수)";
+            outError = "Vulkan root constants are not implemented by this layout contract.";
             return {};
         }
     }
@@ -606,6 +722,10 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
 
     VkDescriptorSetLayoutCreateInfo setInfo{
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    // Select descriptor-indexing limits without UPDATE_AFTER_BIND binding
+    // flags: no descriptor may be changed after its set is recorded/bound.
+    if (indexingLimits)
+        setInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
     setInfo.bindingCount = static_cast<uint32_t>(bindings.size());
     setInfo.pBindings = bindings.empty() ? nullptr : bindings.data();
 
@@ -618,6 +738,13 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
         }
         entry.staticSamplers.clear();
     };
+
+    if (!VkDescribeDescriptorLayout(bindings, indexingLimits, m_descriptorIndexing,
+        entry.descriptorRequirements, outError))
+    {
+        releaseSamplers();
+        return {};
+    }
 
     VkResult result = vkCreateDescriptorSetLayout(m_device, &setInfo, nullptr, &entry.setLayout);
     if (VK_SUCCESS != result)
@@ -655,6 +782,14 @@ VulkanPipelineLayoutEntry VulkanPipelineCache::Resolve(RHIPipelineLayoutHandle h
     if (!handle.IsValid()) return {};
     const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
     return (slot < m_layouts.size()) ? m_layouts[slot] : VulkanPipelineLayoutEntry{};
+}
+
+VulkanDescriptorRequirements VulkanPipelineCache::ResolveDescriptorRequirements(
+    RHIPipelineLayoutHandle handle) const
+{
+    if (!handle.IsValid()) return {};
+    const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
+    return slot < m_layouts.size() ? m_layouts[slot].descriptorRequirements : VulkanDescriptorRequirements{};
 }
 
 VulkanPipelineEntry VulkanPipelineCache::Resolve(RHIPipelineHandle handle) const

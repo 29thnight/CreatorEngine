@@ -12,12 +12,13 @@ struct GpuGeometryVisibility::SharedBatch
     IRenderDeviceServices* device{};
     RHIBufferHandle queue;
     RGHandle graphQueue;
-    std::uint32_t jobs{}, bins{}, views{};
+    std::uint32_t jobs{}, groups{}, bins{}, views{};
+    bool ordered{};
     std::vector<std::uint32_t> counts;
     RHIBufferSlice constants, candidates, binData, worlds, viewData;
     RHIBindingTable outputs, vertices, topologies, ids, arguments, first;
     std::vector<std::shared_ptr<const GpuGeometryOcclusion::Pyramid>> pyramids;
-    std::shared_ptr<const LX::Runtime::ComputeGeneration> reset, cull, finalize;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> reset, cull, count, finalize, scatter;
     static constexpr std::uint64_t kQueueBytes = (kWorkRingHeaderWords + kWorkRingSlots) * sizeof(std::uint32_t);
     ~SharedBatch()
     {
@@ -28,10 +29,12 @@ struct GpuGeometryVisibility::SharedBatch
             pool->Return(queue, kQueueBytes, false, true);
         }
     }
-    void Dispatch(const EnhancedRenderGraph::ExecuteContext& execution, unsigned stage) const
+    void Dispatch(const EnhancedRenderGraph::ExecuteContext& execution, MeshletStage stage) const
     {
         auto& encoder = *execution.encoder;
-        const auto& pipeline = stage == 0 ? reset : stage == 1 ? cull : finalize;
+        const auto& pipeline = stage == MeshletStage::Reset ? reset :
+                               stage == MeshletStage::Cull ? cull : stage == MeshletStage::Count ? count :
+                               stage == MeshletStage::Finalize ? finalize : scatter;
         encoder.SetPipeline(RHIBindPoint::Compute, pipeline->GetHandle());
         encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, constants);
         encoder.SetRootBuffer(RHIBindPoint::Compute, 1, candidates);
@@ -44,7 +47,7 @@ struct GpuGeometryVisibility::SharedBatch
         encoder.SetBindings(RHIBindPoint::Compute, 8, ids);
         encoder.SetBindings(RHIBindPoint::Compute, 9, arguments);
         encoder.SetBindings(RHIBindPoint::Compute, 10, first);
-        if (stage == 1)
+        if (stage == MeshletStage::Cull)
         {
             const auto fallback = std::ranges::find_if(pyramids, [](const auto& pyramid) { return bool(pyramid); });
             if (fallback != pyramids.end())
@@ -64,8 +67,10 @@ struct GpuGeometryVisibility::SharedBatch
                 encoder.SetBindings(RHIBindPoint::Compute, 11, textures);
             }
         }
-        DispatchGroups(encoder, stage == 1 ? (std::min)(bins * kInitialSubdivisions, kPersistentConsumerGroups)
-                                           : VisibilityGroups(bins));
+        DispatchGroups(encoder, stage == MeshletStage::Cull
+                                    ? (std::min)(bins * kInitialSubdivisions, kPersistentConsumerGroups)
+                                : stage == MeshletStage::Count || stage == MeshletStage::Scatter ? groups
+                                : stage == MeshletStage::Finalize && !ordered ? VisibilityGroups(bins) : bins);
     }
 };
 
@@ -118,6 +123,80 @@ std::uint32_t GpuGeometryVisibility::Frame::WorkQueueNonemptyPartitions(std::uin
     return count;
 }
 
+void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
+{
+    CheckCurrent();
+    if (m_constants.IsValid())
+        return;
+    if (!m_meshletInputs || m_meshletInputs->bins.size() != m_meshletGeometries.size())
+        throw std::runtime_error("Meshlet upload requires its sealed input ranges.");
+    const auto& input = *m_meshletInputs;
+    const RHIUploadRequest requests[]{
+        {sizeof(input.constants), RHIUploadUsage::ConstantBuffer, 256},
+        {input.candidates.size() * sizeof(Candidate), RHIUploadUsage::Raw, 256},
+        {input.bins.size() * sizeof(Bin), RHIUploadUsage::Raw, 256},
+        {m_meshletGeometries.size() * 3u * sizeof(math::vector4), RHIUploadUsage::Raw, 16}};
+    std::array<RHIBufferSlice, 4> uploads;
+    std::string error;
+    if (!m_device->ReserveUploadBatch(requests, uploads, error) ||
+        std::ranges::any_of(uploads, [](const auto& upload) { return !upload.IsWritable(); }))
+        throw std::runtime_error("Meshlet input upload failed: " + error);
+    std::memcpy(uploads[0].cpuAddress, &input.constants, sizeof(input.constants));
+    std::memcpy(uploads[1].cpuAddress, input.candidates.data(), requests[1].bytes);
+    std::memcpy(uploads[2].cpuAddress, input.bins.data(), requests[2].bytes);
+    auto* worlds = static_cast<math::vector4*>(uploads[3].cpuAddress);
+    std::vector<RHIBindingDesc> vertices, topologies;
+    const auto descriptorCount = MeshletDescriptorCount(*m_device, m_binCount);
+    vertices.reserve(descriptorCount);
+    topologies.reserve(descriptorCount);
+    for (std::size_t bin = 0; bin < m_meshletGeometries.size(); ++bin)
+    {
+        const auto& geometry = m_meshletGeometries[bin];
+        const auto& world = geometry->ObjectToWorld();
+        for (unsigned column = 0; column < 3; ++column)
+            worlds[bin * 3u + column] =
+                {world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]};
+        const auto topology = geometry->Meshlets();
+        vertices.push_back(RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
+                                                      material_graph::MeshSurfaceBatch::GeometryViewStride));
+        topologies.push_back(RHIBindingDesc::SrvBuffer(topology.buffer, static_cast<std::uint32_t>(topology.size / 4),
+                                                        0, static_cast<std::uint32_t>(topology.offset / 4)));
+    }
+    // The shader indexes only live bins. Backends without partially-bound SRV
+    // arrays still require every descriptor in the fixed declaration to exist.
+    vertices.resize(descriptorCount, vertices.front());
+    topologies.resize(descriptorCount, topologies.front());
+    RHIBufferSlice historyProjection;
+    if (m_historyPyramid)
+    {
+        math::vector4 columns[4];
+        const auto& bits = m_historyPyramid->HistoryOwner()->source.projectionBits;
+        for (unsigned column = 0; column < 4; ++column)
+            columns[column] = {std::bit_cast<float>(bits[column]), std::bit_cast<float>(bits[4 + column]),
+                               std::bit_cast<float>(bits[8 + column]), std::bit_cast<float>(bits[12 + column])};
+        historyProjection = m_device->UploadConstants(columns, sizeof(columns));
+        if (!historyProjection.IsValid())
+            throw std::runtime_error("Meshlet history projection upload failed.");
+    }
+    const auto vertexBindings = m_device->CreateBindings(vertices);
+    const auto topologyBindings = m_device->CreateBindings(topologies);
+    const RHIBindingDesc outputs[]{
+        RHIBindingDesc::UavBuffer(m_visibleIds, static_cast<std::uint32_t>(m_visibleBytes / 4), 4),
+        RHIBindingDesc::UavBuffer(m_arguments, m_binCount, sizeof(RHIDrawIndexedIndirectArguments))};
+    const auto outputBindings = m_device->CreateBindings(outputs);
+    if (!vertexBindings.IsValid() || !topologyBindings.IsValid() || !outputBindings.IsValid())
+        throw std::runtime_error("Meshlet input bindings are incomplete.");
+    CheckCurrent();
+    m_candidates = uploads[1];
+    m_bins = uploads[2];
+    m_meshletWorlds = uploads[3];
+    m_historyProjection = historyProjection;
+    m_meshletVertices = vertexBindings;
+    m_meshletTopologies = topologyBindings;
+    m_outputs = outputBindings;
+    m_constants = uploads[0]; // Publish readiness only after the complete upload.
+}
+
 std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame::BuildShared(
     std::span<const std::shared_ptr<const Frame>> frames)
 {
@@ -128,37 +207,57 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     batch->pool = firstFrame.m_bufferPool;
     batch->views = static_cast<std::uint32_t>(frames.size());
     batch->reset = firstFrame.m_sharedReset;
+    batch->count = firstFrame.m_sharedCount;
     batch->finalize = firstFrame.m_sharedFinalize;
-    std::vector<Candidate> candidates;
-    std::vector<Bin> bins;
-    std::vector<math::vector4> worlds;
-    std::vector<SharedBatch::ViewData> views;
+    batch->scatter = firstFrame.m_sharedScatter;
     std::vector<RHIBindingDesc> vertices, topologies, ids, arguments, first;
     std::size_t totalBins{};
     for (const auto& frame : frames)
     {
+        frame->CheckCurrent();
+        if (!frame->m_meshletInputs || frame->m_device != firstFrame.m_device ||
+            frame->m_recording != firstFrame.m_recording || frame->m_descriptors != firstFrame.m_descriptors ||
+            frames.size() > kSharedViewCapacity)
+            throw std::runtime_error("Shared visibility requires one sealed device/upload/descriptor recording.");
         totalBins += frame->m_binCount;
+        batch->ordered = batch->ordered || frame->m_ordered;
     }
-    candidates.reserve(totalBins);
-    bins.reserve(totalBins);
-    worlds.reserve(totalBins * 3u);
-    vertices.reserve(totalBins);
-    topologies.reserve(totalBins);
+    const RHIUploadRequest requests[]{
+        {sizeof(GeometryVisibilityConstants), RHIUploadUsage::ConstantBuffer, 256},
+        {totalBins * sizeof(Candidate), RHIUploadUsage::Raw, 256},
+        {totalBins * sizeof(Bin), RHIUploadUsage::Raw, 256},
+        {totalBins * 3u * sizeof(math::vector4), RHIUploadUsage::Raw, 16},
+        {frames.size() * sizeof(SharedBatch::ViewData), RHIUploadUsage::Raw, 16},
+        {sizeof(std::uint32_t), RHIUploadUsage::Raw, 16}};
+    std::array<RHIBufferSlice, 6> uploads;
+    std::string error;
+    if (!batch->device->ReserveUploadBatch(requests, uploads, error) ||
+        std::ranges::any_of(uploads, [](const auto& upload) { return !upload.IsWritable(); }))
+        throw std::runtime_error("Shared visibility upload failed: " + error);
+    batch->constants = uploads[0];
+    batch->candidates = uploads[1];
+    batch->binData = uploads[2];
+    batch->worlds = uploads[3];
+    batch->viewData = uploads[4];
+    const auto dummy = uploads[5];
+    *static_cast<std::uint32_t*>(dummy.cpuAddress) = 0;
+    auto* candidates = static_cast<Candidate*>(batch->candidates.cpuAddress);
+    auto* bins = static_cast<Bin*>(batch->binData.cpuAddress);
+    auto* worlds = static_cast<math::vector4*>(batch->worlds.cpuAddress);
+    auto* views = static_cast<SharedBatch::ViewData*>(batch->viewData.cpuAddress);
+    const auto descriptorCount = MeshletDescriptorCount(*batch->device, static_cast<std::uint32_t>(totalBins));
+    vertices.reserve(descriptorCount);
+    topologies.reserve(descriptorCount);
     batch->counts.reserve(totalBins);
-    views.reserve(frames.size());
     batch->pyramids.reserve(frames.size());
     ids.reserve(kSharedViewCapacity);
     arguments.reserve(kSharedViewCapacity);
     first.reserve(kSharedViewCapacity);
     std::uint64_t jobs{};
+    std::uint32_t viewIndex{}, binIndex{};
     for (const auto& frame : frames)
     {
-        if (frame->m_device != firstFrame.m_device || frame->m_recording != firstFrame.m_recording ||
-            frame->m_descriptors != firstFrame.m_descriptors || frames.size() > kSharedViewCapacity)
-        {
-            throw std::runtime_error("Shared visibility requires the same device/upload/descriptor recording.");
-        }
-        const auto* source = static_cast<const GeometryVisibilityConstants*>(frame->m_constants.cpuAddress);
+        const auto* source = &frame->m_meshletInputs->constants;
         SharedBatch::ViewData view{};
         std::copy(std::begin(source->projectionColumns), std::end(source->projectionColumns), view.projection);
         std::copy(std::begin(source->projectionColumns), std::end(source->projectionColumns), view.history);
@@ -179,63 +278,58 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
                                         std::bit_cast<float>(bits[12 + column])};
             }
         }
-        const auto viewIndex = static_cast<std::uint32_t>(views.size());
-        views.push_back(view);
+        views[viewIndex] = view;
         batch->pyramids.push_back(frame->m_pyramid);
         ids.push_back(
             RHIBindingDesc::UavBuffer(frame->m_visibleIds, static_cast<std::uint32_t>(frame->m_visibleBytes / 4), 4));
         arguments.push_back(
             RHIBindingDesc::UavBuffer(frame->m_arguments, frame->m_binCount, sizeof(RHIDrawIndexedIndirectArguments)));
-        const auto* original = static_cast<const Candidate*>(frame->m_candidates.cpuAddress);
-        const auto* originalBins = static_cast<const Bin*>(frame->m_bins.cpuAddress);
-        const auto* originalWorlds = static_cast<const math::vector4*>(frame->m_meshletWorlds.cpuAddress);
+        const auto* original = frame->m_meshletInputs->candidates.data();
+        const auto* originalBins = frame->m_meshletInputs->bins.data();
+        const auto firstBin = binIndex;
         for (unsigned bin = 0; bin < frame->m_binCount; ++bin)
         {
-            if (bins.size() >= kMeshletBinCapacity || jobs + originalBins[bin].indexCount >= UINT32_MAX)
+            if (binIndex >= kMeshletBinCapacity || jobs + originalBins[bin].indexCount >= UINT32_MAX)
             {
                 throw std::runtime_error("Shared visibility exceeds its bounded bin/job capacity.");
             }
             auto candidate = original[bin];
+            candidate.sphere.z += static_cast<float>(firstBin);
             candidate.bin = viewIndex;
             candidate.sourceIndex = static_cast<std::uint32_t>(jobs);
             candidate.outputOffset = bin;
-            candidates.push_back(candidate);
-            bins.push_back(originalBins[bin]);
+            candidates[binIndex] = candidate;
+            bins[binIndex] = originalBins[bin];
+            bins[binIndex].preservedInstanceCount = batch->groups;
+            batch->groups += VisibilityGroups(originalBins[bin].indexCount);
             jobs += originalBins[bin].indexCount;
             batch->counts.push_back(originalBins[bin].indexCount);
-            worlds.insert(worlds.end(), originalWorlds + bin * 3u, originalWorlds + bin * 3u + 3u);
             const auto& geometry = frame->m_meshletGeometries[bin];
+            const auto& world = geometry->ObjectToWorld();
+            for (unsigned column = 0; column < 3; ++column)
+                worlds[binIndex * 3u + column] =
+                    {world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]};
             vertices.push_back(RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
                                                          material_graph::MeshSurfaceBatch::GeometryViewStride));
             const auto topology = geometry->Meshlets();
             topologies.push_back(RHIBindingDesc::SrvBuffer(topology.buffer,
                                                            static_cast<std::uint32_t>(topology.size / 4), 0,
                                                            static_cast<std::uint32_t>(topology.offset / 4)));
+            ++binIndex;
         }
+        ++viewIndex;
     }
     batch->jobs = static_cast<std::uint32_t>(jobs);
-    batch->bins = static_cast<std::uint32_t>(bins.size());
-    const auto upload = [&](const void* data, std::size_t bytes, RHIUploadUsage usage = RHIUploadUsage::Raw) {
-        ce::profile_scope uploadProfile{ce::marker<"GpuVisibility.SharedUpload">()};
-        const auto slice = batch->device->AllocateUpload({bytes, usage, 256});
-        if (!slice.IsWritable())
-        {
-            throw std::runtime_error("Shared visibility upload failed.");
-        }
-        std::memcpy(slice.cpuAddress, data, bytes);
-        return slice;
-    };
+    batch->bins = binIndex;
+    vertices.resize(descriptorCount, vertices.front());
+    topologies.resize(descriptorCount, topologies.front());
     GeometryVisibilityConstants constants{};
     constants.candidateCount = constants.binCount = batch->bins;
     constants.planeMask = kWaveWorkQueue;
+    if (batch->ordered)
+        constants.planeMask |= kOrderedScanDispatch;
     constants.padding = batch->jobs; // Diagnostic only; JOB_COUNT controls completion.
-    batch->constants = upload(&constants, sizeof(constants), RHIUploadUsage::ConstantBuffer);
-    batch->candidates = upload(candidates.data(), candidates.size() * sizeof(Candidate));
-    batch->binData = upload(bins.data(), bins.size() * sizeof(Bin));
-    batch->worlds = upload(worlds.data(), worlds.size() * sizeof(math::vector4));
-    batch->viewData = upload(views.data(), views.size() * sizeof(SharedBatch::ViewData));
-    const std::uint32_t zero{};
-    const auto dummy = upload(&zero, sizeof(zero));
+    std::memcpy(batch->constants.cpuAddress, &constants, sizeof(constants));
     for (const auto& frame : frames)
     {
         if (frame->m_firstStage)
@@ -255,7 +349,6 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         arguments.push_back(arguments.front());
         first.push_back(first.front());
     }
-    std::string error;
     if (!batch->pool->Acquire(SharedBatch::kQueueBytes, false, batch->queue, error))
     {
         throw std::runtime_error(error);
@@ -279,5 +372,7 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     }
     const bool occlusion = std::ranges::any_of(batch->pyramids, [](const auto& pyramid) { return bool(pyramid); });
     batch->cull = occlusion ? firstFrame.m_sharedOcclusion : firstFrame.m_sharedCull;
+    for (const auto& frame : frames)
+        frame->CheckCurrent();
     return batch;
 }

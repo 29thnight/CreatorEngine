@@ -8,6 +8,7 @@
 
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphFrameGeometry.h"
+#include "MaterialGraphSceneGpuData.h"
 #include "MaterialGraphWork.h"
 #include "MaterialGraphHybridVisibility.h"
 #include "MaterialGraphRenderBindings.h"
@@ -305,6 +306,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     std::optional<std::pair<std::uint32_t, std::size_t>> loggedMaterialBuckets_;
     // Per-frame scene buffers return here after their frame retires.
     std::shared_ptr<TransientBufferPool> bufferPool_;
+    ResidentBufferCache sceneResidentBuffers_;
     struct CameraHistory
     {
         std::shared_ptr<GpuGeometryOcclusion::History> pyramid;
@@ -314,9 +316,10 @@ class SceneHost final : private IRHIUploadTransactionListener
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<CameraHistory>> cameraHistories_;
     RenderBindingCache bindings_;
     LX::Runtime::ComputePipeline indirectCommands_;
+    std::array<LX::Runtime::ComputePipeline, 6> packetPipelines_;
     HybridVisibilityPipelines hybridPipelines_;
     LX::Runtime::GraphicsPipeline shadowMerge_;
-    std::array<LX::Runtime::ComputePipeline, 4> materialWorkPipelines_;
+    std::array<LX::Runtime::ComputePipeline, 6> materialWorkPipelines_;
     SceneLookupCache lookup_;
     SceneRuntimeEffectsResources runtimeEffects_;
     SceneSubsurfaceResources subsurface_;

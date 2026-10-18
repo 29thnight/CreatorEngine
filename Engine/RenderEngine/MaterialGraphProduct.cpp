@@ -51,6 +51,17 @@ RHIShaderValueType ValueType(LX::PinType type)
     return result;
 }
 
+// The generated packet loader and the reflected legacy CBV use one field
+// packing contract. Bool/int/scalar are 4 bytes; vectors never cross a row.
+std::uint32_t ReserveMaterialField(std::uint32_t& offset, std::uint32_t bytes)
+{
+    if ((offset & 15u) + bytes > 16u)
+        offset = (offset + 15u) & ~15u;
+    const auto field = offset;
+    offset += bytes;
+    return field;
+}
+
 std::string Symbol(const LX::LXMaterialResource& resource)
 {
     return std::string(resource.kind == LX::LXMaterialResourceKind::Texture ? "lx_texture_" : "lx_sampler_") +
@@ -568,26 +579,42 @@ bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capab
 std::string BuildBoundSource(const LX::LXMaterialProgram& program)
 {
     std::string source = program.slang;
-    std::string prefix;
+    const bool packets = program.semanticKey.ends_with(SceneHostIdentity);
+    // Material instances in a packet dispatch share shader code and select
+    // their values by byte offset. The ordered/bake paths retain their CBVs.
+    if (packets)
+    {
+        Replace(source, "struct LXMaterialParameters\n{", "struct LXMaterialParameters\n{\n    uint lx_descriptor_base;");
+        Replace(source, "    LXMaterialParameters parameters;",
+                "    LXMaterialParameters parameters;\n    parameters.lx_descriptor_base = 0xffffffffu;");
+    }
+    std::string prefix = packets ? "ByteAddressBuffer lx_packetMaterialData : register(t172);\n" : "";
     if (!program.resources.empty())
-        prefix = "cbuffer LXDescriptorIndices : register(b15) { uint4 lx_descriptor_indices[32]; };\n";
+        prefix += "cbuffer LXDescriptorIndices : register(b15) { uint4 lx_descriptor_indices[32]; };\n";
     for (const bool texture : {true, false})
         if (std::ranges::any_of(program.resources, [texture](const auto& r) {
                 return (r.kind == LX::LXMaterialResourceKind::Texture) == texture;
             }))
             prefix += texture ? "Texture2D<float4> lx_texture_table[4096] : register(t16384);\n"
                               : "SamplerState lx_sampler_table[36] : register(s3);\n";
+    const auto resourceExpression = [](const LX::LXMaterialResource& resource, bool packet) {
+        const bool texture = resource.kind == LX::LXMaterialResourceKind::Texture;
+        const auto index = resource.slot + (texture ? 0u : 64u);
+        const std::string descriptor = packet
+            ? "NonUniformResourceIndex(lx_packetMaterialData.Load(parameters.lx_descriptor_base + " +
+              std::to_string(index * 4u) + "u))"
+            : "lx_descriptor_indices[" + std::to_string(index / 4) + "][" + std::to_string(index % 4) + "]";
+        return std::string(texture ? "lx_texture_table[" : "lx_sampler_table[") + descriptor + "]";
+    };
     for (const auto& resource : program.resources)
     {
         const bool texture = resource.kind == LX::LXMaterialResourceKind::Texture;
         const std::string kind = texture ? "t" : "s";
         const auto symbol = Symbol(resource);
-        const auto index = resource.slot + (texture ? 0u : 64u);
         Replace(source,
                 std::string(texture ? "Texture2D<float4> " : "SamplerState ") + symbol + " : register(" + kind +
                     std::to_string(resource.slot) + ", space1);",
-                "\n#define " + symbol + (texture ? " lx_texture_table[" : " lx_sampler_table[") +
-                    "lx_descriptor_indices[" + std::to_string(index / 4) + "][" + std::to_string(index % 4) + "]]\n");
+                "\n#define " + symbol + " " + resourceExpression(resource, false) + "\n");
     }
     source = prefix + source;
     const bool numeric =
@@ -625,6 +652,52 @@ std::string BuildBoundSource(const LX::LXMaterialProgram& program)
         }
     }
     source += "    return parameters;\n}\n";
+    if (!packets)
+        return source;
+
+    // Keep the legacy resource call graph static. Scene Volume, point baking,
+    // and ordered draws call LXGenerateMaterial and never select t172 through
+    // a runtime sentinel. Only packet consumers call this second generated body.
+    const auto packetBegin = source.find("LXGeneratedMaterial LXGenerateMaterial(");
+    const auto packetEnd = source.find("PrincipledSurface LXEvaluateGeneratedSurface(", packetBegin);
+    if (packetBegin == std::string::npos || packetEnd == std::string::npos)
+        return source + "\n#error LX packet source has no canonical material function.\n";
+    auto packetFunction = source.substr(packetBegin, packetEnd - packetBegin);
+    Replace(packetFunction, "LXGeneratedMaterial LXGenerateMaterial(", "LXGeneratedMaterial LXGeneratePacketMaterial(");
+    source += "\nLXMaterialParameters LXBoundMaterialParameters(uint uniformBase, uint descriptorBase)\n{\n";
+    source += "    LXMaterialParameters parameters = LXDefaultMaterialParameters();\n";
+    source += "    parameters.lx_descriptor_base = descriptorBase;\n";
+    std::uint32_t offset{};
+    for (const auto& parameter : program.parameters)
+    {
+        if (!Numeric(parameter.type))
+            continue;
+        const auto columns = ValueType(parameter.type).columns;
+        const auto field = ReserveMaterialField(offset, columns * 4u);
+        const std::string load = "lx_packetMaterialData.Load" +
+            (columns == 1 ? std::string{} : std::to_string(columns)) +
+            "(uniformBase + " + std::to_string(field) + "u)";
+        const std::string value = parameter.type == LX::PinType::Bool ? "(" + load + " != 0u)"
+                                : parameter.type == LX::PinType::Int ? "asint(" + load + ")"
+                                                                    : "asfloat(" + load + ")";
+        source += "    parameters.lx_p" + std::to_string(parameter.id) + " = " + value + ";\n";
+    }
+    for (const auto& resource : program.resources)
+    {
+        if (resource.kind != LX::LXMaterialResourceKind::Texture)
+            continue;
+        const auto field = ReserveMaterialField(offset, 4u);
+        source += "    parameters.lx_texture_" + std::to_string(resource.slot) +
+                  "_encoding = lx_packetMaterialData.Load(uniformBase + " + std::to_string(field) + "u);\n";
+    }
+    source += "    return parameters;\n}\n";
+    for (const auto& resource : program.resources)
+        source += "\n#undef " + Symbol(resource) + "\n#define " + Symbol(resource) + " " +
+                  resourceExpression(resource, true) + "\n";
+    source += "\n" + packetFunction;
+    for (const auto& resource : program.resources)
+        source += "\n#undef " + Symbol(resource) + "\n#define " + Symbol(resource) + " " +
+                  resourceExpression(resource, false) + "\n";
     return source;
 }
 
@@ -682,6 +755,7 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
     if (descriptorIndices != !program.resources.empty())
         return Fail(diagnostics, "product.bindless", "Missing or unexpected descriptor index ABI.");
     std::set<LX::Id> parameterIds;
+    std::uint32_t packetOffset{};
     for (const auto& parameter : program.parameters)
     {
         if (!Numeric(parameter.type))
@@ -691,7 +765,9 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
         const auto field = std::ranges::find(uniforms->fields, "lx_bound_p" + std::to_string(parameter.id),
                                              &RHIShaderFieldReflection::name);
         const auto type = ValueType(parameter.type);
+        const auto packetField = ReserveMaterialField(packetOffset, type.columns * 4u);
         if (field == uniforms->fields.end() || field->type != type || field->byteSize != type.columns * 4u ||
+            field->byteOffset != packetField ||
             (field->byteOffset % 4u) != 0 ||
             static_cast<std::uint64_t>(field->byteOffset) + field->byteSize > candidate.uniformBytes ||
             !parameterIds.insert(parameter.id).second)
@@ -711,7 +787,9 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
         const auto field = std::ranges::find(uniforms->fields, TextureEncodingUniformName(resource.slot),
                                              &RHIShaderFieldReflection::name);
         const RHIShaderValueType type{RHIShaderScalarKind::UInt32, 1, 1, 1};
+        const auto packetField = ReserveMaterialField(packetOffset, 4u);
         if (field == uniforms->fields.end() || field->type != type || field->byteSize != 4u ||
+            field->byteOffset != packetField ||
             field->byteOffset % 4u != 0 || static_cast<std::uint64_t>(field->byteOffset) + 4u > candidate.uniformBytes)
         {
             return Fail(diagnostics, "product.textureEncoding", "Invalid reflected texture encoding field.",

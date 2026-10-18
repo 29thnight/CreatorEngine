@@ -1,157 +1,111 @@
 #pragma once
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphFrameGeometry.h"
+#include "MaterialGraphResidentBuffer.h"
 
 namespace material_graph
 {
-// Prepared immutable root templates plus GPU-owned compact tile ranges. The
-// producer is declared after HW visibility; consumers never insert passes.
+// Visibility produces one packet for each unique (record, 8x8 tile) pair.
+// Packets are bucketed on the GPU; no per-record indirect root template exists.
 struct SceneMaterialWork final
 {
     using Bucket = IndirectMaterialBatch::Bucket;
     IRenderDeviceServices* device{};
     std::shared_ptr<TransientBufferPool> pool;
     std::shared_ptr<const SceneFrameGeometry> geometry;
-    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 4> pipelines;
+    std::shared_ptr<const ResidentBufferFrame> sceneRecordsOwner;
+    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6> pipelines;
     std::vector<Bucket> buckets;
-    RHIBufferSlice templates, records, constants;
-    RHIBufferHandle work, arguments;
-    RHIBindingTable outputs;
+    RHIBufferSlice records;
+    RHIBufferHandle work, ranges, arguments;
     uint32_t width{}, height{}, recordCount{}, commandCount{};
     uint64_t workBytes{};
-    uint32_t commandBytes{};
-    mutable RGHandle graphWork, graphArguments;
-    mutable const EnhancedRenderGraph* graphOwner{};
-    mutable uint64_t graphEpoch{};
-    ~SceneMaterialWork()
+    std::unique_ptr<PacketDispatchWork> packetWork;
+
+    bool UploadPackets(RHIBufferSlice sceneRecords, uint32_t bucketCount, std::string& error)
     {
-        if (device)
+        const auto pixelCapacity = uint64_t(width) * height;
+        if (!device || !width || !height || !recordCount || !bucketCount || buckets.size() != bucketCount ||
+            pixelCapacity > UINT32_MAX || !sceneRecords.IsValid() || sceneRecords.size < uint64_t(recordCount) * 224 ||
+            !sceneRecordsOwner || sceneRecordsOwner->Buffer() != sceneRecords.buffer ||
+            std::ranges::any_of(pipelines, [](const auto& pipeline) { return !pipeline; }))
         {
-            ReleaseSceneBuffer(*device, pool, work);
-            ReleaseSceneBuffer(*device, pool, arguments);
-        }
-    }
-    bool Upload(std::span<const uint32_t> words, std::span<const std::array<uint32_t, 4>> commands,
-                uint32_t argumentBytes, std::string& error)
-    {
-        commandCount = static_cast<uint32_t>(commands.size());
-        commandBytes = argumentBytes;
-        const auto upload = [&](const void* data, size_t bytes) {
-            auto slice = device->AllocateUpload(bytes, 16);
-            if (slice.IsWritable())
-                std::memcpy(slice.cpuAddress, data, bytes);
-            return slice;
-        };
-        templates = upload(words.data(), words.size_bytes());
-        records = upload(commands.data(), commands.size_bytes());
-        const std::array<uint32_t, 4> values{width, height, recordCount, commandCount};
-        constants = device->UploadConstants(values.data(), sizeof(values));
-        workBytes = (4ull + 3ull * recordCount + uint64_t(width) * height) * 4;
-        if (!width || !height || !recordCount || workBytes / 4 > UINT32_MAX || !commandCount)
-        {
-            error = "METEOR material tile capacity is invalid.";
+            error = "METEOR material packet inputs are incomplete or exceed their address range.";
             return false;
         }
-        RHIBufferDesc desc;
-        desc.bytes = workBytes;
-        desc.allowUnorderedAccess = true;
-        desc.debugName = L"METEOR.Scene.Material.Tiles";
-        if (!templates.IsValid() || !records.IsValid() || !constants.IsValid() ||
-            !CreateSceneBuffer(*device, pool.get(), desc, work, error))
+        records = sceneRecords;
+        commandCount = bucketCount;
+        const auto tileCount = ((uint64_t(width) + 7) / 8) * ((uint64_t(height) + 7) / 8);
+        std::vector<uint32_t> capacities;
+        capacities.reserve(bucketCount);
+        uint64_t capacity{};
+        for (const auto& bucket : buckets)
+        {
+            const auto bucketCapacity = std::min<uint64_t>(pixelCapacity,
+                tileCount * (bucket.count ? bucket.count : recordCount));
+            capacities.push_back(static_cast<uint32_t>(bucketCapacity));
+            capacity = std::min(pixelCapacity, capacity + bucketCapacity);
+        }
+        // Few-material views reserve records*tiles rather than one packet per
+        // viewport pixel; the pixel bound still caps heavily overlapping views.
+        packetWork = std::make_unique<PacketDispatchWork>();
+        if (!packetWork->Prepare(*device, pool, recordCount, static_cast<uint32_t>(capacity), capacities,
+                                 width, height, "METEOR.Scene.Material", error))
             return false;
-        desc.bytes = argumentBytes;
-        desc.allowIndirectArguments = true;
-        desc.debugName = L"METEOR.Scene.Material.Arguments";
-        if (!CreateSceneBuffer(*device, pool.get(), desc, arguments, error))
-            return false;
-        const RHIBindingDesc views[]{RHIBindingDesc::UavBuffer(work, static_cast<uint32_t>(workBytes / 4), 4),
-                                     RHIBindingDesc::UavBuffer(arguments, argumentBytes / 4, 4)};
-        outputs = device->CreateBindings(views);
-        return outputs.IsValid();
+        work = packetWork->packets;
+        ranges = packetWork->ranges;
+        arguments = packetWork->arguments;
+        workBytes = capacity * 8;
+        return true;
     }
+    uint32_t PacketCapacity() const { return packetWork ? packetWork->values.packetCapacity : 0; }
     void Declare(EnhancedRenderGraph& graph, RGHandle visibility, std::shared_ptr<const SceneMaterialWork> owner) const
     {
-        if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
-            return;
-        if (graphOwner)
-            throw std::runtime_error("METEOR material work cannot cross frame graphs.");
-        if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
-            throw std::runtime_error("METEOR material work requires an ExplicitVersioned graph.");
-        graphOwner = &graph;
-        graphEpoch = graph.ResourceEpoch();
-        graphWork = graph.ImportBuffer(work, RHIResourceState::Common, "METEOR.Scene.Material.Tiles");
-        graphArguments = graph.ImportBuffer(arguments, RHIResourceState::Common, "METEOR.Scene.Material.Arguments");
-        graph.RequireImportedFinalState(graphWork, RHIResourceState::Common);
-        graph.RequireImportedFinalState(graphArguments, RHIResourceState::Common);
-        constexpr const char* names[]{"METEOR.Scene.Material.Reset", "METEOR.Scene.Material.CountTiles",
-                                      "METEOR.Scene.Material.BuildRanges", "METEOR.Scene.Material.ScatterTiles"};
-        for (unsigned stage = 0; stage < 4; ++stage)
-        {
-            graphWork = stage == 0 ? graph.Write(graphWork) : graph.Modify(graphWork);
-            std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-                {graphWork, RHIResourceState::UnorderedAccess,
-                 stage == 0 ? RGAccessMode::Write : RGAccessMode::ReadWrite}};
-            if (stage == 1 || stage == 3)
-            {
+        packetWork->Declare(graph, owner, pipelines, "METEOR.Scene.Material", true,
+            [&graph, owner, visibility](auto& uses) {
                 uses.push_back({visibility, RHIResourceState::ShaderResource, RGAccessMode::Read});
-                uses.push_back({geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-            }
-            if (stage == 2)
-            {
-                graphArguments = graph.Write(graphArguments);
-                uses.push_back({graphArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write});
-            }
-            graph.AddPass(names[stage], uses, [owner, visibility, stage](const auto& execution) {
-                auto& encoder = *execution.encoder;
-                encoder.SetPipeline(RHIBindPoint::Compute, owner->pipelines[stage]->GetHandle());
-                encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, owner->constants);
-                if (stage == 1 || stage == 3)
+                uses.push_back({owner->geometry->GraphTable(graph), RHIResourceState::ShaderResource,
+                                RGAccessMode::Read});
+                owner->sceneRecordsOwner->AddRead(graph, uses);
+            },
+            [owner, visibility](auto& encoder, const auto& execution, uint32_t stage) {
+                if (stage == 1 || stage == 5)
                 {
                     const auto desc = RHIBindingDesc::Srv2D(execution.ResolveHandle(visibility), RHIFormat::RG32Uint);
                     const auto view = owner->device->CreateBindings({&desc, 1});
                     if (!view.IsValid())
-                        throw std::runtime_error("METEOR material tile visibility binding failed.");
+                        throw std::runtime_error("METEOR material packet visibility binding failed.");
                     encoder.SetBindings(RHIBindPoint::Compute, 1, view);
-                    encoder.SetRootBuffer(RHIBindPoint::Compute, 5, RHIBufferSlice::Whole(owner->geometry->buffer));
+                    encoder.SetRootBuffer(RHIBindPoint::Compute, 2, owner->records);
+                    encoder.SetRootBuffer(RHIBindPoint::Compute, 3, RHIBufferSlice::Whole(owner->geometry->buffer));
                 }
-                encoder.SetRootBuffer(RHIBindPoint::Compute, 2, owner->records);
-                encoder.SetRootBuffer(RHIBindPoint::Compute, 3, owner->templates);
-                encoder.SetBindings(RHIBindPoint::Compute, 4, owner->outputs);
-                if (stage == 0)
-                    encoder.Dispatch((owner->recordCount + 63) / 64, 1, 1);
-                else if (stage == 2)
-                    encoder.Dispatch(1, 1, 1);
-                else
-                    encoder.Dispatch((owner->width + 7) / 8, (owner->height + 7) / 8, 1);
+                if (stage == 4)
+                    encoder.SetRootBuffer(RHIBindPoint::Compute, 5, owner->packetWork->plans);
             });
-        }
     }
     std::array<RGHandle, 2> GraphInputs(const EnhancedRenderGraph& graph) const
     {
-        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
-            throw std::runtime_error("METEOR material consumer requires explicit tile work producer.");
-        return {graphWork, graphArguments};
+        if (!packetWork || packetWork->graphOwner != &graph || packetWork->graphEpoch != graph.ResourceEpoch())
+            throw std::runtime_error("METEOR material consumer requires its explicit packet producer.");
+        return {packetWork->graphPackets, packetWork->graphArguments};
     }
     void ValidateInputs(const EnhancedRenderGraph& graph, const std::array<RGHandle, 2>& inputs) const
     {
         const auto expected = GraphInputs(graph);
-        for (size_t i = 0; i < inputs.size(); ++i)
-            if (inputs[i].index != expected[i].index || inputs[i].version != expected[i].version ||
-                inputs[i].kind != expected[i].kind || inputs[i].epoch != expected[i].epoch)
-                throw std::runtime_error("METEOR material work input is not its published resource version.");
+        for (size_t index = 0; index < inputs.size(); ++index)
+            if (inputs[index].index != expected[index].index || inputs[index].version != expected[index].version ||
+                inputs[index].kind != expected[index].kind || inputs[index].epoch != expected[index].epoch)
+                throw std::runtime_error("METEOR material packet input is not its published resource version.");
     }
     void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
                  const std::array<RGHandle, 2>& inputs) const
     {
         ValidateInputs(graph, inputs);
-        uses.push_back({inputs[0], RHIResourceState::ShaderResource, RGAccessMode::Read});
-        uses.push_back({inputs[1], RHIResourceState::IndirectArgument, RGAccessMode::Read});
+        packetWork->AddRead(uses);
     }
-    void Draw(RHIEncoder& encoder, size_t bucket) const
+    void Draw(RHIEncoder& encoder, size_t bucket, uint32_t selectorRoot) const
     {
-        const auto& range = buckets.at(bucket);
-        if (!encoder.DispatchMeshIndirectBatch(arguments, range.offset, range.count, range.roots))
-            throw std::runtime_error("METEOR material tile submission failed.");
+        packetWork->Draw(encoder, bucket, selectorRoot);
     }
 };
 } // namespace material_graph

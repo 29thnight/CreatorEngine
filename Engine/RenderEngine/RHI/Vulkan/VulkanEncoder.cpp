@@ -237,7 +237,7 @@ void VulkanEncoder::UpsertBinding(size_t bindPointIndex, const PendingBinding& b
     {
         const bool sameParam = UINT32_MAX != binding.param && item.param == binding.param;
         const bool sameBinding = UINT32_MAX == binding.param && UINT32_MAX == item.param &&
-            item.binding == binding.binding;
+            item.binding == binding.binding && item.arrayElement == binding.arrayElement;
         if (sameParam || sameBinding)
         {
             item = binding;
@@ -247,6 +247,21 @@ void VulkanEncoder::UpsertBinding(size_t bindPointIndex, const PendingBinding& b
     }
 
     current.push_back(binding);
+    m_descriptorsDirty[bindPointIndex] = true;
+}
+
+void VulkanEncoder::ReplaceTableBindings(size_t bindPointIndex, uint32_t firstBinding,
+    uint32_t bindingCount, std::span<const PendingBinding> bindings)
+{
+    auto& current = m_pending[bindPointIndex];
+    current.reserve(current.size() + bindings.size());
+    // Replace the complete table in one scan. Per-element Upsert made a fully
+    // populated 4096-element shader array quadratic in its descriptor count.
+    std::erase_if(current, [&](const PendingBinding& item) {
+        return item.param == UINT32_MAX && item.binding >= firstBinding &&
+            uint64_t(item.binding) - firstBinding < bindingCount;
+    });
+    current.insert(current.end(), bindings.begin(), bindings.end());
     m_descriptorsDirty[bindPointIndex] = true;
 }
 
@@ -270,7 +285,8 @@ bool VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
         return false;
     }
 
-    const VkDescriptorSet set = m_descriptors->Allocate(m_device, setLayout);
+    const VkDescriptorSet set = m_descriptors->Allocate(m_device, setLayout,
+        m_pipelines->ResolveDescriptorRequirements(m_boundLayoutHandle[index]));
     if (VK_NULL_HANDLE == set)
     {
         NoteUnimplemented("FlushDescriptors(디스크립터 예산 소진)");
@@ -306,6 +322,7 @@ bool VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
         VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         write.dstSet = set;
         write.dstBinding = binding;
+        write.dstArrayElement = item.arrayElement;
         write.descriptorCount = 1;
         write.descriptorType = type;
         if (PendingBinding::Value::Image == item.value)
@@ -566,7 +583,8 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
     {
         const RHIBindingDesc& desc = (*descs)[i];
         PendingBinding pending{};
-        pending.binding = target.binding + static_cast<uint32_t>(i);
+        pending.binding = target.binding + (target.shaderArray ? 0u : static_cast<uint32_t>(i));
+        pending.arrayElement = target.shaderArray ? static_cast<uint32_t>(i) : 0u;
         pending.type = target.type;
 
         const VkDescriptorType expected =
@@ -606,6 +624,11 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
                 (desc.structureByteStride ? desc.structureByteStride : 4u);
             pending.buffer.range = static_cast<VkDeviceSize>(desc.numElements) *
                 (desc.structureByteStride ? desc.structureByteStride : 4u);
+            if (pending.buffer.offset > entry.bytes || pending.buffer.range > entry.bytes - pending.buffer.offset)
+            {
+                NoteUnimplemented("SetBindings(buffer descriptor exceeds its retained resource)");
+                return;
+            }
         }
         else
         {
@@ -691,7 +714,7 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
 
     // 하나라도 실패하면 기존 셋을 반쯤 바꾸지 않는다. 전부 검증된 뒤에만
     // 현재 바인딩 상태에 합친다.
-    for (const PendingBinding& binding : resolved) UpsertBinding(index, binding);
+    ReplaceTableBindings(index, target.binding, target.shaderArray ? 1u : target.count, resolved);
 }
 
 void VulkanEncoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
@@ -734,14 +757,15 @@ void VulkanEncoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         }
 
         PendingBinding pending{};
-        pending.binding = target.binding + static_cast<uint32_t>(i);
+        pending.binding = target.binding + (target.shaderArray ? 0u : static_cast<uint32_t>(i));
+        pending.arrayElement = target.shaderArray ? static_cast<uint32_t>(i) : 0u;
         pending.type = VK_DESCRIPTOR_TYPE_SAMPLER;
         pending.value = PendingBinding::Value::Image;
         pending.image.sampler = (*samplers)[i];
         resolved.push_back(pending);
     }
 
-    for (const PendingBinding& binding : resolved) UpsertBinding(index, binding);
+    ReplaceTableBindings(index, target.binding, target.shaderArray ? 1u : target.count, resolved);
 }
 
 void VulkanEncoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice)
