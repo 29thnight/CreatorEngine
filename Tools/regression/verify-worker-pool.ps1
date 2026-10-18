@@ -24,7 +24,7 @@ foreach ($config in $configs) {
         }
         $exe = Join-Path $out "$name.exe"
         $flags = if ($config -eq 'Debug') {'/MDd /Od /RTC1 /D_DEBUG'} else {'/MD /O2 /DNDEBUG'}
-        $command = 'call "' + $vcvars + '" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /W4 /WX /DENKITS_DLL=1 ' +
+        $command = 'call "' + $vcvars + '" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /W4 /WX /DENKITS_DLL=1 /DCE_CONTRACT_STANDALONE ' +
             $flags + ' /I"' + (Join-Path $repo 'Engine/Utility_Framework') + '" /external:I"' +
             (Join-Path $dependencies 'include') + '" /external:W0 /Fo"' + $out +
             '/" /Fd"' + (Join-Path $out "$name.pdb") + '" /Fe"' + $exe + '" "' + $source +

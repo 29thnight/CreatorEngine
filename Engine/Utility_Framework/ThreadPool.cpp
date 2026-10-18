@@ -1,37 +1,52 @@
 #include "ThreadPool.h"
 #include <enkiTS/TaskScheduler.h>
 #include "StandardLibrary.h"
+#if defined(_WIN32)
+#include <Windows.h>
+#endif
 #pragma comment(lib, "enkiTS.lib")
 
 namespace
 {
-thread_local bool executing_pool_work = false;
+    thread_local bool executing_pool_work = false;
 
-// 워커 수명 훅 저장소. 이 층은 관측 도구를 모른다 — 받아 둔 함수를 부르기만
-// 한다. 정적인 이유는 enkiTS 콜백이 userData 없는 함수 포인터이기 때문이고,
-// 엔진 소유 영속 풀이 하나뿐이라 그것으로 충분하다.
-thread_pool::worker_hooks g_thread_pool_worker_hooks{};
+    // 워커 수명 훅 저장소. 이 층은 관측 도구를 모른다 — 받아 둔 함수를 부르기만
+    // 한다. 정적인 이유는 enkiTS 콜백이 userData 없는 함수 포인터이기 때문이고,
+    // 엔진 소유 영속 풀이 하나뿐이라 그것으로 충분하다.
+    thread_pool::worker_hooks g_thread_pool_worker_hooks{};
 
-// 배정 스레드 하나가 enkiTS 외부 스레드 번호 1 을 차지해 워커 번호가 하나씩
-// 밀린다. 훅에는 예전과 같은 1..N 을 넘겨 프로파일러 레인 이름이 그대로 선다.
-constexpr uint32_t kDispatcherThreads = 1;
+    // 배정 스레드 하나가 enkiTS 외부 스레드 번호 1 을 차지해 워커 번호가 하나씩
+    // 밀린다. 훅에는 예전과 같은 1..N 을 넘겨 프로파일러 레인 이름이 그대로 선다.
+    constexpr uint32_t kDispatcherThreads = 1;
 
-void thread_pool_worker_thread_start(uint32_t threadnum)
-{
-    if (g_thread_pool_worker_hooks.on_start)
-        g_thread_pool_worker_hooks.on_start(threadnum - kDispatcherThreads);
-}
-void thread_pool_worker_thread_stop(uint32_t threadnum)
-{
-    if (g_thread_pool_worker_hooks.on_stop)
-        g_thread_pool_worker_hooks.on_stop(threadnum - kDispatcherThreads);
-}
-}
+    void thread_pool_worker_thread_start(uint32_t threadnum)
+    {
+#if defined(_WIN32)
+        // ETW에서 풀 워커와 렌더 스레드의 Ready 구간을 분리해 식별한다.
+        wchar_t name[32];
+        std::swprintf(name, std::size(name), L"Creator.JobWorker.%u", threadnum - kDispatcherThreads);
+        SetThreadDescription(GetCurrentThread(), name);
+#endif
+        if (g_thread_pool_worker_hooks.on_start)
+        {
+            g_thread_pool_worker_hooks.on_start(threadnum - kDispatcherThreads);
+        }
+    }
+    void thread_pool_worker_thread_stop(uint32_t threadnum)
+    {
+        if (g_thread_pool_worker_hooks.on_stop)
+        {
+            g_thread_pool_worker_hooks.on_stop(threadnum - kDispatcherThreads);
+        }
+    }
+} // namespace
 
 void thread_pool_worker_idle(uint32_t)
 {
     if (g_thread_pool_worker_hooks.on_idle)
+    {
         g_thread_pool_worker_hooks.on_idle();
+    }
 }
 
 struct thread_pool::state
@@ -81,7 +96,9 @@ struct thread_pool::state
                 {
                     std::lock_guard lock(mutex_);
                     if (!failure_)
+                    {
                         failure_ = std::current_exception();
+                    }
                 }
             }
             executing_pool_work = previous;
@@ -109,7 +126,9 @@ struct thread_pool::state
                 enki::ICompletable::OnDependenciesComplete(scheduler, thread);
                 auto* task = dependency_.GetDependencyTask();
                 if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
+                {
                     delete task;
+                }
             }
         } completion_{references_};
         handoff(state& owner, work* task, uint32_t thread) : enki::IPinnedTask(thread), owner_(owner), work_(task)
@@ -120,7 +139,9 @@ struct thread_pool::state
         void release_submission()
         {
             if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
+            {
                 delete this;
+            }
         }
     };
 
@@ -147,7 +168,9 @@ struct thread_pool::state
     explicit state(std::size_t workers)
     {
         if (workers > (std::numeric_limits<uint32_t>::max)() - 1)
+        {
             throw std::invalid_argument("thread_pool worker count overflow");
+        }
         workers_ = workers ? static_cast<uint32_t>(workers) : (std::max)(1u, enki::GetNumHardwareThreads());
         enki::TaskSchedulerConfig config;
         config.numTaskThreadsToCreate = workers_;
@@ -155,26 +178,35 @@ struct thread_pool::state
         // 워커 수명을 밖으로 알린다. enkiTS 콜백은 함수 포인터라 userData 가
         // 없으므로 트램펄린이 정적 훅을 읽는다.
         config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
-        config.profilerCallbacks.threadStop  = &thread_pool_worker_thread_stop;
+        config.profilerCallbacks.threadStop = &thread_pool_worker_thread_stop;
         config.profilerCallbacks.waitForNewTaskSuspendStart = &thread_pool_worker_idle;
         config.profilerCallbacks.waitForTaskCompleteSuspendStart = &thread_pool_worker_idle;
         scheduler_.Initialize(config);
         std::promise<bool> registered;
         auto ready = registered.get_future();
-        dispatcher_ = std::thread([this, &registered] {
-            const bool ok = scheduler_.RegisterExternalTaskThread(dispatcher_thread_);
-            registered.set_value(ok);
-            if (!ok)
-                return;
-            for (;;)
+        dispatcher_ = std::thread(
+            [this, &registered]
             {
-                scheduler_.WaitForNewPinnedTasks();
-                scheduler_.RunPinnedTasks();
-                if (dispatcher_stop_.load(std::memory_order_acquire))
-                    break;
-            }
-            scheduler_.DeRegisterExternalTaskThread();
-        });
+#if defined(_WIN32)
+                SetThreadDescription(GetCurrentThread(), L"Creator.JobDispatcher");
+#endif
+                const bool ok = scheduler_.RegisterExternalTaskThread(dispatcher_thread_);
+                registered.set_value(ok);
+                if (!ok)
+                {
+                    return;
+                }
+                for (;;)
+                {
+                    scheduler_.WaitForNewPinnedTasks();
+                    scheduler_.RunPinnedTasks();
+                    if (dispatcher_stop_.load(std::memory_order_acquire))
+                    {
+                        break;
+                    }
+                }
+                scheduler_.DeRegisterExternalTaskThread();
+            });
         if (!ready.get())
         {
             dispatcher_.join();
@@ -182,16 +214,15 @@ struct thread_pool::state
             throw std::runtime_error("thread_pool dispatcher registration failed");
         }
     }
-    ~state()
-    {
-        stop_dispatcher();
-    }
+    ~state() { stop_dispatcher(); }
     // Called after the last handoff has drained; the wake task is the final
     // pinned task the dispatcher runs before it deregisters.
     void stop_dispatcher() noexcept
     {
         if (!dispatcher_.joinable())
+        {
             return;
+        }
         dispatcher_stop_.store(true, std::memory_order_release);
         scheduler_.AddPinnedTask(&dispatcher_wake_);
         dispatcher_.join();
@@ -200,10 +231,14 @@ struct thread_pool::state
                   std::function<void(std::exception_ptr)> complete)
     {
         if (!count || count > (std::numeric_limits<uint32_t>::max)())
+        {
             throw std::invalid_argument("thread_pool invalid batch size");
+        }
         std::lock_guard lock(submit_mutex_);
         if (!accepting_)
+        {
             throw std::runtime_error("thread_pool is stopped");
+        }
         auto task = std::make_unique<work>(*this, count, std::move(execute), std::move(complete));
         auto delivery = std::make_unique<handoff>(*this, task.get(), dispatcher_thread_);
         {
@@ -219,7 +254,9 @@ struct thread_pool::state
     {
         std::lock_guard lock(done_mutex_);
         if (--pending_ == 0)
+        {
             done_.notify_all();
+        }
     }
     void close() noexcept
     {
@@ -249,7 +286,9 @@ void thread_pool::start(std::size_t worker_count)
 {
     std::lock_guard lock(mutex_);
     if (!state_)
+    {
         state_ = std::make_shared<state>(worker_count);
+    }
 }
 std::shared_ptr<thread_pool::state> thread_pool::snapshot() const
 {
@@ -272,20 +311,26 @@ bool thread_pool::is_worker_thread() noexcept
 void thread_pool::shutdown() noexcept
 {
     if (is_worker_thread())
+    {
         std::terminate();
+    }
     std::shared_ptr<state> state;
     {
         std::lock_guard lock(mutex_);
         state = std::exchange(state_, {});
     }
     if (state)
+    {
         state->close();
+    }
 }
 void thread_pool::dispatch(std::size_t count, std::function<void(std::size_t)> execute,
                            std::function<void(std::exception_ptr)> complete)
 {
     auto state = snapshot();
     if (!state)
+    {
         throw std::runtime_error("thread_pool is stopped");
+    }
     state->dispatch(count, std::move(execute), std::move(complete));
 }

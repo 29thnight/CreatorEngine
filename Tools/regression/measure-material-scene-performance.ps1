@@ -17,6 +17,7 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'NativeRealMeasurementGate.ps1')
 . (Join-Path $PSScriptRoot 'ArtifactRetention.ps1')
+. (Join-Path $PSScriptRoot 'PerformanceEnvironment.ps1')
 Assert-ArtifactCapacity $PSScriptRoot
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(Get-Process CreatorEditor -ErrorAction SilentlyContinue){throw 'Existing Editor must be closed before isolated measurement'}
@@ -150,15 +151,19 @@ function Measure-Stage([string]$Stage) {
   }while($true)
   $warm|ConvertTo-Json -Depth 30|Set-Content "$case/$Stage-warmup.json"
  }
+ # 프로세스 열거 비용이 native 기록에 섞이지 않도록 시작 전에 경계를 관측한다.
+ $environmentBefore = Get-PerformanceEnvironmentSnapshot
  Read-LiveMeasurement|Out-Null
  Cmd 'profile.record'|Out-Null
  Wait-Recording 'recording'|Out-Null
  $a=Read-LiveMeasurement
  Require-NativeReal $a
+ $measurementBeginQpc = [Diagnostics.Stopwatch]::GetTimestamp()
  $watch=[Diagnostics.Stopwatch]::StartNew()
  Start-Sleep -Seconds $Seconds
  $b=Read-LiveMeasurement
  $watch.Stop()
+ $measurementEndQpc = [Diagnostics.Stopwatch]::GetTimestamp()
  Require-NativeReal $b
  $settings=Cmd 'temporal.status' @($script:nativeGeneration)
  if(!$settings.acknowledged -or $settings.requestState -eq 'superseded'){throw 'Measurement settings changed during capture'}
@@ -171,16 +176,32 @@ function Measure-Stage([string]$Stage) {
   throw 'Selected model produced no resident geometry'
  }
  Save-Recording "$case/$Stage.ceprof"
+ # 저장까지의 간격은 별도로 남긴다. 이 CPU 차분은 정확한 측정 구간의 ETW를 대신하지 않는다.
+ $environmentAfter = Get-PerformanceEnvironmentSnapshot
+ $environmentBefore | ConvertTo-Json -Depth 10 | Set-Content "$case/$Stage-environment-before.json"
+ $environmentAfter | ConvertTo-Json -Depth 10 | Set-Content "$case/$Stage-environment-after.json"
+ Compare-PerformanceEnvironment -Before $environmentBefore -After $environmentAfter -TargetProcessId $proc.Id `
+     -MeasurementBeginQpc $measurementBeginQpc -MeasurementEndQpc $measurementEndQpc |
+     ConvertTo-Json -Depth 10 | Set-Content "$case/$Stage-environment.json"
  $throughput=($b.framesRendered-$a.framesRendered)/$watch.Elapsed.TotalSeconds
  @{start=$a;end=$b;elapsedSeconds=$watch.Elapsed.TotalSeconds;completedRealViewRendersPerSecond=$throughput;
    axis='completed-real-view-renders-not-display-fps';profile="$Stage.ceprof";nativeRealProvenanceVerified=$true;
    nativeQualityAcceptance=$false}|ConvertTo-Json -Depth 30|Set-Content "$case/$Stage.json"
+ $environmentBefore = Get-PerformanceEnvironmentSnapshot
  $a=Read-LiveMeasurement
  Require-NativeReal $a
+ $measurementBeginQpc = [Diagnostics.Stopwatch]::GetTimestamp()
  $watch.Restart()
  Start-Sleep -Seconds $Seconds
  $b=Read-LiveMeasurement
  $watch.Stop()
+ $measurementEndQpc = [Diagnostics.Stopwatch]::GetTimestamp()
+ $environmentAfter = Get-PerformanceEnvironmentSnapshot
+ $environmentBefore | ConvertTo-Json -Depth 10 | Set-Content "$case/$Stage-paused-environment-before.json"
+ $environmentAfter | ConvertTo-Json -Depth 10 | Set-Content "$case/$Stage-paused-environment-after.json"
+ Compare-PerformanceEnvironment -Before $environmentBefore -After $environmentAfter -TargetProcessId $proc.Id `
+     -MeasurementBeginQpc $measurementBeginQpc -MeasurementEndQpc $measurementEndQpc |
+     ConvertTo-Json -Depth 10 | Set-Content "$case/$Stage-paused-environment.json"
  Require-NativeReal $b
  @{start=$a;end=$b;elapsedSeconds=$watch.Elapsed.TotalSeconds;completedRealViewRendersPerSecond=($b.framesRendered-$a.framesRendered)/$watch.Elapsed.TotalSeconds;
    axis='completed-real-view-renders-not-display-fps';nativeRealProvenanceVerified=$false;

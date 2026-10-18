@@ -36,7 +36,7 @@ foreach ($mutant in @($true, $false)) {
         [IO.File]::WriteAllText($worker, $text.Replace($retain, 'std::atomic<unsigned> references_{1};').Replace($release, ''))
     }
     $exe = Join-Path $variant 'probe.exe'
-    $command = 'call "' + $vcRoot + '/Auxiliary/Build/vcvars64.bat" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /Zi /Od /MD /fsanitize=address /DWORKER_POOL_LIFETIME_STRESS ' +
+    $command = 'call "' + $vcRoot + '/Auxiliary/Build/vcvars64.bat" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /Zi /Od /MD /fsanitize=address /DWORKER_POOL_LIFETIME_STRESS /DCE_CONTRACT_STANDALONE ' +
         '/I"' + (Join-Path $repo 'Engine/Utility_Framework') + '" /I"' + (Join-Path $dependencies 'include') + '" /I"' + $sourceDir + '" ' +
         '/Fo"' + $variant + '/" /Fd"' + $variant + '/probe.pdb" /Fe"' + $exe + '" "' + $worker + '" "' +
         (Join-Path $repo 'Engine/Utility_Framework/JobScheduler.cpp') + '" "' + (Join-Path $PSScriptRoot 'worker_pool_probe.cpp') + '" "' + $scheduler + '" /link /NODEFAULTLIB:enkiTS.lib'

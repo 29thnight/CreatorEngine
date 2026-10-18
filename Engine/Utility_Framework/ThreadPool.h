@@ -28,6 +28,7 @@ class thread_pool
     static void set_worker_hooks(const worker_hooks& hooks);
 
     // Lifecycle calls are serialized by the engine owner, never by a worker.
+    // 0은 논리 프로세서 수(최소 1개)를 쓰고, 명시한 양수는 그대로 사용한다.
     void start(std::size_t worker_count = 0);
     void shutdown() noexcept;
     bool is_running() const;
@@ -46,5 +47,5 @@ class thread_pool
 
 namespace ce
 {
-thread_pool& get_thread_pool();
+    thread_pool& get_thread_pool();
 }

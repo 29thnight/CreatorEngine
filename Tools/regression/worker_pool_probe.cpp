@@ -1,5 +1,6 @@
 #include "JobScheduler.h"
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include <enkiTS/TaskScheduler.h>
 
 int main()
 {
@@ -12,7 +13,8 @@ int main()
     thread_pool pool;
     job_scheduler scheduler(pool);
     unsigned checks = 0;
-    const auto require = [&](bool condition, const char* label) {
+    const auto require = [&](bool condition, const char* label)
+    {
         ++checks;
         if (!condition)
         {
@@ -41,18 +43,26 @@ int main()
 
         std::atomic<bool> release{false}, entered{false};
         std::atomic<unsigned> completed{0};
-        auto blocked = scheduler.submit([&] {
-            entered = true;
-            while (!release.load())
-                std::this_thread::yield();
-            ++completed;
-        });
+        auto blocked = scheduler.submit(
+            [&]
+            {
+                entered = true;
+                while (!release.load())
+                {
+                    std::this_thread::yield();
+                }
+                ++completed;
+            });
         while (!entered.load())
+        {
             std::this_thread::yield();
-        std::jthread unblock([&] {
-            std::this_thread::sleep_for(30ms);
-            release = true;
-        });
+        }
+        std::jthread unblock(
+            [&]
+            {
+                std::this_thread::sleep_for(30ms);
+                release = true;
+            });
         blocked.wait();
         const bool barrier_held = completed == 1;
         unblock.join();
@@ -63,17 +73,25 @@ int main()
         foreground.wait();
         release = false;
         entered = false;
-        auto background = scheduler.submit([&] {
-            entered = true;
-            while (!release.load())
-                std::this_thread::yield();
-        });
+        auto background = scheduler.submit(
+            [&]
+            {
+                entered = true;
+                while (!release.load())
+                {
+                    std::this_thread::yield();
+                }
+            });
         while (!entered.load())
+        {
             std::this_thread::yield();
-        std::jthread release_background([&] {
-            std::this_thread::sleep_for(100ms);
-            release = true;
-        });
+        }
+        std::jthread release_background(
+            [&]
+            {
+                std::this_thread::sleep_for(100ms);
+                release = true;
+            });
         foreground.wait();
         const bool isolated_wait = !release.load();
         release_background.join();
@@ -87,14 +105,20 @@ int main()
             std::array<std::atomic<unsigned>, 64> slots{};
             job_group group;
             for (unsigned i = 0; i < slots.size(); ++i)
-                group.add([&, i] {
-                    ++slots[i];
-                    std::lock_guard lock(ids_mutex);
-                    worker_ids.insert(std::this_thread::get_id());
-                });
+            {
+                group.add(
+                    [&, i]
+                    {
+                        ++slots[i];
+                        std::lock_guard lock(ids_mutex);
+                        worker_ids.insert(std::this_thread::get_id());
+                    });
+            }
             scheduler.submit(std::move(group)).wait();
             for (const auto& slot : slots)
+            {
                 require(slot == 1, "batch exactly once");
+            }
         }
         require(worker_ids.size() <= 4 && !worker_ids.contains(std::this_thread::get_id()),
                 "workers reused across batches");
@@ -102,20 +126,32 @@ int main()
         std::array<job_handle, 4> external;
         std::vector<std::jthread> producers;
         for (unsigned p = 0; p < external.size(); ++p)
-            producers.emplace_back([&, p] {
-                const auto submitter = std::this_thread::get_id();
-                job_group group;
-                for (int i = 0; i < 64; ++i)
-                    group.add([&, submitter] {
-                        ++ran;
-                        if (std::this_thread::get_id() == submitter)
-                            ++on_submitter;
-                    });
-                external[p] = scheduler.submit(std::move(group));
-            });
+        {
+            producers.emplace_back(
+                [&, p]
+                {
+                    const auto submitter = std::this_thread::get_id();
+                    job_group group;
+                    for (int i = 0; i < 64; ++i)
+                    {
+                        group.add(
+                            [&, submitter]
+                            {
+                                ++ran;
+                                if (std::this_thread::get_id() == submitter)
+                                {
+                                    ++on_submitter;
+                                }
+                            });
+                    }
+                    external[p] = scheduler.submit(std::move(group));
+                });
+        }
         producers.clear();
         for (auto& handle : external)
+        {
             handle.wait();
+        }
         require(ran == 256 && on_submitter == 0, "external producers never execute inline");
 
         auto capture = std::make_shared<int>(42);
@@ -128,39 +164,55 @@ int main()
         std::array<std::atomic<unsigned>, 73> ranges{};
         scheduler
             .parallel_for(ranges.size(), 7,
-                          [&](std::size_t begin, std::size_t end) {
+                          [&](std::size_t begin, std::size_t end)
+                          {
                               for (auto i = begin; i < end; ++i)
+                              {
                                   ++ranges[i];
+                              }
                           })
             .wait();
         for (const auto& slot : ranges)
+        {
             require(slot == 1, "parallel_for tail coverage");
+        }
         std::array<std::atomic<unsigned>, 73> indexed{};
         const auto indexed_submitter = std::this_thread::get_id();
         std::atomic<unsigned> indexed_on_submitter{0};
         auto indexed_capture = std::make_shared<int>(42);
         std::weak_ptr<int> indexed_weak = indexed_capture;
         auto indexed_handle = scheduler.submit_indexed(indexed.size(),
-            [&, indexed_capture](std::size_t index) {
-                ++indexed[index];
-                if (std::this_thread::get_id() == indexed_submitter)
-                    ++indexed_on_submitter;
-            });
+                                                       [&, indexed_capture](std::size_t index)
+                                                       {
+                                                           ++indexed[index];
+                                                           if (std::this_thread::get_id() == indexed_submitter)
+                                                           {
+                                                               ++indexed_on_submitter;
+                                                           }
+                                                       });
         indexed_capture.reset();
         indexed_handle.wait();
         for (const auto& slot : indexed)
+        {
             require(slot == 1, "indexed batch exactly once");
+        }
         require(indexed_on_submitter == 0, "indexed batch stays on workers");
         require(indexed_weak.expired(), "indexed completion releases captures");
-        scheduler.submit_indexed(0, [](std::size_t) {
-            throw std::runtime_error("empty indexed batch executed");
-        }).wait();
+        scheduler.submit_indexed(0, [](std::size_t) { throw std::runtime_error("empty indexed batch executed"); })
+            .wait();
         bool indexed_failed = false;
         try
         {
-            scheduler.submit_indexed(5, [](std::size_t index) {
-                if (index == 3) throw std::runtime_error("indexed failure");
-            }).wait();
+            scheduler
+                .submit_indexed(5,
+                                [](std::size_t index)
+                                {
+                                    if (index == 3)
+                                    {
+                                        throw std::runtime_error("indexed failure");
+                                    }
+                                })
+                .wait();
         }
         catch (const std::runtime_error& error)
         {
@@ -174,27 +226,41 @@ int main()
         // for it to finish. The watchdog only keeps a red run finite.
         release = false;
         entered = false;
-        auto occupied = scheduler.submit([&] {
-            entered = true;
-            while (!release.load())
-                std::this_thread::yield();
-        });
+        auto occupied = scheduler.submit(
+            [&]
+            {
+                entered = true;
+                while (!release.load())
+                {
+                    std::this_thread::yield();
+                }
+            });
         while (!entered.load())
+        {
             std::this_thread::yield();
-        std::jthread occupied_watchdog([&] {
-            for (int tick = 0; tick < 200 && !release.load(); ++tick)
-                std::this_thread::sleep_for(10ms);
-            release = true;
-        });
+        }
+        std::jthread occupied_watchdog(
+            [&]
+            {
+                for (int tick = 0; tick < 200 && !release.load(); ++tick)
+                {
+                    std::this_thread::sleep_for(10ms);
+                }
+                release = true;
+            });
         std::array<std::atomic<unsigned>, 8> handoffs{};
         for (unsigned i = 0; i < handoffs.size(); ++i)
+        {
             scheduler.submit_indexed(2, [&, i](std::size_t) { ++handoffs[i]; }).wait();
+        }
         const bool prompt_handoff = !release.load();
         release = true;
         occupied.wait();
         occupied_watchdog.join();
         for (const auto& handoff : handoffs)
+        {
             require(handoff == 2, "handoff batch exactly once");
+        }
         require(prompt_handoff, "a busy worker does not hold back other handoffs");
         scheduler.parallel_for(0, 1, [](auto, auto) { throw std::runtime_error("empty range executed"); }).wait();
         rejected = false;
@@ -210,28 +276,40 @@ int main()
 
         release = false;
         std::atomic<unsigned> stages{0};
-        auto root = scheduler.submit([&] {
-            while (!release.load())
-                std::this_thread::yield();
-            stages = 1;
-        });
+        auto root = scheduler.submit(
+            [&]
+            {
+                while (!release.load())
+                {
+                    std::this_thread::yield();
+                }
+                stages = 1;
+            });
         std::array<job_handle, 2> branches;
         for (unsigned i = 0; i < branches.size(); ++i)
         {
             job_group branch;
-            branch.add([&, i] {
-                if (!(stages.load() & 1))
-                    throw std::runtime_error("dependency ran early");
-                stages.fetch_or(2u << i);
-            });
+            branch.add(
+                [&, i]
+                {
+                    if (!(stages.load() & 1))
+                    {
+                        throw std::runtime_error("dependency ran early");
+                    }
+                    stages.fetch_or(2u << i);
+                });
             branches[i] = scheduler.submit_after(std::span(&root, 1), std::move(branch));
         }
         job_group tail;
-        tail.add([&] {
-            if (stages != 7)
-                throw std::runtime_error("fan-in ran early");
-            stages = 15;
-        });
+        tail.add(
+            [&]
+            {
+                if (stages != 7)
+                {
+                    throw std::runtime_error("fan-in ran early");
+                }
+                stages = 15;
+            });
         auto graph = scheduler.submit_after(branches, std::move(tail));
         const bool pending_graph = !graph.is_complete();
         release = true;
@@ -239,12 +317,18 @@ int main()
         require(pending_graph && stages == 15, "dependency fan-out and fan-in");
 
         release = false;
-        auto chain = scheduler.submit([&] {
-            while (!release.load())
-                std::this_thread::yield();
-        });
+        auto chain = scheduler.submit(
+            [&]
+            {
+                while (!release.load())
+                {
+                    std::this_thread::yield();
+                }
+            });
         for (int i = 0; i < 4096; ++i)
+        {
             chain = scheduler.submit_after(std::span(&chain, 1), job_group{});
+        }
         release = true;
         chain.wait();
         require(chain.is_complete(), "deep dependency chain completes without recursive stack growth");
@@ -272,21 +356,27 @@ int main()
         release = false;
         std::atomic<bool> worker_wait_rejected{false};
         scheduler
-            .submit([&] {
-                child = scheduler.submit([&] {
-                    while (!release.load())
-                        std::this_thread::yield();
-                });
-                try
+            .submit(
+                [&]
                 {
-                    child.wait();
-                }
-                catch (const std::logic_error&)
-                {
-                    worker_wait_rejected = true;
-                }
-                release = true;
-            })
+                    child = scheduler.submit(
+                        [&]
+                        {
+                            while (!release.load())
+                            {
+                                std::this_thread::yield();
+                            }
+                        });
+                    try
+                    {
+                        child.wait();
+                    }
+                    catch (const std::logic_error&)
+                    {
+                        worker_wait_rejected = true;
+                    }
+                    release = true;
+                })
             .wait();
         child.wait();
         require(worker_wait_rejected, "worker blocking wait rejected");
@@ -305,18 +395,24 @@ int main()
 
         release = false;
         ran = 0;
-        auto shutdown_root = scheduler.submit([&] {
-            while (!release.load())
-                std::this_thread::yield();
-            ++ran;
-        });
+        auto shutdown_root = scheduler.submit(
+            [&]
+            {
+                while (!release.load())
+                {
+                    std::this_thread::yield();
+                }
+                ++ran;
+            });
         job_group shutdown_tail;
         shutdown_tail.add([&] { ++ran; });
         auto drained = scheduler.submit_after(std::span(&shutdown_root, 1), std::move(shutdown_tail));
-        std::jthread shutdown_release([&] {
-            std::this_thread::sleep_for(30ms);
-            release = true;
-        });
+        std::jthread shutdown_release(
+            [&]
+            {
+                std::this_thread::sleep_for(30ms);
+                release = true;
+            });
         scheduler.shutdown();
         shutdown_release.join();
         require(ran == 2 && drained.is_complete() && !pool.is_running(), "shutdown drains accepted dependent work");
@@ -338,7 +434,89 @@ int main()
             scheduler.shutdown();
             require(!pool.is_running(), "restart lifecycle");
         }
-        std::cout << "JOB_SCHEDULER_OK checks=" << checks << " workers=4 backend=enkiTS\n";
+
+        // 워커 예산을 바꿔도 단일 워커의 의존 체인과 여러 워커의 완료 계약은 같다.
+        for (const std::size_t worker_count :
+             {std::size_t{1}, std::size_t{2}, std::size_t{4}, std::size_t{8}, std::size_t{0}})
+        {
+            scheduler.start(worker_count);
+            const auto hardware_count = enki::GetNumHardwareThreads();
+            const auto expected_workers = worker_count ? worker_count : (std::max)(1u, hardware_count);
+            require(pool.size() == expected_workers, "worker budget preserves explicit counts and hardware default");
+
+            std::array<std::atomic<unsigned>, 65> visits{};
+            std::atomic<unsigned> ran_on_submitter{0};
+            std::atomic<unsigned> invalid_worker_context{0};
+            const auto submitter = std::this_thread::get_id();
+            auto budget_root = scheduler.submit_indexed(visits.size(),
+                                                        [&](std::size_t index)
+                                                        {
+                                                            ++visits[index];
+                                                            if (std::this_thread::get_id() == submitter)
+                                                            {
+                                                                ++ran_on_submitter;
+                                                            }
+                                                            if (!thread_pool::is_worker_thread())
+                                                            {
+                                                                ++invalid_worker_context;
+                                                            }
+                                                        });
+            std::atomic<unsigned> dependent_count{0};
+            job_group budget_tail;
+            budget_tail.add(
+                [&]
+                {
+                    for (const auto& visit : visits)
+                    {
+                        if (visit != 1)
+                        {
+                            throw std::runtime_error("budget dependency ran before every indexed callback");
+                        }
+                    }
+                    ++dependent_count;
+                });
+            auto budget_complete = scheduler.submit_after(std::span(&budget_root, 1), std::move(budget_tail));
+            budget_complete.wait();
+            require(dependent_count == 1 && ran_on_submitter == 0 && invalid_worker_context == 0,
+                    "worker budget dependency and producer isolation");
+            for (const auto& visit : visits)
+            {
+                require(visit == 1, "worker budget indexed callback exactly once");
+            }
+
+            std::atomic<unsigned> failure_visits{0};
+            bool budget_failure = false;
+            try
+            {
+                scheduler
+                    .submit_indexed(17,
+                                    [&](std::size_t index)
+                                    {
+                                        ++failure_visits;
+                                        if (index == 7)
+                                        {
+                                            throw std::runtime_error("budget callback failure");
+                                        }
+                                    })
+                    .wait();
+            }
+            catch (const std::runtime_error& error)
+            {
+                budget_failure = std::string_view(error.what()) == "budget callback failure";
+            }
+            require(budget_failure && failure_visits == 17, "worker budget exception drains the accepted batch");
+
+            std::atomic<unsigned> drain_visits{0};
+            auto budget_drained = scheduler.submit_indexed(31, [&](std::size_t) { ++drain_visits; });
+            scheduler.shutdown();
+            require(drain_visits == 31 && budget_drained.is_complete() && !pool.is_running(),
+                    "worker budget shutdown drains accepted work");
+            scheduler.start(worker_count);
+            scheduler.submit([] {}).wait();
+            scheduler.shutdown();
+            require(!pool.is_running(), "worker budget restart");
+        }
+        std::cout << "JOB_SCHEDULER_OK checks=" << checks << " workers=4 budgets=1,2,4,8,default backend=enkiTS\n";
         return 0;
     }
     catch (const std::exception& error)
