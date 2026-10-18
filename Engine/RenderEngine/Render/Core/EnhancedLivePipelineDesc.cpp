@@ -268,7 +268,7 @@ std::string LivePipelineDesc::Dump() const
 bool LivePipelineDesc::RunSelfTest(std::string& outLog)
 {
     outLog.clear();
-    constexpr uint32_t kSelfTestCases = 14;
+    constexpr uint32_t kSelfTestCases = 15;
     uint32_t passed = 0;
     uint32_t total = 0;
 
@@ -462,6 +462,53 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
         blackboard.Set("METEOR.Test.OwnedSlotNameAfterSourceDestruction", second);
         record(cleared && sameSlot(blackboard, "METEOR.Test.OwnedSlotNameAfterSourceDestruction", second),
             "블랙보드 Reset 뒤 이전 슬롯 제거·새 핸들 발행", "");
+    }
+    {
+        const std::string scalarKey = "METEOR.Test.OwnedScalarAfterQueryDestruction";
+        const std::string listKey = "METEOR.Test.OwnedListAfterQueryDestruction";
+        std::vector<RGHandle> copiedList;
+        bool preserved = true;
+        {
+            LiveBlackboard board;
+            for (uint32_t index = 0; index < 300; ++index)
+            {
+                board.Set("METEOR.Test.Warmup." + std::to_string(index), first);
+            }
+            // 큰 표의 버킷을 유지한 채 소수 슬롯만 발행해도 조회 문자열의 수명을 빌려서는 안 된다.
+            board.Reset();
+            for (uint32_t cycle = 0; cycle < 3; ++cycle)
+            {
+                const RGHandle current = cycle % 2 == 0 ? first : second;
+                const RGHandle other = cycle % 2 == 0 ? second : first;
+                board.Set(scalarKey, current);
+                board.SetList(listKey, {current, other});
+                {
+                    std::string scalarQuery = scalarKey;
+                    std::string listQuery = listKey;
+                    preserved = sameSlot(board, scalarQuery, current) &&
+                        sameHandle(board.Get(std::string{scalarKey}), current) && preserved;
+                    copiedList = board.GetList(listQuery);
+                    const auto temporaryList = board.GetList(std::string{listKey});
+                    preserved = temporaryList.size() == 2 && sameHandle(temporaryList[0], current) &&
+                        sameHandle(temporaryList[1], other) && preserved;
+                    // 같은 버퍼의 내용 변경과 용량을 넘는 재할당을 거친 뒤 조회 원본을 파괴한다.
+                    scalarQuery[0] = 'x';
+                    listQuery[0] = 'y';
+                    scalarQuery.assign(scalarQuery.capacity() + 1, 'x');
+                    listQuery.assign(listQuery.capacity() + 1, 'y');
+                }
+                const auto storedList = board.GetList(listKey);
+                preserved = sameSlot(board, scalarKey, current) && storedList.size() == 2 &&
+                    sameHandle(storedList[0], current) && sameHandle(storedList[1], other) && preserved;
+                board.Reset();
+                preserved = !board.Get(scalarKey).IsValid() && board.GetList(scalarKey).empty() &&
+                    board.GetList(listKey).empty() && copiedList.size() == 2 &&
+                    sameHandle(copiedList[0], current) && sameHandle(copiedList[1], other) && preserved;
+            }
+        }
+        record(preserved && copiedList.size() == 2 && sameHandle(copiedList[0], first) &&
+                sameHandle(copiedList[1], second),
+            "블랙보드 조회 원본 변경·재할당·파괴 뒤 Reset 반복·보드 파괴 뒤 목록 보존", "");
     }
 
     const bool complete = passed == total && total == kSelfTestCases;
