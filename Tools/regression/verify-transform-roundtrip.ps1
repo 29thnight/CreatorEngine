@@ -37,6 +37,8 @@ param(
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
 if (-not (Test-Path $Exe)) { "실행 파일이 없다: $Exe"; exit 1 }
+# 없는 작업 폴더면 시나리오·로그를 쓰지 못해 에디터가 뜨지도 않은 채 "시간 초과"로 보고됐다.
+New-Item -ItemType Directory -Path $Work -Force | Out-Null
 
 $template = Join-Path $PSScriptRoot "transform_roundtrip.txt"
 if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
@@ -126,7 +128,7 @@ Set-Content $scenario -Encoding UTF8 -Value $resolvedLines
 $outFile = Join-Path $Work "transform_roundtrip.out"
 $errFile = Join-Path $Work "transform_roundtrip.err"
 
-$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario `
+$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $scenario -WindowStyle Hidden `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
