@@ -1,0 +1,18 @@
+cpu-perf 0.1.1
+source: bundled (bundled (wheel, commit deb5a0bac467, 2026-10-05))
+sections: 16
+subsections: 60
+entries: 305
+linked_entries: 304
+unique_urls: 288
+reproduce_lines: 15
+benchmarks: 14
+rejected: 541
+claims: 171
+link_notes: 350
+notes: 57
+files: 125
+crawl_targets: 287
+load_ms: 51.2
+index_ms: 394.2
+query_ms p50: 0.428 p99: 0.952

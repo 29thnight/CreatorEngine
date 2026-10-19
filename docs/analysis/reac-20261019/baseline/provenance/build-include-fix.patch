@@ -1,0 +1,12 @@
+diff --git a/Engine/RenderEngine/DataSystem.cpp b/Engine/RenderEngine/DataSystem.cpp
+index fd190aef7..b6a77c2ef 100644
+--- a/Engine/RenderEngine/DataSystem.cpp
++++ b/Engine/RenderEngine/DataSystem.cpp
+@@ -15,6 +15,7 @@
+ #include "MaterialPropertyPacker.h"
+ #include "Material.h" // MBC9: Model.h 전이 include가 사라져 직접 든다
+ #include "MaterialGraphSceneCompiler.h"
++#include "MaterialGraphShaderMeta.h"
+ #include "Mesh.h"
+ #include "Texture.h"
+ #include "FontAsset.h"

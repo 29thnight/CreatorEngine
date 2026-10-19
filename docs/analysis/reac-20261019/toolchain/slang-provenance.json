@@ -1,0 +1,7 @@
+{
+  "release": "v2026.14",
+  "url": "https://github.com/shader-slang/slang/releases/download/v2026.14/slang-2026.14-linux-x86_64-glibc-2.28.tar.gz",
+  "sha256": "21cfb4f2aaa756f448172798734e232d9f1485c29044fcb0af4dc925792e1217",
+  "bytes": 23678623,
+  "extracted": "/tmp/creator-reac-validation/toolchain/slang-2026.14"
+}

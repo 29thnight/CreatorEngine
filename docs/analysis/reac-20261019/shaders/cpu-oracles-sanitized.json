@@ -1,0 +1,164 @@
+{
+  "scope": "Linux shader compilation/validation and optional CPU reference only",
+  "native_windows_rhi_build": "not run",
+  "native_gpu_execution": "not run",
+  "native_performance": "not measured",
+  "tools": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "-version"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "2026.14\n",
+      "sha256": "71b47927833b2cafa68a5d114ced75c017f2195d9b4f339b66150ca974cd7b38"
+    },
+    "cxx": {
+      "command": [
+        "g++",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": ""
+    }
+  },
+  "cases": [],
+  "compiler_option_mode": "current RHI explicit options",
+  "diagnostic_capabilities_acknowledged": [],
+  "tool_files": {
+    "/tmp/creator-reac-validation/toolchain/slang-2026.14/lib/libslang-compiler.so": {
+      "sha256": "665de66fcb784c4578144bd1b17ba6bd0a6a005af86c6e264fd0799d5dcca8b5",
+      "bytes": 33416608
+    },
+    "/tmp/creator-reac-validation/toolchain/slang-2026.14/include/slang-cpp-prelude.h": {
+      "sha256": "d6432c1dff574a55bc303ac43b4401e49cd8350b5ee9ca9d66bd1e7a42c00f45",
+      "bytes": 12739
+    },
+    "/tmp/creator-reac-validation/toolchain/slang-2026.14/include/slang-cpp-types.h": {
+      "sha256": "f684488b215faedf6b4f07ebc0455b0e6e1874915a6a6f0a68c6fa7ef797dc74",
+      "bytes": 37859
+    }
+  },
+  "cpu_bounds": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/sources/Tools/regression/reac_geometry_bounds_probe.slang",
+        "-I",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+        "-entry",
+        "BoundsOracleCS",
+        "-stage",
+        "compute",
+        "-target",
+        "cpp",
+        "-matrix-layout-column-major",
+        "-O3",
+        "-fp-mode",
+        "precise",
+        "-warnings-as-errors",
+        "all",
+        "-o",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/reac_geometry_bounds.generated.cpp"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "passed": true,
+    "compile": {
+      "command": [
+        "g++",
+        "-std=c++20",
+        "-O2",
+        "-fno-fast-math",
+        "-ffp-contract=off",
+        "-I",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/sources/Tools/regression/reac_geometry_bounds_probe.cpp",
+        "-o",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/reac_geometry_bounds_probe",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-fno-sanitize-recover=all"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "leak_sanitizer": "disabled; sandbox PID namespace cannot enumerate task registry",
+    "run": {
+      "command": [
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/reac_geometry_bounds_probe"
+      ],
+      "exit_code": 0,
+      "stdout": "REAC_GEOMETRY_BOUNDS_OK checks=1069124 rejected=13821 normalized_skin_samples=72000\n",
+      "stderr": ""
+    },
+    "generated_sha256": "4978500d9f0047f928c1279153b3f1bb66e2f40ed47bd1f0c684a4106b2c0c15"
+  },
+  "cpu_positions": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/sources/Tools/regression/reac_geometry_position_probe.slang",
+        "-I",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+        "-entry",
+        "PositionOracleCS",
+        "-stage",
+        "compute",
+        "-target",
+        "cpp",
+        "-matrix-layout-column-major",
+        "-O3",
+        "-fp-mode",
+        "precise",
+        "-warnings-as-errors",
+        "all",
+        "-o",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/reac_geometry_position.generated.cpp"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "passed": true,
+    "host_compatibility": "precise token macro; arithmetic protected by -fno-fast-math -ffp-contract=off",
+    "compile": {
+      "command": [
+        "g++",
+        "-std=c++20",
+        "-O2",
+        "-fno-fast-math",
+        "-ffp-contract=off",
+        "-I",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/sources/Tools/regression/reac_geometry_position_probe.cpp",
+        "-o",
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/reac_geometry_position_probe",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-fno-sanitize-recover=all"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "leak_sanitizer": "disabled; sandbox PID namespace cannot enumerate task registry",
+    "run": {
+      "command": [
+        "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/reac_geometry_position_probe"
+      ],
+      "exit_code": 0,
+      "stdout": "REAC_GEOMETRY_POSITION_OK checks=12336 fixtures=514 vertices=2056\n",
+      "stderr": ""
+    },
+    "generated_sha256": "6c73ebf7c356da766dfa22d7e3cad190539786116d21d9e0128e194d7157ec08"
+  },
+  "changed_sources": [],
+  "passed": true,
+  "evidence_snapshot": "cpu-oracles-final-sanitized"
+}

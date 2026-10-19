@@ -1,0 +1,55 @@
+{
+  "primary_design_source": "https://github.com/usamahz/cpu-performance-engineering",
+  "connected_cpu_specific_mcp_available": false,
+  "offline_cli_selftest": {
+    "command": [
+      "/tmp/creator-cpu-perf-uv-cache/archive-v0/GcMO-USwI_aQ0nRh/bin/python",
+      "-m",
+      "cpu_perf",
+      "--selftest"
+    ],
+    "raw_log_sha256": "f4a726a7a9a48b5db8c83426e7d6ab8269be933d875bc07c94d8345715380aaf",
+    "log": "cpu-perf 0.1.1\nsource: bundled (bundled (wheel, commit deb5a0bac467, 2026-10-05))\nsections: 16\nsubsections: 60\nentries: 305\nlinked_entries: 304\nunique_urls: 288\nreproduce_lines: 15\nbenchmarks: 14\nrejected: 541\nclaims: 171\nlink_notes: 350\nnotes: 57\nfiles: 125\ncrawl_targets: 287\nload_ms: 51.2\nindex_ms: 394.2\nquery_ms p50: 0.428 p99: 0.952\n"
+  },
+  "current_stdio_attempt": {
+    "command": [
+      "/tmp/creator-cpu-perf-uv-cache/archive-v0/GcMO-USwI_aQ0nRh/bin/python",
+      "-m",
+      "cpu_perf",
+      "serve",
+      "--no-library",
+      "--no-auto-update",
+      "--no-auto-index",
+      "--no-live-fetch"
+    ],
+    "transport": "stdio JSON-RPC MCP protocol",
+    "connector_installed": false,
+    "sources": "bundled repository only; linked source library disabled",
+    "messages": [
+      {
+        "request": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "initialize",
+          "params": {
+            "protocolVersion": "2025-03-26",
+            "capabilities": {},
+            "clientInfo": {
+              "name": "CreatorEngine-REAC-verification",
+              "version": "1"
+            }
+          }
+        }
+      }
+    ],
+    "success": false,
+    "error": "No response to initialize"
+  },
+  "conclusion": "Offline CLI selftest succeeded; current stdio MCP protocol attempt timed out. CLI availability is not MCP success. No further MCP attempts were made.",
+  "methodology_applied": [
+    "Record source and compiler identity plus exact flags",
+    "Establish correctness before performance claims",
+    "Separate static/CPU/GPU validation and native performance evidence",
+    "Preserve raw failures and baseline counterchecks"
+  ]
+}

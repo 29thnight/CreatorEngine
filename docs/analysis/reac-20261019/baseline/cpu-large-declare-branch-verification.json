@@ -1,0 +1,30 @@
+{
+  "RenderGraphDeclareJoin": {
+    "registryId": 89,
+    "allCaptureCount": 0,
+    "completeInOnWindow": 0,
+    "completeInSelectedGameCpu": 0,
+    "partial": 0
+  },
+  "MaterialMeshDispatchPrepare": {
+    "registryId": 102,
+    "allCaptureCount": 0,
+    "completeInOnWindow": 0,
+    "completeInSelectedGameCpu": 0,
+    "partial": 0
+  },
+  "RenderGraphDeclareMeshPlan": {
+    "registryId": 103,
+    "allCaptureCount": 0,
+    "completeInOnWindow": 0,
+    "completeInSelectedGameCpu": 0,
+    "partial": 0
+  },
+  "RenderGraphDeclareMeshFill": {
+    "registryId": 104,
+    "allCaptureCount": 0,
+    "completeInOnWindow": 0,
+    "completeInSelectedGameCpu": 0,
+    "partial": 0
+  }
+}

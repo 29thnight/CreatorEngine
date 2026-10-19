@@ -1,0 +1,15 @@
+{
+  "scope": "native cache fixture and cooker wiring authored; native Windows build/run not performed",
+  "source_sha256": {
+    "Tools/regression/material_raster_surface_probe.cpp": "f9a701ed027b3edef8eab584027b0e168e0c18f27beaa4b7d9f82f12539f2b4e",
+    "Tools/regression/material_temporal_bucket_tests.inl": "e04b1567d28376b67e74e62ad8af4117ea67250cea8a9083b5f7b3472a778440",
+    "Tools/regression/verify-material-scene-probes.ps1": "4163f394608644776831e1d8b1a1cdb27d7911847a69f592c628fcc687306b03",
+    "Tools/regression/material_shadermeta_probe.cpp": "ff78f2ab63f42cb7d72ccc1f95a13f1c87f56700424bb6a072bd08ece251174a",
+    "Engine/RenderEngine/MaterialGraphSceneCompiler.cpp": "067694b759e442ea9530089cf85078196cc5b5e592f8997154228070e8c65fbe",
+    "Engine/RenderEngine/MaterialGraphSceneCompiler.h": "c5eee8b3b7741cc21ccb48c587d35e47402823e588a85953d9ec681616b50214",
+    "Engine/RenderEngine/MaterialGraphProduct.h": "c095ccc623cf547e0afa531dde71cc60f4915d77d0425869b0be22d4a1df2620"
+  },
+  "native_mode": "--primitive-cache-only",
+  "surface_reference_frames": 32,
+  "temporal_reference_frames": 12
+}
