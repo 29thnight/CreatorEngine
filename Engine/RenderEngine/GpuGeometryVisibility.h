@@ -240,7 +240,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     bool PrepareInternal(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                          std::span<const Candidate> candidates, std::span<const Bin> bins,
                          std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-                         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries = {});
+                         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries = {},
+                         std::shared_ptr<MeshletInputs> preparedInputs = {});
 
     bool Initialize(const EnhancedFrameContext& context, std::string& error);
     bool InitializeSharedMeshlets(const EnhancedFrameContext& context, std::string& error);

@@ -155,9 +155,8 @@ namespace material_graph
             return false;
         }
 
-        // The sealed input is the only worker input. Prefix ranges are fixed before
-        // admission; each task owns complete chunks and the sort task owns its vector.
-        // Native caches, descriptor allocation and publication stay on the caller.
+        // 프레임 결과는 candidate가, 임시 chunk 용량은 SceneHost가 소유한다.
+        // 작업 핸들은 호출 스코프에 남겨 조기 실패에도 빌린 저장소보다 먼저 배출한다.
         struct SceneCpuPreparation final
         {
             struct Chunk
@@ -168,19 +167,31 @@ namespace material_graph
                 std::array<math::vector4, 3> worldColumns, previousWorldColumns;
                 std::uint32_t owner{};
             };
-            std::vector<std::pair<std::size_t, std::size_t>> ranges;
-            std::vector<Chunk> chunks;
-            std::vector<SceneHost::ForwardDraw> blended;
-            job_handle work;
+
+          private:
+            std::vector<std::pair<std::size_t, std::size_t>>& m_ranges;
+            std::vector<Chunk>& m_chunks;
+            std::vector<SceneHost::ForwardDraw>& m_blended;
+            job_handle m_work;
+
+          public:
+            SceneCpuPreparation(std::vector<std::pair<std::size_t, std::size_t>>& ranges, std::vector<Chunk>& chunks,
+                                std::vector<SceneHost::ForwardDraw>& blended)
+                : m_ranges(ranges), m_chunks(chunks), m_blended(blended)
+            {
+            }
+            SceneCpuPreparation(const SceneCpuPreparation&) = delete;
+            SceneCpuPreparation& operator=(const SceneCpuPreparation&) = delete;
+
             ~SceneCpuPreparation()
             {
                 // An early owner-side failure cannot release storage still used by a
                 // worker. Preserve the original error after draining accepted work.
-                if (work.valid())
+                if (m_work.valid())
                 {
                     try
                     {
-                        work.wait();
+                        m_work.wait();
                     }
                     catch (...)
                     {
@@ -191,43 +202,44 @@ namespace material_graph
             {
                 try
                 {
-                    if (work.valid())
+                    if (m_work.valid())
                     {
-                        work.wait();
+                        m_work.wait();
                     }
-                    work = {};
+                    m_work = {};
                     return true;
                 }
                 catch (const std::exception& failure)
                 {
-                    work = {};
+                    m_work = {};
                     return Fail(error, failure.what());
                 }
             }
             void Start(job_scheduler& scheduler, const own::shared_owner<const SceneViewInput>& input)
             {
-                ranges.resize(input->Draws().size());
+                m_ranges.resize(input->Draws().size());
+                m_blended.clear();
                 std::size_t total{};
-                for (std::size_t i = 0; i < ranges.size(); ++i)
+                for (std::size_t i = 0; i < m_ranges.size(); ++i)
                 {
                     const auto count = input->Draws()[i].geometry->Chunks().size();
-                    if (count > chunks.max_size() - total)
+                    if (count > m_chunks.max_size() - total)
                     {
                         throw std::runtime_error("METEOR CPU preparation exceeds chunk storage capacity.");
                     }
-                    ranges[i] = {total, count};
+                    m_ranges[i] = {total, count};
                     total += count;
                 }
                 if (total != input->Cost().chunks)
                 {
                     throw std::runtime_error("METEOR sealed chunk cost does not match its immutable ranges.");
                 }
-                chunks.resize(total);
-                for (std::size_t i = 0; i < ranges.size(); ++i)
+                m_chunks.resize(total);
+                for (std::size_t i = 0; i < m_ranges.size(); ++i)
                 {
-                    for (std::size_t j = 0; j < ranges[i].second; ++j)
+                    for (std::size_t j = 0; j < m_ranges[i].second; ++j)
                     {
-                        auto& chunk = chunks[ranges[i].first + j];
+                        auto& chunk = m_chunks[m_ranges[i].first + j];
                         chunk.input = i;
                         chunk.chunk = j;
                     }
@@ -237,7 +249,6 @@ namespace material_graph
                 {
                     if (task == slices)
                     {
-                        blended.reserve(input->Draws().size());
                         for (std::size_t i = 0; i < input->Draws().size(); ++i)
                         {
                             const auto& draw = input->Draws()[i];
@@ -249,29 +260,35 @@ namespace material_graph
                                 {
                                     throw std::runtime_error("METEOR blended sorting depth is non-finite.");
                                 }
-                                blended.push_back({i, draw.geometryKey, draw.viewDepth});
+                                if (m_blended.empty())
+                                {
+                                    // 불투명 뷰에는 정렬 결과 저장소 자체가 필요하지 않다.
+                                    m_blended.reserve(input->Draws().size());
+                                }
+                                m_blended.push_back({i, draw.geometryKey, draw.viewDepth});
                             }
                         }
-                        std::stable_sort(blended.begin(), blended.end(),
-                                         [](const auto& left, const auto& right)
-                                         {
-                                             if (left.depth != right.depth)
-                                             {
-                                                 return left.depth > right.depth;
-                                             }
-                                             if (left.geometryKey != right.geometryKey)
-                                             {
-                                                 return left.geometryKey < right.geometryKey;
-                                             }
-                                             return left.index < right.index;
-                                         });
+                        // 마지막 키인 입력 인덱스가 유일하므로 안정 정렬용 임시 할당은 필요 없다.
+                        std::sort(m_blended.begin(), m_blended.end(),
+                                  [](const auto& left, const auto& right)
+                                  {
+                                      if (left.depth != right.depth)
+                                      {
+                                          return left.depth > right.depth;
+                                      }
+                                      if (left.geometryKey != right.geometryKey)
+                                      {
+                                          return left.geometryKey < right.geometryKey;
+                                      }
+                                      return left.index < right.index;
+                                  });
                         return;
                     }
-                    const auto first = chunks.size() * task / slices;
-                    const auto last = chunks.size() * (task + 1) / slices;
+                    const auto first = m_chunks.size() * task / slices;
+                    const auto last = m_chunks.size() * (task + 1) / slices;
                     for (auto index = first; index < last; ++index)
                     {
-                        auto& result = chunks[index];
+                        auto& result = m_chunks[index];
                         const auto& draw = input->Draws()[result.input];
                         const auto& current = draw.geometry->Chunks()[result.chunk].input;
                         const auto& previous = draw.previousGeometry && draw.previousGeometry != draw.geometry &&
@@ -312,7 +329,7 @@ namespace material_graph
                 }
                 else
                 {
-                    work = scheduler.submit_indexed(slices + 1, prepare);
+                    m_work = scheduler.submit_indexed(slices + 1, prepare);
                 }
             }
         };
@@ -437,6 +454,12 @@ namespace material_graph
             return *found;
         }
     } // namespace
+
+    struct SceneHost::PreparationScratch
+    {
+        std::vector<SceneCpuPreparation::Chunk> m_chunks;
+        std::vector<std::shared_ptr<const MeshSurfaceBatch>> m_cameraGeometry, m_blendedGeometry;
+    };
 
     struct SceneHost::Program
     {
@@ -1744,6 +1767,25 @@ namespace material_graph
                             std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance,
                             RHITextureHandle source)
     {
+        if (m_preparing.test_and_set(std::memory_order_acquire))
+        {
+            return Fail(error, "METEOR Scene preparation cannot reenter the same host.");
+        }
+        struct PreparationScope final
+        {
+            std::atomic_flag& m_preparing;
+            std::unique_ptr<PreparationScratch>& m_scratch;
+            ~PreparationScope()
+            {
+                if (m_scratch)
+                {
+                    m_scratch->m_cameraGeometry.clear();
+                    m_scratch->m_blendedGeometry.clear();
+                }
+                m_preparing.clear(std::memory_order_release);
+            }
+        } preparationScope{m_preparing, m_preparationScratch};
+        // 작업 소유자보다 먼저 생성해 도움 실행 중 재진입과 동시 스크래치 재사용을 막는다.
         ce::profile_scope profile{ce::marker<"MaterialGraphScenePrepare">()};
         // Keep sequential phases balanced on every early return as well as success.
         std::optional<ce::profile_scope> preparationPhase;
@@ -1795,12 +1837,17 @@ namespace material_graph
         {
             return false;
         }
+        if (!m_preparationScratch)
+        {
+            m_preparationScratch = std::make_unique<PreparationScratch>();
+        }
         auto candidate = own::make_shared<Frame>();
         candidate->device = device_;
         candidate->recording = device_->GetCurrentUploadRecordingId();
         candidate->descriptors = device_->GetDescriptorVersionToken();
         candidate->input = std::move(input);
-        SceneCpuPreparation cpuPreparation;
+        SceneCpuPreparation cpuPreparation(candidate->inputRanges, m_preparationScratch->m_chunks,
+                                           candidate->blendedOrder);
         cpuPreparation.Start(scheduler_, candidate->input);
         candidate->environment = environment;
         const auto emptyVisibility = RHIBindingDesc::Srv2D({}, RHIFormat::RG32Uint).OrNull();
@@ -1912,8 +1959,6 @@ namespace material_graph
         {
             return false;
         }
-        candidate->inputRanges = cpuPreparation.ranges;
-        candidate->blendedOrder = std::move(cpuPreparation.blended);
         nextPreparationPhase(ce::marker<"MaterialSceneGeometryTableSetup">());
         auto geometryTable = std::make_shared<SceneFrameGeometry>();
         geometryTable->device = device_;
@@ -1964,8 +2009,8 @@ namespace material_graph
             return true;
         };
 
-        // 뷰에서 고정된 행렬과 조명 필드는 한 번 구성한다. 각 draw는 값 복사본을 받아
-        // ID, coverage, owner와 chunk별 현재/이전 world를 독립적으로 덮어쓴다.
+        // 뷰에서 고정된 행렬과 조명 필드는 한 번 구성한다. Prepare가 소유한 작업 상수에서
+        // draw별 ID, coverage, owner와 chunk별 현재/이전 world를 빠짐없이 덮어쓴다.
         SceneConstants viewConstants{};
         viewConstants.viewProjection = math::transpose(candidate->input->ViewProjection());
         const auto& eye = candidate->input->Surface().eye;
@@ -2144,9 +2189,11 @@ namespace material_graph
             for (const auto& chunk : draw.geometry->Chunks())
             {
                 const auto chunkIndex = static_cast<std::size_t>(&chunk - draw.geometry->Chunks().data());
-                const auto outputIndex = cpuPreparation.ranges[inputIndex].first + chunkIndex;
+                const auto outputIndex = candidate->inputRanges[inputIndex].first + chunkIndex;
                 auto& item = candidate->draws[outputIndex];
                 item.program = program;
+                item.blended =
+                    program->hasSurface && (draw.queue == SceneCoverage::Blended || program->hasTransmission);
                 item.inputIndex = inputIndex;
                 item.geometryRecord = static_cast<std::uint32_t>(1 + outputIndex);
                 item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
@@ -2546,6 +2593,122 @@ namespace material_graph
         {
             return false;
         }
+        // 기하 소유자 목록은 여기서 봉인된다. 가시성 작업은 뒤에서 채울 Draw/장면 레코드를 읽지 않는다.
+        // 카메라 목록 작업 소유자는 빌린 입력보다 뒤에 두어 Draw 업로드 실패에도 먼저 배출한다.
+        nextPreparationPhase(ce::marker<"MaterialSceneCameraPrepare">());
+        auto& cameraGeometry = m_preparationScratch->m_cameraGeometry;
+        auto& blendedGeometry = m_preparationScratch->m_blendedGeometry;
+        cameraGeometry.clear();
+        blendedGeometry.clear();
+        cameraGeometry.reserve(preparedChunks);
+        blendedGeometry.reserve(preparedChunks);
+        for (auto& draw : candidate->draws)
+        {
+            if (candidate->UsesMeshlets(draw))
+            {
+                auto& list = draw.blended ? blendedGeometry : cameraGeometry;
+                draw.cameraMeshletBin = static_cast<uint32_t>(list.size());
+                list.push_back(draw.geometry);
+            }
+        }
+        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previousCameraHistory;
+        if (!cameraGeometry.empty())
+        {
+            const auto& view = candidate->input->View();
+            auto historyCamera = view.camera;
+            if (view.temporalFrame.camera.valid)
+            {
+                std::memcpy(&historyCamera.projection, view.temporalFrame.camera.projectionMatrix.data(),
+                            sizeof(historyCamera.projection));
+            }
+            std::uint64_t completed;
+            {
+                std::lock_guard lock(recordingMutex_);
+                completed = completed_;
+            }
+            // Only completed, accepted history can enter another recording.
+            // Keep the newest completed view plus its still-submitted successors.
+            std::erase_if(cameraHistories_, [&](const auto& entry) { return entry.first.first != view.sceneEpoch; });
+            auto& histories = cameraHistories_[{view.sceneEpoch, view.viewId}];
+            std::uint64_t newest{};
+            for (const auto& item : histories)
+            {
+                if (item.pyramid->completion <= completed)
+                {
+                    newest = (std::max)(newest, item.pyramid->source.frameId);
+                }
+            }
+            std::erase_if(histories, [&](const auto& item)
+                          { return item.pyramid->completion <= completed && item.pyramid->source.frameId < newest; });
+            for (const auto& item : histories)
+            {
+                const auto& h = *item.pyramid;
+                if (h.source.frameId == newest && h.source.frameId < view.frameId && h.completion <= completed &&
+                    h.source.width == view.width && h.source.height == view.height &&
+                    h.revision == view.historyRevision && historyCamera.HasSameTemporalHistory(item.camera) &&
+                    item.temporalRevision == view.temporalFrame.historyRevision &&
+                    (!view.temporalFrame.realFrameId || !view.temporalFrame.reset))
+                {
+                    previousCameraHistory =
+                        GpuGeometryOcclusion::ReadHistory(context, candidate->input->ViewProjection(), item.pyramid);
+                }
+            }
+            if (!cameraOcclusion_.PrepareHistory(context, candidate->input->ViewProjection(), view.viewId,
+                                                 view.historyRevision, candidate->historyStage.nextCameraHistory,
+                                                 error))
+            {
+                return false;
+            }
+            // The same builder produces the current pyramid from the occluder depth.
+            if (!cameraOcclusion_.Prepare(context, candidate->input->ViewProjection(),
+                                          candidate->finalCullStage.currentPyramid, error))
+            {
+                return false;
+            }
+        }
+        nextPreparationPhase(ce::marker<"MaterialSceneCameraDispatch">());
+        ScenePreparationTasks cameraPreparation(scheduler_, parallelPreparation);
+        if (!cameraGeometry.empty())
+        {
+            if (!cameraPreparation.Add(
+                    ce::marker<"MaterialSceneCameraVisibilityTask">(),
+                    [&, previousCameraHistory](std::string& taskError)
+                    {
+                        if (!visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
+                                                         candidate->firstCullStage.cameraDepthMeshlets, taskError,
+                                                         false, previousCameraHistory, {}, false,
+                                                         candidate->input->GeometryMaxPixelError()) ||
+                            !visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
+                                                         candidate->finalCullStage.cameraMeshlets, taskError, true, {},
+                                                         candidate->firstCullStage.cameraDepthMeshlets, false,
+                                                         candidate->input->GeometryMaxPixelError()))
+                        {
+                            return false;
+                        }
+                        return true;
+                    },
+                    error))
+            {
+                return false;
+            }
+        }
+        // Blended surfaces were never depth-occlusion culled: frustum only, and
+        // survivors keep source meshlet order so blending stays deterministic.
+        if (!blendedGeometry.empty())
+        {
+            if (!cameraPreparation.Add(
+                    ce::marker<"MaterialSceneBlendedVisibilityTask">(),
+                    [&](std::string& taskError)
+                    {
+                        return visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), blendedGeometry,
+                                                           candidate->finalCullStage.blendedMeshlets, taskError, false,
+                                                           {}, {}, true, candidate->input->GeometryMaxPixelError());
+                    },
+                    error))
+            {
+                return false;
+            }
+        }
         {
             ce::profile_scope joinProfile{ce::marker<"MaterialSceneDrawBindingsJoin">()};
             if (!drawPreparation.Join(error))
@@ -2554,6 +2717,7 @@ namespace material_graph
             }
         }
         nextPreparationPhase(ce::marker<"MaterialSceneDrawsPrepare">());
+        SceneConstants constants = viewConstants;
         for (const auto& draw : candidate->input->Draws())
         {
             ce::profile_scope drawProfile{ce::marker<"MaterialSceneDrawPrepare">()};
@@ -2567,7 +2731,6 @@ namespace material_graph
             const auto& program = drawPrograms[inputIndex];
             const auto& prepared = preparedDraws[inputIndex];
             const auto& bindings = prepared.bindings;
-            SceneConstants constants = viewConstants;
             constants.owner = 0x80000001u + static_cast<std::uint32_t>(inputIndex);
             constants.temporalHistoryValid = draw.temporalHistoryValid && !temporal.reset;
             constants.coverage = draw.coverage.flags;
@@ -2596,10 +2759,11 @@ namespace material_graph
 
                 item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
                 const auto chunkIndex = static_cast<std::size_t>(&chunk - draw.geometry->Chunks().data());
-                const auto outputIndex = cpuPreparation.ranges[inputIndex].first + chunkIndex;
+                const auto outputIndex = candidate->inputRanges[inputIndex].first + chunkIndex;
                 item.geometry = candidate->draws[outputIndex].geometry;
                 item.previousGeometry = candidate->draws[outputIndex].previousGeometry;
-                const auto& cpuChunk = cpuPreparation.chunks[outputIndex];
+                item.cameraMeshletBin = candidate->draws[outputIndex].cameraMeshletBin;
+                const auto& cpuChunk = m_preparationScratch->m_chunks[outputIndex];
                 constants.geometryIdentity = cpuChunk.identity;
                 if (geometryTable->records.size() >= UINT32_MAX || item.geometry->MeshletCount() > (UINT32_MAX >> 7))
                 {
@@ -2679,72 +2843,6 @@ namespace material_graph
                 candidate->draws[outputIndex] = std::move(item);
             }
         }
-        nextPreparationPhase(ce::marker<"MaterialSceneCameraPrepare">());
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> cameraGeometry, blendedGeometry;
-        for (auto& draw : candidate->draws)
-        {
-            if (candidate->UsesMeshlets(draw))
-            {
-                auto& list = draw.blended ? blendedGeometry : cameraGeometry;
-                draw.cameraMeshletBin = static_cast<uint32_t>(list.size());
-                list.push_back(draw.geometry);
-            }
-        }
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previousCameraHistory;
-        if (!cameraGeometry.empty())
-        {
-            const auto& view = candidate->input->View();
-            auto historyCamera = view.camera;
-            if (view.temporalFrame.camera.valid)
-            {
-                std::memcpy(&historyCamera.projection, view.temporalFrame.camera.projectionMatrix.data(),
-                            sizeof(historyCamera.projection));
-            }
-            std::uint64_t completed;
-            {
-                std::lock_guard lock(recordingMutex_);
-                completed = completed_;
-            }
-            // Only completed, accepted history can enter another recording.
-            // Keep the newest completed view plus its still-submitted successors.
-            std::erase_if(cameraHistories_, [&](const auto& entry) { return entry.first.first != view.sceneEpoch; });
-            auto& histories = cameraHistories_[{view.sceneEpoch, view.viewId}];
-            std::uint64_t newest{};
-            for (const auto& item : histories)
-            {
-                if (item.pyramid->completion <= completed)
-                {
-                    newest = (std::max)(newest, item.pyramid->source.frameId);
-                }
-            }
-            std::erase_if(histories, [&](const auto& item)
-                          { return item.pyramid->completion <= completed && item.pyramid->source.frameId < newest; });
-            for (const auto& item : histories)
-            {
-                const auto& h = *item.pyramid;
-                if (h.source.frameId == newest && h.source.frameId < view.frameId && h.completion <= completed &&
-                    h.source.width == view.width && h.source.height == view.height &&
-                    h.revision == view.historyRevision && historyCamera.HasSameTemporalHistory(item.camera) &&
-                    item.temporalRevision == view.temporalFrame.historyRevision &&
-                    (!view.temporalFrame.realFrameId || !view.temporalFrame.reset))
-                {
-                    previousCameraHistory =
-                        GpuGeometryOcclusion::ReadHistory(context, candidate->input->ViewProjection(), item.pyramid);
-                }
-            }
-            if (!cameraOcclusion_.PrepareHistory(context, candidate->input->ViewProjection(), view.viewId,
-                                                 view.historyRevision, candidate->historyStage.nextCameraHistory,
-                                                 error))
-            {
-                return false;
-            }
-            // The same builder produces the current pyramid from the occluder depth.
-            if (!cameraOcclusion_.Prepare(context, candidate->input->ViewProjection(),
-                                          candidate->finalCullStage.currentPyramid, error))
-            {
-                return false;
-            }
-        }
         nextPreparationPhase(ce::marker<"MaterialSceneGeometryPublish">());
         if (!candidate->geometryStage.Prepare(
                 std::move(geometryTable), error, &sceneResidentBuffers_,
@@ -2756,55 +2854,20 @@ namespace material_graph
         {
             return false;
         }
-        nextPreparationPhase(ce::marker<"MaterialSceneCameraDispatch">());
-        ScenePreparationTasks cameraPreparation(scheduler_, parallelPreparation);
-        if (!cameraGeometry.empty())
+        nextPreparationPhase(ce::marker<"MaterialSceneCameraJoin">());
+        if (!cameraPreparation.Join(error))
         {
-            if (!cameraPreparation.Add(
-                    ce::marker<"MaterialSceneCameraVisibilityTask">(),
-                    [&, previousCameraHistory](std::string& taskError)
-                    {
-                        if (!visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
-                                                         candidate->firstCullStage.cameraDepthMeshlets, taskError,
-                                                         false, previousCameraHistory, {}, false,
-                                                         candidate->input->GeometryMaxPixelError()) ||
-                            !visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), cameraGeometry,
-                                                         candidate->finalCullStage.cameraMeshlets, taskError, true, {},
-                                                         candidate->firstCullStage.cameraDepthMeshlets, false,
-                                                         candidate->input->GeometryMaxPixelError()))
-                        {
-                            return false;
-                        }
-                        ce::profile_scope surfaceProfile{ce::marker<"MaterialSceneSurfaceStagesPrepare">()};
-                        return candidate->occluderStage.Prepare(
-                                   *candidate, context, candidate->geometryStage.geometryTable,
-                                   candidate->firstCullStage.cameraDepthMeshlets, hybridPipelines_, taskError) &&
-                               candidate->visibilityStage.Prepare(
-                                   *candidate, context, candidate->geometryStage.geometryTable,
-                                   candidate->finalCullStage.cameraMeshlets, hybridPipelines_, taskError,
-                                   candidate->occluderStage.occluderVisibility.get());
-                    },
-                    error))
-            {
-                return false;
-            }
+            return false;
         }
-        // Blended surfaces were never depth-occlusion culled: frustum only, and
-        // survivors keep source meshlet order so blending stays deterministic.
-        if (!blendedGeometry.empty())
+        // 표면 단계는 완성된 Draw/기하 테이블과 첫 목록·복구 목록을 함께 소비한다.
+        nextPreparationPhase(ce::marker<"MaterialSceneSurfaceStagesPrepare">());
+        if (!candidate->occluderStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
+                                              candidate->firstCullStage.cameraDepthMeshlets, hybridPipelines_, error) ||
+            !candidate->visibilityStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
+                                                candidate->finalCullStage.cameraMeshlets, hybridPipelines_, error,
+                                                candidate->occluderStage.occluderVisibility.get()))
         {
-            if (!cameraPreparation.Add(
-                    ce::marker<"MaterialSceneBlendedVisibilityTask">(),
-                    [&](std::string& taskError)
-                    {
-                        return visibility_.PrepareMeshlets(context, candidate->input->ViewProjection(), blendedGeometry,
-                                                           candidate->finalCullStage.blendedMeshlets, taskError, false,
-                                                           {}, {}, true, candidate->input->GeometryMaxPixelError());
-                    },
-                    error))
-            {
-                return false;
-            }
+            return false;
         }
         {
             ce::profile_scope setupJoinProfile{ce::marker<"MaterialSceneShadowSetupJoin">()};
@@ -2821,24 +2884,6 @@ namespace material_graph
                 draw = candidate->draws[draw.geometryRecord - 1];
                 draw.shadowMeshletBin = bin;
                 draw.staticShadow = staticShadow;
-            }
-        }
-        nextPreparationPhase(ce::marker<"MaterialSceneCameraJoin">());
-        if (!cameraPreparation.Join(error))
-        {
-            return false;
-        }
-        if (cameraGeometry.empty())
-        {
-            nextPreparationPhase(ce::marker<"MaterialSceneSurfaceStagesPrepare">());
-            if (!candidate->occluderStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
-                                                  candidate->firstCullStage.cameraDepthMeshlets, hybridPipelines_,
-                                                  error) ||
-                !candidate->visibilityStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
-                                                    candidate->finalCullStage.cameraMeshlets, hybridPipelines_, error,
-                                                    candidate->occluderStage.occluderVisibility.get()))
-            {
-                return false;
             }
         }
         nextPreparationPhase(ce::marker<"MaterialSceneIndirectCommandsPrepare">());

@@ -90,39 +90,59 @@ struct SceneGpuData final
             return false;
         }
         const auto meshlets = current->Meshlets();
-        if (!meshlets.IsValid() || meshlets.offset % 4 || meshlets.size % 4 ||
-            meshlets.offset / 4 > UINT32_MAX || meshlets.size / 4 > UINT32_MAX)
+        if (!meshlets.IsValid() || meshlets.offset % 4 || meshlets.size % 4 || meshlets.offset / 4 > UINT32_MAX ||
+            meshlets.size / 4 > UINT32_MAX)
         {
             error = "METEOR scene packet topology exceeds raw descriptor addressing.";
             return false;
         }
-        const auto findVertex = [](const Page& page, const MeshSurfaceBatch& batch) {
+        const auto findVertex = [](const Page& page, const MeshSurfaceBatch& batch)
+        {
             for (uint32_t i = 0; i < page.vertices.size(); ++i)
-                if (page.vertices[i].buffer == batch.Buffer() && page.vertices[i].elements == batch.GeometryViewElements())
+            {
+                if (page.vertices[i].buffer == batch.Buffer() &&
+                    page.vertices[i].elements == batch.GeometryViewElements())
+                {
                     return i;
+                }
+            }
             return UINT32_MAX;
         };
-        const auto findTopology = [&](const Page& page) {
+        const auto findTopology = [&](const Page& page)
+        {
             for (uint32_t i = 0; i < page.topology.size(); ++i)
             {
                 const auto& value = page.topology[i];
                 if (value.buffer == meshlets.buffer && value.offset == meshlets.offset && value.size == meshlets.size)
+                {
                     return i;
+                }
             }
             return UINT32_MAX;
         };
-        if (pages.empty()) pages.emplace_back();
+        if (pages.empty())
+        {
+            pages.emplace_back();
+        }
         const bool sameStream = current->Buffer() == previous->Buffer() &&
                                 current->GeometryViewElements() == previous->GeometryViewElements();
         const auto& last = pages.back();
-        const auto newVertices = uint32_t(findVertex(last, *current) == UINT32_MAX) +
-                                 uint32_t(!sameStream && findVertex(last, *previous) == UINT32_MAX);
-        if (last.vertices.size() + newVertices > kGeometryPageSize ||
-            last.topology.size() + uint32_t(findTopology(last) == UINT32_MAX) > kGeometryPageSize)
+        auto currentSlot = findVertex(last, *current);
+        auto previousSlot = sameStream ? currentSlot : findVertex(last, *previous);
+        const auto newVertices =
+            uint32_t(currentSlot == UINT32_MAX) + uint32_t(!sameStream && previousSlot == UINT32_MAX);
+        const bool verticesFull = last.vertices.size() + newVertices > kGeometryPageSize;
+        auto topologySlot = verticesFull ? UINT32_MAX : findTopology(last);
+        if (verticesFull || last.topology.size() + uint32_t(topologySlot == UINT32_MAX) > kGeometryPageSize)
+        {
             pages.emplace_back();
+            currentSlot = previousSlot = topologySlot = UINT32_MAX;
+        }
         auto& page = pages.back();
-        const auto appendVertex = [&](const std::shared_ptr<const MeshSurfaceBatch>& batch) {
-            auto slot = findVertex(page, *batch);
+        // 페이지 여유를 확인하며 찾은 슬롯을 그대로 쓴다. 새 페이지에서만 무효화해
+        // 같은 스트림과 토폴로지를 다시 검색하지 않고 기존 삽입·소유 순서를 지킨다.
+        const auto appendVertex = [&](const std::shared_ptr<const MeshSurfaceBatch>& batch, uint32_t slot)
+        {
             if (slot == UINT32_MAX)
             {
                 slot = static_cast<uint32_t>(page.vertices.size());
@@ -132,9 +152,8 @@ struct SceneGpuData final
             return slot;
         };
         auto& value = records[record];
-        value.geometry[0] = appendVertex(current);
-        value.geometry[1] = appendVertex(previous);
-        auto topologySlot = findTopology(page);
+        value.geometry[0] = appendVertex(current, currentSlot);
+        value.geometry[1] = sameStream ? value.geometry[0] : appendVertex(previous, previousSlot);
         if (topologySlot == UINT32_MAX)
         {
             topologySlot = static_cast<uint32_t>(page.topology.size());

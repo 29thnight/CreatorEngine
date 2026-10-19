@@ -468,6 +468,134 @@ bool GpuGeometryVisibility::MeshletQueueStorageWords(std::uint64_t outputWords, 
     return true;
 }
 
+namespace
+{
+    // Only first-bin indices survive in this 96 KiB per-thread slot array. Geometry,
+    // residency and matrix owners remain in the current immutable input span.
+    // Nested preparation uses a bounded linear lookup instead of borrowing an
+    // active invocation's table; independent preparation workers never serialize.
+    class MeshletGroupLookup final
+    {
+      public:
+        explicit MeshletGroupLookup(std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries)
+            : m_geometries(geometries)
+        {
+            static thread_local Scratch scratch;
+            m_scratch = &scratch;
+            m_owned = !scratch.m_active;
+            if (m_owned)
+            {
+                scratch.m_active = true;
+                if (++scratch.m_generation == 0)
+                {
+                    for (auto& slot : scratch.m_slots)
+                    {
+                        slot.m_generation = 0;
+                    }
+                    ++scratch.m_generation;
+                }
+            }
+        }
+        ~MeshletGroupLookup()
+        {
+            if (m_owned)
+            {
+                m_scratch->m_active = false;
+            }
+        }
+        MeshletGroupLookup(const MeshletGroupLookup&) = delete;
+        MeshletGroupLookup& operator=(const MeshletGroupLookup&) = delete;
+
+        std::uint32_t FindOwner(std::uintptr_t stream, std::uintptr_t residency,
+                                const std::array<std::uint32_t, 16>& worldBits, std::uint32_t bin)
+        {
+            const auto matches = [&](std::uint32_t owner)
+            {
+                const auto& geometry = m_geometries[owner];
+                if (!geometry->UsesDirectClusters() ||
+                    reinterpret_cast<std::uintptr_t>(geometry->Input()->ClusterStream().get()) != stream ||
+                    reinterpret_cast<std::uintptr_t>(geometry->ClusterResidency().get()) != residency)
+                {
+                    return false;
+                }
+                const auto& world = geometry->ObjectToWorld();
+                for (unsigned row = 0; row < 4; ++row)
+                {
+                    for (unsigned column = 0; column < 4; ++column)
+                    {
+                        if (std::bit_cast<std::uint32_t>(world.m[row][column]) != worldBits[row * 4u + column])
+                        {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            };
+            if (m_owned)
+            {
+                const auto hash = Hash(stream, residency, worldBits);
+                const auto mask = m_scratch->m_slots.size() - 1u;
+                auto index = std::size_t{hash} & mask;
+                for (std::size_t examined = 0; examined < m_scratch->m_slots.size(); ++examined)
+                {
+                    auto& slot = m_scratch->m_slots[index];
+                    if (slot.m_generation != m_scratch->m_generation)
+                    {
+                        slot = {hash, bin, m_scratch->m_generation};
+                        return bin;
+                    }
+                    if (slot.m_hash == hash && matches(slot.m_bin))
+                    {
+                        return slot.m_bin;
+                    }
+                    index = (index + 1u) & mask;
+                }
+            }
+            for (std::uint32_t owner = 0; owner < bin; ++owner)
+            {
+                if (matches(owner))
+                {
+                    return owner;
+                }
+            }
+            return bin;
+        }
+
+      private:
+        struct Slot
+        {
+            std::uint32_t m_hash{}, m_bin{}, m_generation{};
+        };
+        struct Scratch
+        {
+            std::array<Slot, 2u * kMeshletBinCapacity> m_slots;
+            std::uint32_t m_generation{};
+            bool m_active{};
+        };
+        static_assert(sizeof(Slot) * 2u * kMeshletBinCapacity == 96u * 1024u);
+
+        static std::uint32_t Hash(std::uintptr_t stream, std::uintptr_t residency,
+                                  const std::array<std::uint32_t, 16>& worldBits)
+        {
+            std::uint32_t hash = 2166136261u;
+            const auto append = [&](std::uint32_t word) { hash = (hash ^ word) * 16777619u; };
+            append(static_cast<std::uint32_t>(stream));
+            append(static_cast<std::uint32_t>(std::uint64_t{stream} >> 32u));
+            append(static_cast<std::uint32_t>(residency));
+            append(static_cast<std::uint32_t>(std::uint64_t{residency} >> 32u));
+            for (const auto word : worldBits)
+            {
+                append(word);
+            }
+            return hash ^ (hash >> 16u);
+        }
+
+        std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> m_geometries;
+        Scratch* m_scratch{};
+        bool m_owned{};
+    };
+} // namespace
+
 bool GpuGeometryVisibility::PrepareMeshlets(
     const EnhancedFrameContext& context, const math::matrix4x4& projection,
     std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
@@ -476,19 +604,31 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     float maxPixelError, uint32_t lodWidth, uint32_t lodHeight)
 {
     ce::profile_scope profile{ce::marker<"GeometryVisibilityPrepare">()};
-    std::vector<Candidate> candidates;
-    std::vector<Bin> bins;
-    // Direct-cluster chunks retain one immutable stream/hierarchy and residency
-    // snapshot. Identical transforms in this view share only their group masks;
-    // each chunk still owns its classification, IDs and indirect arguments.
-    using GroupKey = std::tuple<std::uintptr_t, std::uintptr_t, std::array<std::uint32_t, 16>>;
-    std::map<GroupKey, std::uint32_t> groupOwners;
     std::uint64_t offset{}, groups{};
     result.reset();
     if (geometries.size() > kMeshletBinCapacity)
         return VisibilityFail(error, "METEOR meshlet work exceeds 4096 bins; no per-bin dispatch route.");
     if (!context.resources)
         return VisibilityFail(error, "Meshlet work requires its current device.");
+    if (geometries.empty())
+    {
+        if (history && firstStage)
+        {
+            return VisibilityFail(error, "Meshlet stage cannot both read history and recover.");
+        }
+        if (ordered && (history || firstStage))
+        {
+            return VisibilityFail(error, "Ordered meshlet lists are single-stage.");
+        }
+        return PrepareInternal(context, projection, {}, {}, result, error,
+                               currentFrameOcclusion || bool(history) || bool(firstStage));
+    }
+    // This same storage becomes the frame's sealed declaration input. Keep its
+    // local owner through history/recovery validation after PrepareInternal.
+    auto preparedInputs = std::make_shared<MeshletInputs>();
+    auto& candidates = preparedInputs->candidates;
+    auto& bins = preparedInputs->bins;
+    std::optional<MeshletGroupLookup> groupOwners;
     candidates.reserve(geometries.size());
     bins.reserve(geometries.size());
     for (const auto& geometry : geometries)
@@ -510,6 +650,10 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         auto groupOwner = bin;
         if (geometry->UsesDirectClusters())
         {
+            if (!groupOwners)
+            {
+                groupOwners.emplace(geometries);
+            }
             const auto stream = geometry->Input()->ClusterStream();
             const auto& residency = geometry->ClusterResidency();
             if (!stream || !residency)
@@ -519,12 +663,12 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             for (unsigned row = 0; row < 4; ++row)
                 for (unsigned column = 0; column < 4; ++column)
                     worldBits[row * 4u + column] = std::bit_cast<std::uint32_t>(world.m[row][column]);
-            const GroupKey key{reinterpret_cast<std::uintptr_t>(stream.get()),
-                               reinterpret_cast<std::uintptr_t>(residency.get()), worldBits};
-            const auto [owner, inserted] = groupOwners.try_emplace(key, bin);
-            groupOwner = owner->second;
-            if (!inserted && static_cast<std::uint32_t>(bins[groupOwner].baseVertex) != groupCount)
+            groupOwner = groupOwners->FindOwner(reinterpret_cast<std::uintptr_t>(stream.get()),
+                                                reinterpret_cast<std::uintptr_t>(residency.get()), worldBits, bin);
+            if (groupOwner != bin && static_cast<std::uint32_t>(bins[groupOwner].baseVertex) != groupCount)
+            {
                 return VisibilityFail(error, "Shared cluster groups have incompatible hierarchy domains.");
+            }
         }
         // One leading word contains the GPU survivor count; IDs follow it.
         // CPU seals only one range per material/geometry bin. Compute enumerates
@@ -553,8 +697,10 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     if (ordered && (history || firstStage))
         return VisibilityFail(error, "Ordered meshlet lists are single-stage.");
     if (!PrepareInternal(context, projection, candidates, bins, result, error,
-                         currentFrameOcclusion || bool(history) || bool(firstStage), geometries))
+                         currentFrameOcclusion || bool(history) || bool(firstStage), geometries, preparedInputs))
+    {
         return false;
+    }
     if (!result)
         return true;
     auto frame = std::const_pointer_cast<Frame>(result);
@@ -730,7 +876,8 @@ bool GpuGeometryVisibility::PrepareMeshletPipelines(const EnhancedFrameContext& 
 bool GpuGeometryVisibility::PrepareInternal(
     const EnhancedFrameContext& context, const math::matrix4x4& viewProjection, std::span<const Candidate> candidates,
     std::span<const Bin> bins, std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-    std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries)
+    std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
+    std::shared_ptr<MeshletInputs> preparedInputs)
 {
     ce::profile_scope profile{ce::marker<"GpuVisibility.PrepareInternal">()};
     result.reset();
@@ -758,68 +905,104 @@ bool GpuGeometryVisibility::PrepareInternal(
     {
         return VisibilityFail(error, "GPU visibility requires nonempty bins and 32-bit candidate/bin counts.");
     }
-    struct OutputRange
-    {
-        std::uint32_t offset{}, count{};
-    };
-    std::vector<OutputRange> ranges(bins.size());
-    for (const auto& candidate : candidates)
-    {
-        if (candidate.bin >= bins.size() || candidate.outputOffset % kOutputAlignment != 0)
-        {
-            return VisibilityFail(error, "GPU visibility candidate has an invalid bin or unaligned output offset.");
-        }
-        auto& range = ranges[candidate.bin];
-        if (range.count && range.offset != candidate.outputOffset)
-        {
-            return VisibilityFail(error, "GPU visibility candidates in one bin must share an output offset.");
-        }
-        range.offset = candidate.outputOffset;
-        if (!geometries.empty())
-        {
-            const auto words = MeshletOutputWords(candidate, bins[candidate.bin]);
-            if (words > maximum)
-                return VisibilityFail(error, "Meshlet group range exceeds 32-bit addressing.");
-            range.count = static_cast<std::uint32_t>(words);
-        }
-        else
-            ++range.count;
-    }
-    std::vector<std::vector<std::uint8_t>> preservedSources(bins.size());
-    for (std::size_t bin = 0; bin < bins.size(); ++bin)
-    {
-        if (geometries.empty() && bins[bin].preservedInstanceCount != 0u)
-        {
-            if (ranges[bin].count != bins[bin].preservedInstanceCount)
-            {
-                return VisibilityFail(error, "Preserved GPU bins require one candidate per original instance.");
-            }
-            preservedSources[bin].resize(ranges[bin].count, 0u);
-        }
-    }
-    for (const auto& candidate : candidates)
-    {
-        auto& seen = preservedSources[candidate.bin];
-        if (!seen.empty())
-        {
-            if (candidate.sourceIndex >= seen.size() || seen[candidate.sourceIndex] != 0u)
-            {
-                return VisibilityFail(error, "Preserved GPU bins require unique original instance IDs 0..N-1.");
-            }
-            seen[candidate.sourceIndex] = 1u;
-        }
-    }
-    std::erase_if(ranges, [](const auto& range) { return range.count == 0; });
-    std::ranges::sort(ranges, {}, &OutputRange::offset);
     std::uint64_t outputEnd = 0;
-    for (const auto& range : ranges)
+    if (preparedInputs)
     {
-        const auto end = std::uint64_t(range.offset) + range.count;
-        if (range.offset < outputEnd || end > maximum)
+        // PrepareMeshlets emits one aligned, ascending range per bin. Validate
+        // that proof directly; generic instance bins still use the validator below.
+        if (geometries.size() != bins.size() || candidates.size() != bins.size() ||
+            candidates.data() != preparedInputs->candidates.data() || bins.data() != preparedInputs->bins.data())
         {
-            return VisibilityFail(error, "GPU visibility output ranges overlap or exceed 32-bit addressing.");
+            return VisibilityFail(error, "Meshlet preparation requires its exact sealed candidate/bin storage.");
         }
-        outputEnd = end;
+        for (std::size_t bin = 0; bin < bins.size(); ++bin)
+        {
+            const auto& candidate = candidates[bin];
+            if (candidate.bin != bin || candidate.outputOffset % kOutputAlignment != 0)
+            {
+                return VisibilityFail(error, "GPU visibility candidate has an invalid bin or unaligned output offset.");
+            }
+            const auto words = MeshletOutputWords(candidate, bins[bin]);
+            if (words > maximum)
+            {
+                return VisibilityFail(error, "Meshlet group range exceeds 32-bit addressing.");
+            }
+            const auto end = std::uint64_t(candidate.outputOffset) + words;
+            if (candidate.outputOffset < outputEnd || end > maximum)
+            {
+                return VisibilityFail(error, "GPU visibility output ranges overlap or exceed 32-bit addressing.");
+            }
+            outputEnd = end;
+        }
+    }
+    else
+    {
+        struct OutputRange
+        {
+            std::uint32_t offset{}, count{};
+        };
+        std::vector<OutputRange> ranges(bins.size());
+        for (const auto& candidate : candidates)
+        {
+            if (candidate.bin >= bins.size() || candidate.outputOffset % kOutputAlignment != 0)
+            {
+                return VisibilityFail(error, "GPU visibility candidate has an invalid bin or unaligned output offset.");
+            }
+            auto& range = ranges[candidate.bin];
+            if (range.count && range.offset != candidate.outputOffset)
+            {
+                return VisibilityFail(error, "GPU visibility candidates in one bin must share an output offset.");
+            }
+            range.offset = candidate.outputOffset;
+            if (!geometries.empty())
+            {
+                const auto words = MeshletOutputWords(candidate, bins[candidate.bin]);
+                if (words > maximum)
+                {
+                    return VisibilityFail(error, "Meshlet group range exceeds 32-bit addressing.");
+                }
+                range.count = static_cast<std::uint32_t>(words);
+            }
+            else
+            {
+                ++range.count;
+            }
+        }
+        std::vector<std::vector<std::uint8_t>> preservedSources(bins.size());
+        for (std::size_t bin = 0; bin < bins.size(); ++bin)
+        {
+            if (geometries.empty() && bins[bin].preservedInstanceCount != 0u)
+            {
+                if (ranges[bin].count != bins[bin].preservedInstanceCount)
+                {
+                    return VisibilityFail(error, "Preserved GPU bins require one candidate per original instance.");
+                }
+                preservedSources[bin].resize(ranges[bin].count, 0u);
+            }
+        }
+        for (const auto& candidate : candidates)
+        {
+            auto& seen = preservedSources[candidate.bin];
+            if (!seen.empty())
+            {
+                if (candidate.sourceIndex >= seen.size() || seen[candidate.sourceIndex] != 0u)
+                {
+                    return VisibilityFail(error, "Preserved GPU bins require unique original instance IDs 0..N-1.");
+                }
+                seen[candidate.sourceIndex] = 1u;
+            }
+        }
+        std::erase_if(ranges, [](const auto& range) { return range.count == 0; });
+        std::ranges::sort(ranges, {}, &OutputRange::offset);
+        for (const auto& range : ranges)
+        {
+            const auto end = std::uint64_t(range.offset) + range.count;
+            if (range.offset < outputEnd || end > maximum)
+            {
+                return VisibilityFail(error, "GPU visibility output ranges overlap or exceed 32-bit addressing.");
+            }
+            outputEnd = end;
+        }
     }
     if (!Initialize(context, error))
     {
@@ -878,6 +1061,7 @@ bool GpuGeometryVisibility::PrepareInternal(
     frame->m_binCount = static_cast<std::uint32_t>(bins.size());
     frame->m_outputCount = static_cast<std::uint32_t>((std::max)(std::uint64_t{1}, outputEnd));
     frame->m_meshletGeometries.assign(geometries.begin(), geometries.end());
+    frame->m_meshletOffsets.reserve(geometries.size());
     frame->m_reset = !geometries.empty() ? m_meshletReset.GetGeneration() : m_reset.GetGeneration();
     frame->m_cull = !geometries.empty() ? m_meshletCull.GetGeneration() : m_cull.GetGeneration();
     if (!geometries.empty())
@@ -952,10 +1136,17 @@ bool GpuGeometryVisibility::PrepareInternal(
         constants.planeMask |= kWaveWorkQueue;
         if ((candidates.front().flags & kOrderedMeshlets) != 0u)
             constants.planeMask |= kOrderedScanDispatch;
-        frame->m_meshletInputs = std::make_shared<MeshletInputs>();
+        if (preparedInputs)
+        {
+            frame->m_meshletInputs = std::move(preparedInputs);
+        }
+        else
+        {
+            frame->m_meshletInputs = std::make_shared<MeshletInputs>();
+            frame->m_meshletInputs->candidates.assign(candidates.begin(), candidates.end());
+            frame->m_meshletInputs->bins.assign(bins.begin(), bins.end());
+        }
         frame->m_meshletInputs->constants = constants;
-        frame->m_meshletInputs->candidates.assign(candidates.begin(), candidates.end());
-        frame->m_meshletInputs->bins.assign(bins.begin(), bins.end());
     }
     else
     {
