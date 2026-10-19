@@ -1581,6 +1581,12 @@
     <ClInclude Include="MaterialGraphWork.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialGraphPrimitiveCache.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MaterialGraphPrimitiveCacheContract.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
     <ClInclude Include="MaterialGraphBindingDiagnostics.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>

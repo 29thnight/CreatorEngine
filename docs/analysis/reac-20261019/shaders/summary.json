@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "previous_bundle": "/tmp/creator-reac-validation/final-evidence-before-format",
+  "assembled_utc": "2026-10-19T07:21:05.120053+00:00",
+  "base_ref": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+  "scope": "Final source-identified Linux shader compilation/validation and Slang-generated CPU helper execution",
+  "matrix": {
+    "engine": {
+      "counts": {
+        "dxil": {
+          "passed": 34,
+          "total": 34
+        },
+        "spirv": {
+          "passed": 14,
+          "total": 34
+        }
+      },
+      "failure_names": [
+        "ShadowMeshletCullCS/spirv",
+        "ShadowMeshletCullCS-occlusion/spirv",
+        "ShadowMeshletCullCS-history/spirv",
+        "ShadowMeshletCullCS-recovery/spirv",
+        "ShadowMeshletCullCS-camera-prediction/spirv",
+        "ShadowMeshletResetCS-shared/spirv",
+        "ShadowMeshletCullCS-shared/spirv",
+        "MeshletCountCS-shared/spirv",
+        "MeshletFinalizeCS-shared/spirv",
+        "MeshletScatterCS-shared/spirv",
+        "ShadowMeshletCullCS-shared-occlusion/spirv",
+        "ShadowMeshletCullCS-partial/spirv",
+        "ShadowMeshletCullCS-stress/spirv",
+        "ShadowMeshletCullCS-partial-stress/spirv",
+        "LXSceneGBufferPS/spirv",
+        "LXSceneTemporalPS/spirv",
+        "LXSceneCachedGBufferPS/spirv",
+        "LXSceneCachedTemporalPS/spirv",
+        "LXSceneVisibilityMS/spirv",
+        "LXSceneShadowMS/spirv"
+      ]
+    },
+    "diagnostic": {
+      "counts": {
+        "dxil": {
+          "passed": 34,
+          "total": 34
+        },
+        "spirv": {
+          "passed": 32,
+          "total": 34
+        }
+      },
+      "failure_names": [
+        "LXSceneGBufferPS/spirv",
+        "LXSceneCachedGBufferPS/spirv"
+      ]
+    }
+  },
+  "final_primitive_current_rhi": "ClearPrimitiveCache and PopulatePrimitiveCache both DXIL and SPIR-V pass compile and external validation: 4/4",
+  "cpu_oracles": {
+    "bounds_checks": 1069124,
+    "normalized_skin_samples": 72000,
+    "rejected_boxes": 13821,
+    "position_checks": 12336,
+    "position_fixtures": 514,
+    "position_vertices": 2056,
+    "normal": "passed",
+    "asan_ubsan_fail_fast": "passed",
+    "leak_sanitizer": "disabled due sandbox task enumeration failure",
+    "position_cpp_compatibility": "Generated precise token macro with -fno-fast-math -ffp-contract=off"
+  },
+  "remaining_shader_gates": [
+    "Actual RHI arguments still fail 20/34 SPIR-V cases; profile capability budget is not silently widened in production.",
+    "Diagnostic mode explicitly acknowledges 12 capabilities and still fails LXSceneGBufferPS and LXSceneCachedGBufferPS SPIR-V validation because dynamic QuadBroadcast Index is invalid at SPIR-V 1.3.",
+    "Baseline source at 0d3 reproduces the default GBuffer validator failure and profile-upgrade failures; cached GBuffer still has an unresolved gate.",
+    "Default-entry normalized DXIL IR is not byte-identical; resource tables are identical and t174/t175 cache resources and added cache queries/loads are absent in the tested constant-material fixture."
+  ],
+  "not_run": [
+    "Windows MSVC host/RHI build",
+    "Native GPU correctness fixtures",
+    "Vulkan or D3D12 device dispatch",
+    "GPU/frame performance measurement",
+    "All cooked material permutations"
+  ],
+  "evidence_files": {
+    "cpu-oracles-normal.json": {
+      "sha256": "4fe19b37fb8250d235a95ed6843bf295304f26f7b72f9d2f26de81a9378e997c",
+      "bytes": 7246
+    },
+    "cpu-oracles-sanitized.json": {
+      "sha256": "b3189dcebcdf3334db35be58c241b566d166b34a9eff31ac007a4f3f4ea959b2",
+      "bytes": 5803
+    },
+    "cpu-perf-evidence.json": {
+      "sha256": "9459e914219dd18c0b020280a55cb7a9b005a49b267737be0c521b40fe3235c7",
+      "bytes": 2118
+    },
+    "default-base.json": {
+      "sha256": "104113bf6cbe662355efd4e5b2fde15c1f7606a10702e87aafe11a41442a3f62",
+      "bytes": 14794
+    },
+    "default-ir-comparison.json": {
+      "sha256": "c3e6ec38af0ab43e10d6ad400c72d64a942596cd6cc50196ea16e84053c961e7",
+      "bytes": 12151
+    },
+    "matrix-diagnostic.json": {
+      "sha256": "68eb70875d159ee89847e30d8c234994b76b9e0afa7e35aa6f9706beb06ec272",
+      "bytes": 350385
+    },
+    "matrix-engine.json": {
+      "sha256": "f50a73c2ad973716b682b0e584d9a46e29fdb60819bee5cf030cde283bf7ed52",
+      "bytes": 225088
+    },
+    "primitive-spirv-abi.json": {
+      "sha256": "11b793c3396a9964727fa9a31932e903851b357365ce9d648c071adcd1b2fd2c",
+      "bytes": 1261
+    },
+    "source-snapshots.json": {
+      "sha256": "e83fce9c04c99f93852447b537f80b6ed3d6b7d706710448722d722531d2b9d2",
+      "bytes": 81005
+    },
+    "visibility-base.json": {
+      "sha256": "9860b176cf4a9c79d776d23c35bfbac5e6a69afd2e52b20a0b1dd0d756eb6223",
+      "bytes": 4736
+    }
+  }
+}

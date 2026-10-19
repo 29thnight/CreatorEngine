@@ -1,0 +1,73 @@
+{
+  "capture": "after-baseline",
+  "windowQpc": [
+    3086978245321,
+    3087129680118
+  ],
+  "gameViewId": 2,
+  "scopeToleranceTicks": 2,
+  "metrics": {
+    "gameCpuMs": {
+      "count": 444,
+      "mean": 11.742153603603603,
+      "p50": 11.687149999999999,
+      "p95": 14.4517
+    },
+    "scenePrepareMs": {
+      "count": 444,
+      "mean": 2.156797747747748,
+      "p50": 2.1404,
+      "p95": 2.7141
+    },
+    "declareMs": {
+      "count": 444,
+      "mean": 4.219918243243243,
+      "p50": 3.9737,
+      "p95": 5.7037
+    },
+    "renderLoopMs": {
+      "count": 444,
+      "mean": 26.59487747747748,
+      "p50": 25.88315,
+      "p95": 31.2157
+    }
+  },
+  "cohortIdentity": {
+    "scenePrepareMs": {
+      "distinctGameViews": 444,
+      "callsPerGameView": {
+        "1": 444
+      },
+      "allSelected": true
+    },
+    "declareMs": {
+      "distinctGameViews": 444,
+      "callsPerGameView": {
+        "1": 444
+      },
+      "allSelected": true
+    },
+    "renderLoopMs": {
+      "distinctLoops": 444,
+      "gameViewsPerLoop": {
+        "1": 444
+      },
+      "missing": []
+    }
+  },
+  "findings": {
+    "loopsWithoutGameCpu": [
+      {
+        "beginMs": 15377.6003,
+        "durationMs": 0.3745
+      }
+    ]
+  },
+  "matches": {
+    "gameCpuMs": true,
+    "scenePrepareMs": true,
+    "declareMs": true,
+    "renderLoopMs": true
+  },
+  "allCoreCohortsIdentical": true
+}

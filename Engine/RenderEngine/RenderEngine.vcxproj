@@ -772,6 +772,8 @@
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
+    <ClInclude Include="MaterialGraphPrimitiveCache.h" />
+    <ClInclude Include="MaterialGraphPrimitiveCacheContract.h" />
     <ClInclude Include="MeshTransformDeclarationPlan.h" />
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />

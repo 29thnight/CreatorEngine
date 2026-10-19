@@ -27,7 +27,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
             uses.push_back({targets[i], i == 4 ? RHIResourceState::DepthWrite : RHIResourceState::RenderTarget,
                             RGAccessMode::ReadWrite});
         }
-        frame->AddReconstructionReads(graph, uses, visibility, material);
+        frame->AddReconstructionReads(graph, uses, visibility, material, true);
         for (const auto& draw : frame->draws)
         {
             if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)

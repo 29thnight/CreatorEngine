@@ -10,6 +10,7 @@
 #include "MaterialGraphFrameGeometry.h"
 #include "MaterialGraphSceneGpuData.h"
 #include "MaterialGraphWork.h"
+#include "MaterialGraphPrimitiveCache.h"
 #include "MaterialGraphHybridVisibility.h"
 #include "MaterialGraphRenderBindings.h"
 #include "MaterialGraphSceneLookup.h"
@@ -47,6 +48,10 @@ struct SceneHostBudget
     // 명시적으로 선택한 경우에만 켜며 special 효과도 제한된 tile로 평가한다.
     bool lookupRuntimeEvaluation = false;
     std::uint64_t shadowCacheBytes = 512ull << 20;
+    // 실제 light-space recovery가 첫 단계 오판을 복구한다. 네이티브 A/B 수용 전에는 명시적으로만 켠다.
+    bool m_shadowDepthPrediction{};
+    // 고정 cache의 추가 pass/메모리 비용은 네이티브 A/B로 수용하기 전까지 opt-in으로 둔다.
+    bool m_primitiveCache{};
 };
 
 struct SceneProgramStats
@@ -127,6 +132,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     // cache instead of replaying these lists; see CurrentShadowCacheStats.
     std::vector<ShadowMeshletOutput> ShadowMeshletOutputs() const;
     std::shared_ptr<const GpuGeometryVisibility::Frame> ShadowFirstMeshletWork(unsigned cascade) const;
+    bool UsesShadowDepthPrediction() const;
 
     // Prepared lattice mesh draw bins, before GPU visibility rejection.
     uint32_t PreparedMeshletDrawCount() const;
@@ -181,9 +187,12 @@ class SceneHost final : private IRHIUploadTransactionListener
     SceneLayerWork DeclareLayerWork(EnhancedRenderGraph& graph, RGHandle layerList) const;
     void DeclareHistory(EnhancedRenderGraph& graph, RGHandle depth) const;
     // Standalone-fixture composition of the six explicit shadow producers below.
-    RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const;
+    RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap,
+                           RGHandle cameraOccluderDepth = {}) const;
     SceneShadowResources DeclareShadowStaticCache(EnhancedRenderGraph& graph, RGHandle geometry) const;
-    SceneShadowResources DeclareShadowFirstCull(EnhancedRenderGraph& graph, RGHandle geometry) const;
+    // 예측 모드는 이 프레임 카메라 Occluder의 정확한 버전만 받는다. 최종 그림자 깊이는 입력이 아니다.
+    SceneShadowResources DeclareShadowFirstCull(EnhancedRenderGraph& graph, RGHandle geometry,
+                                                RGHandle cameraOccluderDepth = {}) const;
     SceneShadowResources DeclareShadowOccluder(EnhancedRenderGraph& graph, RGHandle geometry,
                                                const SceneShadowResources& cache,
                                                const SceneShadowResources& first) const;
@@ -321,6 +330,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     HybridVisibilityPipelines hybridPipelines_;
     LX::Runtime::GraphicsPipeline shadowMerge_;
     std::array<LX::Runtime::ComputePipeline, 6> materialWorkPipelines_;
+    std::shared_ptr<ScenePrimitiveCacheResources> m_primitiveCacheResources;
     SceneLookupCache lookup_;
     SceneRuntimeEffectsResources runtimeEffects_;
     SceneSubsurfaceResources subsurface_;

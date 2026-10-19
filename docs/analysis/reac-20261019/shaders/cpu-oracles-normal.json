@@ -1,0 +1,190 @@
+{
+  "scope": "Linux shader compilation/validation and optional CPU reference only",
+  "native_windows_rhi_build": "not run",
+  "native_gpu_execution": "not run",
+  "native_performance": "not measured",
+  "tools": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "-version"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "2026.14\n",
+      "sha256": "71b47927833b2cafa68a5d114ced75c017f2195d9b4f339b66150ca974cd7b38"
+    },
+    "cxx": {
+      "command": [
+        "g++",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": ""
+    },
+    "dxc": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/dxc-1.9.2607/linux_dxc_2026_07_29.x86_x64/bin/dxc",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "libdxcompiler.so: 1.9(1-0d3ee6b5)(1.9.0.1)\n",
+      "stderr": ""
+    },
+    "spirv-val": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/spirv-tools-build/tools/spirv-val",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "SPIRV-Tools v2026.4 unknown hash, 2026-10-19T06:15:36+00:00\nTargets:\n  SPIR-V 1.0\n  SPIR-V 1.1\n  SPIR-V 1.2\n  SPIR-V 1.3\n  SPIR-V 1.4\n  SPIR-V 1.5\n  SPIR-V 1.6\n  SPIR-V 1.2 (under OpenCL 2.2 Full Profile semantics)\n  SPIR-V 1.0 (under Vulkan 1.0 semantics)\n  SPIR-V 1.3 (under Vulkan 1.1 semantics)\n  SPIR-V 1.4 (under Vulkan 1.1 semantics)\n  SPIR-V 1.5 (under Vulkan 1.2 semantics)\n  SPIR-V 1.6 (under Vulkan 1.3 semantics) SPIR-V 1.6 (under Vulkan 1.4 semantics)\n",
+      "stderr": ""
+    }
+  },
+  "tool_files": {
+    "/tmp/creator-reac-validation/toolchain/slang-2026.14/lib/libslang-compiler.so": {
+      "sha256": "665de66fcb784c4578144bd1b17ba6bd0a6a005af86c6e264fd0799d5dcca8b5",
+      "bytes": 33416608
+    },
+    "/tmp/creator-reac-validation/toolchain/slang-2026.14/include/slang-cpp-prelude.h": {
+      "sha256": "d6432c1dff574a55bc303ac43b4401e49cd8350b5ee9ca9d66bd1e7a42c00f45",
+      "bytes": 12739
+    },
+    "/tmp/creator-reac-validation/toolchain/slang-2026.14/include/slang-cpp-types.h": {
+      "sha256": "f684488b215faedf6b4f07ebc0455b0e6e1874915a6a6f0a68c6fa7ef797dc74",
+      "bytes": 37859
+    },
+    "/tmp/creator-reac-validation/toolchain/dxc-1.9.2607/linux_dxc_2026_07_29.x86_x64/bin/dxc": {
+      "sha256": "b1bfa493d5c780b94c20b8b5f5aed50d1c4d03339cd55f496bd223eedeec1734",
+      "bytes": 22900096
+    },
+    "/tmp/creator-reac-validation/toolchain/dxc-1.9.2607/linux_dxc_2026_07_29.x86_x64/bin/dxv": {
+      "sha256": "87cc9c1e459a7d6a0dc52c7b319d627d0f6078a2be95621e5a98b3cf12f255cb",
+      "bytes": 4575552
+    },
+    "/tmp/creator-reac-validation/toolchain/dxc-1.9.2607/linux_dxc_2026_07_29.x86_x64/lib/libdxcompiler.so": {
+      "sha256": "be01593d3ff635fca6f20b044aa49c777f6409e50a28fb0242a0c87272620b62",
+      "bytes": 315184552
+    },
+    "/tmp/creator-reac-validation/toolchain/dxc-1.9.2607/linux_dxc_2026_07_29.x86_x64/lib/libdxil.so": {
+      "sha256": "e74c02162cd553a0ceab041937d749cfd6ab9adf919142603ff5fc55af222c73",
+      "bytes": 39385192
+    },
+    "/tmp/creator-reac-validation/toolchain/spirv-tools-build/tools/spirv-val": {
+      "sha256": "d7b7002f2194353a38f50afe68968432d86589edf09fb074bc1b74fed2036ee7",
+      "bytes": 2274952
+    }
+  },
+  "cpu_bounds": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/sources/Tools/regression/reac_geometry_bounds_probe.slang",
+        "-I",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+        "-entry",
+        "BoundsOracleCS",
+        "-stage",
+        "compute",
+        "-target",
+        "cpp",
+        "-matrix-layout-column-major",
+        "-O3",
+        "-fp-mode",
+        "precise",
+        "-warnings-as-errors",
+        "all",
+        "-o",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/reac_geometry_bounds.generated.cpp"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "passed": true,
+    "compile": {
+      "command": [
+        "g++",
+        "-std=c++20",
+        "-O2",
+        "-fno-fast-math",
+        "-ffp-contract=off",
+        "-I",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/sources/Tools/regression/reac_geometry_bounds_probe.cpp",
+        "-o",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/reac_geometry_bounds_probe"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "run": {
+      "command": [
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/reac_geometry_bounds_probe"
+      ],
+      "exit_code": 0,
+      "stdout": "REAC_GEOMETRY_BOUNDS_OK checks=1069124 rejected=13821 normalized_skin_samples=72000\n",
+      "stderr": ""
+    },
+    "generated_sha256": "4ab6e6aea00985d782a70ec6a23ef4499487f1d971a3b094f3e5ca7c064e4e0f"
+  },
+  "cpu_positions": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/sources/Tools/regression/reac_geometry_position_probe.slang",
+        "-I",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+        "-entry",
+        "PositionOracleCS",
+        "-stage",
+        "compute",
+        "-target",
+        "cpp",
+        "-matrix-layout-column-major",
+        "-O3",
+        "-fp-mode",
+        "precise",
+        "-warnings-as-errors",
+        "all",
+        "-o",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/reac_geometry_position.generated.cpp"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "passed": true,
+    "host_compatibility": "precise token macro; arithmetic protected by -fno-fast-math -ffp-contract=off",
+    "compile": {
+      "command": [
+        "g++",
+        "-std=c++20",
+        "-O2",
+        "-fno-fast-math",
+        "-ffp-contract=off",
+        "-I",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/sources/Tools/regression/reac_geometry_position_probe.cpp",
+        "-o",
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/reac_geometry_position_probe"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "run": {
+      "command": [
+        "/tmp/creator-reac-validation/matrix-final-diagnostic/reac_geometry_position_probe"
+      ],
+      "exit_code": 0,
+      "stdout": "REAC_GEOMETRY_POSITION_OK checks=12336 fixtures=514 vertices=2056\n",
+      "stderr": ""
+    },
+    "generated_sha256": "4ff54a7c5826538af27df747c78f868bc87f98048193f84cad78fa8f34ec37d6"
+  },
+  "changed_sources": [],
+  "evidence_snapshot": "matrix-final-diagnostic"
+}

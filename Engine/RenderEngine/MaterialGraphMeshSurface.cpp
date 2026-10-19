@@ -715,6 +715,57 @@ namespace material_graph
         std::unique_ptr<MeshTransformDeclarationScratch> m_declarationScratch;
     };
 
+    void MeshSurfaceInput::SealInstanceBounds()
+    {
+        m_instanceMinimum = {};
+        m_instanceMaximum = {};
+        if (meshlets_.descriptors.empty())
+        {
+            return;
+        }
+        const double positionError = clusterArchive_ ? clusterArchive_->grid.positionError : 0.0;
+        if (!std::isfinite(positionError) || positionError < 0.0)
+        {
+            return;
+        }
+        const auto infinity = std::numeric_limits<double>::infinity();
+        std::array<double, 3> minimum{infinity, infinity, infinity};
+        std::array<double, 3> maximum{-infinity, -infinity, -infinity};
+        for (const auto& descriptor : meshlets_.descriptors)
+        {
+            // QMC2 페이지 검증과 같은 오차 범위를 포함한다. 캐시 적중/매 프레임
+            // 경로에서는 정점이나 메시렛을 다시 순회하지 않는다.
+            const double radius = double(descriptor.sphereRadius) + positionError * 1.732051 + 1e-5;
+            if (!std::isfinite(radius) || descriptor.sphereRadius < 0.0f)
+            {
+                return;
+            }
+            for (unsigned axis = 0; axis < 3; ++axis)
+            {
+                const double center = descriptor.sphereCenter[axis];
+                if (!std::isfinite(center))
+                {
+                    return;
+                }
+                minimum[axis] = (std::min)(minimum[axis], center - radius);
+                maximum[axis] = (std::max)(maximum[axis], center + radius);
+            }
+        }
+        math::vector4 lower{}, upper{};
+        for (unsigned axis = 0; axis < 3; ++axis)
+        {
+            lower[axis] = std::nextafter(static_cast<float>(minimum[axis]), -std::numeric_limits<float>::infinity());
+            upper[axis] = std::nextafter(static_cast<float>(maximum[axis]), std::numeric_limits<float>::infinity());
+            if (!std::isfinite(lower[axis]) || !std::isfinite(upper[axis]))
+            {
+                return;
+            }
+        }
+        lower.w = upper.w = 1.0f;
+        m_instanceMinimum = lower;
+        m_instanceMaximum = upper;
+    }
+
     bool MeshSurfaceInput::Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
                                 std::shared_ptr<const MeshSurfaceInput>& result, std::string& error)
     {
@@ -904,6 +955,7 @@ namespace material_graph
             candidate->clusterStream_ =
                 std::make_shared<assets::cluster::Stream>(candidate->clusterArchive_, candidate->hierarchy_.groups);
         }
+        candidate->SealInstanceBounds();
         result = std::move(candidate);
         error.clear();
         return true;
@@ -1065,6 +1117,7 @@ namespace material_graph
             {
                 remap[index] = unused;
             }
+            chunk->SealInstanceBounds();
             description.input = std::move(chunk);
             description.sourceVerticesOwner_ = sourceVertices;
             description.sourceVertices = *sourceVertices;

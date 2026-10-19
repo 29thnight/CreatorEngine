@@ -1,0 +1,33 @@
+{
+  "sections": 8,
+  "matrix_rows": 19,
+  "matrix_columns": [
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5
+  ],
+  "duplicate_ids": [],
+  "broken_fragment_links": [],
+  "missing_local_links": [],
+  "final_counts_present": true,
+  "browser_visual_render": "not run; local browser binary unavailable",
+  "bytes": 131188,
+  "html_sha256": "703fa0d6fc933b451993ffddc9b591e3d6ed8dea3e823db245731b45784eba8c",
+  "implementation_md_sha256": "fba7ce6aec8627dace2be2c31abf77de004e54e6f2762bccb300b8881c3a57fc"
+}

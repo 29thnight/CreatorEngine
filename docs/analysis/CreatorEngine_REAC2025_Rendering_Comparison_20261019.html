@@ -1,0 +1,1078 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>CreatorEngine × REAC 2025 · 최신 master 비교와 후속 구현</title><style>
+:root{--ink:#16253b;--muted:#50627b;--line:#dce5ef;--paper:#fff;--bg:#f3f6fa;--blue:#194f94;--teal:#087b79;--orange:#9c520d}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--bg);font:16px/1.8 'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;word-break:keep-all;overflow-wrap:anywhere}
+main{max-width:1180px;margin:28px auto 64px;background:var(--paper);box-shadow:0 8px 35px #18395c10;padding:52px 58px;border-radius:14px}header{border-top:5px solid var(--blue);padding-top:22px}.kicker{font-size:12px;letter-spacing:.15em;font-weight:750;color:var(--blue)}h1{font-size:35px;line-height:1.35;margin:10px 0 18px;letter-spacing:-.04em}h2{font-size:25px;line-height:1.5;margin:54px 0 18px;border-bottom:1px solid var(--line);padding-bottom:10px;letter-spacing:-.025em}h3{font-size:20px;margin:32px 0 10px;line-height:1.5}p{margin:12px 0}a{color:var(--blue);text-decoration-thickness:1px;text-underline-offset:3px}.meta{color:var(--muted);font-size:13px;line-height:1.9}.lead{font-size:19px;line-height:1.85;margin:24px 0}.scope{border-left:4px solid var(--teal);background:#eff8f7;padding:15px 20px;margin:22px 0}.scope p{margin:3px 0}nav{display:flex;flex-wrap:wrap;gap:8px 19px;padding:16px 0;border-block:1px solid var(--line);font-size:14px;margin:22px 0}nav a{text-decoration:none}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:26px 0}.card{padding:18px;border:1px solid var(--line);border-radius:8px;background:#f9fbfe}.card strong{display:block;font-size:16px;color:var(--blue);margin-bottom:6px}.card p{font-size:14px;margin:0}.number{font-variant-numeric:tabular-nums}code{font: .87em/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;background:#edf2f7;border-radius:4px;padding:.1em .3em;word-break:break-word}.ref{font-size:12px;white-space:nowrap;text-decoration:none;font-weight:650}.table-wrap{overflow-x:auto;margin:18px 0}table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.75}th{background:#193d67;color:white;text-align:left;font-weight:650;padding:13px 12px}td{padding:14px 12px;vertical-align:top;border-bottom:1px solid var(--line)}tbody tr:nth-child(even){background:#f8fafc}.matrix{min-width:850px}.matrix td:nth-child(1){width:19%;font-weight:650}.matrix td:nth-child(2){width:15%}.matrix td:nth-child(3){width:17%;font-size:13px}.matrix td:nth-child(4){width:49%}.tag{display:inline-block;border-radius:4px;padding:3px 7px;font-size:11px;font-weight:750;white-space:nowrap}.live{color:#075e4b;background:#def3eb}.diff{color:#174d88;background:#e7effc}.partial{color:#86500c;background:#fff0d7}.missing{color:#9d303c;background:#fce9ed}.future{color:#5a4982;background:#efeaf8}.verify{color:#625114;background:#f4efd8}ul,ol{padding-left:24px}li{margin:8px 0}.note{font-size:14px;color:var(--muted)}.decision{background:#f2f6fc;border:1px solid #d6e3f4;padding:19px 22px;margin:20px 0;border-radius:7px}.decision strong{color:var(--blue)}.figure{margin:20px 0;border:1px solid var(--line);border-radius:9px;padding:16px;background:#fbfdff;overflow-x:auto}.figure svg{min-width:690px;display:block;width:100%;height:auto}.caption{font-size:13px;color:var(--muted);margin:8px 0 0}.sources{font-size:13px;line-height:1.8}.source-row{padding:9px 0;border-bottom:1px solid #edf1f5}.source-row span{display:block;color:var(--muted);font-size:12px}.footer{border-top:1px solid var(--line);padding-top:18px;margin-top:36px;font-size:12px;color:var(--muted)}.tocnum{font-size:.65em;vertical-align:middle;color:var(--teal);padding-right:10px;letter-spacing:.05em}.summary-list li{margin:13px 0}.priority td:first-child{width:8%;font-weight:750;color:var(--blue)}.priority td:nth-child(2){width:23%}.priority td:nth-child(3){width:36%}.priority td:nth-child(4){width:33%}.limit-table td:first-child{width:24%;font-weight:650}
+@media(max-width:760px){main{margin:0;padding:27px 19px;border-radius:0}h1{font-size:28px}h2{font-size:22px;margin-top:40px}.cards{grid-template-columns:1fr}.lead{font-size:17px}body{font-size:15px}}
+@media print{body{background:white;font-size:10pt}main{max-width:none;margin:0;padding:0;box-shadow:none}nav{display:none}a{color:#163e6d;text-decoration:none}h1{font-size:24pt}h2{font-size:17pt;break-after:avoid}h3{break-after:avoid}.cards,.scope{break-inside:avoid}tr{break-inside:avoid}thead{display:table-header-group}.table-wrap{overflow:visible}.matrix{min-width:0}.tag{white-space:normal}.figure svg{min-width:0}.ref{font-size:8pt}@page{size:A4;margin:16mm}}
+
+.revision{border:1px solid #a5caca;border-left:5px solid var(--teal);padding:20px 24px;border-radius:8px;background:#eff8f7;margin:26px 0}
+.revision h2{margin:0 0 12px;border:0;padding:0}.baseline-label{font-size:12px;color:var(--muted);border-left:3px solid #9eb0c5;padding-left:12px;margin:14px 0}
+.matrix{min-width:1120px}.matrix td:nth-child(1){width:15%}.matrix td:nth-child(2){width:11%}.matrix td:nth-child(3){width:12%}.matrix td:nth-child(4){width:39%}.matrix td:nth-child(5){width:23%;background:#f1f8f5}
+#implementation h3{margin-top:38px;border-bottom:1px solid var(--line);padding-bottom:8px}#implementation h4{font-size:17px;margin:26px 0 10px}#implementation table{min-width:650px}
+pre{background:#142b45;color:#edf5ff;padding:18px 20px;border-radius:7px;overflow:auto;font-size:13px;line-height:1.7}pre code{background:none;padding:0;color:inherit;word-break:normal}
+@media print{.matrix{min-width:0;font-size:8pt}.revision{break-inside:avoid}#implementation table{min-width:0}pre{white-space:pre-wrap;color:#16253b;background:#edf2f7}}
+</style></head><body><main>
+<header>
+<div class="kicker">ENGINE ARCHITECTURE REVIEW · 2026-10-19</div>
+<h1>CreatorEngine 렌더링 파이프라인<br>REAC 2025 비교와 후속 구현</h1>
+<p class="meta">기준 master: <a href="https://github.com/29thnight/CreatorEngine/commit/0d3c2cac6d3bd16a2c4511ccb067749feafcd33c">0d3c2cac</a> · 2026-10-19 확인<br>
+기준 tree: <code>6399cd1adfd1c7c497b68a3f49dbf39ed59fc1c4</code><br>
+비교 코드와 이번 PR의 구현 상태를 별도로 표시한다. 원 보고서의 <code>946ef4fa</code>에서 기준 master까지 생산 코드는 동일하며, 추가 변경 398개 파일은 docs에 한정된다.<br>
+원문: <a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf">Capcom — RE ENGINE Meshlet Rendering Pipeline</a>, 전체 71페이지. 페이지는 PDF 뷰어 기준이며 하단 슬라이드 번호는 대체로 1 작다.</p></header>
+<p class="lead"><strong>기존 파이프라인을 기준으로 세 가지 후속 경로를 구현했다.</strong>
+메시릿 작업 게시 전 인스턴스 조기 판정, 선택형 가시 프리미티브 캐시, 선택형 현재 카메라 HZB 기반 그림자 예측이다.
+원 보고서의 비교표를 최신 master와 대조하고, 저장된 계측 결과·코드 변경·실행한 검사·남은 네이티브 수용 조건을 하나의 보고서에 정리했다.</p>
+<nav><a href="#scope">01 기준과 판정</a><a href="#pipeline">02 현재 구조</a><a href="#matrix">03 항목별 비교</a><a href="#gaps">04 핵심 차이</a><a href="#priority">05 후속 순서</a><a href="#validation">06 검증 범위</a><a href="#sources">07 기준선 근거</a><a href="#implementation">08 구현·계측·검증·잔여</a>
+</nav>
+<div class="cards">
+<div class="card"><strong>1A · 인스턴스 조기 판정</strong>
+<p>현재 pose의 보수적 경계 · 기존 Reset/Cull에 통합 · 하위 메시릿 ring 게시 전 거절</p>
+</div>
+<div class="card"><strong>1B · 가시 프리미티브 캐시</strong>
+<p>별도 cooked GBuffer/Temporal · 기본 off · 16,384 slot · 활성 뷰의 retained frame당 5.3125 MiB</p>
+</div>
+<div class="card"><strong>3 · 그림자 예측 입력</strong>
+<p>현재 camera HZB · 기본 off · 최종 light-space 복구 유지 · 재투영 atlas/ray-hit은 잔여</p>
+</div>
+</div>
+<div class="revision">
+<h2>이번 개정의 판단</h2>
+<p>공개 <code>after-baseline</code>의 동일 Game 444개 표본에서 CPU Prepare/Declare 평균은 각각 <strong>2.156798 / 4.219918 ms</strong>다. 주요 GPU 컬링 세 구간 합은 <strong>1.975614 ms</strong>로 계측된 GPU pass 합집합의 약 38.03%다. 이 값은 이번 PR의 변경 후 측정이 아니다.</p>
+<p>실제 Slang 코드의 CPU 경계·정점·그림자 oracle와 셰이더 컴파일/바이너리 검증을 수행했다. <strong>Windows 전체 엔진 빌드, 실제 GPU 출력, 새 성능 A/B는 미실행</strong>이다. 통과 범위와 baseline에서도 재현되는 SPIR-V 문제를 <a href="#implementation">08절</a>과 <a href="reac-20261019/verification.json">검증 JSON</a>에 구분했다.</p>
+<p>이 구현은 GPU 파이프라인의 후속 확장이다. <code>RenderGraphDeclare</code>와 <code>MaterialGraphScenePrepare</code>의 CPU 병렬 실행 최적화가 끝났다는 판정으로 사용하지 않는다.</p>
+<p class="note">정밀한 코드·수명·재현 설명은 <a href="REACPipelineImplementation20261019.md">구현 기록</a>에도 동일하게 제공한다.</p>
+</div>
+<section id="scope">
+<h2><span class="tocnum">01</span>조사 기준과 판정 방법</h2>
+<p class="baseline-label">원 보고서의 조사 과정과 판정 기준. 기준 master의 생산 코드 동등성 및 새 계측 검증은 08절에 추가했다.</p>
+<p>발표71페이지의 텍스트와 주요 도식을 확인하고, 엔진의 파이프라인 조립 → stage 선언 → 바인딩과 간접 명령 → 실제 셰이더까지 추적했다. 설계 문서에 타입이나 패스가 적혀 있다는 사실만으로 구현됐다고 판정하지 않았다. 예를 들어 DXR 설계 문서는 스스로 제안 계약이라고 명시한다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3623-L3860">[C1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/design/GpuDrivenMeshletDxrWiring.md#L1-L9">[D6]</a>
+</p>
+<p>조사 시작 기준은001ff417이었다. 작업 중 PR185의 병합을 확인하여 당시 최종 기준을946ef4fa로 갱신했다. 이번 개정의 기준은 생산 코드가 동일한0d3c2cac다. 공개된 merge commit의 tree와 검토한 c9a0f0e 작업본의 tree가 일치한다. 변경은 CPU 준비 코드와 관련 검사이며, 본 보고서가 인용하는 GPU 셰이더·stage 배선은 동일하다. CPU 준비부의 근거 행 번호는 병합 후 파일에 맞췄다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/MaterialGraphScenePrepare20261019.md#L296-L356">[D4]</a>
+</p>
+<p>ReEngineMeshletComparison20261011.html의 기존 비교표는10월11일 스냅샷이다. 반면 LiveRenderWiring20261012.html은 파일명과 달리10월19일까지의 누적 기록을 담는다. “클러스터 단위 LOD·스트리밍 없음” 같은 오래된 판정을 현재 엔진에 그대로 적용하지 않았다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/ReEngineMeshletComparison20261011.html#L168-L180">[D3]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L706-L764">[D2]</a>
+</p>
+<div class="scope">
+<p><strong>판정의 범위:</strong> “현재 경로 미구현”은 이번에 추적한 live METEOR 경로에 필요한 생산자·자원·소비자 연결이 없다는 뜻이다. “부분 구현”은 기능이 작동하는 지원 범위와 제한을 함께 의미한다. “수용 잔여”는 기능 존재 여부가 아니라 실행·품질·성능 증거의 범위다.</p>
+</div>
+</section>
+<section id="pipeline">
+<h2><span class="tocnum">02</span>기준 master의 구조</h2>
+<p class="baseline-label">변경 전 기준선: master 0d3c2cac. 선택형 cache/prediction으로 추가되는 의존성은 08절에서 설명한다.</p>
+<p>카메라 경로는 Geometry에서 준비된 압축 기하를 받아 첫 컬링, occluder 깊이, 최종 복구 컬링, Visibility, MaterialWork, SurfaceResolve, Decal로 이어진다. Temporal.Inputs는 모션·반응 정보를 만드는 별도 소비자이며 Temporal.Upscale과 같은 단계가 아니다. 그림자는 카메라 가시 목록을 복사하지 않고 light-space의 독립 목록과 깊이를 사용한다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3623-L3860">[C1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3707-L3798">[C12]</a>
+</p>
+<div class="figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 750" role="img" aria-labelledby="pipeline-title"><title id="pipeline-title">현재 CreatorEngine의 카메라와 독립 그림자 경로가 최종 색상에서 합류하는 구조</title><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#7894b3"/></marker></defs><path d="M525 75 V98 H255 V121" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M525 98 H795 V121" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M255 193 V211" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M255 283 V301" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M255 373 V391" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M255 463 V481" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M795 193 V231" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M795 303 V341" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M795 413 V451" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M255 553 V576 H525 V603" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M795 523 V576 H525" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><path d="M525 675 V700" fill="none" stroke="#7894b3" stroke-width="2" marker-end="url(#arrow)"/><rect x="305" y="5" width="440" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="525.0" y="34" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Geometry</text><text x="525.0" y="56" text-anchor="middle" font-size="12" fill="#4e647b">상주 압축 페이지 · 현재 / 이전 포즈 · 월드</text><rect x="40" y="123" width="430" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="255.0" y="152" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Cull.First</text><text x="255.0" y="174" text-anchor="middle" font-size="12" fill="#4e647b">완료 history를 사용하는 메시릿 컬링</text><rect x="40" y="213" width="430" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="255.0" y="242" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Occluder → 현재 HZB</text><text x="255.0" y="264" text-anchor="middle" font-size="12" fill="#4e647b">1차 생존 기하의 실제 깊이</text><rect x="40" y="303" width="430" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="255.0" y="332" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Cull.Final</text><text x="255.0" y="354" text-anchor="middle" font-size="12" fill="#4e647b">탈락 메시릿 복구 · 최종 목록</text><rect x="40" y="393" width="430" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="255.0" y="422" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Visibility</text><text x="255.0" y="444" text-anchor="middle" font-size="12" fill="#4e647b">HW / SW 가시성 키 · 깊이와 ID resolve</text><rect x="40" y="483" width="430" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="255.0" y="512" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">MaterialWork → SurfaceResolve → Decal</text><text x="255.0" y="534" text-anchor="middle" font-size="12" fill="#4e647b">타일 간접 실행 · 표면 복원 · 표면 수정</text><rect x="580" y="123" width="430" height="70" rx="8" fill="#eff8f6" stroke="#b9cbdf"/><text x="795.0" y="152" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">StaticCache / Shadow.Cull.First</text><text x="795.0" y="174" text-anchor="middle" font-size="12" fill="#4e647b">opaque rigid 캐시 · 이전 light-space HZB</text><rect x="580" y="233" width="430" height="70" rx="8" fill="#eff8f6" stroke="#b9cbdf"/><text x="795.0" y="262" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Shadow.Occluder</text><text x="795.0" y="284" text-anchor="middle" font-size="12" fill="#4e647b">캐시 깊이 복사 + 비캐시 대상의 1차 래스터</text><rect x="580" y="343" width="430" height="70" rx="8" fill="#eff8f6" stroke="#b9cbdf"/><text x="795.0" y="372" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Shadow.Cull.Final</text><text x="795.0" y="394" text-anchor="middle" font-size="12" fill="#4e647b">현재 light-space HZB · 복구</text><rect x="580" y="453" width="430" height="70" rx="8" fill="#eff8f6" stroke="#b9cbdf"/><text x="795.0" y="482" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Shadow.Raster → Shadow.Map / History</text><text x="795.0" y="504" text-anchor="middle" font-size="12" fill="#4e647b">캐시 합성 + 최종 래스터 · 완료 후 이력 게시</text><rect x="240" y="605" width="570" height="70" rx="8" fill="#edf4fc" stroke="#b9cbdf"/><text x="525.0" y="634" text-anchor="middle" font-size="17" font-weight="650" fill="#173c65">Color · 조명과 재질 효과</text><text x="525.0" y="656" text-anchor="middle" font-size="12" fill="#4e647b">표면·그림자를 소비하며 HDR 처리로 연결</text><text x="525" y="728" text-anchor="middle" font-size="15" fill="#50627b">SSGI / SSR / Volume · Blended / Fog · Temporal.Upscale · 후처리 · UI / Present</text></svg>
+<p class="caption">직접 확인한 주요 데이터 흐름을 묶어서 표시했다. 노드 하나가 여러 내부 패스를 선언할 수 있으며, 이 도식은 직렬 GPU 스케줄이나 모든 자원 간선을 뜻하지 않는다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3623-L3860">[C1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L145-L360">[C10]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3707-L3798">[C12]</a>
+</p>
+</div>
+<p>카메라와 방향광 cascade의 일부 컬링은 같은 준비 완료 묶음의 GPU ring을 공유한다. 이것은 셰이더 내부의 작업 분배다. CPU의 MaterialGraphScenePrepare·RenderGraphDeclare 병렬화, 그리고 graphics/compute 하드웨어 큐 중첩은 각각 다른 계층이므로 같은 성능 개선으로 합산하지 않는다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibilityShared.inl#L320-L386">[C28]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L778-L926">[C29]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/MaterialGraphScenePrepare20261019.md#L296-L356">[D4]</a>
+</p>
+</section>
+<section id="matrix">
+<h2><span class="tocnum">03</span>기준선 비교와 이번 PR의 변화</h2>
+<p class="baseline-label">왼쪽 네 열은 변경 전 master의 비교이며, 마지막 열은 이번 PR의 변화다. 구현됨과 실제 GPU 수용을 구분한다.</p>
+<p class="note">발표 열은 비교 위치를 찾기 위한 짧은 표제다. 오른쪽의 구체적 판정은 CreatorEngine 소스 분석 결과다. 공개 자료가 설명하지 않은 내부 설계를 Capcom 구현의 사실로 보충하지 않았다.</p>
+<div class="table-wrap">
+<table class="matrix"><thead>
+<tr><th>항목</th><th>기준 master 판정</th><th>발표 비교 위치</th><th>기준 코드에서 확인한 사실</th><th>이번 PR 상태</th>
+</tr></thead><tbody>
+<tr><td>메시릿 단위·메타데이터</td><td><span class="tag diff">방식 차이</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=10">10–12</a> · 128/128</td><td>64정점·126삼각형 프로파일, 80바이트 descriptor로 실제 쿠킹과 mesh shader가 연결된다. 표현의 차이이며, 숫자를 동일하게 바꾸는 것만으로 개선이 보장되지 않는다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/MeshletData.h#L7-L90">[C20]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>속성 압축·삼각형 연결정보</td><td><span class="tag partial">부분 구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=12">12–19</a> · 양자화·상수·8비트 인덱스</td><td>양자화와 상수 성분 저장, QMC2의 triangle list가 구현됐다. 전체 체인은 손실 압축이다. 전용 법선 방향 인코딩·strip 선택지는 현재 형식에 없다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/MeshletCompression.h#L1-L24">[C21]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/QuantizedGeometry.h#L50-L124">[C22]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/ClusterTopologyPage.h#L19-L90">[C23]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>정적 공간 LOD</td><td><span class="tag live">구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=11">11</a> · GPU LOD</td><td>경계를 보존한 공간 교체 계층을 만들고, GPU가 투영 오차와 상주 상태로 cut을 선택한다. CPU의 전체 메시 LOD 선택에만 머물러 있지 않다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/Import/MeshLodBuilder.cpp#L313-L412">[C24]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/ClusterStreaming.h#L161-L334">[C27]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L458-L532">[C41]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>스키닝 coarse LOD</td><td><span class="tag partial">부분 구현</span></td><td>엔진 자체 확장 범위</td><td>bone skinning은 동작하지만 변형 오차를 보장할 coarse LOD는 만들지 않고 원본 레벨을 유지한다. 이를 스키닝 자체의 부재로 분류하면 안 된다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/Import/MeshLodBuilder.cpp#L313-L412">[C24]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>압축 페이지 저장·직접 GPU 소비</td><td><span class="tag live">구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=11">11</a> · tiled 데이터 접근</td><td>CEGE9의 metadata와 QMC2 속성·topology 페이지, GPU 직접 복원·스키닝까지 연결된다. 과거 전체 원본 본문 중복 저장을 현재 결함으로 인용할 수 없다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/Cooked/CookedModelStreaming.inl#L1-L45">[C25]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>스트리밍·상주 예산</td><td><span class="tag partial">부분 구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=11">11</a> · 저장 구조</td><td>DX12 장치별 공유 64MiB 물리 풀, 자산별 가상 버퍼, 완료 GPU 요구, 비동기 페이지 읽기·상주 cut 게시가 구현됐다. 가변 heap, 활성 집합 초과 시 LOD 하향, 자산 간 sub-page 병합, Vulkan 동등성은 잔여다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/RHISharedSparsePagePool.h#L26-L153">[C26]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/ClusterStreaming.h#L161-L334">[C27]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L706-L764">[D2]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>메시릿 전 단계 인스턴스 컬링</td><td><span class="tag missing">현재 경로 미구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=20">20–24</a> · instance → cluster</td><td>SceneHost는 메시릿 frame을 곧바로 선언한다. 독립적인 인스턴스 survivor 목록으로 후속 메시릿 작업 생성을 제한하는 계층이 없다. 범용 sphere 커널의 존재와 live 연결은 구분해야 한다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2824-L2843">[C2]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L1-L18">[C3]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L647-L699">[C4]</a></td><td><strong>1A 구현.</strong> 기존 Reset의 현재 pose 경계와 source partition 조기 거절. 독립 compacted instance survivor 목록은 잔여. native 수용 필요.</td>
+</tr>
+<tr><td>두 단계 카메라 컬링</td><td><span class="tag live">구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=20">20·40</a> · two phase</td><td>완료 history를 사용하는 첫 목록, 실제 occluder 깊이, 현재 HZB와 탈락 항목 복구가 연결된다. 정렬 반투명은 별도 프러스텀·원본 순서 경로다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3623-L3860">[C1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L1-L18">[C3]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L647-L699">[C4]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2629-L2705">[C36]</a></td><td>기존 first-survivor 보존을 coarse recovery에서도 유지. 해당 계약의 CPU/native probe 보강.</td>
+</tr>
+<tr><td>컬링 경계와 HZB footprint</td><td><span class="tag diff">방식 차이</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=22">22</a> · zero area / footprint</td><td>메시릿의 실제 복원·변형 정점으로 경계를 만든다. HZB는 footprint가 최대2×2가 될 때까지 mip을 올리고 covered cell을 검사한다. 독립 zero-area 조기 제거와 footprint bias 선택을 같은 형태로 제공하는 경로는 확인되지 않았다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L647-L699">[C4]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang#L47-L137">[C44]</a></td><td>보수적 instance AABB와 camera prediction의 전체 clip-volume 포함 조건 추가. zero-area/bias 정책은 기존 범위.</td>
+</tr>
+<tr><td>GPU 작업 분배</td><td><span class="tag live">구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=24">24·49–50</a> · wave / ring</td><td>16개 논리 분할, lane별 ring 게시·회수, JOB_COUNT 종료, 카메라와 그림자 뷰의 공유 묶음이 있다. 재귀 자식 job과 추가 공유 범위는 별도이며 현재 설정의 성능 최적성은 미입증이다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibilityShared.inl#L320-L386">[C28]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L778-L926">[C29]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1128-L1140">[C37]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1250-L1278">[C38]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3548-L3579">[C39]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/support/MeshletBatchDispatchProbe.inl#L213-L285">[T2]</a></td><td>거절 partition은 메시릿을 ring에 게시하지 않음. 그룹 feedback atomic을 그룹당 한 번으로 이동. 기존 16분할/ring 수명 유지.</td>
+</tr>
+<tr><td>카메라 HW/SW 가시성</td><td><span class="tag diff">방식 차이</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=26">26·33</a> · hybrid raster</td><td>화면 bounds가8×8이하인 적격 meshlet을 SW로 분류한다. HW/SW는 같은64비트 AtomicMin 키를 쓴 뒤 ID·깊이를 resolve한다. HW도 UAV-only·depth test OFF다. 이 live 경로는 mesh shader를 요구하며 indexed/VS fallback을 선택하지 않는다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MeteorHybridVisibility.slang">[C32]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl">[C33]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1260-L1276">[C42]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3645-L3688">[C43]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>머티리얼 분류와 간접 타일 실행</td><td><span class="tag diff">방식 차이</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=34">28–35</a> · shader bucket / 8×4 mask</td><td>GPU count·scan·scatter와 간접 실행은 이미 있다. 현행은 프로그램 전체 신원·래스터 상태·64항목 descriptor page로 나누고, 8×8 타일의 record별 패킷을 만든다. 페이지와 record 수가 같은 shader의 작업 수를 늘릴 수 있다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphWork.slang">[C7]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2917-L3155">[C8]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L10-L190">[C9]</a></td><td>기존 8×8 record/tile packet을 cache 생산자가 재사용. shader/page 패킷 밀도 개선은 별도 후속.</td>
+</tr>
+<tr><td>가시 프리미티브 변환 결과 캐시</td><td><span class="tag missing">현재 경로 미구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=43">43–48</a> · compact / precompute</td><td>현재 SurfaceResolve fragment는 세 정점을 다시 읽고 복원·월드·클립 변환한다. Temporal도 이전 포즈를 계산한다. quad ID 중복 제거와 object-space pose 준비는 있지만, 가시 프리미티브 전용 압축 변환 버퍼를 만들어 재사용하는 단계는 없다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L750-L925">[C5]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl">[C33]</a></td><td><strong>1B 선택형 구현.</strong> 16,384 slot/8 probes, full-float 336 byte triangle, miss 시 기존 decode. 기본 off, 총비용 수용 잔여.</td>
+</tr>
+<tr><td>masked·변형·데칼</td><td><span class="tag partial">부분 구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=37">37·41–42·63</a> · special coverage</td><td>alpha coverage, bone skinning, HW shadow coverage, Surface 이후 데칼 수정이 연결된다. material graph의 비중립 Displacement 출력과 일부 named UV 계약은 compiler가 거부한다. SpeedTree·morph 전용 호환성은 이번 근거로 판정할 수 없다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3623-L3860">[C1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L460-L501">[C31]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Lattice/Material/LXMaterialCompiler.cpp">[C35]</a></td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr>
+<tr><td>머티리얼 미분값·텍스처 LOD</td><td><span class="tag partial">부분 구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=36">36</a> · derivative</td><td>최종 Vector에 ddx_fine/ddy_fine를 적용하고 이미지별 해상도로 LOD를 정한다. UV 이동·배율·회전 lowering도 있다. quad helper 평가 비용과 일반 노드·UV 집합·변위 지원은 별개의 문제다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L750-L925">[C5]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang">[C34]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Lattice/Material/LXMaterialCompiler.cpp">[C35]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/design/MaterialGraphTextureFootprints.md#L1-L35">[D5]</a></td><td>cache 소비자는 기존 quad/helper와 homogeneous 복원 유지. 실제 출력·미분·motion native 검증 필요.</td>
+</tr>
+<tr><td>방향광 그림자</td><td><span class="tag diff">방식 차이</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=65">52–66</a> · two phase shadow</td><td>세 cascade의 opaque rigid 캐시, light-space history, 두 단계 컬링, 최종 깊이 합성과 완료 후 history 게시가 있다. 현재 그림자 래스터는 HW mesh 경로다. 카메라 깊이 재투영과 이전 ray-hit 위치 입력은 이 shadow graph에 없다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L145-L360">[C10]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2345-L2566">[C11]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3707-L3798">[C12]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphPacketWork.h#L295-L312">[C30]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L460-L501">[C31]</a></td><td><strong>3의 일부 구현.</strong> 현재 camera-space HZB 예측 입력과 기존 light-space 복구 연결. light-space 재투영·ray-hit·SW shadow는 잔여.</td>
+</tr>
+<tr><td>비동기 GPU 실행·임시 메모리</td><td><span class="tag partial">부분 구현</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=47">47–48</a> · alias / async</td><td>compute 큐·큐별 계측과 transient aliasing이 각각 구현됐다. 기본 queue mode는0이며, owned mode1·2와 aliasing을 동시에 쓰면 거부된다. mode2 요청도 실제 배치에 따라 effective mode1이 된다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L6945-L6961">[C16]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L53-L62">[C17]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L246-L276">[C18]</a></td><td>cache 저장소는 기존 pool 수명 사용. queue/aliasing 통합은 구현하지 않음.</td>
+</tr>
+<tr><td>발표의 향후 과제</td><td><span class="tag future">비교 범위 구분</span></td><td><a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf#page=69">69</a> · Next Steps</td><td>자동 seamless LOD, subdivision/tessellation, 범용 derivative 자동화는 발표 당시의 후속 과제다. 이를 Capcom 완료 기능의 누락 목록으로 세지 않는다. 이 PDF는 CPU RenderGraph 스케줄러나 BLAS/TLAS 설계의 명세도 아니다.</td><td>변경 전 판정 유지. 지원 범위와 별도 수용 과제를 보존.</td>
+</tr></tbody>
+</table>
+</div>
+</section>
+<section id="gaps">
+<h2><span class="tocnum">04</span>우선 검토할 구조적 차이</h2>
+<p class="baseline-label">변경 전 코드에서 도출한 공백과 설계 이유를 보존했다. 이번 구현이 해결한 범위와 미구현 잔여는 08절을 기준으로 읽는다.</p>
+<h3>4.1 인스턴스 전체를 제거하는 단계가 메시릿 작업 앞에 없다</h3>
+<p>SceneHost는 opaque와 blended 표면의 컬링을 메시릿 단위로 정의하고, FirstCullStage는 준비된 cameraDepthMeshlets를 바로 선언한다. GPU의 범용 GeometryCullCS가 존재한다는 것만으로 이 scene 경로에 인스턴스 컬링이 들어 있다고 볼 수 없다. 실제 메시릿 커널은 정점을 복원하고 필요한 경우 skinning까지 수행하여 경계를 만든 뒤 가시성을 검사한다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2824-L2843">[C2]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L1-L18">[C3]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L647-L699">[C4]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a>
+</p>
+<p>이 구조에서는 큰 오브젝트 전체가 화면 밖이거나 가려진 경우에도 하위 메시릿을 열거하고 일부 복원 비용을 낼 수 있다. 인스턴스 또는 적절한 공간 묶음의 보수적 경계를 먼저 검사하여 생존한 묶음만 ring의 하위 작업으로 펼치는 방안이 가장 명확한 전단계 확장이다. 이 비용 절감 가능성은 코드에서 도출한 추론이며 아직 측정된 개선량은 아니다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L1-L18">[C3]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L647-L699">[C4]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L778-L926">[C29]</a>
+</p>
+<p>구현할 때는 현재 pose에 대한 보수적 bounds, 카메라와 각 light-space의 독립 판정, history 무효화, 첫 단계 탈락의 현재 깊이 복구를 유지해야 한다. 인스턴스가 전부 제거된 경우의 간접 인자와 빈 목록도 유효해야 한다. 현재 경계 계산이 비싸다는 이유만으로 bind-pose bounds를 변형 메시의 확정적인 제거 조건으로 쓰면 안 된다.</p>
+<h3>4.2 가시 프리미티브를 위한 변환 결과 재사용이 없다</h3>
+<p>LXSceneReconstruct는 가시성 ID에서 삼각형을 찾아 세 정점을 다시 가져오고, 월드·클립 변환을 한 뒤 픽셀 위치에서 보간값을 푼다. Temporal fragment도 현재 정점과 이전 포즈·월드를 이용한다. 압축 직접 경로에서는 이 과정에 압축 해제와 bone skinning이 포함될 수 있다. 해상도·재질 소비 횟수·변형 비용이 커질수록 같은 프리미티브에 대한 반복 계산이 늘어날 수 있다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L750-L925">[C5]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a>
+</p>
+<p>현재 quad 안의 완전한 record/primitive ID 중복 제거는 있다. 그러나 helper lane의 미분값을 유지하려고 선택된 ID에 대해 각 lane이 자기 픽셀 중심에서 복원·평가한다. 또한 object-space pose 준비는 화면에서 실제 살아남은 프리미티브의 현재·이전 clip 결과를 보관하는 캐시와 수명·키·소비 지점이 다르다. direct cluster에서는 pose 출력이 전체 변환 정점 캐시가 아니라 bone palette 업로드다. 따라서 기존 기능을 “가시 프리미티브 변환 사전 계산 완료”라고 분류할 수 없다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L750-L925">[C5]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L1612-L1754">[C46]</a>
+</p>
+<p>후속 설계는 Visibility 이후에 유효 ID를 모으고, 중복 범위와 출력 키를 정의한 뒤, 필요한 현재·이전 위치와 방향 정보를 한 번 계산하여 SurfaceResolve·Temporal이 읽도록 만드는 것이다. 전역 정점 중복 제거부터 시작할 필요는 없다. 중복 제거 비용·임시 메모리·추가 읽기 대역폭이 줄어드는 계산보다 작아야 한다. 실제 포맷과 캐시 범위는 현재 압축 오차, motion 정밀도, 작은 삼각형 비율로 정한다.</p>
+<h3>4.3 머티리얼 분류는 이미 있으나 묶는 단위가 다르다</h3>
+<p>GPU의 count·prefix scan·scatter와 indirect args 생성은 실제 구현이다. CPU가 확정하는 bucket key는 cooked program 전체 신원, double-sided 상태, geometry descriptor page다. geometry page는64항목이며, 타일은8×8 영역의 record별 패킷으로 표현한다. 그래서 같은 shader라도 descriptor page 또는 record가 달라지면 작업이 갈라질 수 있다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphWork.slang">[C7]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2917-L3155">[C8]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L10-L190">[C9]</a>
+</p>
+<p>현재 타일 커널은 group shared 배열로 같은 record를 제거한다. 같은 bucket에 속한 서로 다른 record를 wave별로 묶어 atomic을 합산하는 처리는 이 타일 경로에 없다. 반면 별도의 meshlet 패킷 경로에는 전체 visible count를 한 번에 예약하는 처리가 있다. 최적화 대상을 타일 count/scatter에 한정해 판단해야 한다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphWork.slang">[C7]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2917-L3155">[C8]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphIndirect.slang#L23-L53">[C45]</a>
+</p>
+<p>따라서 “GPU 머티리얼 정렬을 새로 구현”하는 작업은 중복이다. 우선 같은8×8 타일에 서로 다른 record가 얼마나 겹치는지, page 때문에 같은 프로그램이 얼마나 분리되는지, 유효 픽셀 대비 실제 fragment·helper 평가가 몇 번 발생하는지 측정해야 한다. 픽셀 mask, shader 중심 묶음, descriptor 접근 방식의 변경은 이 비용이 큰 경우의 후보이며 더 작은 타일이 언제나 유리한 것은 아니다.</p>
+<h3>4.4 그림자는 기능 부재보다 가림 입력과 래스터 경로의 차이가 크다</h3>
+<p>현재 그림자는3개 cascade를 사용한다. 캐시는 mobility 플래그가 아니라 opaque이면서 bone이 없는 caster에 적용한다. world와 light projection 등이 캐시 키에 참여하므로 rigid 물체·광원이 움직여도 무조건 재사용되는 캐시가 아니다. 첫 occluder에는 이 캐시의 복사본과 비캐시 대상의 first-list 래스터가 함께 들어간다. 최종 단계는 현재 light-space HZB로 복구하고 캐시와 최종 목록의 깊이를 합친다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L145-L360">[C10]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2345-L2566">[C11]</a>
+</p>
+<p>Shadow.Occluder의 입력은 기하, static depth, shadow first lists다. 이 그래프에는 camera depth를 light space에 투영하는 생산자나 이전 ray-hit 위치를 받는 자원 간선이 없다. 일반 temporal reprojection이나 SSGI history가 있다는 사실은 해당 그림자 입력을 대신하지 않는다. 현재 SSGI는 화면 깊이 기반의 trace·resolve·합성 경로이며, 별도의 RT hit-position history를 그림자에 넘기지 않는다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3707-L3798">[C12]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4005-L4050">[C13]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L33-L61">[C14]</a>
+</p>
+<p>그림자 패킷의 최종 실행은 DispatchMeshIndirect와 HW shadow mesh/coverage shader다. 카메라의 SW meshlet raster 경로가 그림자까지 자동 적용되는 구조도 아니다. 이 차이의 우선순위는 caster 수, cascade 해상도, 광원 움직임, 캐시 적중률, 작은 삼각형 비율에 따라 달라진다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphPacketWork.h#L295-L312">[C30]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L460-L501">[C31]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MeteorHybridVisibility.slang">[C32]</a>
+</p>
+<p>카메라 깊이를 추가하면 전단계 가림을 빨리 얻을 가능성이 있지만, 현재 카메라와 그림자의 독립성에 새로운 의존성을 만들 수도 있다. offscreen receiver·caster, 광원 회전, 급격한 카메라 이동에서 안전한 복구가 필요하다. ray-hit 보강은 사용할 ray-hit 생산자와 완료된 history 수명 계약을 먼저 확보하는 후속 작업이다. 현재 파이프라인에 RT 전체를 급히 넣는 것을 이 비교의 필수 선행 조건으로 두지 않는다.</p>
+<h3>4.5 async compute와 aliasing을 한 번에 사용할 수 없다</h3>
+<p>DX12 adapter에는 실제 compute 큐와 큐별 profiler 생성이 있고, RenderGraph에는 측정 기반 배치와 transient aliasing이 있다. 다만 기본 실행 모드는0이며 owned queue 모드1·2는 aliasing을 거부한다. mode2를 요청해도 적격 작업·측정·의존성 조건이 충족되지 않으면 effective mode1로 기록된다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L6945-L6961">[C16]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L53-L62">[C17]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L246-L276">[C18]</a>
+</p>
+<p>큐 비용 모델의 handoff와 minimum gain은 보정된 실측값이 아니며 predictionCalibrated는 false 상태다. 따라서 “compute로 옮기면 중첩된다”거나 “aliasing과 동시에 메모리를 줄였다”는 결론은 현재 근거보다 강하다. 가시 프리미티브 precompute를 추가할 경우에는 먼저 단일 큐에서 순수 손익을 확인하고, 그다음 queue-local timing과 전체 프레임으로 중첩 효과를 평가하는 순서가 적절하다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L563-L600">[C19]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a>
+</p>
+</section>
+<section id="priority">
+<h2><span class="tocnum">05</span>후속 작업 순서와 판단 기준</h2>
+<p class="baseline-label">원 보고서가 권고한 순서다. 현재 구현은 1A, 선택형 1B, 그리고 3의 prediction-only 부분이며 전체 로드맵의 완료를 의미하지 않는다.</p>
+<p>아래 순서는 정적 분석에 따른 권고다. 장면별 병목 측정으로 순서를 조정하며, 각 기능의 단독 시간과 전체 프레임 시간을 함께 평가한다.</p>
+<div class="table-wrap">
+<table class="priority"><thead>
+<tr><th>순서</th><th>작업</th><th>먼저 확인할 비용</th><th>수용 조건</th>
+</tr></thead><tbody>
+<tr><td>0</td><td>최신 master의 native 기준선</td><td>동일 장면·카메라·해상도·빌드·GPU에서 CPU 준비/선언과 각 GPU stage 분리. cold / warm · 정적 / 변형 · 가림 밀도 구분.</td><td>최종 출력과 history 정상, Release p50/p95·GPU frame time·메모리 기준선 확보. PR185의 CPU probe를 native 결과로 대체 해석하지 않음.</td>
+</tr>
+<tr><td>1A</td><td>GPU 인스턴스 조기 컬링</td><td>완전히 제거 가능한 오브젝트 비율, 생성된 메시릿 job 수, 경계용 정점 decode·skinning 비용.</td><td>기존 결과와 가시성·그림자 동등. fast motion / disocclusion / 빈 목록 정확. 줄어든 하위 작업 비용이 새 coarse pass 비용보다 큼.</td>
+</tr>
+<tr><td>1B</td><td>가시 프리미티브 변환 캐시</td><td>유효 primitive 수, 같은 ID의 반복 복원, SurfaceResolve·Temporal GPU 시간, quad helper 비율.</td><td>현재·이전 위치와 motion 오차 통제. 근평면·퇴화 삼각형·skinning·negative scale에서 정상. compaction+출력 읽기 포함 총시간 개선.</td>
+</tr>
+<tr><td>2</td><td>머티리얼 패킷 밀도</td><td>record/tile 중복, 프로그램당 page 분할, 유효 픽셀 대비 평가 수, mask 생성 비용.</td><td>특수 coverage·미분값·데칼·순서 보존. 조밀/희소 재질 모두에서 타일·shader 배치 변경의 이득 확인.</td>
+</tr>
+<tr><td>3</td><td>그림자 가림 입력 보강</td><td>cascade별 캐시 적중률, first/final 생존 수, raster overdraw, camera→shadow 의존성 증가.</td><td>offscreen receiver/caster·광원 이동·수직 공간·history reset에서 누락 없음. 추가 재투영 비용까지 포함한 이득.</td>
+</tr>
+<tr><td>병행</td><td>상주 예산·지원 범위</td><td>활성 집합 예산 초과 빈도, 페이지 수용 지연, skinning 원본 LOD의 비용, Vulkan 지원 행렬.</td><td>overflow 시 명시적 품질/실패 정책, active GPU 페이지 보호, 완료 fence 이후 회수, 장시간 스트레스 통과.</td>
+</tr>
+<tr><td>마지막</td><td>큐 배치·aliasing 통합</td><td>queue overlap 실측, cross-queue wait, 동시 작업의 대역폭 경합, 별도 alias heap 수명.</td><td>전체 프레임 p50/p95 개선 및 누락·수명 오류 없음. 요청 mode와 실제 compute 배치, 예측과 실측을 구분.</td>
+</tr></tbody>
+</table>
+</div>
+<div class="decision"><strong>메모리·코딩 제약</strong>
+<p>후속 구현도 CreatorEngine 컨벤션과 사용자 제약을 유지해야 한다. hot path의 임시 vector/map으로 프레임마다 작업 목록을 재할당하는 설계는 피한다. 범위가 고정된 데이터는 고정 크기 scratch, 누적·재사용 데이터는 owner가 보유한 용량 재사용 버퍼, GPU 목록은 용량·overflow·완료 수명이 명시된 저장소로 설계한다. 메모리 유지량·최대 용량·중첩 호출과 소유권도 비용에 포함한다.</p>
+</div>
+</section>
+<section id="validation">
+<h2><span class="tocnum">06</span>검증된 범위와 남은 증거</h2>
+<p class="baseline-label">이 절은 원 보고서의 조사 당시 검증 범위다. 이번 코드의 실제 compiler/CPU oracle 결과와 미실행 native 검사는 08절 및 검증 JSON에 추가했다.</p>
+<p>이번 조사에서 실행한 작업은 소스·바인딩·셰이더 정적 분석과 커밋된 검증 기록의 재검토다. 새 Windows/MSVC/DX12 렌더 실행이나 벤치마크는 수행하지 않았다. 저장된 보고가 말하는 과거 선택 검사 통과와 현재 commit의 전체 실행 수용을 구분한다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L434-L454">[D1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/MaterialGraphScenePrepare20261019.md#L296-L356">[D4]</a>
+</p>
+<div class="table-wrap">
+<table class="limit-table"><thead>
+<tr><th>증거</th><th>확인 가능한 범위</th><th>확장해서 말할 수 없는 결론</th>
+</tr></thead><tbody>
+<tr><td>live source와 shader 연결</td><td>stage가 실제 자원을 생산·소비하고 dispatch·draw로 이어지는지 확인했다.</td><td>같은 구조라는 이유만으로 RE와 동일한 품질·플랫폼·성능이라고 할 수 없다.</td>
+</tr>
+<tr><td>저장된 native 선택 검사 보고 <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L434-L454">[D1]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/verify-material-scene-probes.ps1#L17-L97">[T1]</a></td><td>희소 풀·압축 직접 소비·공간 LOD·그림자 등의 제한된 D/R 통과 기록과 판정 코드를 확인했다.</td><td>문서가 링크한 Artifacts 원본은 이 체크아웃의 추적 파일에 없으므로 모든 원시 캡처·로그를 독립 재검증했다는 뜻이 아니다.</td>
+</tr>
+<tr><td>GPU ring 회귀 코드 <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/support/MeshletBatchDispatchProbe.inl#L213-L285">[T2]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/support/ClusterLodProbe.inl#L351-L486">[T3]</a></td><td>슬롯 full/empty·재시도·재사용·JOB_COUNT 완료·부분 wave·다중 뷰의 유의미한 assertion이 있다.</td><td>현재 ring 크기·16분할·128 group이 실제 장면에서 가장 빠르다는 성능 수용이 아니다.</td>
+</tr>
+<tr><td>PR185의 CPU 검증 <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/MaterialGraphScenePrepare20261019.md#L296-L356">[D4]</a></td><td>CPU probe·ASan/UBSan·값과 소유권·실패 배출 및 저장된 비교 결과를 확인했다.</td><td>Windows native 빌드, GPU 출력, CreatorRobot 전체 프레임 재측정을 완료한 근거로 세지 않는다.</td>
+</tr>
+<tr><td>플랫폼과 실행 정책 <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L706-L764">[D2]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a></td><td>DX12에 구현된 sparse·queue 계약과 Vulkan/aliasing 등 잔여 범위를 확인했다.</td><td>SPIR-V 컴파일 성공이나 RHI API 존재만으로 Vulkan native 동등성이 확보됐다고 할 수 없다.</td>
+</tr></tbody>
+</table>
+</div>
+<h3>현재 엔진의 구체적인 확장 한계</h3><ul><li>스키닝의 변형 오차를 보장하는 coarse LOD.</li><li>활성 working set이 물리 풀 예산을 넘을 때의 자동 LOD 하향, 동적 heap 증감, 자산 간 sub-page 병합.</li><li>방향광3 cascade 외 point/spot, 증분 atlas·타일 캐시의 후속 확장.</li><li>material graph의 비중립 Displacement 출력·일부 UV/노드 계약, 전용 식생·morph 호환성 증거.</li><li>멀티큐와 aliasing의 동시 사용, 실제 GPU 경합을 반영한 비용 보정, 최신 native Release·Vulkan 수용.</li></ul>
+<p>위 목록은 CreatorEngine의 코드와 지원 범위에서 도출한 잔여다. 해당 항목을 모두 Capcom의 이 발표가 구현 완료했다고 주장한 기능으로 세지 않는다. <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/Import/MeshLodBuilder.cpp#L313-L412">[C24]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/RHISharedSparsePagePool.h#L26-L153">[C26]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Lattice/Material/LXMaterialCompiler.cpp">[C35]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L706-L764">[D2]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a> <a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L563-L600">[C19]</a>
+</p>
+<h3>후속 측정에서 분리할 값</h3>
+<p>CPU 준비·선언 wall time과 GPU kernel time, GPU 작업 큐 대기와 OS thread scheduling, 컴포넌트 단축과 최종 프레임 단축을 분리한다. 카메라·그림자·변형·기하 밀도를 통제하고 전체 프레임 p50/p95, transient 최고 사용량, 실제 제출·완료 경계를 함께 남긴다. 다른 플랫폼·빌드·장면의 발표 수치를 직접 나눠 성능 격차나 예상 배수를 만들지 않는다.</p>
+</section>
+<section id="sources">
+<h2><span class="tocnum">07</span>출처와 재검토 위치</h2>
+<p class="baseline-label">원 보고서의 고정 source 링크를 유지한다. 946ef4fa와 기준 master 0d3c2cac의 생산 코드는 동일하다. 이번 PR의 코드와 실행 증거는 08절 및 구현 기록을 참조한다.</p>
+<p><strong>발표 원문:</strong> <a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf">https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf</a><br><strong>코드 기준:</strong> <a href="https://github.com/29thnight/CreatorEngine/commit/946ef4fa9b79f4e74ad09a03d79aa117277ded87">946ef4fa9b79f4e74ad09a03d79aa117277ded87</a><br><strong>병합 변경:</strong> <a href="https://github.com/29thnight/CreatorEngine/pull/185">PR #185 · MaterialGraphScenePrepare</a>
+</p>
+<p class="note">아래 GitHub 링크는 변하는 master URL 대신 동일 commit에 고정했다. Sources C는 코드, D는 설계·조사·검증 문서, T는 회귀 검사다. 과거 문서는 필요한 경우 한계 확인에만 사용했다.</p>
+<div class="sources">
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3623-L3860">[C1]</a> 실제 파이프라인 조립 · BuildPipelineDesc</strong><span>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp · 3623-3860</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2824-L2843">[C2]</a> 메시릿별 컬링 계약 · 인스턴스 컬링 부재</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 2824-2843</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L1-L18">[C3]</a> 카메라 첫 컬링의 실제 호출</strong><span>Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl · 1-18</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L647-L699">[C4]</a> 메시릿 정점 복원 · 경계 생성 · 재검사</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang · 647-699</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L750-L925">[C5]</a> quad 중복 제거 · 세 정점 복원 · 이전 프레임 변환</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang · 750-925</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang#L67-L116">[C6]</a> 상주 압축 페이지 직접 읽기 · bone skinning</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang · 67-116</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphWork.slang">[C7]</a> GPU 머티리얼 타일 count / scan / scatter</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphWork.slang</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2917-L3155">[C8]</a> 프로그램·래스터 상태·descriptor page 버킷과 타일 준비</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 2917-3155</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L10-L190">[C9]</a> 64항목 기하 descriptor page · GPU record 바인딩</strong><span>Engine/RenderEngine/MaterialGraphSceneGpuData.h · 10-190</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L145-L360">[C10]</a> 그림자 캐시 · 두 단계 컬링 · 래스터 · history</strong><span>Engine/RenderEngine/MaterialGraphSceneShadowStage.inl · 145-360</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2345-L2566">[C11]</a> opaque·unskinned 캐시 적격 조건 · 완료된 light-space history</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 2345-2566</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3707-L3798">[C12]</a> 그림자 노드의 명시적 입력과 출력</strong><span>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp · 3707-3798</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4005-L4050">[C13]</a> 실제 SSGI 입력과 후속 HDR 합성</strong><span>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp · 4005-4050</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L33-L61">[C14]</a> 화면 깊이 기반 HiZ ray marching</strong><span>Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp · 33-61</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L60-L101">[C15]</a> owned queue의 aliasing 거부 · effective mode</strong><span>Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp · 60-101</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L6945-L6961">[C16]</a> owned queue / aliasing 상호 배제 · 측정 기반 배치</strong><span>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp · 6945-6961</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L53-L62">[C17]</a> 실행 모드 기본값</strong><span>Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp · 53-62</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L246-L276">[C18]</a> compute 큐와 큐별 profiler 실제 생성</strong><span>Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp · 246-276</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L563-L600">[C19]</a> 큐 비용 모델과 예측의 제한</strong><span>Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h · 563-600</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/MeshletData.h#L7-L90">[C20]</a> 64정점 / 126삼각형 · 80바이트 descriptor</strong><span>Engine/RenderEngine/Experiment/MeshletData.h · 7-90</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/MeshletCompression.h#L1-L24">[C21]</a> 위치·UV·법선·색 양자화 정책</strong><span>Engine/RenderEngine/Assets/MeshletCompression.h · 1-24</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/QuantizedGeometry.h#L50-L124">[C22]</a> 상수 성분 및 raw / 고정소수점 표현</strong><span>Engine/RenderEngine/Assets/QuantizedGeometry.h · 50-124</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/ClusterTopologyPage.h#L19-L90">[C23]</a> QMC2 페이지의 8비트 triangle list</strong><span>Engine/RenderEngine/Assets/ClusterTopologyPage.h · 19-90</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/Import/MeshLodBuilder.cpp#L313-L412">[C24]</a> 스키닝 LOD 제외 · 경계를 보존하는 공간 LOD 생성</strong><span>Engine/RenderEngine/Experiment/Import/MeshLodBuilder.cpp · 313-412</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Experiment/Cooked/CookedModelStreaming.inl#L1-L45">[C25]</a> CEGE9 metadata와 QMC2 페이지 저장</strong><span>Engine/RenderEngine/Experiment/Cooked/CookedModelStreaming.inl · 1-45</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/RHI/RHISharedSparsePagePool.h#L26-L153">[C26]</a> 장치별 64MiB 희소 페이지 풀 · 수용 실패 계약</strong><span>Engine/RenderEngine/RHI/RHISharedSparsePagePool.h · 26-153</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/Assets/ClusterStreaming.h#L161-L334">[C27]</a> GPU 요구 우선 · 비동기 읽기 · 완전한 상주 cut 게시</strong><span>Engine/RenderEngine/Assets/ClusterStreaming.h · 161-334</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibilityShared.inl#L320-L386">[C28]</a> 여러 뷰가 공유하는 실제 GPU ring 및 바인딩</strong><span>Engine/RenderEngine/GpuGeometryVisibilityShared.inl · 320-386</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L778-L926">[C29]</a> 16분할 · wave/lane별 ring 생산과 소비</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang · 778-926</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphPacketWork.h#L295-L312">[C30]</a> 패킷별 DispatchMeshIndirect 실행</strong><span>Engine/RenderEngine/MaterialGraphPacketWork.h · 295-312</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L460-L501">[C31]</a> HW shadow mesh shader와 alpha coverage</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang · 460-501</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MeteorHybridVisibility.slang">[C32]</a> 카메라 HW/SW 공통 가시성 · SW raster · resolve</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/MeteorHybridVisibility.slang</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl">[C33]</a> Visibility → MaterialWork → SurfaceResolve의 실제 단계</strong><span>Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang">[C34]</a> 최종 Vector의 ddx_fine / ddy_fine와 image별 LOD</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Lattice/Material/LXMaterialCompiler.cpp">[C35]</a> 머티리얼 그래프 컴파일러의 지원·거부 계약</strong><span>Lattice/Material/LXMaterialCompiler.cpp</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2629-L2705">[C36]</a> 병합 후 camera first / recovery · 정렬 반투명 준비</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 2629-2705</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1128-L1140">[C37]</a> 실제 meshlet frame의 ring 활성화</strong><span>Engine/RenderEngine/GpuGeometryVisibility.cpp · 1128-1140</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1250-L1278">[C38]</a> 실제 persistent consumer dispatch</strong><span>Engine/RenderEngine/GpuGeometryVisibility.cpp · 1250-1278</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3548-L3579">[C39]</a> 카메라와 그림자 first 목록의 공유 선언</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 3548-3579</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1874-L1893">[C40]</a> 제출·완료·비격리 확인 뒤 GPU 요구 소비</strong><span>Engine/RenderEngine/GpuGeometryVisibility.cpp · 1874-1893</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang#L458-L532">[C41]</a> GPU 투영 오차 · 상주 cluster cut 선택</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang · 458-532</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1260-L1276">[C42]</a> UAV-only visibility · depth test 비활성</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 1260-1276</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3645-L3688">[C43]</a> 실제 HW visibility의 mesh shader 요구 · indexed fallback 거부</strong><span>Engine/RenderEngine/MaterialGraphSceneHost.cpp · 3645-3688</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang#L47-L137">[C44]</a> 보수적인 HZB footprint와 covered cell 검사</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang · 47-137</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphIndirect.slang#L23-L53">[C45]</a> meshlet 패킷 경로의 visible count 일괄 예약</strong><span>Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphIndirect.slang · 23-53</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L1612-L1754">[C46]</a> 호환 pose output과 direct cluster의 pose palette 수명</strong><span>Engine/RenderEngine/MaterialGraphMeshSurface.cpp · 1612-1754</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L434-L454">[D1]</a> 저장된 선택적 D/R 검증 보고</strong><span>docs/analysis/LiveRenderWiring20261012.html · 434-454</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/LiveRenderWiring20261012.html#L706-L764">[D2]</a> 현재 GPU 분배·스트리밍·잔여 작업</strong><span>docs/analysis/LiveRenderWiring20261012.html · 706-764</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/ReEngineMeshletComparison20261011.html#L168-L180">[D3]</a> 10월 11일의 과거 비교표</strong><span>docs/analysis/ReEngineMeshletComparison20261011.html · 168-180</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/analysis/MaterialGraphScenePrepare20261019.md#L296-L356">[D4]</a> 병합된 PR185의 CPU 검증과 네이티브 수용 잔여</strong><span>docs/analysis/MaterialGraphScenePrepare20261019.md · 296-356</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/design/MaterialGraphTextureFootprints.md#L1-L35">[D5]</a> 텍스처 footprint 계약과 지원 범위</strong><span>docs/design/MaterialGraphTextureFootprints.md · 1-35</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/docs/design/GpuDrivenMeshletDxrWiring.md#L1-L9">[D6]</a> DXR 문서는 구현 증거가 아닌 제안 계약</strong><span>docs/design/GpuDrivenMeshletDxrWiring.md · 1-9</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/verify-material-scene-probes.ps1#L17-L97">[T1]</a> 실제 네이티브 probe의 통과 판정 조건</strong><span>Tools/regression/verify-material-scene-probes.ps1 · 17-97</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/support/MeshletBatchDispatchProbe.inl#L213-L285">[T2]</a> GPU ring 경계·완료·슬롯 재사용 검사</strong><span>Tools/regression/support/MeshletBatchDispatchProbe.inl · 213-285</span>
+</div>
+<div class="source-row"><strong><a class="ref" href="https://github.com/29thnight/CreatorEngine/blob/946ef4fa9b79f4e74ad09a03d79aa117277ded87/Tools/regression/support/ClusterLodProbe.inl#L351-L486">[T3]</a> 다중 뷰·GPU 직접 소비·공간 LOD oracle</strong><span>Tools/regression/support/ClusterLodProbe.inl · 351-486</span>
+</div>
+</div>
+</section>
+<section id="implementation">
+<h2><span class="tocnum">08</span>후속 구현 · 기준선 · 검증 · 남은 작업</h2>
+<h3 id="1-해결하는-문제와-구현-범위">1. 해결하는 문제와 구현 범위</h3>
+<p>기준 코드에서는 메시릿마다 정점을 복원한 뒤 경계를 계산한다. 인스턴스
+전체가 제거될 수 있어도 그 메시릿 작업이 GPU ring에 게시되고, 같은 LOD
+그룹에 대한 요구 비트도 여러 메시릿이 반복 갱신한다. 또한
+SurfaceResolve와 Temporal은 화면에 남은 같은 삼각형의 변환을 반복한다.
+그림자의 첫 컬링은 light-space history를 사용할 수 있지만 현재 카메라
+깊이를 받는 입력 계약은 없다.</p>
+<p>이 PR은 다음 세 부분을 구현한다.</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>작업</th>
+<th>변경 후 동작</th>
+<th>기본 상태</th>
+<th>직접 줄이려는 비용</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1A. 인스턴스 조기 판정</td>
+<td>기존 Reset에서 현재 포즈의 보수적 경계를 계산하고, Cull이 하위
+메시릿을 ring에 게시하기 전에 거절한다.</td>
+<td>direct/object-space의 유효 경계에 적용. 경계가 없으면 기존 메시릿
+판정으로 진행.</td>
+<td>제거되는 인스턴스의 ring job, 메시릿 decode/skinning, 반복 그룹
+feedback atomic</td>
+</tr>
+<tr class="even">
+<td>1B. 가시 프리미티브 캐시</td>
+<td>GPU material packet에서 보이는 삼각형의 현재 표면·clip 및 이전
+object-space 위치를 계산하고 SurfaceResolve/Temporal이 재사용한다.</td>
+<td>명시적 opt-in, 기본 꺼짐.</td>
+<td>같은 가시 삼각형의 반복 변환</td>
+</tr>
+<tr class="odd">
+<td>3. 그림자 예측 입력</td>
+<td>첫 shadow 컬링이 현재 camera HZB를 예측 입력으로 읽는다. 최종 복구는
+기존 현재 light-space HZB를 사용한다.</td>
+<td>명시적 opt-in, 기본 꺼짐.</td>
+<td>첫 shadow 목록의 불필요한 래스터 작업</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>REAC의 독립 80-byte instance 목록, 해상도 비례 압축 vertex cache,
+64×64 light-space 깊이 재투영, 이전 ray-hit 주입을 그대로 재현한 구현은
+아니다. 기존 엔진의 입력·복구·수명 계약에 맞춰 구현한 범위를 아래에
+명시한다. CPU의 <code>RenderGraphDeclare</code>와
+<code>MaterialGraphScenePrepare</code>를 직접 단축하는 별도 PR의 성능
+결과로 합산하지 않는다.</p>
+<p>원문 비교 위치: <a
+href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf">Capcom
+REAC 2025 PDF</a>의 PDF 페이지 20–24, 43–48, 53–66. 발표의 69페이지에
+적힌 향후 과제는 Capcom의 구현 완료 항목으로 세지 않는다.</p>
+<h3 id="2-저장된-계측-결과를-기준선으로-삼은-방법">2. 저장된 계측 결과를
+기준선으로 삼은 방법</h3>
+<p>원본은 <a
+href="https://github.com/29thnight/CreatorEngine/blob/0d3c2cac6d3bd16a2c4511ccb067749feafcd33c/docs/analysis/measurements/20261019-cpu-gpu-data/manifest.json"><code>20261019-cpu-gpu-data/manifest.json</code></a>이다.
+<code>after-baseline</code>은 이전 CPU 작업 이후의 캡처 이름이며
+<strong>이번 PR의 변경 후 측정값이 아니다</strong>.</p>
+<p>측정 코드 신원은
+<code>946ef4fa9b79f4e74ad09a03d79aa117277ded87</code>이며 공개
+provenance의 <code>DataSystem.cpp</code> include 보정이 적용돼 있다. 이
+커밋부터 현재 master <code>0d3c2cac</code>까지의 398개 변경 파일은 모두
+docs 아래에 있다. 주요 생산 코드의 Git blob과 LF/CRLF 정규화 SHA-256을
+대조했고, 같은 include 보정을 이번 코드에 포함했다. 측정 바이너리의
+해시는 공개됐지만 실제 DLL/PDB 전체가 저장돼 있다는 뜻은 아니다.</p>
+<p>manifest의 360개 데이터 파일은 Git tree의 크기·blob 신원과 일치한다.
+내려받아 재검증한 182개 파일은 142,989,631 byte이며 크기, SHA-256, Git
+SHA-1을 확인했다. 이 범위에 103개 timeline 파일, 네 캡처 metadata와
+<code>after-baseline</code> 원시 이벤트가 포함된다. CPU scope를 동일
+Game view 표본으로 재집계했고, 원시 GPU 이벤트와 공개된 GPU 이벤트의
+중복·일치도도 확인했다. 세부 기준과 한계는 검증 JSON에 보존한다.</p>
+<h4 id="동일한-444개-game-표본">동일한 444개 Game 표본</h4>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>지표</th>
+<th style="text-align: right;">평균 ms</th>
+<th style="text-align: right;">p50 ms</th>
+<th style="text-align: right;">p95 ms</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Game CPU scope</td>
+<td style="text-align: right;">11.742154</td>
+<td style="text-align: right;">11.687150</td>
+<td style="text-align: right;">14.451700</td>
+</tr>
+<tr class="even">
+<td>MaterialGraphScenePrepare</td>
+<td style="text-align: right;">2.156798</td>
+<td style="text-align: right;">2.140400</td>
+<td style="text-align: right;">2.714100</td>
+</tr>
+<tr class="odd">
+<td>RenderGraphDeclare</td>
+<td style="text-align: right;">4.219918</td>
+<td style="text-align: right;">3.973700</td>
+<td style="text-align: right;">5.703700</td>
+</tr>
+<tr class="even">
+<td>RenderLoop CPU scope</td>
+<td style="text-align: right;">26.594877</td>
+<td style="text-align: right;">25.883150</td>
+<td style="text-align: right;">31.215700</td>
+</tr>
+<tr class="odd">
+<td>계측된 Game GPU pass 구간의 합집합</td>
+<td style="text-align: right;">5.194939</td>
+<td style="text-align: right;">5.162550</td>
+<td style="text-align: right;">5.768600</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>CPU 준비와 선언의 평균 합은 6.376716 ms, Game CPU scope 평균의
+54.31%다. GPU 값은 유효 Game submission의 계측 pass 합집합이며 전체 GPU
+frame time, GPU 이용률, FPS가 아니다. CPU와 GPU의 값도 서로 더하지
+않는다.</p>
+<p>CPU 값은 QPC로 측정한 scope의 wall time이다. RenderLoop는 해당 Game
+view를 포함하는 전체 루프이며, Game과 그 내부 Prepare·Declare를
+포함하므로 이 행들을 서로 더하지 않는다. 444개 Game 표본과 444개
+enclosing loop의 대응도 확인했다.</p>
+<p>주요 GPU 컬링 세 구간은 <code>Shared.ShadowRecovery.Cull</code>
+0.769335 ms, <code>Shared.First.Cull</code> 0.734084 ms,
+<code>CameraMeshlet.Recovery.Cull</code> 0.472195 ms로 평균 합 1.975614
+ms다. 이는 계측 GPU pass 합집합의 약 38.03%다. 반면 Material Resolve는
+평균 0.186160 ms, Resolve와 Temporal 합은 0.266720 ms로 약 5.13%다.
+따라서 항상 작동하는 새 대규모 캐시보다 컬링 작업량 감소를 먼저
+구현하고, 캐시는 비용을 비교할 수 있는 선택 경로로 둔다.</p>
+<p>캡처는 Debug, 8 workers, Scene/Game 1186×514, Editor 전경,
+RenderThread Normal, binding detail 0이다. CPU/GPU 모델, OS/driver 및
+동작 클록이 충분히 공개되지 않아 플랫폼을 넘는 성능 결론이나 Release
+수용에 사용할 수 없다. ETW 표본의 running/waiting/ready는 별도
+캡처이므로 위 baseline scope와 섞지 않는다. 큰
+<code>RenderGraphDeclare</code> 병렬 분기의 marker 89/102/103/104는
+조사한 원시 캡처에 0건이다. 이 자료만으로 해당 분기의 실제 가동률이나
+최적 worker 수를 판정하지 않는다.</p>
+<h3 id="3-인스턴스-조기-판정의-코드-계약">3. 인스턴스 조기 판정의 코드
+계약</h3>
+<h4 id="불변-경계와-현재-포즈">불변 경계와 현재 포즈</h4>
+<p><code>MeshSurfaceInput::SealInstanceBounds()</code>는 정적
+partition을 봉인할 때 cooked meshlet sphere들의 합집합을 만든다. QMC2
+위치 오차와 구면 검증의 여유를 포함하고, double 누적 후 float 변환은
+바깥쪽으로 반올림한다. 이 값은 불변 입력 소유자에게 저장되므로 warm
+frame에서 메시릿 descriptor를 다시 순회하지 않는다. 스트리밍의 전체
+입력과 각 chunk도 같은 봉인 과정을 사용한다.</p>
+<p>GPU Reset은 현재 bone palette의 각 본이 그 경계를 변환한 AABB를
+합친다. 정규화된 비음수 skin 가중치의 변형 위치는 이 합집합 안에
+들어간다. 모든 가중치가 0인 기존 정점 동작을 위해 bind pose 경계도
+포함한다. 현재 world 변환까지 적용한 뒤 frustum 판정을 저장한다.
+shear·reflection을 포함한 affine 변환은 interval 계산과 바깥쪽
+반올림으로 보수적으로 처리한다. 수치가 유효하지 않거나 overflow이면 기존
+메시릿 경로로 통과시킨다. bind-pose 경계만으로 움직이는 skinned
+geometry를 제거하지 않는다.</p>
+<p>CPU가 coarse 경계를 제공하는 대상은
+<code>UsesDirectClusters() &amp;&amp; IsObjectSpace()</code>다.
+compatibility와 경계가 없는 입력은 통과한다. 이는 스키닝의 coarse LOD를
+새로 생성한다는 뜻이 아니다. Reset의 현재 pose 읽기는 RenderGraph의
+명시적 read dependency에 추가됐다.</p>
+<h4 id="기존-gpu-작업-배분에-삽입">기존 GPU 작업 배분에 삽입</h4>
+<p>별도 coarse dispatch를 추가하지 않는다. 기존 Reset의 bin당 64개
+lane에서 경계를 만들고, persistent Cull이 비어 있지 않은 source
+partition을 처음 얻을 때 coarse 결과를 검사한다. 거절된 partition은
+메시릿 descriptor를 decode하거나 ring job을 게시하기 전에 종료된다.
+producer lease는 기존 종료 경로에서 반납한다.</p>
+<p>frustum 계산은 bin당 한 번이다. HZB 검사는 기존 16개 논리 partition
+중 비어 있지 않은 partition마다 최대 한 번 실행한다. 인스턴스 survivor
+목록 자체를 먼저 compaction한 완전한 별도 front stage는 아니며, 거절된
+bin도 초기 partition claim 비용은 남는다. Reset의 bone 경계 합집합과
+1,792 byte의 고정 groupshared scratch 비용도 추가된다. 이 범위를 과장해
+모든 Cull 비용이 사라진다고 해석하지 않는다.</p>
+<p>첫 단계의 메시릿 survivor가 하나라도 있으면 recovery의 coarse HZB
+거절은 건너뛴다. 개별 메시릿에서도 기존 first-stage classification을
+유지한다. 새 경계로 이미 살아남은 기하가 최종 목록에서 사라지는 것을
+막기 위한 계약이다.</p>
+<h4 id="abi와-feedback">ABI와 feedback</h4>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>자원</th>
+<th>변경</th>
+<th>수명 / 한계</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>기존 world upload</td>
+<td>bin당 float4 3개 → 5개, +32 byte</td>
+<td>기존 batch upload 하나에 포함. 마지막 두 행은 불변 local
+min/max.</td>
+</tr>
+<tr class="even">
+<td>기존 출력 UAV</td>
+<td>bin당 8 words, +32 byte</td>
+<td>posed world min/max, valid, frustum admission. 기존 scan 앞에 배치.
+정렬 padding 별도.</td>
+</tr>
+<tr class="odd">
+<td>candidate flags</td>
+<td><code>kInstanceBounds = 512</code></td>
+<td>새 CPU producer는 모든 bin에 같은 5행 stride를 게시. 경계가 없으면
+valid 0.</td>
+</tr>
+<tr class="even">
+<td>indirect arguments</td>
+<td>기존 5 words 유지</td>
+<td>count, empty-list, firstInstance 0 계약 유지.</td>
+</tr>
+<tr class="odd">
+<td>ring header word 15</td>
+<td>거절된 source partition 수</td>
+<td>기존 크기의 진단 word 사용. 새 프레임 readback을 추가하지 않음.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>같은 LOD 그룹의 desired feedback은 Reset에서 한 번만 갱신한다.
+coarse에서 거절된 오브젝트도 기존 desired-cut 스트리밍 요청이 유지된다.
+first/recovery와 공유 group owner의 bitmask 소유권을 바꾸지 않는다.
+<code>MeteorGeometryPosition()</code>은 위치만 필요한 소비자의 계약을
+명시하고 full <code>MeteorGeometryPoint()</code>와 실제 decode/skinning
+결과를 비교했다. 컴파일러가 기존 미사용 속성 계산을 이미 제거할 수
+있으므로 이 helper 자체의 속도 향상을 주장하지 않는다.</p>
+<h3 id="4-가시-프리미티브-캐시">4. 가시 프리미티브 캐시</h3>
+<h4 id="자원과-생산자">자원과 생산자</h4>
+<p><code>ScenePrimitiveCacheFrame</code>은 현재 frame의 scene records,
+material packets, descriptor recording과 graph epoch를 봉인한다.
+<code>ClearPrimitiveCache</code>는 key만 초기화한다.
+<code>PopulatePrimitiveCache</code>는 기존 8×8 record/tile 패킷과 각
+geometry page를 사용해 간접 dispatch하고, 실제 visibility에 나타난
+primitive address를 bounded hash에 게시한다. CPU가 가시 primitive 목록을
+새로 만들지 않는다.</p>
+<p>전역 visibility address가 key이므로 서로 다른 record의 동일 primitive
+index가 섞이지 않는다. 고정 16,384개 slot과 최대 8번의 linear probe를
+사용한다. 네 개 인접 pixel의 중복 CAS는 64-lane 고정 groupshared
+scratch로 줄인다. subgroup 크기나 vendor 전용 WaveMatch 확장을 가정하지
+않는다. producer의 packet/record는 작업 그룹 전체에서 동일하므로
+geometry descriptor index도 동일하며 불필요한 NonUniform 표시를 하지
+않는다. 소비자의 서로 다른 record 접근은 기존 NonUniform 계약을
+유지한다. hash에 들어가지 못한 primitive는 소비자의 기존 decode로
+처리한다. cache miss가 렌더링 누락으로 변환되지 않는다.</p>
+<p>key를 먼저 CAS하는 생산자와 pixel 소비자는 같은 dispatch 안에서
+동작하지 않는다. Clear → Populate의 UAV 경계와 Populate →
+Surface/Temporal의 명시적 SRV dependency가 data 게시를 완성한다.
+Populate의 다른 producer는 선점된 key의 data를 읽지 않는다.</p>
+<h4 id="정밀도와-소비자">정밀도와 소비자</h4>
+<p>한 primitive에 현재 월드 표면의 세 정점, 현재 raster clip, 이전
+object-space 위치를 full float로 저장한다. 기존 homogeneous barycentric
+복원, near-plane 처리, quad helper 미분값 계산과 Temporal의 이전 위치
+보간 후 world/projection 적용 순서를 유지한다. REAC의 vertex당 16-byte
+포맷과 동일하지 않다. 임의의 half/packed 정밀도를 도입해 영상·motion
+오차를 늘리지 않는 초기 구현이며, 저장 형식 축소는 native 화질·대역폭
+비교 이후의 별도 작업이다.</p>
+<p>기본 <code>LXSceneGBufferPS</code>와 <code>LXSceneTemporalPS</code>는
+cache 사용 여부를 compile-time false로 전달한다. opt-in은 별도 cooked
+<code>LXSceneCachedGBufferPS</code>와
+<code>LXSceneCachedTemporalPS</code>를 선택한다. 상수 material fixture의
+DXIL을 기준 master와 대조해 기본 entry의 t174/t175 및 추가 cache
+resource/query가 제거됨을 확인했다. 전체 정규화 IR은 wrapper의 출력 합류
+등으로 동일하지 않으며, 실제 시간 동등성은 미측정이다. cache Temporal은
+lookup 결과를 복원과 이전 위치 경로에 함께 넘겨 같은 pixel의 중복 hash
+탐색을 피한다. 캐시 PSO는 봉인된 generation과 기존 PSO id를 확인해
+재사용하며, 프레임의 Draw에 준비된 handle을 게시한다.</p>
+<h4 id="비용과-호환성">비용과 호환성</h4>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>비용 / 정책</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Key storage</td>
+<td>16,384 × 4 = 65,536 byte</td>
+</tr>
+<tr class="even">
+<td>Triangle storage</td>
+<td>16,384 × 336 = 5,505,024 byte</td>
+</tr>
+<tr class="odd">
+<td>합계</td>
+<td>활성 뷰의 retained frame당 5,570,560 byte = 5.3125 MiB. allocator
+정렬·상위 풀 예약량 별도.</td>
+</tr>
+<tr class="even">
+<td>Constants</td>
+<td>80 byte, 기존 upload allocator 정렬 적용</td>
+</tr>
+<tr class="odd">
+<td>Descriptor</td>
+<td>기존 t170 table 4 → 6 SRV. table당 +2, material/legacy table을 모두
+만드는 일반 뷰는 +4 descriptors. root DWORD 수는 유지. 기본 off도 이
+비용은 존재.</td>
+</tr>
+<tr class="even">
+<td>CPU 저장소</td>
+<td>frame은 고정 2-buffer 배열, 동적 declaration scratch와 PSO map은
+resources owner가 용량/항목을 재사용.</td>
+</tr>
+<tr class="odd">
+<td>기본 off</td>
+<td>cache frame, cache GPU buffers, cache PSO를 만들지 않음. 두 cooked
+shader blob의 저장·로드·SceneShaderSet→Program 복사와 descriptor 증가는
+별도 비용.</td>
+</tr>
+<tr class="even">
+<td>Packet 한계</td>
+<td>compute dispatch의 축별 65,535 한도를 넘는 packet plan이면 기존 복원
+경로 유지.</td>
+</tr>
+<tr class="odd">
+<td>자산 신원</td>
+<td><code>SceneHostIdentity</code> 40 → 41. scene material shader를 다시
+쿠킹해야 함. 오래된 cooked blob을 runtime shader compile로 대체하지
+않음.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>사용 설정은 <code>SceneHostBudget::m_primitiveCache</code> 또는 live
+renderer의 <code>CREATOR_METEOR_PRIMITIVE_CACHE=1</code>이다. 해상도
+임계값 같은 미보정 자동 활성화 정책은 넣지 않았다. 캐시를 켠 경우
+Clear/Populate, lookup, 임시 메모리와 Surface/Temporal의 합을 비교해야
+한다. hit rate만으로 수용하지 않는다.</p>
+<h3 id="5-현재-카메라-깊이를-사용하는-그림자-예측">5. 현재 카메라 깊이를
+사용하는 그림자 예측</h3>
+<p>설정은 <code>SceneHostBudget::m_shadowDepthPrediction</code> 또는
+<code>CREATOR_METEOR_SHADOW_CAMERA_PREDICTION=1</code>이며 기본값은
+꺼짐이다. 입력 표면이 없어 camera HZB를 만들 수 없는 뷰는 기존 경로를
+유지한다. 고정 char 배열로 설정을 읽어 프레임별 동적 문자열/컨테이너를
+만들지 않는다.</p>
+<h4 id="그래프-의존성과-신원">그래프 의존성과 신원</h4>
+<p>활성화할 때 camera first만 먼저 선언한다. Camera Occluder가 실제
+current-depth HZB를 만든 뒤, 세 shadow first를
+<code>METEOR.Shared.ShadowCameraPrediction</code> 묶음으로 선언한다.
+기존 네 뷰 shared first를 그대로 유지한 채 거기에 camera HZB read를
+붙이면 스스로 자기 생산자를 기다리는 cycle이 생기므로, 활성화된
+경로에서만 묶음을 나눈다. 기본 경로의 기존 shared 묶음은 유지한다.</p>
+<p>frustum과 LOD는 light projection/extent를 유지하고, 예측 HZB의
+투영·크기만 camera ViewKey에서 받는다. 해당 키는 같은 device, upload
+recording, descriptor version, frame, scene epoch의 현재 카메라를
+가리켜야 한다. ShadowFirst가 받은 camera depth는 실제 occluder depth의
+동일 RG handle/version이어야 한다.</p>
+<p><code>Pyramid::RequireCurrentView()</code>는 ViewKey가 같더라도
+retained history reader를 거부한다. 일반
+<code>DeclareWithOcclusion</code>/<code>DeclareOcclusionBatch</code>에는
+prediction frame을 넣을 수 없다. 같은 graph/epoch와 같은 생산자의
+재선언만 허용하며, 다른 depth producer로 바꾸는 요청은 거부한다.</p>
+<h4 id="정확성-보존과-미구현-범위">정확성 보존과 미구현 범위</h4>
+<p>현재 camera clip volume 안에 경계 전체가 들어온 경우만 예측 HZB로
+거절한다. 부분적으로 밖에 있거나 near/far/W 또는 수치가 불확실하면
+통과한다. 이는 offscreen caster를 camera visibility만 보고 제거하지 않기
+위한 조건이다.</p>
+<p>예측은 첫 shadow 목록에만 적용한다. 첫 survivor는 최종 복구에서
+유지되고, 첫 거절 대상은 현재 실제 light-space occluder HZB로 다시
+검사한다. static shadow cache와 최종 light-space depth/history에 camera
+depth를 복사하지 않는다. 카메라와 광원에서 반대 가시성인 경우까지 포함해
+이 복구 계약을 검증한다.</p>
+<p>이 구현은 <strong>camera-space HZB를 직접 읽는 prediction-only
+경로</strong>다. REAC의 카메라 깊이를 64×64 light-space atlas에
+재투영하는 생산자, 이전 ray-hit position의 주입, 그림자 software
+rasterizer는 추가하지 않았다. ray-hit 생산자나 history 수명 계약이 없는
+상태에서 이름만 붙인 자원을 만들어 완료로 세지 않는다. 새 camera →
+shadow dependency가 병렬성을 줄일 가능성도 전체 GPU schedule에서
+측정해야 한다.</p>
+<h3 id="6-할당-소유권과-컨벤션">6. 할당, 소유권과 컨벤션</h3>
+<p>새 엔진 멤버는 <code>m_</code> 접두사, 새 상수는
+<code>kPascalCase</code>, 지역 변수는 camelCase를 사용한다. 새 코드의
+제어문은 중괄호와 Allman 배치를 사용하고, C++ 변경 구간은 저장소
+<code>.clang-format</code>에 맞춘다. Slang은 HLSL formatter가 entry/loop
+attribute를 잘못 결합하는 경우가 있어 기존의 attribute 별도 행과 함수
+배치를 보존하고 수동 대조했다. 기존 코드의 광범위한 포맷 변경은 하지
+않는다.</p>
+<p>핫패스의 작업 목록을 지역 vector/map으로 새로 만드는 코드는 추가하지
+않는다. 고정 정보는 <code>std::array</code>와 GPU groupshared 배열을
+사용한다. Shared HZB descriptor 조립의 기존 지역 vector는 8×16 고정
+배열로 교체했다. local instance bounds는 정적 입력 owner에 저장하며,
+캐시의 declaration uses/normalization scratch는 resources owner가
+재사용한다. GPU cache buffers는 기존 <code>TransientBufferPool</code>의
+제출·완료 수명에 따라 회수한다. opt-in cold PSO 준비와 프레임 소유자
+객체 자체는 할당이 존재하므로 전체 시스템의 무할당을 주장하지
+않는다.</p>
+<p>원자적 갱신 횟수, 유지 메모리와 추가 dependency도 비용이다. 빈 목록,
+overflow, stale recording, graph reset, 실패 후 소유권과 descriptor page
+경계를 성능과 함께 확인한다.</p>
+<h3 id="7-검증과-재현">7. 검증과 재현</h3>
+<p>정확한 실행 결과, source SHA-256, compiler/validator 신원과 baseline
+countercheck는 <a
+href="reac-20261019/verification.json">verification.json</a> 및 같은
+디렉터리의 보고서에 기록한다. 원문에서 추출한 생산 함수를 가짜로
+재구현한 뒤 통과시키지 않도록, Slang include closure를 고정해 실제
+compiler에 전달하고 실행 전후 source 변경을 확인한다.</p>
+<h4 id="현재-환경에서-수행할-수-있는-검사">현재 환경에서 수행할 수 있는
+검사</h4>
+<ul>
+<li>실제 Slang의 bounds helper → C++를 독립 double corner/plane/skin
+oracle와 비교.</li>
+<li>실제 position-only/full-surface decoder의 bitwise 위치 비교와 독립
+packet/skin oracle 비교.</li>
+<li>실제 single/shared/recovery HZB wrapper → C++에서 camera/light 반대
+투영, 전체 footprint, odd extent, first-survivor 보존을 확인. coverage
+또는 recovery를 의도적으로 제거한 변이는 실패해야 함.</li>
+<li>실제 cache header/입장 조건/바인딩 코드의 portable fixture에서
+할당·실패·retained ownership·stale epoch를 확인. 이 fixture의
+device/encoder 경계는 대역이며 실제 RHI build가 아님.</li>
+<li>실제 셰이더 변형의 DXIL 생성과 <code>dxv</code> 검증, SPIR-V 생성과
+<code>spirv-val</code> 검증. 현재 RHI 옵션과 capability를 추가한 진단
+모드의 결과를 따로 기록.</li>
+<li><code>git diff --check</code>, runtime/editor include boundary, 변경
+구간 포맷, native probe assertion의 정적 대조.</li>
+</ul>
+<p>Slang 2026.14, DXC 1.9.2607, SPIRV-Tools 2026.4를 사용했다. 도구의
+출처·checksum은 검증 근거에 보존한다. C++ oracle는
+<code>-fno-fast-math -ffp-contract=off</code>를 사용한다. Slang의 C++
+출력이 HLSL <code>precise</code>를 그대로 남기는 경우 host keyword
+adapter를 적용하며 그 사실을 기록한다. ASan/UBSan과 LeakSanitizer는
+구분한다. sandbox에서 <code>/proc</code> task 접근이 막혀
+LeakSanitizer를 실행할 수 없는 경우 leak 검증을 통과한 것으로 세지
+않는다.</p>
+<h4 id="실제-실행-결과">실제 실행 결과</h4>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>검사</th>
+<th>결과</th>
+<th>근거와 해석</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>실제 RHI 옵션의 DXIL 컴파일 및 <code>dxv</code></td>
+<td><strong>34/34 통과</strong></td>
+<td><a href="reac-20261019/shaders/summary.json">셰이더 집계</a>. 전체
+실행과 최종 material/producer 재실행을 source 신원으로 연결한 결과.</td>
+</tr>
+<tr class="even">
+<td>실제 RHI 옵션의 SPIR-V 컴파일 및 <code>spirv-val</code></td>
+<td><strong>14/34 통과, 20개 실패</strong></td>
+<td><a href="reac-20261019/shaders/matrix-engine.json">현재 옵션의
+결과</a>. 생산 Vulkan 수용은 미완료.</td>
+</tr>
+<tr class="odd">
+<td>capability 12개를 명시한 진단 SPIR-V</td>
+<td><strong>32/34 통과, 2개 실패</strong></td>
+<td><a href="reac-20261019/shaders/matrix-diagnostic.json">진단
+결과</a>. 기본·캐시 GBuffer의 dynamic QuadBroadcast Index가 SPIR-V 1.3
+검증에 실패. 기본 entry의 같은 오류는 master에서도 재현.</td>
+</tr>
+<tr class="even">
+<td>최종 cache Clear/Populate producer</td>
+<td><strong>DXIL 2/2, SPIR-V 2/2 통과</strong></td>
+<td>최종 bytes와 실제 RHI 옵션으로 별도 재실행. SPIR-V triangle stride도
+<strong>336 byte</strong>로 확인.</td>
+</tr>
+<tr class="odd">
+<td>실제 Slang bounds / frustum CPU oracle</td>
+<td><strong>1,069,124 checks 통과</strong></td>
+<td>72,000 normalized skin samples 및 실제 거절 13,821개 포함. <a
+href="reac-20261019/shaders/cpu-oracles-sanitized.json">ASan/UBSan
+결과</a>.</td>
+</tr>
+<tr class="even">
+<td>실제 Slang position-only/full decode CPU oracle</td>
+<td><strong>12,336 checks 통과</strong></td>
+<td>514 fixtures, 2,056 vertices. 독립 decode 기준과 bitwise parity
+확인. 같은 ASan/UBSan 근거 참조.</td>
+</tr>
+<tr class="odd">
+<td>실제 cache C++ 수명·그래프·admission fixture</td>
+<td><strong>176 checks 통과</strong></td>
+<td><a href="reac-20261019/primitive-cache-normal.json">Normal</a>, <a
+href="reac-20261019/primitive-cache-asan.json">ASan/UBSan</a>.
+device/graph 서비스 경계는 대역.</td>
+</tr>
+<tr class="even">
+<td>실제 Slang cache 변환·조회 CPU oracle</td>
+<td><strong>27 fixtures / 56,377 checks 통과</strong></td>
+<td>위 cache 보고서의 <code>shader_cpu</code>. cache hit/miss·이전
+위치·복원 계약 확인.</td>
+</tr>
+<tr class="odd">
+<td>실제 Slang shadow prediction/recovery CPU oracle</td>
+<td><strong>33,425 checks / 15,271 helper calls 통과</strong></td>
+<td><a href="reac-20261019/shadow-cpu.json">ASan/UBSan</a>. coverage 및
+recovery를 제거한 두 변이도 해당 경로에서 예상대로 실패.</td>
+</tr>
+<tr class="even">
+<td>기본 cache-off entry의 DXIL 정적 비교</td>
+<td>cache resource/query/load 제거 확인</td>
+<td><a href="reac-20261019/shaders/default-ir-comparison.json">IR
+비교</a>. resource table은 동일하나 전체 IR은 다름. native 시간 비교가
+아님.</td>
+</tr>
+<tr class="odd">
+<td>Include boundary</td>
+<td>전체 실패, <strong>추가 위반 0개</strong></td>
+<td><a href="reac-20261019/include-boundary.json">기준 코드 대조</a>.
+master와 같은 27개 상향 include 및 70개 물리 경계 부채.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>셰이더 집계는 한 번의 새로운 전체 재실행으로 표현하지 않는다. 원래
+full matrix와 최종 material 9개·producer 2개 entry 재실행의 명령·종료
+코드·binary SHA를 보존하고, <a
+href="reac-20261019/shaders/source-snapshots.json">source
+snapshots</a>에 달라진 producer·Host include·runner와 변하지 않은 입력을
+구분했다. 최종 기본 GBuffer/Temporal의 DXIL은 이전 current IR 비교
+바이너리와도 일치한다. 진단 옵션을 실제 RHI에 추가하지 않았다. 새 cached
+GBuffer의 SPIR-V 실패도 기존 기본 entry와 원인이 같다는 이유로 통과
+처리하지 않는다.</p>
+<h4 id="아직-수행하지-못한-검사">아직 수행하지 못한 검사</h4>
+<p>이 환경에는 Windows/MSVC 전체 엔진 빌드와 실제 GPU가 없다. native
+Debug/Release 빌드, DX12 GPU validation, native Vulkan, 새
+영상·shadow·motion 결과, 실제 frame 성능의 A/B 측정은 미실행이다. 작성된
+native probe의 성공 marker를 실행 결과로 기재하지 않는다.</p>
+<p>추가한 coarse native probe는 normal/partial-wave의 16개 case로
+empty/tail/skewed/4096 bins, 완전히 거절되는 partition, 기존
+visible-ID/indirect/ring 종료 oracle를 검사하도록 했다. 기존 48개
+dynamic ring case도 유지한다. 이 fixture의 경계는
+compatibility/unskinned 입력에 수동으로 제공하므로 cooked CPU bounds
+생산자와 GPU bone reduction을 end-to-end로 검증하는 범위는 아니다.</p>
+<p>shadow native probe에는 8개 prediction case와 missing depth 및 RG
+version·epoch 거부, retained-history 거부를 추가했다. 현재 CPU oracle의
+성공과 native probe 미실행을 별도로 기록한다. cache의 전용
+<code>--primitive-cache-only</code> mode는 기존 visibility
+reconstruction 32 frames와 temporal bucket 12 frames에 실제
+<code>SceneHostBudget::m_primitiveCache=true</code>를 전달하도록
+작성했다. Clear/Populate의 존재, packet 생성 및 Resolve와의 실행 순서,
+cache 두 버전의 Pixel SRV read를 compiled graph에서 확인한 뒤 기존 독립
+pixel/motion oracle를 수행한다. 이 44 frames는 아직 실행된 결과가
+아니다. live renderer 환경변수만으로 native probe의 기본 budget이
+바뀐다고 가정하지 않는다.</p>
+<p>현재 RHI SPIR-V 옵션으로 baseline의 일부 subgroup capability 오류가
+재현된다. 해당 오류를 없애려고 장치의 supportedOperations/stages 검증
+없이 capability만 선언하지 않는다. 진단용 capability/profile로
+컴파일돼도 생산 Vulkan 수용은 아니다. 기존 baseline에도 있는 오류와 이
+PR의 새 오류는 비교 근거로 구분한다. include boundary 검사도 전체 통과가
+아니다. 기준 master의 1,785개 source/project 파일 미러와 현재 코드에서
+동일한 27개 상향 include 및 70개 물리 경계 부채가 보고됐으며, 추가
+위반은 0건이다. allowlist를 수정하거나 기존 실패를 통과로 표시하지
+않았다.</p>
+<h4 id="재현-명령">재현 명령</h4>
+<p>도구 경로는 검증 환경에 맞게 지정한다. runner는 도구를 자동
+다운로드하지 않는다.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> Tools/regression/verify-reac-shaders.py <span class="dt">\</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--slangc</span> /path/to/slangc <span class="at">--dxc-root</span> /path/to/dxc <span class="dt">\</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--spirv-val</span> /path/to/spirv-val <span class="at">--output</span> /tmp/reac-current</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> Tools/regression/verify-reac-shaders.py <span class="dt">\</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--slangc</span> /path/to/slangc <span class="at">--cpu-bounds-only</span> <span class="at">--sanitize</span> <span class="dt">\</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> /tmp/reac-bounds</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> Tools/regression/verify-reac-shaders.py <span class="dt">\</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--slangc</span> /path/to/slangc <span class="at">--cpu-positions-only</span> <span class="at">--sanitize</span> <span class="dt">\</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> /tmp/reac-positions</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> Tools/regression/verify-shadow-camera-prediction-cpu.py <span class="dt">\</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">--slangc</span> /path/to/slangc <span class="at">--sanitize</span> <span class="at">--output</span> /tmp/reac-shadow</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> Tools/regression/verify-primitive-cache.py <span class="dt">\</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">--slangc</span> /path/to/slangc <span class="at">--sanitize</span> <span class="dt">\</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> /tmp/reac-primitive-cache.json</span></code></pre>
+</div>
+<p>위 shader runner의 기본 strict SPIR-V mode는 알려진 생산 RHI 옵션
+결함을 실패로 반환한다. <code>--diagnostic-capabilities</code>를 별도 새
+출력 디렉터리에서 사용한 결과는 진단용이다. source tree의 제약에 맞는
+도구 버전을 사용해야 한다.</p>
+<p>native에서는 <code>SceneHostIdentity</code> 41의 material 자산을
+재쿠킹하고 다음을 수행한다. 실제 빌드 명령은 <a
+href="../../CONTRIBUTING.md">CONTRIBUTING.md</a>와 <a
+href="../../Tools/regression/README.md">회귀 검사 README</a>의 해당
+프로젝트 절차를 따른다.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode powershell"><code class="sourceCode powershell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="op">&amp;</span> <span class="op">.</span>\Tools\regression\verify<span class="op">-</span>material<span class="op">-</span>scene<span class="op">-</span>probes<span class="op">.</span><span class="fu">ps1</span> <span class="op">-</span>Configuration Release `</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="op">-</span>OutputDirectory <span class="st">&#39;Artifacts/REAC20261019-Release-fresh&#39;</span> `</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">-</span>Modes <span class="st">&#39;--meshlet-dispatch-only&#39;</span><span class="op">,</span><span class="st">&#39;--meshlet-hzb-only&#39;</span><span class="op">,</span><span class="st">&#39;--cluster-lod-only&#39;</span><span class="op">,</span>`</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>         <span class="st">&#39;--shadow-correctness-only&#39;</span><span class="op">,</span><span class="st">&#39;--visibility-reconstruction-only&#39;</span><span class="op">,</span>`</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>         <span class="st">&#39;--material-bucket-only&#39;</span><span class="op">,</span><span class="st">&#39;--temporal-bucket-only&#39;</span><span class="op">,</span><span class="st">&#39;--primitive-cache-only&#39;</span></span></code></pre>
+</div>
+<p>성능 표본은 GPU validation 및 상세 readback 검사를 끝낸 다음 별도로
+수집한다. 같은 카메라·장면·해상도·build·driver·clock 조건에서 기본,
+cache만, shadow prediction만, 둘 다의 네 경로를 비교한다. 최소한 CPU
+Prepare/Declare wall time, GPU
+Reset/Cull/Clear/Populate/Resolve/Temporal/shadow raster, 전체 GPU frame
+p50/p95, 빈 목록·최종 이미지·motion 동등성, 메모리 최고값을 남긴다.
+coarse 변경은 기준 commit과 동일 장면으로 비교하고 published Debug 값을
+새 Release 수치의 분모로 쓰지 않는다.</p>
+<h3 id="8-cpu-performance-engineering-활용-범위">8.
+cpu-performance-engineering 활용 범위</h3>
+<p><a
+href="https://github.com/usamahz/cpu-performance-engineering"><code>usamahz/cpu-performance-engineering</code></a>의
+설치된 전용 MCP connector는 없었다. 로컬 <code>cpu-perf==0.1.1</code>의
+offline selftest는 성공했으며, source snapshot은
+<code>deb5a0bac467</code>이다. 공식 MCP client와 직접 stdio JSON-RPC
+모두 <code>initialize</code> 응답을 받지 못했다. 따라서 MCP 분석을
+성공적으로 수행했다고 기록하지 않는다. 해당 증거는 <a
+href="reac-20261019/cpu-perf-stdio.json">cpu-perf-stdio.json</a>에
+보존한다.</p>
+<p>대신 저장소가 강조하는 환경·컴파일러·workload·baseline·측정 방법의
+신원 확보, 병목 가설과 correctness oracle의 분리, 불필요한 메모리
+이동·할당·반복 연산 최소화, 동일 조건 재측정 원칙을 적용했다. 공개된
+Debug CPU/GPU 캡처를 서로 다른 ETW 표본이나 새로운 코드의 결과로 섞지
+않는 것도 이 원칙에 따른다. 외부 서버가 엔진을 측정하거나 최적 성능을
+보증한 결과는 없다.</p>
+<h3 id="9-남은-후속-작업과-cpu-최적화의-관계">9. 남은 후속 작업과 CPU
+최적화의 관계</h3>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>항목</th>
+<th>이 PR 이후 남는 일</th>
+<th>판단 기준</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>CPU Prepare/Declare</td>
+<td>큰 Declare 병렬 분기를 실제로 활성화한 표본과 worker/core scaling
+확보. Prepare의 작업량·wait/ready 분리.</td>
+<td>동일 Game view의 wall time과 전체 RenderLoop p50/p95. GPU 단계
+단축으로 대체 해석하지 않음.</td>
+</tr>
+<tr class="even">
+<td>인스턴스 front stage</td>
+<td>별도 compacted instance survivor 목록, spatial/bone-local tighter
+bounds, first/recovery bounds 재사용의 손익.</td>
+<td>전부 보이는 장면의 Reset 비용까지 포함한 native A/B.</td>
+</tr>
+<tr class="odd">
+<td>프리미티브 cache</td>
+<td>실제 hit/miss·hash 충돌·소형 삼각형·helper 비율, 압축/가변 용량/이전
+위치 필요성.</td>
+<td>추가 producer와 읽기 대역폭까지 합한 순이익.</td>
+</tr>
+<tr class="even">
+<td>Material packet 밀도</td>
+<td>기존 8×8 record/tile의 record 중복, 64-entry page에 따른 shader 분할
+계측.</td>
+<td>새 정렬 기능이 아니라 현행 패킷 밀도 개선으로 범위 한정.</td>
+</tr>
+<tr class="odd">
+<td>Shadow 확장</td>
+<td>light-space 재투영 atlas, 유효한 ray-hit 생산자/history, SW shadow
+raster 및 point/spot 지원.</td>
+<td>offscreen/광원 이동/수직 공간에서 무누락, dependency 증가 포함
+시간.</td>
+</tr>
+<tr class="even">
+<td>Residency/LOD</td>
+<td>active working set 초과 시 정책, 가변 heap, skinned coarse LOD의
+변형 오차.</td>
+<td>상주 페이지 보호·완료 fence·장시간 스트레스.</td>
+</tr>
+<tr class="odd">
+<td>멀티큐/aliasing</td>
+<td>동시 사용 계약, 장치별 비용 보정, 실제 overlap/대역폭 경쟁.</td>
+<td>예측 mode와 실제 queue 제출을 구분한 전체 프레임 측정.</td>
+</tr>
+<tr class="even">
+<td>Vulkan</td>
+<td>현재 RHI capability/profile와 device feature admission 정합, native
+probe.</td>
+<td>SPIR-V 진단 성공을 실제 장치 수용으로 올리지 않음.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>이번 구현은 앞선 CPU 작업과 같은 렌더링 파이프라인을 대상으로 하는
+후속 확장이다. 두 CPU scope의 내부 병렬 실행을 직접 끝냈다는 의미는
+아니다. 특히 현재 기준선에서 CPU Prepare/Declare의 비중이 크므로, GPU
+작업량을 줄인 뒤에도 CPU 전용 측정과 개선은 독립적인 수용 과제로
+남는다.</p>
+<h3 id="10-게시한-코드의-고정-근거">10. 게시한 코드의 고정 근거</h3>
+<p>아래 링크는 구현 commit
+<code>deeaff2785fa059fe13e632ff934ce292ccf2801</code>에 고정한다. 실행한
+모든 변경 파일의 SHA-256은 검증 JSON에 보존한다.</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr class="header">
+<th>구성</th>
+<th>코드 근거</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>정적 instance bounds 생산</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphMeshSurface.cpp">MaterialGraphMeshSurface.cpp</a></td>
+</tr>
+<tr class="even">
+<td>GPU 조기 판정 / feedback</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang">GeometryVisibility.slang</a>,
+<a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang">GeometryInstanceBounds.slang</a></td>
+</tr>
+<tr class="odd">
+<td>GPU cache 자원 / graph 수명</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphPrimitiveCache.h">MaterialGraphPrimitiveCache.h</a></td>
+</tr>
+<tr class="even">
+<td>GPU cache 생산자 / 소비자</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang">MaterialGraphPrimitiveCache.slang</a>,
+<a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang">MaterialGraphSceneHost.slang</a></td>
+</tr>
+<tr class="odd">
+<td>CPU admission / cooked PSO 선택</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphSceneHost.cpp">MaterialGraphSceneHost.cpp</a>,
+<a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphProduct.h">MaterialGraphProduct.h</a></td>
+</tr>
+<tr class="even">
+<td>Shadow prediction 의존성 / current-only HZB</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl">MaterialGraphSceneShadowStage.inl</a>,
+<a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/GpuGeometryVisibilityShared.inl">GpuGeometryVisibilityShared.inl</a>,
+<a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/GpuGeometryOcclusion.cpp">GpuGeometryOcclusion.cpp</a></td>
+</tr>
+<tr class="odd">
+<td>Native 검사 진입과 실행 marker</td>
+<td><a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Tools/regression/verify-material-scene-probes.ps1">verify-material-scene-probes.ps1</a>,
+<a
+href="https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Tools/regression/material_raster_surface_probe.cpp">material_raster_surface_probe.cpp</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<footer class="footer">개정 2026-10-19 · 기준 master 0d3c2cac · 원 보고서의 18개 비교와 고정 코드 근거를 보존하고 이번 구현을 추가했다. 새 native GPU/CPU 성능 개선량을 생성하거나 측정했다고 주장하지 않는다.</footer>
+</main>
+</body>
+</html>

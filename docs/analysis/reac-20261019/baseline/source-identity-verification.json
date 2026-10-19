@@ -1,0 +1,67 @@
+[
+  {
+    "path": "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+    "currentCommit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+    "currentGitHubBlobSha1": "0b9e71a8c23bbf53ab05b41da8242353131071c3",
+    "localBlobSha1": "0b9e71a8c23bbf53ab05b41da8242353131071c3",
+    "currentSourceMatchesLocalBlob": true,
+    "measuredSha256": "35469322fd9c844ef6318712390e1c056af0c07a30e02cb806a5debfcb0cc759",
+    "currentLfSha256": "b948df12c3d3b48a4bbafa60a58165763377f77d07e445777a2cdd105312c67e",
+    "currentCrlfSha256": "35469322fd9c844ef6318712390e1c056af0c07a30e02cb806a5debfcb0cc759",
+    "withDocumentedPatchCrlfSha256": "35469322fd9c844ef6318712390e1c056af0c07a30e02cb806a5debfcb0cc759",
+    "documentedPatchRequired": false,
+    "measuredSourceMatchesCurrentWithDocumentedPatch": true
+  },
+  {
+    "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp",
+    "currentCommit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+    "currentGitHubBlobSha1": "3c5a623f8450575304a68cd1fd1d51b0ced9144f",
+    "localBlobSha1": "3c5a623f8450575304a68cd1fd1d51b0ced9144f",
+    "currentSourceMatchesLocalBlob": true,
+    "measuredSha256": "fc469393c2bbe286eaa250e21ec1fc7ce09c366c03a1594a42cc3d2e1b4d4142",
+    "currentLfSha256": "7196aa5081489522b0147262cd7d6fe880157c3485af7baa87ec35e698a35bf3",
+    "currentCrlfSha256": "fc469393c2bbe286eaa250e21ec1fc7ce09c366c03a1594a42cc3d2e1b4d4142",
+    "withDocumentedPatchCrlfSha256": "fc469393c2bbe286eaa250e21ec1fc7ce09c366c03a1594a42cc3d2e1b4d4142",
+    "documentedPatchRequired": false,
+    "measuredSourceMatchesCurrentWithDocumentedPatch": true
+  },
+  {
+    "path": "Engine/RenderEngine/MaterialGraphPacketWork.h",
+    "currentCommit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+    "currentGitHubBlobSha1": "20175c24abde855e6b2c71a71cb909a785ff72bc",
+    "localBlobSha1": "20175c24abde855e6b2c71a71cb909a785ff72bc",
+    "currentSourceMatchesLocalBlob": true,
+    "measuredSha256": "d38e9b34595b572128921a2df5bb2f59e4204b127550e7b3b2ba06523969a7e8",
+    "currentLfSha256": "2c0145bea486d1d406ccf1b44499241e35361a5f470f58c4250ae5e0a3aa86e7",
+    "currentCrlfSha256": "d38e9b34595b572128921a2df5bb2f59e4204b127550e7b3b2ba06523969a7e8",
+    "withDocumentedPatchCrlfSha256": "d38e9b34595b572128921a2df5bb2f59e4204b127550e7b3b2ba06523969a7e8",
+    "documentedPatchRequired": false,
+    "measuredSourceMatchesCurrentWithDocumentedPatch": true
+  },
+  {
+    "path": "Engine/RenderEngine/DataSystem.cpp",
+    "currentCommit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+    "currentGitHubBlobSha1": "fd190aef7f7a443a3abc3ebf6d780f1c8a2b7abc",
+    "localBlobSha1": "fd190aef7f7a443a3abc3ebf6d780f1c8a2b7abc",
+    "currentSourceMatchesLocalBlob": true,
+    "measuredSha256": "50acf219fa21b54d73d7f80492aba86f9a95d462f0f84cdda35de0a737f0ec33",
+    "currentLfSha256": "8d700af7d90f122bc0510523b661c9d98fa1328361ef496e513ea8e7b8ed5457",
+    "currentCrlfSha256": "a5937d2ad26303a71efdc65930af01c610ecc1c48dbfda263a4182ecdeb0121e",
+    "withDocumentedPatchCrlfSha256": "50acf219fa21b54d73d7f80492aba86f9a95d462f0f84cdda35de0a737f0ec33",
+    "documentedPatchRequired": true,
+    "measuredSourceMatchesCurrentWithDocumentedPatch": true
+  },
+  {
+    "path": "Engine/RenderEngine/GpuGeometryVisibility.cpp",
+    "currentCommit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+    "currentGitHubBlobSha1": "aebaf092c9aaebb27e82cf1f1744ff8a264b1b97",
+    "localBlobSha1": "aebaf092c9aaebb27e82cf1f1744ff8a264b1b97",
+    "currentSourceMatchesLocalBlob": true,
+    "measuredSha256": "5cdd841584c53817beb80b478012b42edcbf023078a43c2767dc4e46ca8a3b6b",
+    "currentLfSha256": "70c54b69da59e6837039461f574cb5cd55f826d0d534141144ae3251b879facb",
+    "currentCrlfSha256": "5cdd841584c53817beb80b478012b42edcbf023078a43c2767dc4e46ca8a3b6b",
+    "withDocumentedPatchCrlfSha256": "5cdd841584c53817beb80b478012b42edcbf023078a43c2767dc4e46ca8a3b6b",
+    "documentedPatchRequired": false,
+    "measuredSourceMatchesCurrentWithDocumentedPatch": true
+  }
+]

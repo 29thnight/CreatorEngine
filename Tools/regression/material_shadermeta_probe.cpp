@@ -303,8 +303,9 @@ SamplerState lx_sampler_0 : register(s0, space1);
     {
         ShaderMeta meta;
         Check(ShaderMetaLoader::LoadFile(entry.path() / "material.shadermeta", guid, meta, error) &&
-            meta.generatedMaterial && meta.properties.size() == 1 && meta.properties[0].parameterId == 900 &&
-            meta.passes.size() == 8, "Actual METEOR generation has complete Temporal/Depth/surface/blended/shadow stage pairs");
+                  meta.generatedMaterial && meta.properties.size() == 1 && meta.properties[0].parameterId == 900 &&
+                  meta.passes.size() == 10,
+              "Actual METEOR generation has complete surface/Temporal cache alternatives and raster stage pairs");
         ++scenePairs;
     }
     Check(scenePairs == 1, "One verified production pair");
@@ -370,7 +371,9 @@ SamplerState lx_sampler_0 : register(s0, space1);
         "One-backend product round-trips the editor cache format: " + error);
     SceneShaderSet dxilShaders;
     Check(LoadSceneShaders(dxilRestored.product, RHIShaderBinary::Dxil, dxilShaders, error) &&
-        dxilShaders.color.bytecode.Size() > 0, "One-backend product loads for its backend: " + error);
+              dxilShaders.color.bytecode.Size() > 0 && dxilShaders.m_cachedGbuffer.bytecode.Size() > 0 &&
+              dxilShaders.m_cachedTemporal.bytecode.Size() > 0,
+          "One-backend product restores baseline and cached stages for its backend: " + error);
     Check(!LoadSceneShaders(dxilRestored.product, RHIShaderBinary::SpirV, dxilShaders, error),
         "One-backend product refuses the backend it does not carry");
 

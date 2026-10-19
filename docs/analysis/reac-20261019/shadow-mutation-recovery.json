@@ -1,0 +1,232 @@
+{
+  "scope": "CPU execution of exact production Slang helpers with fake resource bindings",
+  "native_gpu_executed": false,
+  "mutation": "drop-recovery",
+  "sanitize": false,
+  "leak_check": false,
+  "sources": {
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang": {
+      "sha256": "1de11f3b50e886ee8fbdb7687eb9d01a9ca8a22202bfe8ebd869efbec735e8a3",
+      "bytes": 54509
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang": {
+      "sha256": "ca6bb7c4eb9fca2e7cdc79b5c4ed8726a2c98cf674a78d8cdfc417bcfb82e079",
+      "bytes": 6571
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang": {
+      "sha256": "c87b63c27348a91b378c1ed0df534dfd587f596b39f6211e0d12ef05039dba11",
+      "bytes": 4403
+    },
+    "Tools/regression/support/ShadowCameraPredictionCpu.slang": {
+      "sha256": "b4d312f7dbd139ec07db863f3ae3d98dda73fc69af91873f397491dd61bf6a07",
+      "bytes": 1709
+    },
+    "Tools/regression/shadow_camera_prediction_cpu_probe.cpp": {
+      "sha256": "f98f17dfa4793ce48e62dec5bcd06087111873b17945124bc74656d4bae26bdf",
+      "bytes": 16232
+    },
+    "Tools/regression/verify-shadow-camera-prediction-cpu.py": {
+      "sha256": "d2026d5528b278a9fad977c6f88e03cbb9f95c8e031fba81a1095b6d69e8c6a4",
+      "bytes": 8796
+    }
+  },
+  "tools": {
+    "slang": {
+      "command": [
+        "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+        "-version"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "2026.14\n"
+    },
+    "slang_sha256": "71b47927833b2cafa68a5d114ced75c017f2195d9b4f339b66150ca974cd7b38",
+    "cxx": {
+      "command": [
+        "g++",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "stderr": ""
+    }
+  },
+  "cases": [
+    {
+      "name": "prediction",
+      "slang": {
+        "command": [
+          "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+          "/tmp/creator-shadow-cpu-mutation-recovery/ShadowCameraPredictionCpu.generated.slang",
+          "-I",
+          "/tmp/creator-shadow-cpu-mutation-recovery/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+          "-entry",
+          "ShadowCameraPredictionCpu",
+          "-stage",
+          "compute",
+          "-target",
+          "cpp",
+          "-matrix-layout-column-major",
+          "-O3",
+          "-fp-mode",
+          "precise",
+          "-warnings-as-errors",
+          "all",
+          "-DGEOMETRY_VISIBILITY_OCCLUSION=1",
+          "-DGEOMETRY_VISIBILITY_CAMERA_PREDICTION=1",
+          "-o",
+          "/tmp/creator-shadow-cpu-mutation-recovery/prediction/shadow_camera_prediction.generated.cpp"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "passed": true,
+      "compile": {
+        "command": [
+          "g++",
+          "-std=c++20",
+          "-O2",
+          "-fno-fast-math",
+          "-ffp-contract=off",
+          "-I",
+          "/tmp/creator-shadow-cpu-mutation-recovery/prediction",
+          "-DSHADOW_PREDICTION_VARIANT=1",
+          "/tmp/creator-shadow-cpu-mutation-recovery/sources/Tools/regression/shadow_camera_prediction_cpu_probe.cpp",
+          "-o",
+          "/tmp/creator-shadow-cpu-mutation-recovery/prediction/shadow_camera_prediction_cpu_probe"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "generated_sha256": "8598c0b6f06c43f96bba89d2064a46685f09ecea6a5d4d71180bc008560b33a7",
+      "run": {
+        "command": [
+          "/tmp/creator-shadow-cpu-mutation-recovery/prediction/shadow_camera_prediction_cpu_probe"
+        ],
+        "exit_code": 0,
+        "stdout": "SHADOW_CAMERA_PREDICTION_CPU_OK variant=1 checks=11133 helperCalls=5086 nativeGpu=false\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "recovery",
+      "slang": {
+        "command": [
+          "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+          "/tmp/creator-shadow-cpu-mutation-recovery/ShadowCameraPredictionCpu.generated.slang",
+          "-I",
+          "/tmp/creator-shadow-cpu-mutation-recovery/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+          "-entry",
+          "ShadowCameraPredictionCpu",
+          "-stage",
+          "compute",
+          "-target",
+          "cpp",
+          "-matrix-layout-column-major",
+          "-O3",
+          "-fp-mode",
+          "precise",
+          "-warnings-as-errors",
+          "all",
+          "-DGEOMETRY_VISIBILITY_OCCLUSION=1",
+          "-DGEOMETRY_VISIBILITY_RECOVERY=1",
+          "-o",
+          "/tmp/creator-shadow-cpu-mutation-recovery/recovery/shadow_camera_prediction.generated.cpp"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "passed": false,
+      "compile": {
+        "command": [
+          "g++",
+          "-std=c++20",
+          "-O2",
+          "-fno-fast-math",
+          "-ffp-contract=off",
+          "-I",
+          "/tmp/creator-shadow-cpu-mutation-recovery/recovery",
+          "-DSHADOW_PREDICTION_VARIANT=2",
+          "/tmp/creator-shadow-cpu-mutation-recovery/sources/Tools/regression/shadow_camera_prediction_cpu_probe.cpp",
+          "-o",
+          "/tmp/creator-shadow-cpu-mutation-recovery/recovery/shadow_camera_prediction_cpu_probe"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "generated_sha256": "fff34818c969cd26394604f3a9c4fdde3ac1d81d65fbdc6266c526ef1fdf4b5c",
+      "run": {
+        "command": [
+          "/tmp/creator-shadow-cpu-mutation-recovery/recovery/shadow_camera_prediction_cpu_probe"
+        ],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "SHADOW_CAMERA_PREDICTION_CPU_FAILED variant=2 reason=First-stage survivors bypass recovery depth and remain in the union\n"
+      }
+    },
+    {
+      "name": "shared",
+      "slang": {
+        "command": [
+          "/tmp/creator-reac-validation/toolchain/slang-2026.14/bin/slangc",
+          "/tmp/creator-shadow-cpu-mutation-recovery/ShadowCameraPredictionCpu.generated.slang",
+          "-I",
+          "/tmp/creator-shadow-cpu-mutation-recovery/sources/Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+          "-entry",
+          "ShadowCameraPredictionCpu",
+          "-stage",
+          "compute",
+          "-target",
+          "cpp",
+          "-matrix-layout-column-major",
+          "-O3",
+          "-fp-mode",
+          "precise",
+          "-warnings-as-errors",
+          "all",
+          "-DGEOMETRY_VISIBILITY_OCCLUSION=1",
+          "-DGEOMETRY_VISIBILITY_SHARED_VIEWS=1",
+          "-o",
+          "/tmp/creator-shadow-cpu-mutation-recovery/shared/shadow_camera_prediction.generated.cpp"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "passed": false,
+      "compile": {
+        "command": [
+          "g++",
+          "-std=c++20",
+          "-O2",
+          "-fno-fast-math",
+          "-ffp-contract=off",
+          "-I",
+          "/tmp/creator-shadow-cpu-mutation-recovery/shared",
+          "-DSHADOW_PREDICTION_VARIANT=3",
+          "/tmp/creator-shadow-cpu-mutation-recovery/sources/Tools/regression/shadow_camera_prediction_cpu_probe.cpp",
+          "-o",
+          "/tmp/creator-shadow-cpu-mutation-recovery/shared/shadow_camera_prediction_cpu_probe"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "generated_sha256": "98992963ba810c9cb7fb7ff6bb294371959122362001e1c1a43b4eb30ceca6c6",
+      "run": {
+        "command": [
+          "/tmp/creator-shadow-cpu-mutation-recovery/shared/shadow_camera_prediction_cpu_probe"
+        ],
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "SHADOW_CAMERA_PREDICTION_CPU_FAILED variant=3 reason=First-stage survivors bypass recovery depth and remain in the union\n"
+      }
+    }
+  ],
+  "changed_sources": [],
+  "passed": false
+}

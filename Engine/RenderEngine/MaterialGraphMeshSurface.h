@@ -75,6 +75,14 @@ class MeshSurfaceInput
     {
         return staticOwner_ ? staticOwner_->Hierarchy() : hierarchy_;
     }
+    const math::vector4& InstanceMinimum() const
+    {
+        return staticOwner_ ? staticOwner_->InstanceMinimum() : m_instanceMinimum;
+    }
+    const math::vector4& InstanceMaximum() const
+    {
+        return staticOwner_ ? staticOwner_->InstanceMaximum() : m_instanceMaximum;
+    }
     uint32_t OriginalIndexCount() const
     {
         return staticOwner_ ? staticOwner_->OriginalIndexCount() : originalIndexCount_;
@@ -85,6 +93,7 @@ class MeshSurfaceInput
     friend class MeshSurfacePlan;
     friend class MeshSurfaceEvaluator;
     MeshSurfaceInput() = default;
+    void SealInstanceBounds();
     static bool SealImpl(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
                          std::uint32_t maxVertices, std::shared_ptr<const MeshSurfaceInput>& result, std::string& error,
                          bool includeHierarchy = false);
@@ -98,6 +107,8 @@ class MeshSurfaceInput
     std::vector<std::uint32_t> indices_;
     experiment::MeshletPayload meshlets_;
     experiment::MeshClusterHierarchy hierarchy_{};
+    // 불변 압축 토폴로지의 경계다. W=0이면 현재 포즈의 조기 컬링을 생략한다.
+    math::vector4 m_instanceMinimum{}, m_instanceMaximum{};
     uint32_t originalIndexCount_{};
     std::vector<std::uint32_t> sourceVertexIds_;
     uint32_t sourcePrimitiveCount_{}, sourceVertexCount_{};

@@ -1,0 +1,24 @@
+{
+  "evidence_snapshot": "final-format-engine",
+  "command": [
+    "/tmp/creator-reac-validation/toolchain/spirv-tools-build/tools/spirv-dis",
+    "/tmp/creator-reac-validation/final-format-engine/PopulatePrimitiveCache.spirv"
+  ],
+  "exit_code": 0,
+  "binary_sha256": "76a663d5a16aea53e421c702b5706870dcb8bc3c0299b92935419e90a6dcf13e",
+  "disassembly_sha256": "d7488778bb25fea2d95f143e51e1c43d8ff584b9955c2ed65714ecdc2085c6b1",
+  "selected_exact_lines": [
+    "OpCapability Int64",
+    "OpCapability StorageImageExtendedFormats",
+    "OpCapability Shader",
+    "OpMemberDecorate %LXPrimitiveCacheVertex_natural 0 Offset 0",
+    "OpMemberDecorate %LXPrimitiveCacheVertex_natural 1 Offset 80",
+    "OpMemberDecorate %LXPrimitiveCacheVertex_natural 2 Offset 96",
+    "OpMemberDecorate %LXPrimitiveCacheTriangle_natural 0 Offset 0",
+    "OpMemberDecorate %LXPrimitiveCacheTriangle_natural 1 Offset 112",
+    "OpMemberDecorate %LXPrimitiveCacheTriangle_natural 2 Offset 224",
+    "OpDecorate %_runtimearr_LXPrimitiveCacheTriangle_natural ArrayStride 336",
+    "%_runtimearr_LXPrimitiveCacheTriangle_natural = OpTypeRuntimeArray %LXPrimitiveCacheTriangle_natural"
+  ],
+  "scope": "Validated SPIR-V layout and emitted capabilities only; no Vulkan device execution"
+}

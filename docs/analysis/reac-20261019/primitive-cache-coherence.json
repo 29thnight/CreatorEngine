@@ -1,0 +1,42 @@
+{
+  "scope": "final primitive cache evidence versus current disk bytes after four whitespace fixes",
+  "coherent": true,
+  "reports": [
+    {
+      "file": "/tmp/creator-reac-validation/primitive-cache-normal-final.json",
+      "sha256": "70c105521be51add2bb7b314c803f9009aa7249f3c959477c9e3545d4ba58b4b",
+      "sources_checked": 26,
+      "mismatches": [],
+      "exit_code": 0,
+      "shader_cpu_exit_code": 0
+    },
+    {
+      "file": "/tmp/creator-reac-validation/primitive-cache-asan-final.json",
+      "sha256": "0cd813f4a41ab1c6e97ef1f2d2a1c6319b12fb4bd654035a8007ac8764720b2d",
+      "sources_checked": 26,
+      "mismatches": [],
+      "exit_code": 0,
+      "shader_cpu_exit_code": 0
+    },
+    {
+      "file": "/tmp/creator-reac-validation/primitive-native-authored.json",
+      "sha256": "ba9c16a0f8267ef70cc6db98a411db1e91b9ccc1cd461b168a94ca84c6419b65",
+      "sources_checked": 7,
+      "mismatches": [],
+      "exit_code": null,
+      "shader_cpu_exit_code": null
+    }
+  ],
+  "format_review": {
+    "tool": "clang-format 19.1.5 with repository Language: Cpp configuration",
+    "manual_fixes": "Three newly written lines exceeding 120 columns were wrapped; one changed interpolation expression received operator spacing.",
+    "retained_style": "Remaining attribute-placement differences intentionally preserve existing Slang conventions: standalone shader/numthreads/loop/unroll attributes and separate-line shader wrappers. The Cpp parser also indents a following global shader entry incorrectly; this output was not applied.",
+    "precedent": "GeometryOcclusionBuild.slang has shader/numthreads attributes on separate lines; MaterialGraphSceneHost.slang already uses standalone shader attributes.",
+    "reviewed_source_sha256": {
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+      "Tools/regression/reac_primitive_cache_probe.slang": "098dc4fdcd314666f078f5a6a714fe2c2d4b50a2e0437132d34f8c55c16dfb4c"
+    }
+  }
+}

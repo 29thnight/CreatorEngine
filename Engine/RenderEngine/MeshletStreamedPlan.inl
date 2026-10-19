@@ -40,6 +40,7 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
         if (!Affine(draw.bonePalette[bone])) return Fail(error, "Thin geometry has a nonfinite/nonaffine bone matrix.");
         source->bones_.push_back(PackedBoneMatrix::From(draw.bonePalette[bone]));
     }
+    source->SealInstanceBounds();
     candidate->source_ = source; candidate->chunkLimit_ = budget.maxChunkPoints;
     auto& cost = candidate->cost_; cost.sourceVertices = metadata->vertexCount; cost.triangles = static_cast<uint32_t>(triangles);
     cost.points = points; cost.sourceReferenceCountsKnown = false; // Exact unique source IDs stay in deferred pages.
@@ -67,6 +68,7 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
             chunk->hierarchy_.groups.capacity() * sizeof(experiment::MeshClusterGroup) + chunk->bones_.capacity() * sizeof(PackedBoneMatrix);
         cost.gpuPayloadBytes += sizeof(RHIMeshletBufferHeader) + chunk->meshlets_.descriptors.size() * (sizeof(experiment::MeshletDescriptor) + 8ull) +
             chunk->hierarchy_.GpuBytes() + chunk->hierarchy_.groupCount * 4ull + chunk->Count() * 8ull + 256 + chunk->bones_.size() * sizeof(PackedBoneMatrix);
+        chunk->SealInstanceBounds();
         MeshSurfaceChunk item; item.input = chunk; item.firstTriangle = firstTriangle; candidate->chunks_.push_back(std::move(item));
     };
     start();

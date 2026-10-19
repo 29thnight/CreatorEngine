@@ -15,6 +15,7 @@
 #include "MaterialPropertyPacker.h"
 #include "Material.h" // MBC9: Model.h 전이 include가 사라져 직접 든다
 #include "MaterialGraphSceneCompiler.h"
+#include "MaterialGraphShaderMeta.h"
 #include "Mesh.h"
 #include "Texture.h"
 #include "FontAsset.h"

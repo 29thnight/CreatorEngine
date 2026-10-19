@@ -1,6 +1,7 @@
 void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
-    ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-    const own::shared_owner<const Texture>& image, bool transmitting = false)
+                        ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
+                        const own::shared_owner<const Texture>& image, bool transmitting = false,
+                        bool primitiveCache = false)
 {
     const auto product = transmitting ? RefractionProduct(root, false) : ShadowDecalProduct(root, false);
     GenerationStore store;
@@ -58,7 +59,9 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(host.PrepareResidency(context, input, error), "Temporal residency " + error);
             auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers) { pool.BeginFrame(unsigned(context.frameId)); Check(graph->PrepareParallel(pool, error), "Temporal parallel prepare"); }
-            Check(host.Prepare(context, input, {}, {}, {}, {}, {}, error, 0), "Temporal prepare " + error);
+            Check(host.Prepare(context, input, {}, {}, {}, {}, SceneHostBudget{.m_primitiveCache = primitiveCache},
+                               error, 0),
+                  "Temporal prepare " + error);
             const auto meteorGeometry = host.DeclareGeometry(*graph);
             const auto first=host.DeclareFirstCull(*graph,meteorGeometry);
             const auto occluder=host.DeclareOccluder(*graph,meteorGeometry,first);
@@ -95,6 +98,10 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             visibilityBindings.Verify();
             EnhancedRenderGraph::DiagnosticSnapshot snapshot;
             Check(graph->CaptureDiagnosticSnapshot(snapshot),"Temporal packet snapshot");
+            if (primitiveCache)
+            {
+                check_primitive_cache_wiring(snapshot, "METEOR.Scene.Temporal.Resolve");
+            }
             const auto countPass=[&](const char* name){return std::ranges::count(snapshot.passes,std::string(name),&EnhancedRenderGraph::DiagnosticPass::name);};
             Check(countPass("METEOR.Scene.Temporal.Resolve")==unsigned(!transmitting),"Opaque Temporal reads final material packets");
             Check(countPass("METEOR.Scene.Commands.Temporal.Layers.Raster")==unsigned(transmitting||step==2),"Only ordered layers replay");

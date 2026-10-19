@@ -65,14 +65,16 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
         !GpuGeometryVisibility::MeshletQueueStorageWords(UINT64_MAX, 1, 1, checkedWords) &&
         !GpuGeometryVisibility::MeshletQueueStorageWords(1, 1, 4097, checkedWords),
         "Overflow and bin-capacity checks precede queue allocation");
-    unsigned queueCases{};
-    for (const unsigned route : {0u, 1u, 2u, 3u, 4u, 5u, 6u})
+    unsigned queueCases{}, instanceCases{};
+    for (const unsigned route : {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u})
     {
         for (const uint32_t fixtureBins : {0u, 1u, 2u, 3u, 4u, 5u, 6u, 4096u})
         {
             const uint32_t binCount = (std::max)(1u, fixtureBins);
             const bool dynamic = route != 0;
-            const bool ordered = route >= 3;
+            const bool instanceAdmission = route >= 7;
+            const bool stress = route == 5 || route == 6;
+            const bool ordered = route >= 3 && !instanceAdmission;
             Check(device.BeginFrame(error), "Batch meshlet begin");
             const auto upload = [&](const void* data, size_t bytes) {
                 const auto slice = device.AllocateUpload({bytes, RHIUploadUsage::Raw, 256});
@@ -82,7 +84,7 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             std::vector<GpuGeometryVisibility::Candidate> ranges;
             std::vector<GpuGeometryVisibility::Bin> bins;
             std::vector<RHIBindingDesc> vertices, topologies;
-            uint32_t groupCount = 0, outputCount = 0, meshletJobs = 0;
+            uint32_t groupCount = 0, outputCount = 0, meshletJobs = 0, scheduledJobs = 0;
             // Raw topology slices deliberately start at nonzero upload offsets.
             // Each descriptor owns one vertex; even meshlet IDs see vertex 0.
             // Variants: half visible, all visible, all culled.
@@ -93,7 +95,7 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 const uint32_t boundary = fixtureBins == 4 ? 512u : fixtureBins == 5 ? 1024u : 256u;
                 counts = {boundary - 1u, boundary, boundary + 1u};
             }
-            if (route >= 5 && fixtureBins == 4096)
+            if ((stress || instanceAdmission) && fixtureBins == 4096)
             {
                 counts = {1u, 2u, 3u}; // Maximum descriptor count with serial one-slot backpressure.
             }
@@ -135,11 +137,20 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 const auto variant = bin % 3;
                 const auto count = counts[variant];
                 outputCount = (outputCount + 63) / 64 * 64;
-                ranges.push_back({{}, bin, groupCount, outputCount, 8u | (ordered ? GpuGeometryVisibility::kOrderedMeshlets : 0u)});
-                bins.push_back({count, outputCount, 0, 0});
+                const auto instanceFlags =
+                    instanceAdmission ? GpuGeometryVisibility::kGroupSelection | GpuGeometryVisibility::kInstanceBounds
+                                      : 0u;
+                ranges.push_back({{32, 32, float(bin), 1},
+                                  bin,
+                                  groupCount,
+                                  outputCount,
+                                  8u | instanceFlags | (ordered ? GpuGeometryVisibility::kOrderedMeshlets : 0u)});
+                bins.push_back({count, outputCount, instanceAdmission ? 1 : 0, 0});
                 groupCount += (count + 63) / 64;
                 meshletJobs += count;
-                outputCount += count * 2 + 1;
+                scheduledJobs += !instanceAdmission || variant != 2 ? count : 0u;
+                outputCount +=
+                    count * 2 + 1 + (instanceAdmission ? 2u + GpuGeometryVisibility::kInstanceBoundsWords : 0u);
                 vertices.push_back(RHIBindingDesc::SrvBuffer(pointBuffers[variant], 10, MeshSurfaceBatch::GeometryViewStride));
                 const auto t = topology[variant];
                 topologies.push_back(RHIBindingDesc::SrvBuffer(t.buffer, static_cast<uint32_t>(t.size / 4), 0,
@@ -166,8 +177,18 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             const auto vertexTable = device.CreateBindings(vertices), topologyTable = device.CreateBindings(topologies);
             // World-space fixture streams: identity object-to-world per bin.
             std::vector<math::vector4> worlds;
+            worlds.reserve(binCount * (instanceAdmission ? GpuGeometryVisibility::kMeshletInstanceRows : 3u));
             for (uint32_t bin = 0; bin < binCount; ++bin)
+            {
                 worlds.insert(worlds.end(), {math::vector4(1, 0, 0, 0), math::vector4(0, 1, 0, 0), math::vector4(0, 0, 1, 0)});
+                if (instanceAdmission)
+                {
+                    // 호환 정점 fixture의 첫 uvLod word는 0이므로 본은 없다.
+                    // bin 2는 모든 메시렛이 frustum 밖이며 큐에 들어가기 전에 제거된다.
+                    worlds.emplace_back(bin % 3 == 2 ? 3.f : 0.f, 0, .5f, 1);
+                    worlds.emplace_back(bin % 3 == 1 ? 0.f : 3.f, 0, .5f, 1);
+                }
+            }
             const auto worldUpload = upload(worlds.data(), worlds.size() * sizeof(math::vector4));
             Check(uniform.IsValid() && outputTable.IsValid() && vertexTable.IsValid() && topologyTable.IsValid(),
                 "Batch tables stay in the active recording");
@@ -175,9 +196,10 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 {args, RHIResourceState::Common, RHIResourceState::UnorderedAccess}};
             encoder.ResourceBarriers({{}, before});
             for (unsigned stage = 0; stage < kernels.size(); ++stage) {
-                const auto generation = stage == 0 && route >= 5 ? stressCull[2].GetGeneration()
-                    : stage == 1 && route >= 5 ? stressCull[route - 5].GetGeneration()
-                    : stage == 1 && route == 4 ? partialCull.GetGeneration() : kernels[stage].GetGeneration();
+                const auto generation = stage == 0 && stress   ? stressCull[2].GetGeneration()
+                                        : stage == 1 && stress ? stressCull[route - 5].GetGeneration()
+                                        : stage == 1 && (route == 4 || route == 8) ? partialCull.GetGeneration()
+                                                                                   : kernels[stage].GetGeneration();
                 encoder.SetPipeline(RHIBindPoint::Compute, generation->GetHandle());
                 encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform);
                 encoder.SetRootBuffer(RHIBindPoint::Compute, 1, rangeUpload);
@@ -186,9 +208,15 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 encoder.SetBindings(RHIBindPoint::Compute, 4, vertexTable);
                 encoder.SetBindings(RHIBindPoint::Compute, 5, topologyTable);
                 encoder.SetRootBuffer(RHIBindPoint::Compute, 6, worldUpload);
-                const auto groups = stage == 1
-                    ? dynamic ? (std::max)(1u, (std::min)(binCount * GpuGeometryVisibility::kInitialSubdivisions, (route == 1 || route == 5) ? 1u : GpuGeometryVisibility::kPersistentConsumerGroups)) : groupCount
-                    : (binCount + 63) / 64;
+                const auto groups =
+                    stage == 1
+                        ? dynamic ? (std::max)(1u, (std::min)(binCount * GpuGeometryVisibility::kInitialSubdivisions,
+                                                              (route == 1 || route == 5)
+                                                                  ? 1u
+                                                                  : GpuGeometryVisibility::kPersistentConsumerGroups))
+                                  : groupCount
+                    : stage == 0 && instanceAdmission ? binCount
+                                                      : (binCount + 63) / 64;
                 if (!groups)
                 {
                     continue;
@@ -210,17 +238,17 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
             if (dynamic)
             {
                 const auto* queue = reinterpret_cast<const uint32_t*>(idImage.data.data()) + outputCount;
-                Check(queue[0] == meshletJobs && queue[1] == meshletJobs && queue[2] == 0,
-                    "Queue consumed exactly its capacity without invalid records");
-                Check(meshletJobs ? queue[3] > 0 : queue[3] == 0, "Empty/nonempty wave termination");
+                Check(queue[0] == scheduledJobs && queue[1] == scheduledJobs && queue[2] == 0,
+                      "Queue consumed exactly its capacity without invalid records");
+                Check(scheduledJobs ? queue[3] > 0 : queue[3] == 0, "Empty/nonempty wave termination");
                 Check(queue[12] == 0 && queue[13] == 0 && queue[14] == 0, "JOB_COUNT and activity leases are quiescent");
-                const auto slots = route >= 5 ? 1u : GpuGeometryVisibility::kWorkRingSlots;
+                const auto slots = stress ? 1u : GpuGeometryVisibility::kWorkRingSlots;
                 Check(queue[6] == binCount * 16u && queue[9] == slots, "Ring source exhausted and capacity sealed");
                 for (uint32_t slot = 0; slot < slots; ++slot)
                 {
                     Check(queue[GpuGeometryVisibility::kWorkRingHeaderWords + slot] == 0, "Ring drained every reusable slot");
                 }
-                if (route >= 5 && meshletJobs > 0)
+                if (stress && meshletJobs > 0)
                 {
                     Check(queue[8] >= 4, "Stress ring retried empty gathers before publication");
                     if (meshletJobs > 1)
@@ -232,7 +260,7 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 Check(width > 0 && width <= 64, "Active wave width was recorded");
                 Check(queue[5] == queue[0] + queue[7] && queue[4] == queue[1] + queue[8] && queue[4] % width == 0,
                     "Lane reservation accounting matches published/failed and gathered/empty jobs");
-                uint32_t nonempty = 0;
+                uint32_t nonempty = 0, rejected = 0, binIndex = 0;
                 for (const auto& bin : bins)
                 {
                     // Count nonempty subdivisions independently by assigning
@@ -246,10 +274,21 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                         Check(subdivision < 16u, "Initial subdivision index is valid");
                         used[subdivision] = true;
                     }
-                    nonempty += static_cast<uint32_t>(std::count(used.begin(), used.end(), true));
+                    const auto partitions = static_cast<uint32_t>(std::count(used.begin(), used.end(), true));
+                    nonempty += partitions;
+                    rejected += instanceAdmission && binIndex % 3 == 2 ? partitions : 0u;
+                    ++binIndex;
                 }
                 Check(queue[10] == nonempty, "GPU sixteen-way subdivision matches the independent CPU partition oracle");
-                ++queueCases;
+                Check(queue[15] == rejected, "Instance admission reports exactly the rejected source partitions");
+                if (instanceAdmission)
+                {
+                    ++instanceCases;
+                }
+                else
+                {
+                    ++queueCases;
+                }
             }
             for (uint32_t bin = 0; bin < binCount; ++bin) {
                 const auto capacity = bins[bin].indexCount;
@@ -282,6 +321,9 @@ void RunMeshletBatchDispatch(RecordingChangeDevice& device, ProbeRoots& roots, P
                 << " route=" << route << " cullDispatches=1 validation=0\n";
         }
     }
+    Check(instanceCases == 16, "Instance admission covers empty, tail, skewed, partial-wave and maximum-bin queues");
+    std::cout << "METEOR_INSTANCE_ADMISSION_OK cases=" << instanceCases
+              << " partialWaveCases=8 boundsWords=8 legacyParity=1 validation=0\n";
     Check(queueCases == 48, "Six ring routes cover empty, tail, skewed and maximum-bin queues");
     std::cout << "METEOR_QUEUE_COUNT_OK cases=" << queueCases
         << " referenceCases=8 orderedCases=32 partialWaveCases=16 oneSlotCases=16 subdivisions=16 ignoredTotalHintCases=8 budgetBoundaries=3 validation=0\n";

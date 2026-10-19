@@ -1,0 +1,12 @@
+{
+  "tools": {
+    "tag": "v2026.4",
+    "archive": "spirv-tools-v2026.4.tar.gz",
+    "sha256": "92df4c377603f086c3d2a1eb2bd9b8f883a73ca890fb939d78a0cecdcc01686c"
+  },
+  "headers": {
+    "commit": "496543121ce6419f23d6fa5d7194ba66c36212d2",
+    "url": "https://codeload.github.com/KhronosGroup/SPIRV-Headers/tar.gz/496543121ce6419f23d6fa5d7194ba66c36212d2",
+    "sha256": "a9bb9c48713245eacf97cc539b6f1d45405a92d8813f8b82e635f0a085ee9898"
+  }
+}

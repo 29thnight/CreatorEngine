@@ -37,6 +37,8 @@ std::uint64_t MeshletOutputWords(const GpuGeometryVisibility::Candidate& candida
     const auto groupWords = (candidate.flags & GpuGeometryVisibility::kReuseBinGroups) ? 0u :
         GroupMaskWords(groups) * 2u + ((candidate.flags & 32u) ? FeedbackWords(groups) : 0u);
     return std::uint64_t(bin.indexCount) * 2u + 1u + groupWords +
+           ((candidate.flags & GpuGeometryVisibility::kInstanceBounds) ? GpuGeometryVisibility::kInstanceBoundsWords
+                                                                       : 0u) +
            ((candidate.flags & GpuGeometryVisibility::kOrderedMeshlets) ? (bin.indexCount + 63u) / 64u : 0u);
 }
 
@@ -601,7 +603,8 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
     std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
     std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage, bool ordered,
-    float maxPixelError, uint32_t lodWidth, uint32_t lodHeight)
+    float maxPixelError, uint32_t lodWidth, uint32_t lodHeight,
+    const GpuGeometryOcclusion::ViewKey* cameraPredictionView)
 {
     ce::profile_scope profile{ce::marker<"GeometryVisibilityPrepare">()};
     std::uint64_t offset{}, groups{};
@@ -610,6 +613,21 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         return VisibilityFail(error, "METEOR meshlet work exceeds 4096 bins; no per-bin dispatch route.");
     if (!context.resources)
         return VisibilityFail(error, "Meshlet work requires its current device.");
+    if (cameraPredictionView)
+    {
+        const auto lightView = GpuGeometryOcclusion::CaptureView(context, projection);
+        const auto& camera = *cameraPredictionView;
+        if (ordered || history || firstStage || camera.device != lightView.device ||
+            camera.recording != lightView.recording || camera.descriptors != lightView.descriptors ||
+            camera.frameId != lightView.frameId || camera.sceneEpoch != lightView.sceneEpoch || !camera.width ||
+            !camera.height || !GpuGeometryOcclusion::LevelCount(camera.width, camera.height) ||
+            !std::ranges::all_of(camera.projectionBits,
+                                 [](auto bits) { return std::isfinite(std::bit_cast<float>(bits)); }))
+        {
+            return VisibilityFail(error, "Shadow prediction requires the same recording's sealed current camera view "
+                                         "and an independent first stage.");
+        }
+    }
     if (geometries.empty())
     {
         if (history && firstStage)
@@ -621,7 +639,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             return VisibilityFail(error, "Ordered meshlet lists are single-stage.");
         }
         return PrepareInternal(context, projection, {}, {}, result, error,
-                               currentFrameOcclusion || bool(history) || bool(firstStage));
+                               currentFrameOcclusion || bool(history) || bool(firstStage) || cameraPredictionView);
     }
     // This same storage becomes the frame's sealed declaration input. Keep its
     // local owner through history/recovery validation after PrepareInternal.
@@ -681,7 +699,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
                               bin,
                               static_cast<uint32_t>(groups),
                               static_cast<uint32_t>(offset),
-                              8u | kGroupSelection | (ordered ? kOrderedMeshlets : 0u) |
+                              8u | kGroupSelection | kInstanceBounds | (ordered ? kOrderedMeshlets : 0u) |
                                   (groupOwner != bin ? kReuseBinGroups : 0u) |
                                   (geometry->UsesDirectClusters() ? 32u : 0u)});
         bins.push_back({count, static_cast<uint32_t>(offset), static_cast<std::int32_t>(groupCount),
@@ -697,7 +715,8 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     if (ordered && (history || firstStage))
         return VisibilityFail(error, "Ordered meshlet lists are single-stage.");
     if (!PrepareInternal(context, projection, candidates, bins, result, error,
-                         currentFrameOcclusion || bool(history) || bool(firstStage), geometries, preparedInputs))
+                         currentFrameOcclusion || bool(history) || bool(firstStage) || cameraPredictionView, geometries,
+                         preparedInputs))
     {
         return false;
     }
@@ -705,6 +724,19 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         return true;
     auto frame = std::const_pointer_cast<Frame>(result);
     frame->m_ordered = ordered;
+    if (cameraPredictionView)
+    {
+        // 광원의 frustum/LOD 신원은 유지한다. 깊이의 해상도와 투영만 현재
+        // 카메라 입력에서 가져오며, recovery는 원래 광원 HZB를 사용한다.
+        frame->m_cameraPredictionView = *cameraPredictionView;
+        frame->m_width = cameraPredictionView->width;
+        frame->m_height = cameraPredictionView->height;
+        frame->m_occlusionLevelCount = GpuGeometryOcclusion::LevelCount(frame->m_width, frame->m_height);
+        preparedInputs->constants.width = frame->m_width;
+        preparedInputs->constants.height = frame->m_height;
+        preparedInputs->constants.occlusionLevels = frame->m_occlusionLevelCount;
+        frame->m_occlusionCull = m_meshletCameraPredictionCull.GetGeneration();
+    }
     if (history)
     {
         history->RequireView(frame->m_occlusionView);
@@ -751,8 +783,10 @@ bool GpuGeometryVisibility::PrepareMeshlets(
 bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContext& context, std::string& error)
 {
     if (m_meshletOcclusionCull.GetGeneration() && m_meshletHistoryCull.GetGeneration() &&
-        m_meshletRecoveryCull.GetGeneration())
+        m_meshletRecoveryCull.GetGeneration() && m_meshletCameraPredictionCull.GetGeneration())
+    {
         return true;
+    }
     const auto compile = [&](LX::Runtime::ComputePipeline& pipeline, const char* stage) {
         std::vector<RHIPipelineLayoutParam> parameters{
             RHILayout::Cbv(0),
@@ -764,8 +798,10 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
             RHILayout::Srv(kMeshletWorldRegister),
             RHILayout::SrvTable(kOcclusionLevels, 2)};
         if (stage)
-            parameters.push_back(std::string_view(stage) == "GEOMETRY_VISIBILITY_HISTORY" ? RHILayout::Cbv(1)
-                                                                                          : RHILayout::Srv(8210));
+        {
+            parameters.push_back(std::string_view(stage) == "GEOMETRY_VISIBILITY_RECOVERY" ? RHILayout::Srv(8210)
+                                                                                           : RHILayout::Cbv(1));
+        }
         const auto layout = context.rootSignatures->GetOrCreate({parameters, {}}, error);
         if (!layout.IsValid())
             return false;
@@ -786,7 +822,8 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
         return pipeline.Create(*context.psoManager, desc, std::move(shader.description), error);
     };
     return compile(m_meshletOcclusionCull, nullptr) && compile(m_meshletHistoryCull, "GEOMETRY_VISIBILITY_HISTORY") &&
-           compile(m_meshletRecoveryCull, "GEOMETRY_VISIBILITY_RECOVERY");
+           compile(m_meshletRecoveryCull, "GEOMETRY_VISIBILITY_RECOVERY") &&
+           compile(m_meshletCameraPredictionCull, "GEOMETRY_VISIBILITY_CAMERA_PREDICTION");
 }
 
 bool GpuGeometryVisibility::InitializeOcclusion(const EnhancedFrameContext& context, std::string& error)
@@ -1318,7 +1355,7 @@ void GpuGeometryVisibility::Frame::DeclareOcclusionBatch(
     for (std::size_t index = 0; index < frames.size(); ++index)
     {
         const auto& frame = frames[index];
-        if (!frame || !pyramids[index] || frame->m_graph || !frame->m_occlusionCull ||
+        if (!frame || !pyramids[index] || frame->m_graph || frame->m_cameraPredictionView || !frame->m_occlusionCull ||
             pyramids[index]->LevelCount() != frame->m_occlusionLevelCount)
         {
             throw std::runtime_error("Shared occlusion requires undeclared compatible views.");
@@ -1330,12 +1367,46 @@ void GpuGeometryVisibility::Frame::DeclareOcclusionBatch(
     DeclareMeshletBatch(graph, frames, passPrefix);
 }
 
+void GpuGeometryVisibility::Frame::DeclareCameraPredictionBatch(
+    EnhancedRenderGraph& graph, std::span<const std::shared_ptr<const Frame>> frames,
+    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid, const char* passPrefix)
+{
+    if (!pyramid || !passPrefix)
+    {
+        throw std::runtime_error("Shadow camera prediction requires its declared current-depth pyramid.");
+    }
+    for (const auto& frame : frames)
+    {
+        if (!frame || !frame->m_cameraPredictionView || frame->m_firstStage || frame->m_historyPyramid ||
+            !frame->m_occlusionCull || pyramid->LevelCount() != frame->m_occlusionLevelCount)
+        {
+            throw std::runtime_error("Shadow camera prediction requires a sealed independent first stage.");
+        }
+        frame->CheckCurrent();
+        pyramid->RequireCurrentView(*frame->m_cameraPredictionView);
+        if (frame->m_graph)
+        {
+            frame->CheckCurrent(&graph);
+            if (frame->m_pyramid != pyramid)
+            {
+                throw std::runtime_error("Shadow camera prediction cannot change its declared depth producer.");
+            }
+        }
+    }
+    for (const auto& frame : frames)
+    {
+        frame->m_pyramid = pyramid;
+    }
+    DeclareMeshletBatch(graph, frames, passPrefix);
+}
+
 void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& graph,
                                                         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid,
                                                         const char* passPrefix) const
 {
     CheckCurrent();
-    if (m_graph || !m_occlusionCull || !pyramid || pyramid->LevelCount() != m_occlusionLevelCount ||
+    if (m_graph || m_cameraPredictionView || !m_occlusionCull || !pyramid ||
+        pyramid->LevelCount() != m_occlusionLevelCount ||
         graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
     {
         throw std::runtime_error("GPU visibility requires an undeclared occlusion-capable frame and matching pyramid.");
@@ -1480,6 +1551,12 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         {
             const auto topology = geometry->GraphMeshlets(graph);
             resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
+            if (geometry->UsesDirectClusters() && geometry->IsObjectSpace() &&
+                geometry->Input()->InstanceMinimum().w != 0.0f)
+            {
+                resetUses.push_back(
+                    {geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            }
             cullUses.push_back({geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
             cullUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
         }
@@ -1839,6 +1916,7 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
     m_meshletOcclusionCull = {};
     m_meshletHistoryCull = {};
     m_meshletRecoveryCull = {};
+    m_meshletCameraPredictionCull = {};
     m_reset = {};
     m_cull = {};
     m_occlusionCull = {};

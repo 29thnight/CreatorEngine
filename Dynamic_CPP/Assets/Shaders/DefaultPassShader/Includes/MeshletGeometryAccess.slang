@@ -114,6 +114,45 @@ LXSurfacePoint MeteorGeometryPoint(StructuredBuffer<float4> pose, ByteAddressBuf
     point.normal=float4(n,0);point.tangent=float4(t,0);point.bitangent=float4(b,0);
     return point;
 }
+float3 MeteorGeometryPosition(StructuredBuffer<float4> pose, ByteAddressBuffer topology, uint vertex)
+{
+    if (topology.Load(0u) < 5u || topology.Load(80u) == 0u)
+    {
+        return pose[vertex * 5u + 1u].xyz;
+    }
+    const uint2 map = topology.Load2(topology.Load(80u) + vertex * 8u);
+    if (map.x == 0u)
+    {
+        return float3(0.0f);
+    }
+    float3 position = MeteorCluster3(topology, map.x, map.y, 0u);
+    const uint boneCount = MeteorPoseWord(pose, 0u);
+    if (boneCount != 0u)
+    {
+        const uint mask = topology.Load(map.x + 8u);
+        const uint indicesOffset = 48u + ((mask & 8u) != 0u ? 8u : 0u) + ((mask & 32u) != 0u ? 16u : 0u);
+        float4 weights = MeteorCluster4(topology, map.x, map.y, indicesOffset + 4u);
+        const uint packed = MeteorClusterWord(topology, map.x, map.y, indicesOffset);
+        const uint4 indices = (packed >> uint4(0u, 8u, 16u, 24u)) & 255u;
+        const float sum = dot(weights, float4(1, 1, 1, 1));
+        if (sum > 0.0f)
+        {
+            // 위치의 수치 결과를 유지하도록 기존 surface 경로와 같은 순서로
+            // 가중치 정규화와 행렬 혼합을 수행한다.
+            weights /= sum;
+            float4x4 skin = (float4x4)0;
+            for (uint influence = 0u; influence < 4u; ++influence)
+            {
+                if (weights[influence] > 0.0f && indices[influence] < boneCount)
+                {
+                    skin += weights[influence] * MeteorBone(pose, indices[influence]);
+                }
+            }
+            position = mul(float4(position, 1), skin).xyz;
+        }
+    }
+    return position;
+}
 bool MeteorClusterResident(ByteAddressBuffer topology, uint meshlet)
 {
     return topology.Load(0u)<5u || topology.Load(84u)==0u || topology.Load(topology.Load(84u)+meshlet*4u)!=0u;

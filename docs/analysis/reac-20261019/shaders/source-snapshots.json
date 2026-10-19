@@ -1,0 +1,1580 @@
+{
+  "base_ref": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+  "snapshot_identity": {
+    "matrix-engine": {
+      "original_report": "/tmp/creator-reac-validation/matrix-engine/report.json",
+      "original_report_sha256": "8d2825012768db39f30dbfbc011ff1c8440903ea886ff50794b74f3a233c3b39",
+      "original_sources_sha256": "d93e11880335350d099b6bcbf953463c655f5b5867de8024db322fbf635a935d",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang": {
+          "sha256": "ca6bb7c4eb9fca2e7cdc79b5c4ed8726a2c98cf674a78d8cdfc417bcfb82e079",
+          "bytes": 6571
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusionBuild.slang": {
+          "sha256": "a41bb0c5f1412fc5ddc8bd5fdd713cd76675a32fbf3cbcc6ff052d463a3f7b4b",
+          "bytes": 1390
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang": {
+          "sha256": "1de11f3b50e886ee8fbdb7687eb9d01a9ca8a22202bfe8ebd869efbec735e8a3",
+          "bytes": 54509
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Brdf.slang": {
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d",
+          "bytes": 2967
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang": {
+          "sha256": "674b022bce17b08a5e3cd6cad037fddb585dc7aab03d51d1b808f4a4c7e8bfa0",
+          "bytes": 16494
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang": {
+          "sha256": "c87b63c27348a91b378c1ed0df534dfd587f596b39f6211e0d12ef05039dba11",
+          "bytes": 4403
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": {
+          "sha256": "0ce2715d561351f5f44dd2f9b2114c65311c31ce33c407cc60d71b1ebaa5c3ff",
+          "bytes": 54480
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang": {
+          "sha256": "2bc88a8d3c2798fa634fd762232558ea891f41813f5b45ae0a89142c9fdb0631",
+          "bytes": 7206
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang": {
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009",
+          "bytes": 2766
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang": {
+          "sha256": "6bd1dd4a5387eddb4f45c33d61b0aa173d7bfc64abdb08b258d26e709228f79b",
+          "bytes": 999
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+          "bytes": 2463
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang": {
+          "sha256": "4362bae32a4cdbafe2b1637f1afb00eaf583a197d27df363bf0b36754dfd38fc",
+          "bytes": 7473
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang": {
+          "sha256": "c81e6357eb749bf57b1a36dac50ac1bfb05fbef51d6cf1f859cd1a589eff484a",
+          "bytes": 868
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang": {
+          "sha256": "7380217a3837b045c79e2f9b2670568fe3405c8f70a424639a6198199ea8a08d",
+          "bytes": 9883
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+          "sha256": "c82dea5beca9cf443d5953ae57417074732d43d6d437938ce84a9b259ce642a9",
+          "bytes": 64383
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang": {
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346",
+          "bytes": 139
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang": {
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829",
+          "bytes": 237
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang": {
+          "sha256": "22494829556ff9c728d53ad6a82c9781e6640fd9a11106630c3087bc44e6bb7a",
+          "bytes": 6091
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang": {
+          "sha256": "b5bfb0cff592f40c7f65c8ac3f6ca93f1a7fc8320cad61267bd2ad66ef934e60",
+          "bytes": 7919
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang": {
+          "sha256": "12f1a5e84a00d817f3ed07946d7f705051f7c56a381d06391b54396f84e937c9",
+          "bytes": 106
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang": {
+          "sha256": "4c55209ec25df8d0551a1944dd06bfb95f86446cd021cb487634aa669c1340cc",
+          "bytes": 1414
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang": {
+          "sha256": "9fbe8fb66de43dd9bf37a75c59900f09886a64386d1f389e30567c1360348d17",
+          "bytes": 1558
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang": {
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612",
+          "bytes": 917
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang": {
+          "sha256": "ba79d88d81c7842f66c0526e89a09dc49a3a9c687b748ee1499437628cc58805",
+          "bytes": 4257
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang": {
+          "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb",
+          "bytes": 8303
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang": {
+          "sha256": "eec9dea7962cd372698077987e832858b6bf4f55db27d65bf20dcc852d3a76da",
+          "bytes": 10399
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang": {
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e",
+          "bytes": 5735
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang": {
+          "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033",
+          "bytes": 20450
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang": {
+          "sha256": "cd245ddc0ad0704a8d8f08419d7790ce4f84ade078487d3bfa7ba832705c134e",
+          "bytes": 4218
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang": {
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac",
+          "bytes": 3453
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang": {
+          "sha256": "d5b956609faddece2354ac0920000a002212b4475c1e03a6b779b5f5f8fc4c56",
+          "bytes": 6990
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang": {
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1",
+          "bytes": 66387
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang": {
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a",
+          "bytes": 3024
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Radiance.slang": {
+          "sha256": "07bb4df33b912a0c7c7836f7166820fd702e6a48af78a712f1ba9e4770ba0d81",
+          "bytes": 2685
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang": {
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2",
+          "bytes": 41135
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang": {
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc",
+          "bytes": 13594
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang": {
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1",
+          "bytes": 491
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "6ad260c9e7beb8e771f09f151dd84810de9decef719b82e0e56572afef8bb1e1",
+          "bytes": 5182
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/fixtures/material-codegen/constant.slang": {
+          "sha256": "a56a29dd7ddda114d20415095cf2c096242de76bd9d360e69c45e0349805a9e1",
+          "bytes": 2334
+        },
+        "Tools/regression/reac_material_host_probe.slang": {
+          "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95",
+          "bytes": 650
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "6670fae2c5b44b20bafec4132dcca5a043fe7ebc7aad436371a19fa35fda79d5",
+          "bytes": 19374
+        }
+      },
+      "differences_from_final_worktree": [
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+          "snapshot": {
+            "sha256": "c82dea5beca9cf443d5953ae57417074732d43d6d437938ce84a9b259ce642a9",
+            "bytes": 64383
+          },
+          "current": {
+            "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+            "bytes": 64432
+          }
+        },
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang",
+          "snapshot": {
+            "sha256": "6ad260c9e7beb8e771f09f151dd84810de9decef719b82e0e56572afef8bb1e1",
+            "bytes": 5182
+          },
+          "current": {
+            "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+            "bytes": 5229
+          }
+        },
+        {
+          "path": "Tools/regression/verify-reac-shaders.py",
+          "snapshot": {
+            "sha256": "6670fae2c5b44b20bafec4132dcca5a043fe7ebc7aad436371a19fa35fda79d5",
+            "bytes": 19374
+          },
+          "current": {
+            "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+            "bytes": 20432
+          }
+        }
+      ],
+      "source_changed_during_execution": []
+    },
+    "matrix-final-diagnostic": {
+      "original_report": "/tmp/creator-reac-validation/matrix-final-diagnostic/report.json",
+      "original_report_sha256": "e7536a7bffa6dca9eec4f1a51d86ae6a0dc24fd237ca660c679e881d179fcb04",
+      "original_sources_sha256": "9bd243b1640b934a4a75e1732c46bec28c0835eedb6463e2eb03e98cd6970f47",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang": {
+          "sha256": "ca6bb7c4eb9fca2e7cdc79b5c4ed8726a2c98cf674a78d8cdfc417bcfb82e079",
+          "bytes": 6571
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusionBuild.slang": {
+          "sha256": "a41bb0c5f1412fc5ddc8bd5fdd713cd76675a32fbf3cbcc6ff052d463a3f7b4b",
+          "bytes": 1390
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang": {
+          "sha256": "1de11f3b50e886ee8fbdb7687eb9d01a9ca8a22202bfe8ebd869efbec735e8a3",
+          "bytes": 54509
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Brdf.slang": {
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d",
+          "bytes": 2967
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang": {
+          "sha256": "674b022bce17b08a5e3cd6cad037fddb585dc7aab03d51d1b808f4a4c7e8bfa0",
+          "bytes": 16494
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang": {
+          "sha256": "c87b63c27348a91b378c1ed0df534dfd587f596b39f6211e0d12ef05039dba11",
+          "bytes": 4403
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": {
+          "sha256": "0ce2715d561351f5f44dd2f9b2114c65311c31ce33c407cc60d71b1ebaa5c3ff",
+          "bytes": 54480
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang": {
+          "sha256": "2bc88a8d3c2798fa634fd762232558ea891f41813f5b45ae0a89142c9fdb0631",
+          "bytes": 7206
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang": {
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009",
+          "bytes": 2766
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang": {
+          "sha256": "6bd1dd4a5387eddb4f45c33d61b0aa173d7bfc64abdb08b258d26e709228f79b",
+          "bytes": 999
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+          "bytes": 2463
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang": {
+          "sha256": "4362bae32a4cdbafe2b1637f1afb00eaf583a197d27df363bf0b36754dfd38fc",
+          "bytes": 7473
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang": {
+          "sha256": "c81e6357eb749bf57b1a36dac50ac1bfb05fbef51d6cf1f859cd1a589eff484a",
+          "bytes": 868
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang": {
+          "sha256": "7380217a3837b045c79e2f9b2670568fe3405c8f70a424639a6198199ea8a08d",
+          "bytes": 9883
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+          "sha256": "c82dea5beca9cf443d5953ae57417074732d43d6d437938ce84a9b259ce642a9",
+          "bytes": 64383
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang": {
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346",
+          "bytes": 139
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang": {
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829",
+          "bytes": 237
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang": {
+          "sha256": "22494829556ff9c728d53ad6a82c9781e6640fd9a11106630c3087bc44e6bb7a",
+          "bytes": 6091
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang": {
+          "sha256": "b5bfb0cff592f40c7f65c8ac3f6ca93f1a7fc8320cad61267bd2ad66ef934e60",
+          "bytes": 7919
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang": {
+          "sha256": "12f1a5e84a00d817f3ed07946d7f705051f7c56a381d06391b54396f84e937c9",
+          "bytes": 106
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang": {
+          "sha256": "4c55209ec25df8d0551a1944dd06bfb95f86446cd021cb487634aa669c1340cc",
+          "bytes": 1414
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang": {
+          "sha256": "9fbe8fb66de43dd9bf37a75c59900f09886a64386d1f389e30567c1360348d17",
+          "bytes": 1558
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang": {
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612",
+          "bytes": 917
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang": {
+          "sha256": "ba79d88d81c7842f66c0526e89a09dc49a3a9c687b748ee1499437628cc58805",
+          "bytes": 4257
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang": {
+          "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb",
+          "bytes": 8303
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang": {
+          "sha256": "eec9dea7962cd372698077987e832858b6bf4f55db27d65bf20dcc852d3a76da",
+          "bytes": 10399
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang": {
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e",
+          "bytes": 5735
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang": {
+          "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033",
+          "bytes": 20450
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang": {
+          "sha256": "cd245ddc0ad0704a8d8f08419d7790ce4f84ade078487d3bfa7ba832705c134e",
+          "bytes": 4218
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang": {
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac",
+          "bytes": 3453
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang": {
+          "sha256": "d5b956609faddece2354ac0920000a002212b4475c1e03a6b779b5f5f8fc4c56",
+          "bytes": 6990
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang": {
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1",
+          "bytes": 66387
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang": {
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a",
+          "bytes": 3024
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Radiance.slang": {
+          "sha256": "07bb4df33b912a0c7c7836f7166820fd702e6a48af78a712f1ba9e4770ba0d81",
+          "bytes": 2685
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang": {
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2",
+          "bytes": 41135
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang": {
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc",
+          "bytes": 13594
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang": {
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1",
+          "bytes": 491
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "6ad260c9e7beb8e771f09f151dd84810de9decef719b82e0e56572afef8bb1e1",
+          "bytes": 5182
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/fixtures/material-codegen/constant.slang": {
+          "sha256": "a56a29dd7ddda114d20415095cf2c096242de76bd9d360e69c45e0349805a9e1",
+          "bytes": 2334
+        },
+        "Tools/regression/reac_geometry_bounds_probe.cpp": {
+          "sha256": "3306961290185f3e4c8ed0e96ee1fb1eafd1fef6e655a662d0ea80c46e9e163a",
+          "bytes": 15453
+        },
+        "Tools/regression/reac_geometry_bounds_probe.slang": {
+          "sha256": "60df55c6ebd378400d4ff15857aa917abf2d0d718015aeef732e233f5b6d6b3b",
+          "bytes": 1132
+        },
+        "Tools/regression/reac_geometry_position_probe.cpp": {
+          "sha256": "a4c17aa72576c2f83abb332c7afcd48acb02c6513423db4ad82cdb2ccf07cafa",
+          "bytes": 9206
+        },
+        "Tools/regression/reac_geometry_position_probe.slang": {
+          "sha256": "e1c02237a9ca19bef42087cbe44727591166a6c0a5450b15c29da20f7bce56fd",
+          "bytes": 885
+        },
+        "Tools/regression/reac_material_host_probe.slang": {
+          "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95",
+          "bytes": 650
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+          "bytes": 20432
+        }
+      },
+      "differences_from_final_worktree": [
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+          "snapshot": {
+            "sha256": "c82dea5beca9cf443d5953ae57417074732d43d6d437938ce84a9b259ce642a9",
+            "bytes": 64383
+          },
+          "current": {
+            "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+            "bytes": 64432
+          }
+        },
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang",
+          "snapshot": {
+            "sha256": "6ad260c9e7beb8e771f09f151dd84810de9decef719b82e0e56572afef8bb1e1",
+            "bytes": 5182
+          },
+          "current": {
+            "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+            "bytes": 5229
+          }
+        }
+      ],
+      "source_changed_during_execution": []
+    },
+    "primitive-final-engine": {
+      "original_report": "/tmp/creator-reac-validation/primitive-final-engine/report.json",
+      "original_report_sha256": "60a8280867bbb001ad438e67a17e0842b8e4ef2d041835b3722cbe4a842dacf1",
+      "original_sources_sha256": "0b0b42d24fb3e80cbbf673ba5fe729fedc05bbe0ec0ab5c658408dd42178276d",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+          "bytes": 2463
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "266bca63c648747f31a608a7ef97c338b80379b443b8d78507eb58b2af34e066",
+          "bytes": 5290
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+          "bytes": 20432
+        }
+      },
+      "differences_from_final_worktree": [
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang",
+          "snapshot": {
+            "sha256": "266bca63c648747f31a608a7ef97c338b80379b443b8d78507eb58b2af34e066",
+            "bytes": 5290
+          },
+          "current": {
+            "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+            "bytes": 5229
+          }
+        }
+      ],
+      "source_changed_during_execution": []
+    },
+    "primitive-final-diagnostic": {
+      "original_report": "/tmp/creator-reac-validation/primitive-final-diagnostic/report.json",
+      "original_report_sha256": "4287636549a15ec4e4aac6fbd4e4f795810336c78091abba860a82819bde15c7",
+      "original_sources_sha256": "0b0b42d24fb3e80cbbf673ba5fe729fedc05bbe0ec0ab5c658408dd42178276d",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+          "bytes": 2463
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "266bca63c648747f31a608a7ef97c338b80379b443b8d78507eb58b2af34e066",
+          "bytes": 5290
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+          "bytes": 20432
+        }
+      },
+      "differences_from_final_worktree": [
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang",
+          "snapshot": {
+            "sha256": "266bca63c648747f31a608a7ef97c338b80379b443b8d78507eb58b2af34e066",
+            "bytes": 5290
+          },
+          "current": {
+            "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+            "bytes": 5229
+          }
+        }
+      ],
+      "source_changed_during_execution": []
+    },
+    "final-format-engine": {
+      "original_report": "/tmp/creator-reac-validation/final-format-engine/report.json",
+      "original_report_sha256": "d76e9936230395776fe83a3f288d59112c716df7153498589724126e174c01ad",
+      "original_sources_sha256": "10161ca631449495f644be70d0514e434590518c931f35573ffbaf444b94440e",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Brdf.slang": {
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d",
+          "bytes": 2967
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang": {
+          "sha256": "674b022bce17b08a5e3cd6cad037fddb585dc7aab03d51d1b808f4a4c7e8bfa0",
+          "bytes": 16494
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": {
+          "sha256": "0ce2715d561351f5f44dd2f9b2114c65311c31ce33c407cc60d71b1ebaa5c3ff",
+          "bytes": 54480
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang": {
+          "sha256": "2bc88a8d3c2798fa634fd762232558ea891f41813f5b45ae0a89142c9fdb0631",
+          "bytes": 7206
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang": {
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009",
+          "bytes": 2766
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang": {
+          "sha256": "6bd1dd4a5387eddb4f45c33d61b0aa173d7bfc64abdb08b258d26e709228f79b",
+          "bytes": 999
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+          "bytes": 2463
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang": {
+          "sha256": "4362bae32a4cdbafe2b1637f1afb00eaf583a197d27df363bf0b36754dfd38fc",
+          "bytes": 7473
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang": {
+          "sha256": "c81e6357eb749bf57b1a36dac50ac1bfb05fbef51d6cf1f859cd1a589eff484a",
+          "bytes": 868
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang": {
+          "sha256": "7380217a3837b045c79e2f9b2670568fe3405c8f70a424639a6198199ea8a08d",
+          "bytes": 9883
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+          "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+          "bytes": 64432
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang": {
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346",
+          "bytes": 139
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang": {
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829",
+          "bytes": 237
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang": {
+          "sha256": "22494829556ff9c728d53ad6a82c9781e6640fd9a11106630c3087bc44e6bb7a",
+          "bytes": 6091
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang": {
+          "sha256": "b5bfb0cff592f40c7f65c8ac3f6ca93f1a7fc8320cad61267bd2ad66ef934e60",
+          "bytes": 7919
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang": {
+          "sha256": "12f1a5e84a00d817f3ed07946d7f705051f7c56a381d06391b54396f84e937c9",
+          "bytes": 106
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang": {
+          "sha256": "4c55209ec25df8d0551a1944dd06bfb95f86446cd021cb487634aa669c1340cc",
+          "bytes": 1414
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang": {
+          "sha256": "9fbe8fb66de43dd9bf37a75c59900f09886a64386d1f389e30567c1360348d17",
+          "bytes": 1558
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang": {
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612",
+          "bytes": 917
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang": {
+          "sha256": "ba79d88d81c7842f66c0526e89a09dc49a3a9c687b748ee1499437628cc58805",
+          "bytes": 4257
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang": {
+          "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb",
+          "bytes": 8303
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang": {
+          "sha256": "eec9dea7962cd372698077987e832858b6bf4f55db27d65bf20dcc852d3a76da",
+          "bytes": 10399
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang": {
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e",
+          "bytes": 5735
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang": {
+          "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033",
+          "bytes": 20450
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang": {
+          "sha256": "cd245ddc0ad0704a8d8f08419d7790ce4f84ade078487d3bfa7ba832705c134e",
+          "bytes": 4218
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang": {
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac",
+          "bytes": 3453
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang": {
+          "sha256": "d5b956609faddece2354ac0920000a002212b4475c1e03a6b779b5f5f8fc4c56",
+          "bytes": 6990
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang": {
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1",
+          "bytes": 66387
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang": {
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a",
+          "bytes": 3024
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Radiance.slang": {
+          "sha256": "07bb4df33b912a0c7c7836f7166820fd702e6a48af78a712f1ba9e4770ba0d81",
+          "bytes": 2685
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang": {
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2",
+          "bytes": 41135
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang": {
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc",
+          "bytes": 13594
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang": {
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1",
+          "bytes": 491
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+          "bytes": 5229
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/fixtures/material-codegen/constant.slang": {
+          "sha256": "a56a29dd7ddda114d20415095cf2c096242de76bd9d360e69c45e0349805a9e1",
+          "bytes": 2334
+        },
+        "Tools/regression/reac_material_host_probe.slang": {
+          "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95",
+          "bytes": 650
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+          "bytes": 20432
+        }
+      },
+      "differences_from_final_worktree": [],
+      "source_changed_during_execution": []
+    },
+    "final-format-diagnostic": {
+      "original_report": "/tmp/creator-reac-validation/final-format-diagnostic/report.json",
+      "original_report_sha256": "c810749c7023f6e2a5a82045fc5a4d6e492a898377ca35bb677ca7e47d5844a2",
+      "original_sources_sha256": "10161ca631449495f644be70d0514e434590518c931f35573ffbaf444b94440e",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Brdf.slang": {
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d",
+          "bytes": 2967
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang": {
+          "sha256": "674b022bce17b08a5e3cd6cad037fddb585dc7aab03d51d1b808f4a4c7e8bfa0",
+          "bytes": 16494
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": {
+          "sha256": "0ce2715d561351f5f44dd2f9b2114c65311c31ce33c407cc60d71b1ebaa5c3ff",
+          "bytes": 54480
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang": {
+          "sha256": "2bc88a8d3c2798fa634fd762232558ea891f41813f5b45ae0a89142c9fdb0631",
+          "bytes": 7206
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang": {
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009",
+          "bytes": 2766
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang": {
+          "sha256": "6bd1dd4a5387eddb4f45c33d61b0aa173d7bfc64abdb08b258d26e709228f79b",
+          "bytes": 999
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+          "bytes": 2463
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang": {
+          "sha256": "4362bae32a4cdbafe2b1637f1afb00eaf583a197d27df363bf0b36754dfd38fc",
+          "bytes": 7473
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang": {
+          "sha256": "c81e6357eb749bf57b1a36dac50ac1bfb05fbef51d6cf1f859cd1a589eff484a",
+          "bytes": 868
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang": {
+          "sha256": "7380217a3837b045c79e2f9b2670568fe3405c8f70a424639a6198199ea8a08d",
+          "bytes": 9883
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+          "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+          "bytes": 64432
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang": {
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346",
+          "bytes": 139
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang": {
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829",
+          "bytes": 237
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang": {
+          "sha256": "22494829556ff9c728d53ad6a82c9781e6640fd9a11106630c3087bc44e6bb7a",
+          "bytes": 6091
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang": {
+          "sha256": "b5bfb0cff592f40c7f65c8ac3f6ca93f1a7fc8320cad61267bd2ad66ef934e60",
+          "bytes": 7919
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang": {
+          "sha256": "12f1a5e84a00d817f3ed07946d7f705051f7c56a381d06391b54396f84e937c9",
+          "bytes": 106
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang": {
+          "sha256": "4c55209ec25df8d0551a1944dd06bfb95f86446cd021cb487634aa669c1340cc",
+          "bytes": 1414
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang": {
+          "sha256": "9fbe8fb66de43dd9bf37a75c59900f09886a64386d1f389e30567c1360348d17",
+          "bytes": 1558
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang": {
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612",
+          "bytes": 917
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang": {
+          "sha256": "ba79d88d81c7842f66c0526e89a09dc49a3a9c687b748ee1499437628cc58805",
+          "bytes": 4257
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang": {
+          "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb",
+          "bytes": 8303
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang": {
+          "sha256": "eec9dea7962cd372698077987e832858b6bf4f55db27d65bf20dcc852d3a76da",
+          "bytes": 10399
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang": {
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e",
+          "bytes": 5735
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang": {
+          "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033",
+          "bytes": 20450
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang": {
+          "sha256": "cd245ddc0ad0704a8d8f08419d7790ce4f84ade078487d3bfa7ba832705c134e",
+          "bytes": 4218
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang": {
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac",
+          "bytes": 3453
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang": {
+          "sha256": "d5b956609faddece2354ac0920000a002212b4475c1e03a6b779b5f5f8fc4c56",
+          "bytes": 6990
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang": {
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1",
+          "bytes": 66387
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang": {
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a",
+          "bytes": 3024
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Radiance.slang": {
+          "sha256": "07bb4df33b912a0c7c7836f7166820fd702e6a48af78a712f1ba9e4770ba0d81",
+          "bytes": 2685
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang": {
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2",
+          "bytes": 41135
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang": {
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc",
+          "bytes": 13594
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang": {
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1",
+          "bytes": 491
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+          "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+          "bytes": 5229
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/fixtures/material-codegen/constant.slang": {
+          "sha256": "a56a29dd7ddda114d20415095cf2c096242de76bd9d360e69c45e0349805a9e1",
+          "bytes": 2334
+        },
+        "Tools/regression/reac_material_host_probe.slang": {
+          "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95",
+          "bytes": 650
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+          "bytes": 20432
+        }
+      },
+      "differences_from_final_worktree": [],
+      "source_changed_during_execution": []
+    },
+    "cpu-oracles-final-sanitized": {
+      "original_report": "/tmp/creator-reac-validation/cpu-oracles-final-sanitized/report.json",
+      "original_report_sha256": "36538b41bad742a7edac0e28f0985b9cb769d194004eb48c00a65c0f09f46532",
+      "original_sources_sha256": "dcdf71366fd9440fe3a59ae47f0fc53a7aa5ac417f9c3769f3a93a79565e0b84",
+      "source_hashes": {
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang": {
+          "sha256": "c87b63c27348a91b378c1ed0df534dfd587f596b39f6211e0d12ef05039dba11",
+          "bytes": 4403
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+          "bytes": 6780
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/reac_geometry_bounds_probe.cpp": {
+          "sha256": "3306961290185f3e4c8ed0e96ee1fb1eafd1fef6e655a662d0ea80c46e9e163a",
+          "bytes": 15453
+        },
+        "Tools/regression/reac_geometry_bounds_probe.slang": {
+          "sha256": "60df55c6ebd378400d4ff15857aa917abf2d0d718015aeef732e233f5b6d6b3b",
+          "bytes": 1132
+        },
+        "Tools/regression/reac_geometry_position_probe.cpp": {
+          "sha256": "a4c17aa72576c2f83abb332c7afcd48acb02c6513423db4ad82cdb2ccf07cafa",
+          "bytes": 9206
+        },
+        "Tools/regression/reac_geometry_position_probe.slang": {
+          "sha256": "e1c02237a9ca19bef42087cbe44727591166a6c0a5450b15c29da20f7bce56fd",
+          "bytes": 885
+        },
+        "Tools/regression/verify-reac-shaders.py": {
+          "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+          "bytes": 20432
+        }
+      },
+      "differences_from_final_worktree": [],
+      "source_changed_during_execution": []
+    },
+    "default-base": {
+      "original_report": "/tmp/creator-reac-validation/default-base/report.json",
+      "original_report_sha256": "e3d384e549c519250a3a2f0146403b551805fa86fca6bf3074c37df8bc0b665c",
+      "original_sources_sha256": "df83695e9ebad61ad628def8aac77b18f65db757140c976aa2decf1a0519ae35",
+      "source_hashes": {
+        "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+          "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+          "bytes": 85472
+        },
+        "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+          "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+          "bytes": 3266
+        },
+        "Tools/regression/reac_material_host_probe.slang": {
+          "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95",
+          "bytes": 650
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+          "sha256": "c75a5660fd16f133c33d429c59a755e64ecac9517d8edb136ecd071815e73f2c",
+          "bytes": 62034
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang": {
+          "sha256": "7380217a3837b045c79e2f9b2670568fe3405c8f70a424639a6198199ea8a08d",
+          "bytes": 9883
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+          "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+          "bytes": 4395
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang": {
+          "sha256": "9fbe8fb66de43dd9bf37a75c59900f09886a64386d1f389e30567c1360348d17",
+          "bytes": 1558
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang": {
+          "sha256": "4362bae32a4cdbafe2b1637f1afb00eaf583a197d27df363bf0b36754dfd38fc",
+          "bytes": 7473
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang": {
+          "sha256": "eec9dea7962cd372698077987e832858b6bf4f55db27d65bf20dcc852d3a76da",
+          "bytes": 10399
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang": {
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009",
+          "bytes": 2766
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang": {
+          "sha256": "2bc88a8d3c2798fa634fd762232558ea891f41813f5b45ae0a89142c9fdb0631",
+          "bytes": 7206
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Radiance.slang": {
+          "sha256": "07bb4df33b912a0c7c7836f7166820fd702e6a48af78a712f1ba9e4770ba0d81",
+          "bytes": 2685
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Brdf.slang": {
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d",
+          "bytes": 2967
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang": {
+          "sha256": "c81e6357eb749bf57b1a36dac50ac1bfb05fbef51d6cf1f859cd1a589eff484a",
+          "bytes": 868
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang": {
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346",
+          "bytes": 139
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang": {
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829",
+          "bytes": 237
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang": {
+          "sha256": "cd245ddc0ad0704a8d8f08419d7790ce4f84ade078487d3bfa7ba832705c134e",
+          "bytes": 4218
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang": {
+          "sha256": "6bd1dd4a5387eddb4f45c33d61b0aa173d7bfc64abdb08b258d26e709228f79b",
+          "bytes": 999
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang": {
+          "sha256": "b5bfb0cff592f40c7f65c8ac3f6ca93f1a7fc8320cad61267bd2ad66ef934e60",
+          "bytes": 7919
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang": {
+          "sha256": "22494829556ff9c728d53ad6a82c9781e6640fd9a11106630c3087bc44e6bb7a",
+          "bytes": 6091
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang": {
+          "sha256": "12f1a5e84a00d817f3ed07946d7f705051f7c56a381d06391b54396f84e937c9",
+          "bytes": 106
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang": {
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a",
+          "bytes": 3024
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang": {
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1",
+          "bytes": 491
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+          "bytes": 12051
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+          "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+          "bytes": 552
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+          "sha256": "b7d02d46d2436eadb627ca90a44e870ffff600e7160dfb92ea1a41c646abd718",
+          "bytes": 5144
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+          "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+          "bytes": 1873
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+          "bytes": 359
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+          "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+          "bytes": 3871
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+          "bytes": 3244
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+          "bytes": 1109
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang": {
+          "sha256": "ba79d88d81c7842f66c0526e89a09dc49a3a9c687b748ee1499437628cc58805",
+          "bytes": 4257
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang": {
+          "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033",
+          "bytes": 20450
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang": {
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2",
+          "bytes": 41135
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": {
+          "sha256": "0ce2715d561351f5f44dd2f9b2114c65311c31ce33c407cc60d71b1ebaa5c3ff",
+          "bytes": 54480
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang": {
+          "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb",
+          "bytes": 8303
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang": {
+          "sha256": "d5b956609faddece2354ac0920000a002212b4475c1e03a6b779b5f5f8fc4c56",
+          "bytes": 6990
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang": {
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1",
+          "bytes": 66387
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang": {
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc",
+          "bytes": 13594
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang": {
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac",
+          "bytes": 3453
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang": {
+          "sha256": "674b022bce17b08a5e3cd6cad037fddb585dc7aab03d51d1b808f4a4c7e8bfa0",
+          "bytes": 16494
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang": {
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612",
+          "bytes": 917
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang": {
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e",
+          "bytes": 5735
+        },
+        "Tools/regression/fixtures/material-codegen/constant.slang": {
+          "sha256": "a56a29dd7ddda114d20415095cf2c096242de76bd9d360e69c45e0349805a9e1",
+          "bytes": 2334
+        },
+        "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang": {
+          "sha256": "4c55209ec25df8d0551a1944dd06bfb95f86446cd021cb487634aa669c1340cc",
+          "bytes": 1414
+        }
+      },
+      "differences_from_final_worktree": [
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+          "snapshot": {
+            "sha256": "c75a5660fd16f133c33d429c59a755e64ecac9517d8edb136ecd071815e73f2c",
+            "bytes": 62034
+          },
+          "current": {
+            "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+            "bytes": 64432
+          }
+        },
+        {
+          "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang",
+          "snapshot": {
+            "sha256": "b7d02d46d2436eadb627ca90a44e870ffff600e7160dfb92ea1a41c646abd718",
+            "bytes": 5144
+          },
+          "current": {
+            "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+            "bytes": 6780
+          }
+        }
+      ],
+      "source_changed_during_execution": []
+    },
+    "visibility-base": {
+      "source_metadata": "embedded in original report",
+      "original_report": "/tmp/creator-reac-validation/visibility-base/report.json"
+    }
+  },
+  "final_worktree_source_hashes": {
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang": {
+      "sha256": "ca6bb7c4eb9fca2e7cdc79b5c4ed8726a2c98cf674a78d8cdfc417bcfb82e079",
+      "bytes": 6571
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryOcclusionBuild.slang": {
+      "sha256": "a41bb0c5f1412fc5ddc8bd5fdd713cd76675a32fbf3cbcc6ff052d463a3f7b4b",
+      "bytes": 1390
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang": {
+      "sha256": "1de11f3b50e886ee8fbdb7687eb9d01a9ca8a22202bfe8ebd869efbec735e8a3",
+      "bytes": 54509
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Brdf.slang": {
+      "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d",
+      "bytes": 2967
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang": {
+      "sha256": "674b022bce17b08a5e3cd6cad037fddb585dc7aab03d51d1b808f4a4c7e8bfa0",
+      "bytes": 16494
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang": {
+      "sha256": "c87b63c27348a91b378c1ed0df534dfd587f596b39f6211e0d12ef05039dba11",
+      "bytes": 4403
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": {
+      "sha256": "0ce2715d561351f5f44dd2f9b2114c65311c31ce33c407cc60d71b1ebaa5c3ff",
+      "bytes": 54480
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang": {
+      "sha256": "2bc88a8d3c2798fa634fd762232558ea891f41813f5b45ae0a89142c9fdb0631",
+      "bytes": 7206
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang": {
+      "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009",
+      "bytes": 2766
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang": {
+      "sha256": "cbbdda647a8c7ed5bf2d0101d55c5c50f6692f63d4d9b0dbe6ebe4eebf1ebddc",
+      "bytes": 4395
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang": {
+      "sha256": "ed4b76d42539c0e75247ed88c332dc1f989e6b2e9aa5e4fc135a2e6294a06ca2",
+      "bytes": 3871
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang": {
+      "sha256": "6bd1dd4a5387eddb4f45c33d61b0aa173d7bfc64abdb08b258d26e709228f79b",
+      "bytes": 999
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+      "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc",
+      "bytes": 2463
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang": {
+      "sha256": "4362bae32a4cdbafe2b1637f1afb00eaf583a197d27df363bf0b36754dfd38fc",
+      "bytes": 7473
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang": {
+      "sha256": "c81e6357eb749bf57b1a36dac50ac1bfb05fbef51d6cf1f859cd1a589eff484a",
+      "bytes": 868
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang": {
+      "sha256": "7380217a3837b045c79e2f9b2670568fe3405c8f70a424639a6198199ea8a08d",
+      "bytes": 9883
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+      "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b",
+      "bytes": 64432
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang": {
+      "sha256": "2e6f3c86eecb1d83818db25f37367e145b2508b0bf93022c4648c5be88c2679d",
+      "bytes": 552
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang": {
+      "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346",
+      "bytes": 139
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang": {
+      "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829",
+      "bytes": 237
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang": {
+      "sha256": "22494829556ff9c728d53ad6a82c9781e6640fd9a11106630c3087bc44e6bb7a",
+      "bytes": 6091
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang": {
+      "sha256": "b5bfb0cff592f40c7f65c8ac3f6ca93f1a7fc8320cad61267bd2ad66ef934e60",
+      "bytes": 7919
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang": {
+      "sha256": "12f1a5e84a00d817f3ed07946d7f705051f7c56a381d06391b54396f84e937c9",
+      "bytes": 106
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang": {
+      "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb",
+      "bytes": 1109
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang": {
+      "sha256": "4c55209ec25df8d0551a1944dd06bfb95f86446cd021cb487634aa669c1340cc",
+      "bytes": 1414
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+      "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571",
+      "bytes": 6780
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang": {
+      "sha256": "9fbe8fb66de43dd9bf37a75c59900f09886a64386d1f389e30567c1360348d17",
+      "bytes": 1558
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang": {
+      "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782",
+      "bytes": 359
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang": {
+      "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612",
+      "bytes": 917
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang": {
+      "sha256": "ba79d88d81c7842f66c0526e89a09dc49a3a9c687b748ee1499437628cc58805",
+      "bytes": 4257
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang": {
+      "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb",
+      "bytes": 8303
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang": {
+      "sha256": "eec9dea7962cd372698077987e832858b6bf4f55db27d65bf20dcc852d3a76da",
+      "bytes": 10399
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang": {
+      "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e",
+      "bytes": 5735
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang": {
+      "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033",
+      "bytes": 20450
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang": {
+      "sha256": "cd245ddc0ad0704a8d8f08419d7790ce4f84ade078487d3bfa7ba832705c134e",
+      "bytes": 4218
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang": {
+      "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac",
+      "bytes": 3453
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang": {
+      "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d",
+      "bytes": 12051
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang": {
+      "sha256": "d5b956609faddece2354ac0920000a002212b4475c1e03a6b779b5f5f8fc4c56",
+      "bytes": 6990
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang": {
+      "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1",
+      "bytes": 66387
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang": {
+      "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a",
+      "bytes": 3024
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang": {
+      "sha256": "b8c0845dcbc903ce244affab008b9f4415ea9169478a3d3871f5b114fcb5ef46",
+      "bytes": 1873
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Radiance.slang": {
+      "sha256": "07bb4df33b912a0c7c7836f7166820fd702e6a48af78a712f1ba9e4770ba0d81",
+      "bytes": 2685
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang": {
+      "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2",
+      "bytes": 41135
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang": {
+      "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc",
+      "bytes": 13594
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang": {
+      "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1",
+      "bytes": 491
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang": {
+      "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7",
+      "bytes": 3244
+    },
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+      "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4",
+      "bytes": 5229
+    },
+    "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp": {
+      "sha256": "2842523da06318413acb86f1abe73254ccef4a32d83189cfa098754798d28f6f",
+      "bytes": 85472
+    },
+    "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": {
+      "sha256": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+      "bytes": 3266
+    },
+    "Tools/regression/fixtures/material-codegen/constant.slang": {
+      "sha256": "a56a29dd7ddda114d20415095cf2c096242de76bd9d360e69c45e0349805a9e1",
+      "bytes": 2334
+    },
+    "Tools/regression/reac_material_host_probe.slang": {
+      "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95",
+      "bytes": 650
+    },
+    "Tools/regression/verify-reac-shaders.py": {
+      "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17",
+      "bytes": 20432
+    },
+    "Tools/regression/reac_geometry_bounds_probe.cpp": {
+      "sha256": "3306961290185f3e4c8ed0e96ee1fb1eafd1fef6e655a662d0ea80c46e9e163a",
+      "bytes": 15453
+    },
+    "Tools/regression/reac_geometry_bounds_probe.slang": {
+      "sha256": "60df55c6ebd378400d4ff15857aa917abf2d0d718015aeef732e233f5b6d6b3b",
+      "bytes": 1132
+    },
+    "Tools/regression/reac_geometry_position_probe.cpp": {
+      "sha256": "a4c17aa72576c2f83abb332c7afcd48acb02c6513423db4ad82cdb2ccf07cafa",
+      "bytes": 9206
+    },
+    "Tools/regression/reac_geometry_position_probe.slang": {
+      "sha256": "e1c02237a9ca19bef42087cbe44727591166a6c0a5450b15c29da20f7bce56fd",
+      "bytes": 885
+    }
+  },
+  "identity_policy": "Byte identity is required even for comments/formatting. Old producer and material cases are replaced by targeted final-format byte execution. All previous snapshots are preserved, including pre-format producer evidence. The earlier runner bytes remain recorded under matrix-engine; compile and validation commands are unchanged for retained cases. Baseline sources deliberately remain pinned to the base revision."
+}

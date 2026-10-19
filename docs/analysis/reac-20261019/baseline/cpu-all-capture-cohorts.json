@@ -1,0 +1,161 @@
+{
+  "before-baseline": {
+    "values": {
+      "gameCpuMs": {
+        "count": 402,
+        "mean": 13.18660472636816,
+        "p50": 13.05695,
+        "p95": 16.4552
+      },
+      "renderLoopMs": {
+        "count": 402,
+        "mean": 29.560642537313434,
+        "p50": 28.7515,
+        "p95": 36.2777
+      }
+    },
+    "matches": {
+      "gameCpuMs": true,
+      "renderLoopMs": true
+    },
+    "gameWithoutEligibleLoop": [],
+    "nonGameLoops": [
+      [
+        14489.3376,
+        0.2356,
+        0,
+        0
+      ],
+      [
+        14840.2099,
+        0.244,
+        0,
+        0
+      ],
+      [
+        15384.4519,
+        0.2938,
+        0,
+        0
+      ]
+    ]
+  },
+  "before-etw": {
+    "values": {
+      "gameCpuMs": {
+        "count": 390,
+        "mean": 13.693840256410256,
+        "p50": 13.446349999999999,
+        "p95": 16.3665
+      },
+      "renderLoopMs": {
+        "count": 389,
+        "mean": 30.653849614395888,
+        "p50": 29.7891,
+        "p95": 35.6438
+      }
+    },
+    "matches": {
+      "gameCpuMs": true,
+      "renderLoopMs": true
+    },
+    "gameWithoutEligibleLoop": [
+      [
+        16324.0625,
+        12.9563,
+        1373,
+        2
+      ]
+    ],
+    "nonGameLoops": [
+      [
+        5355.0159,
+        0.3009,
+        0,
+        0
+      ],
+      [
+        11579.1818,
+        0.3324,
+        0,
+        0
+      ]
+    ]
+  },
+  "after-baseline": {
+    "values": {
+      "gameCpuMs": {
+        "count": 444,
+        "mean": 11.742153603603603,
+        "p50": 11.687149999999999,
+        "p95": 14.4517
+      },
+      "renderLoopMs": {
+        "count": 444,
+        "mean": 26.59487747747748,
+        "p50": 25.88315,
+        "p95": 31.2157
+      }
+    },
+    "matches": {
+      "gameCpuMs": true,
+      "renderLoopMs": true
+    },
+    "gameWithoutEligibleLoop": [],
+    "nonGameLoops": [
+      [
+        15377.6003,
+        0.3745,
+        0,
+        0
+      ]
+    ]
+  },
+  "after-etw": {
+    "values": {
+      "gameCpuMs": {
+        "count": 396,
+        "mean": 13.226071969696969,
+        "p50": 13.100850000000001,
+        "p95": 16.3195
+      },
+      "renderLoopMs": {
+        "count": 396,
+        "mean": 29.907900505050506,
+        "p50": 29.1656,
+        "p95": 35.6237
+      }
+    },
+    "matches": {
+      "gameCpuMs": true,
+      "renderLoopMs": true
+    },
+    "gameWithoutEligibleLoop": [],
+    "nonGameLoops": [
+      [
+        12705.0942,
+        0.3479,
+        0,
+        0
+      ],
+      [
+        12894.0844,
+        0.2941,
+        0,
+        0
+      ],
+      [
+        13598.6501,
+        0.3325,
+        0,
+        0
+      ],
+      [
+        15418.4311,
+        0.2913,
+        0,
+        0
+      ]
+    ]
+  }
+}

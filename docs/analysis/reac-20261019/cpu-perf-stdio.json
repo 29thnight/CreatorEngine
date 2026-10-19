@@ -1,0 +1,34 @@
+{
+  "command": [
+    "/tmp/creator-cpu-perf-uv-cache/archive-v0/GcMO-USwI_aQ0nRh/bin/python",
+    "-m",
+    "cpu_perf",
+    "serve",
+    "--no-library",
+    "--no-auto-update",
+    "--no-auto-index",
+    "--no-live-fetch"
+  ],
+  "transport": "stdio JSON-RPC MCP protocol",
+  "connector_installed": false,
+  "sources": "bundled repository only; linked source library disabled",
+  "messages": [
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-03-26",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "CreatorEngine-REAC-verification",
+            "version": "1"
+          }
+        }
+      }
+    }
+  ],
+  "success": false,
+  "error": "No response to initialize"
+}

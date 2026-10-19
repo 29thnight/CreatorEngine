@@ -1,0 +1,11 @@
+CSM_SELECTION_BUDGET_OK candidates=4100 sealed=2
+[DX12 검증] DebugLayer=on GPUValidation=off DRED=on BreakOnError=off
+LX_SCENE_LOOKUP_FRAME expanded=2 fixture=0 step=0 workers=0
+[meteor.material-buckets] commands=2 buckets=2 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 1->2 pending task/batch/retirement 0/0/0
+[RHI lifecycle][DX12] offline readback/capture generation 2->3 pending task/batch/retirement 0/0/0
+LX_SCENE_LOOKUP_FRAME expanded=2 fixture=0 step=1 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 3->4 pending task/batch/retirement 0/0/0
+[RHI lifecycle][DX12] offline readback/capture generation 4->5 pending task/batch/retirement 0/0/0
+[RHI lifecycle][DX12] backend shutdown generation 5->6 pending task/batch/retirement 0/0/0
+LX_MATERIAL_SCENE_INTEGRATION_OK frames=2 generationFrames=0 checks=29042832 gpuComponents=9360 stale=0 fallbacks=0 aborts=0

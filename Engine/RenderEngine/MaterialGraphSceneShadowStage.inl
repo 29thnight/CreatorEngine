@@ -189,7 +189,8 @@ SceneShadowResources SceneHost::ShadowCacheStage::Declare(const own::shared_owne
 }
 
 SceneShadowResources SceneHost::ShadowFirstCullStage::Declare(const own::shared_owner<const FrameInput>& frame,
-                                                              EnhancedRenderGraph& graph, RGHandle geometry) const
+                                                              EnhancedRenderGraph& graph, RGHandle geometry,
+                                                              RGHandle cameraOccluderDepth) const
 {
     if (!frame || !frame->shadow || !meshlets[0])
     {
@@ -197,10 +198,33 @@ SceneShadowResources SceneHost::ShadowFirstCullStage::Declare(const own::shared_
     }
     frame->CheckCurrent(&graph);
     RequireStage(geometry, frame->raster->geometry->GraphTable(graph), "Shadow.Cull.First requires Geometry.");
+    if (m_cameraPredictionView)
+    {
+        const auto& camera = frame->occluderStage.occluderVisibility;
+        RequireStage(cameraOccluderDepth, camera ? camera->ResolvedDepth(graph) : RGHandle{},
+                     "Shadow camera prediction requires this frame's camera occluder depth version.");
+        const auto& pyramid = frame->finalCullStage.currentPyramid;
+        if (!camera || !pyramid)
+        {
+            throw std::runtime_error("Shadow camera prediction requires the prepared current camera pyramid.");
+        }
+        pyramid->RequireCurrentView(*m_cameraPredictionView);
+        // 카메라 밖 caster와 첫 단계 오판은 실제 light-space recovery가 다시 시험한다.
+        // 이 입력은 static cache, shadow occluder depth, shadow history에 합성하지 않는다.
+        pyramid->Declare(graph, cameraOccluderDepth);
+        if (!outputs[0].IsValid())
+        {
+            GpuGeometryVisibility::Frame::DeclareCameraPredictionBatch(graph, meshlets, pyramid,
+                                                                       "METEOR.Shared.ShadowCameraPrediction");
+        }
+    }
     for (unsigned cascade = 0; cascade < 3; ++cascade)
     {
-        const auto prefix = "METEOR.Shadow.Cull.First.C" + std::to_string(cascade);
-        meshlets[cascade]->DeclareFirstStage(graph, prefix.c_str());
+        if (!m_cameraPredictionView)
+        {
+            const auto prefix = "METEOR.Shadow.Cull.First.C" + std::to_string(cascade);
+            meshlets[cascade]->DeclareFirstStage(graph, prefix.c_str());
+        }
         outputs[cascade] = meshlets[cascade]->GraphVisibleIds(graph);
     }
     return outputs;

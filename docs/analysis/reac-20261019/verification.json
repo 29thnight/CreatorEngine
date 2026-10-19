@@ -1,0 +1,908 @@
+{
+  "schema_version": 1,
+  "assembled_utc": "2026-10-19T07:28:28.836505+00:00",
+  "scope": "Compact final source-identified implementation evidence; historical baseline and new CPU/shader checks are separate.",
+  "result": "CPU/helper and DXIL evidence complete within the reported scope; production SPIR-V and native GPU/Windows acceptance remain incomplete.",
+  "base_commit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+  "published_code_commit": "deeaff2785fa059fe13e632ff934ce292ccf2801",
+  "local_verification_commit": "1ee35f0361daa7796e4ea0d5591f5aabf7464b43",
+  "code_tree": "6565bd9bf82e768bb86c9252d52895415d37f90e",
+  "code_identity": {
+    "published_tree_matches_local": true,
+    "published_tree_identity_evidence": "Parent publication step verified the GitHub connector code tree equals the locally verified code tree.",
+    "local_commit_tree_checked_during_packaging": true,
+    "disk_bytes_match_local_code_commit": true,
+    "changed_code_path_count": 49,
+    "changed_code_source_sha256": {
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang": {
+        "bytes": 54509,
+        "sha256": "1de11f3b50e886ee8fbdb7687eb9d01a9ca8a22202bfe8ebd869efbec735e8a3"
+      },
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang": {
+        "bytes": 4403,
+        "sha256": "c87b63c27348a91b378c1ed0df534dfd587f596b39f6211e0d12ef05039dba11"
+      },
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCache.slang": {
+        "bytes": 2463,
+        "sha256": "23cc2fa539da69961eb1451f049134e3dcea3b6e55be826c80bba044566efefc"
+      },
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang": {
+        "bytes": 64432,
+        "sha256": "fd34ae7392235ef48d51880d983bf9eb3b7477b0ddfb6d671c6b335c4e494c7b"
+      },
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang": {
+        "bytes": 6780,
+        "sha256": "3a8d7554872e93ddaf948942908934bd2e7d108c9792b3c2d42cd96b830af571"
+      },
+      "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang": {
+        "bytes": 5229,
+        "sha256": "202b91a160671ea375864c15669275497ff289f0218ab316118c67e63d42aea4"
+      },
+      "Engine/RenderEngine/DataSystem.cpp": {
+        "bytes": 323616,
+        "sha256": "d5152aaebf6865527887312f252e7a42cb9077dfccec0628cc54f7fb8de5b32e"
+      },
+      "Engine/RenderEngine/GpuGeometryOcclusion.cpp": {
+        "bytes": 21853,
+        "sha256": "78a4091f89f3998c64b7dfec3497354ce99248d8cb0c89c2248922bc594fd7b7"
+      },
+      "Engine/RenderEngine/GpuGeometryOcclusion.h": {
+        "bytes": 4379,
+        "sha256": "dcaa3e8cc4afb93902ae97661284248bd42cc3c0f32d32a58727b42ff1aebe38"
+      },
+      "Engine/RenderEngine/GpuGeometryVisibility.cpp": {
+        "bytes": 88862,
+        "sha256": "f30c71dc549d2a55324212c72324b3763377f0b42a70f69f51207cd717d345fd"
+      },
+      "Engine/RenderEngine/GpuGeometryVisibility.h": {
+        "bytes": 16119,
+        "sha256": "360cd875ee8a5e65a8fb546e0a06e732e7d144a4a37482414242e6abe058189f"
+      },
+      "Engine/RenderEngine/GpuGeometryVisibilityShared.inl": {
+        "bytes": 21240,
+        "sha256": "4ee4ba4d505b4f0faa583801a98354c7836cee7fa1a76207f0c882e4e2b1d2b6"
+      },
+      "Engine/RenderEngine/MaterialGraphMeshSurface.cpp": {
+        "bytes": 128568,
+        "sha256": "53aad6846fe0e6c5f8b91b8ba771db20ed0907df878bafaef34e3e1cdcc06b4f"
+      },
+      "Engine/RenderEngine/MaterialGraphMeshSurface.h": {
+        "bytes": 18546,
+        "sha256": "72609c61b20a7a5a2f9cfef9f8949a7139672b9185711840c291cff9dafb95f6"
+      },
+      "Engine/RenderEngine/MaterialGraphPrimitiveCache.h": {
+        "bytes": 20967,
+        "sha256": "7031277af91ed6b94c4c9d83567718e2b930d6776682acb4f68426cc6ce284f8"
+      },
+      "Engine/RenderEngine/MaterialGraphPrimitiveCacheContract.h": {
+        "bytes": 857,
+        "sha256": "fbfa8c18b466f352f14788f6ce04912cd9e1f3c1213da6a8167fe5c5371496fb"
+      },
+      "Engine/RenderEngine/MaterialGraphProduct.h": {
+        "bytes": 10042,
+        "sha256": "c095ccc623cf547e0afa531dde71cc60f4915d77d0425869b0be22d4a1df2620"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneCompiler.cpp": {
+        "bytes": 15593,
+        "sha256": "067694b759e442ea9530089cf85078196cc5b5e592f8997154228070e8c65fbe"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneCompiler.h": {
+        "bytes": 2198,
+        "sha256": "c5eee8b3b7741cc21ccb48c587d35e47402823e588a85953d9ec681616b50214"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneGpuData.h": {
+        "bytes": 11660,
+        "sha256": "d66352ad768d093da218a680e063e0708aea284743c565fc43101cf686cae064"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneHost.cpp": {
+        "bytes": 243349,
+        "sha256": "9f0a580a7e683698c03f594bb22d6fa2f611a3de5cb31e0324a11a4c73a75572"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneHost.h": {
+        "bytes": 20276,
+        "sha256": "5299219515de2081d768a055916df8052fbc4226bd424a32e902a1b566531c73"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneShadowStage.inl": {
+        "bytes": 18782,
+        "sha256": "0e2998c9b9fe6f67ce57c9a91dbae143330965e3b6c204dbe02f026def5bfb9b"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneStages.inl": {
+        "bytes": 14583,
+        "sha256": "ec65e1923e447b997b50a56b2ba15beb36d071212dbe55e39636afa470f14581"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl": {
+        "bytes": 10065,
+        "sha256": "21078e84cd84b5bc14df2257f680fe33668cf88c2902c44d90a65e66d5213ecd"
+      },
+      "Engine/RenderEngine/MaterialGraphSceneTemporalStage.inl": {
+        "bytes": 8261,
+        "sha256": "8bb5297ebb92ad5d392b05410266f6004f33a6e7b4219d24a8cffbfbb6f6e4cf"
+      },
+      "Engine/RenderEngine/MeshletStreamedPlan.inl": {
+        "bytes": 7430,
+        "sha256": "f0e683ffa79ac2ed7bbc3a0e0b72828691873dd513312cdf6df88ca692563de0"
+      },
+      "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": {
+        "bytes": 556750,
+        "sha256": "76d5f6aaa99e83ecd8ae4e2e96f3db7a34fe9ff93ad2a519b299d80039e27a37"
+      },
+      "Engine/RenderEngine/RenderEngine.vcxproj": {
+        "bytes": 57869,
+        "sha256": "df7dd43a3551951d91f31d0e350d46faafce97b512aad24288a437b35de59fde"
+      },
+      "Engine/RenderEngine/RenderEngine.vcxproj.filters": {
+        "bytes": 71585,
+        "sha256": "72545f73b5fe663ffafaad447169d632713841151a590eaadf43bfe2550aa0a6"
+      },
+      "Tools/regression/material_raster_surface_probe.cpp": {
+        "bytes": 286309,
+        "sha256": "f9a701ed027b3edef8eab584027b0e168e0c18f27beaa4b7d9f82f12539f2b4e"
+      },
+      "Tools/regression/material_shadermeta_probe.cpp": {
+        "bytes": 25491,
+        "sha256": "ff78f2ab63f42cb7d72ccc1f95a13f1c87f56700424bb6a072bd08ece251174a"
+      },
+      "Tools/regression/material_temporal_bucket_tests.inl": {
+        "bytes": 9850,
+        "sha256": "e04b1567d28376b67e74e62ad8af4117ea67250cea8a9083b5f7b3472a778440"
+      },
+      "Tools/regression/primitive_cache_lifetime_probe.cpp": {
+        "bytes": 30713,
+        "sha256": "74f7f5a03dcd02c0bd680ab3bc3a37c00ab737c4119060319b2691125c40b37b"
+      },
+      "Tools/regression/reac_geometry_bounds_probe.cpp": {
+        "bytes": 15453,
+        "sha256": "3306961290185f3e4c8ed0e96ee1fb1eafd1fef6e655a662d0ea80c46e9e163a"
+      },
+      "Tools/regression/reac_geometry_bounds_probe.slang": {
+        "bytes": 1132,
+        "sha256": "60df55c6ebd378400d4ff15857aa917abf2d0d718015aeef732e233f5b6d6b3b"
+      },
+      "Tools/regression/reac_geometry_position_probe.cpp": {
+        "bytes": 9206,
+        "sha256": "a4c17aa72576c2f83abb332c7afcd48acb02c6513423db4ad82cdb2ccf07cafa"
+      },
+      "Tools/regression/reac_geometry_position_probe.slang": {
+        "bytes": 885,
+        "sha256": "e1c02237a9ca19bef42087cbe44727591166a6c0a5450b15c29da20f7bce56fd"
+      },
+      "Tools/regression/reac_material_host_probe.slang": {
+        "bytes": 650,
+        "sha256": "d56f228aeed1883de7a837ec0487c62f2f5e6b0c1b22a6d85e223643fb0d7b95"
+      },
+      "Tools/regression/reac_primitive_cache_probe.cpp": {
+        "bytes": 9287,
+        "sha256": "1f61a1c21adf40b2f9d85e8a5eaed40ef53564229e26362cdf74d228f595c5d3"
+      },
+      "Tools/regression/reac_primitive_cache_probe.slang": {
+        "bytes": 2521,
+        "sha256": "098dc4fdcd314666f078f5a6a714fe2c2d4b50a2e0437132d34f8c55c16dfb4c"
+      },
+      "Tools/regression/shadow_camera_prediction_cpu_probe.cpp": {
+        "bytes": 16232,
+        "sha256": "f98f17dfa4793ce48e62dec5bcd06087111873b17945124bc74656d4bae26bdf"
+      },
+      "Tools/regression/support/MeshletBatchDispatchProbe.inl": {
+        "bytes": 22067,
+        "sha256": "ebcc11c39f7f8893e816c496e30d451cb59e6139eba04c131159283073ce7f99"
+      },
+      "Tools/regression/support/ShadowCameraPredictionCpu.slang": {
+        "bytes": 1709,
+        "sha256": "b4d312f7dbd139ec07db863f3ae3d98dda73fc69af91873f397491dd61bf6a07"
+      },
+      "Tools/regression/support/ShadowCorrectnessProbe.inl": {
+        "bytes": 33650,
+        "sha256": "d84ef7252b54363575a4cf392d1b6e71d2ad9e1e878d50c8545563f568263c05"
+      },
+      "Tools/regression/verify-material-scene-probes.ps1": {
+        "bytes": 9105,
+        "sha256": "4163f394608644776831e1d8b1a1cdb27d7911847a69f592c628fcc687306b03"
+      },
+      "Tools/regression/verify-primitive-cache.py": {
+        "bytes": 10400,
+        "sha256": "0b705f1aa26e591fbb63332d34232ab589e27bf985813ae4bb8ffb51d4504d40"
+      },
+      "Tools/regression/verify-reac-shaders.py": {
+        "bytes": 20432,
+        "sha256": "0b9e6c7751654f1ac65f3c3d42730af5fdbe24b85de320445dba6e55e8a6ff17"
+      },
+      "Tools/regression/verify-shadow-camera-prediction-cpu.py": {
+        "bytes": 8796,
+        "sha256": "d2026d5528b278a9fad977c6f88e03cbb9f95c8e031fba81a1095b6d69e8c6a4"
+      }
+    },
+    "hash_policy": "SHA-256 of exact raw disk bytes, without newline normalization. Includes production, project and regression files changed from base.",
+    "tree_scope": "Code-only commit, before this report/evidence documentation is added.",
+    "evidence_sources_checked_against_current_disk": [
+      {
+        "artifact": "primitive-cache-normal.json",
+        "sources_checked": 26,
+        "mismatches": []
+      },
+      {
+        "artifact": "primitive-cache-asan.json",
+        "sources_checked": 26,
+        "mismatches": []
+      },
+      {
+        "artifact": "primitive-cache-native-authored.json",
+        "sources_checked": 7,
+        "mismatches": []
+      },
+      {
+        "artifact": "shadow-cpu.json",
+        "sources_checked": 6,
+        "mismatches": []
+      },
+      {
+        "artifact": "shadow-mutation-coverage.json",
+        "sources_checked": 6,
+        "mismatches": []
+      },
+      {
+        "artifact": "shadow-mutation-recovery.json",
+        "sources_checked": 6,
+        "mismatches": []
+      },
+      {
+        "artifact": "shaders/source-snapshots.json",
+        "sources_checked": 56,
+        "mismatches": []
+      }
+    ]
+  },
+  "baseline": {
+    "selection": "after-baseline, Game logical view ID 2, complete scopes in the recorded measurement window",
+    "measurement_commit": "946ef4fa9b79f4e74ad09a03d79aa117277ded87",
+    "retrieval_commit": "0d3c2cac6d3bd16a2c4511ccb067749feafcd33c",
+    "manifest_path_at_retrieval_commit": "docs/analysis/measurements/20261019-cpu-gpu-data/manifest.json",
+    "source_patch": "Documented MaterialGraphShaderMeta.h include correction in DataSystem.cpp; measured source identities are reconciled explicitly.",
+    "measured_source_evidence": "baseline/source-identity-verification.json",
+    "historical_provenance": "baseline/provenance/provenance.json",
+    "file_integrity": {
+      "manifest_data_files": 360,
+      "manifest_paths_and_sizes_matching_pinned_git_tree": 360,
+      "git_tree_entries_including_manifest_itself": 361,
+      "downloaded_data_files_verified": 182,
+      "downloaded_data_bytes_verified": 142989631,
+      "downloaded_timeline_files": 103,
+      "downloaded_capture_metadata_files": 4,
+      "downloaded_after_baseline_frame_files": 58,
+      "checks_on_downloaded_files": [
+        "byte length",
+        "SHA-256 against manifest",
+        "Git blob SHA-1 against pinned Git tree"
+      ],
+      "packaging_check": "Stored download-verification rows were reconciled with the pinned manifest/tree; the 143 MB of raw data was not recopied or rehashed during this packaging step.",
+      "remaining_manifest_file_contents_downloaded": false,
+      "verification_reports": [
+        "baseline/verification-small.json",
+        "baseline/verification-after-frames.json",
+        "baseline/verification-timeline_gpu-blob-after-baseline_events-000.json.json"
+      ],
+      "raw_capture_copied_into_this_bundle": false
+    },
+    "conditions": {
+      "configuration": "Debug",
+      "workers": 8,
+      "scene_and_game_extent": [
+        1186,
+        514
+      ],
+      "foreground": "Editor",
+      "render_thread_priority": "Normal",
+      "binding_detail": 0,
+      "gpu_validation_during_performance_capture": "off",
+      "identity_artifact": "baseline/provenance/after/identity.json",
+      "scene_artifact": "baseline/provenance/probe-scene.txt",
+      "limits": [
+        "CPU/GPU models, OS/driver and power/clock conditions are not fully identified by the retained capture context.",
+        "Do not compare the published Debug baseline with a new Release build as a speedup denominator.",
+        "ETW captures and baseline captures are distinct samples and are not pooled."
+      ]
+    },
+    "cpu": {
+      "sample_count": 444,
+      "view_id": 2,
+      "view_mapping": "EnhancedSceneRenderer.h defines kEnhancedGameViewId = 2; execution order is not the view identity.",
+      "metric_semantics": "QPC scope wall time. RenderLoop encloses the selected Game view; Game encloses its Prepare/Declare scopes. Parent and child rows are not additive and are not CPU running-time/utilization counters.",
+      "metrics_ms": {
+        "gameCpuMs": {
+          "count": 444,
+          "mean": 11.742153603603603,
+          "p50": 11.687149999999999,
+          "p95": 14.4517
+        },
+        "scenePrepareMs": {
+          "count": 444,
+          "mean": 2.156797747747748,
+          "p50": 2.1404,
+          "p95": 2.7141
+        },
+        "declareMs": {
+          "count": 444,
+          "mean": 4.219918243243243,
+          "p50": 3.9737,
+          "p95": 5.7037
+        },
+        "renderLoopMs": {
+          "count": 444,
+          "mean": 26.59487747747748,
+          "p50": 25.88315,
+          "p95": 31.2157
+        }
+      },
+      "cohort_identity": {
+        "scenePrepareMs": {
+          "distinctGameViews": 444,
+          "callsPerGameView": {
+            "1": 444
+          },
+          "allSelected": true
+        },
+        "declareMs": {
+          "distinctGameViews": 444,
+          "callsPerGameView": {
+            "1": 444
+          },
+          "allSelected": true
+        },
+        "renderLoopMs": {
+          "distinctLoops": 444,
+          "gameViewsPerLoop": {
+            "1": 444
+          },
+          "missing": []
+        }
+      },
+      "all_core_cohorts_identical": true,
+      "prepare_plus_declare_mean_ms": 6.376715990990991,
+      "prepare_plus_declare_fraction_of_game_mean": 0.543061878277083,
+      "quantiles": "p50 is statistics.median; p95 is sorted[min(n-1, floor(0.95*n))], without interpolation.",
+      "evidence": "baseline/cpu-baseline-verification.json",
+      "all_capture_context": "baseline/cpu-all-capture-cohorts.json",
+      "large_declare_branch_evidence": "baseline/cpu-large-declare-branch-verification.json",
+      "large_declare_interpretation": "Markers 89/102/103/104 have zero observed events in this capture. This does not establish an optimal worker count or complete the CPU Prepare/Declare parallelization task."
+    },
+    "gpu": {
+      "source": "Retained published capture analysis, with after-baseline raw GPU event download identity verified separately.",
+      "metrics_artifact": "baseline/published-gpu-metrics.json",
+      "published_collection_checks_artifact": "baseline/published-gpu-final-evidence.json",
+      "native_event_count": 126731,
+      "published_exact_provenance_matches": 126731,
+      "published_duplicates_removed": 0,
+      "zero_duration_spans": 4157,
+      "published_source_losses": {
+        "droppedFrames": 0,
+        "droppedEvents": 0,
+        "droppedCounters": 0,
+        "sourceDroppedCounters": 0,
+        "sourceDroppedEvents": 0,
+        "sourceDroppedFrameBoundaries": 0,
+        "lateCpuEvents": 0,
+        "lateGpuSpans": 0
+      },
+      "game_submissions": 444,
+      "game_instrumented_pass_union_ms": {
+        "count": 444,
+        "mean": 5.1949385135137085,
+        "p50": 5.16255000000001,
+        "p95": 5.768599999995786
+      },
+      "game_first_to_last_instrumented_pass_span_ms": {
+        "count": 444,
+        "mean": 5.21722657657659,
+        "p50": 5.185549999999694,
+        "p95": 5.788699999999153
+      },
+      "top_cull_passes": [
+        {
+          "view": 2,
+          "name": "METEOR.Shared.ShadowRecovery.Cull",
+          "count": 444,
+          "mean": 0.7693349099099099,
+          "p50": 0.7746500000000001,
+          "p95": 0.9943
+        },
+        {
+          "view": 2,
+          "name": "METEOR.Shared.First.Cull",
+          "count": 444,
+          "mean": 0.734084009009009,
+          "p50": 0.6881,
+          "p95": 0.9656
+        },
+        {
+          "view": 2,
+          "name": "METEOR.CameraMeshlet.Recovery.Cull",
+          "count": 444,
+          "mean": 0.4721945945945946,
+          "p50": 0.4455,
+          "p95": 0.6861
+        }
+      ],
+      "three_cull_mean_sum_ms": 1.9756135135135136,
+      "three_cull_mean_fraction_of_instrumented_union": 0.3802958414953914,
+      "material_and_temporal_resolve_passes": [
+        {
+          "view": 2,
+          "name": "METEOR.Scene.Material.Resolve",
+          "count": 444,
+          "mean": 0.1861596846846847,
+          "p50": 0.1874,
+          "p95": 0.1976
+        },
+        {
+          "view": 2,
+          "name": "METEOR.Scene.Temporal.Resolve",
+          "count": 444,
+          "mean": 0.08056058558558558,
+          "p50": 0.0809,
+          "p95": 0.088
+        }
+      ],
+      "material_and_temporal_resolve_mean_sum_ms": 0.2667202702702703,
+      "material_and_temporal_resolve_fraction_of_instrumented_union": 0.05134233438498741,
+      "quantile_aggregation": "Individual pass p50/p95 are not added. Combined rows here contain sums of means only.",
+      "clock": "QPC-aligned GPU timestamp; not GPU utilization",
+      "clock_limit": "The exported clock label/alignment is not a new device calibration experiment and is not a GPU utilization measurement.",
+      "queues": {
+        "0": "[GPU Graphics]"
+      },
+      "limits": [
+        "Instrumented pass union is not complete GPU frame time, utilization or FPS.",
+        "Historical GPU capture evidence is not native execution of this implementation.",
+        "Published original unitTests/engineBuildRun fields are retained provenance, not new tests run while packaging.",
+        "CPU and GPU time rows are not added."
+      ]
+    }
+  },
+  "executed_validation": {
+    "shader_matrix": {
+      "engine": {
+        "counts": {
+          "dxil": {
+            "passed": 34,
+            "total": 34
+          },
+          "spirv": {
+            "passed": 14,
+            "total": 34
+          }
+        },
+        "failure_names": [
+          "ShadowMeshletCullCS/spirv",
+          "ShadowMeshletCullCS-occlusion/spirv",
+          "ShadowMeshletCullCS-history/spirv",
+          "ShadowMeshletCullCS-recovery/spirv",
+          "ShadowMeshletCullCS-camera-prediction/spirv",
+          "ShadowMeshletResetCS-shared/spirv",
+          "ShadowMeshletCullCS-shared/spirv",
+          "MeshletCountCS-shared/spirv",
+          "MeshletFinalizeCS-shared/spirv",
+          "MeshletScatterCS-shared/spirv",
+          "ShadowMeshletCullCS-shared-occlusion/spirv",
+          "ShadowMeshletCullCS-partial/spirv",
+          "ShadowMeshletCullCS-stress/spirv",
+          "ShadowMeshletCullCS-partial-stress/spirv",
+          "LXSceneGBufferPS/spirv",
+          "LXSceneTemporalPS/spirv",
+          "LXSceneCachedGBufferPS/spirv",
+          "LXSceneCachedTemporalPS/spirv",
+          "LXSceneVisibilityMS/spirv",
+          "LXSceneShadowMS/spirv"
+        ]
+      },
+      "diagnostic": {
+        "counts": {
+          "dxil": {
+            "passed": 34,
+            "total": 34
+          },
+          "spirv": {
+            "passed": 32,
+            "total": 34
+          }
+        },
+        "failure_names": [
+          "LXSceneGBufferPS/spirv",
+          "LXSceneCachedGBufferPS/spirv"
+        ]
+      }
+    },
+    "shader_evidence": "shaders/summary.json",
+    "matrix_assembly": "Original full matrix plus source-identified targeted final-format cases, with original command/exit/binary hashes retained. Not represented as a single fresh full-matrix run.",
+    "final_cache_producers_current_rhi": {
+      "dxil": {
+        "passed": 2,
+        "total": 2
+      },
+      "spirv": {
+        "passed": 2,
+        "total": 2
+      },
+      "triangle_stride_bytes": 336,
+      "abi_evidence": "shaders/primitive-spirv-abi.json"
+    },
+    "bounds_and_position_cpu": {
+      "bounds_checks": 1069124,
+      "normalized_skin_samples": 72000,
+      "rejected_boxes": 13821,
+      "position_checks": 12336,
+      "position_fixtures": 514,
+      "position_vertices": 2056,
+      "normal": "passed",
+      "asan_ubsan_fail_fast": "passed",
+      "leak_sanitizer": "disabled due sandbox task enumeration failure",
+      "position_cpp_compatibility": "Generated precise token macro with -fno-fast-math -ffp-contract=off"
+    },
+    "primitive_cache_cpu": {
+      "normal": {
+        "artifact": "primitive-cache-normal.json",
+        "cpp_checks": 176,
+        "shader_cpu_fixtures": 27,
+        "shader_cpu_checks": 56377,
+        "native_gpu": false,
+        "native_windows_rhi": false
+      },
+      "asan": {
+        "artifact": "primitive-cache-asan.json",
+        "cpp_checks": 176,
+        "shader_cpu_fixtures": 27,
+        "shader_cpu_checks": 56377,
+        "native_gpu": false,
+        "native_windows_rhi": false
+      }
+    },
+    "primitive_cache_source_coherence": "primitive-cache-coherence.json",
+    "shadow_cpu": {
+      "checks": 33425,
+      "helper_calls": 15271,
+      "variant_count": 3,
+      "passed": true,
+      "sanitize_address_undefined": true,
+      "leak_check_executed": false,
+      "native_gpu_executed": false,
+      "artifact": "shadow-cpu.json",
+      "controlled_mutations": [
+        {
+          "artifact": "shadow-mutation-coverage.json",
+          "mutation": "bypass-coverage",
+          "expected_failing_variants": [
+            "prediction",
+            "shared"
+          ],
+          "observed_failing_variants": [
+            "prediction",
+            "shared"
+          ],
+          "interpretation": "Intentional mutant failed its semantic oracle; the original report failure is preserved."
+        },
+        {
+          "artifact": "shadow-mutation-recovery.json",
+          "mutation": "drop-recovery",
+          "expected_failing_variants": [
+            "recovery",
+            "shared"
+          ],
+          "observed_failing_variants": [
+            "recovery",
+            "shared"
+          ],
+          "interpretation": "Intentional mutant failed its semantic oracle; the original report failure is preserved."
+        }
+      ]
+    },
+    "boundary_substitution": "Portable C++ fixtures replace device/graph services; Slang CPU helpers replace only resource bindings as described by their runners. They do not build or execute the native Windows RHI.",
+    "include_boundary": {
+      "artifact": "include-boundary.json",
+      "overall_passed": false,
+      "baseline_source_files": 1785,
+      "upward_include_violations_in_both": 27,
+      "physical_boundary_violations_in_both": 70,
+      "new_violations_relative_to_baseline": 0,
+      "identical_output": true,
+      "allowlist_modified": false
+    },
+    "default_cache_off_ir": {
+      "artifact": "shaders/default-ir-comparison.json",
+      "interpretation": "Tested constant-material default entries retain the same resource table with no cache resource/query/load additions; normalized IR is not identical and this is not a native performance measurement."
+    }
+  },
+  "authored_native_validation_not_executed": {
+    "primitive_cache": {
+      "artifact": "primitive-cache-native-authored.json",
+      "mode": "--primitive-cache-only",
+      "surface_frames": 32,
+      "temporal_frames": 12,
+      "total_frames": 44,
+      "executed": false
+    },
+    "shadow_prediction": {
+      "cases": 8,
+      "expected_recovered_cases": 2,
+      "expected_exact_version_rejects": 6,
+      "expected_retained_history_rejects": 2,
+      "executed": false,
+      "source": "Tools/regression/support/ShadowCorrectnessProbe.inl"
+    },
+    "instance_admission": {
+      "added_normal_and_partial_wave_cases": 16,
+      "existing_dynamic_ring_cases_retained": 48,
+      "executed": false,
+      "source": "Tools/regression/support/MeshletBatchDispatchProbe.inl",
+      "limit": "Manually supplied compatibility/unskinned bounds; not end-to-end cooked bounds/GPU bone reduction acceptance."
+    }
+  },
+  "remaining_acceptance_gates": [
+    "Actual RHI arguments still fail 20/34 SPIR-V cases; profile capability budget is not silently widened in production.",
+    "Diagnostic mode explicitly acknowledges 12 capabilities and still fails LXSceneGBufferPS and LXSceneCachedGBufferPS SPIR-V validation because dynamic QuadBroadcast Index is invalid at SPIR-V 1.3.",
+    "Baseline source at 0d3 reproduces the default GBuffer validator failure and profile-upgrade failures; cached GBuffer still has an unresolved gate.",
+    "Default-entry normalized DXIL IR is not byte-identical; resource tables are identical and t174/t175 cache resources and added cache queries/loads are absent in the tested constant-material fixture.",
+    "Windows/MSVC Debug and Release engine builds and cooked-material permutations.",
+    "Native DX12/Vulkan dispatch, GPU validation and independent pixel/shadow/motion correctness fixtures.",
+    "New GPU/frame performance A/B and same-condition CPU Prepare/Declare profiling; no speedup is claimed by this bundle.",
+    "LeakSanitizer was not accepted as passed: sandbox task enumeration blocked it; ASan/UBSan are separate evidence."
+  ],
+  "performance_measurement": {
+    "new_native_cpu_gpu_frame_ab_executed": false,
+    "implementation_speedup_claimed": false,
+    "historical_baseline_is_not_after_change_measurement": true
+  },
+  "cpu_performance_engineering": {
+    "source": "https://github.com/usamahz/cpu-performance-engineering",
+    "connected_mcp_available": false,
+    "offline_cli_selftest_succeeded": true,
+    "stdio_initialize_succeeded": false,
+    "stdio_error": "No response to initialize",
+    "stdio_artifact": "cpu-perf-stdio.json",
+    "cli_log_artifact": "cpu-perf-cli-selftest.txt",
+    "methodology_artifact": "shaders/cpu-perf-evidence.json",
+    "interpretation": "CLI corpus availability is not successful MCP access. Source/compiler identity, correctness-first checks and explicit evidence boundaries were applied."
+  },
+  "artifact_inventory": {
+    "path_basis": "Relative to docs/analysis/reac-20261019/",
+    "self_excluded": "verification.json",
+    "artifact_count_excluding_self": 46,
+    "artifact_bytes_excluding_self": 1099028,
+    "copy_policy": "All inventoried artifacts are exact source bytes. Historical absolute paths and references inside source reports are preserved as provenance, not rewritten into executable portable paths.",
+    "excluded_large_inputs": [
+      "raw CEPROF/ETL/frame/timeline event payloads",
+      "full IR/disassembly dumps",
+      "compiler archives/libraries/binaries",
+      "generated C++ and executable probe binaries"
+    ],
+    "files": {
+      "baseline/cpu-all-capture-cohorts.json": {
+        "bytes": 2687,
+        "sha256": "e96d7f686432d8beeec000f82e8c8cfb0b13f4170e1fb77a41f1b8466ab0d2b2",
+        "source_file": "/tmp/creator-baseline-20261019/cpu-all-capture-cohorts.json"
+      },
+      "baseline/cpu-baseline-verification.json": {
+        "bytes": 1387,
+        "sha256": "b036da7ae7b51ba0955134f8609f53c2f9496abecc157a2ebb8a53eb2da40ac2",
+        "source_file": "/tmp/creator-baseline-20261019/cpu-baseline-verification.json"
+      },
+      "baseline/cpu-large-declare-branch-verification.json": {
+        "bytes": 678,
+        "sha256": "5fd8ab1e691256de951f4510e2431be0a504483da49153b9edb3f8607301a1ff",
+        "source_file": "/tmp/creator-baseline-20261019/cpu-large-declare-branch-verification.json"
+      },
+      "baseline/git-files.json": {
+        "bytes": 57445,
+        "sha256": "6cb0b9a46d787304cecda0497712a4d9039f86889b78472205938f366f2a13da",
+        "source_file": "/tmp/creator-baseline-20261019/git-files.json"
+      },
+      "baseline/gpu-after-clock.json": {
+        "bytes": 48,
+        "sha256": "3f463f4c44876cc26efd92b5b86ebfa5cfb5533f1b653a1a7209318a95325950",
+        "source_file": "/tmp/creator-baseline-20261019/timeline/gpu-blob-after-baseline/clock-000.json"
+      },
+      "baseline/gpu-after-queues.json": {
+        "bytes": 22,
+        "sha256": "ab175069eda3d26a4107a83139607c6ac2253448616f76977485a511ff9bfd8e",
+        "source_file": "/tmp/creator-baseline-20261019/timeline/gpu-blob-after-baseline/queues-000.json"
+      },
+      "baseline/manifest.json": {
+        "bytes": 70792,
+        "sha256": "42833ecb657dc1dc78e18eeb428be57e718546e5d86e62de65ae3800fa9a1ead",
+        "source_file": "/tmp/creator-baseline-20261019/manifest.json"
+      },
+      "baseline/provenance/README.md": {
+        "bytes": 1884,
+        "sha256": "46f81d5c9e104d0f0ae2915db76fce96ec74bf178246395b20c0b02ee44e5875",
+        "source_file": "/tmp/creator-baseline-20261019/provenance-context/README.md"
+      },
+      "baseline/provenance/after/diagnostics-config.json": {
+        "bytes": 54,
+        "sha256": "53d9da5a14085398cfc2b14ecd8829fb630947a5bc95ef178eac91cc3b9484a6",
+        "source_file": "/tmp/creator-baseline-20261019/provenance-context/after/diagnostics-config.json"
+      },
+      "baseline/provenance/after/identity.json": {
+        "bytes": 505,
+        "sha256": "5573c0cc9f89ddd963820c99f91196f13a0d8c0aaa9f82c8472fe66c040a921e",
+        "source_file": "/tmp/creator-baseline-20261019/provenance-context/after/identity.json"
+      },
+      "baseline/provenance/build-include-fix.patch": {
+        "bytes": 482,
+        "sha256": "0ff23e825319f43fb1868935de017b98b29c026219f93e14ce4b4b16c41bf2a0",
+        "source_file": "/tmp/creator-baseline-20261019/provenance-context/build-include-fix.patch"
+      },
+      "baseline/provenance/probe-scene.txt": {
+        "bytes": 924,
+        "sha256": "58a4b62f60df5140785244ddf9831e6b326d64b263cf8753f24a6879aa92f830",
+        "source_file": "/tmp/creator-baseline-20261019/provenance-context/probe-scene.txt"
+      },
+      "baseline/provenance/provenance.json": {
+        "bytes": 6782,
+        "sha256": "20603add4ace8d2ae835454bb81d8b42f9b277e7e728c6d8c8e1a391bb09196e",
+        "source_file": "/tmp/creator-baseline-20261019/provenance-context/provenance.json"
+      },
+      "baseline/published-gpu-final-evidence.json": {
+        "bytes": 504,
+        "sha256": "e1da87fdec1106cea0f13e365049b8ab663ece72f642ea0150f43ea7b08ba971",
+        "source_file": "/tmp/creator-baseline-20261019/analysis/gpu-final-evidence.json"
+      },
+      "baseline/published-gpu-metrics.json": {
+        "bytes": 123518,
+        "sha256": "f7598519e8bbff4d6d53b9a8424035ce10002fd91b5f2a0d364a5f5cace94894",
+        "source_file": "/tmp/creator-baseline-20261019/analysis/gpu-metrics.json"
+      },
+      "baseline/published-gpu-verdict.json": {
+        "bytes": 340,
+        "sha256": "1c90a7c17e3233a605b21b6f9f2387218b46cdbe0530cea9cb1b3951a320c567",
+        "source_file": "/tmp/creator-baseline-20261019/analysis/gpu-verdict.json"
+      },
+      "baseline/published-measured-source-hashes.json": {
+        "bytes": 969,
+        "sha256": "39b3041270e7e7a9f9a42845953221187beaa72fe1671270075a513d5e9c9c66",
+        "source_file": "/tmp/creator-baseline-20261019/analysis/measured-source-hashes.json"
+      },
+      "baseline/source-identity-verification.json": {
+        "bytes": 3960,
+        "sha256": "9a21cafa5d26379211eb0c1034c7b520bab703c62bb79cd4c370fded12a9eaf2",
+        "source_file": "/tmp/creator-baseline-20261019/source-identity-verification.json"
+      },
+      "baseline/verification-after-frames.json": {
+        "bytes": 15190,
+        "sha256": "f7200b7312f56e27dbcf4858d6dbae5c3f817af81c51c5ea859bb30d089bbeae",
+        "source_file": "/tmp/creator-baseline-20261019/verification-after-frames.json"
+      },
+      "baseline/verification-small.json": {
+        "bytes": 32696,
+        "sha256": "c9c267ba61185adf0aa8421efbfe6d316d8bbf6a18f597e310d05ed83b052dc9",
+        "source_file": "/tmp/creator-baseline-20261019/verification-small.json"
+      },
+      "baseline/verification-timeline_gpu-blob-after-baseline_events-000.json.json": {
+        "bytes": 479,
+        "sha256": "f3592238600afffe7e23738e0c0dc8ecb8000ca0114e56e40bc51263fc255aaa",
+        "source_file": "/tmp/creator-baseline-20261019/verification-timeline_gpu-blob-after-baseline_events-000.json.json"
+      },
+      "cpu-perf-cli-selftest.txt": {
+        "bytes": 339,
+        "sha256": "f4a726a7a9a48b5db8c83426e7d6ab8269be933d875bc07c94d8345715380aaf",
+        "source_file": "/tmp/creator-reac-validation/cpu-perf-current/selftest.txt"
+      },
+      "cpu-perf-stdio.json": {
+        "bytes": 796,
+        "sha256": "12a1ce635f6518099158ca2e6a51bb72dcf960599be2ad334382b1234fa02864",
+        "source_file": "/tmp/creator-reac-validation/cpu-perf-current/stdio-evidence.json"
+      },
+      "include-boundary.json": {
+        "bytes": 22622,
+        "sha256": "0a6957a227404ad52e642d501c860324fe991cdac23fd81cd7a8d12fde12c785",
+        "source_file": "/tmp/creator-reac-validation/include-boundary/report.json"
+      },
+      "primitive-cache-asan.json": {
+        "bytes": 7311,
+        "sha256": "0cd813f4a41ab1c6e97ef1f2d2a1c6319b12fb4bd654035a8007ac8764720b2d",
+        "source_file": "/tmp/creator-reac-validation/primitive-cache-asan-final.json"
+      },
+      "primitive-cache-coherence.json": {
+        "bytes": 2372,
+        "sha256": "bff5359febaed5b119148a85060d2f76a11ff10273b8d9bdf13bc4c209ae9c44",
+        "source_file": "/tmp/creator-reac-validation/primitive-cache-final-coherence.json"
+      },
+      "primitive-cache-native-authored.json": {
+        "bytes": 1110,
+        "sha256": "ba9c16a0f8267ef70cc6db98a411db1e91b9ccc1cd461b168a94ca84c6419b65",
+        "source_file": "/tmp/creator-reac-validation/primitive-native-authored.json"
+      },
+      "primitive-cache-normal.json": {
+        "bytes": 7106,
+        "sha256": "70c105521be51add2bb7b314c803f9009aa7249f3c959477c9e3545d4ba58b4b",
+        "source_file": "/tmp/creator-reac-validation/primitive-cache-normal-final.json"
+      },
+      "report-structure.json": {
+        "bytes": 589,
+        "sha256": "e056ebb5e64621e89bc90733b420783118f611eecf626a82323262f11bfe0c35",
+        "source_file": "/tmp/creator-reac-validation/report-structure-check.json"
+      },
+      "shaders/cpu-oracles-normal.json": {
+        "bytes": 7246,
+        "sha256": "4fe19b37fb8250d235a95ed6843bf295304f26f7b72f9d2f26de81a9378e997c",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/cpu-oracles-normal.json"
+      },
+      "shaders/cpu-oracles-sanitized.json": {
+        "bytes": 5803,
+        "sha256": "b3189dcebcdf3334db35be58c241b566d166b34a9eff31ac007a4f3f4ea959b2",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/cpu-oracles-sanitized.json"
+      },
+      "shaders/cpu-perf-evidence.json": {
+        "bytes": 2118,
+        "sha256": "9459e914219dd18c0b020280a55cb7a9b005a49b267737be0c521b40fe3235c7",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/cpu-perf-evidence.json"
+      },
+      "shaders/default-base.json": {
+        "bytes": 14794,
+        "sha256": "104113bf6cbe662355efd4e5b2fde15c1f7606a10702e87aafe11a41442a3f62",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/default-base.json"
+      },
+      "shaders/default-ir-comparison.json": {
+        "bytes": 12151,
+        "sha256": "c3e6ec38af0ab43e10d6ad400c72d64a942596cd6cc50196ea16e84053c961e7",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/default-ir-comparison.json"
+      },
+      "shaders/matrix-diagnostic.json": {
+        "bytes": 350385,
+        "sha256": "68eb70875d159ee89847e30d8c234994b76b9e0afa7e35aa6f9706beb06ec272",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/matrix-diagnostic.json"
+      },
+      "shaders/matrix-engine.json": {
+        "bytes": 225088,
+        "sha256": "f50a73c2ad973716b682b0e584d9a46e29fdb60819bee5cf030cde283bf7ed52",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/matrix-engine.json"
+      },
+      "shaders/primitive-spirv-abi.json": {
+        "bytes": 1261,
+        "sha256": "11b793c3396a9964727fa9a31932e903851b357365ce9d648c071adcd1b2fd2c",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/primitive-spirv-abi.json"
+      },
+      "shaders/source-snapshots.json": {
+        "bytes": 81005,
+        "sha256": "e83fce9c04c99f93852447b537f80b6ed3d6b7d706710448722d722531d2b9d2",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/source-snapshots.json"
+      },
+      "shaders/summary.json": {
+        "bytes": 4742,
+        "sha256": "6568846f653d51e5d05b4f5ff66a2de630ca73994c4617bf7c99bafc4e739201",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/summary.json"
+      },
+      "shaders/visibility-base.json": {
+        "bytes": 4736,
+        "sha256": "9860b176cf4a9c79d776d23c35bfbac5e6a69afd2e52b20a0b1dd0d756eb6223",
+        "source_file": "/tmp/creator-reac-validation/final-evidence/visibility-base.json"
+      },
+      "shadow-cpu.json": {
+        "bytes": 8216,
+        "sha256": "904d28b6dbe249740ed242ddcaeae9497b5b0b2b700d227529c3ad047c8d74f0",
+        "source_file": "/tmp/creator-shadow-cpu-final/report.json"
+      },
+      "shadow-mutation-coverage.json": {
+        "bytes": 8331,
+        "sha256": "b48a0e7a953dbe663cde20ec83862b1d68311a02ad76a74b726dc5aa90986d05",
+        "source_file": "/tmp/creator-shadow-cpu-final-mutation-coverage/report.json"
+      },
+      "shadow-mutation-recovery.json": {
+        "bytes": 8147,
+        "sha256": "a5fc4df764f266c1e7b6b9565c7c3fed0cddfe791c44948127818d9f7a1c8ed6",
+        "source_file": "/tmp/creator-shadow-cpu-mutation-recovery/report.json"
+      },
+      "toolchain/dxc-provenance.json": {
+        "bytes": 647,
+        "sha256": "b544354bf4a4bd4699fb3e01647b607cc81b599ca169f005783737c3f5f48226",
+        "source_file": "/tmp/creator-reac-validation/toolchain/dxc-provenance.json"
+      },
+      "toolchain/slang-provenance.json": {
+        "bytes": 322,
+        "sha256": "24902c666dfde2ad0c5e77d028c27ad7aaedc6ce9f74f3ddb62e02057e125e40",
+        "source_file": "/tmp/creator-reac-validation/toolchain/slang-provenance.json"
+      },
+      "toolchain/spirv-tools-provenance.json": {
+        "bytes": 445,
+        "sha256": "1e01f0b736f4ff03bb8142af86eef919279c41e5351f71bd4ae85050ad6ab24f",
+        "source_file": "/tmp/creator-reac-validation/toolchain/spirv-tools-provenance.json"
+      }
+    }
+  }
+}

@@ -52,12 +52,12 @@ struct GpuGeometryVisibility::SharedBatch
             const auto fallback = std::ranges::find_if(pyramids, [](const auto& pyramid) { return bool(pyramid); });
             if (fallback != pyramids.end())
             {
-                std::vector<RHIBindingDesc> descriptions;
+                std::array<RHIBindingDesc, kSharedViewCapacity * kOcclusionLevels> descriptions;
                 for (unsigned view = 0; view < kSharedViewCapacity; ++view)
                 {
                     const auto& pyramid = view < pyramids.size() && pyramids[view] ? pyramids[view] : *fallback;
                     const auto levels = pyramid->BindingInputs(execution);
-                    descriptions.insert(descriptions.end(), levels.begin(), levels.end());
+                    std::copy(levels.begin(), levels.end(), descriptions.begin() + view * kOcclusionLevels);
                 }
                 const auto textures = device->CreateBindings(descriptions);
                 if (!textures.IsValid())
@@ -135,7 +135,7 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
         {sizeof(input.constants), RHIUploadUsage::ConstantBuffer, 256},
         {input.candidates.size() * sizeof(Candidate), RHIUploadUsage::Raw, 256},
         {input.bins.size() * sizeof(Bin), RHIUploadUsage::Raw, 256},
-        {m_meshletGeometries.size() * 3u * sizeof(math::vector4), RHIUploadUsage::Raw, 16}};
+        {m_meshletGeometries.size() * kMeshletInstanceRows * sizeof(math::vector4), RHIUploadUsage::Raw, 16}};
     std::array<RHIBufferSlice, 4> uploads;
     std::string error;
     if (!m_device->ReserveUploadBatch(requests, uploads, error) ||
@@ -159,8 +159,13 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
         const auto& geometry = m_meshletGeometries[bin];
         const auto& world = geometry->ObjectToWorld();
         for (unsigned column = 0; column < 3; ++column)
-            worlds[bin * 3u + column] =
-                {world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]};
+            worlds[bin * kMeshletInstanceRows + column] = {world.m[0][column], world.m[1][column], world.m[2][column],
+                                                           world.m[3][column]};
+        const bool instanceBounds = geometry->UsesDirectClusters() && geometry->IsObjectSpace();
+        worlds[bin * kMeshletInstanceRows + 3u] =
+            instanceBounds ? geometry->Input()->InstanceMinimum() : math::vector4{};
+        worlds[bin * kMeshletInstanceRows + 4u] =
+            instanceBounds ? geometry->Input()->InstanceMaximum() : math::vector4{};
         const auto topology = geometry->Meshlets();
         vertices.push_back(RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
                                                       material_graph::MeshSurfaceBatch::GeometryViewStride));
@@ -172,10 +177,11 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
     vertices.resize(descriptorCount, vertices.front());
     topologies.resize(descriptorCount, topologies.front());
     RHIBufferSlice historyProjection;
-    if (m_historyPyramid)
+    if (m_historyPyramid || m_cameraPredictionView)
     {
         math::vector4 columns[4];
-        const auto& bits = m_historyPyramid->HistoryOwner()->source.projectionBits;
+        const auto& bits = m_cameraPredictionView ? m_cameraPredictionView->projectionBits
+                                                  : m_historyPyramid->HistoryOwner()->source.projectionBits;
         for (unsigned column = 0; column < 4; ++column)
             columns[column] = {std::bit_cast<float>(bits[column]), std::bit_cast<float>(bits[4 + column]),
                                std::bit_cast<float>(bits[8 + column]), std::bit_cast<float>(bits[12 + column])};
@@ -237,7 +243,7 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         {sizeof(GeometryVisibilityConstants), RHIUploadUsage::ConstantBuffer, 256},
         {totalBins * sizeof(Candidate), RHIUploadUsage::Raw, 256},
         {totalBins * sizeof(Bin), RHIUploadUsage::Raw, 256},
-        {totalBins * 3u * sizeof(math::vector4), RHIUploadUsage::Raw, 16},
+        {totalBins * kMeshletInstanceRows * sizeof(math::vector4), RHIUploadUsage::Raw, 16},
         {frames.size() * sizeof(SharedBatch::ViewData), RHIUploadUsage::Raw, 16},
         {sizeof(std::uint32_t), RHIUploadUsage::Raw, 16}};
     std::array<RHIBufferSlice, 6> uploads;
@@ -275,10 +281,16 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         view.valid = source->projectionValid;
         view.bins = frame->m_binCount;
         view.outputWords = frame->m_outputCount;
-        view.mode = frame->m_firstStage ? 3u : frame->m_historyPyramid ? 2u : frame->m_pyramid ? 1u : 0u;
-        if (frame->m_historyPyramid)
+        view.mode = frame->m_firstStage             ? 3u
+                    : frame->m_cameraPredictionView ? 4u
+                    : frame->m_historyPyramid       ? 2u
+                    : frame->m_pyramid              ? 1u
+                                                    : 0u;
+        if (frame->m_historyPyramid || frame->m_cameraPredictionView)
         {
-            const auto& bits = frame->m_historyPyramid->HistoryOwner()->source.projectionBits;
+            const auto& bits = frame->m_cameraPredictionView
+                                   ? frame->m_cameraPredictionView->projectionBits
+                                   : frame->m_historyPyramid->HistoryOwner()->source.projectionBits;
             for (unsigned column = 0; column < 4; ++column)
             {
                 view.history[column] = {std::bit_cast<float>(bits[column]), std::bit_cast<float>(bits[4 + column]),
@@ -315,8 +327,13 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
             const auto& geometry = frame->m_meshletGeometries[bin];
             const auto& world = geometry->ObjectToWorld();
             for (unsigned column = 0; column < 3; ++column)
-                worlds[binIndex * 3u + column] =
-                    {world.m[0][column], world.m[1][column], world.m[2][column], world.m[3][column]};
+                worlds[binIndex * kMeshletInstanceRows + column] = {world.m[0][column], world.m[1][column],
+                                                                    world.m[2][column], world.m[3][column]};
+            const bool instanceBounds = geometry->UsesDirectClusters() && geometry->IsObjectSpace();
+            worlds[binIndex * kMeshletInstanceRows + 3u] =
+                instanceBounds ? geometry->Input()->InstanceMinimum() : math::vector4{};
+            worlds[binIndex * kMeshletInstanceRows + 4u] =
+                instanceBounds ? geometry->Input()->InstanceMaximum() : math::vector4{};
             vertices.push_back(RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
                                                          material_graph::MeshSurfaceBatch::GeometryViewStride));
             const auto topology = geometry->Meshlets();
