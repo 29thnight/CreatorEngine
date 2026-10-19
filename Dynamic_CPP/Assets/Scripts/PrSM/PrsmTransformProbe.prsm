@@ -1,0 +1,31 @@
+export module TransformProbe
+
+// Transform 도메인과 값 타입(D-042)의 에디터 회귀 프로브.
+// Tools/regression/verify-prsm-bindings.ps1 이 LightComponent 를 붙인 빈 엔티티(PrsmProbeTarget)에
+// 붙여 재생한다.
+//
+//   Vector3     Transform.Position 읽기 → 필드를 고쳐서 쓰기, Scale 생성자로 쓰기
+//   Quaternion  Transform.Rotation 쓰기(기준선 항등과 다른 단위 사원수)
+//   Color       LightComponent.Color 쓰기
+//   LightType   LightComponent.Type 읽기 → 비교 → 쓰기
+//
+// 기대값(기준선 position p 기준): position (p.x+1, p.y*2, p.z-4), scale (2, 2, 2),
+// rotation (0, 0.6, 0, 0.8), color (0.25, 0.5, 1, 1), type SpotLight(2).
+class PrsmTransformProbe : Component {
+    contract fn OnInitialized() {
+        val transform = creator::Transform()
+        var position = transform.Position
+        position.x = position.x + 1.0f
+        position.y = position.y * 2.0f
+        position.z = position.z - 4.0f
+        transform.Position = position
+        transform.Scale = creator::Vector3(2.0f, 2.0f, 2.0f)
+        transform.Rotation = creator::Quaternion(0.0f, 0.6f, 0.0f, 0.8f)
+
+        val light = creator::Light()
+        light.Color = creator::Color(0.25f, 0.5f, 1.0f, 1.0f)
+        if (light.Type == creator::LightType::DirectionalLight) {
+            light.Type = creator::LightType::SpotLight
+        }
+    }
+}

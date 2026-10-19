@@ -1,7 +1,7 @@
 export module LightProbe
 
 // 첫 PrSM 엔진 도메인(LightComponent·Entity)의 에디터 회귀 프로브.
-// Tools/regression/verify-prsm-light.ps1 이 scripts/prsm_light_probe.txt 로 붙여 재생한다.
+// Tools/regression/verify-prsm-bindings.ps1 이 scripts/prsm_bindings_probe.txt 로 붙여 재생한다.
 //
 //   OnInitialized  세기 쓰기 · 엔티티 Enabled 읽기 → 범위 쓰기
 //   PrePhysics     세기 읽기 → 스폿 각 쓰기(틱 계약과 읽기 경로를 함께 태운다)

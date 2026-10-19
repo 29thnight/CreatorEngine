@@ -1,0 +1,52 @@
+# PrSM 엔진 바인딩 회귀 — LightComponent·Entity·Transform 과 값 타입(D-042).
+#
+# 사용법:
+#   CreatorEditor.exe --script ..\..\scripts\prsm_bindings_probe.txt
+#   (Tools\regression\verify-prsm-bindings.ps1 이 이 파일을 부른다)
+#
+# ── 무엇을 재현하는가 ──
+#
+# 에디터는 기동 때 Assets/Scripts/PrSM 을 prsmc 로 컴파일하고 prsm_jit 로 적재한다.
+# 그 컴포넌트를 엔티티에 붙여 재생하면 스크립트가 reflgen 이 생성한 바인딩으로 실제
+# 엔진 객체를 읽고 쓴다. 수신자는 엔티티 세대 핸들이고, 호출마다 그 엔티티의 컴포넌트를
+# 다시 찾는다.
+#
+#   "Directional Light"  PrsmLightProbe      Intensity·Range·SpotAngle·Entity.Enabled·PrePhysics
+#   "PrsmProbeTarget"    PrsmTransformProbe  Transform(Vector3·Quaternion)·Light Color·Type(enum)
+#
+# 프로브마다 엔티티를 따로 둔다 — 한 엔티티에 PrsmScriptComponent 가 둘이면
+# object.property 가 어느 쪽인지 #id 없이 가르지 못한다.
+#
+# 대상이 기본 씬인 이유는 C# 광원 프로브(light_script_probe.txt)와 같다 — --script
+# 헤드리스는 렌더 프레임이 거의 돌지 않아 저작 씬 전환이 프록시에 실리지 않는다.
+# 그래서 이 시나리오는 프록시가 아니라 컴포넌트 필드(object.properties)를 잰다.
+
+# 기본 씬이 설 때까지 기다린다.
+wait 60
+
+object.create PrsmProbeTarget Empty
+component.add PrsmProbeTarget LightComponent
+wait 5
+
+# 기준선 — 스크립트가 손대기 전 값.
+object.properties "Directional Light" LightComponent
+object.properties PrsmProbeTarget Transform
+object.properties PrsmProbeTarget LightComponent
+
+component.add "Directional Light" PrsmScriptComponent
+object.property "Directional Light" PrsmScriptComponent m_typeName PrsmLightProbe
+component.add PrsmProbeTarget PrsmScriptComponent
+object.property PrsmProbeTarget PrsmScriptComponent m_typeName PrsmTransformProbe
+wait 5
+
+# 생명주기 훅은 재생 중에만 온다(Scene::DrainPendingPhases).
+play
+wait 30
+
+object.properties "Directional Light" LightComponent
+object.properties PrsmProbeTarget Transform
+object.properties PrsmProbeTarget LightComponent
+stop
+wait 5
+log.flush
+quit

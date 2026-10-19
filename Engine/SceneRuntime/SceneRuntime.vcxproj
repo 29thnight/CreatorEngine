@@ -353,6 +353,7 @@
     <ClInclude Include="PrsmBindingContext.h" />
     <ClInclude Include="PrsmEngineAdapter.h" />
     <ClInclude Include="PrsmBindingRegistry.h" />
+    <ClInclude Include="PrsmValueTypes.h" />
     <ClInclude Include="ScriptObjectRegistry.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="RuntimeFrame.h" />

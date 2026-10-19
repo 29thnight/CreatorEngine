@@ -44,12 +44,15 @@ public:
 	// 그렇게 쓰고 있어(ReflectionTypedDraw.h는 값을 대입만 하고 dirty를
 	// 모른다) 지금 private으로 내리면 저작 경로가 멈춘다. 그 축은 별도로
 	// 닫아야 하고, 그때까지 새 코드는 이 writer들만 쓴다.
+	// 값 타입(creator::LightType·creator::Color)은 PrsmValueTypes.h 의 별칭이 연다.
+	[[reflgen::interop("prsm"), reflgen::property_set("Type")]]
 	void SetLightType(LightType type)
 	{
 		m_lightType = type;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
 
+	[[reflgen::interop("prsm"), reflgen::property_set("Color")]]
 	void SetColor(const math::color& color)
 	{
 		m_color = color;
@@ -86,6 +89,10 @@ public:
 	float GetRange() const noexcept { return m_range; }
 	[[reflgen::interop("prsm"), reflgen::property_get("SpotAngle")]]
 	float GetSpotAngle() const noexcept { return m_spotLightAngle; }
+	[[reflgen::interop("prsm"), reflgen::property_get("Type")]]
+	LightType GetLightType() const noexcept { return m_lightType; }
+	[[reflgen::interop("prsm"), reflgen::property_get("Color")]]
+	const math::color& GetColor() const noexcept { return m_color; }
 
 	void SetLightStatus(LightStatus status)
 	{

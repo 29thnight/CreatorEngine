@@ -61,7 +61,10 @@ const char* TransformWriteReasonName(TransformWriteReason reason);
 // Entity.cpp) 안의 호출부는 이미 고쳤다 — 나머지는 이 슬라이스 최종
 // 보고의 "통합 시 필요한 배선" 목록 참고(파일 밖 편집 금지 규칙 때문에
 // 여기서 고칠 수 없었다).
-class [[reflgen::reflect]] Transform : public meta::identity<Transform, Component>
+// PrSM: 수신자는 소유 엔티티의 세대 핸들이고 호출마다 이 컴포넌트를 다시 찾는다(PrsmEngineAdapter.h).
+// 스크립트에서는 `creator::Transform()` 으로 실행 중인 컴포넌트의 엔티티 Transform 을 얻는다.
+class [[reflgen::reflect, reflgen::interop("prsm"), reflgen::lifetime("borrowed"), reflgen::receiver("component"),
+        reflgen::owner("creator::Transform")]] Transform : public meta::identity<Transform, Component>
 {
    friend struct reflgen::access;
    public:
@@ -87,9 +90,23 @@ public:
 	Transform& operator=(const Transform&) = delete;
 	Transform& operator=(Transform&&) = delete;
 
+	[[reflgen::interop("prsm"), reflgen::property_get("Position")]]
 	math::vector3 GetPosition() const;
+	[[reflgen::interop("prsm"), reflgen::property_get("Rotation")]]
 	math::quaternion GetRotation() const;
+	[[reflgen::interop("prsm"), reflgen::property_get("Scale")]]
 	math::vector3 GetScale() const;
+
+	// PrSM 프로퍼티의 쓰기 쪽. 아래 C++ setter 는 체이닝용 Transform& 와 기록 사유 인자를 가져
+	// 스크립트 setter 계약(void, 인자 하나)과 맞지 않는다 — 사유를 Script 로 고정해 위임한다.
+	[[reflgen::interop("prsm"), reflgen::property_set("Position")]]
+	void SetScriptPosition(math::vector3 value) { SetPosition(value, TransformWriteReason::Script); }
+	[[reflgen::interop("prsm"), reflgen::property_set("Rotation")]]
+	void SetScriptRotation(math::quaternion value) { SetRotation(value, TransformWriteReason::Script); }
+	[[reflgen::interop("prsm"), reflgen::property_set("Scale")]]
+	void SetScriptScale(math::vector3 value) { SetScale(value, TransformWriteReason::Script); }
+	[[reflgen::interop("prsm"), reflgen::property_set("WorldPosition")]]
+	void SetScriptWorldPosition(math::vector3 value) { SetWorldPosition(value, TransformWriteReason::Script); }
 	const math::vector4& GetPositionValue() const { return position; }
 	const math::vector4& GetRotationValue() const { return rotation; }
 	const math::vector4& GetScaleValue() const { return scale; }
@@ -139,12 +156,17 @@ public:
 	void SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLocal = false,
 		TransformWriteReason reason = TransformWriteReason::CppSetter);
 
+	[[reflgen::interop("prsm"), reflgen::property_get("WorldPosition")]]
 	math::vector3 GetWorldPosition() const;
 	math::vector3 GetWorldScale() const;
 	math::quaternion GetWorldQuaternion() const;
 
+	// 읽기 전용 방향 벡터. const 가 아니어도 읽기 효과다(const 는 순수함을 뜻하지 않는다).
+	[[reflgen::interop("prsm"), reflgen::property_get("Forward")]]
 	math::vector3 GetForward();
+	[[reflgen::interop("prsm"), reflgen::property_get("Right")]]
 	math::vector3 GetRight();
+	[[reflgen::interop("prsm"), reflgen::property_get("Up")]]
 	math::vector3 GetUp();
 	void SetDirty();
 	bool IsDirty() const;
