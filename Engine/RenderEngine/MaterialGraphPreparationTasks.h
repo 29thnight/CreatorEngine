@@ -31,7 +31,8 @@ namespace material_graph
         ScenePreparationTasks(const ScenePreparationTasks&) = delete;
         ScenePreparationTasks& operator=(const ScenePreparationTasks&) = delete;
 
-        bool Add(ce::marker_id marker, std::function<bool(std::string&)> task, std::string& error)
+        template<class F>
+        bool Add(ce::marker_id marker, F&& task, std::string& error)
         {
             try
             {
@@ -39,7 +40,9 @@ namespace material_graph
 #if !CE_SHIPPING
                 cpuContext = ce::current_cpu_context;
 #endif
-                auto execute = [marker, cpuContext, task = std::move(task)]
+                // 호출자를 여기서 한 번 더 type-erasure하면 캡처가 큰 작업마다 별도 할당이 붙는다.
+                // scheduler에 넘길 때만 소유 callback으로 만들고, inline 경로는 직접 호출한다.
+                auto execute = [marker, cpuContext, task = std::forward<F>(task)]() mutable
                 {
                     ce::profile_context_scope context{cpuContext};
                     ce::profile_scope profile{marker};
@@ -63,7 +66,8 @@ namespace material_graph
                     // or allocation can lose the handle of already accepted work.
                     auto& slot = work_[count_++];
                     // A leaf preparation has no dependency graph to construct.
-                    slot = scheduler_.submit_indexed(1, [execute = std::move(execute)](std::size_t) { execute(); });
+                    slot = scheduler_.submit_indexed(1, [execute = std::move(execute)](std::size_t) mutable
+                                                     { execute(); });
                 }
                 return true;
             }

@@ -275,6 +275,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     struct EffectStage;
 
     struct Preparation;
+    struct PreparationScratch;
     struct Slot;
     using SlotKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t>;
     void DeclareSharedFirst(EnhancedRenderGraph& graph, RGHandle geometry) const;
@@ -328,6 +329,8 @@ class SceneHost final : private IRHIUploadTransactionListener
     std::vector<own::shared_owner<const Program>> programs_;
     own::shared_owner<const Frame> frame_;
     job_scheduler& scheduler_;
+    std::unique_ptr<PreparationScratch> m_preparationScratch;
+    std::atomic_flag m_preparing{};
     IRenderDeviceServices* programDevice_{};
     std::vector<own::unique_owner<Preparation>> preparations_;
     std::map<SlotKey, own::unique_owner<Slot>> slots_;
