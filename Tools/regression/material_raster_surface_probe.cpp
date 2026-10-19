@@ -2256,12 +2256,49 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
     }
 }
 
+void check_primitive_cache_wiring(const EnhancedRenderGraph::DiagnosticSnapshot& snapshot,
+                                  std::string_view consumerName)
+{
+    const auto find = [&](std::string_view name) -> const EnhancedRenderGraph::DiagnosticPass&
+    {
+        const auto found = std::ranges::find(snapshot.passes, name, &EnhancedRenderGraph::DiagnosticPass::name);
+        Check(found != snapshot.passes.end(), "Primitive cache producer and consumer exist in the compiled graph");
+        return *found;
+    };
+    const auto& clear = find("METEOR.Scene.PrimitiveCache.Clear");
+    const auto& populate = find("METEOR.Scene.PrimitiveCache.Populate");
+    const auto& packets = find("METEOR.Scene.Material.Scatter");
+    const auto& consumer = find(consumerName);
+    Check(clear.compiledIndex >= 0 && clear.compiledIndex < populate.compiledIndex &&
+              packets.compiledIndex < populate.compiledIndex && populate.compiledIndex < consumer.compiledIndex,
+          "Cache population follows key reset and final packets, before its pixel consumer");
+    std::uint32_t cacheWrites{};
+    for (const auto& write : populate.usages)
+    {
+        if (write.state != RHIResourceState::UnorderedAccess)
+        {
+            continue;
+        }
+        ++cacheWrites;
+        Check(std::ranges::any_of(consumer.usages,
+                                  [&](const auto& read)
+                                  {
+                                      return read.resource == write.resource && read.version == write.version &&
+                                             read.state == RHIResourceState::PixelShaderResource &&
+                                             read.access == RGAccessMode::Read;
+                                  }),
+              "The native pixel consumer reads the exact populated key/data versions");
+    }
+    Check(cacheWrites == 2, "Cache producer writes exactly its bounded key and data buffers");
+}
+
 void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                          ProbeTextures& textures, ProbePool& pool,
                          const std::array<own::shared_owner<const Instance>, 2>& surfaceInstances,
                          own::shared_owner<const Texture> cube, const Environment& environmentColors,
-                         const SheenTable& table, unsigned expanded = 0, bool currentFrameDepth = true, bool temporalAudit = false,
-                         bool bucketAudit = false, bool visibilityAudit = false)
+                         const SheenTable& table, unsigned expanded = 0, bool currentFrameDepth = true,
+                         bool temporalAudit = false, bool bucketAudit = false, bool visibilityAudit = false,
+                         bool primitiveCache = false)
 {
     const auto instances = SceneCooked(surfaceInstances);
     std::string error;
@@ -2632,7 +2669,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (!hostListener) device.firstListener = nullptr;
             const auto hostPrepared =
                 host.Prepare(context, input, fixture == 7 ? RHITextureHandle{} : environment.handle, {}, {}, {},
-                             SceneHostBudget{.lookupApproximate = expanded == 5},
+                             SceneHostBudget{.lookupApproximate = expanded == 5, .m_primitiveCache = primitiveCache},
                              error, expanded == 1 && step >= 7 ? 2 : 1);
             Check(hostPrepared, "Scene host prepare " + error);
             if (!hostListener) hostListener = device.firstListener;
@@ -2895,6 +2932,10 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             {
                 EnhancedRenderGraph::DiagnosticSnapshot wiring;
                 Check(graph->CaptureDiagnosticSnapshot(wiring), "Reconstruction graph diagnostic snapshot");
+                if (primitiveCache)
+                {
+                    check_primitive_cache_wiring(wiring, "METEOR.Scene.Material.Resolve");
+                }
                 const auto find = [&](std::string_view name) -> const EnhancedRenderGraph::DiagnosticPass&
                 {
                     const auto found =
@@ -4354,7 +4395,8 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         ShutdownNative(device, roots, pipelines, textures, pool);
         return;
     }
-    if (mode == "--material-bucket-only" || mode == "--hw-visibility-only" || mode == "--visibility-reconstruction-only")
+    if (mode == "--material-bucket-only" || mode == "--hw-visibility-only" ||
+        mode == "--visibility-reconstruction-only" || mode == "--primitive-cache-only")
     {
         const auto first = SceneCooked(instances[0]);
         auto obsolete = first->generation->cooked.product;
@@ -4374,13 +4416,25 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                 });
                 return found == first->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
             }, second, error), "Two distinct instances share one cooked shader: " + error);
-        RunSceneComposition(device, roots, pipelines, textures, pool, {first, second}, cube,
-            environmentColors, table, 0, true, true, true, mode != "--material-bucket-only");
-        if (mode == "--visibility-reconstruction-only")
-            RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors, table, 3);
+        RunSceneComposition(device, roots, pipelines, textures, pool, {first, second}, cube, environmentColors, table,
+                            0, true, true, true, mode != "--material-bucket-only", mode == "--primitive-cache-only");
+        if (mode == "--visibility-reconstruction-only" || mode == "--primitive-cache-only")
+        {
+            RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors,
+                                table, 3, true, false, false, false, mode == "--primitive-cache-only");
+        }
+        if (mode == "--primitive-cache-only")
+        {
+            RunTemporalBuckets(device, roots, pipelines, textures, pool, root, image, false, true);
+        }
         std::string validation;
         Check(device.DrainDebugMessages(validation) == 0, "Material bucket validation " + validation);
         ShutdownNative(device, roots, pipelines, textures, pool);
+        if (mode == "--primitive-cache-only")
+        {
+            std::cout << "METEOR_PRIMITIVE_CACHE_OK surfaceFrames=" << sceneCompositionFrames
+                      << " temporalFrames=12 validation=0\n";
+        }
         if (mode == "--visibility-reconstruction-only") std::cout << "METEOR_VISIBILITY_RECONSTRUCTION_OK frames=" << sceneCompositionFrames << " partitions=3 footprintFrames=8 validation=0\n";
         if (mode == "--hw-visibility-only") std::cout << "METEOR_HW_VISIBILITY_OK frames=" << sceneCompositionFrames << " partitions=3 validation=0\n";
         std::cout << "LX_MATERIAL_BUCKET_OK frames=" << sceneCompositionFrames << " validation=0\n";
@@ -4925,12 +4979,37 @@ int main(int argc, char** argv)
         }
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
-                   (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
-                    std::string_view(argv[2]) == "--layer-shape-only" || std::string_view(argv[2]) == "--layer-bucket-only" || std::string_view(argv[2]) == "--temporal-bucket-only" || std::string_view(argv[2]) == "--visibility-reconstruction-only" || std::string_view(argv[2]) == "--hw-visibility-only" || std::string_view(argv[2]) == "--material-bucket-only" || std::string_view(argv[2]) == "--lx-meshlet-only" || std::string_view(argv[2]) == "--cluster-streaming-only" || std::string_view(argv[2]) == "--cluster-storage-only" || std::string_view(argv[2]) == "--quantized-geometry-only" || std::string_view(argv[2]) == "--geometry-access-only" || std::string_view(argv[2]) == "--meshlet-dispatch-only" || std::string_view(argv[2]) == "--temporal-transmission-only" || std::string_view(argv[2]) == "--shadow-correctness-only" || std::string_view(argv[2]) == "--shadow-correctness-recreated" || std::string_view(argv[2]) == "--cluster-lod-only" || std::string_view(argv[2]) == "--object-space-only" || std::string_view(argv[2]) == "--hybrid-visibility-only" || std::string_view(argv[2]) == "--atomic-reduction-only" || std::string_view(argv[2]) == "--meshlet-hzb-only" ||
+                   (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" ||
+                    std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" ||
+                    std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" ||
+                    std::string_view(argv[2]) == "--scene-full-only" ||
+                    std::string_view(argv[2]) == "--layer-shape-only" ||
+                    std::string_view(argv[2]) == "--layer-bucket-only" ||
+                    std::string_view(argv[2]) == "--temporal-bucket-only" ||
+                    std::string_view(argv[2]) == "--visibility-reconstruction-only" ||
+                    std::string_view(argv[2]) == "--hw-visibility-only" ||
+                    std::string_view(argv[2]) == "--material-bucket-only" ||
+                    std::string_view(argv[2]) == "--lx-meshlet-only" ||
+                    std::string_view(argv[2]) == "--cluster-streaming-only" ||
+                    std::string_view(argv[2]) == "--cluster-storage-only" ||
+                    std::string_view(argv[2]) == "--quantized-geometry-only" ||
+                    std::string_view(argv[2]) == "--geometry-access-only" ||
+                    std::string_view(argv[2]) == "--meshlet-dispatch-only" ||
+                    std::string_view(argv[2]) == "--temporal-transmission-only" ||
+                    std::string_view(argv[2]) == "--shadow-correctness-only" ||
+                    std::string_view(argv[2]) == "--shadow-correctness-recreated" ||
+                    std::string_view(argv[2]) == "--cluster-lod-only" ||
+                    std::string_view(argv[2]) == "--object-space-only" ||
+                    std::string_view(argv[2]) == "--hybrid-visibility-only" ||
+                    std::string_view(argv[2]) == "--atomic-reduction-only" ||
+                    std::string_view(argv[2]) == "--meshlet-hzb-only" ||
+                    std::string_view(argv[2]) == "--primitive-cache-only" ||
                     std::string_view(argv[2]) == "--issue-resource-lifetime" ||
                     std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
-                    std::string_view(argv[2]) == "--refraction-film-only" || std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" || std::string_view(argv[2]) == "--volume-native-only" ||
+                    std::string_view(argv[2]) == "--refraction-film-only" ||
+                    std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
+                    std::string_view(argv[2]) == "--volume-native-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),
               "Expected repository root");
         Run(std::filesystem::absolute(argv[1]), argc >= 3 ? std::string_view(argv[2]) : std::string_view{},

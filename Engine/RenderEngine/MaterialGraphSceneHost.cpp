@@ -482,6 +482,7 @@ namespace material_graph
         std::shared_ptr<const PassLayout> volumeLayoutSnapshot;
         LX::Runtime::ComputePipeline volume;
         RHIShaderBlob meshShader, visibilityMeshShader, reconstructShader, shadowMeshShader;
+        RHIShaderBlob m_cachedSurfaceShader, m_cachedTemporalShader;
         std::unordered_map<uint32_t, RHIPipelineHandle> reconstructionPipelines;
         std::map<uint64_t, RHIPipelineHandle> meshPipelines;
         uint32_t rasterRouteRoot{}, visibilityKeyRoot{}, meshletRoot{}, temporalPreviousRoot{}, geometryTableRoot{},
@@ -561,6 +562,7 @@ namespace material_graph
             bool shadowEnabled{};
             std::shared_ptr<const MeshSurfaceBatch> geometry, previousGeometry;
             RHIBufferSlice constants, referenceConstants;
+            RHIPipelineHandle m_cachedSurfacePipeline, m_cachedTemporalPipeline;
             RHIBufferSlice visibleOwner;
             // Bin in the camera list (opaque) or the ordered blended list.
             std::uint32_t cameraMeshletBin{UINT32_MAX};
@@ -577,6 +579,7 @@ namespace material_graph
         };
         std::shared_ptr<const RasterResources> raster;
         std::shared_ptr<const SceneGpuData> sceneData;
+        std::shared_ptr<const ScenePrimitiveCacheFrame> m_primitiveCache;
         std::map<const IndirectMaterialBatch*, RHIBindingTable> packetBindings;
         RHIBindingTable materialPacketBindings, legacyPacketBindings;
         IRenderDeviceServices* device{};
@@ -692,7 +695,8 @@ namespace material_graph
         }
 
         void AddReconstructionReads(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
-                                    RGHandle visibilityTarget, const std::array<RGHandle, 2>& materialInputs) const
+                                    RGHandle visibilityTarget, const std::array<RGHandle, 2>& materialInputs,
+                                    bool primitiveCache = false) const
         {
             uses.push_back({visibilityTarget, RHIResourceState::PixelShaderResource, RGAccessMode::Read});
             uses.push_back(
@@ -702,6 +706,10 @@ namespace material_graph
                 raster->material->AddRead(graph, uses, materialInputs);
             }
             sceneData->AddRead(graph, uses);
+            if (primitiveCache && m_primitiveCache)
+            {
+                m_primitiveCache->AddRead(graph, uses);
+            }
         }
         RHIBindingTable CreateReconstructionVisibility(const EnhancedRenderGraph::ExecuteContext& execution,
                                                        RGHandle visibilityTarget) const
@@ -718,7 +726,23 @@ namespace material_graph
         void BindReconstruction(RHIEncoder& encoder, const Draw& draw, RHIBindingTable visibility,
                                 RHIPipelineHandle source) const
         {
-            encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->reconstructionPipelines.at(source.id));
+            auto pipeline = draw.program->reconstructionPipelines.at(source.id);
+            if (m_primitiveCache)
+            {
+                if (source == draw.program->gbuffer[draw.doubleSided].GetHandle())
+                {
+                    pipeline = draw.m_cachedSurfacePipeline;
+                }
+                else if (source == draw.program->temporal[draw.doubleSided].GetHandle())
+                {
+                    pipeline = draw.m_cachedTemporalPipeline;
+                }
+            }
+            if (!pipeline.IsValid())
+            {
+                throw std::runtime_error("METEOR reconstruction requires the frame's prepared shader permutation.");
+            }
+            encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);
             encoder.SetBindings(RHIBindPoint::Graphics, draw.program->visibilityRoot, visibility);
             BindPacketResources(encoder, draw, materialPacketBindings, draw.program->packetRoots);
         }
@@ -1094,6 +1118,8 @@ namespace material_graph
                     candidate->visibilityMeshShader = compiled->visibilityMesh.bytecode;
                     candidate->reconstructShader = compiled->reconstructMesh.bytecode;
                     candidate->shadowMeshShader = compiled->shadowMesh.bytecode;
+                    candidate->m_cachedSurfaceShader = compiled->m_cachedGbuffer.bytecode;
+                    candidate->m_cachedTemporalShader = compiled->m_cachedTemporal.bytecode;
                     const auto& product =
                         compiled->verified ? *compiled->verified : candidate->generation->cooked.product;
                     const auto prepare = [&](LX::Runtime::GraphicsPipeline& request,
@@ -1161,11 +1187,10 @@ namespace material_graph
                     const auto appendPacketLayout =
                         [](std::vector<RHIPipelineLayoutParam>& parameters, Program::PacketRoots& roots)
                     {
-                        // Four fixed SRVs share one descriptor table. Together with
-                        // two geometry arrays and b8 this adds five root DWORDs;
-                        // the complete special-surface layout stays within 64.
+                        // cache key/data도 같은 SRV table에 포함해 root DWORD를 늘리지 않는다.
+                        // geometry 배열 둘과 b8을 합쳐 기존의 다섯 DWORD 계약을 유지한다.
                         roots.resources = static_cast<uint32_t>(parameters.size());
-                        parameters.push_back(RHILayout::SrvBufferTable(4, 170, RHIShaderVisibility::All));
+                        parameters.push_back(RHILayout::SrvBufferTable(6, 170, RHIShaderVisibility::All));
                         roots.selector = static_cast<uint32_t>(parameters.size());
                         parameters.push_back(RHILayout::Cbv(8, RHIShaderVisibility::All));
                         roots.vertices = static_cast<uint32_t>(parameters.size());
@@ -2228,6 +2253,15 @@ namespace material_graph
         {
             return false;
         }
+        // 입력 표면이 없는 뷰는 카메라 HZB를 만들지 않는다. 이때는 기존 light-space 경로를 유지한다.
+        // Draw의 봉인된 geometry/program만 읽으며 뒤의 준비 작업이 채울 material binding은 보지 않는다.
+        if (candidate->shadow && budget.m_shadowDepthPrediction &&
+            std::ranges::any_of(candidate->draws,
+                                [&](const auto& draw) { return !draw.blended && candidate->UsesMeshlets(draw); }))
+        {
+            candidate->shadowFirstCullStage.m_cameraPredictionView =
+                GpuGeometryOcclusion::CaptureView(context, candidate->input->ViewProjection());
+        }
         // Destruction drains setup before its cascade handles, then releases snapshots.
         // Setup is the sole writer of shadow caches/histories and its own Draw list.
         ScenePreparationTasks shadowPreparation(scheduler_, parallelPreparation);
@@ -2528,8 +2562,9 @@ namespace material_graph
                             for (const auto& history : histories)
                             {
                                 const auto& old = history.cascades[cascade];
-                                if (!reset && history.frameId == newestCompletedHistory &&
-                                    history.frameId < context.frameId && history.revision == view.historyRevision &&
+                                if (!candidate->shadowFirstCullStage.m_cameraPredictionView && !reset &&
+                                    history.frameId == newestCompletedHistory && history.frameId < context.frameId &&
+                                    history.revision == view.historyRevision &&
                                     history.temporalRevision == view.temporalFrame.historyRevision && old &&
                                     old->completion && old->completion <= completed &&
                                     old->source.width == candidate->shadowExtent &&
@@ -2555,12 +2590,14 @@ namespace material_graph
                                     ce::marker<"MaterialSceneShadowVisibilityTask">(),
                                     [&, shadowContext, previous, pixelError, cascade](std::string& taskError)
                                     {
+                                        const auto& prediction = candidate->shadowFirstCullStage.m_cameraPredictionView;
                                         if (!visibility_.PrepareMeshlets(
                                                 shadowContext, shadow.lightViewProjection[cascade],
                                                 shadowMeshletGeometry,
                                                 candidate->shadowFirstCullStage.meshlets[cascade], taskError,
-                                                bool(previous), previous, {}, false, pixelError,
-                                                candidate->shadowExtent, candidate->shadowExtent) ||
+                                                bool(previous) || bool(prediction), previous, {}, false, pixelError,
+                                                candidate->shadowExtent, candidate->shadowExtent,
+                                                prediction ? &*prediction : nullptr) ||
                                             !visibility_.PrepareMeshlets(
                                                 shadowContext, shadow.lightViewProjection[cascade],
                                                 shadowMeshletGeometry,
@@ -3472,12 +3509,44 @@ namespace material_graph
                 return false;
             }
         }
-        if (const auto& work = candidate->materialWorkStage.materialWork;
-            work && !sceneData->CreatePacketBindings(*device_, work->work, work->PacketCapacity(), work->ranges,
-                                                     static_cast<uint32_t>(work->buckets.size()),
-                                                     candidate->materialPacketBindings, error))
+        if (const auto& work = candidate->materialWorkStage.materialWork; work)
         {
-            return false;
+            if (budget.m_primitiveCache && ScenePrimitiveCacheFrame::SupportsPacketDispatch(*work))
+            {
+                if (!m_primitiveCacheResources)
+                {
+                    m_primitiveCacheResources = std::make_shared<ScenePrimitiveCacheResources>();
+                }
+                auto cache = std::make_shared<ScenePrimitiveCacheFrame>();
+                if (!cache->Prepare(context, bufferPool_, m_primitiveCacheResources, sceneData, work,
+                                    candidate->input->ViewProjection(), error))
+                {
+                    return false;
+                }
+                for (const auto& bucket : work->buckets)
+                {
+                    auto& draw = candidate->draws.at(bucket.representative);
+                    const auto& program = *draw.program;
+                    if (!m_primitiveCacheResources->PrepareReconstruction(
+                            context, program.generation, program.gbuffer[draw.doubleSided], program.reconstructShader,
+                            program.m_cachedSurfaceShader, false, draw.m_cachedSurfacePipeline, error) ||
+                        !m_primitiveCacheResources->PrepareReconstruction(
+                            context, program.generation, program.temporal[draw.doubleSided], program.reconstructShader,
+                            program.m_cachedTemporalShader, true, draw.m_cachedTemporalPipeline, error))
+                    {
+                        return false;
+                    }
+                }
+                candidate->m_primitiveCache = std::move(cache);
+            }
+            const auto& cache = candidate->m_primitiveCache;
+            if (!sceneData->CreatePacketBindings(
+                    *device_, work->work, work->PacketCapacity(), work->ranges,
+                    static_cast<uint32_t>(work->buckets.size()), candidate->materialPacketBindings, error,
+                    cache ? cache->Keys() : RHIBufferHandle{}, cache ? cache->Data() : RHIBufferHandle{}))
+            {
+                return false;
+            }
         }
         if (!sceneData->CreatePacketBindings(*device_, sceneData->recordBuffer->Buffer(), 1,
                                              sceneData->recordBuffer->Buffer(), 1, candidate->legacyPacketBindings,
@@ -3554,21 +3623,27 @@ namespace material_graph
         }
         frame_->CheckCurrent(&graph);
         RequireStage(geometry, frame_->raster->geometry->GraphTable(graph), "Shared first culling requires Geometry.");
-        std::vector<std::shared_ptr<const GpuGeometryVisibility::Frame>> ready;
+        std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 4> ready;
+        std::size_t readyCount{};
         if (frame_->firstCullStage.cameraDepthMeshlets)
         {
-            ready.push_back(frame_->firstCullStage.cameraDepthMeshlets);
+            ready[readyCount++] = frame_->firstCullStage.cameraDepthMeshlets;
         }
-        for (const auto& shadow : frame_->shadowFirstCullStage.meshlets)
+        // 현재 카메라 깊이는 camera first 뒤에 만들어진다. 예측을 켠 경우에만 shadow first를 분리한다.
+        if (!frame_->shadowFirstCullStage.m_cameraPredictionView)
         {
-            if (shadow)
+            for (const auto& shadow : frame_->shadowFirstCullStage.meshlets)
             {
-                ready.push_back(shadow);
+                if (shadow)
+                {
+                    ready[readyCount++] = shadow;
+                }
             }
         }
-        if (!ready.empty())
+        if (readyCount)
         {
-            GpuGeometryVisibility::Frame::DeclareFirstStageBatch(graph, ready, "METEOR.Shared.First");
+            GpuGeometryVisibility::Frame::DeclareFirstStageBatch(graph, std::span{ready}.first(readyCount),
+                                                                 "METEOR.Shared.First");
         }
     }
 
@@ -3946,17 +4021,25 @@ namespace material_graph
         return frame_ && cascade < 3 ? frame_->shadowFirstCullStage.meshlets[cascade] : nullptr;
     }
 
+    bool SceneHost::UsesShadowDepthPrediction() const
+    {
+        return frame_ && frame_->shadowFirstCullStage.m_cameraPredictionView.has_value() &&
+               frame_->shadowFirstCullStage.meshlets[0];
+    }
+
     SceneShadowResources SceneHost::DeclareShadowStaticCache(EnhancedRenderGraph& graph, RGHandle geometry) const
     {
         const ShadowCacheStage empty;
         return (frame_ ? frame_->shadowCacheStage : empty).Declare(frame_, RequireVersionedGraph(graph), geometry);
     }
 
-    SceneShadowResources SceneHost::DeclareShadowFirstCull(EnhancedRenderGraph& graph, RGHandle geometry) const
+    SceneShadowResources SceneHost::DeclareShadowFirstCull(EnhancedRenderGraph& graph, RGHandle geometry,
+                                                           RGHandle cameraOccluderDepth) const
     {
         DeclareSharedFirst(graph, geometry);
         const ShadowFirstCullStage empty;
-        return (frame_ ? frame_->shadowFirstCullStage : empty).Declare(frame_, RequireVersionedGraph(graph), geometry);
+        return (frame_ ? frame_->shadowFirstCullStage : empty)
+            .Declare(frame_, RequireVersionedGraph(graph), geometry, cameraOccluderDepth);
     }
 
     SceneShadowResources SceneHost::DeclareShadowOccluder(EnhancedRenderGraph& graph, RGHandle geometry,
@@ -4031,10 +4114,11 @@ namespace material_graph
     }
 
     // Standalone fixtures use the exact same six producers as the live nodes.
-    RGHandle SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap) const
+    RGHandle SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle geometry, RGHandle shadowMap,
+                                      RGHandle cameraOccluderDepth) const
     {
         const auto cache = DeclareShadowStaticCache(graph, geometry);
-        const auto first = DeclareShadowFirstCull(graph, geometry);
+        const auto first = DeclareShadowFirstCull(graph, geometry, cameraOccluderDepth);
         const auto depth = DeclareShadowOccluder(graph, geometry, cache, first);
         const auto final = DeclareShadowFinalCull(graph, geometry, depth);
         const auto output = DeclareShadowRaster(graph, geometry, cache, final, shadowMap);
@@ -4521,6 +4605,7 @@ namespace material_graph
         hybridPipelines_ = {};
         shadowMerge_ = {};
         materialWorkPipelines_ = {};
+        m_primitiveCacheResources.reset();
         geometry_ = {};
         sceneResidentBuffers_.ShutdownAfterIdle();
         if (bufferPool_)

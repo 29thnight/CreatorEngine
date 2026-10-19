@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][ValidateSet('--shadow-decal-only','--subsurface-only','--refraction-only','--refraction-film-only','--volume-only',
         '--forward-blend','--rg5-mixed','--rg5-decal','--rg5-reference','--scene-only','--lx-meshlet-only',
-        '--temporal-transmission-only','--shadow-correctness-only','--cluster-lod-only','--object-space-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--cluster-streaming-only','--cluster-storage-only','--quantized-geometry-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only')][string[]]$Modes,
+        '--temporal-transmission-only','--shadow-correctness-only','--cluster-lod-only','--object-space-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--cluster-streaming-only','--cluster-storage-only','--quantized-geometry-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only','--primitive-cache-only')][string[]]$Modes,
     [ValidateRange(60,1800)][int]$TimeoutSeconds=1200
 )
 $ErrorActionPreference='Stop'
@@ -28,13 +28,14 @@ $required=@{
     '--cluster-storage-only'=@('METEOR_SHARED_SPARSE_POOL_OK assets=3 physicalPages=3 gpuWords=192 activePin=1 priority=1 lru=1 reuse=1 delta=1 abort=1 validation=0','METEOR_CLUSTER_STORAGE_OK','METEOR_CLUSTER_RESIDENCY_OK','METEOR_SPARSE_BUFFER_OK frames=6 words=384 malformed=6 stableAddress=1 validation=0')
     '--cluster-streaming-only'=@('METEOR_CLUSTER_STREAMING_OK','METEOR_CLUSTER_LOD_OK','METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0','METEOR_COLD_METADATA_OK','METEOR_GEOMETRY_PAGE_ONLY_OK schema=9 bodyBytes=0 oldSchemasRejected=3','METEOR_COLD_BACKING_OK loose=1 pak=1 capturedLifetime=1 pageHashes=1','METEOR_COLD_RENDER_OK frames=32 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0')
     '--quantized-geometry-only'=@('METEOR_QUANTIZED_GEOMETRY_OK')
-    '--shadow-correctness-only'=@('METEOR_SHADOW_CORRECTNESS_OK','METEOR_SHADOW_DEVICE_RECREATION_OK devices=2 validation=0')
+    '--shadow-correctness-only'=@('METEOR_SHADOW_CORRECTNESS_OK','METEOR_SHADOW_CAMERA_PREDICTION_OK cases=8 recovered=2 exactVersionRejects=6 retainedHistoryRejects=2 validation=0','METEOR_SHADOW_DEVICE_RECREATION_OK devices=2 validation=0')
     '--temporal-transmission-only'=@('METEOR_TEMPORAL_TRANSMISSION_OK frames=6 instances=2 validation=0')
     '--cluster-lod-only'=@('METEOR_CLUSTER_LOD_OK frames=32 partitions=2 malformed=9','METEOR_PRODUCTION_SHARED_QUEUE_OK headers=224 cameraFrames=32 shadowFrames=32 sharedReads=192 validation=0')
     '--object-space-only'=@('METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3','METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0')
     '--hybrid-visibility-only'=@('METEOR_HYBRID_VISIBILITY_OK frames=24 cases=8 partitions=3 validation=0')
     '--atomic-reduction-only'=@('METEOR_ATOMIC_REDUCTION_OK permutations=24 frames=6 validation=0')
     '--visibility-reconstruction-only'=@('METEOR_VISIBILITY_RECONSTRUCTION_OK frames=32 partitions=3 footprintFrames=8 validation=0')
+    '--primitive-cache-only'=@('METEOR_PRIMITIVE_CACHE_OK surfaceFrames=32 temporalFrames=12 validation=0','LX_TEMPORAL_BUCKET_OK frames=12 instances=2 opaquePackets=12 layerReplays=3')
     '--hw-visibility-only'=@('METEOR_HW_VISIBILITY_OK frames=24 partitions=3 validation=0')
     '--geometry-access-only'=@('METEOR_GEOMETRY_ACCESS_OK cases=6 lods=2 partitions=3 validation=0')
     '--layer-bucket-only'=@('LX_LAYER_BUCKET_OK mode=1 frames=24','LX_LAYER_BUCKET_OK mode=2 frames=24')
@@ -54,7 +55,7 @@ $required=@{
     '--scene-only'=@('LX_MATERIAL_SCENE_INTEGRATION_OK')
     '--meshlet-hzb-only'=@('METEOR_MESHLET_HZB_OK cases=8','METEOR_MESHLET_TEMPORAL_OK cases=8','METEOR_HISTORY_POOL_OK')
     '--lx-meshlet-only'=@('METEOR_MESHLET_HZB_OK cases=8','METEOR_MESHLET_TEMPORAL_OK cases=8','LX_MESHLET_CULL_LOD_HZB_OK','METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096')
-    '--meshlet-dispatch-only'=@('METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096','METEOR_QUEUE_COUNT_OK cases=48 referenceCases=8 orderedCases=32 partialWaveCases=16 oneSlotCases=16 subdivisions=16 ignoredTotalHintCases=8 budgetBoundaries=3 validation=0')
+    '--meshlet-dispatch-only'=@('METEOR_CAMERA_MESHLET_DISPATCH_BOUNDARIES_OK cases=5 maxSurvivors=131071 ordered=1','METEOR_MESHLET_BATCH_DISPATCH_OK bins=4096','METEOR_QUEUE_COUNT_OK cases=48 referenceCases=8 orderedCases=32 partialWaveCases=16 oneSlotCases=16 subdivisions=16 ignoredTotalHintCases=8 budgetBoundaries=3 validation=0','METEOR_INSTANCE_ADMISSION_OK cases=16 partialWaveCases=8 boundsWords=8 legacyParity=1 validation=0')
     '--decal-only'=@('LX_MATERIAL_SCENE_DECAL_OK')
     '--forward-transport'=@('LX_MATERIAL_FORWARD_TRANSPORT_OK')
 }

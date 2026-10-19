@@ -887,12 +887,21 @@ namespace
         {
             return false;
         }
-        if (!pipeline.graphMaterials.Prepare(context, pipeline.graphInput,
-                pipeline.ibl.GetCubeMap(), pipeline.ibl.GetIrradianceMap(),
+        // 현재 GPU에서 A/B 수용하기 전까지 opt-in이다. 매 프레임 문자열 컨테이너를 만들지 않는다.
+        const auto meteorExperimentEnabled = [](const char* name)
+        {
+            char value[8]{};
+            return GetEnvironmentVariableA(name, value, sizeof(value)) == 1 && value[0] == '1';
+        };
+        if (!pipeline.graphMaterials.Prepare(
+                context, pipeline.graphInput, pipeline.ibl.GetCubeMap(), pipeline.ibl.GetIrradianceMap(),
                 pipeline.ibl.GetPrefilteredMap(), pipeline.shadow.GetShadowData(),
-                material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate,
-                    .lookupRuntimeEvaluation = true}, error, pipeline.ibl.GetGeneration(),
-                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap()))
+                material_graph::SceneHostBudget{
+                    .lookupApproximate = kLiveLookupApproximate,
+                    .lookupRuntimeEvaluation = true,
+                    .m_shadowDepthPrediction = meteorExperimentEnabled("CREATOR_METEOR_SHADOW_CAMERA_PREDICTION"),
+                    .m_primitiveCache = meteorExperimentEnabled("CREATOR_METEOR_PRIMITIVE_CACHE")},
+                error, pipeline.ibl.GetGeneration(), pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap()))
         {
             preparationDeferred = pipeline.graphMaterials.PreparationDeferred();
             return false;
@@ -3702,8 +3711,8 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
-            // Shadow data flow is independent of camera visibility. Static depth
-            // never contains dynamic-occluder rejection; both cull stages use light space.
+            // 정적 cache와 최종 판정은 실제 light-space depth를 사용한다. 선택적 카메라
+            // 예측은 first에만 연결하고, 누락된 caster는 shadow recovery에서 다시 검사한다.
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.StaticCache";
@@ -3726,13 +3735,15 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Cull.First";
-                node.reads = {LiveSlots::kMeteorGeometry};
+                node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
                 node.writes = {LiveSlots::kShadowFirstLists};
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext&,
+                                    const LiveFrameBinding&)
                 {
-                    PublishShadowResources(bb, LiveSlots::kShadowFirstLists,
-                        p.graphMaterials.DeclareShadowFirstCull(graph, bb.Get(LiveSlots::kMeteorGeometry)));
+                    PublishShadowResources(
+                        bb, LiveSlots::kShadowFirstLists,
+                        p.graphMaterials.DeclareShadowFirstCull(graph, bb.Get(LiveSlots::kMeteorGeometry),
+                                                                bb.Get(LiveSlots::kMeteorOccluderDepth)));
                 };
                 p.desc.AddNode(std::move(node));
             }

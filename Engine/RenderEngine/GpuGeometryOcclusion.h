@@ -50,6 +50,7 @@ class GpuGeometryOcclusion final
         // depth version or graph is an error. Consumers must not feed it back.
         void Declare(EnhancedRenderGraph& graph, RGHandle depth) const;
         void RequireView(const ViewKey& view) const;
+        void RequireCurrentView(const ViewKey& view) const;
         void AddReadUsages(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
         RHIBindingTable Bindings(const EnhancedRenderGraph::ExecuteContext& execution) const;
         std::array<RHIBindingDesc, kMaximumLevels> BindingInputs(

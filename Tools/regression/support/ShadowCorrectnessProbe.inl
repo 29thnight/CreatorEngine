@@ -7,7 +7,9 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
     {
         unsigned view{}, extent{32};
         bool staticPresent{true}, reimport{}, reset{}, mutate{}, abort{}, reject{}, noPublish{}, budgetFailure{}, gpuPending{};
+        bool m_prediction{}, m_reverseLight{}, m_versionProbe{};
         float staticX{}, dynamicX{}, staticScale{2};
+        float m_lightOffset{};
         int hit{-1}, history{-1};
         std::uint64_t budget{512ull << 20};
     };
@@ -18,11 +20,14 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
         bool history{};
     };
     unsigned frames{}, pixels{}, recovered{}, rejectedMutations{}, aborts{}, rejections{}, budgetRejects{}, withheldChecks{}, gpuPendingChecks{};
+    unsigned predictionCases{}, predictionRecovered{}, predictionVersionRejects{}, predictionHistoryRejects{};
     std::uint64_t nextFrame{41000};
     device.relayCompletions = true;
     for (unsigned workers : {0u, 4u})
     {
         SceneHost host;
+        GpuGeometryOcclusion predictionHistoryCompiler;
+        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> predictionHistory;
         EnhancedFrameContext context;
         context.resources = &device;
         context.rootSignatures = &roots;
@@ -39,9 +44,9 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
         {
             Drain drain{device};
             context.frameId = nextFrame++;
-            std::cout << "METEOR_SHADOW_CASE frame=" << context.frameId << " workers=" << workers
-                << " view=" << c.view << " x=" << c.staticX << " abort=" << c.abort
-                << " reject=" << c.reject << std::endl;
+            std::cout << "METEOR_SHADOW_CASE frame=" << context.frameId << " workers=" << workers << " view=" << c.view
+                      << " x=" << c.staticX << " abort=" << c.abort << " reject=" << c.reject
+                      << " cameraPrediction=" << c.m_prediction << std::endl;
             auto fixed = MakeGeometry(false, true);
             auto moving = MakeGeometry(false, true);
             ShadowDecalPlane(fixed);
@@ -102,11 +107,14 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             for (unsigned cascade = 0; cascade < 3; ++cascade)
             {
                 shadow.lightViewProjection[cascade] = math::matrix4x4::identity();
-                shadow.lightViewProjection[cascade].m[3][0] = float(cascade) * .0625f + float(c.view) * .125f;
-                shadow.lightViewProjection[cascade].m[3][2] = float(cascade) * .05f;
+                shadow.lightViewProjection[cascade].m[3][0] =
+                    float(cascade) * .0625f + float(c.view) * .125f + c.m_lightOffset;
+                shadow.lightViewProjection[cascade].m[2][2] = c.m_reverseLight ? -1.f : 1.f;
+                shadow.lightViewProjection[cascade].m[3][2] = float(cascade) * .05f + (c.m_reverseLight ? 1.f : 0.f);
             }
             SceneHostBudget budget;
             budget.shadowCacheBytes = c.budget;
+            budget.m_shadowDepthPrediction = c.m_prediction;
             const bool prepared = host.Prepare(context, input, {}, {}, {}, shadow, budget, error, 0);
             if (!prepared)
             {
@@ -117,6 +125,27 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                 return Result{};
             }
             Check(!c.budgetFailure, "Injected shadow byte budget must reject");
+            Check(host.UsesShadowDepthPrediction() == c.m_prediction,
+                  "Explicit camera prediction admission matches the prepared opaque camera input");
+            if (predictionHistory && !c.m_versionProbe)
+            {
+                const auto reader = GpuGeometryOcclusion::ReadHistory(context, input->ViewProjection(),
+                                                                      predictionHistory->HistoryOwner());
+                const auto cameraView = GpuGeometryOcclusion::CaptureView(context, input->ViewProjection());
+                reader->RequireView(cameraView);
+                bool rejected{};
+                try
+                {
+                    reader->RequireCurrentView(cameraView);
+                }
+                catch (const std::runtime_error&)
+                {
+                    rejected = true;
+                }
+                Check(rejected, "A same-view completed history reader cannot replace the current camera depth");
+                ++predictionHistoryRejects;
+                predictionHistory.reset();
+            }
             Result result;
             result.cache = host.CurrentShadowCacheStats();
             Check(result.cache.staticCasters == unsigned(c.staticPresent) && result.cache.dynamicCasters == 1,
@@ -127,7 +156,42 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             }
             const auto geometry = host.DeclareGeometry(*graph);
             const auto cache = host.DeclareShadowStaticCache(*graph, geometry);
-            const auto first = host.DeclareShadowFirstCull(*graph, geometry);
+            SceneFirstCullOutputs cameraFirst;
+            RGHandle cameraDepth;
+            if (c.m_prediction)
+            {
+                cameraFirst = host.DeclareFirstCull(*graph, geometry);
+                cameraDepth = host.DeclareOccluder(*graph, geometry, cameraFirst);
+                if (c.m_versionProbe)
+                {
+                    Check(predictionHistoryCompiler.PrepareHistory(context, input->ViewProjection(), 49000 + workers, 1,
+                                                                   predictionHistory, error,
+                                                                   "Probe.ShadowCameraPrediction"),
+                          "Prediction current-to-history producer " + error);
+                    predictionHistory->RequireCurrentView(
+                        GpuGeometryOcclusion::CaptureView(context, input->ViewProjection()));
+                    predictionHistory->Declare(*graph, cameraDepth);
+                    auto wrongVersion = cameraDepth;
+                    ++wrongVersion.version;
+                    auto wrongEpoch = cameraDepth;
+                    ++wrongEpoch.epoch;
+                    for (const auto badDepth : std::array<RGHandle, 3>{RGHandle{}, wrongVersion, wrongEpoch})
+                    {
+                        bool rejected{};
+                        try
+                        {
+                            host.DeclareShadowFirstCull(*graph, geometry, badDepth);
+                        }
+                        catch (const std::runtime_error&)
+                        {
+                            rejected = true;
+                        }
+                        Check(rejected, "Prediction rejects missing, stale-version and stale-epoch camera depth");
+                        ++predictionVersionRejects;
+                    }
+                }
+            }
+            const auto first = host.DeclareShadowFirstCull(*graph, geometry, cameraDepth);
             result.history = host.ShadowFirstMeshletWork(0)->UsesHistory();
             if (c.history >= 0)
             {
@@ -169,8 +233,11 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             }
             // Record the normal camera/lookup consumers too, so publication goes
             // through the product's complete-frame admission contract.
-            const auto cameraFirst = host.DeclareFirstCull(*graph, geometry);
-            const auto cameraDepth = host.DeclareOccluder(*graph, geometry, cameraFirst);
+            if (!cameraDepth.IsValid())
+            {
+                cameraFirst = host.DeclareFirstCull(*graph, geometry);
+                cameraDepth = host.DeclareOccluder(*graph, geometry, cameraFirst);
+            }
             const auto cameraFinal = host.DeclareFinalCull(*graph, geometry, cameraDepth);
             SceneSurfaceTargets surface;
             surface.Declare(*graph, context);
@@ -324,6 +391,12 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                 }
             }
             RHIReadbackImage depths;
+            if (c.m_versionProbe)
+            {
+                Check(predictionHistory->HistoryOwner()->recorded.load(),
+                      "The retained-history rejection fixture was produced by native current camera depth");
+                predictionHistory->HistoryOwner()->completion = device.GetLastSignaledFenceValue();
+            }
             Check(device.MapReadback(depthRead, depths, error), "Shadow correctness depth map " + error);
             unsigned mismatches{};
             for (unsigned cascade = 0; cascade < 3; ++cascade)
@@ -336,7 +409,7 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                     (stage ? result.final[cascade] : result.first[cascade]) = count.Elements<std::uint32_t>()[0];
                     device.ReleaseReadback(lists[slot]);
                 }
-                const float lightX = float(cascade) * .0625f + float(c.view) * .125f;
+                const float lightX = float(cascade) * .0625f + float(c.view) * .125f + c.m_lightOffset;
                 for (unsigned y = 0; y < c.extent; ++y)
                 {
                     for (unsigned x = 0; x < c.extent; ++x)
@@ -353,11 +426,12 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                         float expected = 1;
                         if (c.staticPresent && std::abs(nx - c.staticX) < halfStatic && std::abs(ny) < 1.5f)
                         {
-                            expected = (c.reimport ? .1f : .2f) + cascade * .05f;
+                            const float sourceDepth = c.reimport ? .1f : .2f;
+                            expected = (c.m_reverseLight ? 1.f - sourceDepth : sourceDepth) + cascade * .05f;
                         }
                         if (std::abs(nx - c.dynamicX) < .3f && std::abs(ny) < .3f)
                         {
-                            expected = (std::min)(expected, .6f + cascade * .05f);
+                            expected = (std::min)(expected, (c.m_reverseLight ? .4f : .6f) + cascade * .05f);
                         }
                         if (std::abs(depths.At(x, y, 0, cascade) - expected) > .00003f)
                         {
@@ -378,6 +452,10 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                 Check(mismatches == 0, "Independent three-cascade rectangle/min-depth oracle mismatches=" + std::to_string(mismatches));
             }
             ++frames;
+            if (c.m_prediction)
+            {
+                ++predictionCases;
+            }
             return result;
         };
         // Alternating views must preserve independent cache and history owners.
@@ -454,6 +532,39 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             render(c); // Newly completed pending cache is now eligible.
         }
 #endif
+        // 카메라가 가린 caster도 반대 방향의 광원에서는 앞에 있다. 예측 first의 탈락을
+        // 실제 shadow depth가 되살려야 하므로 독립 최소 깊이 oracle로 최종 결과를 검사한다.
+        c = {};
+        c.reset = true;
+        c.m_reverseLight = true;
+        const auto predictionControl = render(c);
+        Check(std::ranges::all_of(predictionControl.first, [](unsigned count) { return count != 0; }),
+              "Cold light-space control keeps the camera-occluded caster");
+        c.m_prediction = true;
+        c.m_versionProbe = true;
+        const auto predicted = render(c);
+        Check(std::ranges::all_of(predicted.first, [](unsigned count) { return count == 0; }),
+              "Current camera HZB predicts the hidden caster out of shadow first");
+        Check(predicted.final == predictionControl.final &&
+                  std::ranges::all_of(predicted.final, [](unsigned count) { return count != 0; }),
+              "Actual light-space recovery restores every predicted-away caster");
+        ++predictionRecovered;
+        c.m_versionProbe = false;
+        c.m_reverseLight = false;
+        c.staticPresent = false;
+        c.dynamicX = .85f;
+        const auto partial = render(c);
+        Check(std::ranges::all_of(partial.first, [](unsigned count) { return count != 0; }),
+              "Partly off-camera caster remains in the first-stage unknown path");
+        c.dynamicX = 1.5f;
+        c.m_lightOffset = -1.5f;
+        const auto offCamera = render(c);
+        Check(std::ranges::all_of(offCamera.first, [](unsigned count) { return count != 0; }),
+              "Off-camera light-visible caster survives a clear camera HZB");
+        c.extent = 64;
+        const auto differentExtent = render(c);
+        Check(differentExtent.final == offCamera.final,
+              "Independent camera and light extents preserve recovered caster counts and the depth oracle");
         // Exact per-cache budget is tested on a fresh host, avoiding hidden
         // resident entries; retained/in-flight sum is checked below separately.
         host.ShutdownAfterIdle();
@@ -474,13 +585,25 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
         c.budgetFailure = false;
         render(c); // Exact old-owner + replacement budget succeeds.
         host.ShutdownAfterIdle();
+        predictionHistory.reset();
+        predictionHistoryCompiler.ShutdownAfterIdle();
     }
     device.ReleaseCompletionGate();
     device.relayCompletions = false;
     Check(device.completionRelays.empty(), "Every shadow relay listener unregistered after shutdown");
     Check(recovered == 4 && rejectedMutations == 2 && aborts == 2 && rejections == 1 && budgetRejects == 4 && withheldChecks == 2 && gpuPendingChecks == 1,
         "Shadow correctness acceptance case coverage");
+    Check(predictionCases == 8 && predictionRecovered == 2 && predictionVersionRejects == 6 &&
+              predictionHistoryRejects == 2,
+          "Camera prediction, partial/offscreen fallback, extent, exact-version and retained-history coverage");
+    std::cout << "METEOR_SHADOW_CAMERA_PREDICTION_OK cases=" << predictionCases << " recovered=" << predictionRecovered
+              << " exactVersionRejects=" << predictionVersionRejects
+              << " retainedHistoryRejects=" << predictionHistoryRejects << " validation=0\n";
     std::cout << "METEOR_SHADOW_CORRECTNESS_OK frames=" << frames << " views=2 recovered=" << recovered
-        << " gpuOmissionRejected=" << rejectedMutations << " aborts=" << aborts << " submissionRejections=" << rejections
-        << " budgetRejections=" << budgetRejects << " withheldCompletionCases=" << withheldChecks << " nativeGpuPendingCases=" << gpuPendingChecks << " pixels=" << pixels << " validation=0\n";
+              << " gpuOmissionRejected=" << rejectedMutations << " aborts=" << aborts
+              << " submissionRejections=" << rejections << " budgetRejections=" << budgetRejects
+              << " withheldCompletionCases=" << withheldChecks << " nativeGpuPendingCases=" << gpuPendingChecks
+              << " predictionCases=" << predictionCases << " predictionRecovered=" << predictionRecovered
+              << " predictionVersionRejects=" << predictionVersionRejects
+              << " predictionHistoryRejects=" << predictionHistoryRejects << " pixels=" << pixels << " validation=0\n";
 }

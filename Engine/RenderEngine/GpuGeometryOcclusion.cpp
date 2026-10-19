@@ -357,6 +357,15 @@ void GpuGeometryOcclusion::Pyramid::RequireView(const ViewKey& view) const
     }
 }
 
+void GpuGeometryOcclusion::Pyramid::RequireCurrentView(const ViewKey& view) const
+{
+    RequireView(view);
+    if (m_historyReader)
+    {
+        throw std::runtime_error("Camera depth prediction requires a current-depth producer, not retained history.");
+    }
+}
+
 void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle depth) const
 {
     CheckCurrent();

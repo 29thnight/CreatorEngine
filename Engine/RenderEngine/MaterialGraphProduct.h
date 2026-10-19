@@ -12,29 +12,30 @@ class Texture;
 
 namespace material_graph
 {
-// 호스트(Includes/MaterialGraphSceneHost.slang)나 그것이 포함하는 셰이더를
-// 바꾸면 올린다 — 안 올리면 쿠킹된 옛 바이트코드가 조용히 재사용된다.
-// 13: 그림자 표본을 CascadedShadow.slang 으로 모으고 디버그 보기를 더했다.
-// 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
-// 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
-// 23: camera compute meshlet IDs and GPU-finalized 2D indirect dispatch ABI.
-// 30: occluder depth uses the HW/SW visibility producer; LXSceneDepthPS removed.
-// 32: visibility-packet Temporal shader interface (forced recook).
-// 34: spatial replacement DAG addressing and group-based GPU LOD (forced recook).
-// 31: object-space vertex streams; lx_world/lx_previousWorld/lx_shadowWorld constants.
-// 35: resident meshlet attribute packets and direct GPU pose/attribute consumption.
-// 36: float4-row geometry SRVs; aligned bone rows avoid whole-point gathers (forced recook).
-// 37: stable sparse cluster addresses and GPU LOD demand feedback.
-// 38: bounded component decoding and vector CGQ descriptors for shader preparation.
-// 39: authenticated thin geometry metadata and paged GPU connectivity.
-// 40: record-addressed GPU bucket packets and shared scene/material tables.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:40";
-struct GeneratedMaterialShader;
-enum class Tier : std::uint8_t
-{
-    Standard,
-    Layered,
-    Special
+    // 호스트(Includes/MaterialGraphSceneHost.slang)나 그것이 포함하는 셰이더를
+    // 바꾸면 올린다 — 안 올리면 쿠킹된 옛 바이트코드가 조용히 재사용된다.
+    // 13: 그림자 표본을 CascadedShadow.slang 으로 모으고 디버그 보기를 더했다.
+    // 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
+    // 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
+    // 23: camera compute meshlet IDs and GPU-finalized 2D indirect dispatch ABI.
+    // 30: occluder depth uses the HW/SW visibility producer; LXSceneDepthPS removed.
+    // 32: visibility-packet Temporal shader interface (forced recook).
+    // 34: spatial replacement DAG addressing and group-based GPU LOD (forced recook).
+    // 31: object-space vertex streams; lx_world/lx_previousWorld/lx_shadowWorld constants.
+    // 35: resident meshlet attribute packets and direct GPU pose/attribute consumption.
+    // 36: float4-row geometry SRVs; aligned bone rows avoid whole-point gathers (forced recook).
+    // 37: stable sparse cluster addresses and GPU LOD demand feedback.
+    // 38: bounded component decoding and vector CGQ descriptors for shader preparation.
+    // 39: authenticated thin geometry metadata and paged GPU connectivity.
+    // 40: record-addressed GPU bucket packets and shared scene/material tables.
+    // 41: opt-in primitive cache의 별도 GBuffer/Temporal cooked entry와 t174/t175 계약.
+    inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:41";
+    struct GeneratedMaterialShader;
+    enum class Tier : std::uint8_t
+    {
+        Standard,
+        Layered,
+        Special
 };
 
 enum class Route : std::uint8_t

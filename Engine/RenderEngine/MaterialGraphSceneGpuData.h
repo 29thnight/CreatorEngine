@@ -1,4 +1,5 @@
 #pragma once
+#include "MaterialGraphPrimitiveCacheContract.h"
 
 #include "MaterialGraphGeometryContract.h"
 #include "MaterialGraphMeshSurface.h"
@@ -199,14 +200,20 @@ struct SceneGpuData final
                cache.Prepare({sceneEpoch, viewId, 2}, materialBytes, 16, "METEOR.Scene.Materials", materialBuffer, error);
     }
     bool CreatePacketBindings(IRenderDeviceServices& device, RHIBufferHandle packets, uint32_t packetCapacity,
-                              RHIBufferHandle ranges, uint32_t bucketCount, RHIBindingTable& result,
-                              std::string& error) const
+                              RHIBufferHandle ranges, uint32_t bucketCount, RHIBindingTable& result, std::string& error,
+                              RHIBufferHandle primitiveKeys = {}, RHIBufferHandle primitiveData = {}) const
     {
+        const bool cached = primitiveKeys.IsValid() && primitiveData.IsValid();
+        const auto fallback = materialBuffer->Buffer();
+        const uint32_t cacheCapacity = cached ? ScenePrimitiveCacheContract::kCapacity : 1u;
         const RHIBindingDesc descriptions[]{
             RHIBindingDesc::SrvBuffer(recordBuffer->Buffer(), static_cast<uint32_t>(records.size()), sizeof(Record)),
             RHIBindingDesc::SrvBuffer(packets, packetCapacity, 8),
             RHIBindingDesc::SrvBuffer(materialBuffer->Buffer(), static_cast<uint32_t>(materialBuffer->Size() / 4), 0),
-            RHIBindingDesc::SrvBuffer(ranges, bucketCount, 16)};
+            RHIBindingDesc::SrvBuffer(ranges, bucketCount, 16),
+            RHIBindingDesc::SrvBuffer(cached ? primitiveKeys : fallback, cacheCapacity, sizeof(uint32_t)),
+            RHIBindingDesc::SrvBuffer(cached ? primitiveData : fallback, cacheCapacity,
+                                      ScenePrimitiveCacheContract::kTriangleBytes)};
         result = device.CreateBindings(descriptions);
         if (result.IsValid()) return true;
         error = "METEOR packet scene resource table allocation failed.";

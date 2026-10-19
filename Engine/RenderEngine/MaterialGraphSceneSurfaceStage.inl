@@ -55,6 +55,10 @@ std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_
         return {};
     }
     materialWork->Declare(graph, visibility, materialWork);
+    if (prepared->m_primitiveCache)
+    {
+        prepared->m_primitiveCache->Declare(graph, visibility, prepared);
+    }
     return materialWork->GraphInputs(graph);
 }
 
@@ -98,7 +102,7 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(
         *target = graph.Modify(*target);
         restoreUses.push_back({*target, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite});
     }
-    frame->AddReconstructionReads(graph, restoreUses, inputs.visibility, material);
+    frame->AddReconstructionReads(graph, restoreUses, inputs.visibility, material, true);
     for (const auto& draw : frame->draws)
     {
         if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)

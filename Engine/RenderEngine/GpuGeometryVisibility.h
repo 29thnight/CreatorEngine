@@ -35,6 +35,9 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     static constexpr std::uint32_t kGroupSelection = 64;
     static constexpr std::uint32_t kReuseFirstGroups = 128;
     static constexpr std::uint32_t kReuseBinGroups = 256;
+    static constexpr std::uint32_t kInstanceBounds = 512;
+    static constexpr std::uint32_t kInstanceBoundsWords = 8;
+    static constexpr std::uint32_t kMeshletInstanceRows = 5;
     static constexpr std::uint32_t kWaveWorkQueue = 0x80000000u;
     static constexpr std::uint32_t kWorkRingHeaderWords = 16;
     static constexpr std::uint32_t kSharedViewCapacity = 8;
@@ -111,6 +114,10 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         static void DeclareOcclusionBatch(
             EnhancedRenderGraph& graph, std::span<const std::shared_ptr<const Frame>> frames,
             std::span<const std::shared_ptr<const GpuGeometryOcclusion::Pyramid>> pyramids, const char* passPrefix);
+        static void DeclareCameraPredictionBatch(EnhancedRenderGraph& graph,
+                                                 std::span<const std::shared_ptr<const Frame>> frames,
+                                                 std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid,
+                                                 const char* passPrefix);
         void DeclareFirstStage(EnhancedRenderGraph& graph, const char* passPrefix = "METEOR.CameraMeshlet.First") const;
         void AddReadUsages(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
         // Explicit consumers: producer must already belong to this graph recording.
@@ -178,6 +185,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
             m_meshletFinalize, m_meshletScatter;
         std::shared_ptr<const LX::Runtime::ComputeGeneration> m_occlusionCull;
         GpuGeometryOcclusion::ViewKey m_occlusionView;
+        std::optional<GpuGeometryOcclusion::ViewKey> m_cameraPredictionView;
 
         mutable std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_pyramid;
         std::weak_ptr<const Frame> m_self;
@@ -223,7 +231,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
                          std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion = false,
                          std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history = {},
                          std::shared_ptr<const Frame> firstStage = {}, bool ordered = false, float maxPixelError = 1.f,
-                         uint32_t lodWidth = 0, uint32_t lodHeight = 0);
+                         uint32_t lodWidth = 0, uint32_t lodHeight = 0,
+                         const GpuGeometryOcclusion::ViewKey* cameraPredictionView = nullptr);
 
     // Direct draws use the same vertex-ID indirection with an identity mapping.
     static RHIBufferSlice UploadIdentity(const EnhancedFrameContext& context, std::uint32_t count, std::string& error);
@@ -259,6 +268,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         m_meshletCount, m_meshletFinalize, m_meshletScatter;
     LX::Runtime::ComputePipeline m_meshletOcclusionCull;
     LX::Runtime::ComputePipeline m_meshletHistoryCull, m_meshletRecoveryCull;
+    LX::Runtime::ComputePipeline m_meshletCameraPredictionCull;
     LX::Runtime::ComputePipeline m_occlusionCull;
 
     LX::Runtime::ComputePipeline m_sharedReset, m_sharedCull, m_sharedOcclusion,
