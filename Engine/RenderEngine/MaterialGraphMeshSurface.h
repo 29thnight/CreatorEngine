@@ -257,6 +257,8 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     MeshSurfaceBatch() = default;
     static bool PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
                                 std::shared_ptr<MeshTransformDispatch>& result, std::string& error);
+    static bool PrepareDeclarationDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                                           std::shared_ptr<MeshTransformDispatch>& result, std::string& error);
     static bool RecordDispatch(RHIEncoder& encoder, std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
                                const MeshTransformDispatch& dispatch, std::string& error);
     // Imports inputs/output and appends this mesh's usages; adds no pass.

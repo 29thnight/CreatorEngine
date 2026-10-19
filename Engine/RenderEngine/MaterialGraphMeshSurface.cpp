@@ -1,9 +1,11 @@
 #include "../Utility_Framework/DynamicBitset.h"
 #include "MaterialGraphMeshSurface.h"
+#include "MeshTransformDeclarationPlan.h"
 #include "Assets/QuantizedGeometry.h"
 #include "MaterialGraphSceneAccess.h"
 #include "RHI/RHIModelMeshletUpload.h"
 #include "RHI/RHISharedSparsePagePool.h"
+#include "Render/Graph/RenderGraphDeclarationTask.h"
 #include "Experiment/Import/MeshLodBuilder.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 
@@ -644,6 +646,12 @@ namespace material_graph
         return stats;
     }
 
+    struct MeshTransformDeclarationScratch
+    {
+        MeshTransformDeclarationPlan m_plan;
+        std::array<RHIBindingDesc, MeshTransformDeclarationPlan::kMaxJobs> m_outputs;
+    };
+
     struct MeshSurfaceBufferPool
     {
         struct Entry
@@ -701,6 +709,10 @@ namespace material_graph
         std::mutex mutex;
         std::atomic<std::uint64_t> completed{};
         std::vector<Entry> idle;
+        // GPU 버퍼 풀의 수명 동안 한 번만 만든다. 선언별 원본 포인터와 출력
+        // 설명만 덮어쓰며, 버퍼 회수 mutex를 쥔 채 워커에 합류하지 않는다.
+        std::mutex m_declarationMutex;
+        std::unique_ptr<MeshTransformDeclarationScratch> m_declarationScratch;
     };
 
     bool MeshSurfaceInput::Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
@@ -1907,6 +1919,137 @@ namespace material_graph
         return true;
     }
 
+    bool MeshSurfaceBatch::PrepareDeclarationDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                                                      std::shared_ptr<MeshTransformDispatch>& result,
+                                                      std::string& error)
+    {
+        ce::profile_scope prepareScope{ce::marker<"MaterialMeshDispatchPrepare">()};
+        if (batches.empty() || batches.size() > MeshTransformDeclarationPlan::kMaxJobs || !batches.front() ||
+            !batches.front()->bufferPool_)
+        {
+            return Fail(error, "METEOR transform declaration requires 1..4096 retained jobs.");
+        }
+        auto& pool = *batches.front()->bufferPool_;
+        render_graph_declaration_lock declarationLock(pool.m_declarationMutex);
+        if (!declarationLock.owns_lock())
+        {
+            return Fail(error, "Concurrent transform declaration cannot reuse one scratch owner.");
+        }
+        if (!pool.m_declarationScratch)
+        {
+            pool.m_declarationScratch = std::make_unique<MeshTransformDeclarationScratch>();
+        }
+        auto& scratch = *pool.m_declarationScratch;
+        auto& plan = scratch.m_plan;
+        plan.Reset();
+        auto dispatch = std::make_shared<MeshTransformDispatch>();
+        auto& device = *batches.front()->device_;
+        {
+            ce::profile_scope planScope{ce::marker<"RenderGraphDeclareMeshPlan">()};
+            for (std::size_t index = 0; index < batches.size(); ++index)
+            {
+                const auto& batch = batches[index];
+                if (!batch || !batch->IsPreparedForGraph() || batch->device_ != &device ||
+                    batch->pipeline_ != batches.front()->pipeline_ || batch->transformedOwner_)
+                {
+                    return Fail(error, "METEOR transform jobs require one fresh pipeline/device/recording.");
+                }
+                const auto& source = *batch->input_;
+                if (!plan.Append(batch->Count(), source.PackedVertices(), std::as_bytes(source.Bones()),
+                                 std::as_bytes(source.Lods()), error))
+                {
+                    return false;
+                }
+                dispatch->pointCount += batch->Count();
+                scratch.m_outputs[index] =
+                    RHIBindingDesc::UavBuffer(batch->buffer_, batch->Count(), sizeof(SurfacePoint));
+            }
+        }
+        if (!plan.GroupCount())
+        {
+            return Fail(error, "METEOR transform group list exceeds one 2D dispatch.");
+        }
+        dispatch->groupCount = plan.GroupCount();
+        dispatch->dispatchY =
+            (dispatch->groupCount + MeshTransformDispatch::GroupWidth - 1) / MeshTransformDispatch::GroupWidth;
+        dispatch->dispatchX = (dispatch->groupCount + dispatch->dispatchY - 1) / dispatch->dispatchY;
+        const std::array<std::uint32_t, 4> constants{dispatch->groupCount, dispatch->dispatchX,
+                                                     static_cast<std::uint32_t>(plan.JobCount()), 0};
+        const RHIUploadRequest requests[]{
+            {sizeof(constants), RHIUploadUsage::ConstantBuffer, 256},
+            {plan.InputBytes(), RHIUploadUsage::Raw, 16},
+            {plan.JobCount() * sizeof(MeshTransformDispatch::Job), RHIUploadUsage::Raw,
+             (std::max)(std::size_t{16}, alignof(MeshTransformDispatch::Job))},
+            {std::uint64_t(plan.GroupCount()) * sizeof(MeshTransformDispatch::Group), RHIUploadUsage::Raw, 16}};
+        std::array<RHIBufferSlice, 4> uploads;
+        if (!device.ReserveUploadBatch(requests, uploads, error) ||
+            std::ranges::any_of(uploads,
+                                [](const auto& upload) { return !upload.IsValid() || !upload.IsWritable(); }) ||
+            !std::ranges::all_of(batches, [](const auto& batch) { return batch->IsPreparedForGraph(); }))
+        {
+            return Fail(error, "METEOR transform declaration upload reservation changed recording/descriptors.");
+        }
+        dispatch->uniform = uploads[0];
+        dispatch->inputs = uploads[1];
+        dispatch->jobs = uploads[2];
+        dispatch->groups = uploads[3];
+        dispatch->inputBytes = requests[1].bytes + requests[2].bytes + requests[3].bytes;
+        std::memcpy(dispatch->uniform.cpuAddress, constants.data(), sizeof(constants));
+        const std::span inputBytes(static_cast<std::byte*>(dispatch->inputs.cpuAddress), plan.InputBytes());
+        const std::span jobs(static_cast<MeshTransformDispatch::Job*>(dispatch->jobs.cpuAddress), plan.JobCount());
+        const std::span groups(static_cast<MeshTransformDispatch::Group*>(dispatch->groups.cpuAddress),
+                               std::size_t(plan.GroupCount()));
+        // 실제 스케줄러에서 작은 복사는 제출/합류 비용보다 짧았다. 8 MiB부터
+        // 고정 구간을 한 번만 제출하며, 그 아래는 한 구간으로 직접 완료한다.
+        // 바이트와 그룹 범위는 따로 나눠 큰 메시 하나에도 워커를 배정한다.
+        constexpr std::uint64_t kParallelUploadBytes = 8u << 20;
+        constexpr std::size_t kParallelSlices = 8;
+        constexpr std::size_t kMinimumParallelWorkers = 4;
+        const bool parallel = dispatch->inputBytes >= kParallelUploadBytes && !thread_pool::is_worker_thread() &&
+                              ce::get_thread_pool().size() >= kMinimumParallelWorkers;
+        const auto slices = parallel ? kParallelSlices : std::size_t{1};
+        const auto fill = [&](std::size_t slice)
+        {
+            ce::profile_scope copyScope{ce::marker<"RenderGraphDeclareMeshFill">()};
+            plan.CopyInputRange(inputBytes, inputBytes.size() * slice / slices,
+                                inputBytes.size() * (slice + 1) / slices);
+            plan.FillGroupRange(groups, groups.size() * slice / slices, groups.size() * (slice + 1) / slices);
+            const auto first = jobs.size() * slice / slices;
+            const auto last = jobs.size() * (slice + 1) / slices;
+            for (std::size_t index = first; index < last; ++index)
+            {
+                const auto& batch = batches[index];
+                const auto& source = *batch->input_;
+                MeshTransformDispatch::Job job{batch->objectSpace_ ? math::matrix4x4::identity() : source.World(),
+                                               {batch->Count(), source.Geometry().vertexStride,
+                                                source.Geometry().vertexAttributeMask,
+                                                static_cast<std::uint32_t>(source.Bones().size())},
+                                               {},
+                                               {}};
+                for (const auto& attribute : assets::kVertexAttributeTable)
+                {
+                    job.offsets[static_cast<std::size_t>(attribute.attribute)] =
+                        assets::OffsetOf(source.Geometry().vertexAttributeMask, attribute.attribute);
+                }
+                const auto& planned = plan.GetJob(index);
+                std::copy(planned.m_inputOffsets.begin(), planned.m_inputOffsets.end(), job.inputOffsets.begin());
+                std::construct_at(jobs.data() + index, job);
+            }
+        };
+        render_graph_declaration_task preparation;
+        preparation.start(slices, slices > 1, fill);
+        dispatch->outputs = device.CreateBindings(std::span{scratch.m_outputs}.first(plan.JobCount()));
+        preparation.join();
+        if (!dispatch->outputs.IsValid() ||
+            !std::ranges::all_of(batches, [](const auto& batch) { return batch->IsPreparedForGraph(); }))
+        {
+            return Fail(error, "METEOR transform work-list allocation changed recording/descriptors.");
+        }
+        result = std::move(dispatch);
+        error.clear();
+        return true;
+    }
+
     bool MeshSurfaceBatch::RecordDispatch(RHIEncoder& encoder,
                                           std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
                                           const MeshTransformDispatch& dispatch, std::string& error)
@@ -2097,7 +2240,7 @@ namespace material_graph
             return true;
         }
         std::shared_ptr<MeshTransformDispatch> dispatch;
-        if (!PrepareDispatch(transformed, dispatch, error))
+        if (!PrepareDeclarationDispatch(transformed, dispatch, error))
         {
             return false;
         }

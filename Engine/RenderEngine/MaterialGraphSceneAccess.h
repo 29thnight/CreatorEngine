@@ -33,7 +33,8 @@ namespace material_graph
     // Draws can share geometry and material textures. Only compatible reads of
     // the exact same version may be combined; writes remain unambiguous.
     inline void NormalizeSceneReads(const EnhancedRenderGraph& graph,
-                                    std::vector<EnhancedRenderGraph::RGPassUsage>& uses)
+                                    std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+                                    std::vector<size_t>& overflowScratch)
     {
         if (graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder || uses.size() < 2)
         {
@@ -59,12 +60,11 @@ namespace material_graph
         };
         // 호출자의 vector를 수정하기 전에 원본 사용 목록을 전부 검증한다.
         // 해시 슬롯은 최초 사용 위치를 가리킨다. 입력마다 압축할 목적지도 기록하므로
-        // 압축 중에 덮어쓴 원본 핸들을 다시 참조하지 않는다. 호출이 끝나면 모든 임시
-        // 인덱스를 버린다. 테이블은 절반까지만 채우며 충돌 시 핸들 전체를 비교한다.
+        // 압축 중에 덮어쓴 원본 핸들을 다시 참조하지 않는다. 호출마다 인덱스를 초기화하되
+        // 소유자가 가진 저장 용량은 유지한다. 충돌 시 핸들 전체를 비교한다.
         constexpr size_t empty = (std::numeric_limits<size_t>::max)();
         std::array<size_t, 128> localSlots;
         std::array<size_t, 64> localDestinations;
-        std::vector<size_t> overflowScratch;
         std::span<size_t> slots;
         std::span<size_t> destinations;
         if (uses.size() <= localDestinations.size())
@@ -139,5 +139,14 @@ namespace material_graph
             }
         }
         uses.resize(uniqueCount);
+    }
+
+    inline void NormalizeSceneReads(const EnhancedRenderGraph& graph,
+                                    std::vector<EnhancedRenderGraph::RGPassUsage>& uses)
+    {
+        // 선언의 정규화는 재진입하거나 작업을 제출하지 않는다. 그래프 핸들은 저장하지 않고
+        // 스레드별 인덱스 용량만 유지해 큰 사용 목록마다 할당자를 다시 호출하지 않는다.
+        thread_local std::vector<size_t> overflowScratch;
+        NormalizeSceneReads(graph, uses, overflowScratch);
     }
 } // namespace material_graph

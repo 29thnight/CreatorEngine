@@ -1,6 +1,8 @@
 #include "GpuGeometryVisibility.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphMeshSurface.h"
+#include "MaterialGraphSceneAccess.h"
+#include "Render/Graph/RenderGraphDeclarationTask.h"
 
 #include "RHI/RHIShaderSource.h"
 #include "Render/Graph/EnhancedRenderPass.h"
@@ -147,6 +149,21 @@ struct GpuGeometryVisibility::MeshletInputs
 
 struct GpuGeometryVisibility::BufferPool
 {
+    struct DeclarationScratch
+    {
+        std::mutex m_mutex;
+        std::array<std::vector<EnhancedRenderGraph::RGPassUsage>, 5> m_uses;
+        std::vector<size_t> m_normalize;
+    };
+    struct UploadScratch
+    {
+        std::mutex m_mutex;
+        std::vector<RHIBindingDesc> m_vertices, m_topologies;
+    };
+    // 선언 메타데이터와 업로드 조립은 서로 다른 저장소를 독점한다.
+    // GPU callback에는 복사된 사용 목록/완성된 테이블만 전달하고 용량은 풀에 남긴다.
+    DeclarationScratch m_declaration;
+    UploadScratch m_upload;
     struct Entry
     {
         RHIBufferHandle handle;
@@ -1149,72 +1166,115 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
 {
     ce::profile_scope profile{ce::marker<"GpuVisibility.MeshletDeclare">()};
     if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+    {
         throw std::runtime_error("METEOR meshlet visibility requires an ExplicitVersioned graph.");
+    }
     std::uint64_t totalBins{};
+    bool pending{};
     for (const auto& frame : frames)
     {
-        if (!frame)
+        if (!frame || frame->m_meshletGeometries.empty() || !frame->m_bufferPool || !frame->m_binCount ||
+            frame->m_binCount > kMeshletBinCapacity)
         {
-            throw std::runtime_error("Null shared visibility view.");
+            throw std::runtime_error("Invalid shared visibility view or bin capacity.");
+        }
+        frame->CheckCurrent();
+        if (frame->m_occlusionCull && !frame->m_pyramid)
+        {
+            throw std::runtime_error("Camera meshlet occlusion requires its declared current-view HZB.");
+        }
+        if (frame->m_graph)
+        {
+            frame->CheckCurrent(&graph);
+        }
+        else
+        {
+            pending = true;
         }
         totalBins += frame->m_binCount;
     }
-    if (frames.size() > kSharedViewCapacity || totalBins > kMeshletBinCapacity)
+    // Shared.First가 이미 발행한 카메라/캐스케이드는 검증만 한다.
+    // 사용 목록이나 checked-iterator proxy를 만든 뒤 빈 작업임을 알아내지 않는다.
+    if (!pending)
     {
-        std::vector<std::shared_ptr<const Frame>> chunk;
-        std::uint32_t bins{}, number{};
-        for (const auto& frame : frames)
-        {
-            if (!chunk.empty() &&
-                (chunk.size() == kSharedViewCapacity || bins + frame->m_binCount > kMeshletBinCapacity))
-            {
-                const auto prefix = std::string(passPrefix) + ".Batch" + std::to_string(number++);
-                DeclareMeshletBatch(graph, chunk, prefix.c_str());
-                chunk.clear();
-                bins = 0;
-            }
-            chunk.push_back(frame);
-            bins += frame->m_binCount;
-        }
-        if (!chunk.empty())
-        {
-            const auto prefix = std::string(passPrefix) + ".Batch" + std::to_string(number);
-            DeclareMeshletBatch(graph, chunk, prefix.c_str());
-        }
         return;
     }
-    std::vector<std::shared_ptr<const Frame>> owners;
-    std::vector<EnhancedRenderGraph::RGPassUsage> resetUses, cullUses, countUses, finalizeUses, scatterUses;
-    const bool ordered = std::ranges::any_of(frames, [](const auto& frame) {
-        return !frame->m_graph && frame->m_ordered;
-    });
-    owners.reserve(frames.size());
-    resetUses.reserve(frames.size() * 2u + 1u);
-    finalizeUses.reserve(frames.size() * 2u);
-    cullUses.reserve(static_cast<std::size_t>(totalBins) * 2u +
-        frames.size() * (3u + GpuGeometryOcclusion::kMaximumLevels) + 1u);
-    std::set<std::pair<std::uint32_t, std::uint32_t>> geometryReads, topologyReads;
-    // Group reset/selection, lane work and stable compaction use separate RG
-    // versions. No shader relies on a cross-dispatch implicit UAV barrier.
-    const auto advance = [&graph](const Frame& frame, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool first) {
+    if (frames.size() > kSharedViewCapacity || totalBins > kMeshletBinCapacity)
+    {
+        std::size_t first{};
+        std::uint32_t bins{}, number{};
+        for (std::size_t index = 0; index < frames.size(); ++index)
+        {
+            const auto& frame = frames[index];
+            if (index != first &&
+                (index - first == kSharedViewCapacity || bins + frame->m_binCount > kMeshletBinCapacity))
+            {
+                const auto prefix = std::string(passPrefix) + ".Batch" + std::to_string(number++);
+                DeclareMeshletBatch(graph, frames.subspan(first, index - first), prefix.c_str());
+                first = index;
+                bins = 0;
+            }
+            bins += frame->m_binCount;
+        }
+        const auto prefix = std::string(passPrefix) + ".Batch" + std::to_string(number);
+        DeclareMeshletBatch(graph, frames.subspan(first), prefix.c_str());
+        return;
+    }
+
+    std::array<std::shared_ptr<const Frame>, kSharedViewCapacity> ownerStorage;
+    std::size_t ownerCount{};
+    std::uint32_t pendingBins{};
+    bool ordered{};
+    for (const auto& frame : frames)
+    {
+        if (frame->m_graph)
+        {
+            continue;
+        }
+        const auto accepted = std::span{ownerStorage}.first(ownerCount);
+        if (std::ranges::find(accepted, frame) != accepted.end())
+        {
+            continue;
+        }
+        ownerStorage[ownerCount++] = frame;
+        pendingBins += frame->m_binCount;
+        ordered = ordered || frame->m_ordered;
+    }
+    const auto owners = std::span{ownerStorage}.first(ownerCount);
+    auto& scratch = owners.front()->m_bufferPool->m_declaration;
+    render_graph_declaration_lock scratchLock(scratch.m_mutex);
+    if (!scratchLock.owns_lock())
+    {
+        throw std::runtime_error("Concurrent meshlet declaration cannot borrow the same pool scratch.");
+    }
+    for (auto& uses : scratch.m_uses)
+    {
+        uses.clear();
+    }
+    auto& resetUses = scratch.m_uses[0];
+    auto& cullUses = scratch.m_uses[1];
+    auto& countUses = scratch.m_uses[2];
+    auto& finalizeUses = scratch.m_uses[3];
+    auto& scatterUses = scratch.m_uses[4];
+    resetUses.reserve(pendingBins + ownerCount * 2u + 1u);
+    cullUses.reserve(pendingBins * 2u + ownerCount * (3u + GpuGeometryOcclusion::kMaximumLevels) + 1u);
+    finalizeUses.reserve(ownerCount * 2u);
+    if (ordered)
+    {
+        countUses.reserve(ownerCount * 2u);
+        scatterUses.reserve(ownerCount * 2u);
+    }
+
+    const auto advance = [&graph](const Frame& frame, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool first)
+    {
         frame.m_graphArguments = first ? graph.Write(frame.m_graphArguments) : graph.Modify(frame.m_graphArguments);
         frame.m_graphVisibleIds = first ? graph.Write(frame.m_graphVisibleIds) : graph.Modify(frame.m_graphVisibleIds);
         const auto access = first ? RGAccessMode::Write : RGAccessMode::ReadWrite;
         uses.push_back({frame.m_graphArguments, RHIResourceState::UnorderedAccess, access});
         uses.push_back({frame.m_graphVisibleIds, RHIResourceState::UnorderedAccess, access});
     };
-    for (const auto& frame : frames)
+    for (const auto& frame : owners)
     {
-        if (!frame || frame->m_meshletGeometries.empty())
-            throw std::runtime_error("Invalid shadow meshlet batch member.");
-        frame->CheckCurrent();
-        if (frame->m_occlusionCull && !frame->m_pyramid)
-            throw std::runtime_error("Camera meshlet occlusion requires its declared current-view HZB.");
-        if (frame->m_graph)
-        {
-            frame->CheckCurrent(&graph);
-            continue;
-        }
         frame->m_graph = &graph;
         frame->m_graphEpoch = graph.ResourceEpoch();
         frame->m_graphVisibleIds =
@@ -1228,16 +1288,14 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         for (const auto& geometry : frame->m_meshletGeometries)
         {
             const auto topology = geometry->GraphMeshlets(graph);
-            // Group selection reads the immutable hierarchy/residency and CPU
-            // world columns. Posed vertex output is needed only by the cull.
-            if (topologyReads.emplace(topology.index, topology.version).second)
-                resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
-            for (auto handle : {geometry->GraphOutput(graph), topology})
-                if (geometryReads.emplace(handle.index, handle.version).second)
-                    cullUses.push_back({handle, RHIResourceState::ShaderResource, RGAccessMode::Read});
+            resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
+            cullUses.push_back({geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            cullUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
         }
         if (frame->m_pyramid)
+        {
             frame->m_pyramid->AddReadUsages(graph, cullUses);
+        }
         if (frame->m_firstStage)
         {
             frame->m_firstStage->CheckCurrent(&graph);
@@ -1245,17 +1303,24 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
                 {frame->m_firstStage->m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
         }
         if (ordered)
+        {
             advance(*frame, countUses, false);
+        }
         advance(*frame, finalizeUses, false);
         if (ordered)
+        {
             advance(*frame, scatterUses, false);
-        owners.push_back(frame);
+        }
     }
-    if (owners.empty())
-        return;
+    // 같은 버전의 읽기만 합치며 최초 사용 순서는 보존한다. 트리 노드별 할당 대신
+    // 풀 소유 해시 scratch를 재사용한다.
+    material_graph::NormalizeSceneReads(graph, resetUses, scratch.m_normalize);
+    material_graph::NormalizeSceneReads(graph, cullUses, scratch.m_normalize);
     const auto shared = owners.size() > 1 ? BuildShared(owners) : std::shared_ptr<SharedBatch>{};
     if (!shared)
+    {
         owners.front()->UploadMeshletInputs();
+    }
     if (shared)
     {
         auto queue = graph.ImportBuffer(shared->queue, RHIResourceState::Common, "METEOR.SharedVisibility.Queue");
@@ -1270,18 +1335,23 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             owner->m_sharedBatch = shared;
         }
     }
-    const auto declare = [&](const char* suffix, std::vector<EnhancedRenderGraph::RGPassUsage> uses,
-                             MeshletStage stage) {
-        const auto pass = graph.AddPass(std::string(passPrefix) + suffix, std::move(uses),
-            [owners, shared, stage](const auto& execution) {
-                for (const auto& owner : owners)
+    const auto declare =
+        [&](const char* suffix, const std::vector<EnhancedRenderGraph::RGPassUsage>& uses, MeshletStage stage)
+    {
+        const auto pass = graph.AddPass(
+            std::string(passPrefix) + suffix, uses,
+            [ownerStorage, ownerCount, shared, stage](const auto& execution)
+            {
+                for (const auto& owner : std::span{ownerStorage}.first(ownerCount))
+                {
                     owner->CheckCurrent(execution.graph);
+                }
                 if (shared)
                 {
                     shared->Dispatch(execution, stage);
                     return;
                 }
-                const auto& owner = owners.front();
+                const auto& owner = ownerStorage.front();
                 owner->DispatchMeshletStage(*execution.encoder, stage,
                     stage == MeshletStage::Cull && owner->m_pyramid
                         ? owner->m_pyramid->Bindings(execution) : RHIBindingTable{});
@@ -1289,26 +1359,36 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         graph.DeclareComputeCompatible(pass);
         graph.DeclareRecordingIndependent(pass);
     };
-    declare(".Reset", std::move(resetUses), MeshletStage::Reset);
-    declare(".Cull", std::move(cullUses), MeshletStage::Cull);
+    declare(".Reset", resetUses, MeshletStage::Reset);
+    declare(".Cull", cullUses, MeshletStage::Cull);
     if (ordered)
-        declare(".CountTiles", std::move(countUses), MeshletStage::Count);
-    declare(".Finalize", std::move(finalizeUses), MeshletStage::Finalize);
+    {
+        declare(".CountTiles", countUses, MeshletStage::Count);
+    }
+    declare(".Finalize", finalizeUses, MeshletStage::Finalize);
     if (ordered)
-        declare(".Scatter", std::move(scatterUses), MeshletStage::Scatter);
+    {
+        declare(".Scatter", scatterUses, MeshletStage::Scatter);
+    }
     for (const auto& owner : owners)
     {
-        if (std::ranges::none_of(owner->m_streamingFeedback, [](const auto& r) { return r.buffer.IsValid(); }))
+        if (std::ranges::none_of(owner->m_streamingFeedback,
+                                 [](const auto& feedback) { return feedback.buffer.IsValid(); }))
+        {
             continue;
+        }
         graph.AddPass(
             std::string(passPrefix) + ".StreamingFeedback",
             {{owner->m_graphVisibleIds, RHIResourceState::CopySource, RGAccessMode::Read}},
-            [owner](const auto& execution) {
+            [owner](const auto& execution)
+            {
                 for (uint32_t bin = 0; bin < owner->m_streamingFeedback.size(); ++bin)
                 {
                     const auto& readback = owner->m_streamingFeedback[bin];
                     if (!readback.buffer.IsValid())
+                    {
                         continue;
+                    }
                     const auto offset = MeshletFeedbackOffset(owner->m_meshletInputs->bins[bin]) * sizeof(uint32_t);
                     execution.encoder->CopyBufferToReadback(readback, owner->m_visibleIds, offset);
                 }

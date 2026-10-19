@@ -975,6 +975,9 @@
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
+    <ClInclude Include="Render\Graph\RenderGraphDeclarationTask.h">
+      <Filter>Render\Graph</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h">
       <Filter>Render\Graph</Filter>
     </ClInclude>
@@ -1456,6 +1459,9 @@
       <Filter>Render\MaterialGraph</Filter>
     </ClCompile>
     <ClInclude Include="MaterialGraphMeshSurface.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="MeshTransformDeclarationPlan.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
     <ClCompile Include="MaterialGraphProduct.cpp">
