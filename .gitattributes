@@ -130,3 +130,6 @@ Tools/regression/fixtures/imgui-ini/*.ini -text
 ThirdParty/GCCE/include/** text eol=lf
 ThirdParty/GCCE/src/** text eol=lf
 ThirdParty/GCCE/CMakeLists.txt text eol=lf
+ThirdParty/GCCE/LICENSE text eol=lf
+# Preserve the pinned PrSM runtime source bytes.
+ThirdParty/PrSM/** text eol=lf

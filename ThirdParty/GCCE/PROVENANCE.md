@@ -1,14 +1,15 @@
 # GCCE provenance
 
 - Upstream: https://github.com/29thnight/Garbage-Collector-for-CreatorEngine-GCCE_CPP-
-- Pinned commit: `aef79b3f57861fc16d0045e860e9082eeed8ec29`
-- Retrieved: 2026-10-09
+- Pinned commit: `54dd96e6a4460f0db4bbdd518ea629db0cb85176` (2026-10-19). The only change
+  from the previous pin `aef79b3f57861fc16d0045e860e9082eeed8ec29` is the added LICENSE;
+  every vendored source file below is byte-identical to that earlier pin.
+- Retrieved: 2026-10-19
 - Upstream project version: `0.1.0` (from the pinned `CMakeLists.txt`)
-- Vendored scope: `include/gc/`, `src/`, and `CMakeLists.txt`, byte-for-byte unmodified
-- License: **unspecified**. No upstream LICENSE was supplied at this pin. The source owner
-  explicitly authorized this integration; that authorization does not invent a license,
-  grant general redistribution rights, or relicense the upstream code. Resolve applicable
-  redistribution terms before distributing this dependency beyond the authorized scope.
+- Vendored scope: `include/gc/`, `src/`, `CMakeLists.txt`, and `LICENSE`, byte-for-byte unmodified
+- License: Apache License 2.0, supplied upstream at this pin and copied byte-for-byte to
+  `LICENSE`. The PrSM runtime pins the same commit, so engine and script runtime share one
+  GCCE source and license.
 
 ## Build and deployment policy
 
@@ -34,7 +35,7 @@ still applies. GCCE has no engine reflection, vcpkg, SceneRuntime, or Editor dep
 which records GCCE and its import closure in each Editor/Player runtime manifest.
 Shipping staging copies the exact same DLL. Existing `EnginePublisher` and
 `GamePackager` consume these manifests; the provenance is included by the publisher's
-existing `Licenses/ThirdParty` collection. There is no invented license file.
+existing `Licenses/ThirdParty` collection, together with the upstream `LICENSE`.
 
 Engine-facing code includes `Engine/SceneRuntime/SceneGC.h`. Assets retain their
 separate `Ownership.h` ownership contracts. See [integration plan](../../docs/design/GCCEIntegration.md).
@@ -63,6 +64,7 @@ formatting or implementation edits belong in this integration.
 | `src/block_allocator.hpp` | `5886ed0791f837288b870a2e8555be0d31cde28d` | `f8536dd91306e0032cc550f71cb90383b23309be219f111757faeb30960232fc` |
 | `src/block_allocator_testing.hpp` | `d2e0b9955d909a5d93276c5dbfbc948c02264a40` | `1da41b16baad0a54ee6b29d041baac425bd14861a8b45a0a3199a4e2fe846851` |
 | `src/domain.cpp` | `8fbb97dc4b07f083ac3104f2d62cdbe356313706` | `50b1f9cad80feb9e519f13499529021e77916a06dcb7076f79546e8de67e1074` |
+| `LICENSE` | `d645695673349e3947e8e5ae42332d0ac3164cd7` | `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30` |
 
 ## Update procedure and validation limits
 

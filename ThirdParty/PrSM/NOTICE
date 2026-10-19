@@ -1,0 +1,9 @@
+PrSM v1
+Copyright 2026 박영웅 (29thnight)
+
+This product is licensed under the Apache License, Version 2.0.
+
+third_party/gcce is a git submodule of
+https://github.com/29thnight/Garbage-Collector-for-CreatorEngine-GCCE_CPP-
+and is distributed under the Apache License, Version 2.0.
+See third_party/gcce/LICENSE and PROVENANCE.md.
