@@ -772,6 +772,7 @@
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
+    <ClInclude Include="MeshTransformDeclarationPlan.h" />
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />
     <ClInclude Include="MaterialGraphPacketWork.h" />
@@ -900,6 +901,7 @@
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />
+    <ClInclude Include="Render\Graph\RenderGraphDeclarationTask.h" />
     <ClInclude Include="Render\Graph\EnhancedGpuMeasurementHistory.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderPass.h" />
     <ClInclude Include="Render\Passes\Lighting\EnhancedLightTilePass.h" />

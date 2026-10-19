@@ -145,7 +145,12 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
     std::memcpy(uploads[1].cpuAddress, input.candidates.data(), requests[1].bytes);
     std::memcpy(uploads[2].cpuAddress, input.bins.data(), requests[2].bytes);
     auto* worlds = static_cast<math::vector4*>(uploads[3].cpuAddress);
-    std::vector<RHIBindingDesc> vertices, topologies;
+    auto& scratch = m_bufferPool->m_upload;
+    const std::lock_guard scratchLock{scratch.m_mutex};
+    auto& vertices = scratch.m_vertices;
+    auto& topologies = scratch.m_topologies;
+    vertices.clear();
+    topologies.clear();
     const auto descriptorCount = MeshletDescriptorCount(*m_device, m_binCount);
     vertices.reserve(descriptorCount);
     topologies.reserve(descriptorCount);
@@ -210,7 +215,13 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     batch->count = firstFrame.m_sharedCount;
     batch->finalize = firstFrame.m_sharedFinalize;
     batch->scatter = firstFrame.m_sharedScatter;
-    std::vector<RHIBindingDesc> vertices, topologies, ids, arguments, first;
+    auto& scratch = batch->pool->m_upload;
+    const std::lock_guard scratchLock{scratch.m_mutex};
+    auto& vertices = scratch.m_vertices;
+    auto& topologies = scratch.m_topologies;
+    vertices.clear();
+    topologies.clear();
+    std::array<RHIBindingDesc, kSharedViewCapacity> ids, arguments, first;
     std::size_t totalBins{};
     for (const auto& frame : frames)
     {
@@ -250,9 +261,6 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     topologies.reserve(descriptorCount);
     batch->counts.reserve(totalBins);
     batch->pyramids.reserve(frames.size());
-    ids.reserve(kSharedViewCapacity);
-    arguments.reserve(kSharedViewCapacity);
-    first.reserve(kSharedViewCapacity);
     std::uint64_t jobs{};
     std::uint32_t viewIndex{}, binIndex{};
     for (const auto& frame : frames)
@@ -280,10 +288,10 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         }
         views[viewIndex] = view;
         batch->pyramids.push_back(frame->m_pyramid);
-        ids.push_back(
-            RHIBindingDesc::UavBuffer(frame->m_visibleIds, static_cast<std::uint32_t>(frame->m_visibleBytes / 4), 4));
-        arguments.push_back(
-            RHIBindingDesc::UavBuffer(frame->m_arguments, frame->m_binCount, sizeof(RHIDrawIndexedIndirectArguments)));
+        ids[viewIndex] =
+            RHIBindingDesc::UavBuffer(frame->m_visibleIds, static_cast<std::uint32_t>(frame->m_visibleBytes / 4), 4);
+        arguments[viewIndex] =
+            RHIBindingDesc::UavBuffer(frame->m_arguments, frame->m_binCount, sizeof(RHIDrawIndexedIndirectArguments));
         const auto* original = frame->m_meshletInputs->candidates.data();
         const auto* originalBins = frame->m_meshletInputs->bins.data();
         const auto firstBin = binIndex;
@@ -330,24 +338,24 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         constants.planeMask |= kOrderedScanDispatch;
     constants.padding = batch->jobs; // Diagnostic only; JOB_COUNT controls completion.
     std::memcpy(batch->constants.cpuAddress, &constants, sizeof(constants));
-    for (const auto& frame : frames)
+    for (std::size_t index = 0; index < frames.size(); ++index)
     {
+        const auto& frame = frames[index];
         if (frame->m_firstStage)
         {
-            first.push_back(
-                RHIBindingDesc::SrvBuffer(frame->m_firstStage->m_visibleIds, frame->m_firstStage->m_outputCount, 4));
+            first[index] =
+                RHIBindingDesc::SrvBuffer(frame->m_firstStage->m_visibleIds, frame->m_firstStage->m_outputCount, 4);
         }
         else
         {
-            first.push_back(
-                RHIBindingDesc::SrvBuffer(dummy.buffer, 1, 4, static_cast<std::uint32_t>(dummy.offset / 4)));
+            first[index] = RHIBindingDesc::SrvBuffer(dummy.buffer, 1, 4, static_cast<std::uint32_t>(dummy.offset / 4));
         }
     }
-    while (ids.size() < kSharedViewCapacity)
+    for (std::size_t index = frames.size(); index < kSharedViewCapacity; ++index)
     {
-        ids.push_back(ids.front());
-        arguments.push_back(arguments.front());
-        first.push_back(first.front());
+        ids[index] = ids.front();
+        arguments[index] = arguments.front();
+        first[index] = first.front();
     }
     if (!batch->pool->Acquire(SharedBatch::kQueueBytes, false, batch->queue, error))
     {
