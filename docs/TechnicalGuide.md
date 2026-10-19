@@ -204,6 +204,14 @@ CoreCLR host가 .NET 10 `ScriptCore`와 게임 어셈블리를 로드합니다. 
 
 엔진의 ScriptCore·제너레이터 변경은 엔진 빌드 범위입니다. 배포본의 게임 컴파일은 포함된 Roslyn·참조 어셈블리·런타임을 사용하며 별도 NuGet 복원이나 사용자 native plugin ABI를 제공하지 않습니다.
 
+### PrSM 스크립트 (CoreCLR 대체 진행 중)
+
+PrSM은 LLVM으로 컴파일하는 엔진 전용 언어입니다. 에디터는 기동 때 `Assets/Scripts/PrSM`(소스 목록은 `project.json`)을 `prsmc`로 컴파일하고 `prsm_jit`(ORC)로 적재합니다. 컴파일러는 자식 프로세스로 돌기 때문에 컴파일러 결함이 에디터를 죽이지 않습니다. 스크립트 컴포넌트는 `PrsmScriptComponent`(`m_typeName`)로 붙고, C# 스크립트처럼 재생 중에만 생명주기를 받습니다. `PrePhysics`/`PostPhysics(tick: float)`는 기존 관리 틱 두 지점에서 프레임당 한 번 일괄로 돕니다. 런타임(GC 어댑터·핸들 표·태스크 스케줄러)은 `ThirdParty/PrSM`에서 SceneRuntime에 들어가며 호스트당 하나입니다.
+
+엔진 노출은 퍼사드 없이 실제 엔진 클래스에 직접 답니다. 클래스와 여는 멤버에만 `reflgen::interop("prsm")`을 붙이고, 클래스 표시만으로 멤버가 열리지는 않습니다. 수신자는 C#과 같은 엔티티 세대 핸들입니다(`receiver("entity")`·`receiver("component")`). 컴포넌트 호출은 매번 엔티티를 다시 찾고 `GetComponent<T>`를 다시 부르며, 주소를 캐시하지 않습니다. 값으로 넘기는 타입(Vector3·Quaternion·Color·LightType)은 `PrsmValueTypes.h`의 별칭 하나씩이 동의하고, 서드파티 header는 건드리지 않습니다. SceneRuntime 빌드 안의 reflgen 실행(`ReflgenPrsm`)이 래퍼·네이티브 서명표·카탈로그를 빌드 중간물로 만듭니다. `BindingRegistry`는 모듈 표를 모아 JIT 허가 심볼과 `ce_prsm_validate_binding`을 공급합니다. 호스트(`PrsmScriptHost`)는 어느 도메인이 열려 있는지 모릅니다. 현재 열린 도메인은 LightComponent(Intensity·Range·SpotAngle·Color·Type), Entity.Enabled, Transform(Position·Rotation·Scale·WorldPosition·Forward/Right/Up)입니다.
+
+도구(`prsmc.exe`·`prsm_jit.dll`·`LLVM-C.dll`)는 `EnginePrsmToolchainDir`(기본 이웃 `..\PrSM\target\release\`)에서 `Bin/<구성>/PrSM/`으로 배치되고, 없으면 에디터는 PrSM 없이 뜹니다. 값 타입 카탈로그를 읽으려면 PrSM `2b7e0df` 이후의 도구가 필요합니다. Player AOT 패키징, 에디터 핫 리로드, PrSM 직렬화 필드의 저장·재로드 왕복은 아직 검증하지 않았습니다. 회귀: [verify-prsm-bindings.ps1](../Tools/regression/verify-prsm-bindings.ps1).
+
 ### 리플렉션과 저장
 
 reflgen이 `[[reflgen::reflect]]` 선언에서 타입 서술자를 생성합니다. 엔진 등록소와 `schema_of<T>`가 씬·프리팹 저작 YAML, Inspector, property 명령과 Component 목록에 연결됩니다. 런타임 캐시처럼 저장하지 않을 필드는 `[[reflgen::ignore]]`로 제외합니다.
