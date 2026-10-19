@@ -1,0 +1,32 @@
+{
+  "gameCpuMs": {
+    "count": 445,
+    "mean": 11.827552808988765,
+    "p50": 11.7057,
+    "p95": 14.6749
+  },
+  "scenePrepareMs": {
+    "count": 445,
+    "mean": 2.1692476404494383,
+    "p50": 2.1321,
+    "p95": 2.7451
+  },
+  "renderLoopMs": {
+    "count": 444,
+    "mean": 26.81299234234234,
+    "p50": 26.1298,
+    "p95": 31.3504
+  },
+  "complete": true,
+  "unacked": 0,
+  "losses": {
+    "droppedFrames": 0,
+    "droppedEvents": 0,
+    "droppedCounters": 0,
+    "sourceDroppedCounters": 0,
+    "sourceDroppedEvents": 0,
+    "sourceDroppedFrameBoundaries": 0,
+    "lateCpuEvents": 0,
+    "lateGpuSpans": 0
+  }
+}

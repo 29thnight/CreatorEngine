@@ -1,0 +1,37 @@
+{
+  "inputsExact": true,
+  "sourceDrawOrderSame": true,
+  "attachments": {
+    "depth": {
+      "different": 0,
+      "over1e4": 0,
+      "maxAbs": 0.0
+    },
+    "baseColor": {
+      "different": 0,
+      "over1e4": 0,
+      "maxAbs": 0.0
+    },
+    "normal": {
+      "different": 0,
+      "over1e4": 0,
+      "maxAbs": 0.0
+    },
+    "metalRough": {
+      "different": 0,
+      "over1e4": 0,
+      "maxAbs": 0.0
+    },
+    "emissive": {
+      "different": 0,
+      "over1e4": 0,
+      "maxAbs": 0.0
+    },
+    "sceneHdr": {
+      "different": 0,
+      "over1e4": 0,
+      "maxAbs": 0.0
+    }
+  },
+  "passed": true
+}

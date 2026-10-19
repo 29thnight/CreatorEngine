@@ -77,7 +77,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 </head>
 <body>
 <nav class="ve-crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span></nav>
-<main>
+<main><section id="performance-remeasure-10-20261019"><h2>2026-10-19 저장소 동기화 후 재측정 10</h2><p>HEAD 946ef4fa9 + 정의 헤더 include 한 줄 보정, 로컬 최적화 제외. Game CPU 중앙값 13.057 → 11.687ms, 반복 11.706ms. 이전 값은 역사 기준. 120프레임 예산 충족: False.</p><p><a href="measurements/20261019-remeasure-10/report.html">조건·정확성·ON/OFF 비교</a> · <a href="../../Artifacts/remeasure-10-20261019/timeline.html?dataset=after-etw&amp;detail=declare">전체 ETW 타임라인(로컬 원본)</a></p><p>선언 내부 분석: 그래프 API 자기 시간 1.220ms, 전체 4.563ms. 그림자/HZB 읽기 목록·패스 메타데이터 반복과 계측 잔여 비용을 우선 줄일 후보로 확인했다. <a href="measurements/20261019-remeasure-10/declare-analysis/index.html">기존 ETW와 하위 스코프 분석</a></p></section>
 <header class="hero">
 <div class="kicker">METEOR · DX12 live pipeline · 2026-10-17</div>
 <h1>클러스터 스트리밍과 현재 렌더링 배선</h1>

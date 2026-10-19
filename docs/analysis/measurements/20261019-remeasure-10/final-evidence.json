@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "checks": {
+    "capturesAndRegression": true,
+    "reportQa": true,
+    "timelineQa": true,
+    "localRestored": true,
+    "timelineAlignment": true,
+    "runtimeUnchanged": true,
+    "synchronized": true,
+    "localPacketFlagAbsent": true,
+    "restoredCodeHashes": true,
+    "editorBuild": true,
+    "kitReport": true,
+    "kitTimeline": true
+  },
+  "source": "946ef4fa9 + MaterialGraphShaderMeta.h include only",
+  "localOptimizationExcluded": true,
+  "target120Met": false,
+  "historicalComparison": true
+}

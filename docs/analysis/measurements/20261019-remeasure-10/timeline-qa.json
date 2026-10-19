@@ -1,0 +1,136 @@
+{
+  "passed": true,
+  "errors": [],
+  "checks": [
+    {
+      "mode": "preparation",
+      "overflow": false,
+      "rows": 21
+    },
+    {
+      "mode": "bindingDetail",
+      "overflow": false,
+      "rows": 12
+    },
+    {
+      "mode": "binding",
+      "overflow": false,
+      "rows": 20
+    },
+    {
+      "mode": "mesh",
+      "overflow": false,
+      "rows": 12
+    },
+    {
+      "mode": "assist",
+      "overflow": false,
+      "rows": 10
+    },
+    {
+      "mode": "parallel",
+      "overflow": false,
+      "rows": 17
+    },
+    {
+      "mode": "scene",
+      "overflow": false,
+      "rows": 20
+    },
+    {
+      "mode": "draw",
+      "overflow": false,
+      "rows": 8
+    },
+    {
+      "mode": "shadow",
+      "overflow": false,
+      "rows": 9
+    },
+    {
+      "mode": "pool",
+      "overflow": false,
+      "rows": 9
+    },
+    {
+      "mode": "declare",
+      "overflow": false,
+      "rows": 15
+    },
+    {
+      "mode": "pipeline",
+      "overflow": false,
+      "rows": 9
+    },
+    {
+      "mode": "all",
+      "overflow": false,
+      "rows": 105
+    },
+    {
+      "mode": "preparation",
+      "overflow": false,
+      "rows": 21
+    },
+    {
+      "mode": "bindingDetail",
+      "overflow": false,
+      "rows": 12
+    },
+    {
+      "mode": "binding",
+      "overflow": false,
+      "rows": 20
+    },
+    {
+      "mode": "mesh",
+      "overflow": false,
+      "rows": 12
+    },
+    {
+      "mode": "assist",
+      "overflow": false,
+      "rows": 10
+    },
+    {
+      "mode": "parallel",
+      "overflow": false,
+      "rows": 17
+    },
+    {
+      "mode": "scene",
+      "overflow": false,
+      "rows": 20
+    },
+    {
+      "mode": "draw",
+      "overflow": false,
+      "rows": 8
+    },
+    {
+      "mode": "shadow",
+      "overflow": false,
+      "rows": 9
+    },
+    {
+      "mode": "pool",
+      "overflow": false,
+      "rows": 9
+    },
+    {
+      "mode": "declare",
+      "overflow": false,
+      "rows": 15
+    },
+    {
+      "mode": "pipeline",
+      "overflow": false,
+      "rows": 9
+    },
+    {
+      "mode": "all",
+      "overflow": false,
+      "rows": 105
+    }
+  ]
+}

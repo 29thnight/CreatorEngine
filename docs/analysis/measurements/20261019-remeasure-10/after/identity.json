@@ -1,0 +1,10 @@
+{
+  "engineBuildPerformed": true,
+  "validation": "off",
+  "project": "C:\\Users\\lance\\source\\CreatorEngine/Build/Obj/MaterialProductProbe/Remeasure10-Debug-20261019-after/Project",
+  "runtimeSha256": "126516D5A7DCABD2EDFBB5612CCE7AB1CFAD36FEEAFB1912F04052EB74E9F812",
+  "trace": "CPU sampling, CSwitch/ReadyThread stacks and DxgKrnl 0x277",
+  "configuration": "Debug",
+  "runtimePdbSha256": "506F1DD80A269C9C96A60523C35CBC91EB2CCE0DBBAA0EAB7858B71D1573EC40",
+  "utc": "2026-10-19T04:30:37.3995362Z"
+}

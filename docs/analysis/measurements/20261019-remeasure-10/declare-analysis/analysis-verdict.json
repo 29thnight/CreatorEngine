@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "gameRoots": 396,
+  "rootMs": 4.562593939393939,
+  "exclusiveSumMs": 4.562593939393932,
+  "apiSelfMs": 1.219584595921686,
+  "stackSamples": {
+    "on": 3492,
+    "off": 3328
+  },
+  "limits": [
+    "node wall is Game only; stacks include Scene and Game",
+    "inclusive sample percentages overlap",
+    "self residual is not allocation-only",
+    "no new build or measurement"
+  ],
+  "head": "946ef4fa9b79f4e74ad09a03d79aa117277ded87",
+  "engineSourceUnchanged": true,
+  "browserQa": true
+}

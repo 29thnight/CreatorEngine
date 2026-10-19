@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "errors": [],
+  "checks": [
+    {
+      "width": 1280,
+      "overflow": false,
+      "headings": 6,
+      "hidden": false
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "headings": 6,
+      "hidden": false
+    }
+  ]
+}

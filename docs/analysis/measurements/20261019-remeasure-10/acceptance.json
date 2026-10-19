@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "checks": {
+    "afterCapture": true,
+    "afterReplay": true,
+    "afterNativeLossless": true,
+    "repeatCapture": true,
+    "repeatReplay": true,
+    "repeatNativeLossless": true,
+    "etwLossless": true,
+    "sameAfterRepeatBinary": true,
+    "sceneProbe": true,
+    "volumeProbe": true,
+    "analysis": true
+  }
+}

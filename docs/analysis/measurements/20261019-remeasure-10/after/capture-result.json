@@ -1,0 +1,8 @@
+{
+  "workerCountRequested": 8,
+  "foregroundSamplesAccepted": true,
+  "foregroundMode": "editor",
+  "passed": true,
+  "runtimeUnchanged": true,
+  "normalExit": true
+}

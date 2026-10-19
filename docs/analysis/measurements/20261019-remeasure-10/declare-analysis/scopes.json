@@ -1,0 +1,2697 @@
+{
+  "etw": {
+    "roots": 396,
+    "root": {
+      "count": 396,
+      "mean": 4.562593939393939,
+      "p50": 4.3046500000000005,
+      "p95": 6.0193
+    },
+    "scopes": {
+      "RenderGraphDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 4.562593939393939,
+        "selfMs": 0.02675176767665833,
+        "selfRunning": 0.02674999999989167,
+        "selfDpcIsr": 0.00017398989899560308,
+        "selfRunningNet": 0.026576010100896066,
+        "inclusiveRunning": 4.55392474747477,
+        "inclusiveDpcIsr": 0.09892752525253529,
+        "inclusiveRunningNet": 4.454997222222235,
+        "inclusiveReady": 0.006631313131301014,
+        "inclusiveWaiting": 0.002015151515165874,
+        "selfReady": 1.7676767666588686e-06,
+        "inclusiveUnknown": 2.2727272727309474e-05
+      },
+      "RenderDeclare.METEOR.Scene.Geometry": {
+        "calls": 1.0,
+        "inclusiveMs": 0.3686499999999999,
+        "selfMs": 0.0019040404041297367,
+        "selfRunning": 0.0019040404041297367,
+        "selfDpcIsr": 4.545454544313543e-06,
+        "selfRunningNet": 0.0018994949495854231,
+        "inclusiveRunning": 0.36807929292930763,
+        "inclusiveDpcIsr": 0.011268939393929863,
+        "inclusiveRunningNet": 0.35681035353537777,
+        "inclusiveWaiting": 0.00022222222222156076,
+        "inclusiveReady": 0.0003484848484915365
+      },
+      "RenderGraphDeclareNodeBody": {
+        "calls": 37.0,
+        "inclusiveMs": 4.450431313131296,
+        "selfMs": 1.8239396464838675,
+        "selfRunning": 1.8188603535545915,
+        "selfDpcIsr": 0.03389444444457242,
+        "selfRunningNet": 1.7849659091100192,
+        "inclusiveRunning": 4.4417702020201,
+        "inclusiveDpcIsr": 0.09768712121214805,
+        "inclusiveRunningNet": 4.344083080807953,
+        "inclusiveReady": 0.0066232323232199375,
+        "selfWaiting": 0.0011338383838494677,
+        "selfReady": 0.003925252525236989,
+        "inclusiveWaiting": 0.002015151515165874,
+        "selfUnknown": 2.0202020201542486e-05,
+        "inclusiveUnknown": 2.2727272727309474e-05
+      },
+      "MaterialDeclareGeometry": {
+        "calls": 1.0,
+        "inclusiveMs": 0.3494257575757575,
+        "selfMs": 0.23666893939433736,
+        "selfRunning": 0.23631287878827312,
+        "selfDpcIsr": 0.007690404040405693,
+        "selfRunningNet": 0.22862247474786743,
+        "inclusiveRunning": 0.348855050505046,
+        "inclusiveDpcIsr": 0.010664393939379985,
+        "inclusiveRunningNet": 0.338190656565666,
+        "selfWaiting": 0.00018686868687000976,
+        "selfReady": 0.00016919191919423428,
+        "inclusiveWaiting": 0.00022222222222156076,
+        "inclusiveReady": 0.0003484848484915365
+      },
+      "RenderGraphDeclareImportTexture": {
+        "calls": 112.0,
+        "inclusiveMs": 0.2590042929293484,
+        "selfMs": 0.25900429292926275,
+        "selfRunning": 0.2583398989898639,
+        "selfDpcIsr": 0.008246464646476576,
+        "selfRunningNet": 0.2500934343433873,
+        "inclusiveRunning": 0.2583398989898639,
+        "inclusiveDpcIsr": 0.008246464646476576,
+        "inclusiveRunningNet": 0.2500934343433873,
+        "selfReady": 0.00048510101009694584,
+        "inclusiveReady": 0.00048510101009694584,
+        "selfWaiting": 0.00017929292929730223,
+        "inclusiveWaiting": 0.00017929292929730223
+      },
+      "RenderGraphDeclareImportBuffer": {
+        "calls": 91.0,
+        "inclusiveMs": 0.20748484848487408,
+        "selfMs": 0.20748484848532847,
+        "selfRunning": 0.20722550505099444,
+        "selfDpcIsr": 0.004165656565635804,
+        "selfRunningNet": 0.20305984848535863,
+        "inclusiveRunning": 0.20722550505099444,
+        "inclusiveDpcIsr": 0.004165656565635804,
+        "inclusiveRunningNet": 0.20305984848535863,
+        "selfReady": 0.0002037878787855288,
+        "inclusiveReady": 0.0002037878787855288,
+        "selfWaiting": 5.555555555539019e-05,
+        "inclusiveWaiting": 5.555555555539019e-05
+      },
+      "RenderGraphDeclareAdvanceVersion": {
+        "calls": 300.0,
+        "inclusiveMs": 0.22475429292923932,
+        "selfMs": 0.2247542929075954,
+        "selfRunning": 0.22468787876618357,
+        "selfDpcIsr": 0.004277777777716814,
+        "selfRunningNet": 0.22041010098846678,
+        "inclusiveRunning": 0.22468787876618357,
+        "inclusiveDpcIsr": 0.004277777777716814,
+        "inclusiveRunningNet": 0.22041010098846678,
+        "selfReady": 6.64141414118245e-05,
+        "inclusiveReady": 6.64141414118245e-05
+      },
+      "RenderGraphDeclareAddPass": {
+        "calls": 133.0,
+        "inclusiveMs": 0.39161818181813435,
+        "selfMs": 0.2671409091118994,
+        "selfRunning": 0.26681641416239577,
+        "selfDpcIsr": 0.004388888888991809,
+        "selfRunningNet": 0.26242752527340396,
+        "inclusiveRunning": 0.39099217171532374,
+        "inclusiveDpcIsr": 0.007199747474715542,
+        "inclusiveRunningNet": 0.38379242424060817,
+        "selfReady": 0.000271464646474017,
+        "inclusiveReady": 0.0005729797979904216,
+        "selfWaiting": 5.050505050385622e-05,
+        "inclusiveWaiting": 5.050505050385622e-05,
+        "selfUnknown": 2.525252525766987e-06,
+        "inclusiveUnknown": 2.525252525766987e-06
+      },
+      "RenderGraphDeclareInitializePass": {
+        "calls": 141.0,
+        "inclusiveMs": 0.1316732323232382,
+        "selfMs": 0.1316732322989875,
+        "selfRunning": 0.13137171714747684,
+        "selfDpcIsr": 0.002834343434205558,
+        "selfRunningNet": 0.12853737371327129,
+        "inclusiveRunning": 0.13137171714747684,
+        "inclusiveDpcIsr": 0.002834343434205558,
+        "inclusiveRunningNet": 0.12853737371327129,
+        "selfReady": 0.0003015151515164046,
+        "inclusiveReady": 0.0003015151515164046
+      },
+      "RenderGraphDeclareAfterNode": {
+        "calls": 37.0,
+        "inclusiveMs": 0.022032575757576018,
+        "selfMs": 0.02203257575895993,
+        "selfRunning": 0.02203106060744401,
+        "selfDpcIsr": 0.00018636363637025363,
+        "selfRunningNet": 0.021844696971073756,
+        "inclusiveRunning": 0.02203106060744401,
+        "inclusiveDpcIsr": 0.00018636363637025363,
+        "inclusiveRunningNet": 0.021844696971073756,
+        "selfReady": 1.515151515919533e-06,
+        "inclusiveReady": 1.515151515919533e-06
+      },
+      "RenderDeclare.METEOR.Scene.Cull.First": {
+        "calls": 1.0,
+        "inclusiveMs": 0.5946931818181822,
+        "selfMs": 0.0016646464647453625,
+        "selfRunning": 0.0016646464647453625,
+        "selfDpcIsr": 7.828282832633704e-06,
+        "selfRunningNet": 0.0016568181819127288,
+        "inclusiveRunning": 0.5940593434343605,
+        "inclusiveDpcIsr": 0.018586868686865883,
+        "inclusiveRunningNet": 0.5754724747474946,
+        "inclusiveReady": 0.0004772727272752215,
+        "inclusiveWaiting": 0.00015656565656539933
+      },
+      "GpuVisibility.MeshletDeclare": {
+        "calls": 8.0,
+        "inclusiveMs": 0.6679050505050411,
+        "selfMs": 0.3794732323269193,
+        "selfRunning": 0.37912424242792575,
+        "selfDpcIsr": 0.011344696969685647,
+        "selfRunningNet": 0.3677795454582401,
+        "inclusiveRunning": 0.6674429292923928,
+        "inclusiveDpcIsr": 0.01852904040403891,
+        "inclusiveRunningNet": 0.6489138888883539,
+        "selfReady": 0.00032878787878745343,
+        "inclusiveReady": 0.000441919191915632,
+        "selfWaiting": 2.0202020201542486e-05,
+        "inclusiveWaiting": 2.0202020201542486e-05
+      },
+      "GpuVisibility.SharedBuild": {
+        "calls": 2.0,
+        "inclusiveMs": 0.1672328282828282,
+        "selfMs": 0.08586111111112081,
+        "selfRunning": 0.08586111111112081,
+        "selfDpcIsr": 0.002723989898990539,
+        "selfRunningNet": 0.08313712121213028,
+        "inclusiveRunning": 0.1672328282828343,
+        "inclusiveDpcIsr": 0.004504040404041498,
+        "inclusiveRunningNet": 0.1627287878787928
+      },
+      "GpuVisibility.SharedBindings": {
+        "calls": 2.0,
+        "inclusiveMs": 0.08137171717171723,
+        "selfMs": 0.08137171717171349,
+        "selfRunning": 0.08137171717171349,
+        "selfDpcIsr": 0.0017800505050509588,
+        "selfRunningNet": 0.07959166666666254,
+        "inclusiveRunning": 0.08137171717171349,
+        "inclusiveDpcIsr": 0.0017800505050509588,
+        "inclusiveRunningNet": 0.07959166666666254
+      },
+      "MaterialDeclareFirstCull": {
+        "calls": 1.0,
+        "inclusiveMs": 0.004070959595959602,
+        "selfMs": 0.0032154040405086995,
+        "selfRunning": 0.0032154040405086995,
+        "selfDpcIsr": 1.5151515136228291e-06,
+        "selfRunningNet": 0.0032138888889950766,
+        "inclusiveRunning": 0.004070959595943084,
+        "inclusiveDpcIsr": 1.5151515136228291e-06,
+        "inclusiveRunningNet": 0.00406944444442946
+      },
+      "RenderDeclare.METEOR.Scene.Occluder": {
+        "calls": 1.0,
+        "inclusiveMs": 0.25916969696969694,
+        "selfMs": 0.0020876262626408027,
+        "selfRunning": 0.0020876262626408027,
+        "selfDpcIsr": 0.00038510101009448747,
+        "selfRunningNet": 0.0017025252525463151,
+        "inclusiveRunning": 0.2588742424242696,
+        "inclusiveDpcIsr": 0.008249494949468222,
+        "inclusiveRunningNet": 0.25062474747480135,
+        "inclusiveReady": 0.00021464646464540817,
+        "inclusiveWaiting": 8.080808080616995e-05
+      },
+      "MaterialDeclareOccluder": {
+        "calls": 1.0,
+        "inclusiveMs": 0.24516414141414153,
+        "selfMs": 0.17303333333557813,
+        "selfRunning": 0.17276515151739244,
+        "selfDpcIsr": 0.004448484848494721,
+        "selfRunningNet": 0.16831666666889772,
+        "inclusiveRunning": 0.24486868686873473,
+        "inclusiveDpcIsr": 0.00743964646462953,
+        "inclusiveRunningNet": 0.23742904040410517,
+        "selfReady": 0.00018737373737263678,
+        "inclusiveReady": 0.00021464646464540817,
+        "selfWaiting": 8.080808080616995e-05,
+        "inclusiveWaiting": 8.080808080616995e-05
+      },
+      "RenderGraphDeclareAddSplitPass": {
+        "calls": 8.0,
+        "inclusiveMs": 0.02763308080808088,
+        "selfMs": 0.02043712121318586,
+        "selfRunning": 0.0203714646475297,
+        "selfDpcIsr": 0.00046136363636897575,
+        "selfRunningNet": 0.01991010101116072,
+        "inclusiveRunning": 0.02756742424207857,
+        "inclusiveDpcIsr": 0.00048484848485079993,
+        "inclusiveRunningNet": 0.027082575757227768,
+        "selfWaiting": 3.0303030302313733e-05,
+        "selfReady": 3.5353535353847704e-05,
+        "inclusiveWaiting": 3.0303030302313733e-05,
+        "inclusiveReady": 3.5353535353847704e-05
+      },
+      "RenderGraphDeclareCreateTexture": {
+        "calls": 89.0,
+        "inclusiveMs": 0.08974166666669765,
+        "selfMs": 0.08974166665204664,
+        "selfRunning": 0.08972727271265345,
+        "selfDpcIsr": 0.0020780303029312684,
+        "selfRunningNet": 0.08764924240972218,
+        "inclusiveRunning": 0.08972727271265345,
+        "inclusiveDpcIsr": 0.0020780303029312684,
+        "inclusiveRunningNet": 0.08764924240972218,
+        "selfReady": 1.43939393931971e-05,
+        "inclusiveReady": 1.43939393931971e-05
+      },
+      "RenderDeclare.METEOR.Scene.Cull.Final": {
+        "calls": 1.0,
+        "inclusiveMs": 0.1960553030303031,
+        "selfMs": 0.001738636363740804,
+        "selfRunning": 0.001738636363740804,
+        "selfDpcIsr": 8.080808083373039e-06,
+        "selfRunningNet": 0.0017305555556574308,
+        "inclusiveRunning": 0.19580277777779798,
+        "inclusiveDpcIsr": 0.0061472222222196575,
+        "inclusiveRunningNet": 0.1896555555555783,
+        "inclusiveReady": 0.00025252525252272617
+      },
+      "MaterialDeclareFinalCull": {
+        "calls": 1.0,
+        "inclusiveMs": 0.17873661616161615,
+        "selfMs": 0.061406313133449145,
+        "selfRunning": 0.06135707070920588,
+        "selfDpcIsr": 0.002536363636379221,
+        "selfRunningNet": 0.058820707072826654,
+        "inclusiveRunning": 0.17852196969697892,
+        "inclusiveDpcIsr": 0.0057800505050482395,
+        "inclusiveRunningNet": 0.1727419191919307,
+        "inclusiveReady": 0.00021464646464540817,
+        "selfReady": 4.9242424245566134e-05
+      },
+      "RenderGraphDeclareAddRepeatedPass": {
+        "calls": 8.0,
+        "inclusiveMs": 0.04589419191919213,
+        "selfMs": 0.019348232323380038,
+        "selfRunning": 0.019348232323380038,
+        "selfDpcIsr": 0.00028156565657249153,
+        "selfRunningNet": 0.019066666666807546,
+        "inclusiveRunning": 0.0458941919189116,
+        "inclusiveDpcIsr": 0.0010651515151448162,
+        "inclusiveRunningNet": 0.044829040403766784
+      },
+      "RenderDeclare.METEOR.Scene.LayerWork": {
+        "calls": 1.0,
+        "inclusiveMs": 0.021409848484848497,
+        "selfMs": 0.0019191919191344786,
+        "selfRunning": 0.0019191919191344786,
+        "selfDpcIsr": 5.3030303022733095e-06,
+        "selfRunningNet": 0.0019138888888322054,
+        "inclusiveRunning": 0.021351767676750077,
+        "inclusiveDpcIsr": 0.0004497474747545817,
+        "inclusiveRunningNet": 0.020902020201995497,
+        "inclusiveReady": 5.808080808115718e-05
+      },
+      "RenderDeclare.METEOR.Shadow.StaticCache": {
+        "calls": 1.0,
+        "inclusiveMs": 0.03396691919191917,
+        "selfMs": 0.0017489898989941305,
+        "selfRunning": 0.0017489898989941305,
+        "selfDpcIsr": 5.8080808060486845e-06,
+        "selfRunningNet": 0.0017431818181880819,
+        "inclusiveRunning": 0.033966919191931365,
+        "inclusiveDpcIsr": 0.0010974747474737148,
+        "inclusiveRunningNet": 0.032869444444457656
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.First": {
+        "calls": 1.0,
+        "inclusiveMs": 0.030130050505050496,
+        "selfMs": 0.0018772727272694466,
+        "selfRunning": 0.0018772727272694466,
+        "selfDpcIsr": 2.525252525766987e-06,
+        "selfRunningNet": 0.0018747474747436797,
+        "inclusiveRunning": 0.03008207070710378,
+        "inclusiveDpcIsr": 0.000272222222226235,
+        "inclusiveRunningNet": 0.029809848484877544,
+        "inclusiveWaiting": 2.0202020201542486e-05,
+        "inclusiveReady": 2.7777777778843448e-05
+      },
+      "RenderDeclare.METEOR.Shadow.Occluder": {
+        "calls": 1.0,
+        "inclusiveMs": 0.4156356060606061,
+        "selfMs": 0.0021651515152574107,
+        "selfRunning": 0.0021651515152574107,
+        "selfDpcIsr": 1.515151514771181e-06,
+        "selfRunningNet": 0.0021636363637426393,
+        "inclusiveRunning": 0.41548409090914085,
+        "inclusiveDpcIsr": 0.010818181818205052,
+        "inclusiveRunningNet": 0.4046659090909358,
+        "inclusiveWaiting": 2.272727272960618e-05,
+        "inclusiveReady": 0.0001287878787865559
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.Final": {
+        "calls": 1.0,
+        "inclusiveMs": 0.46673055555555576,
+        "selfMs": 0.0017760101011011404,
+        "selfRunning": 0.0017760101011011404,
+        "selfDpcIsr": 2.525252525766987e-06,
+        "selfRunningNet": 0.0017734848485753735,
+        "inclusiveRunning": 0.46658156565653924,
+        "inclusiveDpcIsr": 0.009455050505057627,
+        "inclusiveRunningNet": 0.4571265151514816,
+        "inclusiveWaiting": 2.020202019981996e-05,
+        "inclusiveReady": 0.00012878787878425917
+      },
+      "ShadowFinalCull.HzbDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.20843762626262644,
+        "selfMs": 0.13235227273469666,
+        "selfRunning": 0.13224823233065594,
+        "selfDpcIsr": 0.00237651515155421,
+        "selfRunningNet": 0.12987171717910173,
+        "inclusiveRunning": 0.20828863636362863,
+        "inclusiveDpcIsr": 0.0032126262626294157,
+        "inclusiveRunningNet": 0.2050760101009992,
+        "selfWaiting": 2.020202019981996e-05,
+        "selfReady": 8.383838383571231e-05,
+        "inclusiveWaiting": 2.020202019981996e-05,
+        "inclusiveReady": 0.00012878787878425917
+      },
+      "ShadowFinalCull.SharedDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.2397300505050506,
+        "selfMs": 0.004935101010103567,
+        "selfRunning": 0.004935101010103567,
+        "selfDpcIsr": 0.00044015151515643743,
+        "selfRunningNet": 0.004494949494947129,
+        "inclusiveRunning": 0.23973005050506477,
+        "inclusiveDpcIsr": 0.006198989898993287,
+        "inclusiveRunningNet": 0.23353106060607148
+      },
+      "RenderDeclare.METEOR.Shadow.Raster": {
+        "calls": 1.0,
+        "inclusiveMs": 0.4093906565656564,
+        "selfMs": 0.0017719696970772535,
+        "selfRunning": 0.0017719696970772535,
+        "selfDpcIsr": 0.00010883838384034615,
+        "selfRunningNet": 0.0016631313132369073,
+        "inclusiveRunning": 0.4083098484848809,
+        "inclusiveDpcIsr": 0.006116666666668901,
+        "inclusiveRunningNet": 0.402193181818212,
+        "inclusiveWaiting": 0.00021464646464483398,
+        "inclusiveReady": 0.0008661616161629529
+      },
+      "RenderDeclare.METEOR.Shadow.History": {
+        "calls": 1.0,
+        "inclusiveMs": 0.30334696969697,
+        "selfMs": 0.0021232323232970654,
+        "selfRunning": 0.0021232323232970654,
+        "selfDpcIsr": 2.5505050508409206e-05,
+        "selfRunningNet": 0.0020977272727886564,
+        "inclusiveRunning": 0.30284696969697494,
+        "inclusiveDpcIsr": 0.004938383838390165,
+        "inclusiveRunningNet": 0.29790858585858476,
+        "inclusiveReady": 0.00035858585857737914,
+        "inclusiveWaiting": 0.00014141414141309412
+      },
+      "RenderDeclare.METEOR.Scene.Visibility": {
+        "calls": 1.0,
+        "inclusiveMs": 0.24520883838383842,
+        "selfMs": 0.0017005050506311203,
+        "selfRunning": 0.0017005050506311203,
+        "selfDpcIsr": 7.323232319671514e-06,
+        "selfRunningNet": 0.0016931818183114488,
+        "inclusiveRunning": 0.24448409090912504,
+        "inclusiveDpcIsr": 0.0030267676767669564,
+        "inclusiveRunningNet": 0.2414573232323581,
+        "inclusiveReady": 0.000522727272731563,
+        "inclusiveUnknown": 2.525252525766987e-06,
+        "inclusiveWaiting": 0.0001994949494988447
+      },
+      "MaterialSceneVisibilityDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.21490606060606054,
+        "selfMs": 0.14954040404207794,
+        "selfRunning": 0.14899848485017192,
+        "selfDpcIsr": 0.0017053030303233957,
+        "selfRunningNet": 0.14729318181984852,
+        "inclusiveRunning": 0.21426717171718654,
+        "inclusiveDpcIsr": 0.0023914141414121386,
+        "inclusiveRunningNet": 0.2118757575757744,
+        "selfReady": 0.00034999999999941756,
+        "inclusiveReady": 0.000439393939399626,
+        "inclusiveUnknown": 2.525252525766987e-06,
+        "selfWaiting": 0.00019191919192154374,
+        "inclusiveWaiting": 0.0001969696969730777
+      },
+      "RenderDeclare.METEOR.Scene.MaterialWork": {
+        "calls": 1.0,
+        "inclusiveMs": 0.09734722222222225,
+        "selfMs": 0.0015464646465179934,
+        "selfRunning": 0.0015464646465179934,
+        "selfDpcIsr": 4.797979796201231e-06,
+        "selfRunningNet": 0.001541666666721792,
+        "inclusiveRunning": 0.09722348484849372,
+        "inclusiveDpcIsr": 0.0020209595959730714,
+        "inclusiveRunningNet": 0.09520252525252065,
+        "inclusiveWaiting": 3.0303030302313733e-05,
+        "inclusiveReady": 9.343434343270818e-05
+      },
+      "MaterialSceneWorkDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.08249141414141421,
+        "selfMs": 0.054102525253143775,
+        "selfRunning": 0.053978787879415645,
+        "selfDpcIsr": 0.0011310606060700905,
+        "selfRunningNet": 0.05284772727334556,
+        "inclusiveRunning": 0.08236767676770212,
+        "inclusiveDpcIsr": 0.0013525252525279498,
+        "inclusiveRunningNet": 0.08101515151517417,
+        "selfWaiting": 3.0303030302313733e-05,
+        "selfReady": 9.343434343270818e-05,
+        "inclusiveWaiting": 3.0303030302313733e-05,
+        "inclusiveReady": 9.343434343270818e-05
+      },
+      "RenderDeclare.METEOR.Scene.SurfaceResolve": {
+        "calls": 1.0,
+        "inclusiveMs": 0.10699797979797974,
+        "selfMs": 0.0014712121212229212,
+        "selfRunning": 0.0014712121212229212,
+        "selfDpcIsr": 7.0707070666354745e-06,
+        "selfRunningNet": 0.0014641414141562858,
+        "inclusiveRunning": 0.10672777777777567,
+        "inclusiveDpcIsr": 0.0013159090909112185,
+        "inclusiveRunningNet": 0.10541186868686445,
+        "inclusiveWaiting": 7.828282828729308e-05,
+        "inclusiveReady": 0.00019191919191924705
+      },
+      "MaterialSceneResolveDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.051501515151515125,
+        "selfMs": 0.044946717171979005,
+        "selfRunning": 0.044853282828544,
+        "selfDpcIsr": 0.0008800505050518004,
+        "selfRunningNet": 0.0439732323234922,
+        "inclusiveRunning": 0.051408080808069447,
+        "inclusiveDpcIsr": 0.0008964646464658407,
+        "inclusiveRunningNet": 0.0505116161616036,
+        "selfWaiting": 3.535353535614441e-05,
+        "selfReady": 5.8080808083453884e-05,
+        "inclusiveWaiting": 3.535353535614441e-05,
+        "inclusiveReady": 5.8080808083453884e-05
+      },
+      "RenderDeclare.METEOR.Scene.Decal": {
+        "calls": 1.0,
+        "inclusiveMs": 0.023765151515151524,
+        "selfMs": 0.0015376262625652704,
+        "selfRunning": 0.0015376262625652704,
+        "selfDpcIsr": 4.797979796201231e-06,
+        "selfRunningNet": 0.0015328282827690692,
+        "inclusiveRunning": 0.02376515151516085,
+        "inclusiveDpcIsr": 0.0005585858585903344,
+        "inclusiveRunningNet": 0.023206565656570515
+      },
+      "RenderDeclare.METEOR.Scene.History": {
+        "calls": 1.0,
+        "inclusiveMs": 0.09565252525252513,
+        "selfMs": 0.0014148989898733982,
+        "selfRunning": 0.0014148989898733982,
+        "selfDpcIsr": 3.2828282825784016e-06,
+        "selfRunningNet": 0.0014116161615908198,
+        "inclusiveRunning": 0.09482424242423747,
+        "inclusiveDpcIsr": 0.0012669191919095016,
+        "inclusiveRunningNet": 0.09355732323232796,
+        "inclusiveWaiting": 8.838383838576761e-05,
+        "inclusiveReady": 0.0007398989898981447
+      },
+      "RenderDeclare.Temporal.Inputs": {
+        "calls": 1.0,
+        "inclusiveMs": 0.1313209595959596,
+        "selfMs": 0.0018252525253834538,
+        "selfRunning": 0.0018252525253834538,
+        "selfDpcIsr": 3.282828277984994e-06,
+        "selfRunningNet": 0.001821969697105469,
+        "inclusiveRunning": 0.13081843434347412,
+        "inclusiveDpcIsr": 0.0013699494949346123,
+        "inclusiveRunningNet": 0.12944848484853952,
+        "inclusiveReady": 0.00023737373737156927,
+        "inclusiveWaiting": 0.0002651515151504127
+      },
+      "RenderDeclare.SSAO": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0274482323232323,
+        "selfMs": 0.0016891414141210507,
+        "selfRunning": 0.0016891414141210507,
+        "selfDpcIsr": 1.5151515150008513e-05,
+        "selfRunningNet": 0.0016739898989710422,
+        "inclusiveRunning": 0.02742045454544089,
+        "inclusiveDpcIsr": 0.00035176767677296656,
+        "inclusiveRunningNet": 0.027068686868667924,
+        "inclusiveWaiting": 2.525252525766987e-06,
+        "inclusiveReady": 2.525252525307646e-05
+      },
+      "RenderDeclare.METEOR.Scene.Color": {
+        "calls": 1.0,
+        "inclusiveMs": 0.15491767676767682,
+        "selfMs": 0.0020669191918947184,
+        "selfRunning": 0.0020669191918947184,
+        "selfDpcIsr": 3.5353535333177373e-06,
+        "selfRunningNet": 0.0020633838383614005,
+        "inclusiveRunning": 0.15409949494944739,
+        "inclusiveDpcIsr": 0.0019750000000031934,
+        "inclusiveRunningNet": 0.1521244949494442,
+        "inclusiveReady": 0.0006868686868696698,
+        "inclusiveWaiting": 0.00013131313131921297
+      },
+      "RenderDeclare.SkyBox": {
+        "calls": 1.0,
+        "inclusiveMs": 0.018295959595959612,
+        "selfMs": 0.0014361111109911975,
+        "selfRunning": 0.0014361111109911975,
+        "selfDpcIsr": 7.07070706433877e-06,
+        "selfRunningNet": 0.0014290404039268587,
+        "inclusiveRunning": 0.018242929292921532,
+        "inclusiveDpcIsr": 0.0006696969696965213,
+        "inclusiveRunningNet": 0.01757323232322501,
+        "inclusiveWaiting": 2.7777777778843448e-05,
+        "inclusiveReady": 2.525252525307646e-05
+      },
+      "RenderDeclare.SSGI": {
+        "calls": 1.0,
+        "inclusiveMs": 0.24330530303030304,
+        "selfMs": 0.001641919191900921,
+        "selfRunning": 0.001641919191900921,
+        "selfDpcIsr": 5.808080808345388e-06,
+        "selfRunningNet": 0.0016361111110925759,
+        "inclusiveRunning": 0.24251994949495015,
+        "inclusiveDpcIsr": 0.005165151515154891,
+        "inclusiveRunningNet": 0.23735479797979528,
+        "inclusiveWaiting": 0.0001363636363650052,
+        "inclusiveReady": 0.0006287878787839192,
+        "inclusiveUnknown": 2.0202020201542486e-05
+      },
+      "RenderDeclare.SSS": {
+        "calls": 1.0,
+        "inclusiveMs": 0.006907070707070709,
+        "selfMs": 0.0017020202019277046,
+        "selfRunning": 0.0016987373736451262,
+        "selfDpcIsr": 1.7676767643621648e-06,
+        "selfRunningNet": 0.001696969696880764,
+        "inclusiveRunning": 0.006899242424269273,
+        "inclusiveDpcIsr": 3.030303031839066e-06,
+        "inclusiveRunningNet": 0.006896212121237435,
+        "selfReady": 3.2828282825784016e-06,
+        "inclusiveReady": 7.828282828040297e-06
+      },
+      "RenderDeclare.SSR": {
+        "calls": 1.0,
+        "inclusiveMs": 0.008501262626262631,
+        "selfMs": 0.0014707070705388546,
+        "selfRunning": 0.0014691919190229351,
+        "selfDpcIsr": 2.2727272704342436e-06,
+        "selfRunningNet": 0.001466919191752501,
+        "inclusiveRunning": 0.008450252525228803,
+        "inclusiveDpcIsr": 1.691919191437068e-05,
+        "inclusiveRunningNet": 0.008433333333314433,
+        "selfReady": 1.515151515919533e-06,
+        "inclusiveReady": 4.343434343262734e-05,
+        "inclusiveWaiting": 7.575757577300961e-06
+      },
+      "RenderDeclare.METEOR.Scene.Volume": {
+        "calls": 1.0,
+        "inclusiveMs": 0.009044191919191926,
+        "selfMs": 0.0017843434342027116,
+        "selfRunning": 0.0017843434342027116,
+        "selfDpcIsr": 2.272727272960618e-05,
+        "selfRunningNet": 0.0017616161614731054,
+        "inclusiveRunning": 0.008902777777794916,
+        "inclusiveDpcIsr": 4.4191919196328866e-05,
+        "inclusiveRunningNet": 0.008858585858598587,
+        "inclusiveWaiting": 5.303030303191991e-05,
+        "inclusiveReady": 8.838383838347091e-05
+      },
+      "RenderDeclare.METEOR.Scene.LightTiles": {
+        "calls": 1.0,
+        "inclusiveMs": 0.004710353535353531,
+        "selfMs": 0.0016984848483438595,
+        "selfRunning": 0.0016984848483438595,
+        "selfDpcIsr": 3.7878787886504805e-06,
+        "selfRunningNet": 0.0016946969695552088,
+        "inclusiveRunning": 0.004710353535421121,
+        "inclusiveDpcIsr": 1.0101010100771243e-05,
+        "inclusiveRunningNet": 0.00470025252532035
+      },
+      "RenderDeclare.METEOR.Scene.Blended": {
+        "calls": 1.0,
+        "inclusiveMs": 0.01910075757575757,
+        "selfMs": 0.0018174242423619163,
+        "selfRunning": 0.0018174242423619163,
+        "selfDpcIsr": 0.00018232323232225117,
+        "selfRunningNet": 0.0016351010100396652,
+        "inclusiveRunning": 0.01906287878786157,
+        "inclusiveDpcIsr": 0.0007709595959526764,
+        "inclusiveRunningNet": 0.018291919191908895,
+        "inclusiveReady": 3.7878787877317985e-05
+      },
+      "RenderDeclare.Sprite": {
+        "calls": 1.0,
+        "inclusiveMs": 0.006546717171717184,
+        "selfMs": 0.0016068181816714941,
+        "selfRunning": 0.0016068181816714941,
+        "selfDpcIsr": 8.585858582555007e-06,
+        "selfRunningNet": 0.001598232323088939,
+        "inclusiveRunning": 0.0065239898989966835,
+        "inclusiveDpcIsr": 0.00013585858585376552,
+        "inclusiveRunningNet": 0.006388131313142918,
+        "inclusiveReady": 2.2727272727309474e-05
+      },
+      "RenderDeclare.Temporal.SpriteMotion": {
+        "calls": 1.0,
+        "inclusiveMs": 0.014419444444444457,
+        "selfMs": 0.001549999999923844,
+        "selfRunning": 0.001549999999923844,
+        "selfDpcIsr": 3.535353536188617e-06,
+        "selfRunningNet": 0.0015464646463876554,
+        "inclusiveRunning": 0.014419444444453085,
+        "inclusiveDpcIsr": 0.00027929292929344465,
+        "inclusiveRunningNet": 0.01414015151515964
+      },
+      "RenderDeclare.Temporal.Upscale": {
+        "calls": 1.0,
+        "inclusiveMs": 0.009408080808080818,
+        "selfMs": 0.0017704545453379795,
+        "selfRunning": 0.0017704545453379795,
+        "selfDpcIsr": 3.2828282825784016e-06,
+        "selfRunningNet": 0.001767171717055401,
+        "inclusiveRunning": 0.009408080808096849,
+        "inclusiveDpcIsr": 1.8939393938658993e-05,
+        "inclusiveRunningNet": 0.00938914141415819
+      },
+      "RenderDeclare.PostChain": {
+        "calls": 1.0,
+        "inclusiveMs": 0.1466532828282829,
+        "selfMs": 0.0015388888888867198,
+        "selfRunning": 0.0015388888888867198,
+        "selfDpcIsr": 3.0303030272456583e-06,
+        "selfRunningNet": 0.0015358585858594742,
+        "inclusiveRunning": 0.14640075757575122,
+        "inclusiveDpcIsr": 0.0012204545454479062,
+        "inclusiveRunningNet": 0.14518030303030333,
+        "inclusiveWaiting": 5.555555555539019e-05,
+        "inclusiveReady": 0.0001969696969661876
+      },
+      "RenderDeclare.SpatialPost": {
+        "calls": 1.0,
+        "inclusiveMs": 0.00599343434343434,
+        "selfMs": 0.0017638888888187568,
+        "selfRunning": 0.0017638888888187568,
+        "selfDpcIsr": 4.545454545461895e-06,
+        "selfRunningNet": 0.0017593434342732949,
+        "inclusiveRunning": 0.005993434343402056,
+        "inclusiveDpcIsr": 2.247474747657014e-05,
+        "inclusiveRunningNet": 0.005970959595925486
+      },
+      "RenderDeclare.Temporal.DisplayInputs": {
+        "calls": 1.0,
+        "inclusiveMs": 0.030946969696969653,
+        "selfMs": 0.001591414141347686,
+        "selfRunning": 0.001591414141347686,
+        "selfDpcIsr": 2.525252525766987e-06,
+        "selfRunningNet": 0.001588888888821919,
+        "inclusiveRunning": 0.030699494949484426,
+        "inclusiveDpcIsr": 0.0005939393939418854,
+        "inclusiveRunningNet": 0.03010555555554254,
+        "inclusiveWaiting": 5.8080808080008825e-05,
+        "inclusiveReady": 0.00018939393939577676
+      },
+      "RenderDeclare.UI": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0033861111111111045,
+        "selfMs": 0.0017568181816303959,
+        "selfRunning": 0.0017568181816303959,
+        "selfDpcIsr": 0.0,
+        "selfRunningNet": 0.0017568181816303959,
+        "inclusiveRunning": 0.003386111111045452,
+        "inclusiveDpcIsr": 0.0,
+        "inclusiveRunningNet": 0.003386111111045452
+      },
+      "RenderDeclare.Grid": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0037739898989899096,
+        "selfMs": 0.0015002525250774668,
+        "selfRunning": 0.0015002525250774668,
+        "selfDpcIsr": 0.0,
+        "selfRunningNet": 0.0015002525250774668,
+        "inclusiveRunning": 0.0037739898989836243,
+        "inclusiveDpcIsr": 0.0,
+        "inclusiveRunningNet": 0.0037739898989836243
+      },
+      "RenderDeclare.GizmoIcon": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0035729797979797842,
+        "selfMs": 0.001690656565457253,
+        "selfRunning": 0.001690656565457253,
+        "selfDpcIsr": 7.070707068932178e-06,
+        "selfRunningNet": 0.001683585858388321,
+        "inclusiveRunning": 0.0035729797980567093,
+        "inclusiveDpcIsr": 1.5656565656080594e-05,
+        "inclusiveRunningNet": 0.0035573232324006285
+      },
+      "RenderDeclare.GizmoLine": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0031297979797979755,
+        "selfMs": 0.0016828282827434737,
+        "selfRunning": 0.0016828282827434737,
+        "selfDpcIsr": 1.0606060609140026e-05,
+        "selfRunningNet": 0.0016722222221343338,
+        "inclusiveRunning": 0.0031297979796881415,
+        "inclusiveDpcIsr": 2.1464646466722686e-05,
+        "inclusiveRunningNet": 0.003108333333221419
+      },
+      "RenderDeclare.live_present": {
+        "calls": 1.0,
+        "inclusiveMs": 0.016309090909090895,
+        "selfMs": 0.0013464646463729776,
+        "selfRunning": 0.0013464646463729776,
+        "selfDpcIsr": 4.2929292947225595e-06,
+        "selfRunningNet": 0.0013421717170782551,
+        "inclusiveRunning": 0.016276262626261064,
+        "inclusiveDpcIsr": 0.0004792929292954906,
+        "inclusiveRunningNet": 0.015796969696965573,
+        "inclusiveWaiting": 2.525252525766987e-06,
+        "inclusiveReady": 3.0303030304610436e-05
+      }
+    },
+    "nodes": {
+      "RenderDeclare.METEOR.Scene.Geometry": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.3686499999999999,
+          "Running": 0.36807929292930763,
+          "DpcIsr": 0.011268939393929863,
+          "RunningNet": 0.35681035353537777,
+          "Waiting": 0.00022222222222156076,
+          "Ready": 0.0003484848484915365
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.36865,
+          "p50": 0.3325,
+          "p95": 0.5596
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Cull.First": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.5946931818181822,
+          "Running": 0.5940593434343605,
+          "DpcIsr": 0.018586868686865883,
+          "RunningNet": 0.5754724747474946,
+          "Ready": 0.0004772727272752215,
+          "Waiting": 0.00015656565656539933
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.5946931818181819,
+          "p50": 0.54985,
+          "p95": 0.8354
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Occluder": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.25916969696969694,
+          "Running": 0.2588742424242696,
+          "DpcIsr": 0.008249494949468222,
+          "RunningNet": 0.25062474747480135,
+          "Ready": 0.00021464646464540817,
+          "Waiting": 8.080808080616995e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.259169696969697,
+          "p50": 0.23735,
+          "p95": 0.3881
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Cull.Final": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.1960553030303031,
+          "Running": 0.19580277777779798,
+          "DpcIsr": 0.0061472222222196575,
+          "RunningNet": 0.1896555555555783,
+          "Ready": 0.00025252525252272617
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.19605530303030302,
+          "p50": 0.18085,
+          "p95": 0.2964
+        }
+      },
+      "RenderDeclare.METEOR.Scene.LayerWork": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.021409848484848497,
+          "Running": 0.021351767676750077,
+          "DpcIsr": 0.0004497474747545817,
+          "RunningNet": 0.020902020201995497,
+          "Ready": 5.808080808115718e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.021409848484848486,
+          "p50": 0.0189,
+          "p95": 0.0319
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.StaticCache": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.03396691919191917,
+          "Running": 0.033966919191931365,
+          "DpcIsr": 0.0010974747474737148,
+          "RunningNet": 0.032869444444457656
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.033966919191919194,
+          "p50": 0.0289,
+          "p95": 0.0563
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.First": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.030130050505050496,
+          "Running": 0.03008207070710378,
+          "DpcIsr": 0.000272222222226235,
+          "RunningNet": 0.029809848484877544,
+          "Waiting": 2.0202020201542486e-05,
+          "Ready": 2.7777777778843448e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.030130050505050507,
+          "p50": 0.0264,
+          "p95": 0.0463
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Occluder": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.4156356060606061,
+          "Running": 0.41548409090914085,
+          "DpcIsr": 0.010818181818205052,
+          "RunningNet": 0.4046659090909358,
+          "Waiting": 2.272727272960618e-05,
+          "Ready": 0.0001287878787865559
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.41563560606060607,
+          "p50": 0.3758,
+          "p95": 0.6003
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.Final": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.46673055555555576,
+          "Running": 0.46658156565653924,
+          "DpcIsr": 0.009455050505057627,
+          "RunningNet": 0.4571265151514816,
+          "Waiting": 2.020202019981996e-05,
+          "Ready": 0.00012878787878425917
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.46673055555555554,
+          "p50": 0.42984999999999995,
+          "p95": 0.6698
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Raster": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.4093906565656564,
+          "Running": 0.4083098484848809,
+          "DpcIsr": 0.006116666666668901,
+          "RunningNet": 0.402193181818212,
+          "Waiting": 0.00021464646464483398,
+          "Ready": 0.0008661616161629529
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.40939065656565654,
+          "p50": 0.3799,
+          "p95": 0.5875
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.History": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.30334696969697,
+          "Running": 0.30284696969697494,
+          "DpcIsr": 0.004938383838390165,
+          "RunningNet": 0.29790858585858476,
+          "Ready": 0.00035858585857737914,
+          "Waiting": 0.00014141414141309412
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.30334696969696967,
+          "p50": 0.28055,
+          "p95": 0.4392
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Visibility": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.24520883838383842,
+          "Running": 0.24448409090912504,
+          "DpcIsr": 0.0030267676767669564,
+          "RunningNet": 0.2414573232323581,
+          "Ready": 0.000522727272731563,
+          "Unknown": 2.525252525766987e-06,
+          "Waiting": 0.0001994949494988447
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.2452088383838384,
+          "p50": 0.22535,
+          "p95": 0.3783
+        }
+      },
+      "RenderDeclare.METEOR.Scene.MaterialWork": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.09734722222222225,
+          "Running": 0.09722348484849372,
+          "DpcIsr": 0.0020209595959730714,
+          "RunningNet": 0.09520252525252065,
+          "Waiting": 3.0303030302313733e-05,
+          "Ready": 9.343434343270818e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.09734722222222222,
+          "p50": 0.0833,
+          "p95": 0.1535
+        }
+      },
+      "RenderDeclare.METEOR.Scene.SurfaceResolve": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.10699797979797974,
+          "Running": 0.10672777777777567,
+          "DpcIsr": 0.0013159090909112185,
+          "RunningNet": 0.10541186868686445,
+          "Waiting": 7.828282828729308e-05,
+          "Ready": 0.00019191919191924705
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.1069979797979798,
+          "p50": 0.0931,
+          "p95": 0.1627
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Decal": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.023765151515151524,
+          "Running": 0.02376515151516085,
+          "DpcIsr": 0.0005585858585903344,
+          "RunningNet": 0.023206565656570515
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.023765151515151517,
+          "p50": 0.0205,
+          "p95": 0.0369
+        }
+      },
+      "RenderDeclare.METEOR.Scene.History": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.09565252525252513,
+          "Running": 0.09482424242423747,
+          "DpcIsr": 0.0012669191919095016,
+          "RunningNet": 0.09355732323232796,
+          "Waiting": 8.838383838576761e-05,
+          "Ready": 0.0007398989898981447
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.09565252525252525,
+          "p50": 0.0845,
+          "p95": 0.1448
+        }
+      },
+      "RenderDeclare.Temporal.Inputs": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.1313209595959596,
+          "Running": 0.13081843434347412,
+          "DpcIsr": 0.0013699494949346123,
+          "RunningNet": 0.12944848484853952,
+          "Ready": 0.00023737373737156927,
+          "Waiting": 0.0002651515151504127
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.1313209595959596,
+          "p50": 0.1168,
+          "p95": 0.195
+        }
+      },
+      "RenderDeclare.SSAO": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0274482323232323,
+          "Running": 0.02742045454544089,
+          "DpcIsr": 0.00035176767677296656,
+          "RunningNet": 0.027068686868667924,
+          "Waiting": 2.525252525766987e-06,
+          "Ready": 2.525252525307646e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.027448232323232322,
+          "p50": 0.0242,
+          "p95": 0.0437
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Color": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.15491767676767682,
+          "Running": 0.15409949494944739,
+          "DpcIsr": 0.0019750000000031934,
+          "RunningNet": 0.1521244949494442,
+          "Ready": 0.0006868686868696698,
+          "Waiting": 0.00013131313131921297
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.15491767676767676,
+          "p50": 0.1399,
+          "p95": 0.2344
+        }
+      },
+      "RenderDeclare.SkyBox": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.018295959595959612,
+          "Running": 0.018242929292921532,
+          "DpcIsr": 0.0006696969696965213,
+          "RunningNet": 0.01757323232322501,
+          "Waiting": 2.7777777778843448e-05,
+          "Ready": 2.525252525307646e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.018295959595959595,
+          "p50": 0.0147,
+          "p95": 0.036
+        }
+      },
+      "RenderDeclare.SSGI": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.24330530303030304,
+          "Running": 0.24251994949495015,
+          "DpcIsr": 0.005165151515154891,
+          "RunningNet": 0.23735479797979528,
+          "Waiting": 0.0001363636363650052,
+          "Ready": 0.0006287878787839192,
+          "Unknown": 2.0202020201542486e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.24330530303030304,
+          "p50": 0.2264,
+          "p95": 0.3688
+        }
+      },
+      "RenderDeclare.SSS": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.006907070707070709,
+          "Running": 0.006899242424269273,
+          "DpcIsr": 3.030303031839066e-06,
+          "RunningNet": 0.006896212121237435,
+          "Ready": 7.828282828040297e-06
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.006907070707070707,
+          "p50": 0.0059,
+          "p95": 0.0103
+        }
+      },
+      "RenderDeclare.SSR": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.008501262626262631,
+          "Running": 0.008450252525228803,
+          "DpcIsr": 1.691919191437068e-05,
+          "RunningNet": 0.008433333333314433,
+          "Ready": 4.343434343262734e-05,
+          "Waiting": 7.575757577300961e-06
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.008501262626262626,
+          "p50": 0.0075,
+          "p95": 0.0119
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Volume": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.009044191919191926,
+          "Running": 0.008902777777794916,
+          "DpcIsr": 4.4191919196328866e-05,
+          "RunningNet": 0.008858585858598587,
+          "Waiting": 5.303030303191991e-05,
+          "Ready": 8.838383838347091e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.009044191919191919,
+          "p50": 0.0075,
+          "p95": 0.013
+        }
+      },
+      "RenderDeclare.METEOR.Scene.LightTiles": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.004710353535353531,
+          "Running": 0.004710353535421121,
+          "DpcIsr": 1.0101010100771243e-05,
+          "RunningNet": 0.00470025252532035
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.004710353535353535,
+          "p50": 0.0041,
+          "p95": 0.0059
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Blended": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.01910075757575757,
+          "Running": 0.01906287878786157,
+          "DpcIsr": 0.0007709595959526764,
+          "RunningNet": 0.018291919191908895,
+          "Ready": 3.7878787877317985e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.019100757575757576,
+          "p50": 0.016649999999999998,
+          "p95": 0.0286
+        }
+      },
+      "RenderDeclare.Sprite": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.006546717171717184,
+          "Running": 0.0065239898989966835,
+          "DpcIsr": 0.00013585858585376552,
+          "RunningNet": 0.006388131313142918,
+          "Ready": 2.2727272727309474e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.006546717171717171,
+          "p50": 0.0056,
+          "p95": 0.0085
+        }
+      },
+      "RenderDeclare.Temporal.SpriteMotion": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.014419444444444457,
+          "Running": 0.014419444444453085,
+          "DpcIsr": 0.00027929292929344465,
+          "RunningNet": 0.01414015151515964
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.014419444444444445,
+          "p50": 0.0127,
+          "p95": 0.021
+        }
+      },
+      "RenderDeclare.Temporal.Upscale": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.009408080808080818,
+          "Running": 0.009408080808096849,
+          "DpcIsr": 1.8939393938658993e-05,
+          "RunningNet": 0.00938914141415819
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.009408080808080808,
+          "p50": 0.0084,
+          "p95": 0.0126
+        }
+      },
+      "RenderDeclare.PostChain": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.1466532828282829,
+          "Running": 0.14640075757575122,
+          "DpcIsr": 0.0012204545454479062,
+          "RunningNet": 0.14518030303030333,
+          "Waiting": 5.555555555539019e-05,
+          "Ready": 0.0001969696969661876
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.14665328282828283,
+          "p50": 0.1324,
+          "p95": 0.211
+        }
+      },
+      "RenderDeclare.SpatialPost": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.00599343434343434,
+          "Running": 0.005993434343402056,
+          "DpcIsr": 2.247474747657014e-05,
+          "RunningNet": 0.005970959595925486
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.005993434343434343,
+          "p50": 0.0052,
+          "p95": 0.0086
+        }
+      },
+      "RenderDeclare.Temporal.DisplayInputs": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.030946969696969653,
+          "Running": 0.030699494949484426,
+          "DpcIsr": 0.0005939393939418854,
+          "RunningNet": 0.03010555555554254,
+          "Waiting": 5.8080808080008825e-05,
+          "Ready": 0.00018939393939577676
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.0309469696969697,
+          "p50": 0.0263,
+          "p95": 0.0519
+        }
+      },
+      "RenderDeclare.UI": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0033861111111111045,
+          "Running": 0.003386111111045452,
+          "DpcIsr": 0.0,
+          "RunningNet": 0.003386111111045452
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.003386111111111111,
+          "p50": 0.0028,
+          "p95": 0.0043
+        }
+      },
+      "RenderDeclare.Grid": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0037739898989899096,
+          "Running": 0.0037739898989836243,
+          "DpcIsr": 0.0,
+          "RunningNet": 0.0037739898989836243
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.0037739898989898987,
+          "p50": 0.0034,
+          "p95": 0.0048
+        }
+      },
+      "RenderDeclare.GizmoIcon": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0035729797979797842,
+          "Running": 0.0035729797980567093,
+          "DpcIsr": 1.5656565656080594e-05,
+          "RunningNet": 0.0035573232324006285
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.003572979797979798,
+          "p50": 0.003,
+          "p95": 0.0045
+        }
+      },
+      "RenderDeclare.GizmoLine": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0031297979797979755,
+          "Running": 0.0031297979796881415,
+          "DpcIsr": 2.1464646466722686e-05,
+          "RunningNet": 0.003108333333221419
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.00312979797979798,
+          "p50": 0.0026,
+          "p95": 0.0041
+        }
+      },
+      "RenderDeclare.live_present": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.016309090909090895,
+          "Running": 0.016276262626261064,
+          "DpcIsr": 0.0004792929292954906,
+          "RunningNet": 0.015796969696965573,
+          "Waiting": 2.525252525766987e-06,
+          "Ready": 3.0303030304610436e-05
+        },
+        "perCall": {
+          "count": 396,
+          "mean": 0.01630909090909091,
+          "p50": 0.0142,
+          "p95": 0.0248
+        }
+      }
+    },
+    "example": {
+      "begin": 11271.721,
+      "ms": 4.3057,
+      "nodes": [
+        {
+          "name": "RenderDeclare.METEOR.Scene.Geometry",
+          "begin": 11271.7222,
+          "ms": 0.3227
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Cull.First",
+          "begin": 11272.0456,
+          "ms": 0.6342
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Occluder",
+          "begin": 11272.6805,
+          "ms": 0.2374
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Cull.Final",
+          "begin": 11272.9185,
+          "ms": 0.1534
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.LayerWork",
+          "begin": 11273.0724,
+          "ms": 0.0384
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.StaticCache",
+          "begin": 11273.1114,
+          "ms": 0.0291
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Cull.First",
+          "begin": 11273.141,
+          "ms": 0.0254
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Occluder",
+          "begin": 11273.167,
+          "ms": 0.4415
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Cull.Final",
+          "begin": 11273.6091,
+          "ms": 0.4192
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Raster",
+          "begin": 11274.0288,
+          "ms": 0.4029
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.History",
+          "begin": 11274.4325,
+          "ms": 0.26
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Visibility",
+          "begin": 11274.693,
+          "ms": 0.226
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.MaterialWork",
+          "begin": 11274.9196,
+          "ms": 0.0808
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.SurfaceResolve",
+          "begin": 11275.0009,
+          "ms": 0.09
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Decal",
+          "begin": 11275.0914,
+          "ms": 0.0204
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.History",
+          "begin": 11275.1123,
+          "ms": 0.1039
+        },
+        {
+          "name": "RenderDeclare.Temporal.Inputs",
+          "begin": 11275.2313,
+          "ms": 0.129
+        },
+        {
+          "name": "RenderDeclare.SSAO",
+          "begin": 11275.3608,
+          "ms": 0.0235
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Color",
+          "begin": 11275.3848,
+          "ms": 0.1313
+        },
+        {
+          "name": "RenderDeclare.SkyBox",
+          "begin": 11275.5166,
+          "ms": 0.0144
+        },
+        {
+          "name": "RenderDeclare.SSGI",
+          "begin": 11275.5316,
+          "ms": 0.2052
+        },
+        {
+          "name": "RenderDeclare.SSS",
+          "begin": 11275.7372,
+          "ms": 0.0055
+        },
+        {
+          "name": "RenderDeclare.SSR",
+          "begin": 11275.7432,
+          "ms": 0.0074
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Volume",
+          "begin": 11275.7511,
+          "ms": 0.0071
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.LightTiles",
+          "begin": 11275.7587,
+          "ms": 0.0042
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Blended",
+          "begin": 11275.7634,
+          "ms": 0.0153
+        },
+        {
+          "name": "RenderDeclare.Sprite",
+          "begin": 11275.7792,
+          "ms": 0.0299
+        },
+        {
+          "name": "RenderDeclare.Temporal.SpriteMotion",
+          "begin": 11275.8102,
+          "ms": 0.0132
+        },
+        {
+          "name": "RenderDeclare.Temporal.Upscale",
+          "begin": 11275.824,
+          "ms": 0.0086
+        },
+        {
+          "name": "RenderDeclare.PostChain",
+          "begin": 11275.8331,
+          "ms": 0.1315
+        },
+        {
+          "name": "RenderDeclare.SpatialPost",
+          "begin": 11275.9651,
+          "ms": 0.0051
+        },
+        {
+          "name": "RenderDeclare.Temporal.DisplayInputs",
+          "begin": 11275.9707,
+          "ms": 0.0266
+        },
+        {
+          "name": "RenderDeclare.UI",
+          "begin": 11275.9978,
+          "ms": 0.0028
+        },
+        {
+          "name": "RenderDeclare.Grid",
+          "begin": 11276.0011,
+          "ms": 0.0034
+        },
+        {
+          "name": "RenderDeclare.GizmoIcon",
+          "begin": 11276.0059,
+          "ms": 0.003
+        },
+        {
+          "name": "RenderDeclare.GizmoLine",
+          "begin": 11276.0094,
+          "ms": 0.0027
+        },
+        {
+          "name": "RenderDeclare.live_present",
+          "begin": 11276.0125,
+          "ms": 0.0138
+        }
+      ]
+    }
+  },
+  "baseline": {
+    "roots": 444,
+    "root": {
+      "count": 444,
+      "mean": 4.219918243243243,
+      "p50": 3.9737,
+      "p95": 5.7037
+    },
+    "scopes": {
+      "RenderGraphDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 4.219918243243244,
+        "selfMs": 0.02751644144175055,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Geometry": {
+        "calls": 1.0,
+        "inclusiveMs": 0.34240608108108106,
+        "selfMs": 0.0017990990991918537,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareNodeBody": {
+        "calls": 37.0,
+        "inclusiveMs": 4.115328153153126,
+        "selfMs": 1.6851290540689774,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialDeclareGeometry": {
+        "calls": 1.0,
+        "inclusiveMs": 0.32497837837837856,
+        "selfMs": 0.21859909909927563,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareImportTexture": {
+        "calls": 112.0,
+        "inclusiveMs": 0.24092297297303683,
+        "selfMs": 0.24092297297321344,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareImportBuffer": {
+        "calls": 91.0,
+        "inclusiveMs": 0.1941659909910234,
+        "selfMs": 0.19416599099209456,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareAdvanceVersion": {
+        "calls": 300.0,
+        "inclusiveMs": 0.21165382882877762,
+        "selfMs": 0.21165382881234635,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareAddPass": {
+        "calls": 133.0,
+        "inclusiveMs": 0.3592328828828358,
+        "selfMs": 0.2423002252448581,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareInitializePass": {
+        "calls": 141.0,
+        "inclusiveMs": 0.12383468468468171,
+        "selfMs": 0.12383468466249153,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareAfterNode": {
+        "calls": 37.0,
+        "inclusiveMs": 0.02072297297297363,
+        "selfMs": 0.020722972974719422,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Cull.First": {
+        "calls": 1.0,
+        "inclusiveMs": 0.5571191441441445,
+        "selfMs": 0.0018693693694248968,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "GpuVisibility.MeshletDeclare": {
+        "calls": 8.0,
+        "inclusiveMs": 0.6181777027026943,
+        "selfMs": 0.35055427928194477,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "GpuVisibility.SharedBuild": {
+        "calls": 2.0,
+        "inclusiveMs": 0.15368941441441414,
+        "selfMs": 0.07768445945946532,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "GpuVisibility.SharedBindings": {
+        "calls": 2.0,
+        "inclusiveMs": 0.07600495495495502,
+        "selfMs": 0.07600495495495967,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialDeclareFirstCull": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0035322072072072174,
+        "selfMs": 0.0027144144144599707,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Occluder": {
+        "calls": 1.0,
+        "inclusiveMs": 0.24025472972972978,
+        "selfMs": 0.001971621621612946,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialDeclareOccluder": {
+        "calls": 1.0,
+        "inclusiveMs": 0.22753986486486502,
+        "selfMs": 0.16156531531705662,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareAddSplitPass": {
+        "calls": 8.0,
+        "inclusiveMs": 0.026419144144144136,
+        "selfMs": 0.019517117118047825,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareCreateTexture": {
+        "calls": 89.0,
+        "inclusiveMs": 0.08345202702706103,
+        "selfMs": 0.08345202701329849,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Cull.Final": {
+        "calls": 1.0,
+        "inclusiveMs": 0.17344121621621608,
+        "selfMs": 0.00151734234229791,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialDeclareFinalCull": {
+        "calls": 1.0,
+        "inclusiveMs": 0.15895292792792803,
+        "selfMs": 0.052645720722611956,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderGraphDeclareAddRepeatedPass": {
+        "calls": 8.0,
+        "inclusiveMs": 0.04187657657657695,
+        "selfMs": 0.01803896396426277,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.LayerWork": {
+        "calls": 1.0,
+        "inclusiveMs": 0.020992117117117137,
+        "selfMs": 0.0015860360360322276,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Shadow.StaticCache": {
+        "calls": 1.0,
+        "inclusiveMs": 0.03205968468468472,
+        "selfMs": 0.0016295045045427873,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.First": {
+        "calls": 1.0,
+        "inclusiveMs": 0.029227477477477483,
+        "selfMs": 0.0015259009008462543,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Shadow.Occluder": {
+        "calls": 1.0,
+        "inclusiveMs": 0.3857038288288287,
+        "selfMs": 0.001832207207247354,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.Final": {
+        "calls": 1.0,
+        "inclusiveMs": 0.4283563063063061,
+        "selfMs": 0.0014988738739491725,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "ShadowFinalCull.HzbDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.1946779279279278,
+        "selfMs": 0.12268445946653762,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "ShadowFinalCull.SharedDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.21706216216216234,
+        "selfMs": 0.0039004504504563872,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Shadow.Raster": {
+        "calls": 1.0,
+        "inclusiveMs": 0.37381711711711707,
+        "selfMs": 0.0015326576576769782,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Shadow.History": {
+        "calls": 1.0,
+        "inclusiveMs": 0.2794295045045045,
+        "selfMs": 0.00141891891891494,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Visibility": {
+        "calls": 1.0,
+        "inclusiveMs": 0.23009459459459478,
+        "selfMs": 0.0014860360360154652,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialSceneVisibilityDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.20334819819819822,
+        "selfMs": 0.1404236486496618,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.MaterialWork": {
+        "calls": 1.0,
+        "inclusiveMs": 0.08844662162162162,
+        "selfMs": 0.0014574324324455432,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialSceneWorkDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.07543761261261263,
+        "selfMs": 0.04921666666707272,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.SurfaceResolve": {
+        "calls": 1.0,
+        "inclusiveMs": 0.09744977477477484,
+        "selfMs": 0.0014671171171375267,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "MaterialSceneResolveDeclare": {
+        "calls": 1.0,
+        "inclusiveMs": 0.046356306306306334,
+        "selfMs": 0.040319819819933864,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Decal": {
+        "calls": 1.0,
+        "inclusiveMs": 0.02187387387387386,
+        "selfMs": 0.0014436936936097528,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.History": {
+        "calls": 1.0,
+        "inclusiveMs": 0.08620585585585587,
+        "selfMs": 0.0014385135134600629,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.Temporal.Inputs": {
+        "calls": 1.0,
+        "inclusiveMs": 0.1229056306306307,
+        "selfMs": 0.0014952702703229168,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.SSAO": {
+        "calls": 1.0,
+        "inclusiveMs": 0.025618693693693694,
+        "selfMs": 0.0014513513512907094,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Color": {
+        "calls": 1.0,
+        "inclusiveMs": 0.1425452702702702,
+        "selfMs": 0.0016817567568094486,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.SkyBox": {
+        "calls": 1.0,
+        "inclusiveMs": 0.015268468468468474,
+        "selfMs": 0.0014121621620689809,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.SSGI": {
+        "calls": 1.0,
+        "inclusiveMs": 0.22696914414414412,
+        "selfMs": 0.0014407657657053484,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.SSS": {
+        "calls": 1.0,
+        "inclusiveMs": 0.006197747747747753,
+        "selfMs": 0.0014603603602471428,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.SSR": {
+        "calls": 1.0,
+        "inclusiveMs": 0.007899549549549554,
+        "selfMs": 0.001441216216071701,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Volume": {
+        "calls": 1.0,
+        "inclusiveMs": 0.008605180180180194,
+        "selfMs": 0.0021168918917344715,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.LightTiles": {
+        "calls": 1.0,
+        "inclusiveMs": 0.004253153153153149,
+        "selfMs": 0.0013768018016150762,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.METEOR.Scene.Blended": {
+        "calls": 1.0,
+        "inclusiveMs": 0.01814684684684684,
+        "selfMs": 0.0017673423423328384,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.Sprite": {
+        "calls": 1.0,
+        "inclusiveMs": 0.006099099099099114,
+        "selfMs": 0.0014738738737424132,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.Temporal.SpriteMotion": {
+        "calls": 1.0,
+        "inclusiveMs": 0.013644819819819827,
+        "selfMs": 0.0014380630629633802,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.Temporal.Upscale": {
+        "calls": 1.0,
+        "inclusiveMs": 0.009240315315315328,
+        "selfMs": 0.0013966216215095528,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.PostChain": {
+        "calls": 1.0,
+        "inclusiveMs": 0.13791599099099108,
+        "selfMs": 0.0014195945945548547,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.SpatialPost": {
+        "calls": 1.0,
+        "inclusiveMs": 0.005387837837837829,
+        "selfMs": 0.0013858108107390953,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.Temporal.DisplayInputs": {
+        "calls": 1.0,
+        "inclusiveMs": 0.027737612612612622,
+        "selfMs": 0.0014027027026249546,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.UI": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0028900900900900857,
+        "selfMs": 0.0013148648646475975,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.Grid": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0035254504504504697,
+        "selfMs": 0.0013326576575000647,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.GizmoIcon": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0031666666666666544,
+        "selfMs": 0.0013691441439112031,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.GizmoLine": {
+        "calls": 1.0,
+        "inclusiveMs": 0.0028004504504504464,
+        "selfMs": 0.0013639639638895389,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      },
+      "RenderDeclare.live_present": {
+        "calls": 1.0,
+        "inclusiveMs": 0.014705855855855866,
+        "selfMs": 0.0013351351350625695,
+        "selfRunningNet": 0.0,
+        "inclusiveRunningNet": 0.0
+      }
+    },
+    "nodes": {
+      "RenderDeclare.METEOR.Scene.Geometry": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.34240608108108106,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.34240608108108106,
+          "p50": 0.31035,
+          "p95": 0.494
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Cull.First": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.5571191441441445,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.5571191441441441,
+          "p50": 0.50805,
+          "p95": 0.7694
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Occluder": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.24025472972972978,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.24025472972972972,
+          "p50": 0.2178,
+          "p95": 0.3491
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Cull.Final": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.17344121621621608,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.17344121621621622,
+          "p50": 0.1635,
+          "p95": 0.2503
+        }
+      },
+      "RenderDeclare.METEOR.Scene.LayerWork": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.020992117117117137,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.020992117117117116,
+          "p50": 0.0184,
+          "p95": 0.031
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.StaticCache": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.03205968468468472,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.03205968468468468,
+          "p50": 0.0287,
+          "p95": 0.0435
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.First": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.029227477477477483,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.029227477477477476,
+          "p50": 0.026,
+          "p95": 0.0417
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Occluder": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.3857038288288287,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.3857038288288288,
+          "p50": 0.3539,
+          "p95": 0.5618
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Cull.Final": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.4283563063063061,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.42835630630630633,
+          "p50": 0.39725,
+          "p95": 0.613
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.Raster": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.37381711711711707,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.3738171171171171,
+          "p50": 0.3435,
+          "p95": 0.5445
+        }
+      },
+      "RenderDeclare.METEOR.Shadow.History": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.2794295045045045,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.2794295045045045,
+          "p50": 0.2606,
+          "p95": 0.3824
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Visibility": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.23009459459459478,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.23009459459459458,
+          "p50": 0.2129,
+          "p95": 0.3305
+        }
+      },
+      "RenderDeclare.METEOR.Scene.MaterialWork": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.08844662162162162,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.08844662162162162,
+          "p50": 0.0817,
+          "p95": 0.1286
+        }
+      },
+      "RenderDeclare.METEOR.Scene.SurfaceResolve": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.09744977477477484,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.09744977477477478,
+          "p50": 0.0903,
+          "p95": 0.1388
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Decal": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.02187387387387386,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.021873873873873875,
+          "p50": 0.0202,
+          "p95": 0.0323
+        }
+      },
+      "RenderDeclare.METEOR.Scene.History": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.08620585585585587,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.08620585585585586,
+          "p50": 0.0785,
+          "p95": 0.1194
+        }
+      },
+      "RenderDeclare.Temporal.Inputs": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.1229056306306307,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.12290563063063063,
+          "p50": 0.1158,
+          "p95": 0.1717
+        }
+      },
+      "RenderDeclare.SSAO": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.025618693693693694,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.025618693693693694,
+          "p50": 0.024,
+          "p95": 0.0343
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Color": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.1425452702702702,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.14254527027027028,
+          "p50": 0.13455,
+          "p95": 0.191
+        }
+      },
+      "RenderDeclare.SkyBox": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.015268468468468474,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.01526846846846847,
+          "p50": 0.0144,
+          "p95": 0.0195
+        }
+      },
+      "RenderDeclare.SSGI": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.22696914414414412,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.22696914414414415,
+          "p50": 0.2123,
+          "p95": 0.3354
+        }
+      },
+      "RenderDeclare.SSS": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.006197747747747753,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.006197747747747747,
+          "p50": 0.0058,
+          "p95": 0.0086
+        }
+      },
+      "RenderDeclare.SSR": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.007899549549549554,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.007899549549549549,
+          "p50": 0.0074,
+          "p95": 0.0108
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Volume": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.008605180180180194,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.00860518018018018,
+          "p50": 0.0074,
+          "p95": 0.0142
+        }
+      },
+      "RenderDeclare.METEOR.Scene.LightTiles": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.004253153153153149,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.004253153153153153,
+          "p50": 0.00405,
+          "p95": 0.0056
+        }
+      },
+      "RenderDeclare.METEOR.Scene.Blended": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.01814684684684684,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.018146846846846847,
+          "p50": 0.0161,
+          "p95": 0.0248
+        }
+      },
+      "RenderDeclare.Sprite": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.006099099099099114,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.006099099099099099,
+          "p50": 0.0057,
+          "p95": 0.0084
+        }
+      },
+      "RenderDeclare.Temporal.SpriteMotion": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.013644819819819827,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.01364481981981982,
+          "p50": 0.0126,
+          "p95": 0.019
+        }
+      },
+      "RenderDeclare.Temporal.Upscale": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.009240315315315328,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.009240315315315316,
+          "p50": 0.0084,
+          "p95": 0.0117
+        }
+      },
+      "RenderDeclare.PostChain": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.13791599099099108,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.137915990990991,
+          "p50": 0.1292,
+          "p95": 0.2017
+        }
+      },
+      "RenderDeclare.SpatialPost": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.005387837837837829,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.005387837837837838,
+          "p50": 0.0051,
+          "p95": 0.0075
+        }
+      },
+      "RenderDeclare.Temporal.DisplayInputs": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.027737612612612622,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.02773761261261261,
+          "p50": 0.0259,
+          "p95": 0.0388
+        }
+      },
+      "RenderDeclare.UI": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0028900900900900857,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.00289009009009009,
+          "p50": 0.0028,
+          "p95": 0.0039
+        }
+      },
+      "RenderDeclare.Grid": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0035254504504504697,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.0035254504504504502,
+          "p50": 0.0034,
+          "p95": 0.0045
+        }
+      },
+      "RenderDeclare.GizmoIcon": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0031666666666666544,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.0031666666666666666,
+          "p50": 0.003,
+          "p95": 0.0041
+        }
+      },
+      "RenderDeclare.GizmoLine": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.0028004504504504464,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.0028004504504504503,
+          "p50": 0.0026,
+          "p95": 0.0036
+        }
+      },
+      "RenderDeclare.live_present": {
+        "perFrame": {
+          "calls": 1.0,
+          "wallMs": 0.014705855855855866,
+          "RunningNet": 0.0
+        },
+        "perCall": {
+          "count": 444,
+          "mean": 0.014705855855855855,
+          "p50": 0.0137,
+          "p95": 0.0209
+        }
+      }
+    },
+    "example": {
+      "begin": 1898.4718,
+      "ms": 3.9742,
+      "nodes": [
+        {
+          "name": "RenderDeclare.METEOR.Scene.Geometry",
+          "begin": 1898.473,
+          "ms": 0.2941
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Cull.First",
+          "begin": 1898.7677,
+          "ms": 0.4789
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Occluder",
+          "begin": 1899.2565,
+          "ms": 0.2458
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Cull.Final",
+          "begin": 1899.503,
+          "ms": 0.1764
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.LayerWork",
+          "begin": 1899.6799,
+          "ms": 0.019
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.StaticCache",
+          "begin": 1899.6994,
+          "ms": 0.029
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Cull.First",
+          "begin": 1899.7289,
+          "ms": 0.0264
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Occluder",
+          "begin": 1899.7558,
+          "ms": 0.3471
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Cull.Final",
+          "begin": 1900.1034,
+          "ms": 0.3951
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.Raster",
+          "begin": 1900.499,
+          "ms": 0.3366
+        },
+        {
+          "name": "RenderDeclare.METEOR.Shadow.History",
+          "begin": 1900.8362,
+          "ms": 0.3104
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Visibility",
+          "begin": 1901.1475,
+          "ms": 0.2468
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.MaterialWork",
+          "begin": 1901.3949,
+          "ms": 0.0818
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.SurfaceResolve",
+          "begin": 1901.4772,
+          "ms": 0.0911
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Decal",
+          "begin": 1901.5688,
+          "ms": 0.0199
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.History",
+          "begin": 1901.5892,
+          "ms": 0.0787
+        },
+        {
+          "name": "RenderDeclare.Temporal.Inputs",
+          "begin": 1901.6684,
+          "ms": 0.1191
+        },
+        {
+          "name": "RenderDeclare.SSAO",
+          "begin": 1901.788,
+          "ms": 0.0234
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Color",
+          "begin": 1901.8122,
+          "ms": 0.1266
+        },
+        {
+          "name": "RenderDeclare.SkyBox",
+          "begin": 1901.9393,
+          "ms": 0.0141
+        },
+        {
+          "name": "RenderDeclare.SSGI",
+          "begin": 1901.9538,
+          "ms": 0.2062
+        },
+        {
+          "name": "RenderDeclare.SSS",
+          "begin": 1902.1606,
+          "ms": 0.006
+        },
+        {
+          "name": "RenderDeclare.SSR",
+          "begin": 1902.1671,
+          "ms": 0.0077
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Volume",
+          "begin": 1902.1753,
+          "ms": 0.0073
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.LightTiles",
+          "begin": 1902.1831,
+          "ms": 0.0039
+        },
+        {
+          "name": "RenderDeclare.METEOR.Scene.Blended",
+          "begin": 1902.1875,
+          "ms": 0.0152
+        },
+        {
+          "name": "RenderDeclare.Sprite",
+          "begin": 1902.2109,
+          "ms": 0.0084
+        },
+        {
+          "name": "RenderDeclare.Temporal.SpriteMotion",
+          "begin": 1902.2208,
+          "ms": 0.0174
+        },
+        {
+          "name": "RenderDeclare.Temporal.Upscale",
+          "begin": 1902.2392,
+          "ms": 0.0118
+        },
+        {
+          "name": "RenderDeclare.PostChain",
+          "begin": 1902.2515,
+          "ms": 0.1327
+        },
+        {
+          "name": "RenderDeclare.SpatialPost",
+          "begin": 1902.3847,
+          "ms": 0.0051
+        },
+        {
+          "name": "RenderDeclare.Temporal.DisplayInputs",
+          "begin": 1902.3903,
+          "ms": 0.0264
+        },
+        {
+          "name": "RenderDeclare.UI",
+          "begin": 1902.4172,
+          "ms": 0.003
+        },
+        {
+          "name": "RenderDeclare.Grid",
+          "begin": 1902.4207,
+          "ms": 0.0033
+        },
+        {
+          "name": "RenderDeclare.GizmoIcon",
+          "begin": 1902.4255,
+          "ms": 0.003
+        },
+        {
+          "name": "RenderDeclare.GizmoLine",
+          "begin": 1902.429,
+          "ms": 0.0026
+        },
+        {
+          "name": "RenderDeclare.live_present",
+          "begin": 1902.4321,
+          "ms": 0.0136
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "errors": [],
+  "checks": [
+    {
+      "width": 1280,
+      "overflow": false,
+      "images": true
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "images": true
+    }
+  ]
+}

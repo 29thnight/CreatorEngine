@@ -1,0 +1,142 @@
+CSM_SELECTION_BUDGET_OK candidates=4100 sealed=2
+[DX12 검증] DebugLayer=on GPUValidation=off DRED=on BreakOnError=off
+LX_VOLUME_FIXTURE_BEGIN fixture=0 workers=0
+[meteor.material-buckets] commands=2 buckets=1 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 1->2 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=0 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 2->3 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=0 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 3->4 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=0 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 4->5 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=0 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 5->6 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=0 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 6->7 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=1 workers=0
+[meteor.material-buckets] commands=1 buckets=1 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 7->8 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=1 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 8->9 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=1 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 9->10 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=1 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 10->11 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=1 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 11->12 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=1 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 12->13 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=2 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 13->14 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=2 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 14->15 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=2 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 15->16 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=2 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 16->17 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=2 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 17->18 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=2 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 18->19 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=3 workers=0
+[meteor.material-buckets] commands=2 buckets=1 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 19->20 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=3 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 20->21 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=3 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 21->22 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=3 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 22->23 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=3 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 23->24 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=3 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 24->25 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=4 workers=0
+[meteor.material-buckets] commands=1 buckets=1 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 25->26 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=4 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 26->27 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=4 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 27->28 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=4 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 28->29 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=4 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 29->30 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=4 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 30->31 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=5 workers=0
+[meteor.material-buckets] commands=2 buckets=1 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 31->32 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=5 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 32->33 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=5 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 33->34 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=5 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 34->35 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=5 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 35->36 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=5 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 36->37 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=6 workers=0
+[meteor.material-buckets] commands=1 buckets=1 cpuInstanceSubmissions=0
+[RHI lifecycle][DX12] offline readback/capture generation 37->38 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=6 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 38->39 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=6 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 39->40 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=6 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 40->41 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=6 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 41->42 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=6 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 42->43 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=7 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 43->44 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=7 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 44->45 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=7 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 45->46 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=7 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 46->47 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=7 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 47->48 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=7 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 48->49 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=8 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 49->50 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=8 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 50->51 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=8 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 51->52 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=8 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 52->53 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=8 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 53->54 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=8 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 54->55 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=9 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 55->56 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=9 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 56->57 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=9 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 57->58 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=9 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 58->59 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=9 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 59->60 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=9 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 60->61 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=10 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 61->62 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=10 workers=0
+[RHI lifecycle][DX12] offline readback/capture generation 62->63 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=10 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 63->64 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=10 workers=1
+[RHI lifecycle][DX12] offline readback/capture generation 64->65 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_BEGIN fixture=10 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 65->66 pending task/batch/retirement 0/0/0
+LX_VOLUME_FIXTURE_OK fixture=10 workers=4
+[RHI lifecycle][DX12] offline readback/capture generation 66->67 pending task/batch/retirement 0/0/0
+LX_MATERIAL_SCENE_VOLUME_OK frames=33 pixels=8448 interior=108 scattering=1728 failures=66 checks=36159 gpuComponents=58812 validation=0
+[RHI lifecycle][DX12] backend shutdown generation 67->68 pending task/batch/retirement 0/0/0
