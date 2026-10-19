@@ -15,6 +15,7 @@
 // I5-D5a: 죽은 include 청산 — Model 타입 사용 0건(착수 정찰 실측)
 #include "InvalidScriptComponent.h"
 #include "ScriptComponent.h"
+#include "PrsmScriptComponent.h"
 #include "FoliageComponent.h"
 #include "BehaviorTreeComponent.h"
 #include "ImageComponent.h"
@@ -176,13 +177,14 @@ void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& vie
     ce::profile_scope componentProfile{ ce::intern_runtime_marker(
         std::string("Component.").append(componentType->name()), ce::marker_kind::cpu_scope) };
 
-    // ScriptComponent만 한 오브젝트에 여럿 붙을 수 있다.
+    // 스크립트 컴포넌트(C# ScriptComponent·PrsmScriptComponent)만 한 오브젝트에 여럿 붙을 수 있다.
     //
     // AddComponent는 타입이 겹치면 새로 만들지 않고 기존 것을 돌려주므로, 스크립트를
     // 둘 이상 붙인 오브젝트는 씬을 다시 읽을 때 두 번째부터 통째로 사라졌다.
     // 재생을 누르면 씬을 직렬화해 사본을 만들기 때문에 여기서 바로 드러난다.
     const HashedGuid componentTypeID = Meta::TypeIDOf(*componentType);
-    const bool allowMultiple = (componentTypeID == type_guid(ScriptComponent));
+    const bool allowMultiple = (componentTypeID == type_guid(ScriptComponent))
+        || (componentTypeID == type_guid(PrsmScriptComponent));
 
     // K2 스테이지 A: AddComponent/AddComponentAllowMultiple가 이제 raw
     // Component*를 직접 돌려준다 — .get()이 더는 필요 없다.

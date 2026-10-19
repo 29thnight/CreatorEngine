@@ -18,7 +18,10 @@ namespace reflgen { class type_descriptor; }
 class RenderScene;
 class ModelLoader;
 class Prefab;
-class [[reflgen::reflect]] Entity : public Object, public gc::managed
+// PrSM: 수신자는 이 엔티티의 세대 핸들(ScriptObjectRegistry)이다(PrsmEngineAdapter.h).
+// 스크립트에서는 `creator::Self()` 로 실행 중인 컴포넌트의 엔티티를 얻는다.
+class [[reflgen::reflect, reflgen::interop("prsm"), reflgen::lifetime("borrowed"), reflgen::receiver("entity"),
+        reflgen::owner("creator::Self")]] Entity : public Object, public gc::managed
 {
 public:
 	using Index = GameObjectIndex;
@@ -262,7 +265,11 @@ public:
 		return index == kInvalidIndex;
 	}
 
+	[[reflgen::interop("prsm"), reflgen::property_set("Enabled")]]
 	void SetEnabled(bool able) override final;
+	// 스크립트 프로퍼티 Enabled 의 읽기 쪽(Object::IsEnabled 와 같은 값).
+	[[reflgen::interop("prsm"), reflgen::property_get("Enabled")]]
+	bool GetEnabled() const noexcept { return IsEnabled(); }
 	Scene* GetScene() const { return m_ownerScene; }
 
 	// Transform 컴포넌트 접근자 (S1-b: m_transform 값 멤버 소멸, 저장소는

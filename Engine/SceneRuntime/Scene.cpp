@@ -12,6 +12,7 @@
 #include "Entity.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
+#include "PrsmScriptComponent.h"
 #include "ScriptObjectRegistry.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
@@ -2659,6 +2660,15 @@ void Scene::DrainPendingPhases()
                 m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
                 continue;
             }
+        }
+
+        // PrSM 스크립트도 같은 규약이다. 다만 편집 모드 인스턴스는 만들지 않는다 —
+        // @serialize 값은 컴포넌트의 m_fieldData 에 있고 인스턴스 없이 저장·복원된다.
+        if (component->GetTypeID() == TypeTrait::GUIDCreator::GetTypeID<PrsmScriptComponent>()
+            && !IsSimulationLifecycleActive())
+        {
+            m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
+            continue;
         }
 
         component->MarkLifecycleState(Component::State_Initialized);

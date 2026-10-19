@@ -77,6 +77,7 @@
 #include "Object.h"
 #include "RectTransformComponent.h"
 #include "ScriptComponent.h"
+#include "PrsmScriptComponent.h"
 #include "Terrain.h"
 #include "TextComponent.h"
 #include "TransCondition.h"
@@ -140,6 +141,7 @@
     X(SSGIPassSetting) \
     X(Scene) \
     X(ScriptComponent) \
+    X(PrsmScriptComponent) \
     X(SoundComponent) \
     X(AudioListenerComponent) \
     X(SpriteRenderer) \

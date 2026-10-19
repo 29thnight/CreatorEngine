@@ -30,6 +30,7 @@
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Player와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
 #include "ClrHost.h"
+#include "PrsmScriptHost.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorPlatform.h"
@@ -419,6 +420,8 @@ void Editor::EditorMain::Initialize()
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	BootProgress::Step(L"Loading scripting", L"Starting the managed script runtime");
 	ClrHost::Get().Initialize();
+	// PrSM 스크립트 계층(편집기 ORC JIT). 도구·소스가 없으면 비활성으로 남는다.
+	PrsmScriptHost::Get().Initialize();
 	Editor::ModelPlacement::Get().Initialize();
 
 	ce::profiler().publish_frame(Time->GetFrameCount());
@@ -655,6 +658,8 @@ void Editor::EditorMain::Finalize()
 	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 	std::printf("[SHUTDOWN] ClrHost 진입\n");
 	ClrHost::Get().Shutdown();
+	// 씬 해체로 PrSM 컴포넌트가 모두 내려간 뒤 GC·JIT 세대를 회수한다.
+	PrsmScriptHost::Get().Shutdown();
 	std::printf("[SHUTDOWN] ClrHost 반환\n");
 	EditorAssetPresentation::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetPresentation 반환\n");

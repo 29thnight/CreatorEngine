@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PrSM 스크립트 계층의 빌드 배선 (SceneRuntime 전용).
+
+  1. ThirdParty/PrSM 의 엔진 독립 런타임(GC 어댑터·핸들 표·태스크 스케줄러 등)을
+     PRSM_HOST_BUILD 로 SceneRuntime 에 넣는다. 런타임은 호스트당 하나다(PROVENANCE.md).
+  2. 엔진 바인딩: 반영 생성과 **같은 reflgen 실행**이 PrSM 바인딩도 만든다(ReflgenPrsm).
+     header 의 reflgen::interop("prsm") 표시가 노출의 정본이고, 같은 프로젝트 플래그로 파싱하므로
+     엔진 header 를 그대로 쓸 수 있다. 생성물(래퍼·네이티브 서명/주소 표·카탈로그 JSON)은 빌드
+     중간물이며 체크인하지 않는다. 지원하지 않는 선언은 생성기가 출력 전에 거부한다(D-040·D-043).
+  3. 에디터 실행에 필요한 도구(prsmc.exe·prsm_jit.dll·LLVM-C.dll)와 이 모듈의 카탈로그를
+     $(EngineBinaryRoot)PrSM\ 에 둔다. 도구가 없으면 경고만 남기고 엔진은 PrSM 없이 뜬다.
+
+  EnginePrsmToolchainDir: prsmc.exe 와 prsm_jit.dll 이 있는 폴더(PrSM 의
+  `cargo build -p prsmc -p prsm-jit` external-llvm 출력). 기본은 이웃 체크아웃 ..\PrSM\target\release\ 이다.
+-->
+<Project>
+  <PropertyGroup>
+    <PrsmThirdPartyDir>$(SolutionDir)ThirdParty\PrSM\</PrsmThirdPartyDir>
+    <ReflgenPrsm>true</ReflgenPrsm>
+    <ReflgenPrsmAdapterHeader>$(MSBuildThisFileDirectory)PrsmEngineAdapter.h</ReflgenPrsmAdapterHeader>
+    <EnginePrsmToolchainDir Condition="'$(EnginePrsmToolchainDir)' == ''">$(SolutionDir)..\PrSM\target\release\</EnginePrsmToolchainDir>
+    <PrsmLlvmCDll Condition="'$(PrsmLlvmCDll)' == ''">$(VCInstallDir)Tools\Llvm\x64\bin\LLVM-C.dll</PrsmLlvmCDll>
+    <PrsmDeployDir>$(EngineBinaryRoot)PrSM\</PrsmDeployDir>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(PrsmThirdPartyDir)abi;$(PrsmThirdPartyDir)harness\host;$(PrsmThirdPartyDir)samples\mock_engine;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>PRSM_HOST_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\floating_point_scope.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\gc_runtime.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\handle_table.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\reload_validation.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\script_boundary.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\task_bridge.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="$(PrsmThirdPartyDir)harness\host\task_scheduler.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <None Include="$(PrsmThirdPartyDir)PROVENANCE.md" />
+  </ItemGroup>
+
+  <!-- 카탈로그는 컴파일러 입력이다(권한의 근거는 컴파일된 표). 도구는 있으면 배치한다. -->
+  <Target Name="PrsmDeployToolchain" AfterTargets="Build">
+    <MakeDir Directories="$(PrsmDeployDir)" />
+    <Copy Condition="Exists('$(ReflgenPrsmCatalog)')" SourceFiles="$(ReflgenPrsmCatalog)"
+          DestinationFiles="$(PrsmDeployDir)$(ReflgenModule).bindings.json" SkipUnchangedFiles="true" />
+    <Copy Condition="Exists('$(EnginePrsmToolchainDir)prsmc.exe') and Exists('$(EnginePrsmToolchainDir)prsm_jit.dll') and Exists('$(PrsmLlvmCDll)')"
+          SourceFiles="$(EnginePrsmToolchainDir)prsmc.exe;$(EnginePrsmToolchainDir)prsm_jit.dll;$(PrsmLlvmCDll)"
+          DestinationFolder="$(PrsmDeployDir)" SkipUnchangedFiles="true" />
+    <Warning Condition="!Exists('$(EnginePrsmToolchainDir)prsmc.exe') or !Exists('$(EnginePrsmToolchainDir)prsm_jit.dll')"
+             Text="PrSM toolchain not found in $(EnginePrsmToolchainDir) (prsmc.exe, prsm_jit.dll). The editor will start without PrSM scripts. Set EnginePrsmToolchainDir." />
+    <Warning Condition="!Exists('$(PrsmLlvmCDll)')"
+             Text="LLVM-C.dll not found at $(PrsmLlvmCDll). Install the Visual Studio 'C++ Clang tools for Windows' component or set PrsmLlvmCDll." />
+  </Target>
+</Project>

@@ -13,6 +13,7 @@
 #include "PlayerPresentation.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ClrHost.h"
+#include "PrsmScriptHost.h"
 #include "WindowsCoreWindow.h"
 #include "DataSystem.h"
 #include "EngineBootstrap.h"
@@ -276,6 +277,8 @@ void Player::PlayerMain::Initialize()
 	// CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
+	// PrSM 스크립트 계층. Player AOT 패키징 전에는 도구가 없어 비활성으로 남는다.
+	PrsmScriptHost::Get().Initialize();
 
     // Startup uses the same staged scene preparation as later transitions.
     // Metadata/payload jobs progress without blocking the owner or render thread;
@@ -616,6 +619,7 @@ void Player::PlayerMain::Finalize()
 
 	SceneManagers->Decommissioning();
 	ClrHost::Get().Shutdown();
+	PrsmScriptHost::Get().Shutdown();
 	TagManagers->Finalize();
     SceneManagers->BindAudioPlayback(nullptr);
     m_audioPlayback->Shutdown();

@@ -16,7 +16,10 @@
 // 필요해졌는데, 그 헤더는 Camera·RenderPassData·프록시 계층을 통째로 끌고 온다.
 // ScriptBinder의 어느 헤더도 그것을 include하지 않는 것이 이 저장소의 규약이라
 // 정의를 .cpp로 옮겼다.
-class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent, Component>
+// PrSM: 수신자는 소유 엔티티의 세대 핸들이고 호출마다 이 컴포넌트를 다시 찾는다(PrsmEngineAdapter.h).
+// 스크립트에서는 `creator::Light()` 로 실행 중인 컴포넌트의 엔티티에 붙은 광원을 얻는다.
+class [[reflgen::reflect, reflgen::interop("prsm"), reflgen::lifetime("borrowed"), reflgen::receiver("component"),
+        reflgen::owner("creator::Light")]] LightComponent : public meta::identity<LightComponent, Component>
 {
     public:
     [[reflgen::ignore]]
@@ -54,12 +57,14 @@ public:
 	}
 
 	// 세기는 EnhancedLight::color.a로 실린다(EnhancedLightPacking.h).
+	[[reflgen::interop("prsm"), reflgen::property_set("Intensity")]]
 	void SetIntensity(float intensity)
 	{
 		m_intencity = intensity;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
 
+	[[reflgen::interop("prsm"), reflgen::property_set("Range")]]
 	void SetRange(float range)
 	{
 		m_range = range;
@@ -67,11 +72,20 @@ public:
 	}
 
 	// 도 단위로 받는다 — 패킹이 radians()로 바꿔 싣는다.
+	[[reflgen::interop("prsm"), reflgen::property_set("SpotAngle")]]
 	void SetSpotAngle(float degrees)
 	{
 		m_spotLightAngle = degrees;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
+
+	// 읽기 쪽. 스크립트 프로퍼티는 위 writer 와 짝을 이룬다(쓰기는 반드시 dirty 를 낸다).
+	[[reflgen::interop("prsm"), reflgen::property_get("Intensity")]]
+	float GetIntensity() const noexcept { return m_intencity; }
+	[[reflgen::interop("prsm"), reflgen::property_get("Range")]]
+	float GetRange() const noexcept { return m_range; }
+	[[reflgen::interop("prsm"), reflgen::property_get("SpotAngle")]]
+	float GetSpotAngle() const noexcept { return m_spotLightAngle; }
 
 	void SetLightStatus(LightStatus status)
 	{

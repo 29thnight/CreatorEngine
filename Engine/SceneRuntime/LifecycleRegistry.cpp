@@ -23,6 +23,7 @@
 #include "MeshRenderer.h"
 #include "PlayerInput.h"
 #include "ScriptComponent.h"
+#include "PrsmScriptComponent.h"
 #include "SoundComponent.h"
 #include "AudioListenerComponent.h"
 #include "SpriteRenderer.h"
@@ -105,6 +106,7 @@ namespace Lifecycle
         Register<MeshRenderer>();
         Register<PlayerInputComponent>();
         Register<ScriptComponent>();
+        Register<PrsmScriptComponent>();
         Register<SoundComponent>();
         Register<AudioListenerComponent>();
         Register<SpriteRenderer>();

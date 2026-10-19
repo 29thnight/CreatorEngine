@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "TimeSystem.h"
 #include "ClrHost.h"
+#include "PrsmScriptHost.h"
 
 namespace
 {
@@ -79,6 +80,8 @@ namespace Runtime
         if (!SceneManagers->HasPendingSceneStructureChange())
         {
             TickManagedPrePhysics(deltaSeconds);
+            // PrSM 컴포넌트도 같은 두 지점에서 프레임당 한 번 일괄로 돈다(PrsmScriptHost.h).
+            PrsmScriptHost::Get().TickPrePhysics(deltaSeconds);
         }
 
         SceneManagers->Physics(deltaSeconds);
@@ -87,6 +90,8 @@ namespace Runtime
         if (!SceneManagers->HasPendingSceneStructureChange())
         {
             TickManagedPostPhysics(deltaSeconds);
+            // 틱 → 코루틴 폴링 → PrSM GC 증분 단계.
+            PrsmScriptHost::Get().TickPostPhysics(deltaSeconds);
         }
     }
 }

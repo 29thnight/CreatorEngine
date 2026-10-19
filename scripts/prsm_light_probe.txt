@@ -1,0 +1,36 @@
+# PrSM 첫 엔진 도메인 회귀 — LightComponent(Intensity·Range·SpotAngle) + Entity(Enabled).
+#
+# 사용법:
+#   CreatorEditor.exe --script ..\..\scripts\prsm_light_probe.txt
+#   (Tools\regression\verify-prsm-light.ps1 이 이 파일을 부른다)
+#
+# ── 무엇을 재현하는가 ──
+#
+# Assets/Scripts/PrSM/PrsmLightProbe.prsm 을 에디터가 기동 때 prsmc 로 컴파일하고
+# prsm_jit 로 적재한다. 그 컴포넌트를 기본 씬의 "Directional Light" 에 붙여 재생하면
+# 스크립트가 reflgen 이 생성한 바인딩으로 실제 LightComponent 를 읽고 쓴다.
+# 수신자는 엔티티 세대 핸들이고, 호출마다 그 엔티티의 LightComponent 를 다시 찾는다.
+#
+# 대상이 C# 광원 프로브(light_script_probe.txt)와 같은 기본 씬 광원인 이유도 같다 —
+# --script 헤드리스는 렌더 프레임이 거의 돌지 않아 저작 씬 전환이 프록시에 실리지 않는다.
+# 그래서 이 시나리오는 프록시가 아니라 컴포넌트 필드(object.properties)를 잰다.
+
+# 기본 씬이 설 때까지 기다린다.
+wait 60
+
+# 기준선 — 스크립트가 손대기 전 값.
+object.properties "Directional Light" LightComponent
+
+component.add "Directional Light" PrsmScriptComponent
+object.property "Directional Light" PrsmScriptComponent m_typeName PrsmLightProbe
+wait 5
+
+# 생명주기 훅은 재생 중에만 온다(Scene::DrainPendingPhases).
+play
+wait 30
+
+object.properties "Directional Light" LightComponent
+stop
+wait 5
+log.flush
+quit

@@ -228,6 +228,16 @@
     <ClCompile Include="ClrHost.cpp" />
     <ClCompile Include="ManagedAniBehavior.cpp" />
     <ClCompile Include="ScriptComponent.cpp" />
+    <ClCompile Include="PrsmScriptComponent.cpp" />
+    <ClCompile Include="PrsmScriptHost.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="PrsmHostApi.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="PrsmBindingContext.cpp" />
+    <ClCompile Include="PrsmBindingRegistry.cpp" />
+    <ClCompile Include="PrsmBindingModules.cpp" />
     <ClCompile Include="ScriptObjectRegistry.cpp" />
     <ClCompile Include="SceneManager.cpp" />
     <ClCompile Include="RuntimeFrame.cpp" />
@@ -338,6 +348,11 @@
     <ClInclude Include="ClrHost.h" />
     <ClInclude Include="ManagedAniBehavior.h" />
     <ClInclude Include="ScriptComponent.h" />
+    <ClInclude Include="PrsmScriptComponent.h" />
+    <ClInclude Include="PrsmScriptHost.h" />
+    <ClInclude Include="PrsmBindingContext.h" />
+    <ClInclude Include="PrsmEngineAdapter.h" />
+    <ClInclude Include="PrsmBindingRegistry.h" />
     <ClInclude Include="ScriptObjectRegistry.h" />
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="RuntimeFrame.h" />
@@ -405,6 +420,7 @@
   <ItemGroup>
     <ClInclude Include="SceneGC.h" />
   </ItemGroup>
+  <Import Project="PrsmScripting.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

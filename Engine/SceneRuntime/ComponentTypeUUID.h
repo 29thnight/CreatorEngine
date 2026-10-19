@@ -47,6 +47,9 @@ namespace ComponentTypeUUID
         { "MeshRenderer",                "a84ed25a-31de-4289-92a0-546b27cee0ff" },
         { "PlayerInputComponent",        "fb08e9f8-ba18-4444-85db-a042d822bd4c" },
         { "ScriptComponent",             "16beda95-3967-4d95-838b-b9e6694b6609" },
+        // PrSM 스크립트 컴포넌트(CoreCLR ScriptComponent 의 PrSM 짝). 처음 박는 값이라
+        // 앞으로 절대 바꾸지 않는다.
+        { "PrsmScriptComponent",         "b965842d-812b-4a01-8ca4-e1a2e2174873" },
         { "SoundComponent",              "f2441c9e-234b-42cd-8067-2276a3c985fe" },
         { "AudioListenerComponent",      "c942d1d3-04da-4bea-826b-32bd7d5d2124" },
         { "SpriteRenderer",              "637e2910-0658-42cd-a58c-7bae908a852c" },
