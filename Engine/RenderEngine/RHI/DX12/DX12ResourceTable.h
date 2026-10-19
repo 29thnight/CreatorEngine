@@ -29,26 +29,29 @@
 // 놓은 칸을 다시 쓰면 세대가 필요해진다. V2-a가 예고한 그 순간이다.
 class DX12ResourceTable
 {
-public:
-    DX12ResourceTable() : m_buffers(RHIHandleBits::kMaxSlots) {}
+  public:
+    DX12ResourceTable() : m_textures(RHIHandleBits::kMaxSlots), m_buffers(RHIHandleBits::kMaxSlots) {}
 
     /// 소유하고 등록한다. 표가 ComPtr을 들고 있으므로 호출부는 핸들만 남긴다.
     RHITextureHandle AddTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
-    {
-        if (nullptr == resource.Get()) return {};
-        return RHITextureHandle{ Acquire(m_textures, m_textureFree, std::move(resource), nullptr, false) };
-    }
-
-    RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-        bool allowIndirectArguments = false, Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
-        std::shared_ptr<const void> allocationLifetime = {})
     {
         if (nullptr == resource.Get())
         {
             return {};
         }
-        return RHIBufferHandle{ AcquireBuffer(std::move(resource), nullptr, allowIndirectArguments,
-            std::move(sparseHeap), std::move(allocationLifetime)) };
+        return RHITextureHandle{AcquireTexture(std::move(resource), nullptr)};
+    }
+
+    RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource, bool allowIndirectArguments = false,
+                              Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
+                              std::shared_ptr<const void> allocationLifetime = {})
+    {
+        if (nullptr == resource.Get())
+        {
+            return {};
+        }
+        return RHIBufferHandle{AcquireBuffer(std::move(resource), nullptr, allowIndirectArguments,
+                                             std::move(sparseHeap), std::move(allocationLifetime))};
     }
 
     /// 소유하지 않고 등록한다 — 임포트(스왑체인 백버퍼·자가 검증이 만든 텍스처).
@@ -58,36 +61,55 @@ public:
     ///   자기 칸만 비우고, 남의 리소스를 죽이지 않는다.
     RHITextureHandle AddExternalTexture(ID3D12Resource* resource)
     {
-        if (nullptr == resource) return {};
-        return RHITextureHandle{ Acquire(m_textures, m_textureFree, nullptr, resource, false) };
+        if (nullptr == resource)
+        {
+            return {};
+        }
+        return RHITextureHandle{AcquireTexture(nullptr, resource)};
     }
 
     /// 〃 버퍼 판 (A-5a). 업로드 링이 자기 버퍼를 ComPtr 로 들고 있고 표는
     /// 빌려 본다 — 슬라이스가 그 핸들로 백엔드에 닿는다.
     RHIBufferHandle AddExternalBuffer(ID3D12Resource* resource)
     {
-        if (nullptr == resource) return {};
-        return RHIBufferHandle{ AcquireBuffer(nullptr, resource) };
+        if (nullptr == resource)
+        {
+            return {};
+        }
+        return RHIBufferHandle{AcquireBuffer(nullptr, resource)};
     }
 
-    ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveIn(m_textures, handle.id); }
+    ID3D12Resource* Resolve(RHITextureHandle handle) const { return ResolveTexture(handle.id); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return ResolveBuffer(handle.id); }
     ID3D12Heap* ResolveSparseHeap(RHIBufferHandle handle) const
     {
-        if (!handle.IsValid()) return nullptr;
+        if (!handle.IsValid())
+        {
+            return nullptr;
+        }
         const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
-        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return nullptr;
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire))
+        {
+            return nullptr;
+        }
         const Slot& entry = m_buffers[slot];
-        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id)
-            ? entry.sparseHeap.Get() : nullptr;
+        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.sparseHeap.Get()
+                                                                                         : nullptr;
     }
     std::shared_ptr<const void> ResolveBufferLifetime(RHIBufferHandle handle) const
     {
-        if (!handle.IsValid()) return {};
+        if (!handle.IsValid())
+        {
+            return {};
+        }
         const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
-        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return {};
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire))
+        {
+            return {};
+        }
         const Slot& entry = m_buffers[slot];
-        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.allocationLifetime : nullptr;
+        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.allocationLifetime
+                                                                                         : nullptr;
     }
 
     DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
@@ -106,7 +128,7 @@ public:
         {
             return {};
         }
-        return { entry.Get(), entry.bufferBytes, entry.allowIndirectArguments };
+        return {entry.Get(), entry.bufferBytes, entry.allowIndirectArguments};
     }
 
     /// 버퍼의 GPU 가상 주소. 등록할 때 한 번 물어 둔 값이다 (A-4).
@@ -124,17 +146,26 @@ public:
     /// 무효 핸들이면 0. 호출부는 그것 하나만 검사한다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
     {
-        if (0 == handle.id) return 0;
+        if (0 == handle.id)
+        {
+            return 0;
+        }
         const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
-        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return 0;
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire))
+        {
+            return 0;
+        }
 
         const Slot& entry = m_buffers[slot];
-        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(handle.id)) return 0;
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(handle.id))
+        {
+            return 0;
+        }
         return entry.gpuAddress;
     }
 
     /// 칸을 비우고 세대를 올린다. 이 뒤로 같은 핸들은 nullptr로 풀린다.
-    void Release(RHITextureHandle handle) { ReleaseIn(m_textures, m_textureFree, handle.id); }
+    void Release(RHITextureHandle handle) { ReleaseTexture(handle.id); }
     void Release(RHIBufferHandle handle) { ReleaseBuffer(handle.id); }
 
     // ── 파이프라인 (A-1) ──
@@ -150,30 +181,30 @@ public:
     //   **모델이 그것을 허용해 두는 것**이 V8-a 가 요구한 것이다(§7.2.5).
 
     RHIPipelineHandle AddPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature,
-        bool meshPipeline = false, bool computePipeline = false)
+                                  bool meshPipeline = false, bool computePipeline = false)
     {
-        if (nullptr == pipeline) return {};
-        return RHIPipelineHandle{ AcquirePipeline(m_pipelines, m_pipelineFree,
-            DX12PipelineEntry{ pipeline, signature, meshPipeline, computePipeline }) };
+        if (nullptr == pipeline)
+        {
+            return {};
+        }
+        return RHIPipelineHandle{AcquirePipeline(
+            m_pipelines, m_pipelineFree, DX12PipelineEntry{pipeline, signature, meshPipeline, computePipeline})};
     }
 
     RHIPipelineLayoutHandle AddPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash,
-        bool allowInputAssembler = true)
+                                              bool allowInputAssembler = true)
     {
-        if (nullptr == signature) return {};
-        return RHIPipelineLayoutHandle{ AcquireLayout(m_layouts, m_layoutFree,
-            DX12PipelineLayoutEntry{ signature, stableHash, allowInputAssembler }) };
+        if (nullptr == signature)
+        {
+            return {};
+        }
+        return RHIPipelineLayoutHandle{AcquireLayout(
+            m_layouts, m_layoutFree, DX12PipelineLayoutEntry{signature, stableHash, allowInputAssembler})};
     }
 
-    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
-    {
-        return ResolveEntry(m_pipelines, handle.id);
-    }
+    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const { return ResolveEntry(m_pipelines, handle.id); }
 
-    DX12PipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const
-    {
-        return ResolveEntry(m_layouts, handle.id);
-    }
+    DX12PipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const { return ResolveEntry(m_layouts, handle.id); }
 
     /// M5-C3b1부터 DX12PSOManager invalidation이 호출한다. cache의 ComPtr는
     /// in-flight 안전을 위해 retired 보관하고, 표는 이 자리에서 generation을
@@ -183,7 +214,17 @@ public:
 
     void Clear()
     {
-        m_textures.clear();
+        {
+            std::lock_guard lock(m_textureRegistryMutex);
+            const auto count = m_textureHighWater.load(std::memory_order_relaxed);
+            for (std::uint32_t index = 0; index < count; ++index)
+            {
+                m_textures[index] = {};
+            }
+            m_textureHighWater.store(0, std::memory_order_release);
+            m_liveTextures.store(0, std::memory_order_release);
+            m_textureFree.clear();
+        }
         {
             std::lock_guard lock(m_bufferRegistryMutex);
             const uint32_t count = m_bufferHighWater.load(std::memory_order_relaxed);
@@ -205,7 +246,6 @@ public:
             m_bufferSlotReuses.store(0, std::memory_order_release);
             m_bufferFree.clear();
         }
-        m_textureFree.clear();
         m_pipelines.clear();
         m_layouts.clear();
         m_pipelineFree.clear();
@@ -213,88 +253,84 @@ public:
     }
 
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.
-    size_t LiveTextureCount() const { return m_textures.size() - m_textureFree.size(); }
+    size_t LiveTextureCount() const { return m_liveTextures.load(std::memory_order_acquire); }
     size_t LiveBufferCount() const { return m_liveBuffers.load(std::memory_order_acquire); }
-    uint32_t BufferSlotHighWater() const
-    {
-        return m_bufferHighWater.load(std::memory_order_acquire);
-    }
-    uint64_t BufferSlotReuseCount() const
-    {
-        return m_bufferSlotReuses.load(std::memory_order_acquire);
-    }
+    uint32_t BufferSlotHighWater() const { return m_bufferHighWater.load(std::memory_order_acquire); }
+    uint64_t BufferSlotReuseCount() const { return m_bufferSlotReuses.load(std::memory_order_acquire); }
 
-private:
+  private:
     struct Slot
     {
-        Microsoft::WRL::ComPtr<ID3D12Resource> owned;      // 소유할 때만
+        Microsoft::WRL::ComPtr<ID3D12Resource> owned; // 소유할 때만
         Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap;
         std::shared_ptr<const void> allocationLifetime;
-        ID3D12Resource*                        external{ nullptr };  // 임포트일 때만
-        uint32_t                               generation{ 0 };
-        bool                                   alive{ false };
+        ID3D12Resource* external{nullptr}; // 임포트일 때만
+        uint32_t generation{0};
+        bool alive{false};
 
         /// 등록할 때 한 번 물어 둔 값 (A-4). 텍스처 칸에서는 0이다 —
         /// D3D12 는 버퍼가 아닌 리소스에 0을 돌려준다.
-        D3D12_GPU_VIRTUAL_ADDRESS              gpuAddress{ 0 };
-        uint64_t bufferBytes{ 0 };
-        bool allowIndirectArguments{ false };
+        D3D12_GPU_VIRTUAL_ADDRESS gpuAddress{0};
+        uint64_t bufferBytes{0};
+        bool allowIndirectArguments{false};
 
         ID3D12Resource* Get() const { return owned ? owned.Get() : external; }
     };
 
-    /// wantsGpuAddress 는 **버퍼 칸에서만** 참이다 (A-4).
-    ///
-    /// ★ 텍스처에 `GetGPUVirtualAddress` 를 부르면 값은 0 으로 잘 돌아오는데
-    ///   **검증 레이어가 경고를 남긴다**("returns NULL for non-buffer
-    ///   resources"). 이 저장소의 자가 검증은 WARNING 이상을 '실제 문제'로
-    ///   세므로(`DrainDebugMessages`), 그 한 줄이 텍스처를 등록하는 검사
-    ///   28종을 통째로 실패로 만든다 — 실측이다. 값이 맞다고 불러도 되는
-    ///   것은 아니다.
-    static uint32_t Acquire(std::vector<Slot>& slots, std::vector<uint32_t>& freeList,
-        Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external,
-        bool wantsGpuAddress)
+    // The storage never relocates while a different worker registers a texture.
+    // The recording/retirement contract keeps a resolved handle alive until its
+    // consumers finish; concurrent mutation of the same live handle is forbidden.
+    uint32_t AcquireTexture(Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external)
     {
-        uint32_t slot = 0;
-        if (!freeList.empty())
+        std::lock_guard lock(m_textureRegistryMutex);
+        std::uint32_t slot{};
+        if (!m_textureFree.empty())
         {
-            slot = freeList.back();
-            freeList.pop_back();
+            slot = m_textureFree.back();
+            m_textureFree.pop_back();
         }
         else
         {
-            if (slots.size() >= RHIHandleBits::kMaxSlots) return 0;   // 조용히 겹치지 않는다
-            slot = static_cast<uint32_t>(slots.size());
-            slots.emplace_back();
+            slot = m_textureHighWater.load(std::memory_order_relaxed);
+            if (slot >= RHIHandleBits::kMaxSlots)
+            {
+                return 0;
+            }
         }
-
-        Slot& entry = slots[slot];
+        auto& entry = m_textures[slot];
         entry.owned = std::move(owned);
         entry.external = external;
         entry.alive = true;
-        // 주소를 여기서 한 번 묻는다 (A-4) — 드로우 루프가 아니라 등록 시점이
-        // 이 COM 호출의 자리다.
-        entry.gpuAddress = (wantsGpuAddress && nullptr != entry.Get())
-            ? entry.Get()->GetGPUVirtualAddress() : 0;
+        if (slot == m_textureHighWater.load(std::memory_order_relaxed))
+        {
+            m_textureHighWater.store(slot + 1, std::memory_order_release);
+        }
+        m_liveTextures.fetch_add(1, std::memory_order_relaxed);
         return RHIHandleBits::Encode(slot, entry.generation);
     }
 
-    static ID3D12Resource* ResolveIn(const std::vector<Slot>& slots, uint32_t id)
+    ID3D12Resource* ResolveTexture(std::uint32_t id) const
     {
-        if (0 == id) return nullptr;
-        const uint32_t slot = RHIHandleBits::SlotOf(id);
-        if (slot >= slots.size()) return nullptr;
-
-        const Slot& entry = slots[slot];
-        // 세대가 다르면 이 핸들은 이미 놓인 것이다 — 재사용된 남의 리소스를
-        // 돌려주는 것이 이 검사가 막는 사고다.
-        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id)) return nullptr;
+        if (!id)
+        {
+            return nullptr;
+        }
+        const auto slot = RHIHandleBits::SlotOf(id);
+        if (slot >= m_textureHighWater.load(std::memory_order_acquire))
+        {
+            return nullptr;
+        }
+        const auto& entry = m_textures[slot];
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id))
+        {
+            return nullptr;
+        }
         return entry.Get();
     }
 
-    uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned,
-        ID3D12Resource* external, bool allowIndirectArguments = false,
-        Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {}, std::shared_ptr<const void> allocationLifetime = {})
+    uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external,
+                           bool allowIndirectArguments = false, Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
+                           std::shared_ptr<const void> allocationLifetime = {})
     {
         std::lock_guard lock(m_bufferRegistryMutex);
 
@@ -308,7 +344,10 @@ private:
         else
         {
             slot = m_bufferHighWater.load(std::memory_order_relaxed);
-            if (slot >= RHIHandleBits::kMaxSlots) return 0;
+            if (slot >= RHIHandleBits::kMaxSlots)
+            {
+                return 0;
+            }
         }
 
         Slot& entry = m_buffers[slot];
@@ -316,41 +355,58 @@ private:
         entry.sparseHeap = std::move(sparseHeap);
         entry.allocationLifetime = std::move(allocationLifetime);
         entry.external = external;
-        entry.gpuAddress = nullptr != entry.Get()
-            ? entry.Get()->GetGPUVirtualAddress() : 0;
+        entry.gpuAddress = nullptr != entry.Get() ? entry.Get()->GetGPUVirtualAddress() : 0;
         const D3D12_RESOURCE_DESC description = entry.Get()->GetDesc();
-        entry.bufferBytes = D3D12_RESOURCE_DIMENSION_BUFFER == description.Dimension
-            ? description.Width : 0;
+        entry.bufferBytes = D3D12_RESOURCE_DIMENSION_BUFFER == description.Dimension ? description.Width : 0;
         entry.allowIndirectArguments = allowIndirectArguments && entry.bufferBytes != 0;
         entry.alive = true;
 
         if (slot == m_bufferHighWater.load(std::memory_order_relaxed))
+        {
             m_bufferHighWater.store(slot + 1, std::memory_order_release);
+        }
         m_liveBuffers.fetch_add(1, std::memory_order_relaxed);
         return RHIHandleBits::Encode(slot, entry.generation);
     }
 
     ID3D12Resource* ResolveBuffer(uint32_t id) const
     {
-        if (0 == id) return nullptr;
+        if (0 == id)
+        {
+            return nullptr;
+        }
         const uint32_t slot = RHIHandleBits::SlotOf(id);
-        if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return nullptr;
+        if (slot >= m_bufferHighWater.load(std::memory_order_acquire))
+        {
+            return nullptr;
+        }
 
         const Slot& entry = m_buffers[slot];
         if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id))
+        {
             return nullptr;
+        }
         return entry.Get();
     }
 
     void ReleaseBuffer(uint32_t id)
     {
-        if (0 == id) return;
+        if (0 == id)
+        {
+            return;
+        }
         std::lock_guard lock(m_bufferRegistryMutex);
         const uint32_t slot = RHIHandleBits::SlotOf(id);
-        if (slot >= m_bufferHighWater.load(std::memory_order_relaxed)) return;
+        if (slot >= m_bufferHighWater.load(std::memory_order_relaxed))
+        {
+            return;
+        }
 
         Slot& entry = m_buffers[slot];
-        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id)) return;
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id))
+        {
+            return;
+        }
         entry.alive = false;
         entry.owned.Reset();
         entry.sparseHeap.Reset();
@@ -364,21 +420,29 @@ private:
         m_liveBuffers.fetch_sub(1, std::memory_order_relaxed);
     }
 
-    static void ReleaseIn(std::vector<Slot>& slots, std::vector<uint32_t>& freeList, uint32_t id)
+    void ReleaseTexture(std::uint32_t id)
     {
-        if (0 == id) return;
-        const uint32_t slot = RHIHandleBits::SlotOf(id);
-        if (slot >= slots.size()) return;
-
-        Slot& entry = slots[slot];
-        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id)) return;  // 두 번 놓기
-
+        if (!id)
+        {
+            return;
+        }
+        std::lock_guard lock(m_textureRegistryMutex);
+        const auto slot = RHIHandleBits::SlotOf(id);
+        if (slot >= m_textureHighWater.load(std::memory_order_relaxed))
+        {
+            return;
+        }
+        auto& entry = m_textures[slot];
+        if (!entry.alive || entry.generation != RHIHandleBits::GenerationOf(id))
+        {
+            return;
+        }
         entry.owned.Reset();
         entry.external = nullptr;
-        entry.gpuAddress = 0;
         entry.alive = false;
         ++entry.generation;
-        freeList.push_back(slot);
+        m_textureFree.push_back(slot);
+        m_liveTextures.fetch_sub(1, std::memory_order_relaxed);
     }
 
     // ── 파이프라인 칸 (A-1) ──
@@ -387,17 +451,16 @@ private:
     //   필드가 있는데 이쪽은 늘 빌려 보기이고, 드는 값도 짝이라 모양이 다르다.
     //   한 Slot 에 몰면 쓰지 않는 필드가 생기고 그것을 채우는 호출부가 반드시
     //   생긴다(`RHIStaticSamplerDesc` 를 힙 샘플러와 가른 것과 같은 이유).
-    template <typename T>
+    template<typename T>
     struct EntrySlot
     {
-        T        entry{};
-        uint32_t generation{ 0 };
-        bool     alive{ false };
+        T entry{};
+        uint32_t generation{0};
+        bool alive{false};
     };
 
-    template <typename T>
-    static uint32_t AcquireEntry(std::vector<EntrySlot<T>>& slots,
-        std::vector<uint32_t>& freeList, const T& value)
+    template<typename T>
+    static uint32_t AcquireEntry(std::vector<EntrySlot<T>>& slots, std::vector<uint32_t>& freeList, const T& value)
     {
         uint32_t slot = 0;
         if (!freeList.empty())
@@ -407,7 +470,10 @@ private:
         }
         else
         {
-            if (slots.size() >= RHIHandleBits::kMaxSlots) return 0;   // 조용히 겹치지 않는다
+            if (slots.size() >= RHIHandleBits::kMaxSlots)
+            {
+                return 0; // 조용히 겹치지 않는다
+            }
             slot = static_cast<uint32_t>(slots.size());
             slots.emplace_back();
         }
@@ -418,40 +484,57 @@ private:
         return RHIHandleBits::Encode(slot, target.generation);
     }
 
-    static uint32_t AcquirePipeline(std::vector<EntrySlot<DX12PipelineEntry>>& slots,
-        std::vector<uint32_t>& freeList, const DX12PipelineEntry& value)
+    static uint32_t AcquirePipeline(std::vector<EntrySlot<DX12PipelineEntry>>& slots, std::vector<uint32_t>& freeList,
+                                    const DX12PipelineEntry& value)
     {
         return AcquireEntry(slots, freeList, value);
     }
 
     static uint32_t AcquireLayout(std::vector<EntrySlot<DX12PipelineLayoutEntry>>& slots,
-        std::vector<uint32_t>& freeList, const DX12PipelineLayoutEntry& value)
+                                  std::vector<uint32_t>& freeList, const DX12PipelineLayoutEntry& value)
     {
         return AcquireEntry(slots, freeList, value);
     }
 
-    template <typename T>
+    template<typename T>
     static T ResolveEntry(const std::vector<EntrySlot<T>>& slots, uint32_t id)
     {
-        if (0 == id) return T{};
+        if (0 == id)
+        {
+            return T{};
+        }
         const uint32_t slot = RHIHandleBits::SlotOf(id);
-        if (slot >= slots.size()) return T{};
+        if (slot >= slots.size())
+        {
+            return T{};
+        }
 
         const EntrySlot<T>& target = slots[slot];
-        if (!target.alive || target.generation != RHIHandleBits::GenerationOf(id)) return T{};
+        if (!target.alive || target.generation != RHIHandleBits::GenerationOf(id))
+        {
+            return T{};
+        }
         return target.entry;
     }
 
-    template <typename T>
-    static void ReleaseEntry(std::vector<EntrySlot<T>>& slots, std::vector<uint32_t>& freeList,
-        uint32_t id)
+    template<typename T>
+    static void ReleaseEntry(std::vector<EntrySlot<T>>& slots, std::vector<uint32_t>& freeList, uint32_t id)
     {
-        if (0 == id) return;
+        if (0 == id)
+        {
+            return;
+        }
         const uint32_t slot = RHIHandleBits::SlotOf(id);
-        if (slot >= slots.size()) return;
+        if (slot >= slots.size())
+        {
+            return;
+        }
 
         EntrySlot<T>& target = slots[slot];
-        if (!target.alive || target.generation != RHIHandleBits::GenerationOf(id)) return;
+        if (!target.alive || target.generation != RHIHandleBits::GenerationOf(id))
+        {
+            return;
+        }
 
         target.entry = T{};
         target.alive = false;
@@ -459,20 +542,23 @@ private:
         freeList.push_back(slot);
     }
 
-    std::vector<Slot>     m_textures;
+    // Texture registration can overlap material uploads and shadow history creation.
+    std::vector<Slot> m_textures;
+    std::atomic<std::uint32_t> m_textureHighWater{};
+    std::atomic<std::size_t> m_liveTextures{};
+    mutable std::mutex m_textureRegistryMutex;
     // 고정 크기로 한 번만 할당한다. worker segment 등록과 완료 후 slot 재사용
     // 중에도 기존 slot 주소가 움직이지 않는 stable registry 저장소다.
-    std::vector<Slot>     m_buffers;
+    std::vector<Slot> m_buffers;
     std::vector<uint32_t> m_textureFree;
     std::vector<uint32_t> m_bufferFree;
-    std::atomic<uint32_t> m_bufferHighWater{ 0 };
-    std::atomic<uint32_t> m_liveBuffers{ 0 };
-    std::atomic<uint64_t> m_bufferSlotReuses{ 0 };
+    std::atomic<uint32_t> m_bufferHighWater{0};
+    std::atomic<uint32_t> m_liveBuffers{0};
+    std::atomic<uint64_t> m_bufferSlotReuses{0};
     mutable std::mutex m_bufferRegistryMutex;
 
-    std::vector<EntrySlot<DX12PipelineEntry>>       m_pipelines;
+    std::vector<EntrySlot<DX12PipelineEntry>> m_pipelines;
     std::vector<EntrySlot<DX12PipelineLayoutEntry>> m_layouts;
-    std::vector<uint32_t>                           m_pipelineFree;
-    std::vector<uint32_t>                           m_layoutFree;
+    std::vector<uint32_t> m_pipelineFree;
+    std::vector<uint32_t> m_layoutFree;
 };
-

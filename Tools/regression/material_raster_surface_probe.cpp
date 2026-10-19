@@ -768,15 +768,21 @@ class RecordingChangeDevice : public ProbeDevice
         void Verify() const
         {
             Check(device.visibilityBindingGraph == &graph, "Visibility audit belongs to the recorded graph");
+            const auto visibility = device.visibilityBindingTarget;
             device.visibilityBindingGraph = nullptr;
             device.visibilityBindingTarget = {};
             EnhancedRenderGraph::DiagnosticSnapshot snapshot;
             Check(graph.CaptureDiagnosticSnapshot(snapshot), "Visibility descriptor consumer snapshot");
-            const auto consumers = std::ranges::count_if(snapshot.passes, [](const auto& pass)
+            // Derive consumers from the compiled resource contract, not pass names.
+            const auto consumers = std::ranges::count_if(snapshot.passes, [&](const auto& pass)
             {
-                return !pass.culled && (pass.name == "METEOR.Scene.Material.CountTiles" ||
-                    pass.name == "METEOR.Scene.Material.ScatterTiles" ||
-                    pass.name == "METEOR.Scene.Material.Resolve" || pass.name == "METEOR.Scene.Temporal.Resolve");
+                return !pass.culled && std::ranges::any_of(pass.usages, [&](const auto& use)
+                {
+                    return use.resource == visibility.index && use.kind == RGResourceKind::Texture &&
+                        use.access == RGAccessMode::Read &&
+                        (use.state == RHIResourceState::ShaderResource ||
+                         use.state == RHIResourceState::PixelShaderResource);
+                });
             });
             Check(device.visibilityBindingAllocations.load(std::memory_order_relaxed) ==
                       static_cast<unsigned>(consumers),
@@ -2107,13 +2113,14 @@ bool CookSceneProduct(LX::LXMaterialProgram program, const own::shared_owner<con
 
 // A generated feature fixture cooked exactly as the AssetCooker does: the full
 // Scene stage set for both backends.
-VerifiedProduct CookedScene(const LX::LXMaterialProgram& program, const std::string& name)
+VerifiedProduct CookedScene(const LX::LXMaterialProgram& program, const std::string& name,
+                            std::optional<RHIShaderBinary> backend = std::nullopt)
 {
     const auto* paths = InternalPath::GetInstance();
     VerifiedProduct product;
     std::string error;
     const bool compiled = CompileSceneProduct(program, paths->ShaderSourcePath / "DefaultPassShader",
-                                              paths->CacheRoot / (name + ".slang"), {}, product, error);
+                                              paths->CacheRoot / (name + ".slang"), {}, product, error, {}, backend);
     Check(compiled, "Cook Scene product " + name + ": " + error);
     std::vector<uint8_t> bytes;
     CookedProgram restored;
@@ -2841,7 +2848,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 const auto finalIds = finalWork->VisibleIds(finalWork->MeshletOutputOffset(bin), geometry->MeshletCount() + 1);
                 CameraWorkReadback audit{{}, bin};
                 const std::array<uint64_t, 6> sizes{ids.size, sizeof(RHIDrawIndexedIndirectArguments),
-                    uint64_t(geometry->Count()) * sizeof(SurfacePoint), topology.size, finalIds.size, sizeof(RHIDrawIndexedIndirectArguments)};
+                    geometry->BufferBytes(), topology.size, finalIds.size, sizeof(RHIDrawIndexedIndirectArguments)};
                 const std::array<RHIBufferHandle, 6> buffers{ids.buffer, cameraWork->Arguments(), geometry->Buffer(), topology.buffer, finalIds.buffer, finalWork->Arguments()};
                 const std::array<uint64_t, 6> offsets{ids.offset, cameraWork->ArgsOffset(bin), 0, topology.offset, finalIds.offset, finalWork->ArgsOffset(bin)};
                 std::vector<EnhancedRenderGraph::RGPassUsage> workReads;
@@ -2884,48 +2891,87 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             error.clear();
             const bool graphCompiled = graph->Compile(error);
             Check(graphCompiled, "Scene composition graph compile " + error);
-            if (visibilityAudit || expanded == 3) {
+            if (visibilityAudit || expanded == 3)
+            {
                 EnhancedRenderGraph::DiagnosticSnapshot wiring;
                 Check(graph->CaptureDiagnosticSnapshot(wiring), "Reconstruction graph diagnostic snapshot");
-                const auto find = [&](std::string_view name) -> const EnhancedRenderGraph::DiagnosticPass& {
-                    const auto found = std::ranges::find(wiring.passes, name, &EnhancedRenderGraph::DiagnosticPass::name);
-                    Check(found != wiring.passes.end(), "Required reconstruction producer/consumer " + std::string(name));
+                const auto find = [&](std::string_view name) -> const EnhancedRenderGraph::DiagnosticPass&
+                {
+                    const auto found =
+                        std::ranges::find(wiring.passes, name, &EnhancedRenderGraph::DiagnosticPass::name);
+                    Check(found != wiring.passes.end(),
+                          "Required reconstruction producer/consumer " + std::string(name));
                     return *found;
                 };
                 const auto& raster = find("METEOR.Scene.Visibility.HW");
-                const auto& countTiles = find("METEOR.Scene.Material.CountTiles");
-                const auto& ranges = find("METEOR.Scene.Material.BuildRanges");
-                const auto& scatter = find("METEOR.Scene.Material.ScatterTiles");
+                const auto& countTiles = find("METEOR.Scene.Material.Count");
+                const auto& reset = find("METEOR.Scene.Material.Reset");
+                const auto& scan = find("METEOR.Scene.Material.Scan");
+                const auto& ranges = find("METEOR.Scene.Material.Arguments");
+                const auto& scatter = find("METEOR.Scene.Material.Scatter");
                 const auto& resolve = find("METEOR.Scene.Material.Resolve");
-                const auto& upload = find("METEOR.Scene.Geometry.Table.Upload");
-                const auto readsFrameTable = [&](const auto& pass) {
-                    return std::ranges::any_of(pass.usages, [&](const auto& use) {
-                        return use.resource == frameGeometry->GraphTable(*graph).index &&
-                            use.state == RHIResourceState::ShaderResource;
-                    });
+                const auto upload = std::ranges::find(wiring.passes, "METEOR.Scene.Geometry.Table.Upload",
+                                                      &EnhancedRenderGraph::DiagnosticPass::name);
+                if (frameGeometry->resident && frameGeometry->resident->Reused())
+                {
+                    Check(upload == wiring.passes.end() && frameGeometry->resident->UploadBytes() == 0 &&
+                              frameGeometry->resident->CopyBytes() == 0 &&
+                              graph->ResolveBufferHandle(frameGeometry->GraphTable(*graph)) ==
+                                  frameGeometry->resident->Buffer(),
+                          "Unchanged geometry table imports its exact pinned resident buffer without another upload");
+                }
+                else
+                {
+                    Check(upload != wiring.passes.end() && upload->compiledIndex < countTiles.compiledIndex &&
+                              std::ranges::any_of(
+                                  upload->usages,
+                                  [&](const auto& use)
+                                  {
+                                      return use.resource == frameGeometry->GraphTable(*graph).index &&
+                                             use.state == RHIResourceState::CopyDest;
+                                  }),
+                          "Changed geometry table has its explicit copy producer before material address lookup");
+                }
+                const auto readsFrameTable = [&](const auto& pass)
+                {
+                    return std::ranges::any_of(pass.usages,
+                                               [&](const auto& use)
+                                               {
+                                                   return use.resource == frameGeometry->GraphTable(*graph).index &&
+                                                          use.state == RHIResourceState::ShaderResource;
+                                               });
                 };
-                Check(readsFrameTable(countTiles) && readsFrameTable(scatter) && !readsFrameTable(ranges) &&
-                    upload.compiledIndex < countTiles.compiledIndex,
-                    "Only address lookup stages read the explicitly uploaded frame table");
-                Check(raster.compiledIndex < countTiles.compiledIndex && countTiles.compiledIndex < ranges.compiledIndex &&
-                    ranges.compiledIndex < scatter.compiledIndex && scatter.compiledIndex < resolve.compiledIndex,
-                    "Explicit visibility -> count -> ranges -> scatter -> material consumer");
-                Check(std::ranges::none_of(wiring.passes, [](const auto& pass) {return pass.name=="METEOR.Scene.Commands.Reconstruct.Build";}),
-                    "No obsolete Cull reconstruction command producer");
+                Check(readsFrameTable(countTiles) && readsFrameTable(scatter) && !readsFrameTable(ranges),
+                      "Only address lookup stages read the explicitly uploaded frame table");
+                Check(raster.compiledIndex < countTiles.compiledIndex &&
+                          reset.compiledIndex < countTiles.compiledIndex &&
+                          countTiles.compiledIndex < scan.compiledIndex && scan.compiledIndex < ranges.compiledIndex &&
+                          ranges.compiledIndex < scatter.compiledIndex && scatter.compiledIndex < resolve.compiledIndex,
+                      "Explicit visibility/reset -> count -> scan -> arguments -> scatter -> material consumer");
+                Check(std::ranges::none_of(wiring.passes, [](const auto& pass)
+                                           { return pass.name == "METEOR.Scene.Commands.Reconstruct.Build"; }),
+                      "No obsolete Cull reconstruction command producer");
                 const auto& color = find("METEOR.Scene.Color");
-                Check(std::ranges::count(raster.usages, RHIResourceState::RenderTarget, &EnhancedRenderGraph::DiagnosticUsage::state) == 0,
-                    "HW raster writes atomic keys without attachment dependencies");
-                const auto readsVisibility = [&](const auto& pass) {
-                    return std::ranges::any_of(pass.usages, [&](const auto& use) {
-                        return use.resource == outputs.visibility.index && use.state == RHIResourceState::PixelShaderResource;
-                    });
+                Check(std::ranges::count(raster.usages, RHIResourceState::RenderTarget,
+                                         &EnhancedRenderGraph::DiagnosticUsage::state) == 0,
+                      "HW raster writes atomic keys without attachment dependencies");
+                const auto readsVisibility = [&](const auto& pass)
+                {
+                    return std::ranges::any_of(pass.usages,
+                                               [&](const auto& use)
+                                               {
+                                                   return use.resource == outputs.visibility.index &&
+                                                          use.state == RHIResourceState::PixelShaderResource;
+                                               });
                 };
-                Check(readsVisibility(resolve) && readsVisibility(color), "Material and lighting consume hardware visibility");
+                Check(readsVisibility(resolve) && readsVisibility(color),
+                      "Material and lighting consume hardware visibility");
                 Check(raster.compiledIndex < resolve.compiledIndex && resolve.compiledIndex < color.compiledIndex,
-                    "RenderPassGraph orders visibility, reconstruction and lighting");
-                Check(std::ranges::none_of(wiring.passes, [](const auto& pass) {
-                    return pass.name == "METEOR.Scene.GBuffer" || pass.name == "METEOR.Scene.LookupCapture";
-                }), "Opaque path contains no material geometry reraster or old lookup capture");
+                      "RenderPassGraph orders visibility, reconstruction and lighting");
+                Check(std::ranges::none_of(
+                          wiring.passes, [](const auto& pass)
+                          { return pass.name == "METEOR.Scene.GBuffer" || pass.name == "METEOR.Scene.LookupCapture"; }),
+                      "Opaque path contains no material geometry reraster or old lookup capture");
             }
 
             RHICompletionPoint graphCompletion;
@@ -2968,7 +3014,14 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (!workers)
                 Check(!host.PublishSubmittedCache(context.frameId, {UINT64_MAX}, error),
                       "Recorded but unsubmitted cache is rejected");
-            Check(device.EndFrame(error), "Scene frame enqueue " + error);
+            const bool frameEnqueued = device.EndFrame(error);
+            if (!frameEnqueued)
+            {
+                std::string validation;
+                device.DrainDebugMessages(validation);
+                std::cerr << validation;
+            }
+            Check(frameEnqueued, "Scene frame enqueue " + error);
             if (!workers)
                 graphCompletion = {device.GetLastSignaledFenceValue()};
             if (submissionGate)
@@ -3032,8 +3085,36 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     uint32_t outside = 63;
                     for (uint32_t vertex = 0; vertex < vertices; ++vertex)
                     {
-                        SurfacePoint point;
-                        std::memcpy(&point, mapped[2].data.data() + word(mapped[3], remap + vertex * 4u) * sizeof(point), sizeof(point));
+                        SurfacePoint point{};
+                        const auto vertexId = word(mapped[3], remap + vertex * 4u);
+                        if (geometry->UsesDirectClusters())
+                        {
+                            // Direct consumption stores a pose block, not Count() decoded points.
+                            // Replay this rigid fixture from its independently sealed CPU input.
+                            const auto& source = geometry->Input()->Geometry();
+                            Check(geometry->Input()->Bones().empty() && source.vertexData &&
+                                      (uint64_t(vertexId) + 1) * source.vertexStride <= source.vertexBytes,
+                                  "Direct cluster clip reference has bounded rigid source vertices");
+                            const auto* data = static_cast<const std::byte*>(source.vertexData);
+                            const auto offset = assets::OffsetOf(source.vertexAttributeMask, assets::VertexAttribute::Position);
+                            std::memcpy(point.position.data(), data + uint64_t(vertexId) * source.vertexStride + offset, 12);
+                        }
+                        else
+                        {
+                            const auto offset = uint64_t(vertexId) * sizeof(point);
+                            Check(offset + sizeof(point) <= mapped[2].data.size(), "Decoded clip reference is bounded");
+                            std::memcpy(&point, mapped[2].data.data() + offset, sizeof(point));
+                        }
+                        if (geometry->IsObjectSpace())
+                        {
+                            const auto position = point.position;
+                            const auto& world = geometry->ObjectToWorld();
+                            for (unsigned c = 0; c < 3; ++c)
+                            {
+                                point.position[c] = position[0] * world.m[0][c] + position[1] * world.m[1][c] +
+                                                    position[2] * world.m[2][c] + world.m[3][c];
+                            }
+                        }
                         float clip[4];
                         const auto& matrix = input->ViewProjection();
                         for (unsigned c = 0; c < 4; ++c)
@@ -4344,9 +4425,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             RunSceneRefraction(device, roots, pipelines, textures, pool, root, image, cube, instances[0],
                                mode == "--refraction-film-only");
         }
-        else if (mode == "--volume-only")
+        else if (mode == "--volume-only" || mode == "--volume-native-only")
         {
-            RunSceneVolume(device, roots, pipelines, textures, pool, root, image, cube, instances[0]);
+            RunSceneVolume(device, roots, pipelines, textures, pool, root, image, cube, instances[0],
+                           mode == "--volume-native-only" ? std::optional{RHIShaderCompiler::GetOutput()}
+                                                          : std::nullopt);
         }
         else if (mode == "--shadow-decal-only")
         {
@@ -4847,7 +4930,7 @@ int main(int argc, char** argv)
                     std::string_view(argv[2]) == "--issue-resource-lifetime" ||
                     std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
-                    std::string_view(argv[2]) == "--refraction-film-only" || std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
+                    std::string_view(argv[2]) == "--refraction-film-only" || std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" || std::string_view(argv[2]) == "--volume-native-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),
               "Expected repository root");
         Run(std::filesystem::absolute(argv[1]), argc >= 3 ? std::string_view(argv[2]) : std::string_view{},

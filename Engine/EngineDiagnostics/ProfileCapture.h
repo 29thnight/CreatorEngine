@@ -11,6 +11,7 @@
 #include "../Utility_Framework/StandardLibrary.h"
 
 #include "ProfileEvent.h"
+#include "ProfileCaptureAllocator.h"
 #include "ProfileThreadStream.h"
 
 namespace ce
@@ -79,16 +80,20 @@ namespace ce
         physics_command_rejections = 58,
         physics_command_overflows = 59,
         physics_max_command_wait_ticks = 60,
-
-
     };
 
     // Descriptors are copied into each capture. Runtime providers may register
     // more IDs; a file reader never resolves them against this process's registry.
     enum class counter_category : std::uint32_t
     {
-        process = 1u << 0, gpu = 1u << 1, network = 1u << 2,
-        render = 1u << 3, managed = 1u << 4, resources = 1u << 5, physics = 1u << 6, audio = 1u << 7,
+        process = 1u << 0,
+        gpu = 1u << 1,
+        network = 1u << 2,
+        render = 1u << 3,
+        managed = 1u << 4,
+        resources = 1u << 5,
+        physics = 1u << 6,
+        audio = 1u << 7,
     };
     using counter_mask = std::uint32_t;
     constexpr counter_mask counter_bit(counter_category category)
@@ -102,12 +107,10 @@ namespace ce
         std::string unit;
         counter_category category = counter_category::process;
     };
-    profile_counter_id register_counter(std::string_view name, std::string_view unit,
-                                        counter_category category);
+    profile_counter_id register_counter(std::string_view name, std::string_view unit, counter_category category);
     std::vector<capture_counter> snapshot_counters();
     counter_mask counter_category_bit(profile_counter_id id);
-    const capture_counter* find_counter(std::span<const capture_counter> counters,
-                                        profile_counter_id id);
+    const capture_counter* find_counter(std::span<const capture_counter> counters, profile_counter_id id);
     struct profile_counter_sample
     {
         profile_counter_id id{};
@@ -119,54 +122,64 @@ namespace ce
     // 담고, 늦게 들어온 이벤트도 가능한 한 원본 페이지의 구간을 참조한다.
     class frame_events
     {
-    public:
+      public:
         class const_iterator
         {
-        public:
+          public:
             using iterator_category = std::forward_iterator_tag;
             using value_type = profile_event;
             using difference_type = std::ptrdiff_t;
             using pointer = const profile_event*;
             using reference = const profile_event&;
             const_iterator() = default;
-            const_iterator(const frame_events* owner, std::size_t index)
-                : m_owner(owner), m_index(index) {}
+            const_iterator(const frame_events* owner, std::size_t index) : m_owner(owner), m_index(index) {}
             reference operator*() const { return (*m_owner)[m_index]; }
             pointer operator->() const { return &(**this); }
-            const_iterator& operator++() { ++m_index; return *this; }
-            const_iterator operator++(int) { auto copy = *this; ++*this; return copy; }
+            const_iterator& operator++()
+            {
+                ++m_index;
+                return *this;
+            }
+            const_iterator operator++(int)
+            {
+                auto copy = *this;
+                ++*this;
+                return copy;
+            }
             bool operator==(const const_iterator& other) const
-                { return m_owner == other.m_owner && m_index == other.m_index; }
-        private:
+            {
+                return m_owner == other.m_owner && m_index == other.m_index;
+            }
+
+          private:
             const frame_events* m_owner = nullptr;
             std::size_t m_index = 0;
         };
 
         std::size_t size() const { return m_count; }
         bool empty() const { return m_count == 0; }
-        const_iterator begin() const { return { this, 0 }; }
-        const_iterator end() const { return { this, m_count }; }
+        const_iterator begin() const { return {this, 0}; }
+        const_iterator end() const { return {this, m_count}; }
         const profile_event& operator[](std::size_t index) const;
         profile_event& mutable_at(std::size_t index);
         void push_back(const profile_event& value);
         void resize(std::size_t count);
         frame_events extract_closed(profile_tick begin, profile_tick end, std::uint64_t& discarded);
-        void append_page(std::shared_ptr<const event_chunk> page,
-                         std::uint32_t offset, std::uint32_t count);
+        void append_page(std::shared_ptr<const event_chunk> page, std::uint32_t offset, std::uint32_t count);
         std::size_t memory_bytes() const { return m_memoryBytes; }
 
-    private:
+      private:
         struct segment
         {
             std::shared_ptr<const event_chunk> page;
-            std::shared_ptr<std::vector<profile_event>> owned;
+            std::shared_ptr<std::vector<profile_event, capture_allocator<profile_event>>> owned;
             std::size_t begin = 0;
             std::uint32_t offset = 0;
             std::uint32_t count = 0;
         };
         void append_segment(const segment& value, std::uint32_t offset, std::uint32_t count);
         void materialize();
-        std::vector<segment> m_segments;
+        std::vector<segment, capture_allocator<segment>> m_segments;
         std::size_t m_count = 0;
         std::size_t m_memoryBytes = 0;
     };
@@ -176,9 +189,9 @@ namespace ce
     // 정렬의 부등호 하나가 스레드를 통째로 사라지게 했다).
     struct frame_record
     {
-        std::uint32_t              engine_frame = 0;
-        profile_tick               tick_begin = 0;
-        profile_tick               tick_end = 0;
+        std::uint32_t engine_frame = 0;
+        profile_tick tick_begin = 0;
+        profile_tick tick_end = 0;
         frame_events events;
         std::vector<profile_counter_sample> counters;
         std::vector<profile_render_measurement> render_measurements;
@@ -188,7 +201,7 @@ namespace ce
         std::size_t memory_bytes() const
         {
             return events.memory_bytes() + counters.capacity() * sizeof(profile_counter_sample) +
-                render_measurements.capacity() * sizeof(profile_render_measurement);
+                   render_measurements.capacity() * sizeof(profile_render_measurement);
         }
 
         const profile_render_measurement* render_measurement_for(const profile_event& event) const
@@ -215,7 +228,7 @@ namespace ce
     // 기본값(§6.3). 60 FPS 에서 약 10초라는 UX 값일 뿐이고, 실제 보존 길이는
     // 이벤트 밀도에 따라 달라지므로 둘을 함께 표시한다.
     inline constexpr std::uint32_t kDefaultRetainedFrames = 600;
-    inline constexpr std::size_t   kDefaultMemoryBudget = 128ull * 1024ull * 1024ull;
+    inline constexpr std::size_t kDefaultMemoryBudget = 128ull * 1024ull * 1024ull;
 
     // 캡처가 **자기 뜻을 풀기 위해** 들고 다녀야 하는 것. 전부 뜬 기계의
     // 값이고, 읽는 기계의 것으로 풀면 숫자가 조용히 틀린다(§8.2).
@@ -237,19 +250,15 @@ namespace ce
     // 얼어붙은 캡처. 생성 뒤에는 아무도 고치지 않는다.
     class capture_session
     {
-    public:
+      public:
         capture_session() = default;
-        capture_session(std::vector<frame_record>   frames,
-                        std::vector<thread_info>    threads,
-                        std::vector<capture_marker> markers,
-                        capture_environment         environment,
-                        bool                        complete,
-                        std::uint32_t               unacked_streams,
-                        std::uint64_t               dropped_counters = 0,
+        capture_session(std::vector<frame_record> frames, std::vector<thread_info> threads,
+                        std::vector<capture_marker> markers, capture_environment environment, bool complete,
+                        std::uint32_t unacked_streams, std::uint64_t dropped_counters = 0,
                         std::vector<capture_counter> counters = {});
 
         std::span<const frame_record> frames() const { return m_frames; }
-        std::span<const thread_info>  threads() const { return m_threads; }
+        std::span<const thread_info> threads() const { return m_threads; }
 
         // ── 이 캡처의 어휘(P6) ───────────────────────────────────────────
         //
@@ -275,7 +284,7 @@ namespace ce
         double milliseconds(profile_tick ticks) const;
 
         std::uint32_t frame_count() const { return static_cast<std::uint32_t>(m_frames.size()); }
-        std::size_t   memory_bytes() const { return m_memoryBytes; }
+        std::size_t memory_bytes() const { return m_memoryBytes; }
         std::uint64_t total_events() const { return m_totalEvents; }
         std::uint64_t dropped_counters() const { return m_droppedCounters; }
 
@@ -285,22 +294,22 @@ namespace ce
         // ★ 세는 것과 판정하는 것은 다르다. 미응답을 요약에만 적어 두고 그대로
         //   frozen 으로 끝내면, 읽는 쪽은 "그 스레드가 조용했다" 와 "못 받았다"
         //   를 구분할 수 없다. 그래서 캡처 자신이 들고 다닌다.
-        bool          complete() const { return m_complete; }
+        bool complete() const { return m_complete; }
         std::uint32_t unacked_streams() const { return m_unackedStreams; }
 
         const frame_record* find_frame(std::uint32_t engine_frame) const;
 
-    private:
-        std::vector<frame_record>   m_frames;
-        std::vector<thread_info>    m_threads;
+      private:
+        std::vector<frame_record> m_frames;
+        std::vector<thread_info> m_threads;
         std::vector<capture_marker> m_markers;
         std::vector<capture_counter> m_counters;
-        capture_environment         m_environment{};
-        std::size_t               m_memoryBytes = 0;
-        std::uint64_t             m_totalEvents = 0;
-        std::uint64_t             m_droppedCounters = 0;
-        bool                      m_complete = true;
-        std::uint32_t             m_unackedStreams = 0;
+        capture_environment m_environment{};
+        std::size_t m_memoryBytes = 0;
+        std::uint64_t m_totalEvents = 0;
+        std::uint64_t m_droppedCounters = 0;
+        bool m_complete = true;
+        std::uint32_t m_unackedStreams = 0;
     };
 
     using capture_session_ptr = std::shared_ptr<const capture_session>;
@@ -308,7 +317,7 @@ namespace ce
     // 녹화 중 계속 쓰는 쪽. 수집 스레드(프레임 경계를 도는 쪽) 하나만 만진다.
     class capture_ring
     {
-    public:
+      public:
         void configure(std::uint32_t retained_frames, std::size_t memory_budget);
         void clear();
 
@@ -317,8 +326,8 @@ namespace ce
         // generation 과 다른 세대의 청크는 버리고 센다(Clear 이전의 것).
         // frame_begin_tick 은 지금 열려 있는 프레임의 시작 시각이고, 그보다
         // 앞서 끝난 이벤트는 **자기 시각이 속한 프레임 칸**으로 돌려보낸다.
-        void ingest(event_chunk* sealed_list, std::shared_ptr<chunk_pool> pool,
-                    std::uint64_t generation, profile_tick frame_begin_tick);
+        void ingest(event_chunk* sealed_list, std::shared_ptr<chunk_pool> pool, std::uint64_t generation,
+                    profile_tick frame_begin_tick);
 
         // 이 프레임을 닫고 다음 프레임을 연다.
         void close_frame(std::uint32_t engine_frame, profile_tick tick_begin, profile_tick tick_end);
@@ -341,12 +350,11 @@ namespace ce
 
         // 지금까지 모인 것을 얼려 공개한다. 링은 비우지 않는다 — 다시
         // 녹화를 눌러도 앞이 남아 있어야 하기 때문이다.
-        capture_session_ptr freeze(std::span<const thread_info> threads,
-                                   capture_environment environment,
-                                   bool complete, std::uint32_t unacked_streams) const;
+        capture_session_ptr freeze(std::span<const thread_info> threads, capture_environment environment, bool complete,
+                                   std::uint32_t unacked_streams) const;
 
         std::uint32_t retained_frames() const { return static_cast<std::uint32_t>(m_frames.size()); }
-        std::size_t   memory_bytes() const { return m_memoryBytes; }
+        std::size_t memory_bytes() const { return m_memoryBytes; }
         std::uint64_t dropped_events() const { return m_droppedEvents; }
 
         // 가장 최근에 닫힌 프레임의 이벤트 수. 녹화 중에도 값싸게 읽히는
@@ -373,15 +381,14 @@ namespace ce
         std::uint64_t ingested_pages() const { return m_ingestedPages; }
         std::uint64_t late_events_placed() const { return m_lateEventsPlaced; }
         std::uint64_t late_events_dropped() const { return m_lateEventsDropped; }
-        std::size_t   late_spans_waiting() const { return m_deferredSpans.size(); }
+        std::size_t late_spans_waiting() const { return m_deferredSpans.size(); }
 
-    private:
+      private:
         void trim();
 
         // 이 구간을 제 프레임 칸에 넣는다. 그 프레임이 아직 안 닫혔으면
         // 기다리게 두고, 이미 밀려났으면 버리고 센다.
-        void place_late_span(const profile_event& value,
-                             const std::shared_ptr<const event_chunk>& page = {},
+        void place_late_span(const profile_event& value, const std::shared_ptr<const event_chunk>& page = {},
                              std::uint32_t offset = 0);
         void drain_deferred_spans();
         void place_render_measurement(const profile_render_measurement& sample);
@@ -390,15 +397,18 @@ namespace ce
         // 늦게 온 CPU 구간. GPU 와 규칙이 다르다 — GPU 는 **제출한 프레임**에
         // 귀속하지만(§5.4), CPU 구간은 **끝난 시각이 속한 프레임**이 제 자리다.
         // 프레임을 넘는 구간이 닫히는 프레임에 기록되던 것과 같은 답이 나온다.
-        bool place_by_tick(const profile_event& value,
-                           const std::shared_ptr<const event_chunk>& page,
+        bool place_by_tick(const profile_event& value, const std::shared_ptr<const event_chunk>& page,
                            std::uint32_t offset);
 
         std::vector<frame_record> m_frames;
         std::vector<frame_record> retired_frames_;
         bool archive_enabled_ = false;
-        frame_record              m_pending;
-        struct deferred_counter { std::uint32_t frame; profile_counter_sample sample; };
+        frame_record m_pending;
+        struct deferred_counter
+        {
+            std::uint32_t frame;
+            profile_counter_sample sample;
+        };
         std::vector<deferred_counter> m_deferredCounters;
         std::uint64_t m_droppedCounters = 0;
 
@@ -417,11 +427,11 @@ namespace ce
         std::uint64_t m_lateEventsDropped = 0;
 
         std::uint32_t m_retainedFrames = kDefaultRetainedFrames;
-        std::size_t   m_memoryBudget = kDefaultMemoryBudget;
-        std::size_t   m_memoryBytes = 0;
+        std::size_t m_memoryBudget = kDefaultMemoryBudget;
+        std::size_t m_memoryBytes = 0;
         std::uint64_t m_droppedEvents = 0;
-        std::uint64_t m_pendingDropped = 0;   // 아직 닫히지 않은 프레임의 몫
+        std::uint64_t m_pendingDropped = 0; // 아직 닫히지 않은 프레임의 몫
         std::uint32_t m_lastFrameEvents = 0;
         std::uint32_t m_peakFrameEvents = 0;
     };
-}
+} // namespace ce

@@ -219,8 +219,15 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
         // 뒤 노드가 이전 값을 이어받는다 — 폴백 코드가 필요 없는 이유다.
         if (!node.IsActive()) continue;
         ce::profile_scope profile{node.declarationMarker};
-        node.declare(blackboard, graph, context, binding);
-        if (afterDeclare) afterDeclare(node, blackboard);
+        {
+            ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
+            node.declare(blackboard, graph, context, binding);
+        }
+        if (afterDeclare)
+        {
+            ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
+            afterDeclare(node, blackboard);
+        }
     }
 }
 

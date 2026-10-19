@@ -15,9 +15,10 @@ namespace
     // 엔진 소유 영속 풀이 하나뿐이라 그것으로 충분하다.
     thread_pool::worker_hooks g_thread_pool_worker_hooks{};
 
-    // 배정 스레드 하나가 enkiTS 외부 스레드 번호 1 을 차지해 워커 번호가 하나씩
-    // 밀린다. 훅에는 예전과 같은 1..N 을 넘겨 프로파일러 레인 이름이 그대로 선다.
+    // 배정 스레드와 합류 지원 슬롯은 enkiTS 외부 번호 1, 2를 사용한다.
+    // 워커 훅에는 기존 1..N을 넘겨 프로파일러 레인 신원을 유지한다.
     constexpr uint32_t kDispatcherThreads = 1;
+    constexpr uint32_t kExternalThreads = kDispatcherThreads + 1;
 
     uint32_t thread_pool_os_thread_id() noexcept
     {
@@ -33,19 +34,19 @@ namespace
 #if defined(_WIN32)
         // ETW에서 풀 워커와 렌더 스레드의 Ready 구간을 분리해 식별한다.
         wchar_t name[32];
-        std::swprintf(name, std::size(name), L"Creator.JobWorker.%u", threadnum - kDispatcherThreads);
+        std::swprintf(name, std::size(name), L"Creator.JobWorker.%u", threadnum - kExternalThreads);
         SetThreadDescription(GetCurrentThread(), name);
 #endif
         if (g_thread_pool_worker_hooks.on_start)
         {
-            g_thread_pool_worker_hooks.on_start(threadnum - kDispatcherThreads);
+            g_thread_pool_worker_hooks.on_start(threadnum - kExternalThreads);
         }
     }
     void thread_pool_worker_thread_stop(uint32_t threadnum)
     {
         if (g_thread_pool_worker_hooks.on_stop)
         {
-            g_thread_pool_worker_hooks.on_stop(threadnum - kDispatcherThreads);
+            g_thread_pool_worker_hooks.on_stop(threadnum - kExternalThreads);
         }
     }
 } // namespace
@@ -173,8 +174,7 @@ struct thread_pool::state
             gate_kind kind_;
             std::size_t index_{};
 
-            gate(graph_work& graph, gate_kind kind, std::size_t index = 0)
-                : graph_(graph), kind_(kind), index_(index)
+            gate(graph_work& graph, gate_kind kind, std::size_t index = 0) : graph_(graph), kind_(kind), index_(index)
             {
             }
 
@@ -281,9 +281,7 @@ struct thread_pool::state
         struct delivery : enki::IPinnedTask
         {
             graph_work& graph_;
-            explicit delivery(graph_work& graph) : enki::IPinnedTask(dispatcher_thread_), graph_(graph)
-            {
-            }
+            explicit delivery(graph_work& graph) : enki::IPinnedTask(dispatcher_thread_), graph_(graph) {}
             void Execute() override
             {
                 if (graph_.diagnostics_)
@@ -309,10 +307,8 @@ struct thread_pool::state
         // 마지막 멤버로 두어 모든 노드를 파괴하기 전에 간선을 먼저 해제한다.
         std::vector<enki::Dependency> dependencies_;
 
-        graph_work(state& owner, std::span<const job_graph_node> nodes,
-                   std::function<void(std::size_t)> execute,
-                   std::function<void(std::exception_ptr)> complete,
-                   std::shared_ptr<job_graph_diagnostics> diagnostics)
+        graph_work(state& owner, std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
+                   std::function<void(std::exception_ptr)> complete, std::shared_ptr<job_graph_diagnostics> diagnostics)
             : owner_(owner), execute_(std::move(execute)), complete_(std::move(complete)),
               diagnostics_(std::move(diagnostics))
         {
@@ -322,8 +318,7 @@ struct thread_pool::state
             {
                 const auto prerequisite_count = (std::max)(std::size_t(1), nodes[index].dependencies.size());
                 const auto maximum_edges = (std::numeric_limits<std::size_t>::max)();
-                if (prerequisite_count > maximum_edges - 3 ||
-                    edge_count > maximum_edges - (prerequisite_count + 3))
+                if (prerequisite_count > maximum_edges - 3 || edge_count > maximum_edges - (prerequisite_count + 3))
                 {
                     throw std::invalid_argument("job graph edge count overflow");
                 }
@@ -337,9 +332,7 @@ struct thread_pool::state
             dependencies_.resize(edge_count);
             std::size_t edge = 0;
             const auto connect = [&](const enki::ICompletable* from, enki::ICompletable* to)
-            {
-                dependencies_[edge++].SetDependency(from, to);
-            };
+            { dependencies_[edge++].SetDependency(from, to); };
             connect(&delivery_, &admission_);
             connect(&admission_, &terminal_);
             for (const auto& task : nodes_)
@@ -389,10 +382,7 @@ struct thread_pool::state
             }
         }
 
-        void retain() noexcept
-        {
-            references_.fetch_add(1, std::memory_order_relaxed);
-        }
+        void retain() noexcept { references_.fetch_add(1, std::memory_order_relaxed); }
 
         void release() noexcept
         {
@@ -412,7 +402,7 @@ struct thread_pool::state
     };
 
     enki::TaskScheduler scheduler_;
-    std::mutex submit_mutex_, done_mutex_;
+    std::mutex submit_mutex_, done_mutex_, assist_mutex_;
     std::condition_variable done_;
     std::size_t pending_{};
     uint32_t workers_{};
@@ -426,18 +416,18 @@ struct thread_pool::state
 
     explicit state(std::size_t workers)
     {
-        if (workers > (std::numeric_limits<uint32_t>::max)() - kDispatcherThreads - 1)
+        if (workers > (std::numeric_limits<uint32_t>::max)() - kExternalThreads - 1)
         {
             throw std::invalid_argument("thread_pool worker count overflow");
         }
         workers_ = workers ? static_cast<uint32_t>(workers) : (std::max)(1u, enki::GetNumHardwareThreads());
-        if (workers_ > (std::numeric_limits<uint32_t>::max)() - kDispatcherThreads - 1)
+        if (workers_ > (std::numeric_limits<uint32_t>::max)() - kExternalThreads - 1)
         {
             throw std::invalid_argument("thread_pool worker count overflow");
         }
         enki::TaskSchedulerConfig config;
         config.numTaskThreadsToCreate = workers_;
-        config.numExternalTaskThreads = kDispatcherThreads;
+        config.numExternalTaskThreads = kExternalThreads;
         // 워커 수명을 밖으로 알린다. enkiTS 콜백은 함수 포인터라 userData 가
         // 없으므로 트램펄린이 정적 훅을 읽는다.
         config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
@@ -517,8 +507,8 @@ struct thread_pool::state
                         std::function<void(std::exception_ptr)> complete,
                         std::shared_ptr<job_graph_diagnostics> diagnostics)
     {
-        auto graph = std::make_unique<graph_work>(*this, nodes, std::move(execute), std::move(complete),
-                                                std::move(diagnostics));
+        auto graph =
+            std::make_unique<graph_work>(*this, nodes, std::move(execute), std::move(complete), std::move(diagnostics));
         graph_work* submitted = nullptr;
         {
             std::lock_guard lock(submit_mutex_);
@@ -542,13 +532,47 @@ struct thread_pool::state
         // 완료가 제출보다 빨랐어도 graph 소멸자의 후속 제출이 submit_mutex_와 교착하지 않게 한다.
         submitted->release();
     }
+    void assist_until(const std::function<bool()>& ready)
+    {
+        // One extra external slot, no additional OS worker. Never take scheduler
+        // or job completion locks while executing a callback on the joining owner.
+        std::unique_lock assist(assist_mutex_, std::try_to_lock);
+        if (!assist || ready())
+        {
+            return;
+        }
+        const bool external = scheduler_.GetThreadNum() == enki::NO_THREAD_NUM;
+        if (external && !scheduler_.RegisterExternalTaskThread(dispatcher_thread_ + 1))
+        {
+            return;
+        }
+        try
+        {
+            while (!ready())
+            {
+                scheduler_.WaitforTask(nullptr);
+                std::unique_lock lock(done_mutex_);
+                done_.wait_for(lock, std::chrono::microseconds(100), ready);
+            }
+        }
+        catch (...)
+        {
+            if (external)
+            {
+                scheduler_.DeRegisterExternalTaskThread();
+            }
+            throw;
+        }
+        if (external)
+        {
+            scheduler_.DeRegisterExternalTaskThread();
+        }
+    }
     void finish()
     {
         std::lock_guard lock(done_mutex_);
-        if (--pending_ == 0)
-        {
-            done_.notify_all();
-        }
+        --pending_;
+        done_.notify_all();
     }
     void close() noexcept
     {
@@ -560,6 +584,7 @@ struct thread_pool::state
             std::unique_lock lock(done_mutex_);
             done_.wait(lock, [this] { return pending_ == 0; });
         }
+        std::lock_guard assist(assist_mutex_);
         stop_dispatcher();
         scheduler_.WaitforAllAndShutdown();
     }
@@ -626,8 +651,7 @@ void thread_pool::dispatch(std::size_t count, std::function<void(std::size_t)> e
     }
     state->dispatch(count, std::move(execute), std::move(complete));
 }
-void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes,
-                                 std::function<void(std::size_t)> execute,
+void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
                                  std::function<void(std::exception_ptr)> complete,
                                  std::shared_ptr<job_graph_diagnostics> diagnostics)
 {
@@ -637,4 +661,12 @@ void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes,
         throw std::runtime_error("thread_pool is stopped");
     }
     state->dispatch_graph(nodes, std::move(execute), std::move(complete), std::move(diagnostics));
+}
+
+void thread_pool::assist_until(const std::function<bool()>& ready)
+{
+    if (const auto state = snapshot())
+    {
+        state->assist_until(ready);
+    }
 }

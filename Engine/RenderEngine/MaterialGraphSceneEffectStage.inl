@@ -17,24 +17,38 @@ RGHandle SceneHost::EffectStage::DeclareColor(const own::shared_owner<const Fram
     const bool sameTargets = std::equal(expectedColors.begin(), expectedColors.end(), actualColors.begin(),
                                         [](RGHandle a, RGHandle b) { return a.index == b.index; });
     if (!expected.depth.IsValid() || expected.depth.index != inputs.depth.index || !sameTargets)
+    {
         throw std::runtime_error("METEOR Color requires this recording surface targets.");
+    }
     if (frame->raster->material)
+    {
         frame->raster->material->ValidateInputs(graph, commands.material);
+    }
     if (frame->raster->layerCommands)
+    {
         frame->raster->layerCommands->ValidateInput(graph, commands.layers.layer);
+    }
     RequireStage(inputs.visibility, expected.visibility, "METEOR Color requires its published surface visibility.");
     if (this->colorOutput.IsValid() || !inputs.depth.IsValid())
+    {
         throw std::runtime_error("METEOR Color requires its surface producer and one declaration.");
+    }
     const auto count = std::ranges::count_if(inputs.decalBaseline, [](auto handle) { return handle.IsValid(); });
     if (count != 0 && count != 3)
+    {
         throw std::runtime_error("METEOR material packets require a complete Decal baseline.");
+    }
     for (const auto baseline : inputs.decalBaseline)
+    {
         if (baseline.IsValid())
         {
             if (!graph.HasDeclaredWriter(baseline, "Decal.Snapshot") || baseline.index == inputs.diffuse.index ||
                 baseline.index == inputs.metalRough.index || baseline.index == inputs.normal.index)
+            {
                 throw std::runtime_error("METEOR material packets require distinct pre-Decal snapshots on this graph.");
+            }
         }
+    }
     this->lookup.opaque->DeclareInputs(graph);
     if (this->runtime.frame)
     {
@@ -87,7 +101,9 @@ RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Fr
 
     const auto frame = prepared;
     if (indices.empty())
+    {
         throw std::runtime_error("METEOR blended range is empty.");
+    }
     const auto index = indices.front();
     if (!frame || !this->colorOutput.IsValid() || !this->lookup.layered || !lighting.IsValid() ||
         index >= frame->input->Draws().size() || !forward.lights.IsValid() || !forward.counts.IsValid() ||
@@ -98,11 +114,13 @@ RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Fr
     frame->CheckCurrent(&graph);
     std::set<std::size_t> selected;
     for (const auto input : indices)
+    {
         if (!selected.insert(input).second || input >= frame->input->Draws().size() ||
             this->layers.blendedOutputs.contains(input))
         {
             throw std::runtime_error("Graph Blend draw declared twice.");
         }
+    }
     if (!this->lookup.layered->InputsDeclared(graph))
     {
         this->lookup.layered->DeclareInputs(graph);
@@ -129,7 +147,9 @@ RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Fr
                        lighting, {}, shadowMap, (p.features & 0x0800u) != 0, index, forward, indices);
     this->lookup.layered->DeclareReady(graph);
     for (const auto input : indices)
+    {
         this->layers.blendedOutputs.emplace(input, lighting);
+    }
     return lighting;
 }
 
@@ -142,18 +162,28 @@ RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<co
     if (prepared && !prepared->draws.empty())
     {
         if (prepared->raster->layerCommands)
+        {
             prepared->raster->layerCommands->ValidateInput(graph, commands.layer);
+        }
         size_t next = 0;
         for (const auto& range : this->layers.blendedRanges)
+        {
             for (const auto& batch : range.commands)
+            {
                 if (batch)
                 {
                     if (next >= commands.blended.size())
+                    {
                         throw std::runtime_error("METEOR blended commands missing.");
+                    }
                     batch->ValidateInput(graph, commands.blended[next++]);
                 }
+            }
+        }
         if (next != commands.blended.size())
+        {
             throw std::runtime_error("METEOR blended commands have extra inputs.");
+        }
     }
     const auto draws = BlendedDraws(prepared);
     if (draws.empty())
@@ -166,9 +196,13 @@ RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<co
     EnhancedForwardLighting shared = tiles;
     // Medium bindings belong to VolumeStage; only its graph read crosses into layer work.
     if (const auto medium = this->volume.frame)
+    {
         shared.graphVolumeCoefficients = medium->GraphCoefficients(graph);
+    }
     for (const auto& range : this->layers.blendedRanges)
+    {
         lighting = DeclareBlended(prepared, graph, opaque, range.inputs, commands, lighting, shadowMap, shared);
+    }
     return lighting;
 }
 
@@ -205,52 +239,55 @@ void SceneHost::EffectStage::DeclareRefractionCapture(const own::shared_owner<co
         }
     }
     frame->AddLayerReads(
-        graph, uses,
-        [&](const auto& draw) { return draw.program->hasTransmission && (!index || draw.inputIndex == *index); },
-        commands.layers.layer);
+        graph, uses, [&](const auto& draw)
+        { return draw.program->hasTransmission && (!index || draw.inputIndex == *index); }, commands.layers.layer);
     NormalizeSceneReads(graph, uses);
-    graph.AddPass("METEOR.Scene.RefractionCapture", uses, [this, frame, inputs, index](const auto& execution) {
-        frame->CheckCurrent(execution.graph);
-        const auto depth =
-            RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-        const auto targets = frame->device->CreateRenderTargets(this->refraction->Inputs(), &depth);
-        const RHIBindingDesc descriptions[]{
-            RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull(),
-            RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
-            RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
-            RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull()};
-        const auto table = frame->device->CreateBindings(descriptions);
-        const auto decalTable = this->decal.Table(*frame, execution, inputs, true);
-        if (!targets.IsValid() || !table.IsValid())
+    graph.AddPass(
+        "METEOR.Scene.RefractionCapture", uses,
+        [this, frame, inputs, index](const auto& execution)
         {
-            throw std::runtime_error("METEOR Scene refraction capture binding failed.");
-        }
-        auto& encoder = *execution.encoder;
-        encoder.BindRenderTargets(targets);
-        const float clear[]{0, 0, 0, 0};
-        encoder.ClearRenderTargets(targets, clear);
-        encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-        encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-        for (const auto& draw : frame->RasterDrawsFor())
-        {
-            if (!draw.program->hasTransmission || (index && draw.inputIndex != *index))
+            frame->CheckCurrent(execution.graph);
+            const auto depth =
+                RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
+            const auto targets = frame->device->CreateRenderTargets(this->refraction->Inputs(), &depth);
+            const RHIBindingDesc descriptions[]{
+                RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull(),
+                RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
+                RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
+                RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull()};
+            const auto table = frame->device->CreateBindings(descriptions);
+            const auto decalTable = this->decal.Table(*frame, execution, inputs, true);
+            if (!targets.IsValid() || !table.IsValid())
             {
-                continue;
+                throw std::runtime_error("METEOR Scene refraction capture binding failed.");
             }
-            encoder.SetPipeline(RHIBindPoint::Graphics,
-                                frame->RasterPipeline(draw, draw.program->refraction[draw.doubleSided].GetHandle()));
-            std::string error;
-            if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+            auto& encoder = *execution.encoder;
+            encoder.BindRenderTargets(targets);
+            const float clear[]{0, 0, 0, 0};
+            encoder.ClearRenderTargets(targets, clear);
+            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            for (const auto& draw : frame->RasterDrawsFor())
             {
-                throw std::runtime_error(error);
+                if (!draw.program->hasTransmission || (index && draw.inputIndex != *index))
+                {
+                    continue;
+                }
+                encoder.SetPipeline(
+                    RHIBindPoint::Graphics,
+                    frame->RasterPipeline(draw, draw.program->refraction[draw.doubleSided].GetHandle()));
+                std::string error;
+                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                {
+                    throw std::runtime_error(error);
+                }
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                frame->BindLayerGeometry(encoder, draw);
+                encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
+                this->decal.Bind(encoder, draw, decalTable, false);
+                frame->DrawLayerGeometry(encoder, draw);
             }
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-            frame->BindLayerGeometry(encoder, draw);
-            encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-            this->decal.Bind(encoder, draw, decalTable, false);
-            frame->DrawLayerGeometry(encoder, draw);
-        }
-    });
+        });
 }
 
 RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const FrameInput>& prepared,
@@ -264,16 +301,21 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     const auto frame = prepared;
     const bool reconstruct = !blended && !transmissionStage;
     const auto lookup = blended ? this->lookup.layered : this->lookup.opaque;
-    const auto selected = [blended, blendedGroup](const Frame::Draw& draw) {
+    const auto selected = [blended, blendedGroup](const Frame::Draw& draw)
+    {
         return blended ? draw.blended && (blendedGroup.empty()
                                               ? draw.inputIndex == *blended
                                               : std::ranges::find(blendedGroup, draw.inputIndex) != blendedGroup.end())
                        : !draw.blended;
     };
-    const bool ordinary = !this->runtime.frame || std::ranges::any_of(frame->draws, [&](const auto& draw) {
-        return selected(draw) && draw.program->hasSurface && !draw.program->hasSpecial &&
-               draw.program->hasTransmission == transmissionStage;
-    });
+    const bool ordinary =
+        !this->runtime.frame || std::ranges::any_of(frame->draws,
+                                                    [&](const auto& draw)
+                                                    {
+                                                        return selected(draw) && draw.program->hasSurface &&
+                                                               !draw.program->hasSpecial &&
+                                                               draw.program->hasTransmission == transmissionStage;
+                                                    });
     std::shared_ptr<const IndirectMaterialBatch> blendedCommands;
     if (blended && ordinary)
     {
@@ -281,7 +323,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
         const auto found =
             std::ranges::find_if(this->layers.blendedRanges, [&](const auto& range) { return range.inputs == order; });
         if (found == this->layers.blendedRanges.end())
+        {
             throw std::runtime_error("METEOR blended range was not prepared.");
+        }
         blendedCommands = found->commands[forward.reference ? 1 : 0];
     }
     if (ordinary)
@@ -294,7 +338,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
         {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read},
         {ambientOcclusion, RHIResourceState::ShaderResource, RGAccessMode::Read}};
     if (reconstruct)
+    {
         std::erase_if(uses, [&](const auto& use) { return use.handle.index == inputs.depth.index; });
+    }
     if (blended)
     {
         uses.pop_back();
@@ -348,7 +394,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
             {inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
             {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read}};
         if (reconstruct)
+        {
             std::erase_if(captureUses, [&](const auto& use) { return use.handle.index == inputs.depth.index; });
+        }
         this->decal.AddUses(inputs, captureUses, transmissionStage || blended.has_value());
         const unsigned first = part ? 8 : 0, count = part ? 3 : 8;
         const auto lookupInputs = lookup->DeclareCaptureOutputs(graph, first, count);
@@ -376,16 +424,21 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
             }
         }
         if (reconstruct)
+        {
             frame->AddReconstructionReads(graph, captureUses, inputs.visibility, commands.material);
+        }
         else
+        {
             frame->AddLayerReads(
                 graph, captureUses, [&](const auto& draw) { return draw.program->hasSurface && selected(draw); },
                 commands.layers.layer);
+        }
         NormalizeSceneReads(graph, captureUses);
         graph.AddPass(
             reconstruct ? "METEOR.Scene.Lookup.Resolve" : "METEOR.Scene.LookupCapture", captureUses,
             [this, frame, inputs, first, count, part, transmissionStage, blended, lookup, selected, forward,
-             reconstruct](const auto& execution) {
+             reconstruct](const auto& execution)
+            {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
                 const auto handles = lookup->Inputs().subspan(first, count);
@@ -410,6 +463,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                 encoder.ClearRenderTargets(targets, clear);
                 encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+                RHIBindingTable reconstructionVisibility;
                 for (const auto& draw : frame->RasterDrawsFor(blended))
                 {
                     if (!draw.program->hasSurface || !selected(draw))
@@ -422,8 +476,15 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                             draw, (blended ? draw.program->blendedLookup : draw.program->lookup)[part][draw.doubleSided]
                                       .GetHandle()));
                     if (reconstruct)
-                        frame->BindReconstruction(execution, draw, inputs.visibility,
+                    {
+                        if (!reconstructionVisibility.IsValid())
+                        {
+                            reconstructionVisibility =
+                                frame->CreateReconstructionVisibility(execution, inputs.visibility);
+                        }
+                        frame->BindReconstruction(encoder, draw, reconstructionVisibility,
                                                   draw.program->lookup[part][draw.doubleSided].GetHandle());
+                    }
                     std::string error;
                     if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
                                                   error))
@@ -433,15 +494,21 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                               blended && forward.reference ? draw.referenceConstants : draw.constants);
                     if (!reconstruct)
+                    {
                         frame->BindLayerGeometry(encoder, draw);
+                    }
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                     this->decal.Bind(encoder, draw, decalTable,
                                      inputs.decalBaseline[0].IsValid() && !(transmissionStage || blended.has_value()));
                     this->BindForward(encoder, draw, forward);
                     if (reconstruct)
+                    {
                         frame->DrawReconstruction(encoder, draw);
+                    }
                     else
+                    {
                         frame->DrawLayerGeometry(encoder, draw);
+                    }
                 }
             });
     }
@@ -454,9 +521,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
         uses.push_back(
             {this->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read});
     }
-    const bool special = std::ranges::any_of(frame->draws, [&](const auto& draw) {
-        return selected(draw) && draw.program->hasSpecial && draw.program->hasTransmission == transmissionStage;
-    });
+    const bool special = std::ranges::any_of(
+        frame->draws, [&](const auto& draw)
+        { return selected(draw) && draw.program->hasSpecial && draw.program->hasTransmission == transmissionStage; });
     if (this->subsurface && special)
     {
         const auto targets = this->subsurface->DeclareCaptureOutputs(graph);
@@ -467,7 +534,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
             {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read},
             {this->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read}};
         if (reconstruct)
+        {
             std::erase_if(captureUses, [&](const auto& use) { return use.handle.index == inputs.depth.index; });
+        }
         this->decal.AddUses(inputs, captureUses, transmissionStage || blended.has_value());
         lookup->DeclareShadingInputs(graph, captureUses);
         if (blended)
@@ -508,16 +577,21 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                 {this->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read});
         }
         if (reconstruct)
+        {
             frame->AddReconstructionReads(graph, captureUses, inputs.visibility, commands.material);
+        }
         else
+        {
             frame->AddLayerReads(
                 graph, captureUses, [&](const auto& draw) { return draw.program->hasSubsurface && selected(draw); },
                 commands.layers.layer);
+        }
         NormalizeSceneReads(graph, captureUses);
         graph.AddPass(
             "METEOR.Scene.SubsurfaceCapture", captureUses,
             [this, frame, inputs, shadowMap, transmissionStage, blended, lookup, selected, forward,
-             reconstruct](const auto& execution) {
+             reconstruct](const auto& execution)
+            {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
                 const auto depth =
@@ -548,6 +622,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                 encoder.ClearRenderTargets(targets, clear);
                 encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+                RHIBindingTable reconstructionVisibility;
                 for (const auto& draw : frame->RasterDrawsFor(blended))
                 {
                     if (!selected(draw) || !draw.program->hasSubsurface ||
@@ -559,8 +634,15 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                         RHIBindPoint::Graphics,
                         frame->RasterPipeline(draw, draw.program->subsurface[draw.doubleSided].GetHandle()));
                     if (reconstruct)
-                        frame->BindReconstruction(execution, draw, inputs.visibility,
+                    {
+                        if (!reconstructionVisibility.IsValid())
+                        {
+                            reconstructionVisibility =
+                                frame->CreateReconstructionVisibility(execution, inputs.visibility);
+                        }
+                        frame->BindReconstruction(encoder, draw, reconstructionVisibility,
                                                   draw.program->subsurface[draw.doubleSided].GetHandle());
+                    }
                     std::string error;
                     if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
                                                   error))
@@ -570,7 +652,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                               blended && forward.reference ? draw.referenceConstants : draw.constants);
                     if (!reconstruct)
+                    {
                         frame->BindLayerGeometry(encoder, draw);
+                    }
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                     this->decal.Bind(encoder, draw, decalTable,
                                      inputs.decalBaseline[0].IsValid() && !(transmissionStage || blended.has_value()));
@@ -584,9 +668,13 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                                               RHIBufferSlice::Whole(this->refraction->Samples()));
                     }
                     if (reconstruct)
+                    {
                         frame->DrawReconstruction(encoder, draw);
+                    }
                     else
+                    {
                         frame->DrawLayerGeometry(encoder, draw);
+                    }
                 }
             });
         this->subsurface->DeclareFilter(graph, inputs.bitmask);
@@ -598,18 +686,24 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     if (ordinary)
     {
         if (blendedCommands)
+        {
             frame->raster->layers->AddVisibleIdsRead(graph, uses);
+        }
         else if (reconstruct)
+        {
             frame->AddReconstructionReads(graph, uses, inputs.visibility, commands.material);
+        }
         else
+        {
             frame->AddLayerReads(
-                graph, uses,
-                [&](const auto& draw) {
-                    return draw.program->hasSurface && !draw.program->hasSpecial && selected(draw);
-                },
+                graph, uses, [&](const auto& draw)
+                { return draw.program->hasSurface && !draw.program->hasSpecial && selected(draw); },
                 commands.layers.layer);
+        }
         if (blendedCommands)
+        {
             blendedCommands->AddRead(graph, uses, BlendedCommandInput(graph, *blendedCommands, commands.layers));
+        }
         NormalizeSceneReads(graph, uses);
         const auto colorPass = graph.AddPass(
             blended             ? "METEOR.Blended.Color"
@@ -617,7 +711,8 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                                 : "METEOR.Scene.Color",
             uses,
             [this, frame, inputs, lighting, ambientOcclusion, shadowMap, transmissionStage, blended, lookup, selected,
-             forward, blendedCommands, reconstruct](const auto& execution) mutable {
+             forward, blendedCommands, reconstruct](const auto& execution) mutable
+            {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
                 const auto color = execution.ResolveHandle(lighting);
@@ -658,6 +753,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                 encoder.BindRenderTargets(target);
                 encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+                RHIBindingTable reconstructionVisibility;
                 for (const auto& draw : frame->RasterDrawsFor({}, blended.has_value()))
                 {
                     if (!selected(draw) || !draw.program->hasSurface ||
@@ -668,14 +764,23 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                     }
                     if (blendedCommands && (blendedCommands->buckets.empty() ||
                                             &draw != &frame->draws[blendedCommands->buckets.front().representative]))
+                    {
                         continue;
+                    }
                     encoder.SetPipeline(RHIBindPoint::Graphics,
                                         frame->RasterPipeline(draw, (blended ? draw.program->blendedColor
                                                                              : draw.program->color)[draw.doubleSided]
                                                                         .GetHandle()));
                     if (reconstruct)
-                        frame->BindReconstruction(execution, draw, inputs.visibility,
+                    {
+                        if (!reconstructionVisibility.IsValid())
+                        {
+                            reconstructionVisibility =
+                                frame->CreateReconstructionVisibility(execution, inputs.visibility);
+                        }
+                        frame->BindReconstruction(encoder, draw, reconstructionVisibility,
                                                   draw.program->color[draw.doubleSided].GetHandle());
+                    }
                     std::string error;
                     if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
                                                   error))
@@ -685,7 +790,9 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                               blended && forward.reference ? draw.referenceConstants : draw.constants);
                     if (!reconstruct)
+                    {
                         frame->BindLayerGeometry(encoder, draw);
+                    }
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                     this->decal.Bind(encoder, draw, decalTable,
                                      inputs.decalBaseline[0].IsValid() && !(transmissionStage || blended.has_value()));
@@ -709,9 +816,13 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                         frame->blendedBucketSubmissions.fetch_add(1, std::memory_order_relaxed);
                     }
                     else if (reconstruct)
+                    {
                         frame->DrawReconstruction(encoder, draw);
+                    }
                     else
+                    {
                         frame->DrawLayerGeometry(encoder, draw);
+                    }
                 }
             });
         if (!blended && !transmissionStage)
@@ -740,12 +851,14 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     const bool reconstruct = !blended && !transmissionStage;
     const auto effects = this->runtime.frame;
     const auto lookup = blended ? this->lookup.layered : this->lookup.opaque;
-    const auto selected = [blended, transmissionStage](const Frame::Draw& draw) {
+    const auto selected = [blended, transmissionStage](const Frame::Draw& draw)
+    {
         return draw.program->hasSurface && draw.program->hasSpecial &&
                draw.program->hasTransmission == transmissionStage &&
                (blended ? draw.blended && draw.inputIndex == *blended : !draw.blended);
     };
-    const auto commonUses = [&] {
+    const auto commonUses = [&]
+    {
         std::vector<EnhancedRenderGraph::RGPassUsage> uses{
             {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read},
             {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read}};
@@ -788,15 +901,20 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
             }
         }
         if (reconstruct)
+        {
             frame->AddReconstructionReads(graph, uses, inputs.visibility, commands.material);
+        }
         else
+        {
             frame->AddLayerReads(graph, uses, selected, commands.layers.layer);
+        }
         return uses;
     };
     const auto raster = [this, frame, effects, lookup, inputs, ambientOcclusion, shadowMap, transmissionStage, blended,
                          selected, reconstruct](const EnhancedRenderGraph::ExecuteContext& execution,
                                                 std::size_t tileIndex, int part, RGHandle lighting,
-                                                EnhancedForwardLighting forward) {
+                                                EnhancedForwardLighting forward)
+    {
         frame->CheckCurrent(execution.graph);
         effects->CheckCurrent(*execution.graph);
         const auto& tile = effects->Tiles()[tileIndex];
@@ -827,6 +945,7 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
             }
         }
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+        RHIBindingTable reconstructionVisibility;
         for (const auto& draw : frame->RasterDrawsFor(blended))
         {
             if (!selected(draw))
@@ -838,7 +957,13 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
                         : (blended ? draw.program->blendedColor : draw.program->color)[draw.doubleSided].GetHandle();
             encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, pipeline));
             if (reconstruct)
-                frame->BindReconstruction(execution, draw, inputs.visibility, pipeline);
+            {
+                if (!reconstructionVisibility.IsValid())
+                {
+                    reconstructionVisibility = frame->CreateReconstructionVisibility(execution, inputs.visibility);
+                }
+                frame->BindReconstruction(encoder, draw, reconstructionVisibility, pipeline);
+            }
             std::string error;
             if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
             {
@@ -847,7 +972,9 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                       blended && forward.reference ? draw.referenceConstants : draw.constants);
             if (!reconstruct)
+            {
                 frame->BindLayerGeometry(encoder, draw);
+            }
             encoder.SetBindings(RHIBindPoint::Graphics, 2, bindings.common);
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(lookup->Samples()));
             this->decal.Bind(encoder, draw, bindings.decal,
@@ -861,9 +988,13 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 6, RHIBufferSlice::Whole(lookup->Samples()));
             }
             if (reconstruct)
+            {
                 frame->DrawReconstruction(encoder, draw);
+            }
             else
+            {
                 frame->DrawLayerGeometry(encoder, draw);
+            }
         }
         encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
     };
@@ -882,9 +1013,8 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     effects->DeclareShadingInputs(graph, external, false, transmissionStage);
     // Tile depth is already the external Write. Its local Read belongs to the
     // capture phases, not a duplicate access on the outer version.
-    std::erase_if(external, [&](const auto& use) {
-        return use.handle.index == tileDepth.index && use.access == RGAccessMode::Read;
-    });
+    std::erase_if(external, [&](const auto& use)
+                  { return use.handle.index == tileDepth.index && use.access == RGAccessMode::Read; });
     NormalizeSceneReads(graph, external);
     std::vector<EnhancedRenderGraph::RepeatedPhase> phases;
     phases.push_back({"METEOR.Scene.RuntimeTileDepth",
@@ -913,7 +1043,8 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     graph.AddRepeatedPass(
         "METEOR.Scene.RuntimeEffects", external, phases, static_cast<std::uint32_t>(effects->Tiles().size()),
         [effects, raster, inputs, lighting, forward](const auto& execution, std::uint32_t iteration,
-                                                     std::uint32_t phase) {
+                                                     std::uint32_t phase)
+        {
             if (phase == 0)
             {
                 effects->RecordDepth(execution, inputs.depth, iteration);

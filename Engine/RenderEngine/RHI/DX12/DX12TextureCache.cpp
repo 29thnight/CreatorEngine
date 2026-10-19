@@ -1,4 +1,5 @@
 #include "DX12TextureCache.h"
+#include "../../MaterialGraphBindingDiagnostics.h"
 #include "DX12DeviceResources.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../Texture.h"
@@ -11,22 +12,20 @@
 
 #include "../../../Utility_Framework/StandardLibrary.h"
 
-uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
-    RHIAssetEvictionPass* evictionPass)
+uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue, RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retired = 0;
     std::vector<RHIAssetEvictionCandidate> candidates;
     candidates.reserve(m_entries.size());
     for (const auto& pair : m_entries)
     {
-        candidates.push_back(RHIAssetEvictionCandidate{
-            static_cast<uint64_t>(pair.first.m_ID_Data),
-            pair.second.lastUsedFrame, pair.second.bytes,
-            pair.second.uploadState == RHIUploadTransactionState::Resident });
+        candidates.push_back(RHIAssetEvictionCandidate{static_cast<uint64_t>(pair.first.m_ID_Data),
+                                                       pair.second.lastUsedFrame, pair.second.bytes,
+                                                       pair.second.uploadState == RHIUploadTransactionState::Resident});
     }
 
-    const RHIAssetEvictionSelection selection = SelectRHIAssetEvictionCandidates(
-        candidates, m_frameIndex, evictionPass);
+    const RHIAssetEvictionSelection selection =
+        SelectRHIAssetEvictionCandidates(candidates, m_frameIndex, evictionPass);
     if (nullptr != evictionPass && evictionPass->memoryPressure)
     {
         ++m_stats.eviction.pressurePasses;
@@ -36,14 +35,15 @@ uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
 
     for (const RHIAssetEvictionSelectionEntry& selected : selection.entries)
     {
-        const auto it = m_entries.find(HashedGuid{
-            static_cast<size_t>(selected.assetId) });
-        if (it == m_entries.end()) continue;
+        const auto it = m_entries.find(HashedGuid{static_cast<size_t>(selected.assetId)});
+        if (it == m_entries.end())
+        {
+            continue;
+        }
 
         const uint64_t bytes = it->second.bytes;
 
-        m_retireQueue.Enqueue(RHICompletionPoint{ fenceValue },
-            RetiredResource{ std::move(it->second.allocation) }, bytes);
+        m_retireQueue.Enqueue(RHICompletionPoint{fenceValue}, RetiredResource{std::move(it->second.allocation)}, bytes);
         --m_stats.residentCount;
         m_stats.residentBytes -= bytes;
         ++m_stats.retired;
@@ -55,7 +55,9 @@ uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
             m_stats.eviction.pressureRetiredBytes += bytes;
         }
         if (nullptr != evictionPass)
+        {
             evictionPass->RecordRetired(bytes, selected.pressureDriven);
+        }
 
         // 설명도 함께 지운다 — 남겨 두면 다음 GetOrUpload가 히트로 판정하고
         // 이미 놓은 리소스의 핸들을 돌려준다.
@@ -67,7 +69,10 @@ uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
         if (nullptr != m_resources)
         {
             const auto described = m_descriptions.find(it->first);
-            if (described != m_descriptions.end()) m_resources->ReleaseTexture(described->second.handle);
+            if (described != m_descriptions.end())
+            {
+                m_resources->ReleaseTexture(described->second.handle);
+            }
         }
         m_descriptions.erase(it->first);
         m_entries.erase(it);
@@ -78,10 +83,9 @@ uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue,
 
 uint64_t DX12TextureCache::SweepGraveyard(uint64_t completedFenceValue)
 {
-    const RHIRetireCollection collected = m_retireQueue.Collect(
-        RHICompletionPoint{ completedFenceValue },
-        [&](RetiredResource& retired)
-        { m_persistentHeap.Release(retired.allocation); });
+    const RHIRetireCollection collected =
+        m_retireQueue.Collect(RHICompletionPoint{completedFenceValue},
+                              [&](RetiredResource& retired) { m_persistentHeap.Release(retired.allocation); });
     m_persistentHeap.TrimEmptySegments(false);
     return collected.bytes;
 }
@@ -89,7 +93,10 @@ uint64_t DX12TextureCache::SweepGraveyard(uint64_t completedFenceValue)
 DX12TextureCache::~DX12TextureCache()
 {
     // 자원 해제는 명시 Shutdown 의 몫이다. 여기서는 리스너 등록만 걷는다(헤더 주석).
-    if (nullptr != m_resources) m_resources->UnregisterUploadTransactionListener(this);
+    if (nullptr != m_resources)
+    {
+        m_resources->UnregisterUploadTransactionListener(this);
+    }
 }
 
 bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& outError)
@@ -101,9 +108,8 @@ bool DX12TextureCache::Initialize(DX12DeviceResources* resources, std::string& o
     }
 
     m_resources = resources;
-    if (!m_persistentHeap.Initialize(resources->GetDevice(),
-        resources->GetAdapter(),
-        &resources->GetPersistentMemoryBudgetCoordinator(), outError))
+    if (!m_persistentHeap.Initialize(resources->GetDevice(), resources->GetAdapter(),
+                                     &resources->GetPersistentMemoryBudgetCoordinator(), outError))
     {
         m_resources = nullptr;
         return false;
@@ -124,7 +130,9 @@ void DX12TextureCache::BeginFrame(uint64_t frameIndex)
     m_frameIndex = frameIndex;
     m_persistentHeap.RefreshBudget();
     if (m_persistentHeap.IsMemoryPressure())
+    {
         m_persistentHeap.TrimEmptySegments(true);
+    }
 }
 
 void DX12TextureCache::Shutdown()
@@ -133,14 +141,19 @@ void DX12TextureCache::Shutdown()
     if (nullptr != m_resources)
     {
         m_resources->UnregisterUploadTransactionListener(this);
-        for (const auto& described : m_descriptions) m_resources->ReleaseTexture(described.second.handle);
+        for (const auto& described : m_descriptions)
+        {
+            m_resources->ReleaseTexture(described.second.handle);
+        }
         m_resources->ReleaseTexture(m_white.handle);
         m_resources->ReleaseTexture(m_black.handle);
         m_resources->ReleaseTexture(m_ormNeutral.handle);
     }
 
     for (auto& resident : m_entries)
+    {
         m_persistentHeap.Release(resident.second.allocation);
+    }
 
     m_entries.clear();
     m_descriptions.clear();
@@ -152,8 +165,7 @@ void DX12TextureCache::Shutdown()
     m_ormNeutral = Entry{};
     m_fallbackTransactions.clear();
 
-    m_retireQueue.Drain([&](RetiredResource& retired)
-        { m_persistentHeap.Release(retired.allocation); });
+    m_retireQueue.Drain([&](RetiredResource& retired) { m_persistentHeap.Release(retired.allocation); });
     m_persistentHeap.Shutdown();
 
     // 상주량도 함께 0으로. 안 비우면 "다 놓았는데 수치는 남아 있다"가 되어
@@ -168,8 +180,8 @@ void DX12TextureCache::Shutdown()
 }
 
 bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* name,
-    DX12PersistentHeap::Allocation& outAllocation, Entry& outEntry,
-    std::string& outError)
+                                          DX12PersistentHeap::Allocation& outAllocation, Entry& outEntry,
+                                          std::string& outError)
 {
     D3D12_RESOURCE_DESC desc{};
     desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -180,8 +192,8 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.SampleDesc.Count = 1;
 
-    const RHIBufferSlice staging = m_resources->AllocateUpload(RHIUploadRequest{
-        D3D12_TEXTURE_DATA_PITCH_ALIGNMENT, RHIUploadUsage::TextureCopy, 1 });
+    const RHIBufferSlice staging = m_resources->AllocateUpload(
+        RHIUploadRequest{D3D12_TEXTURE_DATA_PITCH_ALIGNMENT, RHIUploadUsage::TextureCopy, 1});
     ID3D12Resource* const stagingResource = m_resources->Resolve(staging.buffer);
     if (!staging.IsWritable() || nullptr == stagingResource)
     {
@@ -192,9 +204,10 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 
     DX12PersistentHeap::Allocation allocation;
     // COMMON creation; the copy promotes to COPY_DEST (see UploadFromCpuPixels).
-    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COMMON,
-        name, allocation, outError))
+    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COMMON, name, allocation, outError))
+    {
         return false;
+    }
 
     outEntry = Entry{};
     outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.Get());
@@ -242,9 +255,8 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     outEntry.width = 1;
     outEntry.height = 1;
     outEntry.mipLevels = 1;
-    m_fallbackTransactions.push_back(FallbackTransaction{
-        outEntry.handle, m_resources->GetCurrentUploadRecordingId(), 0,
-        RHIUploadTransactionState::Recording });
+    m_fallbackTransactions.push_back(FallbackTransaction{outEntry.handle, m_resources->GetCurrentUploadRecordingId(), 0,
+                                                         RHIUploadTransactionState::Recording});
     outAllocation = std::move(allocation);
     return true;
 }
@@ -252,17 +264,19 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 bool DX12TextureCache::CreateWhiteTexture(std::string& outError)
 {
     // 값은 `RHINeutralTexel`이 정본이다(W3) — 여기에 숫자를 다시 적지 않는다.
-    return CreateSolidTexture(RHINeutralTexel::kWhite.data(), L"DX12DefaultWhite",
-        m_whiteResource, m_white, outError);
+    return CreateSolidTexture(RHINeutralTexel::kWhite.data(), L"DX12DefaultWhite", m_whiteResource, m_white, outError);
 }
 
 DX12TextureCache::Entry DX12TextureCache::GetBlackTexture(std::string& outError)
 {
-    if (nullptr == m_resources) return Entry{};
+    if (nullptr == m_resources)
+    {
+        return Entry{};
+    }
     if (!m_black.IsValid())
     {
-        if (!CreateSolidTexture(RHINeutralTexel::kBlack.data(), L"DX12DefaultBlack",
-            m_blackResource, m_black, outError))
+        if (!CreateSolidTexture(RHINeutralTexel::kBlack.data(), L"DX12DefaultBlack", m_blackResource, m_black,
+                                outError))
         {
             return Entry{};
         }
@@ -272,7 +286,10 @@ DX12TextureCache::Entry DX12TextureCache::GetBlackTexture(std::string& outError)
 
 DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outError)
 {
-    if (nullptr == m_resources) return Entry{};
+    if (nullptr == m_resources)
+    {
+        return Entry{};
+    }
     if (!m_ormNeutral.IsValid())
     {
         // 값과 그 값인 이유(B 가 0 이었다가 a2e5ecdc 로 뒤집힌 경위 포함)는
@@ -282,8 +299,8 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
         // ★ 이 백엔드 쪽 증상만 덧붙인다 — B 가 0 이던 동안 dx12.gbuffer 자가
         //   검증이 계속 붉게 알리고 있었다(MetalRough 기대 (1, 0.75, 0.25) vs
         //   실측 (1, 0.75, 0.000)).
-        if (!CreateSolidTexture(RHINeutralTexel::kOrmNeutral.data(), L"DX12DefaultOrmNeutral",
-            m_ormNeutralResource, m_ormNeutral, outError))
+        if (!CreateSolidTexture(RHINeutralTexel::kOrmNeutral.data(), L"DX12DefaultOrmNeutral", m_ormNeutralResource,
+                                m_ormNeutral, outError))
         {
             return Entry{};
         }
@@ -291,18 +308,17 @@ DX12TextureCache::Entry DX12TextureCache::GetOrmNeutralTexture(std::string& outE
     return m_ormNeutral;
 }
 
-
 // ── CPU 픽셀 업로드 (PHASE 3-1 재정의, T1 → T4에서 유일 경로) ──
 //
 // 예전에는 짝이 되는 UploadFromDX11이 있었다. DX11 스테이징을 만들어
 // CopyResource로 GPU에서 끌어내린 뒤 Map으로 읽는 경로였고, Texture가 픽셀을
 // 들고 있지 않던 시절의 유일한 방법이었다. T1이 로더에게 최종 이미지를
 // 남기게 하면서 그쪽 소비자가 사라졌고, T4에서 함께 걷었다.
-bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
-    const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
-    Entry& outEntry, std::string& outError)
+bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const wchar_t* debugName,
+                                           DX12PersistentHeap::Allocation& outAllocation, Entry& outEntry,
+                                           std::string& outError)
 {
-    ce::profile_scope profile{ ce::marker<"DX12TextureUpload">() };
+    ce::profile_scope profile{ce::marker<"DX12TextureUpload">()};
     auto* device = m_resources->GetDevice();
     outEntry = {};
 
@@ -333,19 +349,18 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     const uint32_t subresourceCount = image.SubresourceCount();
 
     std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
-    std::vector<UINT>   rowCounts(subresourceCount);
+    std::vector<UINT> rowCounts(subresourceCount);
     std::vector<UINT64> rowSizes(subresourceCount);
     UINT64 totalBytes = 0;
-    device->GetCopyableFootprints(&desc, 0, subresourceCount, 0,
-        footprints.data(), rowCounts.data(), rowSizes.data(), &totalBytes);
+    device->GetCopyableFootprints(&desc, 0, subresourceCount, 0, footprints.data(), rowCounts.data(), rowSizes.data(),
+                                  &totalBytes);
 
-    const RHIBufferSlice staging = m_resources->AllocateUpload(
-        RHIUploadRequest{ totalBytes, RHIUploadUsage::TextureCopy, 1 });
+    const RHIBufferSlice staging =
+        m_resources->AllocateUpload(RHIUploadRequest{totalBytes, RHIUploadUsage::TextureCopy, 1});
     ID3D12Resource* const stagingResource = m_resources->Resolve(staging.buffer);
     if (!staging.IsWritable() || nullptr == stagingResource)
     {
-        outError = "텍스처 업로드 세그먼트 예약 실패 (" +
-            std::to_string(totalBytes) + "바이트)";
+        outError = "텍스처 업로드 세그먼트 예약 실패 (" + std::to_string(totalBytes) + "바이트)";
         return false;
     }
     uint8_t* const destinationBase = static_cast<uint8_t*>(staging.cpuAddress);
@@ -374,9 +389,8 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
         //
         // ★ 블록 압축이면 여기서 '행'은 블록 한 줄이다. GetCopyableFootprints
         //   가 rowCounts에 블록 줄 수를 주므로 이 루프는 그대로 맞는다.
-        CopyImageRows(reinterpret_cast<std::byte*>(destinationBase + footprint.Offset),
-            footprint.Footprint.RowPitch, sourcePixels, source->rowPitch,
-            rows, static_cast<size_t>(rowSize));
+        CopyImageRows(reinterpret_cast<std::byte*>(destinationBase + footprint.Offset), footprint.Footprint.RowPitch,
+                      sourcePixels, source->rowPitch, rows, static_cast<size_t>(rowSize));
 
         // A/B 대조용 다이제스트. 방금 쓴 자리에서 **유효 바이트만** 읽는다 —
         // 256바이트 정렬 패딩을 먹이면 Vulkan 과 절대 같아질 수 없다.
@@ -386,9 +400,9 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
         {
             for (uint32_t row = 0; row < rows; ++row)
             {
-                m_stats.uploadDigest.FeedRow(destinationBase + footprint.Offset
-                    + static_cast<size_t>(row) * footprint.Footprint.RowPitch,
-                    static_cast<size_t>(rowSize));
+                m_stats.uploadDigest.FeedRow(destinationBase + footprint.Offset +
+                                                 static_cast<size_t>(row) * footprint.Footprint.RowPitch,
+                                             static_cast<size_t>(rowSize));
             }
         }
     }
@@ -400,9 +414,10 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     // as COPY_DEST at its first draw, although the flushed upload list ran first
     // on the same queue; later frames were clean. COMMON is also the creation
     // state Microsoft recommends for resources first written by copies.
-    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COMMON,
-        debugName, allocation, outError))
+    if (!m_persistentHeap.CreateTexture(desc, D3D12_RESOURCE_STATE_COMMON, debugName, allocation, outError))
+    {
         return false;
+    }
 
     outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.Get());
     if (!outEntry.handle.IsValid())
@@ -466,15 +481,18 @@ bool DX12TextureCache::IsResident(const Texture* texture) const
         return true;
     }
     const auto resident = m_entries.find(texture->m_assetId);
-    return resident != m_entries.end()
-        && resident->second.uploadState != RHIUploadTransactionState::Quarantined
-        && m_descriptions.find(texture->m_assetId) != m_descriptions.end();
+    return resident != m_entries.end() && resident->second.uploadState != RHIUploadTransactionState::Quarantined &&
+           m_descriptions.find(texture->m_assetId) != m_descriptions.end();
 }
 
 DX12TextureCache::Entry DX12TextureCache::GetOrUpload(const Texture* texture,
-    const own::shared_owner<const Texture::CodecImage>& image, std::string& outError)
+                                                      const own::shared_owner<const Texture::CodecImage>& image,
+                                                      std::string& outError)
 {
-    if (nullptr == m_resources) return Entry{};
+    if (nullptr == m_resources)
+    {
+        return Entry{};
+    }
 
     // 첫 호출에 흰색을 만든다(프레임 안이어야 하므로 여기가 유일하게 안전한 자리).
     if (!m_white.IsValid())
@@ -488,23 +506,29 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(const Texture* texture,
     }
 
     // 텍스처가 없는 재질 슬롯은 흰색으로 대신한다 — 호출부가 분기하지 않게.
-    if (nullptr == texture) return m_white;
+    if (nullptr == texture)
+    {
+        return m_white;
+    }
 
     // 키는 주소가 아니라 자산 신원이다(멤버 선언부 주석 참고).
     const HashedGuid assetId = texture->m_assetId;
 
+    material_graph::BindingDetailScope lookupProfile{ce::marker<"DX12TextureCacheAccess">()};
     const auto found = m_descriptions.find(assetId);
     if (found != m_descriptions.end())
     {
-        if (!IsResident(texture))
+        material_graph::BindingDetailScope residentProfile{ce::marker<"DX12TextureResidentValidateTouch">()};
+        // The description was found above. Validate and touch the exact resident
+        // entry once, preserving quarantine rejection and eviction accounting.
+        const auto resident = m_entries.find(assetId);
+        if (resident == m_entries.end() || resident->second.uploadState == RHIUploadTransactionState::Quarantined)
         {
-            outError = "DX12 texture upload has no verified completion; native allocation is quarantined.";
-            return {};
+            outError = "DX12 texture upload has no verified resident generation";
+            return Entry{};
         }
         ++m_stats.hits;
-        // 쓰였다고 찍는다(③). 이 값이 은퇴 판정의 전부다.
-        const auto resident = m_entries.find(assetId);
-        if (resident != m_entries.end()) resident->second.lastUsedFrame = m_frameIndex;
+        resident->second.lastUsedFrame = m_frameIndex;
         return found->second;
     }
 
@@ -569,27 +593,28 @@ DX12TextureCache::Entry DX12TextureCache::GetOrUpload(const Texture* texture,
     return entry;
 }
 
-void DX12TextureCache::OnUploadSubmitted(uint64_t recordingId,
-    RHICompletionPoint completion)
+void DX12TextureCache::OnUploadSubmitted(uint64_t recordingId, RHICompletionPoint completion)
 {
     for (auto& pair : m_entries)
     {
         Resident& resident = pair.second;
-        if (resident.uploadState != RHIUploadTransactionState::Recording ||
-            resident.recordingId != recordingId) continue;
+        if (resident.uploadState != RHIUploadTransactionState::Recording || resident.recordingId != recordingId)
+        {
+            continue;
+        }
         resident.completionValue = completion.value;
-        resident.uploadState = completion.IsValid()
-            ? RHIUploadTransactionState::Queued
-            : RHIUploadTransactionState::Quarantined;
+        resident.uploadState =
+            completion.IsValid() ? RHIUploadTransactionState::Queued : RHIUploadTransactionState::Quarantined;
     }
     for (FallbackTransaction& transaction : m_fallbackTransactions)
     {
-        if (transaction.state != RHIUploadTransactionState::Recording ||
-            transaction.recordingId != recordingId) continue;
+        if (transaction.state != RHIUploadTransactionState::Recording || transaction.recordingId != recordingId)
+        {
+            continue;
+        }
         transaction.completionValue = completion.value;
-        transaction.state = completion.IsValid()
-            ? RHIUploadTransactionState::Queued
-            : RHIUploadTransactionState::Quarantined;
+        transaction.state =
+            completion.IsValid() ? RHIUploadTransactionState::Queued : RHIUploadTransactionState::Quarantined;
     }
 }
 
@@ -598,15 +623,17 @@ void DX12TextureCache::OnUploadCompleted(uint64_t completedValue)
     for (auto& pair : m_entries)
     {
         Resident& resident = pair.second;
-        if (resident.uploadState == RHIUploadTransactionState::Queued &&
-            resident.completionValue <= completedValue)
+        if (resident.uploadState == RHIUploadTransactionState::Queued && resident.completionValue <= completedValue)
+        {
             resident.uploadState = RHIUploadTransactionState::Resident;
+        }
     }
     for (FallbackTransaction& transaction : m_fallbackTransactions)
     {
-        if (transaction.state == RHIUploadTransactionState::Queued &&
-            transaction.completionValue <= completedValue)
+        if (transaction.state == RHIUploadTransactionState::Queued && transaction.completionValue <= completedValue)
+        {
             transaction.state = RHIUploadTransactionState::Resident;
+        }
     }
 }
 
@@ -616,7 +643,7 @@ void DX12TextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompl
     {
         if (resident.recordingId == recordingId && resident.completionValue == completion.value &&
             (resident.uploadState == RHIUploadTransactionState::Queued ||
-                resident.uploadState == RHIUploadTransactionState::Resident))
+             resident.uploadState == RHIUploadTransactionState::Resident))
         {
             resident.uploadState = RHIUploadTransactionState::Recording;
         }
@@ -625,7 +652,7 @@ void DX12TextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompl
     {
         if (transaction.recordingId == recordingId && transaction.completionValue == completion.value &&
             (transaction.state == RHIUploadTransactionState::Queued ||
-                transaction.state == RHIUploadTransactionState::Resident))
+             transaction.state == RHIUploadTransactionState::Resident))
         {
             transaction.state = RHIUploadTransactionState::Recording;
         }
@@ -639,8 +666,7 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
     while (it != m_entries.end())
     {
         Resident& resident = it->second;
-        if (resident.uploadState != RHIUploadTransactionState::Recording ||
-            resident.recordingId != recordingId)
+        if (resident.uploadState != RHIUploadTransactionState::Recording || resident.recordingId != recordingId)
         {
             ++it;
             continue;
@@ -661,8 +687,7 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
     auto transaction = m_fallbackTransactions.begin();
     while (transaction != m_fallbackTransactions.end())
     {
-        if (transaction->state != RHIUploadTransactionState::Recording ||
-            transaction->recordingId != recordingId)
+        if (transaction->state != RHIUploadTransactionState::Recording || transaction->recordingId != recordingId)
         {
             ++transaction;
             continue;
@@ -688,4 +713,3 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
         transaction = m_fallbackTransactions.erase(transaction);
     }
 }
-

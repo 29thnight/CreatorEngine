@@ -5616,6 +5616,18 @@ namespace
 int main(int argc, char** argv)
 {
 	silence_crt_dialogs();
+    {
+        std::vector<int, ce::capture_allocator<int>> first;
+        first.push_back(11);
+        auto moved = std::move(first);
+        first.push_back(17);
+        auto retained = moved;
+        moved = std::move(first);
+        first.push_back(23);
+        check(moved[0] == 17 && first[0] == 23 && retained[0] == 11,
+              "capture-allocator/move-reuse — moved-from buffers retain a usable heap owner");
+    }
+
 	if (argc == 2 && std::strcmp(argv[1], "--aggregate-only") == 0)
 	{
 		test_aggregate_tree();

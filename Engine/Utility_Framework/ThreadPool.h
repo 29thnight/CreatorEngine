@@ -38,6 +38,8 @@ class thread_pool
 
   private:
     friend class job_scheduler;
+    friend class job_handle;
+    void assist_until(const std::function<bool()>& ready);
     struct state;
     void dispatch(std::size_t count, std::function<void(std::size_t)> execute,
                   std::function<void(std::exception_ptr)> complete);

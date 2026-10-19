@@ -153,34 +153,65 @@ struct PacketDispatchWork final
             }
         }
         argumentWords = static_cast<uint32_t>(slices.size() * 3);
-        plans = device->AllocateUpload(planValues.size() * sizeof(planValues.front()), 16);
-        if (!plans.IsWritable())
         {
-            error = "METEOR packet bucket plan upload failed.";
+            ce::profile_scope upload{ce::marker<"MaterialScenePacketPlanUpload">()};
+            plans = device->AllocateUpload(planValues.size() * sizeof(planValues.front()), 16);
+            if (!plans.IsWritable())
+            {
+                error = "METEOR packet bucket plan upload failed.";
+                return false;
+            }
+            std::memcpy(plans.cpuAddress, planValues.data(), planValues.size() * sizeof(planValues.front()));
+        }
+        const std::wstring label(name.begin(), name.end());
+        std::array<RHIBufferDesc, 4> descriptions{};
+        const std::array sizes{uint64_t(argumentWords) * 4, uint64_t(values.bucketCount) * 16, uint64_t(capacity) * 8,
+                               uint64_t(scratchWords) * 4};
+        for (std::size_t index = 0; index < descriptions.size(); ++index)
+        {
+            auto& desc = descriptions[index];
+            desc.bytes = sizes[index];
+            desc.allowUnorderedAccess = true;
+            desc.allowIndirectArguments = index == 0;
+            desc.debugName = label.c_str();
+        }
+        std::array<RHIBufferHandle, 4> packetBuffers{};
+        bool acquired = true;
+        if (pool)
+        {
+            acquired = pool->AcquireBatch(descriptions, packetBuffers, error);
+        }
+        else
+        {
+            for (std::size_t index = 0; index < descriptions.size(); ++index)
+            {
+                if (!device->CreateBuffer(descriptions[index], packetBuffers[index], error))
+                {
+                    acquired = false;
+                    break;
+                }
+            }
+        }
+        arguments = packetBuffers[0];
+        ranges = packetBuffers[1];
+        packets = packetBuffers[2];
+        scratch = packetBuffers[3];
+        if (!acquired)
+        {
             return false;
         }
-        std::memcpy(plans.cpuAddress, planValues.data(), planValues.size() * sizeof(planValues.front()));
-        const std::wstring label(name.begin(), name.end());
-        const auto create = [&](RHIBufferHandle& buffer, uint64_t bytes, bool indirect) {
-            RHIBufferDesc desc;
-            desc.bytes = bytes;
-            desc.allowUnorderedAccess = true;
-            desc.allowIndirectArguments = indirect;
-            desc.debugName = label.c_str();
-            return CreateSceneBuffer(*device, pool.get(), desc, buffer, error);
-        };
-        if (!create(arguments, uint64_t(argumentWords) * 4, true) ||
-            !create(ranges, uint64_t(values.bucketCount) * 16, false) ||
-            !create(packets, uint64_t(capacity) * 8, false) ||
-            !create(scratch, uint64_t(scratchWords) * 4, false))
-            return false;
         const RHIBindingDesc views[]{RHIBindingDesc::UavBuffer(arguments, argumentWords, 4),
-            RHIBindingDesc::UavBuffer(ranges, values.bucketCount, 16),
-            RHIBindingDesc::UavBuffer(packets, capacity, 8),
-            RHIBindingDesc::UavBuffer(scratch, scratchWords, 4)};
-        outputs = device->CreateBindings(views);
+                                     RHIBindingDesc::UavBuffer(ranges, values.bucketCount, 16),
+                                     RHIBindingDesc::UavBuffer(packets, capacity, 8),
+                                     RHIBindingDesc::UavBuffer(scratch, scratchWords, 4)};
+        {
+            ce::profile_scope bindings{ce::marker<"MaterialScenePacketOutputBindings">()};
+            outputs = device->CreateBindings(views);
+        }
         if (!outputs.IsValid())
+        {
             error = "METEOR packet output bindings failed.";
+        }
         return outputs.IsValid();
     }
     static void DispatchLinear(RHIEncoder& encoder, uint32_t items, uint32_t threads)

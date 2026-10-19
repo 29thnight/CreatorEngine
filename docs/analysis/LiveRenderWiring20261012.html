@@ -87,6 +87,87 @@ footer { margin-top: 56px; color: var(--muted); font-size: 12px; border-top: 1px
 </header>
 <details id="performance-debug-20261017"><summary>이전 호스트의 최초 성능 측정 · 보관</summary><h2>Debug CreatorRobot 플레이 성능 · 120 FPS 미달</h2><p>2026-10-17: 1186×514 Scene+Game 두 뷰·unlimited·native·15초 기록. Game 뷰 CPU 제출 빈도 3.21회/초, 제출 중앙값 107.78ms / p95 125.87ms. GPU 계측 구간 합집합 중앙값 34.75ms. 빈 장면 Game 제출 빈도는 50.12회/초. 실제 화면 표시 FPS·단일 뷰·1080p 수용은 별도다. CPU MaterialGraphScenePrepare 58.16ms와 RenderGraphBuild 25.89ms, GPU 그림자 컬링을 우선 조사한다. 기록·모델 출력 검사와 정상 종료는 통과했다. <a href="../../Artifacts/performance-debug-20261017/report.html">측정 조건·결과·증거</a></p></details>
 <section id="validation-current">
+<div id="performance-binding-overhead-parallel-20261019"><h2>2026-10-19 · 동일 계측 비교와 Draw/메시 병렬 준비</h2><p>신규 세부 계측은 기본 OFF, CREATOR_BINDING_DETAIL_SCOPES=1에서만 기록한다. 동일 바이너리 세부 ON/OFF의 텍스처 Running 0.129→0.047ms. 동일 공통 계측의 이전 경로→직전 경로→최종 경로는 0.047→0.047→0.039ms.</p><p>Draw 바인딩·재질 바이트 준비를 메시 GPU 준비와 병렬화하고 청크 조립 전에 합류한다. 간접 명령은 기하 페이지·재질 레코드·컬링 목록의 실제 의존성을 유지한다. ETW 동시 Running 교집합 0.291ms/준비. 일반 Game CPU p50 12.759→12.041/11.974ms. 120프레임 CPU 예산 미달. Debug 빌드·바인딩 GPUValidation ON·Scene/Volume DebugLayer 및 GPU 출력 검증·두 플레이의 고정 출력 일치 검증 통과. 확장 Scene GPUValidation ON은 드라이버 컴파일 지연으로 미완료이며 통과로 세지 않는다. 볼륨 특수 효과의 가시성 record 인자 누락도 수정하고 DX12 전용 33프레임을 검증했다. SPIR-V 양쪽 백엔드 쿠킹은 별도 미수용이다. 이전 기록의 텍스처 증가와 프레임 캐시 45% 개선은 아래 역사적 표본으로 보존하며, 동일 조건 판정은 이 항목을 우선한다.</p><p><a href="../../Artifacts/binding-overhead-parallel-20261019/report.html">동일 계측 분석 보고서</a> · <a href="../../Artifacts/binding-overhead-parallel-20261019/timeline.html?dataset=after-etw&amp;detail=preparation">전후 ETW 타임라인</a></p></div>
+<div id="performance-binding-init-texture-20261019"><h2>2026-10-19 · 바인딩 프레임 초기화·텍스처 확인 수정</h2><p>프레임 색인을 빈 상태→512바이트부터 필요에 따라 확장하도록 바꾸고, GPU 적중 시 CPU 이미지 pin 조회를 생략했다. DX12 적중의 중복 트리 조회는 4→2회로 줄이고 recording별 네이티브 확인·퇴거 사용 이력·격리 거부는 유지했다.</p><p>전후 ETW Running: 프레임 캐시 0.080→0.044ms, 텍스처 확인 0.082→0.121ms, 바인딩 전체 0.422→0.450ms. Debug 빌드·GPU 8765 checks 및 두 플레이의 6개 출력 bit-exact 검증 통과. Game CPU p50 12.291→12.263/12.360ms.</p><p><a href="../../Artifacts/binding-init-texture-20261019/report.html">분석·검증 보고서</a> · <a href="../../Artifacts/binding-init-texture-20261019/timeline.html?dataset=after-etw&amp;detail=bindingDetail">전후 세부 타임라인</a></p></div>
+<div id="performance-mesh-binding-detail-20261019"><h2>2026-10-19 · 메시·바인딩 세부 계측과 안정 상주 결과 재사용</h2><p>클러스터 LRU·임시 마스크/벡터를 배열·dynamic_bitset·mutex 소유 저장소로 바꾸고, 모든 그룹 상주/동일 예산/I/O 없음/업로드·퇴거·오류 통계 0 조건에서 불변 상주 집합을 재사용한다. 요청 우선순위와 예산 변경 처리는 유지한다. bindless 키별 트리 노드 할당을 프레임 소유 색인으로 대체했다.</p><p>Debug 빌드·GPU 바인딩 8754 checks·메시 1264204 checks·스트리밍 비교 5132 checks 통과. 최종 두 플레이 정상 종료·6개 출력 bit-exact. 기록 ON/OFF와 전후 ETW 세부 시간은 <a href="../../Artifacts/mesh-binding-detail-20261019/report.html">분석·검증 보고서</a>, <a href="../../Artifacts/mesh-binding-detail-20261019/timeline.html?dataset=final-etw&amp;detail=mesh">상세 타임라인</a>에 정리했다.</p><p>새 세부 계측 전후 ETW Running: 메시 준비 0.720→0.351ms, 바인딩 0.448→0.422ms. 일반 실행 Game CPU p50는 수정 전 독립 12.605ms, 최종 12.176/12.175ms이며 120프레임 CPU 예산 8.333ms는 아직 미달이다. 장면 준비 평균 3.003~3.102→2.548/2.555ms.</p></div>
+<div id="performance-assist-allocation-20261019"><h2>2026-10-19 · 합류 지원 실행·할당 경합 전후 검증</h2><p>렌더 스레드가 합류 중 큐 작업을 실행하도록 변경했다. Game 준비 305회 중 269회에서 카메라·표면 CPU 준비 202회와 패킷 준비 181회를 직접 실행했다. ETW 장면 준비 평균 Waiting 0.915→0.308ms(-66.4%), wall 4.413→4.303ms(-2.5%). 약 15초간 프로파일러 측 CRT 할당 락 Waiting 24.507→2.939ms(-88.0%), ResourcePacket 복사 관련 대기 5→0회. 다른 할당 락 경로는 남아 있다.</p><p>Debug 빌드·DX12 558 checks·프로파일러 1396 checks 및 mutation 검출 통과. CreatorRobot 두 실행 정상 종료·6개 출력 bit-exact. 기록 ON/OFF·ETW 비교 완료. Debug 120프레임 CPU 예산은 아직 미충족이다.</p><p><a href="../../Artifacts/assist-allocation-20261019/report.html">전후 통계·ETW 화면</a> · <a href="../../Artifacts/assist-allocation-20261019/timeline.html?dataset=detail-etw&start=11571.8069&span=4.2184&detail=assist">실제 합류 지원 타임라인</a></p></div>
+<div id="performance-draw-shadow-parallel-fixed-20261019"><h2>2026-10-19 · Draw·그림자 설정 분기와 텍스처 표 경합 수정</h2>
+<p><strong>기하·변환·캐스터 입력을 먼저 확정하고, 머티리얼 Draw 준비와 그림자 설정을 병렬화했다.</strong> 그림자 작업에는 별도 Draw 복사본을 전달하며, 캐시·이력의 단독 작성자가 된다. 설정 합류 뒤 완료된 머티리얼 바인딩을 연결하고, 캐스케이드 가시성은 첫 소비 시 별도 합류한다. 실패·조기 반환도 설정 생산자와 모든 수락된 자식 작업을 회수한다.</p>
+<p>기하 캐시·프로그램 참조 확정 → [렌더 스레드: 머티리얼 바인딩·장면 레코드 ∥ 워커: 캐시 키·이력·캐스케이드 배포] → 설정 합류 → 바인딩 연결. GPU 패스 배선은 그대로이며 CPU 준비 의존성을 분리했다.</p>
+<table><thead><tr><th>검증</th><th>현재 결과</th></tr></thead><tbody>
+<tr><td>장면 준비 평균</td><td>3.930 → 3.828ms (-2.6%), 독립 반복 3.888ms. 전체 개선은 작다.</td></tr>
+<tr><td>실제 동시 Running</td><td>ETW Game 준비 304/304회에서 Draw↔그림자 설정 겹침. 평균 0.467ms, p95 0.620ms. Running은 DPC/ISR 포함 CPU residency다.</td></tr>
+<tr><td>Game CPU p50</td><td>15.915 / 16.074ms. 120프레임 CPU 예산 8.333ms 미달성. 화면 FPS 측정치로 해석하지 않는다.</td></tr>
+<tr><td>정확성</td><td>Debug Editor 빌드·DX12 GPU Validation 547검사/4프레임, 동일 바이너리의 두 플레이 정상 종료, 고정 입력 6개 출력 모두 비트 일치.</td></tr>
+<tr><td>종료 크래시</td><td>최초 반복 실행의 DX12ResourceTable 텍스처 슬롯 파괴에서 접근 위반. 동기화 없는 텍스처 표의 동시 등록은 분리 재현에서 0xC0000005 실패. 고정 주소 슬롯과 등록·반환 잠금 적용 후 실제 DX12 리소스 32회/32,768등록 통과. 실패 실행은 수용 성능 결과에서 제외.</td></tr>
+<tr><td>남은 경계</td><td>기하 입력 확정·공유 캐시·장면 업로드·합류 비용은 남아 있다. 전체 성능 개선은 반복에서 일관되게 입증되지 않았다.</td></tr>
+</tbody></table>
+<p><a href="../../Artifacts/draw-shadow-parallel-fixed-20261019/report.html">비교·검증 보고서</a> · <a href="../../Artifacts/draw-shadow-parallel-fixed-20261019/timeline.html?start=5000.6365&amp;span=4.7599&amp;detail=parallel">Draw↔그림자 실제 겹침 타임라인</a> · <a href="../../Artifacts/draw-shadow-parallel-fixed-20261019/acceptance.json">수용 판정</a></p></div>
+<div id="performance-scene-prepare-parallel-batch-20261019"><h2>2026-10-19 · 장면 준비 병렬화·묶음 확보</h2>
+<p><b>MaterialGraphScenePrepare 평균 4.302→3.930ms(-8.6%), 독립 반복 3.954ms.</b> 전체 Game CPU p50 16.016/16.101ms로 120 FPS 예산 8.333ms에는 미달한다. 실제 표시 FPS는 측정하지 않았다.</p>
+<p>공통 Draw·기하와 공유 파이프라인을 확정한 뒤 카메라 First→Final→표면 준비와 그림자 캐스케이드 준비를 별도 작업으로 실행한다. 소비 지점에서 카메라·그림자를 각각 합류한다. 재질·깊이·그림자 패킷은 불변 버킷 스냅샷으로 준비하고 카메라/캐스케이드 단위로 묶는다. 버퍼 4개를 한 번의 풀 잠금으로 확보하며 leaf indexed 배포로 일반 의존 그래프 생성 비용을 줄였다. 모든 오류·조기 반환에서 작업을 회수한다.</p>
+<div class="table-wrap"><table><thead><tr><th>비추적 기록 ON</th><th>병렬화 전</th><th>묶음 병렬화</th><th>독립 반복</th></tr></thead><tbody><tr><th>장면 준비 평균 ms</th><td>4.302</td><td>3.930</td><td>3.954</td></tr><tr><th>장면 준비 p50 ms</th><td>4.213</td><td>3.825</td><td>3.865</td></tr><tr><th>장면 준비 p95 ms</th><td>5.189</td><td>4.730</td><td>4.832</td></tr><tr><th>선언 평균 ms</th><td>5.805</td><td>5.749</td><td>5.782</td></tr><tr><th>CPU 기록 평균 ms</th><td>2.834</td><td>2.789</td><td>2.786</td></tr><tr><th>전체 Game CPU p50 ms</th><td>16.326</td><td>16.016</td><td>16.101</td></tr></tbody></table></div>
+<p>단순 분할의 장면 준비 평균은 4.259ms로 효과가 작아 작업·확보 단위를 보강했다. 최종 풀 획득 락 스코프 wall 합은 Game당 평균 0.091/0.098ms다. Acquire 계열 스코프는 묶음당, 요청·적중 카운터는 버퍼별로 기록한다. 중첩·스레드 간 포함 시간을 합산하지 않는다.</p>
+<p>ETW owner/worker Running 교집합 평균 0.826ms/Game, 워커 간 Running 중첩 평균 0.866ms/Game, 최대 동시 Running 워커 4개를 확인했다. Running은 DPC/ISR을 포함한다. GPU 대기와 CPU 준비 합류를 같은 의미로 해석하지 않는다.</p>
+<p>Debug 빌드·DX12 GPU Validation 회귀 526검사·4프레임, 두 CreatorRobot 플레이 실행의 입력/6출력 비트 일치·정상 종료·기록 ON/OFF·네이티브/ETW 손실 0·시간 정렬·실제 OS 중첩 검증을 통과했다. 동일 8워커·Editor 전경·Scene+Game 각 1186×514·15초 조건이다. <a href="../../Artifacts/scene-prepare-parallel-batch-20261019/report.html">비교 보고서·CPU 준비 DAG</a> · <a href="../../Artifacts/scene-prepare-parallel-batch-20261019/timeline.html?start=12354.2999&amp;span=6.9929&amp;detail=parallel">병렬 분기·합류 타임라인</a> · <a href="../../Artifacts/scene-prepare-parallel-batch-20261019/acceptance.json">수용 판정</a></p></div>
+<div id="performance-remeasure-8-20261019"><h2>2026-10-19 · 임시 버퍼 재사용 후 재측정 8</h2>
+<p><b>Game CPU p50 21.073→16.326ms(-22.5%), 독립 반복 16.960ms. 개선은 재현됐지만 Debug 120 FPS 예산 8.333ms에는 미달한다.</b> CreatorRobot Debug DX12·62 entities·PlayingPossessed·8워커·Editor 전경·Scene+Game 각 1186×514·15초 ON/OFF 조건을 유지했다.</p>
+<div class="table-wrap"><table><thead><tr><th>지표</th><th>수정 전</th><th>수정 후</th><th>독립 반복</th></tr></thead><tbody>
+<tr><th>Game CPU p95 ms</th><td>25.527</td><td>19.510</td><td>20.587</td></tr>
+<tr><th>장면 준비 평균 ms</th><td>8.248</td><td>4.302</td><td>4.473</td></tr>
+<tr><th>선언 평균 ms · 추가 계측 포함</th><td>4.303</td><td>5.805</td><td>5.973</td></tr>
+<tr><th>GPU 계측 합집합 p95 ms</th><td>13.814</td><td>7.694</td><td>8.132</td></tr>
+<tr><th>기록 OFF 완료 뷰/초 · 표시 FPS 아님</th><td>38.688</td><td>49.543</td><td>49.294</td></tr>
+</tbody></table></div>
+<p>세 기록 ON 구간 모두 풀 생성·해제·재사용 실패 0회다. 워밍업 생성 184개가 유지되고 ETW ON/OFF CPU 스택에서도 CreateBuffer·ReleaseBuffer 경로는 미관측이다. 선언은 새 세부 계측을 포함하므로 증가분을 순수 연산 퇴행으로 단정하지 않는다. GPU 값은 전체 GPU 프레임 시간이 아니다.</p>
+<p>동일 binary/PDB·입력 및 6출력 비트 일치·정상 종료·네이티브/ETW 손실 0·원본 시간 정렬 대조를 통과했다. 실제 표시 FPS는 측정하지 않았다. <a href="../../Artifacts/remeasure-8-20261019/report.html">비교 보고서</a> · <a href="../../Artifacts/remeasure-8-20261019/timeline.html">전체 스코프 타임라인 · 풀/선언 필터</a> · <a href="../../Artifacts/remeasure-8-20261019/acceptance.json">수용 판정</a></p></div>
+<div id="scene-buffer-pool-20261019"><h2>2026-10-19 · 임시 장면 버퍼 재사용·추가 계측</h2>
+<p>재사용 키에서 디버그 이름을 제외하고 UAV·indirect 용도·초기 상태가 일치하는 반납 버퍼 중 요청 이상 최소 용량을 선택한다. 64개 개수 제한을 제거하고 캐시 64MiB 예산을 유지했다. GPU 완료 후 소유자가 반납하는 수명 조건은 유지하며 드라이버 생성·해제는 풀 락 밖에서 실행한다.</p>
+<p>풀 요청·적중·생성·실패·반납·해제·용량 부족·호환 반납 버퍼 부재·예산 초과 해제·미등록 반납 누계와 캐시 바이트·개수·소유 개수·최대 소유 개수를 기록한다. 카운터는 기록 중 성공한 뷰 준비마다 한 배치로 발행하며 누계는 합산하지 않고 동일 풀의 시점 차이로 해석한다. 호환 반납 버퍼 부재는 GPU 대기를 확정하지 않는다.</p>
+<p>타임라인은 풀 검색·락 획득·생성·반납·해제, 패킷 계획 업로드·출력 바인딩, RenderGraphDeclare 노드 본문·후처리·버퍼/텍스처 등록·생성·패스 추가·메타데이터 초기화·버전 갱신을 구분한다. 노드별 기존 마커 아래 세부 스코프를 확인한다.</p>
+<p id="scene-buffer-pool-validation">Editor Debug 최종 빌드와 실제 DX12 GPU Validation 회귀 582검사·4프레임 통과. 96개 동시 버퍼 반납 후 이름 변경·크기 축소 요청의 추가 생성 0, 사용 중 버퍼 보호·용도 분리·최소 용량 선택·64MiB 예산·종료 후 반납을 확인했다. CreatorRobot 재측정 8에서 세 기록 ON 구간의 추가 생성·해제 0회를 확인했다. 아래 재측정 7은 수정 전 결과다.</p>
+<p><a href="../../Artifacts/scene-buffer-pool-20261019/instrumentation.json">계측 항목·판독 기준·회귀 범위</a></p></div>
+<div id="performance-remeasure-7-20261019"><h2>2026-10-19 · PR #183 동기화 재측정 7 · CPU 성능 퇴행</h2>
+<p><b>5761bdd6c와 보존한 로컬 최적화를 Debug 재빌드해 측정했다. Game CPU p50은 13.697→21.073ms(+53.8%), 독립 반복은 21.240ms다. 120 FPS의 8.333ms 예산을 넘는다.</b> 표시 FPS·입력 지연은 측정하지 않았다. 비교에는 PR #182·#183 및 로컬 통합 변경이 함께 포함되므로 특정 변경 하나의 인과 효과로 단정하지 않는다.</p>
+<div class="table-wrap"><table><thead><tr><th>비추적 지표</th><th>이전</th><th>현재</th><th>독립 반복</th></tr></thead><tbody>
+<tr><td>Game CPU p50 / p95 ms</td><td>13.697 / 16.457</td><td>21.073 / 25.527</td><td>21.240 / 26.169</td></tr>
+<tr><td>장면 준비 평균 ms</td><td>3.803</td><td>8.248</td><td>8.315</td></tr>
+<tr><td>Game GPU 계측 합집합 p50 / p95 ms</td><td>6.033 / 6.787</td><td>5.901 / 13.814</td><td>5.828 / 13.578</td></tr>
+<tr><td>기록 OFF 완료 뷰/s</td><td>54.748</td><td>38.688</td><td>38.518</td></tr>
+</tbody></table></div>
+<p>완료 뷰/s는 Scene+Game 합계이며 표시 FPS가 아니다. GPU 합집합은 같은 realFrame/view의 계측 패스를 합친 값으로 전체 GPU 프레임 시간과 구분한다. 비추적 평균 간접 준비 4.135ms 중 작업 패킷 준비 3.246ms가 포함된다. ETW의 패킷 준비 평균 4.357ms는 Running 2.588·Ready 0.121·Waiting 1.648ms다.</p>
+<p>렌더 CPU 표본에서 TransientBufferPool::Acquire 포함률이 이전 ON/OFF 1.20/1.43%→현재 11.40/13.27%로 늘었다. 현재 ON의 Acquire 표본 중 79.60%는 CreateBuffer 하위에 있고, CreateCommittedResource 포함률은 ON/OFF 8.21/9.87%, ReleaseBuffer는 7.62/8.74%다. 새 버퍼 생성·반납/해제 경로를 우선 조사할 근거다. inclusive 표본이므로 합산하거나 wall 비율·할당 횟수로 바꾸지 않는다. 풀 miss가 어느 제한·키 변화·반납 시점에서 생기는지는 추가 계측 전까지 미확정이다.</p>
+<p>8워커·Normal·실제 Editor 전경/auto·CreatorRobot 62 entities PlayingPossessed·host 1920×1080·두 뷰 1186×514·warmup 5초·FG/upscale/NIS/DVC OFF·GPU validation OFF 조건이다. ETW 없는 ON/OFF를 각각 15초씩 두 프로세스에서, ETW ON/OFF를 각각 15초씩 수집했다. 두 실행 모두 통제 입력·드로 순서·6출력 bit-exact·정상 종료·동일 DLL/PDB를 확인했다. native 손실/불균형 0·ETW 손실 0, 2개 정밀 구간 상태 합계 0.005ms 이내 일치. ETW 장면 준비 216개 완결 호출의 Unknown 누적 0.002ms는 다른 상태로 치환하지 않았다.</p>
+<p>새 파이프라인은 기하/머티리얼/바인딩 레코드의 상주 버퍼와 GPU count→prefix scan→packet scatter→indirect 명령을 사용한다. CPU의 PSO bucket·정렬 메타데이터와 기하 GPU ring 작업 분배는 각각의 역할을 유지한다. 통합 시 불변 레이아웃 공유·청크 캐시를 보존하고, 스트리밍 feedback readback 포인터는 바이트 범위를 검사한 span으로 수정했다.</p>
+<p><a href="../../Artifacts/remeasure-7-20261019/report.html">전체 비교·ON/OFF·ETW 분석</a> · <a href="../../Artifacts/remeasure-7-20261019/timeline.html">전체 스코프·스레드 상태 타임라인</a> · <a href="../../Artifacts/remeasure-7-20261019/acceptance.json">검증 범위</a> · <a href="../../Artifacts/remeasure-7-20261019/pool-samples.json">버퍼 생성/해제 표본</a></p></div>
+
+<div id="sync-draw-layout-20261018"><h2>2026-10-18 · PR #182 동기화 및 로컬 Draw 최적화 통합</h2>
+<p><b>master를 <code>ed9b84a60</code>으로 fast-forward했다.</b> SceneHost와 검증 HTML의 충돌을 해결하고, PR의 callback별 visibility SRV 재사용·추가 spin 제거·검증된 컴파일 결과 재사용과 로컬의 청크 캐시·불변 레이아웃 공유를 함께 유지했다. 프레임별 업로드·descriptor 검증·상주/퇴거 조건은 유지한다.</p>
+<p>새 BindReconstruction API에 빠져 있던 EffectStage의 lookup·subsurface·color·runtime 4개 소비자를 callback 내부 첫 적격 draw에서 한 번 생성·재사용하도록 이관했다. DataSystem의 메타데이터 타입 정의 헤더를 직접 포함했다. 원본 enkiTS 헤더·Debug/Release 라이브러리·DLL을 복원하고 Debug 실행 DLL 해시 및 제거된 확장 import 부재를 확인했다.</p>
+<p>회귀도 보강했다. visibility SRV 생성 수는 패스 이름 일부가 아닌 그래프의 실제 셰이더 읽기 의존성으로 계산한다. 직접 클러스터의 pose 버퍼를 Count×SurfacePoint 배열로 잘못 읽던 검사는 실제 BufferBytes로 복사하고, rigid 정점/월드 변환에서 독립 컬링 기대값을 계산한다. EndFrame 실패는 현재 오류와 D3D 메시지를 남긴다. 독립 코드 생성 프로브에는 CE_CONTRACT_STANDALONE을 지정했다. 일반 SurfaceBatch의 cold descriptor 게시도 선언 단계에서 준비하고 PreparedPass를 콜백에 보관해 기록 워커의 할당을 제거했다.</p>
+<div class="table-wrap"><table><thead><tr><th>통합 후 검사</th><th>결과</th></tr></thead><tbody>
+<tr><td>CreatorEditor Debug 실행 파일·공유 런타임</td><td>빌드 통과</td></tr>
+<tr><td>전체 메시 / 바인딩 · DX12 GPU 기반 검증</td><td>1,264,204 / 279 checks 통과</td></tr>
+<tr><td>Material / Temporal · DX12 기본 디버그 레이어·readback</td><td>24 / 12프레임 통과, 검증 오류 0</td></tr>
+<tr><td>장면 합성 행렬 · DX12 기본 검증</td><td id="sync-full-raster-result">전체 실행의 Scene 단계 완료. 후속 일반 Surface 콜백 할당 실패는 수정 후 별도 RG5 상위 집합으로 재검증</td></tr>
+<tr><td>일반 Surface/RG5 · DX12 기본 검증</td><td>1,513,971 checks 통과 · 그래프 63·공유 깊이 72·스키닝 깊이 18프레임 · 콜백 할당 금지 유지</td></tr>
+<tr><td>원본 enkiTS DAG / wave 대기 변이 / 분석기</td><td>21,714 checks / 변이 검출 / 64 tests 통과</td></tr>
+<tr><td>머티리얼 코드 생성</td><td>22사례·15,434 checks·101 컴파일·3,960 GPU checks 통과</td></tr>
+</tbody></table></div>
+<p><b>검증 경계:</b> 전체 프로브는 후속 Surface 기록 문제로 종료됐고, 수정 후 해당 경로는 RG5 분리 검사로 재검증했다. 전체 장면의 GPU 기반 검증은 NVIDIA 드라이버 셰이더 컴파일 경로에서 장시간 지연되어 중단했으며 통과로 세지 않는다. 관련 없는 기존 변경 6개는 해시가 일치한다. 아래 Draw 성능 수치는 병합 전 바이너리의 기록이며 통합 후 성능을 재측정하지 않았다. <a href="../../Artifacts/sync-draw-layout-20261018/integration.json">통합·검사 근거</a></p></div>
+<div id="performance-draw-layout-20261018"><h3>Draw 청크·바인딩 반복 비용 수정 — 2026-10-18</h3>
+<p>청크 static cache의 topology 헤더 버퍼 할당을 miss 뒤로 이동하고, 매 Acquire마다 만들던 sparse 저장소 map을 mutex 보호 재사용 scratch의 정렬·병합으로 교체했다. 매 호출 모든 현재 소유자의 퇴거 가능 조건을 확인하며, recording/completion/residency 검사를 생략하지 않는다. texture shape ranges 비교와 안정된 바인딩·변환 cache 순회는 span을 사용한다. MSVC vector::operator==는 원래 unchecked 경로여서 기존 default 비교를 유지했다. 중간 측정에서 바인딩 개선이 없어, 매 패킷 PassLayout 벡터 복사를 불변 Program 스냅샷의 강한 공유 소유권으로 교체했다. 스냅샷의 전체 값/신원 대조와 독립적인 프레임 업로드·descriptor 검증은 유지한다.</p>
+<p>CreatorRobot Debug 플레이, 8워커·Normal·실제 Editor 전경·두 뷰·warmup 5초 조건. 비추적 Game 준비 한 번당 p50은 Draw 1.652 → 1.415ms, 청크 0.963 → 0.890ms, 바인딩 0.546 → 0.399ms, 준비 전체 3.886 → 3.647ms다. Game CPU p50 13.697ms·p95 16.457ms이며 120 FPS 예산 8.333ms 달성은 수용하지 않는다. 이전/이후 한 쌍의 실행 차이 전부를 변경의 인과 효과로 단정하지 않는다.</p>
+<p>ETW ON Game 준비 평균 4.068ms: Running 4.053·Ready 0.006·Waiting 0.008ms. Running에는 DPC/ISR 겹침 0.119ms가 포함된다. 기록 ON/OFF는 ETW 유무별 각 15초씩 비교했고, 기록 OFF에 없는 마커별 시간을 추정하지 않았다.</p>
+<p>최종 소스 Debug Editor·메시/바인딩 probe 빌드, GPU 전체 메시 1,264,204·바인딩 값/수명 279 checks, 통제 입력·드로 순서·6개 출력 bit-exact·정상 종료 통과. native 손실/불균형 0·ETW 손실 0·두 독립 정밀 구간 상태 합계 0.005ms 이내 일치. 수정 파일 코딩 컨벤션 검사 통과.</p>
+<p><a href="../../Artifacts/draw-layout-20261018/report.html">수정 전후·ON/OFF·ETW 분석</a> · <a href="../../Artifacts/draw-layout-20261018/timeline.html">수정 후 상세 타임라인</a> · <a href="../../Artifacts/draw-layout-20261018/comparison.json">비교 원본</a></p></div>
+<div id="performance-scene-prepare-20261018"><h3>장면 준비 내부 계측·재측정 — 2026-10-18</h3>
+<p>기존 타임라인에 Draw·그림자 상세를 추가하고, SceneHost::Prepare에 프레임 초기화·효과·기하 테이블·Draw·카메라·표면 단계·그림자·간접 명령·최종화·게시/자원 해제 구간을 계측했다. Draw의 프로그램/바인딩·상수·청크/업로드와 그림자의 캐시 키·검색/할당·캐스케이드도 구분한다. 렌더 동작 최적화는 하지 않았다.</p>
+<p>Debug CreatorRobot 플레이, 8워커·Normal·Editor 실제 전경·62 entities·두 뷰 조건에서 ETW 동시 기록 ON/OFF 각 15초, ETW 없는 기록 ON/OFF 각 15초를 재측정했다. ETW ON의 완전한 Game 준비 328회 평균 4.627ms = Running 4.602 + Ready 0.009 + Waiting 0.016ms이며 Unknown 0이다. Running에는 DPC/ISR 겹침 평균 0.109ms가 포함되고 이를 뺀 실행 중 시간은 4.493ms다. 준비 전체를 GPU 완료 대기로 설명할 수 없으며 Debug 검사·할당·락 실행 경로도 남은 실행 시간에 포함된다.</p>
+<p>평균 Draw 1.985ms(청크 1.167, 프로그램/바인딩 0.698), 그림자 0.876ms(캐스케이드 0.783), 간접 명령 0.723ms다. 하위 값은 상위 값에 포함되므로 합산하지 않는다. 준비 최대 7.382ms에서도 Running 7.338·Ready 0.044·Waiting 0ms였다. 직접 하위 단계가 준비 시간의 99.60%를 설명한다. 기록 OFF에는 마커가 없어 내부 단계별 귀속을 추정하지 않고 ETW 전체 창과 sampled stack을 비교했다.</p>
+<p>Editor/메시 probe Debug 빌드, 전체 메시 GPU 1,264,204 checks, CreatorRobot 통제 입력·드로 순서·6개 출력 bit-exact·정상 종료 통과. native 손실/불균형 0·ETW 손실 0, 2개 독립 정밀 구간과 상태 합계 0.005ms 이내 일치. 이번 변경은 계측이며 120 FPS 달성·성능 개선을 주장하지 않는다.</p>
+<p><a href="../../Artifacts/scene-prepare-20261018/report.html">준비 내부 분석·ON/OFF 비교</a> · <a href="../../Artifacts/scene-prepare-20261018/timeline.html">새 캡처 상세 타임라인</a> · <a href="../../Artifacts/remeasure-6-20261018/timeline.html">기존 캡처 상세 타임라인</a></p></div>
+
 <div id="performance-recording-cleanup-20261018">
 <h2>2026-10-18 · 추가 spin 정리·바인딩 중복 제거·완료 경로 진단 구현</h2>
 <p><b>기준 master는 <code>55b865fee8debb924eeb91ea89eefe12bb51aec0</code>다.
@@ -483,7 +564,7 @@ flowchart TB
   R --> D["Decal · 표면 버전 수정"]
   D --> A["SSAO · 데칼 이후 법선"] --> L["Color · HDR / 재질 효과"]
   G --> SH["그림자 별도 경로 · 아래 2.2 참조"] --> L
-  C --> W["LayerWork · 정렬 레이어 명령"]
+  C --> W["LayerWork · GPU 레이어 명령 패킷"]
   W -. "캡처" .-> L
   L --> P["SkyBox / SSGI / SSS / SSR / Volume"]
   P --> B["LightTiles → Blended"]
@@ -710,7 +791,7 @@ flowchart LR
 <tr><td>검증</td><td><code>Tools/regression/verify-meteor-scene-cutover.ps1</code> · <code>Editor/RenderTests/.../Geometry/EnhancedBlendedStreamTest.cpp</code>(<code>dx12.blended</code>)</td></tr>
 </tbody></table></div>
 
-<footer>CreatorEngine · 2026-10-18 · 55b865fe 기준 추가 spin 정리·SRV 재사용·완료 경로 진단 · 실행 검증 대기</footer>
+<footer>CreatorEngine · 2026-10-19 · PR #183 및 로컬 최적화 재측정 7 · CPU 퇴행 재현 · 검증 범위는 최신 기록 참조</footer>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
 <script>

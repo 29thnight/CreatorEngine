@@ -268,6 +268,7 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareImportBuffer">()};
     RequireQueueIdle();
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
@@ -296,6 +297,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareImportTexture">()};
     RequireQueueIdle();
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
@@ -321,6 +323,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
 
 RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareCreateTexture">()};
     RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", desc.name))
     {
@@ -341,6 +344,7 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
 
 RGHandle EnhancedRenderGraph::CreateBuffer(const RGBufferDesc& desc)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareCreateBuffer">()};
     RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", desc.name))
     {
@@ -488,6 +492,7 @@ bool EnhancedRenderGraph::ValidVersionHandle(RGHandle h, bool allowUnwritten) co
 
 RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAdvanceVersion">()};
     RequireQueueIdle();
     m_compiled = false;
     if (m_scheduling != RGSchedulingMode::ExplicitVersioned || !ValidVersionHandle(previous, !modify)) return {};
@@ -584,6 +589,7 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
 
 RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSideEffect)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareInitializePass">()};
     RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
     {
@@ -604,6 +610,7 @@ RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSi
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
     {
@@ -618,6 +625,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     std::vector<RGPassUsage>&& usages, ExecuteCallback execute, bool hasSideEffect)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
     {
@@ -632,6 +640,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     std::initializer_list<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
     {
@@ -647,6 +656,7 @@ RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
     std::vector<RGPassUsage> usages, std::vector<RepeatedPhase> phases,
     uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddRepeatedPass">()};
     RequireQueueIdle();
     const auto id = AddPass(name, std::move(usages), {}, hasSideEffect);
     if (!id.IsValid())
@@ -666,6 +676,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddSplitPass">()};
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
     {
@@ -683,6 +694,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     std::vector<RGPassUsage>&& usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddSplitPass">()};
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
     {
@@ -700,6 +712,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     std::initializer_list<RGPassUsage> usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddSplitPass">()};
     const auto id = InitializePass(name, hasSideEffect);
     if (!id.IsValid())
     {

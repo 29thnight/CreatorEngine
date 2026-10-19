@@ -12,8 +12,8 @@ namespace material_graph
             return false;
         }
 
-        bool InstallShaders(const VerifiedProduct& product, RHIShaderBinary backend, RHIGraphicsPipelineDesc& description,
-                            std::string& error)
+        bool InstallShaders(const VerifiedProduct& product, RHIShaderBinary backend,
+                            RHIGraphicsPipelineDesc& description, std::string& error)
         {
             const std::string binary = backend == RHIShaderBinary::Dxil ? "dxil" : "spirv";
             unsigned vertices = 0, pixels = 0;
@@ -29,9 +29,9 @@ namespace material_graph
                 {
                     continue;
                 }
-                const auto shader = std::ranges::find_if(product.shaders, [&](const auto& artifact) {
-                    return artifact.backend == binary && artifact.entryPoint == target.entry;
-                });
+                const auto shader =
+                    std::ranges::find_if(product.shaders, [&](const auto& artifact)
+                                         { return artifact.backend == binary && artifact.entryPoint == target.entry; });
                 if (shader == product.shaders.end() || shader->bytecode.empty())
                 {
                     return Fail(error, "Scene material is missing its compiled surface entry.");
@@ -84,9 +84,11 @@ namespace material_graph
         }
         for (const auto& parameter : hostParameters)
         {
-            if ((parameter.kind == RHILayoutParamKind::ShaderResourceBuffer && parameter.shaderRegister == iblRegister) ||
+            if ((parameter.kind == RHILayoutParamKind::ShaderResourceBuffer &&
+                 parameter.shaderRegister == iblRegister) ||
                 (parameter.kind == RHILayoutParamKind::DescriptorTable &&
-                 parameter.table.type == RHIDescriptorType::ShaderResource && iblRegister >= parameter.table.baseRegister &&
+                 parameter.table.type == RHIDescriptorType::ShaderResource &&
+                 iblRegister >= parameter.table.baseRegister &&
                  std::uint64_t(iblRegister) < std::uint64_t(parameter.table.baseRegister) + parameter.table.count))
             {
                 return Fail(error, "Scene host overlaps the evaluated-point IBL buffer register.");
@@ -126,10 +128,11 @@ namespace material_graph
     }
 
     bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCache& pipelines,
-                                    RenderBindingCache& bindings, IblBaker& baker, const SceneSurfaceEvaluation& evaluation,
-                                    const IblEnvironment& environment, const EnhancedMaterialCoverage& coverage,
-                                    const ScenePassLayout& layout, const RHIGraphicsPipelineDesc& pipeline,
-                                    RHIShaderBinary backend, const Capabilities& capabilities, const Budget& budget,
+                                    RenderBindingCache& bindings, IblBaker& baker,
+                                    const SceneSurfaceEvaluation& evaluation, const IblEnvironment& environment,
+                                    const EnhancedMaterialCoverage& coverage, const ScenePassLayout& layout,
+                                    const RHIGraphicsPipelineDesc& pipeline, RHIShaderBinary backend,
+                                    const Capabilities& capabilities, const Budget& budget,
                                     std::shared_ptr<const SceneMaterialPacket>& result, std::string& error)
     {
         error.clear();
@@ -142,18 +145,17 @@ namespace material_graph
         {
             return Fail(error, "Scene material needs an owning evaluated instance/view/geometry in an open recording.");
         }
-        if (evaluation.gpu &&
-            (evaluation.gpu->Device() != device_ || !evaluation.gpu->Count() ||
-             evaluation.gpu->Count() > IblBaker::MaxPoints ||
-             InstanceFramePins::Identity(*evaluation.gpu->Material()) != InstanceFramePins::Identity(*evaluation.instance) ||
-             evaluation.gpu->View().sceneEpoch != evaluation.sceneEpoch ||
-             evaluation.gpu->View().viewRevision != evaluation.viewRevision ||
-             evaluation.gpu->View().geometryRevision != evaluation.geometryRevision ||
-             (evaluation.gpu->RecordingId() != recordingId && !evaluation.gpu->IsValidated())))
+        if (evaluation.gpu && (evaluation.gpu->Device() != device_ || !evaluation.gpu->Count() ||
+                               evaluation.gpu->Count() > IblBaker::MaxPoints ||
+                               InstanceFramePins::Identity(*evaluation.gpu->Material()) !=
+                                   InstanceFramePins::Identity(*evaluation.instance) ||
+                               evaluation.gpu->View().sceneEpoch != evaluation.sceneEpoch ||
+                               evaluation.gpu->View().viewRevision != evaluation.viewRevision ||
+                               evaluation.gpu->View().geometryRevision != evaluation.geometryRevision ||
+                               (evaluation.gpu->RecordingId() != recordingId && !evaluation.gpu->IsValidated())))
         {
-            return Fail(
-                error,
-                "Scene GPU material/view/geometry must match its live source in this recording or completed validation.");
+            return Fail(error, "Scene GPU material/view/geometry must match its live source in this recording or "
+                               "completed validation.");
         }
         const auto& product = evaluation.instance->generation->cooked.product;
         std::vector<std::uint8_t> validated;
@@ -165,7 +167,8 @@ namespace material_graph
         std::vector<LX::LXMaterialDiagnostic> diagnostics;
         if (!SelectRoute(product.program, capabilities, budget, candidate->selection, diagnostics))
         {
-            return Fail(error, diagnostics.empty() ? "Scene material route is unavailable." : diagnostics.front().message);
+            return Fail(error,
+                        diagnostics.empty() ? "Scene material route is unavailable." : diagnostics.front().message);
         }
         if (product.program.volume || candidate->selection.tier == Tier::Special ||
             candidate->selection.route != Route::Forward || candidate->selection.route != product.selection.route ||
@@ -185,9 +188,9 @@ namespace material_graph
         if (pipeline.blendEnable != blended ||
             pipeline.depthWriteMask != (blended ? RHIDepthWrite::Zero : RHIDepthWrite::All) ||
             pipeline.cullMode != (doubleSided ? RHICullMode::None : RHICullMode::Back) ||
-            !std::ranges::all_of(evaluation.points, [&](const auto& point) {
-                return point.viewTier[3] == ((product.program.features & 0x17C0u) != 0 ? 1.f : 0.f);
-            }))
+            !std::ranges::all_of(
+                evaluation.points, [&](const auto& point)
+                { return point.viewTier[3] == ((product.program.features & 0x17C0u) != 0 ? 1.f : 0.f); }))
         {
             return Fail(error, "Scene PSO coverage or evaluated reflection model disagrees with the owning material.");
         }
@@ -225,8 +228,9 @@ namespace material_graph
         {
             return Fail(error, "Scene material packet requires its exact instance in the frame pin table.");
         }
-        candidate->evaluation = {instanceView, evaluation.sceneEpoch, evaluation.viewRevision,
-            evaluation.geometryRevision, evaluation.points, evaluation.gpu};
+        candidate->evaluation = {
+            instanceView,      evaluation.sceneEpoch, evaluation.viewRevision, evaluation.geometryRevision,
+            evaluation.points, evaluation.gpu};
         candidate->environment = environment;
         candidate->pipeline = std::move(request);
         candidate->iblSlot = layout.iblSlot;
@@ -234,9 +238,8 @@ namespace material_graph
         // Retain before any operation which can record GPU work. In particular a
         // texture upload can submit a recording segment before returning a failure.
         recordings_[recordingId].owners.push_back(candidate);
-        const bool prepared =
-            bindings.Prepare(*device_, textures, evaluation.instance, layout.material, candidate->bindings, error,
-                candidate->instancePins);
+        const bool prepared = bindings.Prepare(*device_, textures, evaluation.instance, layout.material,
+                                               candidate->bindings, error, candidate->instancePins);
         const auto current = device_->GetCurrentUploadRecordingId();
         if (current != 0 && current != recordingId)
         {
@@ -248,7 +251,8 @@ namespace material_graph
         }
         if (current != recordingId || candidate->bindings->recordingId != current)
         {
-            return Fail(error, "Scene material recording changed during texture preparation; retry in the new recording.");
+            return Fail(error,
+                        "Scene material recording changed during texture preparation; retry in the new recording.");
         }
         auto& recording = recordings_[current];
         const auto previous = recording.accepted ? recording.accepted : active_;
@@ -271,10 +275,11 @@ namespace material_graph
     {
         error.clear();
         if (!device_ || !packet.bindings || !packet.pipeline || !packet.pipeline->IsValid() || !packet.ibl ||
-            packet.bindings->device != device_ || packet.bindings->recordingId != device_->GetCurrentUploadRecordingId() ||
-            packet.bindings->descriptorVersion != device_->GetDescriptorVersionToken() ||
-            packet.pipeline->GetDesc().layout != packet.bindings->layout.handle || packet.iblSlot >= 64 ||
-            packet.iblSlot + 1 != packet.bindings->layout.hostParameterCount)
+            packet.bindings->device != device_ ||
+            packet.bindings->recordingId != device_->GetCurrentUploadRecordingId() ||
+            packet.bindings->descriptorVersion != device_->GetDescriptorVersionToken() || !packet.bindings->layout ||
+            packet.pipeline->GetDesc().layout != packet.bindings->layout->handle || packet.iblSlot >= 64 ||
+            packet.iblSlot + 1 != packet.bindings->layout->hostParameterCount)
         {
             return Fail(error, "Scene material packet is incomplete or belongs to another recording.");
         }
@@ -313,29 +318,33 @@ namespace material_graph
         auto& recording = found->second;
         // Acceptance is independent of cache publication. An unknown completion
         // cannot release owners through a later finite fence or tail rejection.
-        recording.completion = recording.submissionAccepted
-            ? (recording.completion == 0 || completion.value == 0 ? 0 : (std::max)(recording.completion, completion.value))
-            : completion.value;
+        recording.completion = recording.submissionAccepted ? (recording.completion == 0 || completion.value == 0
+                                                                   ? 0
+                                                                   : (std::max)(recording.completion, completion.value))
+                                                            : completion.value;
         recording.submissionNotified = true;
         recording.submissionAccepted = true;
         recording.submitted = recording.accepted;
     }
 
-    bool SceneMaterialSlot::PublishSubmitted(std::uint64_t recordingId, RHICompletionPoint completion, std::string& error)
+    bool SceneMaterialSlot::PublishSubmitted(std::uint64_t recordingId, RHICompletionPoint completion,
+                                             std::string& error)
     {
         error.clear();
         const auto found = recordings_.find(recordingId);
         if (found == recordings_.end() || !found->second.submissionAccepted || !completion.value ||
-            found->second.completion != completion.value ||
-            !found->second.submitted || (found->second.publicationDecided && active_ != found->second.submitted) ||
+            found->second.completion != completion.value || !found->second.submitted ||
+            (found->second.publicationDecided && active_ != found->second.submitted) ||
             (active_ && found->second.submitted->serial < active_->serial))
         {
-            return Fail(error, "Scene material publication needs the confirmed submission's exact recording and fence.");
+            return Fail(error,
+                        "Scene material publication needs the confirmed submission's exact recording and fence.");
         }
         if (found->second.submitted->evaluation.gpu &&
             (completed_ < completion.value || !found->second.submitted->evaluation.gpu->IsValidated()))
         {
-            return Fail(error, "Scene GPU material publication awaits completed submission and accepted evaluated input.");
+            return Fail(error,
+                        "Scene GPU material publication awaits completed submission and accepted evaluated input.");
         }
         active_ = found->second.submitted;
         found->second.publicationDecided = true;
@@ -388,7 +397,8 @@ namespace material_graph
         }
         // A recording can have an earlier partial submission. Abort only cancels
         // the unsubmitted tail; those owners still wait for the known fence.
-        if (!found->second.submissionNotified || (found->second.completion != 0 && found->second.completion <= completed_))
+        if (!found->second.submissionNotified ||
+            (found->second.completion != 0 && found->second.completion <= completed_))
         {
             recordings_.erase(found);
         }

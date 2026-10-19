@@ -1345,9 +1345,11 @@ void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const std:
             if (!frame->m_device->MapReadback(readback, image, error))
                 throw std::runtime_error("Completed streaming feedback readback: " + error);
             const auto groups = static_cast<std::uint32_t>(frame->m_meshletInputs->bins[bin].baseVertex);
-            const auto demands = image.Elements<std::uint32_t>();
-            if (demands.size() != FeedbackWords(groups))
+            const std::span demands(image.Elements<std::uint32_t>(), image.data.size() / sizeof(std::uint32_t));
+            if (image.data.size() % sizeof(std::uint32_t) != 0 || demands.size() != FeedbackWords(groups))
+            {
                 throw std::runtime_error("Streaming group feedback extent mismatch.");
+            }
             const auto& stream = frame->m_meshletGeometries[bin]->Input()->ClusterStream();
             auto& collected = pending[stream.get()];
             if (!collected.stream)

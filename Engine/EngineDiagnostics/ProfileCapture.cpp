@@ -18,66 +18,96 @@ namespace ce
         {
             std::mutex lock;
             std::vector<capture_counter> entries{
-                { profile_counter_id::process_cpu_percent, "CPU", "%", counter_category::process },
-                { profile_counter_id::process_ram_mb, "RAM", "MB", counter_category::process },
-                { profile_counter_id::gpu_vram_mb, "VRAM", "MB", counter_category::gpu },
-                { profile_counter_id::lan_send_bytes_per_second, "LAN send", "B/s", counter_category::network },
-                { profile_counter_id::lan_receive_bytes_per_second, "LAN receive", "B/s", counter_category::network },
-                { profile_counter_id::upload_bytes, "Upload", "B", counter_category::render },
-                { profile_counter_id::upload_overflows, "Upload rejected batches", "count", counter_category::render },
-                { profile_counter_id::descriptor_allocations, "Descriptors", "count", counter_category::render },
-                { profile_counter_id::descriptor_overflows, "Descriptor overflow", "count", counter_category::render },
-                { profile_counter_id::draw_calls, "GBuffer draws", "count", counter_category::render },
-                { profile_counter_id::batches, "GBuffer batches", "count", counter_category::render },
-                { profile_counter_id::gc_gen0_collections, "GC Gen0", "count", counter_category::managed },
-                { profile_counter_id::gc_gen1_collections, "GC Gen1", "count", counter_category::managed },
-                { profile_counter_id::gc_gen2_collections, "GC Gen2", "count", counter_category::managed },
-                { profile_counter_id::gc_heap_mb, "GC heap", "MB", counter_category::managed },
-                { profile_counter_id::gc_fragmented_mb, "GC fragmented", "MB", counter_category::managed },
-                { profile_counter_id::gc_pause_percent, "GC pause", "%", counter_category::managed },
-                { profile_counter_id::resource_models, "Models", "count", counter_category::resources },
-                { profile_counter_id::resource_materials, "Materials", "count", counter_category::resources },
-                { profile_counter_id::resource_textures, "Textures", "count", counter_category::resources },
-                { profile_counter_id::resource_proxies, "Render proxies", "count", counter_category::resources },
-                { profile_counter_id::provider_process_us, "Process provider cost", "us", counter_category::process },
-                { profile_counter_id::provider_render_us, "Render provider cost", "us", counter_category::render },
-                { profile_counter_id::provider_gc_us, "GC provider cost", "us", counter_category::managed },
-                { profile_counter_id::provider_resources_us, "Resource provider cost", "us", counter_category::resources },
-                { profile_counter_id::physics_bodies, "Physics.Bodies", "bodies", counter_category::physics },
-                { profile_counter_id::physics_shapes, "Physics.Shapes", "shapes", counter_category::physics },
-                { profile_counter_id::physics_characters, "Physics.Characters", "characters", counter_category::physics },
-                { profile_counter_id::physics_active_bodies, "Physics.Active bodies", "bodies/tick", counter_category::physics },
-                { profile_counter_id::physics_active_shapes, "Physics.Active shapes", "shapes/tick", counter_category::physics },
-                { profile_counter_id::physics_changed_bodies, "Physics.Changed bodies", "bodies/interval", counter_category::physics },
-                { profile_counter_id::physics_changed_shapes, "Physics.Changed shapes", "shapes/interval", counter_category::physics },
-                { profile_counter_id::physics_changed_characters, "Physics.Changed characters", "characters/interval", counter_category::physics },
-                { profile_counter_id::physics_commands_applied, "Physics.Applied commands", "commands/tick", counter_category::physics },
-                { profile_counter_id::physics_commands_failed, "Physics.Failed commands", "commands/tick", counter_category::physics },
-                { profile_counter_id::physics_commands_cancelled, "Physics.Cancelled commands", "commands/tick", counter_category::physics },
-                { profile_counter_id::physics_commands_queued, "Physics.Queued commands", "commands", counter_category::physics },
-                { profile_counter_id::physics_events_stored, "Physics.Stored events", "events/tick", counter_category::physics },
-                { profile_counter_id::physics_required_events, "Physics.Required events", "events/tick", counter_category::physics },
-                { profile_counter_id::physics_dropped_events, "Physics.Dropped events", "events/tick", counter_category::physics },
-                { profile_counter_id::physics_contacts_stored, "Physics.Stored contact points", "points/tick", counter_category::physics },
-                { profile_counter_id::physics_required_contacts, "Physics.Required contact points", "points/tick", counter_category::physics },
-                { profile_counter_id::physics_dropped_contacts, "Physics.Dropped contact points", "points/tick", counter_category::physics },
-                { profile_counter_id::physics_unresolved_identities, "Physics.Unresolved identities", "pairs/tick", counter_category::physics },
-                { profile_counter_id::physics_queries, "Physics.Queries", "queries/interval", counter_category::physics },
-                { profile_counter_id::physics_query_hits, "Physics.Required query hits", "hits/interval", counter_category::physics },
-                { profile_counter_id::physics_query_overflows, "Physics.Query overflows", "queries/interval", counter_category::physics },
-                { profile_counter_id::physics_workers, "Physics.SDK workers", "workers", counter_category::physics },
-                { profile_counter_id::physics_tasks_submitted, "Physics.SDK tasks submitted", "tasks/interval", counter_category::physics },
-                { profile_counter_id::physics_tasks_completed, "Physics.SDK tasks completed", "tasks/interval", counter_category::physics },
-                { profile_counter_id::physics_tasks_inline, "Physics.Inline SDK tasks", "tasks/interval", counter_category::physics },
-                { profile_counter_id::physics_snapshot_buffers, "Physics.Snapshot buffers", "buffers", counter_category::physics },
-                { profile_counter_id::physics_snapshot_buffers_in_use, "Physics.Snapshot buffers in use", "buffers", counter_category::physics },
-                { profile_counter_id::physics_tick_buffer_bytes, "Physics.Tick buffer capacity", "B", counter_category::physics },
-                { profile_counter_id::physics_tick_buffer_peak_bytes, "Physics.Peak tick buffer capacity", "B", counter_category::physics },
-                { profile_counter_id::physics_query_scratch_peak_bytes, "Physics.Peak query stack scratch", "B", counter_category::physics },
-                { profile_counter_id::physics_step_failed, "Physics.Step failed", "0/1", counter_category::physics },
-                { profile_counter_id::physics_command_rejections, "Physics.Rejected input commands", "commands/interval", counter_category::physics },
-                { profile_counter_id::physics_command_overflows, "Physics.Input queue overflows", "commands/interval", counter_category::physics },
-                { profile_counter_id::physics_max_command_wait_ticks, "Physics.Maximum command residence", "ticks", counter_category::physics },
+                {profile_counter_id::process_cpu_percent, "CPU", "%", counter_category::process},
+                {profile_counter_id::process_ram_mb, "RAM", "MB", counter_category::process},
+                {profile_counter_id::gpu_vram_mb, "VRAM", "MB", counter_category::gpu},
+                {profile_counter_id::lan_send_bytes_per_second, "LAN send", "B/s", counter_category::network},
+                {profile_counter_id::lan_receive_bytes_per_second, "LAN receive", "B/s", counter_category::network},
+                {profile_counter_id::upload_bytes, "Upload", "B", counter_category::render},
+                {profile_counter_id::upload_overflows, "Upload rejected batches", "count", counter_category::render},
+                {profile_counter_id::descriptor_allocations, "Descriptors", "count", counter_category::render},
+                {profile_counter_id::descriptor_overflows, "Descriptor overflow", "count", counter_category::render},
+                {profile_counter_id::draw_calls, "GBuffer draws", "count", counter_category::render},
+                {profile_counter_id::batches, "GBuffer batches", "count", counter_category::render},
+                {profile_counter_id::gc_gen0_collections, "GC Gen0", "count", counter_category::managed},
+                {profile_counter_id::gc_gen1_collections, "GC Gen1", "count", counter_category::managed},
+                {profile_counter_id::gc_gen2_collections, "GC Gen2", "count", counter_category::managed},
+                {profile_counter_id::gc_heap_mb, "GC heap", "MB", counter_category::managed},
+                {profile_counter_id::gc_fragmented_mb, "GC fragmented", "MB", counter_category::managed},
+                {profile_counter_id::gc_pause_percent, "GC pause", "%", counter_category::managed},
+                {profile_counter_id::resource_models, "Models", "count", counter_category::resources},
+                {profile_counter_id::resource_materials, "Materials", "count", counter_category::resources},
+                {profile_counter_id::resource_textures, "Textures", "count", counter_category::resources},
+                {profile_counter_id::resource_proxies, "Render proxies", "count", counter_category::resources},
+                {profile_counter_id::provider_process_us, "Process provider cost", "us", counter_category::process},
+                {profile_counter_id::provider_render_us, "Render provider cost", "us", counter_category::render},
+                {profile_counter_id::provider_gc_us, "GC provider cost", "us", counter_category::managed},
+                {profile_counter_id::provider_resources_us, "Resource provider cost", "us",
+                 counter_category::resources},
+                {profile_counter_id::physics_bodies, "Physics.Bodies", "bodies", counter_category::physics},
+                {profile_counter_id::physics_shapes, "Physics.Shapes", "shapes", counter_category::physics},
+                {profile_counter_id::physics_characters, "Physics.Characters", "characters", counter_category::physics},
+                {profile_counter_id::physics_active_bodies, "Physics.Active bodies", "bodies/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_active_shapes, "Physics.Active shapes", "shapes/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_changed_bodies, "Physics.Changed bodies", "bodies/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_changed_shapes, "Physics.Changed shapes", "shapes/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_changed_characters, "Physics.Changed characters", "characters/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_commands_applied, "Physics.Applied commands", "commands/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_commands_failed, "Physics.Failed commands", "commands/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_commands_cancelled, "Physics.Cancelled commands", "commands/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_commands_queued, "Physics.Queued commands", "commands",
+                 counter_category::physics},
+                {profile_counter_id::physics_events_stored, "Physics.Stored events", "events/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_required_events, "Physics.Required events", "events/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_dropped_events, "Physics.Dropped events", "events/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_contacts_stored, "Physics.Stored contact points", "points/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_required_contacts, "Physics.Required contact points", "points/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_dropped_contacts, "Physics.Dropped contact points", "points/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_unresolved_identities, "Physics.Unresolved identities", "pairs/tick",
+                 counter_category::physics},
+                {profile_counter_id::physics_queries, "Physics.Queries", "queries/interval", counter_category::physics},
+                {profile_counter_id::physics_query_hits, "Physics.Required query hits", "hits/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_query_overflows, "Physics.Query overflows", "queries/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_workers, "Physics.SDK workers", "workers", counter_category::physics},
+                {profile_counter_id::physics_tasks_submitted, "Physics.SDK tasks submitted", "tasks/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_tasks_completed, "Physics.SDK tasks completed", "tasks/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_tasks_inline, "Physics.Inline SDK tasks", "tasks/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_snapshot_buffers, "Physics.Snapshot buffers", "buffers",
+                 counter_category::physics},
+                {profile_counter_id::physics_snapshot_buffers_in_use, "Physics.Snapshot buffers in use", "buffers",
+                 counter_category::physics},
+                {profile_counter_id::physics_tick_buffer_bytes, "Physics.Tick buffer capacity", "B",
+                 counter_category::physics},
+                {profile_counter_id::physics_tick_buffer_peak_bytes, "Physics.Peak tick buffer capacity", "B",
+                 counter_category::physics},
+                {profile_counter_id::physics_query_scratch_peak_bytes, "Physics.Peak query stack scratch", "B",
+                 counter_category::physics},
+                {profile_counter_id::physics_step_failed, "Physics.Step failed", "0/1", counter_category::physics},
+                {profile_counter_id::physics_command_rejections, "Physics.Rejected input commands", "commands/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_command_overflows, "Physics.Input queue overflows", "commands/interval",
+                 counter_category::physics},
+                {profile_counter_id::physics_max_command_wait_ticks, "Physics.Maximum command residence", "ticks",
+                 counter_category::physics},
             };
         };
         registry& instance()
@@ -85,10 +115,9 @@ namespace ce
             static registry value;
             return value;
         }
-    }
+    } // namespace detail::counter_registry_impl
 
-    profile_counter_id register_counter(std::string_view name, std::string_view unit,
-                                        counter_category category)
+    profile_counter_id register_counter(std::string_view name, std::string_view unit, counter_category category)
     {
         if (name.empty() || name.size() > 255 || unit.size() > 32)
         {
@@ -100,8 +129,7 @@ namespace ce
         {
             if (entry.name == name)
             {
-                return entry.unit == unit && entry.category == category
-                    ? entry.id : static_cast<profile_counter_id>(0);
+                return entry.unit == unit && entry.category == category ? entry.id : static_cast<profile_counter_id>(0);
             }
         }
         if (registry.entries.size() >= (std::numeric_limits<std::uint16_t>::max)())
@@ -109,7 +137,7 @@ namespace ce
             return static_cast<profile_counter_id>(0);
         }
         const auto id = static_cast<profile_counter_id>(registry.entries.size() + 1);
-        registry.entries.push_back({ id, std::string(name), std::string(unit), category });
+        registry.entries.push_back({id, std::string(name), std::string(unit), category});
         return id;
     }
 
@@ -176,8 +204,7 @@ namespace ce
         return 0;
     }
 
-    const capture_counter* find_counter(std::span<const capture_counter> counters,
-                                        profile_counter_id id)
+    const capture_counter* find_counter(std::span<const capture_counter> counters, profile_counter_id id)
     {
         const auto number = static_cast<std::uint16_t>(id);
         if (number > 0 && number <= counters.size() && counters[number - 1].id == id)
@@ -196,11 +223,7 @@ namespace ce
 
     const profile_event& frame_events::operator[](std::size_t index) const
     {
-        ::ce::contracts::assert_that(
-            [&]() -> bool {
-                return static_cast<bool>((index < m_count));
-            },
-            "index < m_count");
+        ::ce::contracts::assert_that([&]() -> bool { return static_cast<bool>((index < m_count)); }, "index < m_count");
         std::size_t low = 0;
         std::size_t high = m_segments.size();
         while (low + 1 < high)
@@ -222,45 +245,40 @@ namespace ce
 
     void frame_events::materialize()
     {
-        if (m_segments.size() == 1 && m_segments[0].owned
-            && m_segments[0].owned.use_count() == 1 && m_segments[0].offset == 0
-            && m_segments[0].count == m_segments[0].owned->size())
+        if (m_segments.size() == 1 && m_segments[0].owned && m_segments[0].owned.use_count() == 1 &&
+            m_segments[0].offset == 0 && m_segments[0].count == m_segments[0].owned->size())
         {
             return;
         }
-        auto values = std::make_shared<std::vector<profile_event>>();
+        auto values = std::allocate_shared<std::vector<profile_event, capture_allocator<profile_event>>>(
+            capture_allocator<std::vector<profile_event, capture_allocator<profile_event>>>{});
         values->reserve(m_count);
         for (const profile_event& value : *this)
         {
             values->push_back(value);
         }
         m_segments.clear();
-        m_segments.push_back(segment{ {}, std::move(values), 0, 0,
-            static_cast<std::uint32_t>(m_count) });
+        m_segments.push_back(segment{{}, std::move(values), 0, 0, static_cast<std::uint32_t>(m_count)});
         m_memoryBytes = m_segments[0].owned->capacity() * sizeof(profile_event);
     }
 
     profile_event& frame_events::mutable_at(std::size_t index)
     {
-        ::ce::contracts::assert_that(
-            [&]() -> bool {
-                return static_cast<bool>((index < m_count));
-            },
-            "index < m_count");
+        ::ce::contracts::assert_that([&]() -> bool { return static_cast<bool>((index < m_count)); }, "index < m_count");
         materialize();
         return (*m_segments[0].owned)[index];
     }
 
     void frame_events::push_back(const profile_event& value)
     {
-        if (m_segments.empty() || !m_segments.back().owned
-            || m_segments.back().owned.use_count() != 1
-            || m_segments.back().offset + m_segments.back().count != m_segments.back().owned->size())
+        if (m_segments.empty() || !m_segments.back().owned || m_segments.back().owned.use_count() != 1 ||
+            m_segments.back().offset + m_segments.back().count != m_segments.back().owned->size())
         {
-            auto values = std::make_shared<std::vector<profile_event>>();
+            auto values = std::allocate_shared<std::vector<profile_event, capture_allocator<profile_event>>>(
+                capture_allocator<std::vector<profile_event, capture_allocator<profile_event>>>{});
             values->reserve(8);
             m_memoryBytes += values->capacity() * sizeof(profile_event);
-            m_segments.push_back(segment{ {}, std::move(values), m_count, 0, 0 });
+            m_segments.push_back(segment{{}, std::move(values), m_count, 0, 0});
         }
         segment& last = m_segments.back();
         const std::size_t before = last.owned->capacity();
@@ -285,18 +303,14 @@ namespace ce
         m_memoryBytes = m_segments[0].owned->capacity() * sizeof(profile_event);
     }
 
-    void frame_events::append_page(std::shared_ptr<const event_chunk> page,
-                                   std::uint32_t offset, std::uint32_t count)
+    void frame_events::append_page(std::shared_ptr<const event_chunk> page, std::uint32_t offset, std::uint32_t count)
     {
         if (!page || count == 0)
         {
             return;
         }
-        ::ce::contracts::assert_that(
-            [&]() -> bool {
-                return static_cast<bool>((offset + count <= page->count));
-            },
-            "offset + count <= page->count");
+        ::ce::contracts::assert_that([&]() -> bool { return static_cast<bool>((offset + count <= page->count)); },
+                                     "offset + count <= page->count");
         // Sparse producer pages must return to the bounded pool promptly. Keeping
         // one whole page for a few events can exhaust producers before ring trim.
         // Dense ranges retain the zero-copy path; owned segments remain copy-on-write.
@@ -327,7 +341,7 @@ namespace ce
                 break;
             }
         }
-        m_segments.push_back(segment{ std::move(page), {}, m_count, offset, count });
+        m_segments.push_back(segment{std::move(page), {}, m_count, offset, count});
         m_count += count;
         if (firstReference)
         {
@@ -362,7 +376,7 @@ namespace ce
         }
         else
         {
-            m_segments.push_back(segment{ {}, value.owned, m_count, offset, count });
+            m_segments.push_back(segment{{}, value.owned, m_count, offset, count});
         }
         m_count += count;
         if (firstReference)
@@ -384,8 +398,8 @@ namespace ce
             {
                 const auto classify = [&](std::uint32_t index)
                 {
-                    const profile_event& value = part.page ? part.page->events[part.offset + index]
-                                                          : (*part.owned)[part.offset + index];
+                    const profile_event& value =
+                        part.page ? part.page->events[part.offset + index] : (*part.owned)[part.offset + index];
                     if (value.tick_end <= begin || value.tick_end < value.tick_begin)
                     {
                         return 0;
@@ -421,27 +435,18 @@ namespace ce
     // capture_session
     //-------------------------------------------------------------------------
 
-    capture_session::capture_session(std::vector<frame_record>   frames,
-                                     std::vector<thread_info>    threads,
-                                     std::vector<capture_marker> markers,
-                                     capture_environment         environment,
-                                     bool                        complete,
-                                     std::uint32_t               unacked_streams,
-                                     std::uint64_t               dropped_counters,
+    capture_session::capture_session(std::vector<frame_record> frames, std::vector<thread_info> threads,
+                                     std::vector<capture_marker> markers, capture_environment environment,
+                                     bool complete, std::uint32_t unacked_streams, std::uint64_t dropped_counters,
                                      std::vector<capture_counter> counters)
-        : m_frames(std::move(frames))
-        , m_threads(std::move(threads))
-        , m_markers(std::move(markers))
-        , m_counters(std::move(counters))
-        , m_environment(environment)
-        , m_droppedCounters(dropped_counters)
-        , m_complete(complete)
-        , m_unackedStreams(unacked_streams)
+        : m_frames(std::move(frames)), m_threads(std::move(threads)), m_markers(std::move(markers)),
+          m_counters(std::move(counters)), m_environment(environment), m_droppedCounters(dropped_counters),
+          m_complete(complete), m_unackedStreams(unacked_streams)
     {
         if (m_counters.empty())
         {
             auto builtins = snapshot_counters();
-            m_counters.assign(builtins.begin(), builtins.begin() + (std::min)(builtins.size(), std::size_t{ 25 }));
+            m_counters.assign(builtins.begin(), builtins.begin() + (std::min)(builtins.size(), std::size_t{25}));
         }
         for (const frame_record& frame : m_frames)
         {
@@ -458,8 +463,7 @@ namespace ce
         {
             return 0.0;
         }
-        return static_cast<double>(ticks) * 1000.0 /
-               static_cast<double>(m_environment.ticks_per_second);
+        return static_cast<double>(ticks) * 1000.0 / static_cast<double>(m_environment.ticks_per_second);
     }
 
     std::uint32_t capture_session::marker_count() const
@@ -484,9 +488,9 @@ namespace ce
     const frame_record* capture_session::find_frame(std::uint32_t engine_frame) const
     {
         // 프레임은 증가 순으로 들어오므로 이분 탐색이 성립한다.
-        const auto found = std::lower_bound(
-            m_frames.begin(), m_frames.end(), engine_frame,
-            [](const frame_record& record, std::uint32_t value) { return record.engine_frame < value; });
+        const auto found = std::lower_bound(m_frames.begin(), m_frames.end(), engine_frame,
+                                            [](const frame_record& record, std::uint32_t value)
+                                            { return record.engine_frame < value; });
 
         if (found == m_frames.end() || found->engine_frame != engine_frame)
         {
@@ -528,8 +532,8 @@ namespace ce
         m_lateEventsDropped = 0;
     }
 
-    void capture_ring::ingest(event_chunk* sealed_list, std::shared_ptr<chunk_pool> pool,
-                              std::uint64_t generation, profile_tick frame_begin_tick)
+    void capture_ring::ingest(event_chunk* sealed_list, std::shared_ptr<chunk_pool> pool, std::uint64_t generation,
+                              profile_tick frame_begin_tick)
     {
         while (sealed_list)
         {
@@ -537,15 +541,12 @@ namespace ce
             sealed_list->next = nullptr;
             // 캡처가 이 페이지의 마지막 참조를 놓아야 free 목록에 돌아간다.
             // 풀도 함께 붙잡으므로 서비스 종료 뒤의 얼린 캡처가 안전하다.
-            std::shared_ptr<const event_chunk> page(sealed_list,
-                [pool](const event_chunk* value)
-                {
-                    pool->release(const_cast<event_chunk*>(value));
-                });
-            if (page->magic != kProfilePageMagic || page->version != kProfilePageVersion
-                || page->event_bytes != sizeof(profile_event)
-                || page->count > kEventsPerChunk
-                || page->render_measurement_count > kRenderMeasurementsPerChunk)
+            std::shared_ptr<const event_chunk> page(
+                sealed_list, [pool](const event_chunk* value) { pool->release(const_cast<event_chunk*>(value)); },
+                capture_allocator<event_chunk>{});
+            if (page->magic != kProfilePageMagic || page->version != kProfilePageVersion ||
+                page->event_bytes != sizeof(profile_event) || page->count > kEventsPerChunk ||
+                page->render_measurement_count > kRenderMeasurementsPerChunk)
             {
                 ++m_malformedPages;
                 note_dropped((std::min)(page->count, kEventsPerChunk));
@@ -603,8 +604,7 @@ namespace ce
                 for (std::uint32_t i = 0; i < page->count; ++i)
                 {
                     const profile_event& value = page->events[i];
-                    if (!m_frames.empty() && value.tick_end <= frame_begin_tick
-                        && place_by_tick(value, page, i))
+                    if (!m_frames.empty() && value.tick_end <= frame_begin_tick && place_by_tick(value, page, i))
                     {
                         continue;
                     }
@@ -615,8 +615,7 @@ namespace ce
         }
     }
 
-    bool capture_ring::place_by_tick(const profile_event& value,
-                                     const std::shared_ptr<const event_chunk>& page,
+    bool capture_ring::place_by_tick(const profile_event& value, const std::shared_ptr<const event_chunk>& page,
                                      std::uint32_t offset)
     {
         // 뒤에서부터 찾는다. 늦게 오는 것은 대개 가장 최근 몇 프레임의 것이다.
@@ -648,8 +647,7 @@ namespace ce
         return true;
     }
 
-    void capture_ring::place_late_span(const profile_event& value,
-                                       const std::shared_ptr<const event_chunk>& page,
+    void capture_ring::place_late_span(const profile_event& value, const std::shared_ptr<const event_chunk>& page,
                                        std::uint32_t offset)
     {
         // 뒤에서부터 찾는다. 늦게 오는 것은 대개 가장 최근 몇 프레임의 것이고,
@@ -747,7 +745,7 @@ namespace ce
                 if (counter_loss_trace_enabled())
                 {
                     std::fprintf(stderr, "[profile.counter.skipped-frame] counterFrame=%u closedFrame=%u id=%u\n",
-                        value.frame, engine_frame, static_cast<unsigned>(value.sample.id));
+                                 value.frame, engine_frame, static_cast<unsigned>(value.sample.id));
                 }
                 ++m_droppedCounters;
             }
@@ -854,17 +852,15 @@ namespace ce
             ++m_droppedCounters;
             return;
         }
-        m_deferredCounters.push_back({ engine_frame, sample });
+        m_deferredCounters.push_back({engine_frame, sample});
     }
 
     void capture_ring::discard_deferred_counters_before(std::uint32_t engine_frame)
     {
         // Record may be requested while the game thread advances. Samples from
         // submissions older than the first boundary never belonged to this capture.
-        std::erase_if(m_deferredCounters, [engine_frame](const deferred_counter& sample)
-        {
-            return sample.frame < engine_frame;
-        });
+        std::erase_if(m_deferredCounters,
+                      [engine_frame](const deferred_counter& sample) { return sample.frame < engine_frame; });
     }
 
     void capture_ring::trim()
@@ -923,12 +919,12 @@ namespace ce
         m_deferredRenderMeasurements.clear();
         if (counter_loss_trace_enabled())
         {
-            std::fprintf(stderr, "[profile.counter.pending-loss] count=%zu lastFrame=%u\n",
-                m_deferredCounters.size(), m_frames.empty() ? 0 : m_frames.back().engine_frame);
+            std::fprintf(stderr, "[profile.counter.pending-loss] count=%zu lastFrame=%u\n", m_deferredCounters.size(),
+                         m_frames.empty() ? 0 : m_frames.back().engine_frame);
             for (std::size_t i = 0; i < std::min<std::size_t>(8, m_deferredCounters.size()); ++i)
             {
-                std::fprintf(stderr, "[profile.counter.pending-loss] frame=%u id=%u\n",
-                    m_deferredCounters[i].frame, static_cast<unsigned>(m_deferredCounters[i].sample.id));
+                std::fprintf(stderr, "[profile.counter.pending-loss] frame=%u id=%u\n", m_deferredCounters[i].frame,
+                             static_cast<unsigned>(m_deferredCounters[i].sample.id));
             }
         }
 
@@ -943,20 +939,19 @@ namespace ce
         return retired;
     }
 
-    capture_session_ptr capture_ring::freeze(std::span<const thread_info> threads,
-                                             capture_environment environment,
+    capture_session_ptr capture_ring::freeze(std::span<const thread_info> threads, capture_environment environment,
                                              bool complete, std::uint32_t unacked_streams) const
     {
         // 프레임 인덱스와 페이지 참조만 복사한다. 이벤트 본문은 봉인된
         // 페이지에 남으므로 라이브 스냅샷을 반복해도 본문을 다시 복사하지 않는다.
         std::vector<frame_record> frames(m_frames.begin(), m_frames.end());
-        std::vector<thread_info>  thread_list(threads.begin(), threads.end());
+        std::vector<thread_info> thread_list(threads.begin(), threads.end());
 
         // ★ 어휘도 **이 순간**의 것을 함께 뜬다(P6). 얼린 뒤에 등록되는
         //   마커는 이 캡처의 뜻이 아니고, 파일로 나갔다 돌아온 캡처는 이
         //   표 없이는 제 이름을 말할 수 없다.
-        return std::make_shared<const capture_session>(
-            std::move(frames), std::move(thread_list), snapshot_markers(),
-            environment, complete, unacked_streams, m_droppedCounters, snapshot_counters());
+        return std::make_shared<const capture_session>(std::move(frames), std::move(thread_list), snapshot_markers(),
+                                                       environment, complete, unacked_streams, m_droppedCounters,
+                                                       snapshot_counters());
     }
-}
+} // namespace ce

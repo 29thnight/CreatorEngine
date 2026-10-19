@@ -169,7 +169,7 @@ LXSceneRuntimeEffects0 LXSceneRuntimeEffects0PS(LXSceneVertex input, bool frontF
 {
     if (input.reconstruction == 0u) return LXSceneRuntimeEffects0PSEvaluate(input, frontFace);
     input.clip.xy += float2(lx_effectSourceX, lx_effectSourceY);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     LXSceneRuntimeEffects0 output = (LXSceneRuntimeEffects0)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
@@ -201,7 +201,7 @@ LXSceneRuntimeEffects1 LXSceneRuntimeEffects1PS(LXSceneVertex input, bool frontF
 {
     if (input.reconstruction == 0u) return LXSceneRuntimeEffects1PSEvaluate(input, frontFace);
     input.clip.xy += float2(lx_effectSourceX, lx_effectSourceY);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy));
+    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
     LXSceneRuntimeEffects1 output = (LXSceneRuntimeEffects1)0;
     [loop] for (uint lane = 0u; lane < 4u; ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);

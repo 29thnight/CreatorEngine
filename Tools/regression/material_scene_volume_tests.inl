@@ -1,4 +1,5 @@
-VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface)
+VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface,
+                              std::optional<RHIShaderBinary> target = std::nullopt)
 {
     LXMaterialAsset asset;
     const auto volume = asset.CreateNode("LXPrincipledVolume", 0, 0);
@@ -41,19 +42,20 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface)
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(program && program->volume && program->slang.find("LX_MATERIAL_VOLUME_HOMOGENEOUS 1") != std::string::npos,
           "Uniform Volume classification");
-    const auto product = CookedScene(*program, surface ? "volume-surface-product" : "volume-product");
+    const auto product = CookedScene(*program, surface ? "volume-surface-product" : "volume-product", target);
     std::string error;
-    for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+    const auto targets = target ? std::vector{*target} : std::vector{RHIShaderBinary::Dxil, RHIShaderBinary::SpirV};
+    for (const auto backend : targets)
     {
         LX::Runtime::ComputeShaderDescription identity;
         Check(DescribeComputeShader(product, backend, "LXSceneVolumeCoefficientCS", identity, error) &&
-              identity.compile.backend == backend && identity.compile.profile == "cs_6_0" &&
-              identity.compile.sealedProgramIdentity == product.program.semanticKey,
+                  identity.compile.backend == backend && identity.compile.profile == "cs_6_0" &&
+                  identity.compile.sealedProgramIdentity == product.program.semanticKey,
               "Volume cooked compute identity: " + error);
         const auto accepted = identity;
         Check(!DescribeComputeShader(product, backend, "missing", identity, error) &&
-              identity.compile.entry == accepted.compile.entry &&
-              identity.compile.sealedProgramIdentity == accepted.compile.sealedProgramIdentity,
+                  identity.compile.entry == accepted.compile.entry &&
+                  identity.compile.sealedProgramIdentity == accepted.compile.sealedProgramIdentity,
               "Rejected cooked compute stage preserves accepted identity");
     }
     return product;
@@ -181,10 +183,11 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const own::shared_owner<const Texture>& image, const own::shared_owner<const Texture>& cube,
-                    const own::shared_owner<const Instance>& surfaceBackground)
+                    const own::shared_owner<const Instance>& surfaceBackground,
+                    std::optional<RHIShaderBinary> target = std::nullopt)
 {
     const auto background = SceneCooked(surfaceBackground);
-    const std::array products{VolumeProduct(root, false), VolumeProduct(root, true)};
+    const std::array products{VolumeProduct(root, false, target), VolumeProduct(root, true, target)};
     GenerationStore store;
     experiment::AssetId graphId;
     Check(Uuid::TryParse("BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB", graphId.value), "Volume graph identity");

@@ -5,8 +5,8 @@
 
 namespace job_detail
 {
-struct completion_state;
-struct scheduler_state;
+    struct completion_state;
+    struct scheduler_state;
 } // namespace job_detail
 
 // Copyable completion token. Dropping it never cancels or waits for the work.
@@ -19,6 +19,9 @@ class job_handle
     // Reports this job's error, after its callbacks/captures have been released.
     // An incomplete wait from a pool worker is rejected; use submit_after instead.
     void wait() const;
+    // Explicit owner participation. No incomplete worker wait and no callback
+    // under a completion mutex; ordinary wait() keeps its blocking semantics.
+    void wait_assisting() const;
 
   private:
     friend class job_scheduler;
@@ -44,10 +47,7 @@ class job_group
     // failure before a task body runs. Invoked after task captures are released,
     // before the completion token becomes ready; observer captures are also
     // released before readiness. May run inline during submit_after.
-    void on_complete(std::function<void(std::exception_ptr)> observer)
-    {
-        terminal_observer_ = std::move(observer);
-    }
+    void on_complete(std::function<void(std::exception_ptr)> observer) { terminal_observer_ = std::move(observer); }
     std::size_t size() const noexcept { return tasks_.size(); }
     bool empty() const noexcept { return tasks_.empty(); }
 
@@ -96,5 +96,5 @@ class job_scheduler
 
 namespace ce
 {
-job_scheduler& get_job_scheduler();
+    job_scheduler& get_job_scheduler();
 }

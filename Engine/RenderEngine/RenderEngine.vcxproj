@@ -775,6 +775,8 @@
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />
     <ClInclude Include="MaterialGraphPacketWork.h" />
+    <ClInclude Include="MaterialGraphBindingDiagnostics.h" />
+    <ClInclude Include="MaterialGraphPreparationTasks.h" />
     <ClInclude Include="MaterialGraphResidentBuffer.h" />
     <ClInclude Include="MaterialGraphSceneGpuData.h" />
     <ClInclude Include="MaterialGraphWork.h" />

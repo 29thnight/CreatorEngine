@@ -15,7 +15,8 @@ namespace material_graph
 
         bool Finite(std::span<const float> values)
         {
-            return std::ranges::all_of(values, [](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; });
+            return std::ranges::all_of(values,
+                                       [](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; });
         }
 
         bool ValidInput(const SurfacePoint& point, const SurfaceView& view)
@@ -25,9 +26,11 @@ namespace material_graph
             {
                 return false;
             }
-            const auto direction = [](const IblVector& value) { return std::hypot(value[0], value[1], value[2]) > 1e-10; };
-            const double distance = std::hypot(double(view.eye[0]) - point.position[0], double(view.eye[1]) - point.position[1],
-                                               double(view.eye[2]) - point.position[2]);
+            const auto direction = [](const IblVector& value)
+            { return std::hypot(value[0], value[1], value[2]) > 1e-10; };
+            const double distance =
+                std::hypot(double(view.eye[0]) - point.position[0], double(view.eye[1]) - point.position[1],
+                           double(view.eye[2]) - point.position[2]);
             return direction(point.normal) && ValidSurfaceTangentPair(point) && distance > 1e-10;
         }
     } // namespace
@@ -45,24 +48,27 @@ namespace material_graph
     }
 
     bool VerifySurfaceProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& file,
-                              std::span<const CompileTarget> targets, RHIShaderCompileOptions options, const Budget& budget,
-                              VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                              std::span<const CompileTarget> targets, RHIShaderCompileOptions options,
+                              const Budget& budget, VerifiedProduct& result,
+                              std::vector<LX::LXMaterialDiagnostic>& diagnostics)
     {
         std::ifstream input(file, std::ios::binary);
         const std::string source{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
         if (!input || source != BuildSurfaceSource(program) || targets.size() != 6 ||
-            !std::ranges::all_of(targets, [](const CompileTarget& target) {
-                return (target.entry == "LXEvaluateSurface" && target.profile == "cs_6_0") ||
-                       (target.entry == "LXSurfaceVS" && target.profile == "vs_6_0") ||
-                       (target.entry == "LXSurfacePS" && target.profile == "ps_6_0");
-            }))
+            !std::ranges::all_of(targets,
+                                 [](const CompileTarget& target)
+                                 {
+                                     return (target.entry == "LXEvaluateSurface" && target.profile == "cs_6_0") ||
+                                            (target.entry == "LXSurfaceVS" && target.profile == "vs_6_0") ||
+                                            (target.entry == "LXSurfacePS" && target.profile == "ps_6_0");
+                                 }))
         {
             diagnostics.push_back(
                 {"MAT_SURFACE_HOST", "Surface product needs the exact spatial evaluation/reference host and targets."});
             return false;
         }
-        return VerifyProduct(program, file, targets, {}, std::move(options), {.coreForward = true, .layeredLookup = true},
-                             budget, result, diagnostics);
+        return VerifyProduct(program, file, targets, {}, std::move(options),
+                             {.coreForward = true, .layeredLookup = true}, budget, result, diagnostics);
     }
 
     SurfaceBatch::~SurfaceBatch()
@@ -148,9 +154,9 @@ namespace material_graph
                     return Fail(error, "Surface evaluator has duplicate backend CS artifacts.");
                 }
                 const auto name = backend == RHIShaderBinary::Dxil ? "dxil" : "spirv";
-                const auto artifact = std::ranges::find_if(product.shaders, [&](const auto& value) {
-                    return value.backend == name && value.entryPoint == target.entry;
-                });
+                const auto artifact =
+                    std::ranges::find_if(product.shaders, [&](const auto& value)
+                                         { return value.backend == name && value.entryPoint == target.entry; });
                 if (artifact == product.shaders.end())
                 {
                     return Fail(error, "Surface evaluator has no matching CS bytes.");
@@ -162,7 +168,8 @@ namespace material_graph
         {
             return Fail(error, "Surface evaluator has no cooked backend CS artifact.");
         }
-        const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::UavBufferTable(1, 0)};
+        const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(0), RHILayout::Srv(0),
+                                                  RHILayout::UavBufferTable(1, 0)};
         PassLayout layout;
         if (!CreatePassLayout(roots, product.layout, parameters, {}, false, layout, error))
         {
@@ -224,8 +231,8 @@ namespace material_graph
         // 소유한 bindings로 첫 자원 참조 전에 준비하고, 아래 기록에서는 확정된
         // 테이블만 사용한다. 실패하면 기존 result와 제출된 자원 수명은 그대로다.
         RenderBindingCache::PreparedPass material;
-        if (!RenderBindingCache::PreparePass(device, *candidate->bindings_, candidate->bindings_->layout,
-                                             material, error))
+        if (!RenderBindingCache::PreparePass(device, *candidate->bindings_, *candidate->bindings_->layout, material,
+                                             error))
         {
             return false;
         }
@@ -234,7 +241,8 @@ namespace material_graph
             return Fail(error, "Surface material table preparation changed recording/descriptors.");
         }
         auto& encoder = device.GetImmediateEncoder();
-        const RHIBufferTransition before{candidate->Buffer(), RHIResourceState::Common, RHIResourceState::UnorderedAccess};
+        const RHIBufferTransition before{candidate->Buffer(), RHIResourceState::Common,
+                                         RHIResourceState::UnorderedAccess};
         encoder.ResourceBarriers({{}, {&before, 1}});
         if (!candidate->RecordCommands(encoder, error, &material))
         {
@@ -253,31 +261,36 @@ namespace material_graph
                                       std::shared_ptr<const SurfaceBatch>& result, std::string& error)
     {
         if (!source || source->Device() != &device || !source->Buffer().IsValid() || source->Count() == 0 ||
-            source->Count() > IblBaker::MaxPoints || (!source->IsReadyForEvaluation() && !source->IsPreparedForGraph()) ||
+            source->Count() > IblBaker::MaxPoints ||
+            (!source->IsReadyForEvaluation() && !source->IsPreparedForGraph()) ||
             (source->RecordingId() != device.GetCurrentUploadRecordingId() && !source->IsValidated()))
         {
-            return Fail(error, "Surface preparation needs a current graph source or an accepted completed geometry owner.");
+            return Fail(error,
+                        "Surface preparation needs a current graph source or an accepted completed geometry owner.");
         }
         const auto view = source->View();
         return PrepareInputs(device, std::move(bindings), view, {}, std::move(source), result, error);
     }
 
-    bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
-                                         const SurfaceView& view, std::span<const SurfacePoint> points,
+    bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device,
+                                         own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,
+                                         std::span<const SurfacePoint> points,
                                          std::shared_ptr<const SurfaceGeometrySource> mesh,
                                          std::shared_ptr<const SurfaceBatch>& result, std::string& error)
     {
         const auto recordingId = device.GetCurrentUploadRecordingId();
         const auto descriptorVersion = device.GetDescriptorVersionToken();
-        if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || recordingId == 0 || !bindings || !bindings->instance ||
-            !bindings->instance->generation || bindings->layout.handle != layout_.handle ||
-            bindings->layout.material != layout_.material ||
-            bindings->instance->generation->cooked.product.program.semanticKey != semanticKey_ || view.sceneEpoch == 0 ||
-            view.viewRevision == 0 || view.geometryRevision == 0 || !Finite(view.eye) ||
-            (!mesh && (points.empty() || points.size() > IblBaker::MaxPoints ||
-                       !std::ranges::all_of(points, [&](const SurfacePoint& point) { return ValidInput(point, view); }))))
+        if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || recordingId == 0 || !bindings ||
+            !bindings->instance || !bindings->instance->generation || !bindings->layout ||
+            bindings->layout->handle != layout_.handle || bindings->layout->material != layout_.material ||
+            bindings->instance->generation->cooked.product.program.semanticKey != semanticKey_ ||
+            view.sceneEpoch == 0 || view.viewRevision == 0 || view.geometryRevision == 0 || !Finite(view.eye) ||
+            (!mesh &&
+             (points.empty() || points.size() > IblBaker::MaxPoints ||
+              !std::ranges::all_of(points, [&](const SurfacePoint& point) { return ValidInput(point, view); }))))
         {
-            return Fail(error, "Surface evaluation needs matching bindings and finite spatial/view inputs in a recording.");
+            return Fail(error,
+                        "Surface evaluation needs matching bindings and finite spatial/view inputs in a recording.");
         }
         if (!RenderBindingCache::Validate(device, *bindings, error))
         {
@@ -315,7 +328,8 @@ namespace material_graph
         if (!candidate->inputs_.IsValid() || (!candidate->mesh_ && !candidate->inputs_.IsWritable()) ||
             !candidate->uniform_.IsValid() || !candidate->output_.IsValid() || !candidate->IsPreparedForGraph())
         {
-            return Fail(error, "Surface allocation failed or changed recording/descriptors; accepted batch is retained.");
+            return Fail(error,
+                        "Surface allocation failed or changed recording/descriptors; accepted batch is retained.");
         }
         if (!candidate->mesh_)
         {
@@ -353,7 +367,7 @@ namespace material_graph
         encoder.SetPipeline(RHIBindPoint::Compute, pipeline_->GetHandle());
         const bool bound = prepared
                                ? RenderBindingCache::BindPreparedPass(*device_, encoder, RHIBindPoint::Compute,
-                                                                     *bindings_, bindings_->layout, *prepared, error)
+                                                                      *bindings_, *bindings_->layout, *prepared, error)
                                : RenderBindingCache::Bind(*device_, encoder, RHIBindPoint::Compute, *bindings_, error);
         if (!bound)
         {
@@ -376,6 +390,13 @@ namespace material_graph
         {
             return Fail(error, "Surface declaration needs an unrecorded GPU source and its current prepared owner.");
         }
+        // Resolve cold descriptor publication before command-recording workers run.
+        // The retained owner pins the source packet for this exact recording.
+        RenderBindingCache::PreparedPass material;
+        if (!RenderBindingCache::PreparePass(*device_, *bindings_, *bindings_->layout, material, error))
+        {
+            return false;
+        }
         auto input = mesh_->GraphOutput(graph);
         if (!input.IsValid() && (mesh_->IsPreparedForGraph() || !mesh_->IsReadyForEvaluation()))
         {
@@ -386,7 +407,8 @@ namespace material_graph
             input = graph.FindImportedBuffer(mesh_->Buffer());
             if (!input.IsValid())
             {
-                input = graph.ImportBuffer(mesh_->Buffer(), RHIResourceState::ShaderResource, "METEOR.Surface.Geometry");
+                input =
+                    graph.ImportBuffer(mesh_->Buffer(), RHIResourceState::ShaderResource, "METEOR.Surface.Geometry");
             }
         }
         if (declared_.exchange(true))
@@ -410,25 +432,30 @@ namespace material_graph
             auto texture = graph.FindImportedTexture(binding.resource);
             if (!texture.IsValid())
             {
-                texture = graph.ImportTexture(binding.resource, RHIResourceState::ShaderResource, "METEOR.Surface.Texture");
+                texture =
+                    graph.ImportTexture(binding.resource, RHIResourceState::ShaderResource, "METEOR.Surface.Texture");
             }
             if (std::ranges::none_of(usages, [&](const auto& usage) { return usage.handle.index == texture.index; }))
             {
                 usages.push_back({texture, RHIResourceState::ShaderResource, read});
             }
         }
-        graph.AddPass("METEOR.EvaluateMaterialSurface", usages, [owner](const auto& context) {
-            std::string error;
-            if (!context.graph || !context.encoder || !owner->GraphOutput(*context.graph).IsValid() ||
-                !owner->RecordCommands(*context.encoder, error))
-            {
-                owner->recordedStages_.fetch_or(4);
-                throw std::runtime_error(error.empty() ? "Invalid surface graph recording owner." : error);
-            }
-        });
+        graph.AddPass("METEOR.EvaluateMaterialSurface", usages,
+                      [owner, material](const auto& context)
+                      {
+                          std::string error;
+                          if (!context.graph || !context.encoder || !owner->GraphOutput(*context.graph).IsValid() ||
+                              !owner->RecordCommands(*context.encoder, error, &material))
+                          {
+                              owner->recordedStages_.fetch_or(4);
+                              throw std::runtime_error(error.empty() ? "Invalid surface graph recording owner."
+                                                                     : error);
+                          }
+                      });
         graph.AddPass(
             "METEOR.EvaluatedSurfaceReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
-            [owner](const auto&) {
+            [owner](const auto&)
+            {
                 if (!owner->IsPreparedForGraph())
                 {
                     owner->recordedStages_.fetch_or(4);

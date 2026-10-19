@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -33,6 +33,7 @@
     <ClInclude Include="DxCaptureSubmission.h" />
     <ClInclude Include="ProfileAggregate.h" />
     <ClInclude Include="ProfileCapture.h" />
+    <ClInclude Include="ProfileCaptureAllocator.h" />
     <ClInclude Include="ProfileCaptureFile.h" />
     <ClInclude Include="ProfileEvent.h" />
     <ClInclude Include="ProfileRenderMeasurement.h" />
