@@ -1,6 +1,7 @@
 #include "IRHICommandTranslator.h"
 #include "IRenderDeviceServices.h"
 #include "RHIParallelCommandPool.h"
+#include "../../EngineDiagnostics/ProfileScope.h"
 
 bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHICommandTranslationOptions& options,
                                      RHITranslatedBatch& outBatch, RHICommandFailure& outFailure)
@@ -11,11 +12,14 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
     outFailure.recordingId = input.GetRecordingId();
     outFailure.backendGeneration = input.GetDesc().backendGeneration;
     if (!input.IsValid() || outBatch.IsValid() || !m_pool.IsInitialized() ||
-        options.mode != RHICommandTranslationMode::Serial || options.maxTranslationJobs != 1 || !m_queue.IsValid() ||
-        input.GetDesc().queue != m_queue || m_queue.kind != RHIQueueKind::Graphics)
+        (options.mode != RHICommandTranslationMode::Serial && options.mode != RHICommandTranslationMode::Parallel) ||
+        options.maxTranslationJobs == 0 || options.maxTranslationJobs > IRHIParallelCommandPool::kMaxWorkers ||
+        (options.mode == RHICommandTranslationMode::Serial && options.maxTranslationJobs != 1) ||
+        (options.mode == RHICommandTranslationMode::Parallel && !m_pool.SupportsParallelTranslation()) ||
+        !m_queue.IsValid() || input.GetDesc().queue != m_queue || m_queue.kind != RHIQueueKind::Graphics)
     {
         outFailure.message =
-            "Serial pool translation requires a sealed graphics batch, empty output and initialized pool.";
+            "Pool translation requires a sealed graphics batch, valid job policy and independent parallel targets.";
         return false;
     }
     uint64_t uploadRecordingId{};
@@ -40,10 +44,47 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
             return false;
         }
     }
+    const auto order = std::span(input.m_storage->targetOrder.data(), input.m_storage->targetOrder.size());
+    struct alignas(64) TargetResult
+    {
+        RHICommandTranslationStats stats;
+        RHICommandFailure failure;
+        bool succeeded{};
+    };
+    // Retain diagnostic strings on the coordinating thread. Jobs borrow
+    // disjoint slots only until RunParallel joins, including on failure.
+    static thread_local std::array<TargetResult, IRHIParallelCommandPool::kMaxWorkers> resultStorage;
+    auto* const results = resultStorage.data();
+    static thread_local bool resultsInUse{};
+    if (resultsInUse)
+    {
+        outFailure.message = "Native translation cannot recursively borrow target results.";
+        return false;
+    }
+    struct ResultLease
+    {
+        bool& active;
+        ~ResultLease() { active = false; }
+    } resultLease{resultsInUse};
+    resultsInUse = true;
+    for (size_t index = 0; index < order.size(); ++index)
+    {
+        results[index].stats = {};
+        results[index].failure.Reset();
+        results[index].succeeded = false;
+    }
+    uint32_t jobs = 1;
+    if (options.mode == RHICommandTranslationMode::Parallel && order.size() > 1)
+    {
+        const auto commandCount = input.GetRecordingStats().commandCount;
+        const auto budget = options.minCommandsPerJob ? commandCount / options.minCommandsPerJob : order.size();
+        jobs = static_cast<uint32_t>((std::max)(
+            uint64_t{1}, (std::min)({uint64_t(options.maxTranslationJobs), uint64_t(order.size()), budget})));
+    }
     input.m_state = RHISoftwareBatchState::Translating;
     RHITranslatedBatch translated;
+    translated.m_stats.translationJobCount = jobs;
     std::string error;
-    RHICommandFailure segmentFailure;
     bool nativeOpened = false;
     const auto closeFailedRecording = [&]
     {
@@ -56,9 +97,65 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
             }
         }
     };
+    const auto accumulate = [](RHICommandTranslationStats& destination, const RHICommandTranslationStats& source)
+    {
+        destination.commandCount += source.commandCount;
+        if (destination.nativeComputeDispatches == UINT64_MAX || source.nativeComputeDispatches == UINT64_MAX)
+        {
+            destination.nativeComputeDispatches = UINT64_MAX;
+        }
+        else
+        {
+            destination.nativeComputeDispatches += source.nativeComputeDispatches;
+        }
+    };
+#if !CE_SHIPPING
+    const auto cpuContext = ce::current_cpu_context;
+#endif
+    const auto replayTargets = [&](uint32_t job)
+    {
+#if !CE_SHIPPING
+        const ce::profile_context_scope context(cpuContext);
+#endif
+        ce::profile_scope replay{ce::marker<"RHISoftwareTranslate.Targets">()};
+        for (size_t index = job; index < order.size(); index += jobs)
+        {
+            const auto target = order[index];
+            auto& result = results[index];
+            try
+            {
+                result.succeeded = true;
+                for (const auto& segment : std::span(input.m_storage->targets[target].segments.data(),
+                                                     input.m_storage->targets[target].activeSegments))
+                {
+                    RHICommandTranslationStats stats;
+                    auto& encoder = m_pool.AcquireTranslationEncoder(target);
+                    if (!segment->Replay(encoder, stats, result.failure))
+                    {
+                        result.failure.commandIndex += result.stats.commandCount;
+                        result.succeeded = false;
+                        break;
+                    }
+                    accumulate(result.stats, stats);
+                }
+            }
+            catch (const std::exception& exception)
+            {
+                result.succeeded = false;
+                result.failure.message = exception.what();
+            }
+            catch (...)
+            {
+                result.succeeded = false;
+                result.failure.message = "Unknown native target translation exception.";
+            }
+        }
+    };
     try
     {
-        for (const auto target : std::span(input.m_storage->targetOrder.data(), input.m_storage->targetOrder.size()))
+        // Allocator/list reset and final close stay on the RHI owner. A replay
+        // job exclusively owns its target; only the owner combines results.
+        for (const auto target : order)
         {
             outFailure.targetIndex = target;
             nativeOpened = true;
@@ -68,32 +165,28 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
                 closeFailedRecording();
                 return false;
             }
-            uint64_t targetCommands{};
-            for (const auto& segment : std::span(input.m_storage->targets[target].segments.data(),
-                                                 input.m_storage->targets[target].activeSegments))
+        }
+        if (jobs > 1)
+        {
+            m_pool.RunParallel(replayTargets, jobs);
+        }
+        else
+        {
+            replayTargets(0);
+        }
+        for (size_t index = 0; index < order.size(); ++index)
+        {
+            const auto& result = results[index];
+            if (!result.succeeded)
             {
-                RHICommandTranslationStats segmentStats;
-                auto& encoder = m_pool.AcquireTranslationEncoder(target);
-                if (!segment->Replay(encoder, segmentStats, segmentFailure))
-                {
-                    outFailure.commandIndex = targetCommands + segmentFailure.commandIndex;
-                    outFailure.commandType = segmentFailure.commandType;
-                    outFailure.message = segmentFailure.message;
-                    closeFailedRecording();
-                    return false;
-                }
-                targetCommands += segmentStats.commandCount;
-                translated.m_stats.commandCount += segmentStats.commandCount;
-                if (translated.m_stats.nativeComputeDispatches == UINT64_MAX ||
-                    segmentStats.nativeComputeDispatches == UINT64_MAX)
-                {
-                    translated.m_stats.nativeComputeDispatches = UINT64_MAX;
-                }
-                else
-                {
-                    translated.m_stats.nativeComputeDispatches += segmentStats.nativeComputeDispatches;
-                }
+                outFailure.targetIndex = order[index];
+                outFailure.commandIndex = result.failure.commandIndex;
+                outFailure.commandType = result.failure.commandType;
+                outFailure.message = result.failure.message;
+                closeFailedRecording();
+                return false;
             }
+            accumulate(translated.m_stats, result.stats);
         }
         if (m_pool.DrainEncoderDrops(error))
         {
@@ -109,7 +202,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
         nativeDesc.captureContext = input.m_desc.captureContext;
 #endif
-        if (!m_pool.FinalizeRecordedBatch(input.m_storage->targetOrder, nativeDesc, translated.m_native, error))
+        if (!m_pool.FinalizeRecordedBatch(order, nativeDesc, translated.m_native, error))
         {
             outFailure.message = error;
             closeFailedRecording();

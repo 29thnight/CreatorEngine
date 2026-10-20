@@ -42,6 +42,9 @@ class IRHIParallelCommandPool
     /// worker recording용 upload/descriptor version을 연다.
     virtual bool Prepare(std::string& outError) = 0;
 
+    // Opt in only when replay targets and captured resource views are independent.
+    virtual bool SupportsParallelTranslation() const { return false; }
+
     /// worker의 command target을 연다. Reset은 owner thread에서 끝낸다.
     virtual bool OpenWorker(uint32_t worker, std::string& outError) = 0;
 

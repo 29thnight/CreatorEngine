@@ -35,6 +35,7 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     bool CreateTranslationPool(std::shared_ptr<DX12CommandListPool>& result, std::string& outError);
     bool GetTranslationRecording(uint64_t& uploadRecordingId, uint64_t& descriptorVersion) const override;
 
+    bool SupportsParallelTranslation() const override { return m_recordingResources != nullptr; }
     bool Prepare(std::string& outError) override;
     bool OpenWorker(uint32_t worker, std::string& outError) override;
     RHIEncoder& AcquireEncoder(uint32_t worker) override;

@@ -1152,7 +1152,14 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
             RHICommandFailure failure;
             {
                 ce::profile_scope translate{ce::marker<"RHISoftwareTranslate">()};
-                if (!translator->Translate(std::move(*software), {}, translated, failure))
+                RHICommandTranslationOptions options;
+                if (pool->SupportsParallelTranslation())
+                {
+                    options.mode = RHICommandTranslationMode::Parallel;
+                    options.maxTranslationJobs = (std::min)(4u, pool->GetWorkerCount());
+                    options.minCommandsPerJob = 256;
+                }
+                if (!translator->Translate(std::move(*software), options, translated, failure))
                 {
                     error = failure.message;
                     return false;

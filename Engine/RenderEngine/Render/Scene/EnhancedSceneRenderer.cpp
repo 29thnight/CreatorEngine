@@ -1581,7 +1581,10 @@ namespace
             }
             lastNativeRecordMs = recordWatch.ElapsedMs();
             if (capture && !capture->RecordCompiledGraph(graph, lastNativeRecordMs, compileMs))
-            { outError = "capture graph is not compiled"; return false; }
+            {
+                outError = "capture graph is not compiled";
+                return false;
+            }
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
@@ -7111,10 +7114,6 @@ namespace
                 }
             }
             p.lastNativeRecordMs = ownedQueueExecution ? ownedRecordingMilliseconds : recordWatch.ElapsedMs();
-            viewShadowStats[targetIndex] = CaptureShadowStats(p);
-            if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
-            { outError = "capture graph is not compiled"; return false; }
-            p.lastGraphStats = graph.GetStats();
             LiveStopwatch submitWatch;
             submitWatch.Start();
             {
@@ -7158,6 +7157,19 @@ namespace
                 }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
+            // The batch is sealed and admitted. Let RHI translate/submit while
+            // the producer reads CPU-only diagnostics, before the required
+            // temporal submission wait. Recording callbacks are already joined.
+            {
+                ce::profile_scope diagnostics{ce::marker<"RenderPostSubmitDiagnostics">()};
+                viewShadowStats[targetIndex] = CaptureShadowStats(p);
+                if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
+                {
+                    outError = "capture graph is not compiled";
+                    return false;
+                }
+                p.lastGraphStats = graph.GetStats();
+            }
             if (sourceFrame.temporalFixture.IsValid() &&
                 ((!ownedQueueExecution && !GetRHISubmissionThread().Wait(batchTicket, outError)) ||
                     !dx12.WaitForLastFrameSubmission(outError)))

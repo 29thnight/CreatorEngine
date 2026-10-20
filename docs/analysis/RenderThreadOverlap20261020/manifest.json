@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "baseCommit": "9ca7d29e2ef438efbf182806ab38f7a1840d3fe6",
+  "configuration": "Debug",
+  "profileSeconds": 15,
+  "workers": 8,
+  "views": 2,
+  "etw": false,
+  "afterRuntimeSha256": "A3CE7826A824CEDE0667118150E7A90F51949BB72DF8C71AE8D78FEFAB764283",
+  "sourceFiles": {
+    "Editor/RenderTests/RHI/DX12/Tests/RHISoftwareNativeTests.h": "6f0326898d7fd5303914c4101fbbc38e7018448d876548a6d9652132e1f5c6de",
+    "Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h": "9a6abe301a1bb9eb0cf95cea73a31c0c51bcab4238d5073d09919d68fa52747e",
+    "Engine/RenderEngine/RHI/IRHICommandTranslator.h": "6276ad0f001716d578913759db35f7f97257a95870cb1a0984920c44f3679623",
+    "Engine/RenderEngine/RHI/RHICommandTranslator.cpp": "fdf798aa50fe378617dafd69f06836b190b77e16870dc4e5b243101980911194",
+    "Engine/RenderEngine/RHI/RHIParallelCommandPool.h": "4bc7e84c5bbe2d4e1e871b3c3399172b9057f53f760a0bba06df939db7fc11eb",
+    "Engine/RenderEngine/RHI/RHISoftwareCommandTypes.h": "76ba18457629ce95ec25704482445f1e7b57abf5b54ee2481959364bafde002d",
+    "Engine/RenderEngine/RHI/RHISubmissionThread.cpp": "1f35ff6211ae4c51bfcdb5d49c489259757260b2687154ee576b7089a8833f86",
+    "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": "89efaf6dcd73db248c2bb02d4f0a56ccbc5d61026e273980e3f0a5e0af506d43",
+    "Tools/regression/verify-rhi-software-native.ps1": "e94466155712719e78c7bab87592a77abe391187912ef79106901eeca2a5d6cc"
+  },
+  "files": [
+    {
+      "file": "before.summary.json",
+      "bytes": 1828314,
+      "sha256": "3d0d77f7a4f4244b8f59708dc02ec4a8345286a090d2deccbc5d5eff95a2847f"
+    },
+    {
+      "file": "after.summary.json",
+      "bytes": 1753922,
+      "sha256": "70fc9992cd00f1a8b7231d266cec958b9d51d7c62cbae34ce48171b17a44b5fc"
+    },
+    {
+      "file": "gpu-metrics.json",
+      "bytes": 104915,
+      "sha256": "7a38ebfd34e2c9dfdd3f170907806e2385f66f58228e4c7c2ecd523c871d1b7d"
+    }
+  ]
+}

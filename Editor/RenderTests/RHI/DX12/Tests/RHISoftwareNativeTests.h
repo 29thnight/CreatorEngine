@@ -263,7 +263,10 @@ namespace
             require(pendingFrame.lock()->drawInputs.back() == 0x12345678,
                     "Pending frame arena contents changed while RHI was gated.");
             RHITextureHandle other;
-            require(resources.CreateTexture(textureDesc, other, error), error);
+            auto sourceDesc = textureDesc;
+            sourceDesc.clearColor[0] = 1;
+            sourceDesc.clearColor[1] = sourceDesc.clearColor[2] = 0;
+            require(resources.CreateTexture(sourceDesc, other, error), error);
             resources.GetDevice()->CreateRenderTargetView(
                 resources.Resolve(other), nullptr, resources.GetRtvViewHeap().CpuAt(DX12RtvIndexOf(binding.backend)));
             releaseTranslation->set_value();
@@ -319,13 +322,97 @@ namespace
                     "Reused translation fork retained the previous recording identity.");
             reusedFork.reset();
             pool.Shutdown();
+            resources.AbortFrame();
+            require(pool.Initialize(resources, 2, 3, error), error);
+            require(resources.BeginFrame(error), error);
+            pool.BeginFrame(0);
+            require(pool.Prepare(error), error);
+            const std::array<RHITextureHandle, 1> sourceTargets{other};
+            const auto parallelBinding =
+                resources.CreateRenderTargets(std::span<const RHITextureHandle>{sourceTargets}, nullptr);
+            require(parallelBinding.IsValid(), "Parallel translation target creation failed.");
+            recordingDesc.targetCount = 2;
+            batchDesc.frameId = 2;
+            batchDesc.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&resources);
+            batchDesc.uploadRecordingId = resources.GetCurrentUploadRecordingId();
+            batchDesc.descriptorVersion = resources.GetDescriptorVersionToken();
+            batchDesc.lifetimeToken = std::make_shared<int>(2);
+            require(recorder.BeginRecording(recordingDesc, error), error);
+            auto& first = recorder.AcquireEncoder(1);
+            first.BindRenderTargets(parallelBinding);
+            const std::array<float, 4> parallelExpected{1, 0, 0, 1};
+            first.ClearRenderTargets(parallelBinding, parallelExpected.data());
+            const std::array<RHITransition, 1> sourceTransition{
+                RHITransition{other, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
+            barriers.textureTransitions = sourceTransition;
+            first.ResourceBarriers(barriers);
+            auto& last = recorder.AcquireEncoder(0);
+            const std::array<RHITransition, 1> toCopyDest{
+                RHITransition{texture, RHIResourceState::CopySource, RHIResourceState::CopyDest}};
+            barriers.textureTransitions = toCopyDest;
+            last.ResourceBarriers(barriers);
+            last.CopyResource(texture, other);
+            const std::array<RHITransition, 1> toCopySource{
+                RHITransition{texture, RHIResourceState::CopyDest, RHIResourceState::CopySource}};
+            barriers.textureTransitions = toCopySource;
+            last.ResourceBarriers(barriers);
+            last.CopyToReadback(readback, texture, 0, 0);
+            const std::array<uint32_t, 2> reversedOrder{1, 0};
+            require(recorder.FinishRecording(reversedOrder, batchDesc, software, error), error);
+            require(pool.CreateTranslationPool(frozen, error), error);
+            DX12CommandTranslator parallelTranslator(*frozen, resources, primary->GetIdentity());
+            const RHICommandTranslationOptions parallelOptions{RHICommandTranslationMode::Parallel, 2, 0};
+            require(parallelTranslator.Translate(std::move(software), parallelOptions, translated, failure),
+                    failure.message);
+            require(translated.GetTranslationStats().translationJobCount == 2 &&
+                        translated.GetTranslationStats().commandCount == 7,
+                    "Parallel translation did not run both targets exactly once.");
+            releaseTranslation = std::make_shared<std::promise<void>>();
+            auto notificationGate = releaseTranslation->get_future().share();
+            require(GetRHISubmissionThread().Enqueue(
+                        &resources, "parallel submission gate",
+                        [notificationGate](std::string&)
+                        {
+                            notificationGate.wait();
+                            return true;
+                        },
+                        gateTicket, error),
+                    error);
+            translationBlocked = true;
+            require(GetRHISubmissionThread().EnqueueTranslatedBatch(&resources, resources, std::move(translated),
+                                                                    ticket, error),
+                    error);
+            require(resources.EndFrame(error), error);
+            require(!ticket.IsComplete(), "Parallel native submission blocked its producer.");
+            releaseTranslation->set_value();
+            translationBlocked = false;
+            require(resources.WaitForLastFrameSubmission(error), error);
+            resources.WaitForGpu();
+            require(resources.MapReadback(readback, image, error), error);
+            for (uint32_t y = 0; y < 8; ++y)
+            {
+                for (uint32_t x = 0; x < 8; ++x)
+                {
+                    for (uint32_t channel = 0; channel < 4; ++channel)
+                    {
+                        if (std::abs(image.At(x, y, channel) - parallelExpected[channel]) > 1.0f / 255.0f)
+                        {
+                            require(false, "Parallel replay pixel mismatch: channel=" + std::to_string(channel) +
+                                               " actual=" + std::to_string(image.At(x, y, channel)) +
+                                               " expected=" + std::to_string(parallelExpected[channel]));
+                        }
+                    }
+                }
+            }
+            require(resources.DrainDebugMessages(validation) == 0, validation);
+            pool.Shutdown();
             resources.ReleaseTexture(other);
             resources.ReleaseReadback(readback);
             resources.ReleaseTexture(texture);
             resources.Shutdown();
             log += "RHI_SOFTWARE_NATIVE_OK commands=4 pixels=64 channels=4 staleRejected=true asynchronous=true "
                    "frozenTargets=true uploadRollover=true poolReuse=true arenaRetirement=true gpuMergeReuse=true "
-                   "declarationMetadata=true validationErrors=0\n";
+                   "declarationMetadata=true parallelTranslation=true validationErrors=0\n";
             return true;
         }
         catch (const std::exception& exception)

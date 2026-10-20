@@ -73,6 +73,7 @@ struct RHICommandRecordingStats
 
 struct RHICommandTranslationStats
 {
+    uint32_t translationJobCount{};
     uint64_t commandCount{};
     uint64_t nativeComputeDispatches{};
 };

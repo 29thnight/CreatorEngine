@@ -55,7 +55,7 @@ class IRHICommandTranslator
                            RHITranslatedBatch& outBatch, RHICommandFailure& outFailure) = 0;
 };
 
-// Serial replay uses a pool-specific frozen recording when supplied. Legacy
+// Replay uses independent targets from a frozen recording for parallel jobs. Legacy
 // synchronous callers must retain the current upload/descriptor recording.
 // Queue admission advances only the producer; frozen pools retain their leases.
 class RHICommandTranslator : public IRHICommandTranslator
