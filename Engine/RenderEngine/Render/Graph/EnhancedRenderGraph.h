@@ -399,6 +399,15 @@ public:
     // GPU-driven recording is not proportional to the number of draw batches.
     void SetRecordingWorkloadBalance(bool enabled) { RequireQueueIdle(); m_recordingWorkloadBalance = enabled; }
 
+    // Reserve handles on the producer; workers materialize disjoint owned
+    // declaration packets. Finish joins and publishes them in reservation order.
+    void BeginDeclarationPackets();
+    void NextDeclarationPacket();
+    void FinishDeclarationPackets();
+    void CancelDeclarationPackets() noexcept;
+    uint32_t DeclarationPacketJobs() const { return m_declarationPacketJobs; }
+    uint32_t DeclarationPacketCount() const { return static_cast<uint32_t>(m_declarationPackets.size()); }
+
     void Reset();
 
     // 외부 리소스를 그래프에 들인다. 현재 상태를 알려 줘야 첫 전이를 맞게 만든다.
@@ -459,7 +468,7 @@ public:
     RGHandle FindImportedTexture(RHITextureHandle texture) const;
     // Declaration-time validation against real pass usages, not a second stage registry.
     // Any version of this physical graph resource written by this producer matches.
-    bool HasDeclaredWriter(RGHandle resource, const std::string& producer) const;
+    bool HasDeclaredWriter(RGHandle resource, std::string_view producer) const;
 
     // Flush the immediate upload prefix before preparing recording-scoped pass
     // packets. RecordParallel reuses this exact recording instead of flushing it
@@ -471,14 +480,14 @@ public:
     EnhancedRenderGraph& operator=(const EnhancedRenderGraph&) = delete;
 
     /// 이미 표에 있는 리소스를 들인다 — 패스가 소유한 것(V2-a로 핸들이 된 것들).
-    RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,
-        const std::string& name, RHIResourceState* stateWriteback = nullptr);
+    RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState, std::string_view name,
+                           RHIResourceState* stateWriteback = nullptr);
 
     /// 버퍼를 상태 추적에 들인다. Resource가 texture/buffer handle을 갈라 들고,
     /// backend encoder가 DX12 transition 또는 Vulkan `VkBufferMemoryBarrier2`로
     /// 변환한다. 중립 생성자에서도 같은 계약으로 동작한다(G-2).
-    RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,
-        const std::string& name, RHIResourceState* stateWriteback = nullptr);
+    RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState, std::string_view name,
+                          RHIResourceState* stateWriteback = nullptr);
 
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
@@ -510,18 +519,19 @@ public:
         RGAccessMode access{ RGAccessMode::LegacyState };
     };
 
-    // lvalue는 반환 전에 그래프 저장 공간에 복사하고, rvalue는 소유권을 바로 넘긴다.
-    // 값 매개변수의 임시 vector 없이 Reset이 남긴 복사 대상의 용량을 재사용한다.
-    RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
-        ExecuteCallback execute, bool hasSideEffect = false);
-    RGPassId AddPass(const std::string& name, std::vector<RGPassUsage>&& usages,
-        ExecuteCallback execute, bool hasSideEffect = false);
-    RGPassId AddPass(const std::string& name, std::span<const RGPassUsage> usages, ExecuteCallback execute,
+    // Every usage payload is copied once into the graph's non-pmr frame arena.
+    // Rvalue lists are emptied after copying and retain their caller-owned capacity.
+    // Pass stores an immutable view, never a second vector copy or caller storage.
+    RGPassId AddPass(std::string_view name, const std::vector<RGPassUsage>& usages, ExecuteCallback execute,
+                     bool hasSideEffect = false);
+    RGPassId AddPass(std::string_view name, std::vector<RGPassUsage>&& usages, ExecuteCallback execute,
+                     bool hasSideEffect = false);
+    RGPassId AddPass(std::string_view name, std::span<const RGPassUsage> usages, ExecuteCallback execute,
                      bool hasSideEffect = false);
     // 중괄호 목록은 그래프가 소유한 저장 공간으로 바로 복사한다.
     // 반환 전에 복사를 끝내므로 임시 배열의 참조가 다음 기록까지 남지 않는다.
-    RGPassId AddPass(const std::string& name, std::initializer_list<RGPassUsage> usages,
-        ExecuteCallback execute, bool hasSideEffect = false);
+    RGPassId AddPass(std::string_view name, std::initializer_list<RGPassUsage> usages, ExecuteCallback execute,
+                     bool hasSideEffect = false);
 
     struct RepeatedPhase
     {
@@ -540,12 +550,12 @@ public:
 
     // 외부 버전은 한 번 발행한다. 내부 단계는 그 핸들을 그대로 쓰며,
     // usage.state는 해당 자원의 첫 단계 상태다. 반복은 같은 인코더에서 직렬 기록한다.
-    RGPassId AddRepeatedPass(const std::string& name, std::vector<RGPassUsage> usages,
-        std::vector<RepeatedPhase> phases, uint32_t repeatCount,
-        RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
+    RGPassId AddRepeatedPass(std::string_view name, std::vector<RGPassUsage> usages, std::vector<RepeatedPhase> phases,
+                             uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect = false,
+                             uint32_t recordCost = 0);
     // Views are copied before returning. Reset retains the owned phase/name/usage
     // capacity, never a reference to the caller's declaration scratch.
-    RGPassId AddRepeatedPassView(const std::string& name, std::span<const RGPassUsage> usages,
+    RGPassId AddRepeatedPassView(std::string_view name, std::span<const RGPassUsage> usages,
                                  std::span<const RepeatedPhaseView> phases, uint32_t repeatCount,
                                  RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
 
@@ -567,15 +577,13 @@ public:
     ///
     /// 조각 수(maxSlices)와는 여전히 다른 값이다. 조각 수는 '얼마나 쪼갤 수
     /// 있나'라 워커 수에 눌리고, 이 값은 '병렬로 갈 만한가'를 정한다.
-    RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,
-        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
-        uint32_t recordCost = 0);
-    RGPassId AddSplitPass(const std::string& name, std::vector<RGPassUsage>&& usages,
-        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
-        uint32_t recordCost = 0);
-    RGPassId AddSplitPass(const std::string& name, std::initializer_list<RGPassUsage> usages,
-        SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
-        uint32_t recordCost = 0);
+    RGPassId AddSplitPass(std::string_view name, const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
+                          uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);
+    RGPassId AddSplitPass(std::string_view name, std::vector<RGPassUsage>&& usages, SplitExecuteCallback execute,
+                          uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);
+    RGPassId AddSplitPass(std::string_view name, std::initializer_list<RGPassUsage> usages,
+                          SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
+                          uint32_t recordCost = 0);
 
     // 순서 유도 → 컬링 → 배리어 계획. 실패 사유는 문자열로.
     /// ★ 디바이스를 받지 않는다 (G-1). 그래프는 생성자에서 device service를
@@ -960,8 +968,50 @@ private:
         std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
     };
 
+    struct ResourceDeclaration
+    {
+        std::string_view name, descriptorName;
+    };
+    struct PassDeclaration
+    {
+        std::string_view name;
+        std::span<const RepeatedPhaseView> phases;
+    };
+    struct DeclarationPacket
+    {
+        size_t firstResource{}, endResource{}, firstPass{}, endPass{};
+    };
+    template<class T>
+    std::span<const T> CopyPacketValues(std::span<const T> values)
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        if (values.empty())
+        {
+            return {};
+        }
+        if (values.size() > SIZE_MAX / sizeof(T))
+        {
+            throw std::bad_array_new_length();
+        }
+        auto* data = static_cast<T*>(m_packetArena.allocate(values.size_bytes(), alignof(T)));
+        std::memcpy(data, values.data(), values.size_bytes());
+        return {data, values.size()};
+    }
+    std::string_view CopyPacketName(std::string_view value);
+    void SetDeclarationUsages(uint16_t pass, std::span<const RGPassUsage> usages);
+    void SetDeclarationResourceName(uint16_t resource, std::string_view name, std::string_view descriptorName = {});
+    void AppendDeclarationVersion(uint16_t resource, Resource::Version value);
+    static void MaterializeDeclarationPacket(const DeclarationPacket& packet, Resource* resources,
+                                             ResourceDeclaration* resourceDeclarations, Pass* passes,
+                                             PassDeclaration* passDeclarations);
+    void DispatchDeclarationPackets(bool finish);
+    void JoinDeclarationPackets();
+    void PinDeclarationNames();
+    void ClearResourceMetadata(Resource& resource);
+    struct DeclarationWork;
+
     Pass& AppendPass();
-    RGPassId InitializePass(const std::string& name, bool hasSideEffect);
+    RGPassId InitializePass(std::string_view name, bool hasSideEffect);
     void ClearPassMetadata(Pass& pass);
 
     struct FinalStateRequirement
@@ -971,8 +1021,7 @@ private:
     };
 
     void ReleaseResources();
-    bool CheckDeclarationCapacity(std::size_t count, uint16_t limit,
-        const char* kind, const std::string& name);
+    bool CheckDeclarationCapacity(std::size_t count, uint16_t limit, const char* kind, std::string_view name);
     bool BuildOrder(std::string& outError);
     void CullPasses();
     /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
@@ -999,6 +1048,18 @@ private:
     Resource& AppendResource();
     // Pass처럼 완료된 기록 사이에 메타데이터 컨테이너를 유지한다.
     // 활성 구간만 현재 핸들·상태·버전 선언을 포함한다.
+    // The arena owns every borrowed name/usage before Add* returns. Retained
+    // records contain no callbacks; producer-affine captures stay in Pass.
+    std::unique_ptr<DeclarationWork> m_declarationWork;
+    ce::render_arena_resource m_packetArena;
+    ce::render_vector<ResourceDeclaration> m_resourceDeclarations;
+    ce::render_vector<PassDeclaration> m_passDeclarations;
+    ce::render_vector<DeclarationPacket> m_declarationPackets;
+    DeclarationPacket m_openDeclarationPacket;
+    size_t m_packetFirstResource{}, m_packetFirstPass{};
+    uint32_t m_declarationPacketJobs{};
+    bool m_collectingDeclarationPackets{};
+    bool m_cancelledDeclarationPackets{};
     ce::render_vector<Resource> m_resourceStorage;
     std::span<Resource> m_resources;
     // Declaration-local indices. Reset removes every entry, and generation bits

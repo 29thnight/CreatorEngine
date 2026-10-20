@@ -1,0 +1,19 @@
+{
+  "gpuMergeReuse": true,
+  "uploadRollover": true,
+  "arenaRetirement": true,
+  "fullRenderGraph": true,
+  "declarationMetadata": true,
+  "validation": "gpu",
+  "nativeClearBarrierReadback": true,
+  "frozenTargets": true,
+  "normalExit": true,
+  "retainedBlackboard": true,
+  "parallelTranslation": true,
+  "asynchronousTranslation": true,
+  "translationPoolReuse": true,
+  "declarationPackets": true,
+  "singleCopyPassUsages": true,
+  "creatorRobotSoftwarePath": false,
+  "passed": true
+}

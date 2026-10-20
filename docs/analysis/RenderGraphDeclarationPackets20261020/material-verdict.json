@@ -1,0 +1,40 @@
+{
+  "gpuValidation": "off",
+  "sourceStable": true,
+  "configuration": "Debug",
+  "passed": true,
+  "runs": [
+    {
+      "missingMarkers": [],
+      "passed": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "mode": "--meshlet-dispatch-only",
+      "gpuValidationCoverageNotices": 0
+    },
+    {
+      "missingMarkers": [],
+      "passed": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "mode": "--cluster-lod-only",
+      "gpuValidationCoverageNotices": 0
+    },
+    {
+      "missingMarkers": [],
+      "passed": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "mode": "--object-space-dx12-only",
+      "gpuValidationCoverageNotices": 0
+    },
+    {
+      "missingMarkers": [],
+      "passed": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "mode": "--shadow-correctness-only",
+      "gpuValidationCoverageNotices": 0
+    }
+  ]
+}

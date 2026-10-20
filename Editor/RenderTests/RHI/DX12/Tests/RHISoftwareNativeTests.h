@@ -3,6 +3,8 @@
 #include "RHI/RHISoftwareRecorder.h"
 #include "RenderArena.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
+#include "Render/Core/EnhancedLivePipelineDesc.h"
+#include "JobScheduler.h"
 #include "RHI/DX12/DX12GpuProfiler.h"
 
 namespace
@@ -68,6 +70,9 @@ namespace
                 require(output.size() == 1 && output[0].name == "Replacement" && output[0].milliseconds == 0.0,
                         "Flat GPU timing merge reused a freed name or dropped a zero-length slice.");
             }
+            std::string blackboardLog;
+            require(LivePipelineDesc::RunSelfTest(blackboardLog), blackboardLog);
+            log += blackboardLog;
             require(resources.Initialize(8, 8, error), error);
             {
                 // Declaration-only handles exercise full generation identity and
@@ -169,6 +174,128 @@ namespace
             const std::array<RHITextureHandle, 1> targets{texture};
             const auto binding = resources.CreateRenderTargets(std::span<const RHITextureHandle>{targets}, nullptr);
             require(binding.IsValid(), "Software native probe render target creation failed.");
+
+            {
+                EnhancedRenderGraph serial(resources, RGSchedulingMode::ExplicitVersioned);
+                EnhancedRenderGraph packets(resources, RGSchedulingMode::ExplicitVersioned);
+                const auto declare = [&](EnhancedRenderGraph& graph, bool packetMode, size_t count)
+                {
+                    auto value = graph.ImportTexture(texture, RHIResourceState::RenderTarget, "PacketInput");
+                    graph.AddPass("BeforePacketCollection",
+                                  {{value, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
+                    if (packetMode)
+                    {
+                        graph.BeginDeclarationPackets();
+                    }
+                    RGTextureDesc setup;
+                    setup.width = setup.height = 4;
+                    setup.name = "PacketSetup";
+                    require(graph.CreateTexture(setup).IsValid(), "Packet setup reservation failed.");
+                    for (size_t index = 0; index < count; ++index)
+                    {
+                        if (packetMode)
+                        {
+                            graph.NextDeclarationPacket();
+                        }
+                        std::string name = index % 2 == 0
+                                               ? "P" + std::to_string(index)
+                                               : "OwnedPacket" + std::to_string(index) + std::string(128, 'x');
+                        RGTextureDesc unused;
+                        unused.width = unused.height = 4;
+                        unused.name = name;
+                        require(graph.CreateTexture(unused).IsValid(), "Packet transient reservation failed.");
+                        value = graph.Modify(value);
+                        require(value.IsValid() && value.version == index + 1,
+                                "Packet version reservation changed the producer chain.");
+                        std::array<EnhancedRenderGraph::RGPassUsage, 1> usages{
+                            {{value, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}}};
+                        if (index % 3 == 0)
+                        {
+                            std::string phaseName = name + ".Phase";
+                            const std::array<EnhancedRenderGraph::RepeatedPhaseView, 1> phases{{{phaseName, usages}}};
+                            graph.AddRepeatedPassView(
+                                name, usages, phases, 2,
+                                [](const EnhancedRenderGraph::ExecuteContext&, uint32_t, uint32_t) {}, true);
+                            phaseName.assign(256, 'z');
+                        }
+                        else if (index % 3 == 1)
+                        {
+                            graph.AddSplitPass(name, {{value, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}},
+                                               nullptr, 2, true);
+                        }
+                        else
+                        {
+                            graph.AddPass(name, std::span{usages}, nullptr, true);
+                        }
+                        require(graph.HasDeclaredWriter(value, name), "Pending packet writer lookup failed.");
+                        usages.front().handle = {};
+                        name.assign(256, 'z');
+                        unused.name.assign(256, 'z');
+                    }
+                    if (packetMode)
+                    {
+                        require(!graph.Compile(error), "Unmerged declaration packets were compiled.");
+                        error.clear();
+                        graph.FinishDeclarationPackets();
+                        require(graph.DeclarationPacketCount() == count + 1, "Declaration packet boundaries changed.");
+                        if (ce::get_job_scheduler().is_running() && ce::get_thread_pool().size() > 1)
+                        {
+                            require(graph.DeclarationPacketJobs() > 1, "Declaration packets did not dispatch workers.");
+                        }
+                    }
+                    graph.AddPass("AfterPacketCollection",
+                                  {{value, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
+                    std::vector<EnhancedRenderGraph::RGPassUsage> movedUsages{
+                        {value, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+                    const auto* transferredUsages = movedUsages.data();
+                    graph.AddPass("MovedUsagePayload", std::move(movedUsages), nullptr, true);
+                    require(movedUsages.empty() && transferredUsages->handle.index == value.index &&
+                                transferredUsages->handle.version == value.version,
+                            "Rvalue usage input did not transfer its owned storage.");
+                    movedUsages.resize(1);
+                    movedUsages.front().handle = {};
+                    require(transferredUsages->handle.index == value.index &&
+                                transferredUsages->handle.version == value.version,
+                            "Reusing the moved-from caller invalidated graph-owned usage storage.");
+                    require(graph.Compile(error), error);
+                };
+                for (size_t epoch = 0; epoch < 3; ++epoch)
+                {
+                    const size_t count = epoch == 0 ? 24 : 600;
+                    declare(serial, false, count);
+                    declare(packets, true, count);
+                    EnhancedRenderGraph::DiagnosticSnapshot left, right;
+                    require(serial.CaptureDiagnosticSnapshot(left) && packets.CaptureDiagnosticSnapshot(right),
+                            "Declaration packet diagnostic snapshot failed.");
+                    require(left.dependencyHash == right.dependencyHash && left.executeOrder == right.executeOrder &&
+                                left.passes.size() == right.passes.size() &&
+                                left.resources.size() == right.resources.size(),
+                            "Packet merge changed declaration ordering or dependency structure.");
+                    for (size_t index = 0; index < left.passes.size(); ++index)
+                    {
+                        require(left.passes[index].name == right.passes[index].name &&
+                                    left.passes[index].phases.size() == right.passes[index].phases.size(),
+                                "Packet names or repeated phases borrowed overwritten input storage.");
+                    }
+                    for (size_t index = 0; index < left.resources.size(); ++index)
+                    {
+                        require(left.resources[index].name == right.resources[index].name,
+                                "Packet resource names changed after caller mutation.");
+                    }
+                    serial.Reset();
+                    packets.Reset();
+                }
+                packets.BeginDeclarationPackets();
+                for (size_t index = 0; index < 16; ++index)
+                {
+                    packets.AddPass("CancelledPacket", {}, nullptr);
+                    packets.NextDeclarationPacket();
+                }
+                packets.CancelDeclarationPackets();
+                require(!packets.Compile(error), "Cancelled declaration packets were compiled.");
+                error.clear();
+                packets.Reset();
+            }
 
             SoftwareNativeProbeValidator validator;
             RHISoftwareRecorder recorder(validator);
@@ -412,7 +539,8 @@ namespace
             resources.Shutdown();
             log += "RHI_SOFTWARE_NATIVE_OK commands=4 pixels=64 channels=4 staleRejected=true asynchronous=true "
                    "frozenTargets=true uploadRollover=true poolReuse=true arenaRetirement=true gpuMergeReuse=true "
-                   "declarationMetadata=true parallelTranslation=true validationErrors=0\n";
+                   "declarationMetadata=true parallelTranslation=true declarationPackets=true retainedBlackboard=true "
+                   "singleCopyPassUsages=true validationErrors=0\n";
             return true;
         }
         catch (const std::exception& exception)

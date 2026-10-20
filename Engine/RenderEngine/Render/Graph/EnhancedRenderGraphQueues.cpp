@@ -173,7 +173,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                     retainsExplicitStateOnGraphicsQueue);
             }
         }
-        const auto rejectComputeUses = [&](const std::vector<RGPassUsage>& usages)
+        const auto rejectComputeUses = [&](std::span<const RGPassUsage> usages)
         {
             for (const auto& usage : usages)
             {

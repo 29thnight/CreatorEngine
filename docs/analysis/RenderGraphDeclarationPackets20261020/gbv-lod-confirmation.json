@@ -1,0 +1,16 @@
+{
+  "gpuValidation": "on",
+  "sourceStable": true,
+  "configuration": "Debug",
+  "passed": true,
+  "runs": [
+    {
+      "missingMarkers": [],
+      "passed": true,
+      "timedOut": false,
+      "exitCode": 0,
+      "mode": "--cluster-lod-only",
+      "gpuValidationCoverageNotices": 0
+    }
+  ]
+}

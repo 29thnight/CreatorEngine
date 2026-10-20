@@ -108,54 +108,101 @@ namespace LiveViewFlags
 /// 애초에 없다.
 class LiveBlackboard
 {
-public:
-    void Reset() { m_slots.clear(); }
+  public:
+    void Reset()
+    {
+        // Slots own their keys and buffers across frames. Only the current
+        // generation is visible; dynamic diagnostic names have bounded retention.
+        if (m_generation == UINT64_MAX || m_slots.size() > 4096)
+        {
+            m_slots.clear();
+            m_generation = 1;
+        }
+        else
+        {
+            ++m_generation;
+        }
+    }
 
     /// 발행·수정 공용. 수정이 별도 함수가 아닌 이유는 값이 갈리지 않아서다 —
     /// 무엇이 발행이고 무엇이 수정인지는 노드의 writes/modifies가 말하고,
     /// Validate가 그것으로 판정한다.
-    void Set(const std::string& slot, RGHandle handle) { m_slots[slot] = {handle}; }
+    void Set(std::string_view slot, RGHandle handle)
+    {
+        auto& destination = WritableSlot(slot);
+        if (destination.handles.size() != 1)
+        {
+            destination.handles.resize(1);
+        }
+        destination.handles[0] = handle;
+        destination.generation = m_generation;
+    }
 
     /// 없으면 무효 핸들. 슬롯 이름 오타는 여기서 조용히 무효가 되지만,
     /// Validate가 파이프라인을 세울 때 이미 잡았어야 하는 종류다.
     RGHandle Get(std::string_view slot) const
     {
         const auto found = m_slots.find(slot);
-        if (found == m_slots.end() || found->second.empty())
+        if (found == m_slots.end() || found->second.generation != m_generation || found->second.handles.empty())
         {
             return {};
         }
-        if (found->second.size() != 1)
+        if (found->second.handles.size() != 1)
         {
             throw std::runtime_error("A resource-list slot requires GetList.");
         }
-        return found->second.front();
+        return found->second.handles.front();
     }
 
     // One slot may publish several independently versioned command buffers.
     // They remain real resource handles, never a dummy join token or hidden producer.
-    void SetList(const std::string& slot, std::vector<RGHandle> handles) { m_slots[slot] = std::move(handles); }
+    void SetList(std::string_view slot, std::vector<RGHandle> handles)
+    {
+        auto& destination = WritableSlot(slot);
+        if (destination.handles.size() != handles.size())
+        {
+            destination.handles.resize(handles.size());
+        }
+        std::copy_n(handles.data(), handles.size(), destination.handles.data());
+        destination.generation = m_generation;
+    }
     std::vector<RGHandle> GetList(std::string_view slot) const
     {
         const auto found = m_slots.find(slot);
-        return found == m_slots.end() ? std::vector<RGHandle>{} : found->second;
+        return found == m_slots.end() || found->second.generation != m_generation ? std::vector<RGHandle>{}
+                                                                                  : found->second.handles;
     }
 
-private:
+  private:
     struct SlotHash
     {
         using is_transparent = void;
 
-        std::size_t operator()(std::string_view slot) const noexcept
-        {
-            return std::hash<std::string_view>{}(slot);
-        }
+        std::size_t operator()(std::string_view slot) const noexcept { return std::hash<std::string_view>{}(slot); }
     };
+
+    struct Slot
+    {
+        std::vector<RGHandle> handles;
+        uint64_t generation{};
+    };
+    Slot& WritableSlot(std::string_view slot)
+    {
+        const auto found = m_slots.find(slot);
+        if (found != m_slots.end())
+        {
+            return found->second;
+        }
+        // Heterogeneous lookup avoids constructing a temporary owning key on
+        // every Set. An actual new key is copied and owned exactly once.
+        return m_slots.try_emplace(std::string{slot}).first->second;
+    }
 
     // 174d073에서 고친 빌린 키 저장 뒤 원본 문자열 변경 문제가 재발하지 않도록 저장 키는 std::string으로 소유한다.
     // 조회 view와 iterator는 호출 안에서만 쓰며 보관하지 않는다. 핸들과 목록도 값으로 반환한다.
     // 저장 키와 조회 view에 같은 해시·문자 비교를 적용해 주소와 종료 문자에 의존하지 않는다.
-    std::unordered_map<std::string, std::vector<RGHandle>, SlotHash, std::equal_to<>> m_slots;
+    std::unordered_map<std::string, Slot, SlotHash, std::equal_to<>> m_slots;
+    uint64_t m_generation{1};
 };
 
 /// 프레임마다 달라지는 값. 노드 정의는 정적이어야 하므로 이런 것은 캡처가

@@ -1,6 +1,7 @@
 #include "../../RHI/RHISoftwareRecorder.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
+#include "../../../Utility_Framework/JobScheduler.h"
 #include "../../RenderArena.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -67,6 +68,86 @@ namespace
         std::copy_n(source.data(), source.size(), destination.data());
     }
 
+    // The producer owns these slots. Full native IDs include handle generation;
+    // a frame epoch invalidates old slots without visiting Debug STL iterators.
+    // Unusually large declarations retain the existing owning overflow map.
+    class ImportedIndexCache final
+    {
+      public:
+        enum class Result
+        {
+            Inserted,
+            Duplicate,
+            Overflow
+        };
+        uint16_t Find(uint32_t id) const noexcept
+        {
+            const auto* slots = m_slots.data();
+            size_t index = Hash(id);
+            while (slots[index].epoch == m_epoch)
+            {
+                if (slots[index].id == id)
+                {
+                    return slots[index].index;
+                }
+                index = (index + 1) & kMask;
+            }
+            return RGHandle::kInvalid;
+        }
+        Result Remember(uint32_t id, uint16_t value) noexcept
+        {
+            auto* slots = m_slots.data();
+            size_t index = Hash(id);
+            while (slots[index].epoch == m_epoch)
+            {
+                if (slots[index].id == id)
+                {
+                    return Result::Duplicate;
+                }
+                index = (index + 1) & kMask;
+            }
+            if (Full())
+            {
+                return Result::Overflow;
+            }
+            slots[index] = {id, m_epoch, value};
+            ++m_size;
+            return Result::Inserted;
+        }
+        bool Full() const noexcept { return m_size == kCapacity / 2; }
+        void Reset() noexcept
+        {
+            m_size = 0;
+            if (++m_epoch == 0)
+            {
+                for (auto& slot : std::span{m_slots})
+                {
+                    slot.epoch = 0;
+                }
+                m_epoch = 1;
+            }
+        }
+
+      private:
+        static constexpr size_t kCapacity = 1024, kMask = kCapacity - 1;
+        static size_t Hash(uint32_t id) noexcept
+        {
+            id ^= id >> 16;
+            id *= 0x7feb352du;
+            id ^= id >> 15;
+            id *= 0x846ca68bu;
+            return (id ^ (id >> 16)) & kMask;
+        }
+        struct Slot
+        {
+            uint32_t id{}, epoch{};
+            uint16_t index{};
+        };
+        std::array<Slot, kCapacity> m_slots{};
+        uint32_t m_epoch{1};
+        size_t m_size{};
+    };
+
     void ResetImportedIndices(std::unordered_map<uint32_t, uint16_t>& indices)
     {
         constexpr size_t kMaximumRetainedIndices = 4096;
@@ -81,8 +162,18 @@ namespace
         }
     }
 
-    bool RememberImportedIndex(std::unordered_map<uint32_t, uint16_t>& indices, uint32_t id, uint16_t index)
+    bool RememberImportedIndex(ImportedIndexCache& cache, std::unordered_map<uint32_t, uint16_t>& indices, uint32_t id,
+                               uint16_t index)
     {
+        switch (cache.Remember(id, index))
+        {
+        case ImportedIndexCache::Result::Inserted:
+            return true;
+        case ImportedIndexCache::Result::Duplicate:
+            return false;
+        case ImportedIndexCache::Result::Overflow:
+            break;
+        }
         const auto [entry, inserted] = indices.try_emplace(id, index);
         if (!inserted && entry->second != RGHandle::kInvalid)
         {
@@ -191,25 +282,331 @@ RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle han
     return resource.IsBuffer() ? RHITextureHandle{} : resource.handle;
 }
 
+struct EnhancedRenderGraph::DeclarationWork
+{
+    ImportedIndexCache importedTextures, importedBuffers;
+    std::array<job_handle, 8> pending;
+    size_t pendingCount{}, nextPacket{};
+};
+
+void EnhancedRenderGraph::JoinDeclarationPackets()
+{
+    auto& work = *m_declarationWork;
+    std::exception_ptr failure;
+    for (size_t index = 0; index < work.pendingCount; ++index)
+    {
+        try
+        {
+            work.pending[index].wait();
+        }
+        catch (...)
+        {
+            if (!failure)
+            {
+                failure = std::current_exception();
+            }
+        }
+        work.pending[index] = {};
+    }
+    work.pendingCount = 0;
+    if (failure)
+    {
+        std::rethrow_exception(failure);
+    }
+}
+
+void EnhancedRenderGraph::DispatchDeclarationPackets(bool finish)
+{
+    auto& work = *m_declarationWork;
+    const size_t count = m_declarationPackets.size() - work.nextPacket;
+    if (!count || (!finish && count < 8))
+    {
+        return;
+    }
+    struct BuildBatch
+    {
+        std::span<const DeclarationPacket> packets;
+        Resource* resources;
+        ResourceDeclaration* resourceDeclarations;
+        Pass* passes;
+        PassDeclaration* passDeclarations;
+        size_t jobs;
+    };
+    auto& scheduler = ce::get_job_scheduler();
+    const size_t jobs = count >= 8 && !thread_pool::is_worker_thread() && scheduler.is_running()
+                            ? (std::min)({size_t{4}, ce::get_thread_pool().size(), count})
+                            : size_t{1};
+    m_declarationPacketJobs = (std::max)(m_declarationPacketJobs, static_cast<uint32_t>(jobs));
+    if (work.pendingCount == work.pending.size())
+    {
+        JoinDeclarationPackets();
+    }
+    auto* batch = static_cast<BuildBatch*>(m_packetArena.allocate(sizeof(BuildBatch), alignof(BuildBatch)));
+    std::construct_at(
+        batch, BuildBatch{CopyPacketValues<DeclarationPacket>(std::span{m_declarationPackets}.subspan(work.nextPacket)),
+                          m_resources.data(), m_resourceDeclarations.data(), m_passes.data(), m_passDeclarations.data(),
+                          jobs});
+    const auto build = [batch](size_t job)
+    {
+        for (size_t index = job; index < batch->packets.size(); index += batch->jobs)
+        {
+            MaterializeDeclarationPacket(batch->packets[index], batch->resources, batch->resourceDeclarations,
+                                         batch->passes, batch->passDeclarations);
+        }
+    };
+    if (jobs > 1)
+    {
+        ce::profile_scope profile{ce::marker<"RenderGraphDeclarePacketDispatch">()};
+        work.pending[work.pendingCount++] = scheduler.submit_indexed(jobs, build);
+    }
+    else
+    {
+        build(0);
+    }
+    work.nextPacket += count;
+}
+
+void EnhancedRenderGraph::PinDeclarationNames()
+{
+    // Moving outer metadata invalidates SSO-backed cached views. Jobs have
+    // joined before this rare growth path; pin every active view first.
+    for (size_t index = m_packetFirstResource; index < m_resources.size(); ++index)
+    {
+        auto& declaration = m_resourceDeclarations[index];
+        declaration.name = CopyPacketName(declaration.name);
+        declaration.descriptorName = CopyPacketName(declaration.descriptorName);
+    }
+    for (size_t index = m_packetFirstPass; index < m_passes.size(); ++index)
+    {
+        auto& declaration = m_passDeclarations[index];
+        declaration.name = CopyPacketName(declaration.name);
+    }
+}
+
+void EnhancedRenderGraph::ClearResourceMetadata(Resource& resource)
+{
+    // Inactive metadata stays owned. Preserve strings/capacity so the next
+    // declaration can borrow an equal name without allocating or copying it.
+    resource.desc.width = resource.desc.height = 0;
+    resource.desc.arraySize = 1;
+    resource.desc.format = RHIFormat::RGBA8Unorm;
+    resource.desc.allowRenderTarget = false;
+    resource.desc.allowDepthStencil = false;
+    resource.desc.allowUnorderedAccess = false;
+    std::fill_n(resource.desc.clearColor, 4, 0.f);
+    resource.bufferDesc.bytes = 0;
+    resource.bufferDesc.allowUnorderedAccess = false;
+    resource.bufferDesc.allowIndirectArguments = false;
+    resource.bufferKind = false;
+    resource.handle = {};
+    resource.buffer = {};
+    resource.poolKey = 0;
+    resource.state = resource.initialState = RHIResourceState::Common;
+    resource.writeback = nullptr;
+    resource.imported = false;
+    resource.firstImport = true;
+    resource.hasAtomicMin64 = false;
+    resource.used = false;
+    resource.firstUse = UINT32_MAX;
+    resource.lastUse = 0;
+    resource.aliasGroup = resource.aliasMember = UINT32_MAX;
+    resource.allocationBytes = 0;
+    ClearNonempty(resource.versions);
+}
+
+std::string_view EnhancedRenderGraph::CopyPacketName(std::string_view value)
+{
+    const auto owned = CopyPacketValues<char>({value.data(), value.size()});
+    return {owned.data(), owned.size()};
+}
+
+void EnhancedRenderGraph::BeginDeclarationPackets()
+{
+    RequireQueueIdle();
+    if (m_collectingDeclarationPackets || m_cancelledDeclarationPackets)
+    {
+        throw std::logic_error("Declaration packet collection requires a finished or Reset graph");
+    }
+    m_packetArena.reset();
+    m_declarationWork->nextPacket = 0;
+    m_declarationPackets.clear();
+    m_declarationPacketJobs = 0;
+    m_compiled = false;
+    m_packetFirstResource = m_resources.size();
+    m_packetFirstPass = m_passes.size();
+    m_openDeclarationPacket = {m_resources.size(), m_resources.size(), m_passes.size(), m_passes.size()};
+    m_collectingDeclarationPackets = true;
+}
+
+void EnhancedRenderGraph::NextDeclarationPacket()
+{
+    if (!m_collectingDeclarationPackets)
+    {
+        throw std::logic_error("Declaration packet collection has not started");
+    }
+    m_openDeclarationPacket.endResource = m_resources.size();
+    m_openDeclarationPacket.endPass = m_passes.size();
+    if (m_openDeclarationPacket.firstResource != m_openDeclarationPacket.endResource ||
+        m_openDeclarationPacket.firstPass != m_openDeclarationPacket.endPass)
+    {
+        m_declarationPackets.push_back(m_openDeclarationPacket);
+    }
+    m_openDeclarationPacket = {m_resources.size(), m_resources.size(), m_passes.size(), m_passes.size()};
+    DispatchDeclarationPackets(false);
+}
+
+void EnhancedRenderGraph::CancelDeclarationPackets() noexcept
+{
+    if (m_collectingDeclarationPackets)
+    {
+        try
+        {
+            JoinDeclarationPackets();
+        }
+        catch (...)
+        {
+        }
+        m_collectingDeclarationPackets = false;
+        // A cancelled graph is incomplete. Reset is its only recovery path.
+        m_cancelledDeclarationPackets = true;
+    }
+}
+
+void EnhancedRenderGraph::SetDeclarationResourceName(uint16_t index, std::string_view name,
+                                                     std::string_view descriptorName)
+{
+    if (m_collectingDeclarationPackets)
+    {
+        auto& declaration = m_resourceDeclarations[index];
+        const auto& retained = m_resources[index].name;
+        declaration.name = retained == name ? std::string_view{retained} : CopyPacketName(name);
+        declaration.descriptorName = name == descriptorName ? declaration.name : CopyPacketName(descriptorName);
+    }
+    else
+    {
+        m_resources[index].name.assign(name);
+    }
+}
+
+void EnhancedRenderGraph::AppendDeclarationVersion(uint16_t index, Resource::Version value)
+{
+    m_resources[index].versions.push_back(value);
+}
+
+void EnhancedRenderGraph::SetDeclarationUsages(uint16_t index, std::span<const RGPassUsage> usages)
+{
+    CopyPassUsages(m_passes[index].usages, usages);
+}
+
+void EnhancedRenderGraph::MaterializeDeclarationPacket(const DeclarationPacket& packet, Resource* resources,
+                                                       ResourceDeclaration* resourceDeclarations, Pass* passes,
+                                                       PassDeclaration* passDeclarations)
+{
+    ce::profile_scope profile{ce::marker<"RenderGraphDeclarePacketBuild">()};
+    for (size_t index = packet.firstResource; index < packet.endResource; ++index)
+    {
+        auto& resource = resources[index];
+        const auto& declaration = resourceDeclarations[index];
+        if (resource.name.data() != declaration.name.data() || resource.name.size() != declaration.name.size())
+        {
+            resource.name.assign(declaration.name);
+        }
+        if (!resource.imported)
+        {
+            if (resource.IsBuffer() && resource.bufferDesc.name != declaration.descriptorName)
+            {
+                resource.bufferDesc.name.assign(declaration.descriptorName);
+            }
+            else if (!resource.IsBuffer() && resource.desc.name != declaration.descriptorName)
+            {
+                resource.desc.name.assign(declaration.descriptorName);
+            }
+        }
+    }
+    for (size_t index = packet.firstPass; index < packet.endPass; ++index)
+    {
+        auto& pass = passes[index];
+        const auto& declaration = passDeclarations[index];
+        if (pass.name.data() != declaration.name.data() || pass.name.size() != declaration.name.size())
+        {
+            pass.name.assign(declaration.name);
+        }
+        if (!declaration.phases.empty())
+        {
+            if (pass.phaseStorage.size() < declaration.phases.size())
+            {
+                pass.phaseStorage.resize(declaration.phases.size());
+            }
+            for (size_t phase = 0; phase < declaration.phases.size(); ++phase)
+            {
+                const auto& source = declaration.phases[phase];
+                auto& destination = pass.phaseStorage[phase];
+                destination.name.assign(source.name);
+                CopyPassUsages(destination.usages, source.usages);
+            }
+            pass.phases = std::span{pass.phaseStorage}.first(declaration.phases.size());
+        }
+    }
+}
+
+void EnhancedRenderGraph::FinishDeclarationPackets()
+{
+    ce::profile_scope profile{ce::marker<"RenderGraphDeclarePacketJoin">()};
+    NextDeclarationPacket();
+    try
+    {
+        DispatchDeclarationPackets(true);
+        JoinDeclarationPackets();
+    }
+    catch (...)
+    {
+        CancelDeclarationPackets();
+        throw;
+    }
+    // Jobs never append. The producer's reserved IDs define the merge order,
+    // independent of completion order; callbacks retain their original handles.
+    ce::profile_scope merge{ce::marker<"RenderGraphDeclarePacketMerge">()};
+    size_t resource = m_packetFirstResource;
+    size_t pass = m_packetFirstPass;
+    for (const auto& packet : std::span{m_declarationPackets})
+    {
+        if (packet.firstResource != resource || packet.firstPass != pass)
+        {
+            CancelDeclarationPackets();
+            throw std::logic_error("Declaration packet reservation order changed");
+        }
+        resource = packet.endResource;
+        pass = packet.endPass;
+    }
+    m_collectingDeclarationPackets = false;
+}
+
 void EnhancedRenderGraph::Reset()
 {
     ce::profile_scope profile{ce::marker<"RenderGraphReset">()};
     RequireQueueIdle();
+    CancelDeclarationPackets();
     ReleaseResources();
+    m_packetArena.reset();
+    m_declarationWork->nextPacket = 0;
+    m_declarationPackets.clear();
+    m_declarationPacketJobs = 0;
+    m_cancelledDeclarationPackets = false;
     m_recordedRecording = 0;
     m_statesCommitted = false;
     m_queueExecutionAttempted = false;
     m_queueDiagnostics = {};
     m_measurementDomain = RGMeasurementDomain::Normal;
     m_queueExecutionMode = 0;
-    // 현재 native 자원을 해제한 뒤 모든 필드를 비운다. Resource와 버전 vector의 수명을 유지해
+    // 현재 native 자원을 해제한 뒤 활성 상태를 비우고 이름·저장 공간은 재사용한다. 버전 vector의 수명을 유지해
     // 다음 선언에서 checked-iterator proxy까지 다시 생성하는 비용을 피한다.
-    const Resource emptyResource{};
     for (auto& resource : m_resources)
     {
-        resource = emptyResource;
+        ClearResourceMetadata(resource);
     }
     m_resources = {};
+    m_declarationWork->importedTextures.Reset();
+    m_declarationWork->importedBuffers.Reset();
     ResetImportedIndices(m_importedTextures);
     ResetImportedIndices(m_importedBuffers);
     m_atomicResources.clear();
@@ -244,20 +641,46 @@ RHIBufferHandle EnhancedRenderGraph::ResolveBufferHandle(RGHandle handle) const
 
 RGHandle EnhancedRenderGraph::FindImportedBuffer(RHIBufferHandle buffer) const
 {
-    const auto found = m_importedBuffers.find(buffer.id);
-    if (buffer.IsValid() && found != m_importedBuffers.end() && found->second != RGHandle::kInvalid)
+    if (!buffer.IsValid())
     {
-        return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(found->second, 0) : RGHandle{found->second};
+        return {};
+    }
+    const auto& cache = m_declarationWork->importedBuffers;
+    auto index = cache.Find(buffer.id);
+    if (index == RGHandle::kInvalid && cache.Full())
+    {
+        const auto found = m_importedBuffers.find(buffer.id);
+        if (found != m_importedBuffers.end())
+        {
+            index = found->second;
+        }
+    }
+    if (index != RGHandle::kInvalid)
+    {
+        return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(index, 0) : RGHandle{index};
     }
     return {};
 }
 
 RGHandle EnhancedRenderGraph::FindImportedTexture(RHITextureHandle texture) const
 {
-    const auto found = m_importedTextures.find(texture.id);
-    if (texture.IsValid() && found != m_importedTextures.end() && found->second != RGHandle::kInvalid)
+    if (!texture.IsValid())
     {
-        return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(found->second, 0) : RGHandle{found->second};
+        return {};
+    }
+    const auto& cache = m_declarationWork->importedTextures;
+    auto index = cache.Find(texture.id);
+    if (index == RGHandle::kInvalid && cache.Full())
+    {
+        const auto found = m_importedTextures.find(texture.id);
+        if (found != m_importedTextures.end())
+        {
+            index = found->second;
+        }
+    }
+    if (index != RGHandle::kInvalid)
+    {
+        return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(index, 0) : RGHandle{index};
     }
     return {};
 }
@@ -281,8 +704,8 @@ bool EnhancedRenderGraph::PrepareParallel(IRHIParallelCommandPool& pool, std::st
     return true;
 }
 
-bool EnhancedRenderGraph::CheckDeclarationCapacity(std::size_t count, uint16_t limit,
-    const char* kind, const std::string& name)
+bool EnhancedRenderGraph::CheckDeclarationCapacity(std::size_t count, uint16_t limit, const char* kind,
+                                                   std::string_view name)
 {
     if (!m_declarationError.empty())
     {
@@ -292,8 +715,8 @@ bool EnhancedRenderGraph::CheckDeclarationCapacity(std::size_t count, uint16_t l
     {
         // 무효 ID로 감싼 뒤 검사하면 핸들이 이전 자원을 가리킬 수 있다.
         // 반환값을 무시해도 잘린 그래프를 Compile/Execute할 수 없도록 잠근다.
-        m_declarationError = "RenderGraph " + std::string(kind) + " declaration limit (" +
-            std::to_string(limit) + ") exceeded before '" + name + "'";
+        m_declarationError = "RenderGraph " + std::string(kind) + " declaration limit (" + std::to_string(limit) +
+                             ") exceeded before '" + std::string{name} + "'";
         m_compiled = false;
         return false;
     }
@@ -305,15 +728,28 @@ EnhancedRenderGraph::Resource& EnhancedRenderGraph::AppendResource()
     const auto index = m_resources.size();
     if (index == m_resourceStorage.size())
     {
+        if (m_collectingDeclarationPackets && index == m_resourceStorage.capacity())
+        {
+            JoinDeclarationPackets();
+            PinDeclarationNames();
+        }
         m_resourceStorage.emplace_back();
     }
     m_resources = std::span{m_resourceStorage}.first(index + 1);
+    if (m_collectingDeclarationPackets)
+    {
+        if (m_resourceDeclarations.size() <= index)
+        {
+            JoinDeclarationPackets();
+            m_resourceDeclarations.resize((std::max)(index + 1, m_resourceDeclarations.size() * 2));
+        }
+        m_resourceDeclarations[index] = {};
+    }
     return m_resources[index];
 }
 
-RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
-    RHIResourceState currentState, const std::string& name,
-    RHIResourceState* stateWriteback)
+RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,
+                                           std::string_view name, RHIResourceState* stateWriteback)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareImportBuffer">()};
     RequireQueueIdle();
@@ -330,19 +766,22 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     entry.state = currentState;
     entry.writeback = stateWriteback;
     entry.imported = true;
-    if (m_scheduling == RGSchedulingMode::ExplicitVersioned) entry.versions.push_back({RGHandle::kInvalid, false});
-    entry.name = name;
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
+    {
+        AppendDeclarationVersion(static_cast<uint16_t>(m_resources.size() - 1), {RGHandle::kInvalid, false});
+    }
+    SetDeclarationResourceName(static_cast<uint16_t>(m_resources.size() - 1), name);
 
     handle.index = static_cast<uint16_t>(m_resources.size() - 1);
-    entry.firstImport = RememberImportedIndex(m_importedBuffers, resource.id, handle.index);
+    entry.firstImport =
+        RememberImportedIndex(m_declarationWork->importedBuffers, m_importedBuffers, resource.id, handle.index);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
 }
 
-RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
-    RHIResourceState currentState, const std::string& name,
-    RHIResourceState* stateWriteback)
+RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource, RHIResourceState currentState,
+                                            std::string_view name, RHIResourceState* stateWriteback)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareImportTexture">()};
     RequireQueueIdle();
@@ -358,11 +797,15 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
     entry.state = currentState;
     entry.writeback = stateWriteback;
     entry.imported = true;
-    if (m_scheduling == RGSchedulingMode::ExplicitVersioned) entry.versions.push_back({RGHandle::kInvalid, false});
-    entry.name = name;
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
+    {
+        AppendDeclarationVersion(static_cast<uint16_t>(m_resources.size() - 1), {RGHandle::kInvalid, false});
+    }
+    SetDeclarationResourceName(static_cast<uint16_t>(m_resources.size() - 1), name);
 
     handle.index = static_cast<uint16_t>(m_resources.size() - 1);
-    entry.firstImport = RememberImportedIndex(m_importedTextures, resource.id, handle.index);
+    entry.firstImport =
+        RememberImportedIndex(m_declarationWork->importedTextures, m_importedTextures, resource.id, handle.index);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
@@ -377,10 +820,25 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
         return {};
     }
     auto& entry = AppendResource();
-    entry.desc = desc;
+    if (m_collectingDeclarationPackets)
+    {
+        // Copy scalar fields without constructing a second owning string.
+        entry.desc.width = desc.width;
+        entry.desc.height = desc.height;
+        entry.desc.arraySize = desc.arraySize;
+        entry.desc.format = desc.format;
+        entry.desc.allowRenderTarget = desc.allowRenderTarget;
+        entry.desc.allowDepthStencil = desc.allowDepthStencil;
+        entry.desc.allowUnorderedAccess = desc.allowUnorderedAccess;
+        std::copy_n(desc.clearColor, 4, entry.desc.clearColor);
+    }
+    else
+    {
+        entry.desc = desc;
+    }
     entry.state = RHIResourceState::Common;
     entry.imported = false;
-    entry.name = desc.name;
+    SetDeclarationResourceName(static_cast<uint16_t>(m_resources.size() - 1), desc.name, desc.name);
 
     RGHandle handle{};
     handle.index = static_cast<uint16_t>(m_resources.size() - 1);
@@ -398,9 +856,18 @@ RGHandle EnhancedRenderGraph::CreateBuffer(const RGBufferDesc& desc)
         return {};
     }
     auto& entry = AppendResource();
-    entry.bufferDesc = desc;
+    if (m_collectingDeclarationPackets)
+    {
+        entry.bufferDesc.bytes = desc.bytes;
+        entry.bufferDesc.allowUnorderedAccess = desc.allowUnorderedAccess;
+        entry.bufferDesc.allowIndirectArguments = desc.allowIndirectArguments;
+    }
+    else
+    {
+        entry.bufferDesc = desc;
+    }
     entry.bufferKind = true;
-    entry.name = desc.name;
+    SetDeclarationResourceName(static_cast<uint16_t>(m_resources.size() - 1), desc.name, desc.name);
     const auto index = static_cast<uint16_t>(m_resources.size() - 1);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned
@@ -552,15 +1019,29 @@ RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
     return VersionHandle(previous.index, version);
 }
 
-bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, const std::string& producer) const
+bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, std::string_view producer) const
 {
     if (!ValidVersionHandle(resource)) return false;
-    for (const auto& pass : m_passes) if (pass.name == producer)
-        for (const auto& use : std::span{pass.usages})
+    for (size_t index = 0; index < m_passes.size(); ++index)
+    {
+        const auto& pass = m_passes[index];
+        const bool pending = m_collectingDeclarationPackets && index >= m_packetFirstPass;
+        const auto name = pending ? m_passDeclarations[index].name : std::string_view{pass.name};
+        if (name != producer)
+        {
+            continue;
+        }
+        const auto usages = pass.usages;
+        for (const auto& use : usages)
+        {
             if (use.handle.index == resource.index && use.handle.kind == resource.kind &&
                 use.handle.epoch == resource.epoch &&
                 (use.access == RGAccessMode::Write || use.access == RGAccessMode::ReadWrite))
+            {
                 return true;
+            }
+        }
+    }
     return false;
 }
 
@@ -595,9 +1076,23 @@ EnhancedRenderGraph::Pass& EnhancedRenderGraph::AppendPass()
     const auto index = m_passes.size();
     if (index == m_passStorage.size())
     {
+        if (m_collectingDeclarationPackets && index == m_passStorage.capacity())
+        {
+            JoinDeclarationPackets();
+            PinDeclarationNames();
+        }
         m_passStorage.emplace_back();
     }
     m_passes = std::span{m_passStorage}.first(index + 1);
+    if (m_collectingDeclarationPackets)
+    {
+        if (m_passDeclarations.size() <= index)
+        {
+            JoinDeclarationPackets();
+            m_passDeclarations.resize((std::max)(index + 1, m_passDeclarations.size() * 2));
+        }
+        m_passDeclarations[index] = {};
+    }
     return m_passes[index];
 }
 
@@ -608,9 +1103,10 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     pass.execute = {};
     pass.splitExecute = {};
     pass.repeatedExecute = {};
-    ClearNonempty(pass.name);
-    // Inactive passes are outside m_passes. Retain constructed usage records
-    // and their proxy; the next AddPass overwrites the entire active range.
+    // Names stay owned while inactive and can be reused without a journal copy.
+    // Keep the payload size as well as capacity: equal-shaped declarations
+    // overwrite raw slots without orphaning Debug iterators on every frame.
+    std::fill_n(pass.usages.data(), pass.usages.size(), RGPassUsage{});
     ClearNonempty(pass.transitions);
     ClearNonempty(pass.bufferTransitions);
     ClearNonempty(pass.uavBarriers);
@@ -635,7 +1131,7 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     pass.repeated = false;
 }
 
-RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSideEffect)
+RGPassId EnhancedRenderGraph::InitializePass(std::string_view name, bool hasSideEffect)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareInitializePass">()};
     RequireQueueIdle();
@@ -646,7 +1142,15 @@ RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSi
     // Construct vector-owning metadata in place. Moving a temporary Pass also
     // constructs every checked-iterator proxy again in a Debug build.
     auto& pass = AppendPass();
-    pass.name = name;
+    if (m_collectingDeclarationPackets)
+    {
+        m_passDeclarations[m_passes.size() - 1].name =
+            pass.name == name ? std::string_view{pass.name} : CopyPacketName(name);
+    }
+    else
+    {
+        pass.name = name;
+    }
     pass.hasSideEffect = hasSideEffect;
 
     RGPassId id{};
@@ -655,8 +1159,8 @@ RGPassId EnhancedRenderGraph::InitializePass(const std::string& name, bool hasSi
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
-    const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
+RGPassId EnhancedRenderGraph::AddPass(std::string_view name, const std::vector<RGPassUsage>& usages,
+                                      ExecuteCallback execute, bool hasSideEffect)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
     const auto id = InitializePass(name, hasSideEffect);
@@ -665,13 +1169,13 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    CopyPassUsages(pass.usages, usages);
+    SetDeclarationUsages(id.index, usages);
     pass.execute = std::move(execute);
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
-    std::vector<RGPassUsage>&& usages, ExecuteCallback execute, bool hasSideEffect)
+RGPassId EnhancedRenderGraph::AddPass(std::string_view name, std::vector<RGPassUsage>&& usages, ExecuteCallback execute,
+                                      bool hasSideEffect)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
     const auto id = InitializePass(name, hasSideEffect);
@@ -685,22 +1189,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
-    std::initializer_list<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect)
-{
-    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
-    const auto id = InitializePass(name, hasSideEffect);
-    if (!id.IsValid())
-    {
-        return {};
-    }
-    auto& pass = m_passes[id.index];
-    CopyPassUsages(pass.usages, {usages.begin(), usages.size()});
-    pass.execute = std::move(execute);
-    return id;
-}
-
-RGPassId EnhancedRenderGraph::AddPass(const std::string& name, std::span<const RGPassUsage> usages,
+RGPassId EnhancedRenderGraph::AddPass(std::string_view name, std::initializer_list<RGPassUsage> usages,
                                       ExecuteCallback execute, bool hasSideEffect)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
@@ -710,14 +1199,29 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name, std::span<const R
         return {};
     }
     auto& pass = m_passes[id.index];
-    CopyPassUsages(pass.usages, {usages.begin(), usages.size()});
+    SetDeclarationUsages(id.index, {usages.begin(), usages.size()});
     pass.execute = std::move(execute);
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
-    std::vector<RGPassUsage> usages, std::vector<RepeatedPhase> phases,
-    uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
+RGPassId EnhancedRenderGraph::AddPass(std::string_view name, std::span<const RGPassUsage> usages,
+                                      ExecuteCallback execute, bool hasSideEffect)
+{
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    SetDeclarationUsages(id.index, {usages.begin(), usages.size()});
+    pass.execute = std::move(execute);
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddRepeatedPass(std::string_view name, std::vector<RGPassUsage> usages,
+                                              std::vector<RepeatedPhase> phases, uint32_t repeatCount,
+                                              RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddRepeatedPass">()};
     RequireQueueIdle();
@@ -736,7 +1240,7 @@ RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddRepeatedPassView(const std::string& name, std::span<const RGPassUsage> usages,
+RGPassId EnhancedRenderGraph::AddRepeatedPassView(std::string_view name, std::span<const RGPassUsage> usages,
                                                   std::span<const RepeatedPhaseView> phases, uint32_t repeatCount,
                                                   RepeatedExecuteCallback execute, bool hasSideEffect,
                                                   uint32_t recordCost)
@@ -749,18 +1253,32 @@ RGPassId EnhancedRenderGraph::AddRepeatedPassView(const std::string& name, std::
         return {};
     }
     auto& pass = m_passes[id.index];
-    if (pass.phaseStorage.size() < phases.size())
+    if (m_collectingDeclarationPackets)
     {
-        pass.phaseStorage.resize(phases.size());
+        auto* owned = static_cast<RepeatedPhaseView*>(
+            phases.empty() ? nullptr : m_packetArena.allocate(phases.size_bytes(), alignof(RepeatedPhaseView)));
+        for (size_t index = 0; index < phases.size(); ++index)
+        {
+            std::construct_at(owned + index, RepeatedPhaseView{CopyPacketName(phases[index].name),
+                                                               CopyPacketValues(phases[index].usages)});
+        }
+        m_passDeclarations[id.index].phases = {owned, phases.size()};
     }
-    for (size_t index = 0; index < phases.size(); ++index)
+    else
     {
-        auto& destination = pass.phaseStorage[index];
-        const auto& source = phases[index];
-        destination.name.assign(source.name);
-        CopyPassUsages(destination.usages, source.usages);
+        if (pass.phaseStorage.size() < phases.size())
+        {
+            pass.phaseStorage.resize(phases.size());
+        }
+        for (size_t index = 0; index < phases.size(); ++index)
+        {
+            auto& destination = pass.phaseStorage[index];
+            const auto& source = phases[index];
+            destination.name.assign(source.name);
+            CopyPassUsages(destination.usages, source.usages);
+        }
+        pass.phases = std::span{pass.phaseStorage}.first(phases.size());
     }
-    pass.phases = std::span{pass.phaseStorage}.first(phases.size());
     pass.repeated = true;
     pass.repeatCount = repeatCount;
     pass.repeatedExecute = std::move(execute);
@@ -768,9 +1286,9 @@ RGPassId EnhancedRenderGraph::AddRepeatedPassView(const std::string& name, std::
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
-    const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
-    uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
+RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, const std::vector<RGPassUsage>& usages,
+                                           SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect,
+                                           uint32_t recordCost)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddSplitPass">()};
     const auto id = InitializePass(name, hasSideEffect);
@@ -779,16 +1297,16 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    CopyPassUsages(pass.usages, usages);
+    SetDeclarationUsages(id.index, usages);
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.recordCost = recordCost;
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
-    std::vector<RGPassUsage>&& usages, SplitExecuteCallback execute,
-    uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
+RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, std::vector<RGPassUsage>&& usages,
+                                           SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect,
+                                           uint32_t recordCost)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddSplitPass">()};
     const auto id = InitializePass(name, hasSideEffect);
@@ -804,9 +1322,9 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
-    std::initializer_list<RGPassUsage> usages, SplitExecuteCallback execute,
-    uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
+RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, std::initializer_list<RGPassUsage> usages,
+                                           SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect,
+                                           uint32_t recordCost)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddSplitPass">()};
     const auto id = InitializePass(name, hasSideEffect);
@@ -815,7 +1333,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    CopyPassUsages(pass.usages, {usages.begin(), usages.size()});
+    SetDeclarationUsages(id.index, {usages.begin(), usages.size()});
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.recordCost = recordCost;
@@ -1924,6 +2442,10 @@ EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSche
     // checked-iterator proxies in Debug. These are initial capacities, not limits.
     // The METEOR scene graph alone records ~190 passes; 128 forced one full
     // relocation of every Pass per frame.
+    m_declarationWork = std::make_unique<DeclarationWork>();
+    m_resourceDeclarations.resize(512);
+    m_passDeclarations.resize(512);
+    m_declarationPackets.reserve(64);
     m_resourceStorage.reserve(512);
     m_passStorage.reserve(512);
     m_executeOrder.reserve(512);
@@ -1933,6 +2455,7 @@ EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSche
 
 EnhancedRenderGraph::~EnhancedRenderGraph()
 {
+    CancelDeclarationPackets();
     m_deviceServices->UnregisterUploadTransactionListener(this);
     ReleaseResources();
 }
@@ -2732,7 +3255,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
             hash *= 1099511628211ull;
         }
     };
-    const auto mixName = [&mix](const std::string& name)
+    const auto mixName = [&mix](std::string_view name)
     {
         mix(name.size());
         for (const unsigned char character : name)
@@ -2885,7 +3408,7 @@ bool EnhancedRenderGraph::MatchesStructuralSchedule(const StructuralSchedule& sc
             current.kind == cached.kind &&
             (m_scheduling != RGSchedulingMode::ExplicitVersioned || ValidVersionHandle(current));
     };
-    const auto sameUsages = [&](const std::vector<RGPassUsage>& current, const std::vector<RGPassUsage>& cached)
+    const auto sameUsages = [&](std::span<const RGPassUsage> current, std::span<const RGPassUsage> cached)
     {
         if (current.size() != cached.size())
         {
@@ -3021,7 +3544,7 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
     {
         auto& declaration = schedule.passes.emplace_back();
         declaration.name = pass.name;
-        declaration.usages = pass.usages;
+        CopyPassUsages(declaration.usages, pass.usages);
         declaration.phases.assign(pass.phases.begin(), pass.phases.end());
         forgetEpochs(declaration.usages);
         for (auto& phase : declaration.phases)
@@ -3092,6 +3615,11 @@ std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> EnhancedRenderGra
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
+    if (m_collectingDeclarationPackets || m_cancelledDeclarationPackets)
+    {
+        outError = "Declaration packets require successful FinishDeclarationPackets before Compile";
+        return false;
+    }
     if (!m_queueLease.expired() || m_queueExecutionAttempted)
     {
         outError = "Queue execution requires completion collection and Reset before reuse";
@@ -3307,7 +3835,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
         number(value.size());
         signature.append(value);
     };
-    const auto usages = [&](const std::vector<RGPassUsage>& values)
+    const auto usages = [&](std::span<const RGPassUsage> values)
     {
         number(values.size());
         for (const auto& usage : std::span{values})
@@ -3432,14 +3960,18 @@ bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
     {
         return false;
     }
-    const auto compatible = [this](const std::vector<RGPassUsage>& usages)
+    const auto compatible = [this](std::span<const RGPassUsage> usages)
     {
         for (const auto& usage : usages)
         {
             // Reduction storage stays on graphics until cross-queue simultaneous UAV ownership is supported.
             if (usage.handle.index < m_resources.size() &&
-                std::any_of(m_resources[usage.handle.index].versions.begin(), m_resources[usage.handle.index].versions.end(),
-                    [](const Resource::Version& v) { return v.atomicMin64; })) return false;
+                std::any_of(
+                    m_resources[usage.handle.index].versions.begin(), m_resources[usage.handle.index].versions.end(),
+                    [](const Resource::Version& v) { return v.atomicMin64; }))
+            {
+                return false;
+            }
             // This is the RHI compute encoder's supported legacy-state subset.
             // ShaderResource is narrowed to NON_PIXEL only after a COMMON handoff.
             switch (usage.state)

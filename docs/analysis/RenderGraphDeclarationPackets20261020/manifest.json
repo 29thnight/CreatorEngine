@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "baseCommit": "27de3f5a02aadde7456aab680db3184c36ee735e",
+  "sourceFiles": {
+    "Editor/RenderTests/RHI/DX12/Tests/RHISoftwareNativeTests.h": "7d1fac7e3e69d13966799e4f6e0a5f9c6338f7c272ee7a0492a7c220daa85263",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp": "b63e134cca75ffeae0515b46fba7d40dc9dcb73a3692d36d2b3aff36391c6f57",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h": "4cf5c09d9c5b57b3f7aac4a20feab22ecd1d3b5fd6a2242292da1b909f9d8b1c",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "8d47dcb9ed710c7b3a6158ae0da66d53a4b26ecbee26bcb0e8aaee2e003f7b12",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "cdac5b27d7355b6f8b22037e9f2b9a8424d4d44ef2a5e58b507188945fc656ca",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp": "e0812e79efe6f33cad0ad7447b8ef717fcf52f16d25c863260269b1ff4b5a2be",
+    "Tools/regression/verify-rhi-software-native.ps1": "1cd83b404be6b97bae581f8c577f34d0bdbf14647aa1b7d94a7cc7c8e1afcc3c"
+  },
+  "afterRuntimeSha256": "5c789acceb7b965910eabea6b0a497f904fad43fda70903c544b391c8febc9e7",
+  "executionOrder": [
+    "before-flat",
+    "after-flat",
+    "after-flat-confirm",
+    "before-flat-confirm"
+  ],
+  "files": [
+    {
+      "file": "before-flat.summary.json",
+      "bytes": 1803589,
+      "sha256": "697d093d7e3b48720a1af8fcd60d36c7aa761d295c16f64469027a3c24bcaaba"
+    },
+    {
+      "file": "after-flat.summary.json",
+      "bytes": 1841647,
+      "sha256": "5e5d35d2ef04e696901cdae265dad541cbaacadaebbea34061dcea54378cab1d"
+    },
+    {
+      "file": "after-flat-confirm.summary.json",
+      "bytes": 1770720,
+      "sha256": "541f585aa12f8ecba6cc66fe3a6702a6b65d86cc18f25f8d941c7ef690c37931"
+    },
+    {
+      "file": "before-flat-confirm.summary.json",
+      "bytes": 1765611,
+      "sha256": "737168fb3daaeddd1ef5abf0cc50c666c0a2bf73bf1089c49c24e9283c764705"
+    },
+    {
+      "file": "native-result.json",
+      "bytes": 511,
+      "sha256": "4a5a0090b4cbcc8abbce1961f3ccb3832dd09f59be129235add7efd2f38ae8fd"
+    },
+    {
+      "file": "material-verdict.json",
+      "bytes": 913,
+      "sha256": "63e0a34a565a53b5eef9b0a7e56245161c8db771b1829851eb77e9cbd66f10cd"
+    },
+    {
+      "file": "gbv-lod-verdict.json",
+      "bytes": 315,
+      "sha256": "2a2588f8f6c1b7d6ce6ec568b8dfd807df92a2af344da655a971714e01f85e30"
+    },
+    {
+      "file": "gbv-lod-confirmation.json",
+      "bytes": 315,
+      "sha256": "2a2588f8f6c1b7d6ce6ec568b8dfd807df92a2af344da655a971714e01f85e30"
+    }
+  ],
+  "measurementSourceFiles": {
+    "Editor/RenderTests/RHI/DX12/Tests/RHISoftwareNativeTests.h": "7d1fac7e3e69d13966799e4f6e0a5f9c6338f7c272ee7a0492a7c220daa85263",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp": "b63e134cca75ffeae0515b46fba7d40dc9dcb73a3692d36d2b3aff36391c6f57",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h": "3b7cbce6cb4ebd18879436edbe90d6f46b2644d86a08e6d33921bb66958096b2",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "8d47dcb9ed710c7b3a6158ae0da66d53a4b26ecbee26bcb0e8aaee2e003f7b12",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "cdac5b27d7355b6f8b22037e9f2b9a8424d4d44ef2a5e58b507188945fc656ca",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp": "e0812e79efe6f33cad0ad7447b8ef717fcf52f16d25c863260269b1ff4b5a2be",
+    "Tools/regression/verify-rhi-software-native.ps1": "1cd83b404be6b97bae581f8c577f34d0bdbf14647aa1b7d94a7cc7c8e1afcc3c"
+  },
+  "publicationFormatProof": {
+    "path": "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h",
+    "measuredSha256": "3b7cbce6cb4ebd18879436edbe90d6f46b2644d86a08e6d33921bb66958096b2",
+    "publishedSha256": "4cf5c09d9c5b57b3f7aac4a20feab22ecd1d3b5fd6a2242292da1b909f9d8b1c",
+    "cppTokensIdentical": true,
+    "rebuiltAfterFormatOnlyChange": false
+  }
+}

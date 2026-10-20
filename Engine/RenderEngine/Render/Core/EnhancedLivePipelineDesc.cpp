@@ -213,21 +213,35 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
     const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
 {
     ce::profile_scope declarationProfile{ce::marker<"RenderGraphDeclare">()};
-    for (const LivePassNode& node : m_nodes)
+    graph.BeginDeclarationPackets();
+    try
     {
-        // 비활성 노드는 통째로 건너뛴다. modifies 슬롯은 값이 그대로 남으므로
-        // 뒤 노드가 이전 값을 이어받는다 — 폴백 코드가 필요 없는 이유다.
-        if (!node.IsActive()) continue;
-        ce::profile_scope profile{node.declarationMarker};
+        for (const LivePassNode& node : m_nodes)
         {
-            ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
-            node.declare(blackboard, graph, context, binding);
+            // 비활성 노드는 통째로 건너뛴다. modifies 슬롯은 값이 그대로 남으므로
+            // 뒤 노드가 이전 값을 이어받는다 — 폴백 코드가 필요 없는 이유다.
+            if (!node.IsActive())
+            {
+                continue;
+            }
+            graph.NextDeclarationPacket();
+            ce::profile_scope profile{node.declarationMarker};
+            {
+                ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
+                node.declare(blackboard, graph, context, binding);
+            }
+            if (afterDeclare)
+            {
+                ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
+                afterDeclare(node, blackboard);
+            }
         }
-        if (afterDeclare)
-        {
-            ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
-            afterDeclare(node, blackboard);
-        }
+        graph.FinishDeclarationPackets();
+    }
+    catch (...)
+    {
+        graph.CancelDeclarationPackets();
+        throw;
     }
 }
 
