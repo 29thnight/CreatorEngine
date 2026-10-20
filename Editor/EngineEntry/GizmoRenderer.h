@@ -13,7 +13,6 @@ class GizmoRenderer
 public:
 	GizmoRenderer(RenderScene* renderScene, Camera* editorCamera);
 	~GizmoRenderer();
-	void OnDrawGizmos();
 
 	void SetWireFrame() { m_buseWireFrame = !m_buseWireFrame; }
 

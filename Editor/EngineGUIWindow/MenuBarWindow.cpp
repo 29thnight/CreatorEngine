@@ -393,7 +393,6 @@ void MenuBarWindow::RenderMenuBar()
 						EditorSettingsStore::Get().Build().GetStartupSceneName();
                     if(!startupSceneName.empty())
                     {
-						GameBuilderSystem::GetInstance()->Initialize();
                         GameBuilderSystem::GetInstance()->BuildGame();
                     }
                 }

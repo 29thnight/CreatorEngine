@@ -57,10 +57,11 @@ try {
     $process.Refresh()
     $output = Get-Content -LiteralPath $outPath -Raw
     $successes = [regex]::Matches($output, '(?m)^SCENE_GC_OK cycle=2 lifecycle=2 staleHandles=2 selection=2 ddol=1 workerPin=1 incrementalSteps=[1-9][0-9]*\r?$').Count
-    if ($process.ExitCode -ne 0 -or $successes -ne $Iterations -or $output.Contains('SCENE_GC_FAILED')) {
-        throw "Scene GC gate failed: exit=$($process.ExitCode), passed=$successes/$Iterations. See $outPath and $errPath"
+    $renderRegistrations = [regex]::Matches($output, '(?m)^SCENE_RENDER_REGISTRY_OK types=9 duplicate=9 ownerless=9 retiredGenerations=18 lightCompactions=33 invalidLightSlots=3\r?$').Count
+    if ($process.ExitCode -ne 0 -or $successes -ne $Iterations -or $renderRegistrations -ne $Iterations -or $output.Contains('SCENE_GC_FAILED')) {
+        throw "Scene GC gate failed: exit=$($process.ExitCode), passed=$successes/$Iterations renderRegistrations=$renderRegistrations/$Iterations. See $outPath and $errPath"
     }
-    "PASS Scene GC $Configuration iterations=$successes exit=$($process.ExitCode)"
+    "PASS Scene GC $Configuration iterations=$successes renderRegistrations=$renderRegistrations exit=$($process.ExitCode)"
 } finally {
     $env:CREATOR_EDITOR_WORKSPACE_DIR = $priorWorkspace
     $env:CREATOR_EDITOR_LEGACY_INI = $priorLegacyIni

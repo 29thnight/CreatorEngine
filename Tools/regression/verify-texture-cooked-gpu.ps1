@@ -9,7 +9,8 @@ $paths = @('Tools/regression/texture_cooked_gpu_fixture.cpp','Tools/regression/t
     'Tools/regression/texture_cooked_gpu_probe.slang','Tools/regression/TextureCookedGpuFixture.vcxproj',
     'Tools/regression/TextureCookedGpuProbe.vcxproj','Tools/regression/verify-texture-cooked-gpu.ps1',
     'Engine/RenderEngine/DataSystem.cpp',
-    'Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp','Engine/RenderEngine/Experiment/Cooked/CookedTexture.cpp',
+    'Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp','Engine/RenderEngine/AssetDepot/TextureAssetRuntime.h',
+    'Engine/RenderEngine/Experiment/MaterialResolver.cpp','Engine/RenderEngine/Experiment/Cooked/CookedTexture.cpp',
     'Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp','Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp',
     'Engine/RenderEngine/RHI/RHIShaderCompiler.cpp', 'Tools/regression/TextureCookedVulkanProbe.vcxproj',
     'Engine/RenderEngine/RHI/Vulkan/VulkanRenderServices.cpp','Engine/RenderEngine/RHI/Vulkan/VulkanBindingTable.h',
@@ -18,14 +19,14 @@ $sources = @($paths | ForEach-Object { $path = Join-Path $repo $_; [pscustomobje
 if (!$SkipBuild) {
     $msbuild = 'C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Current/Bin/amd64/MSBuild.exe'
     & $msbuild (Join-Path $repo 'Engine/RenderEngine/RenderEngine.vcxproj') /t:Build /p:Configuration=Release /p:Platform=x64 `
-        /p:BuildProjectReferences=false /m:2 /nologo /v:minimal *> (Join-Path $root 'RenderEngine-build.log')
+        /m:2 /nologo /v:minimal *> (Join-Path $root 'RenderEngine-build.log')
     if ($LASTEXITCODE -ne 0) { throw "Current RenderEngine build failed: $root" }
     $projects = @('TextureCookedGpuFixture') + @($backends | ForEach-Object {
         if ($_ -eq 'dx12') { 'TextureCookedGpuProbe' } else { 'TextureCookedVulkanProbe' }
     })
     foreach ($project in $projects) {
         & $msbuild (Join-Path $PSScriptRoot ($project + '.vcxproj')) /t:Build /p:Configuration=Release /p:Platform=x64 `
-            /p:BuildProjectReferences=false /m:2 /nologo /v:minimal *> (Join-Path $root ($project + '-build.log'))
+            /m:2 /nologo /v:minimal *> (Join-Path $root ($project + '-build.log'))
         if ($LASTEXITCODE -ne 0) { throw "Build failed: $project, $root" }
     }
 }
@@ -51,7 +52,11 @@ try {
     $log = Get-Content $probeLog -Raw
     $validationMarker = if ($currentBackend -eq 'dx12') { 'GPUValidation=on' } else { 'VULKAN_VALIDATION_ENABLED=true' }
     if ($exitCode -ne 0 -or $log -notmatch "TEXTURE_COOKED_GPU_OK backend=$currentBackend formats=3 components=1020 corruptRejected=3 validation=0" -or
-        $log -notmatch $validationMarker) { throw "Cooked GPU verification failed: backend=$currentBackend exit=$exitCode $root" }
+        $log -notmatch $validationMarker -or
+        $log -notmatch 'TEXTURE_IMAGE_IDENTITY_OK variants=48 partitions=8 pathIgnored=1' -or
+        [regex]::Matches($log, 'TEXTURE_PREPARED_BINDING_OK cases=6 unmountedOwner=1').Count -ne 3) {
+        throw "Cooked GPU verification failed: backend=$currentBackend exit=$exitCode $root"
+    }
     # Ensure a wrong reference cannot pass the GPU comparison.
     $negative = Join-Path $root ($currentBackend + '-OracleNegative')
     New-Item -ItemType Directory -Path $negative | Out-Null
@@ -68,7 +73,8 @@ try {
         throw "Wrong GPU reference was not rejected: $root"
     }
     $receipts += [pscustomobject]@{ backend=$currentBackend; exitCode=$exitCode; validation=0; gpuComponents=1020;
-        corruptRejected=3; oracleNegativeExit=$oracleNegativeExit; binary=$probe; binarySha256=(Get-FileHash $probe).Hash;
+        corruptRejected=3; imageIdentityVariants=48; imageIdentityPartitions=8; preparedBindingCases=18;
+        oracleNegativeExit=$oracleNegativeExit; binary=$probe; binarySha256=(Get-FileHash $probe).Hash;
         log=$probeLog; negativeLog=$negativeLog }
     }
 } finally {
@@ -93,3 +99,4 @@ foreach ($receipt in $receipts) {
     Get-Content $receipt.log | Where-Object { $_ -match '(INTEGRITY_OK|GPU_SAMPLE_OK|TEXTURE_COOKED_GPU_OK)' }
 }
 "TEXTURE_COOKED_GPU_RESULT=$root"
+exit 0

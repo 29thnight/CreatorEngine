@@ -200,8 +200,9 @@ static bool push_unique(R& vec, const T& v)
 }
 
 // Scene의 렌더 도메인 비소유 registry. Entity/component lifetime은 여전히
-// m_Entities가 단독 소유한다. X8부터 종류별 벡터는 편집기/기존 시스템 조회만
-// 맡고, 렌더 갱신은 generation ticket을 가진 frame-persistent dirty queue가 맡는다.
+// m_Entities가 단독 소유한다. 종류별 벡터는 실제 조회 소비자가 있는 타입만
+// 유지한다. 렌더 등록의 중복 검사는 registrations가 맡고, 렌더 갱신은
+// generation ticket을 가진 frame-persistent dirty queue가 맡는다.
 struct SceneRenderRegistryState
 {
 	enum class Kind : uint8_t
@@ -228,6 +229,7 @@ struct SceneRenderRegistryState
 	struct Dispatch
 	{
 		Component* component = nullptr;
+        uint64_t generation = 0;
 		Kind kind{};
 		EntityHandle owner{};
 		size_t instanceId = 0;
@@ -236,17 +238,14 @@ struct SceneRenderRegistryState
 
     std::vector<LightComponent*> lights;
     std::vector<MeshRenderer*> meshes;
-    std::vector<TerrainComponent*> terrains;
     std::vector<FoliageComponent*> foliages;
     std::vector<DecalComponent*> decals;
-    std::vector<SpriteRenderer*> sprites;
-	std::vector<ImageComponent*> images;
-	std::vector<TextComponent*> texts;
-	std::vector<SpriteSheetComponent*> spriteSheets;
 
     // 직렬화된 LightComponent::m_lightIndex 복원과 파괴 시 압축용 점유표다.
     // 실제 렌더 값은 LightRenderProxy가 소유한다.
     std::vector<uint8_t> lightSlots;
+    // 슬롯 압축용 scratch는 Scene 수명 동안 capacity를 재사용한다.
+    std::vector<size_t> lightSlotRemap;
 
 	std::mutex dirtyMutex;
 	std::unordered_map<Component*, Registration> registrations;
@@ -263,14 +262,10 @@ struct SceneRenderRegistryState
     {
         lights.clear();
         meshes.clear();
-        terrains.clear();
         foliages.clear();
         decals.clear();
-        sprites.clear();
-		images.clear();
-		texts.clear();
-		spriteSheets.clear();
         lightSlots.clear();
+        lightSlotRemap.clear();
 		registrations.clear();
 		entityProxies.clear();
 		dirtyQueue.clear();
@@ -2249,7 +2244,7 @@ void Scene::CommitRenderProxies()
 			}
 
 			auto& registration = found->second;
-			registry.dispatchQueue.push_back({ ticket.component, registration.kind,
+			registry.dispatchQueue.push_back({ ticket.component, ticket.generation, registration.kind,
 				registration.owner, registration.instanceId, registration.pending });
 			registration.pending = ProxyDirty::None;
 			registration.queued = false;
@@ -2291,7 +2286,25 @@ void Scene::CommitRenderProxies()
 		}
 		catch (const std::exception& e)
 		{
-			std::cerr << "Error committing render proxy command: " << e.what() << '\n';
+            // A failed CPU publication must not consume the only dirty signal.
+            // Never restore work into a replacement registration at the same address.
+            {
+                std::scoped_lock lock(registry.dirtyMutex);
+                const auto found = registry.registrations.find(dispatch.component);
+                if (found != registry.registrations.end()
+                    && found->second.generation == dispatch.generation)
+                {
+                    auto& registration = found->second;
+                    registration.pending |= dispatch.mask;
+                    if (!registration.queued)
+                    {
+                        registry.dirtyQueue.push_back({dispatch.component, dispatch.generation});
+                        registration.queued = true;
+                    }
+                }
+            }
+            std::cerr << "Error committing render proxy command (instance=" << dispatch.instanceId
+                << ", generation=" << dispatch.generation << "): " << e.what() << '\n';
 		}
 	}
 
@@ -3519,9 +3532,11 @@ std::span<FoliageComponent* const> Scene::FoliageComponents() const
 
 void Scene::CollectLightComponent(LightComponent* ptr)
 {
-	if (ptr && push_unique(m_renderRegistry->lights, ptr) && ptr->GetOwner())
-		RegisterRenderProxy(*m_renderRegistry, ptr,
-			SceneRenderRegistryState::Kind::Light, HandleOf(ptr->GetOwner()->m_index));
+    if (ptr && ptr->GetOwner() && push_unique(m_renderRegistry->lights, ptr))
+    {
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Light, HandleOf(ptr->GetOwner()->m_index));
+    }
 }
 
 void Scene::UnCollectLightComponent(LightComponent* ptr)
@@ -3550,6 +3565,13 @@ size_t Scene::AddLight()
 
 void Scene::EnsureLightSlot(size_t index)
 {
+    // Serialized light indices use int. Reject invalid values before index + 1
+    // can wrap or the registry can allocate for a converted negative value.
+    if (index > static_cast<size_t>((std::numeric_limits<int>::max)()))
+    {
+        throw std::out_of_range("Light slot index exceeds the serialized index range");
+    }
+
     // 로드 경로가 여기로 온다. LightComponent::m_lightIndex는 직렬화되므로
     // 되살아난 컴포넌트는 AddLight()가 아니라 이 함수로 **이미 있어야 할 슬롯**을
     // 집는데, 갓 로드된 Scene의 lightSlots는 비어 있다. 슬롯을 자라게 하는 책임이
@@ -3578,22 +3600,16 @@ void Scene::RemoveLight(size_t index)
 
 void Scene::DestroyLight()
 {
-    std::unordered_map<size_t, size_t> indexRemap;
-    std::vector<uint8_t> newLightSlots;
+    auto& slots = m_renderRegistry->lightSlots;
+    auto& remap = m_renderRegistry->lightSlotRemap;
+    remap.resize(slots.size());
+    size_t liveCount = 0;
     bool isFirstDirectional = false;
 
-    newLightSlots.reserve(m_renderRegistry->lightSlots.size());
-
-    for (size_t i = 0; i < m_renderRegistry->lightSlots.size(); ++i)
+    for (size_t i = 0; i < slots.size(); ++i)
     {
-        if (0u != m_renderRegistry->lightSlots[i])
-        {
-            indexRemap[i] = newLightSlots.size();
-            newLightSlots.push_back(1u);
-        }
+        remap[i] = 0u != slots[i] ? liveCount++ : std::numeric_limits<size_t>::max();
     }
-
-    m_renderRegistry->lightSlots = std::move(newLightSlots);
 
     for (auto& comp : m_renderRegistry->lights)
     {
@@ -3601,9 +3617,10 @@ void Scene::DestroyLight()
 
         int& lightIndex = comp->m_lightIndex;
         auto& lightType = comp->m_lightType;
-        if (auto it = indexRemap.find(lightIndex); it != indexRemap.end())
+        if (lightIndex >= 0 && static_cast<size_t>(lightIndex) < remap.size()
+            && remap[lightIndex] != std::numeric_limits<size_t>::max())
         {
-            lightIndex = static_cast<int>(it->second);
+            lightIndex = static_cast<int>(remap[lightIndex]);
         }
 
         if (!isFirstDirectional && lightType == LightType::DirectionalLight)
@@ -3612,13 +3629,17 @@ void Scene::DestroyLight()
             comp->m_lightStatus = LightStatus::StaticShadows;
         }
     }
+    slots.resize(liveCount);
+    std::fill(slots.begin(), slots.end(), uint8_t{1});
 }
 
 void Scene::CollectMeshRenderer(MeshRenderer* ptr)
 {
-	if (ptr && push_unique(m_renderRegistry->meshes, ptr) && ptr->GetOwner())
-		RegisterRenderProxy(*m_renderRegistry, ptr,
-			SceneRenderRegistryState::Kind::Mesh, HandleOf(ptr->GetOwner()->m_index));
+    if (ptr && ptr->GetOwner() && push_unique(m_renderRegistry->meshes, ptr))
+    {
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Mesh, HandleOf(ptr->GetOwner()->m_index));
+    }
 }
 
 void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
@@ -3633,51 +3654,38 @@ void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 
 void Scene::CollectSpriteRenderer(SpriteRenderer* ptr)
 {
-    if (ptr)
+    if (ptr && ptr->GetOwner())
     {
-		if (push_unique(m_renderRegistry->sprites, ptr) && ptr->GetOwner())
-			RegisterRenderProxy(*m_renderRegistry, ptr,
-				SceneRenderRegistryState::Kind::Sprite, HandleOf(ptr->GetOwner()->m_index));
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Sprite, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
 void Scene::UnCollectSpriteRenderer(SpriteRenderer* ptr)
 {
-    if (ptr)
-    {
-        std::erase_if(m_renderRegistry->sprites,
-            [ptr](const auto& sprite) { return sprite == ptr; });
-		UnregisterRenderProxy(*m_renderRegistry, ptr);
-    }
+    UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
 void Scene::CollectTerrainComponent(TerrainComponent* ptr)
 {
-    if (ptr)
+    if (ptr && ptr->GetOwner())
     {
-		if (push_unique(m_renderRegistry->terrains, ptr) && ptr->GetOwner())
-			RegisterRenderProxy(*m_renderRegistry, ptr,
-				SceneRenderRegistryState::Kind::Terrain, HandleOf(ptr->GetOwner()->m_index));
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Terrain, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
 void Scene::UnCollectTerrainComponent(TerrainComponent* ptr)
 {
-    if (ptr)
-    {
-        std::erase_if(m_renderRegistry->terrains,
-            [ptr](const auto& terrain) { return terrain == ptr; });
-		UnregisterRenderProxy(*m_renderRegistry, ptr);
-    }
+    UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
 void Scene::CollectFoliageComponent(FoliageComponent* ptr)
 {
-    if (ptr)
+    if (ptr && ptr->GetOwner() && push_unique(m_renderRegistry->foliages, ptr))
     {
-		if (push_unique(m_renderRegistry->foliages, ptr) && ptr->GetOwner())
-			RegisterRenderProxy(*m_renderRegistry, ptr,
-				SceneRenderRegistryState::Kind::Foliage, HandleOf(ptr->GetOwner()->m_index));
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Foliage, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
@@ -3693,11 +3701,10 @@ void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
 
 void Scene::CollectDecalComponent(DecalComponent* ptr)
 {
-    if (ptr)
+    if (ptr && ptr->GetOwner() && push_unique(m_renderRegistry->decals, ptr))
     {
-		if (push_unique(m_renderRegistry->decals, ptr) && ptr->GetOwner())
-			RegisterRenderProxy(*m_renderRegistry, ptr,
-				SceneRenderRegistryState::Kind::Decal, HandleOf(ptr->GetOwner()->m_index));
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Decal, HandleOf(ptr->GetOwner()->m_index));
     }
 }
 
@@ -3713,44 +3720,44 @@ void Scene::UnCollectDecalComponent(DecalComponent* ptr)
 
 void Scene::CollectImageComponent(ImageComponent* ptr)
 {
-	if (ptr && push_unique(m_renderRegistry->images, ptr) && ptr->GetOwner())
-		RegisterRenderProxy(*m_renderRegistry, ptr,
-			SceneRenderRegistryState::Kind::Image, HandleOf(ptr->GetOwner()->m_index));
+    if (ptr && ptr->GetOwner())
+    {
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Image, HandleOf(ptr->GetOwner()->m_index));
+    }
 }
 
 void Scene::UnCollectImageComponent(ImageComponent* ptr)
 {
-	if (!ptr) return;
-	std::erase(m_renderRegistry->images, ptr);
-	UnregisterRenderProxy(*m_renderRegistry, ptr);
+    UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
 void Scene::CollectTextComponent(TextComponent* ptr)
 {
-	if (ptr && push_unique(m_renderRegistry->texts, ptr) && ptr->GetOwner())
-		RegisterRenderProxy(*m_renderRegistry, ptr,
-			SceneRenderRegistryState::Kind::Text, HandleOf(ptr->GetOwner()->m_index));
+    if (ptr && ptr->GetOwner())
+    {
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::Text, HandleOf(ptr->GetOwner()->m_index));
+    }
 }
 
 void Scene::UnCollectTextComponent(TextComponent* ptr)
 {
-	if (!ptr) return;
-	std::erase(m_renderRegistry->texts, ptr);
-	UnregisterRenderProxy(*m_renderRegistry, ptr);
+    UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
 void Scene::CollectSpriteSheetComponent(SpriteSheetComponent* ptr)
 {
-	if (ptr && push_unique(m_renderRegistry->spriteSheets, ptr) && ptr->GetOwner())
-		RegisterRenderProxy(*m_renderRegistry, ptr,
-			SceneRenderRegistryState::Kind::SpriteSheet, HandleOf(ptr->GetOwner()->m_index));
+    if (ptr && ptr->GetOwner())
+    {
+        RegisterRenderProxy(*m_renderRegistry, ptr,
+            SceneRenderRegistryState::Kind::SpriteSheet, HandleOf(ptr->GetOwner()->m_index));
+    }
 }
 
 void Scene::UnCollectSpriteSheetComponent(SpriteSheetComponent* ptr)
 {
-	if (!ptr) return;
-	std::erase(m_renderRegistry->spriteSheets, ptr);
-	UnregisterRenderProxy(*m_renderRegistry, ptr);
+    UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
 void Scene::DestroyEntities()

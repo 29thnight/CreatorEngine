@@ -68,8 +68,7 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
 
     const EnhancedGizmoSceneData* gizmoScene = context.gizmoScene;
 
-    // ── 기즈모 체인 — dx12.gizmoscene의 배선 그대로(DX11
-    // GizmoRenderer::OnDrawGizmos 순서): Grid → WireFrame → Icon → Line.
+    // ── 기즈모 체인 — dx12.gizmoscene과 같은 Grid → WireFrame → Icon → Line 순서.
     // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다.
     //
     // ★ 네 노드 전부 씬 오버레이 뷰에서만 선다(kSceneOverlay). 저작

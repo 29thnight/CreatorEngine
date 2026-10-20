@@ -29,9 +29,3 @@ GizmoRenderer::~GizmoRenderer()
 	m_pEditorCamera = nullptr;
 	m_renderScene = nullptr;
 }
-
-void GizmoRenderer::OnDrawGizmos()
-{
-	// DX11 Gizmo/Grid 패스는 dead code다. EnhancedSceneRenderer::RenderOnce가
-	// BuildEnhancedGizmoSceneData를 밀봉하고 DX12 패스 체인을 실행한다.
-}

@@ -100,8 +100,7 @@ namespace experiment
                 const auto origin = texture ? texture->GetAssetOrigin() : nullptr;
                 return origin && origin->resolved.entry.asset.key.assetId == reference->assetId
                     && origin->resolved.resolverRevision == material.assetOrigin->resolved.resolverRevision
-                    && origin->variant == AssetDepot::TextureAssetVariant{}
-                    && origin->imageKey.recipe.mipPolicy == AssetDepot::TextureMipPolicy::PreserveAuthored;
+                    && origin->variant == AssetDepot::TextureAssetVariant{};
             });
             if (found == textures.end())
             {

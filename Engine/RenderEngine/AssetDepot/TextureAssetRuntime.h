@@ -40,15 +40,10 @@ namespace AssetDepot
     // Byte compatibility excludes logical ID, resolver, path and role labels.
     // Version 2 consumes immutable GPU-ready CECT bytes. Offline import recipe
     // changes alter the artifact hash; runtime role/sampler choices do not change
-    // payload bytes. The fields remain for transitional authoring callers only.
+    // payload bytes. Only the decoder compatibility version belongs here.
     struct TextureImageRecipe final
     {
         std::uint32_t version{ 2u };
-        bool compress{};
-        bool forceRgba8{};
-        TextureAssetColorSpace compressionColorSpace{ TextureAssetColorSpace::Source };
-        TextureMipPolicy mipPolicy{ TextureMipPolicy::PreserveAuthored };
-        TextureAssetColorSpace mipColorSpace{ TextureAssetColorSpace::Source };
         friend auto operator<=>(const TextureImageRecipe&, const TextureImageRecipe&) noexcept = default;
     };
 

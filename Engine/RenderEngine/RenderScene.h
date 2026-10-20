@@ -46,7 +46,6 @@ public:
 	RenderScene() = default;
 	~RenderScene();
 
-	void Initialize();
 	void SetScene(Scene* scene, uint64_t sceneEpoch)
 	{
 		m_currentScene.store(scene, std::memory_order_release);

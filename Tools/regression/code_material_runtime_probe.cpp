@@ -162,8 +162,9 @@ namespace code_material_runtime_probe
             Require(data.RebuildCookedMaterialInstance(clone, error), "Cooked ref rebuild failed");
             const auto rebuilt = clone.GetTextureMapShared(propertyName);
             Require(rebuilt && rebuilt->GetImageDescription().Format() == format
-                && rebuilt->GetAssetOrigin()->imageKey.recipe.mipColorSpace == origin->imageKey.recipe.mipColorSpace,
-                "Ref rebuild converted Source-sRGB sampling or mip filtering to linear");
+                && rebuilt->GetAssetOrigin()->variant == origin->variant
+                && rebuilt->GetAssetOrigin()->imageKey == origin->imageKey,
+                "Ref rebuild changed Source-sRGB sampling or exact cooked image identity");
         }
 
         void VerifyPreparedTextureOverride(const own::shared_owner<const Texture>& raw,

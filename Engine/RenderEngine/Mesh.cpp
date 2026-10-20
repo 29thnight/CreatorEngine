@@ -42,10 +42,6 @@ Mesh::~Mesh()
 {
 }
 
-void Mesh::AssetInit()
-{
-}
-
 void Mesh::RecalculateBounds()
 {
 	if (m_vertices.empty()) return;

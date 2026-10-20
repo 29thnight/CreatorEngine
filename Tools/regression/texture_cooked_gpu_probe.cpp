@@ -1,6 +1,8 @@
 #include "DataSystem.h"
 #include "Experiment/Cooked/ArtifactByteSource.h"
 #include "Experiment/Cooked/CookedTexture.h"
+#include "Experiment/MaterialResolver.h"
+#include "AssetDepot/MaterialAssetRuntime.h"
 #ifdef CECT_PROBE_VULKAN
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanCommandBufferPool.h"
@@ -43,6 +45,60 @@ namespace
         {
             throw std::runtime_error(message);
         }
+    }
+
+    void VerifyImageIdentity()
+    {
+        Cooked::AssetBlobRecord blob;
+        blob.byteSize = 34u;
+        blob.kind = Cooked::CookedAssetKind::Texture;
+        blob.representation = Cooked::kCookedTextureRepresentationVersion;
+        blob.schemaVersion = Cooked::kCookedTextureSchemaVersion;
+        blob.targetPlatform = "probe";
+        blob.targetAbi = "probe";
+        const auto key = AssetDepot::MakeTextureImageKey(blob, {});
+        unsigned variants{};
+        for (const auto color : { AssetDepot::TextureAssetColorSpace::Source,
+            AssetDepot::TextureAssetColorSpace::Linear, AssetDepot::TextureAssetColorSpace::Srgb })
+        {
+            for (const bool compress : { false, true })
+            {
+                for (const bool rgba : { false, true })
+                {
+                    for (const auto mip : { AssetDepot::TextureMipPolicy::PreserveAuthored,
+                        AssetDepot::TextureMipPolicy::GenerateFull })
+                    {
+                        for (const auto role : { 0u, 99u })
+                        {
+                            const AssetDepot::TextureAssetVariant variant{ color, compress, role, mip, rgba };
+                            Check(key == AssetDepot::MakeTextureImageKey(blob, variant),
+                                "Descriptor variant split identical cooked image bytes");
+                            ++variants;
+                        }
+                    }
+                }
+            }
+        }
+        auto changed = blob;
+        changed.artifactPath = "Derived/another.cetex";
+        Check(key == AssetDepot::MakeTextureImageKey(changed, {}), "Path entered image identity");
+        const auto checkPartition = [&](const auto& mutate)
+        {
+            auto other = blob;
+            mutate(other);
+            Check(key != AssetDepot::MakeTextureImageKey(other, {}), "Cooked image identity lost a partition");
+        };
+        checkPartition([](auto& other) { other.contentSha256[0] ^= 1u; });
+        checkPartition([](auto& other) { ++other.byteSize; });
+        checkPartition([](auto& other) { other.kind = Cooked::CookedAssetKind::Material; });
+        checkPartition([](auto& other) { ++other.representation; });
+        checkPartition([](auto& other) { ++other.schemaVersion; });
+        checkPartition([](auto& other) { other.targetPlatform += "-other"; });
+        checkPartition([](auto& other) { other.targetAbi += "-other"; });
+        auto other = key;
+        ++other.recipe.version;
+        Check(key != other, "Decoder compatibility version lost its partition");
+        std::cout << "TEXTURE_IMAGE_IDENTITY_OK variants=" << variants << " partitions=8 pathIgnored=1\n";
     }
 
     std::vector<std::byte> Read(const std::filesystem::path& path)
@@ -104,6 +160,50 @@ namespace
             completion.wait();
         }
         return request.Snapshot();
+    }
+
+    void VerifyPreparedBinding(const own::shared_owner<const Texture>& texture,
+        const own::shared_owner<const Texture>& labeled)
+    {
+        const auto origin = texture->GetAssetOrigin();
+        Check(!!origin && origin->variant == AssetDepot::TextureAssetVariant{}, "Expected untransformed cooked descriptor");
+        experiment::TextureReference reference;
+        reference.assetId = origin->resolved.entry.asset.key.assetId;
+        experiment::Material material;
+        material.properties.push_back({ "probe", reference });
+        auto captured = own::make_shared<AssetDepot::MaterialDocumentAssetOrigin>();
+        captured->resolved.resolverRevision = origin->resolved.resolverRevision;
+        material.assetOrigin = captured;
+        const std::array supplied{ texture };
+        std::string error;
+        Check(!experiment::BindPreparedMaterialTextures(material, {}, error) && !error.empty()
+            && std::addressof(*material.assetOrigin) == std::addressof(*captured), "Missing prepared owner changed captured material");
+        const std::array labeledOnly{ labeled };
+        Check(labeled && labeled->GetAssetOrigin()->variant.role == 99u
+            && !experiment::BindPreparedMaterialTextures(material, labeledOnly, error) && !error.empty()
+            && std::addressof(*material.assetOrigin) == std::addressof(*captured), "Transformed descriptor accepted as untransformed owner");
+        auto wrongSnapshot = own::make_shared<AssetDepot::MaterialDocumentAssetOrigin>(*captured);
+        ++wrongSnapshot->resolved.resolverRevision;
+        material.assetOrigin = wrongSnapshot;
+        Check(!experiment::BindPreparedMaterialTextures(material, supplied, error) && !error.empty()
+            && std::addressof(*material.assetOrigin) == std::addressof(*wrongSnapshot), "Wrong resolver revision accepted or changed captured material");
+        material.assetOrigin = captured;
+        auto wrongReference = reference;
+        wrongReference.assetId = Id(250u);
+        material.properties.front().value = wrongReference;
+        Check(!experiment::BindPreparedMaterialTextures(material, supplied, error) && !error.empty()
+            && std::addressof(*material.assetOrigin) == std::addressof(*captured), "Wrong texture ID accepted or changed captured material");
+        material.properties.front().value = reference;
+        Check(experiment::BindPreparedMaterialTextures(material, supplied, error) && error.empty()
+            && std::addressof(*material.assetOrigin) != std::addressof(*captured) && captured->textures.empty()
+            && material.assetOrigin->textures.size() == 1u
+            && std::addressof(*material.assetOrigin->textures.front().owner) == std::addressof(*texture),
+            "Prepared binding lost exact owner or mutated shared captured origin");
+        const auto accepted = material.assetOrigin;
+        Check(experiment::BindPreparedMaterialTextures(material, supplied, error) && error.empty()
+            && std::addressof(*material.assetOrigin) == std::addressof(*accepted) && material.assetOrigin->textures.size() == 1u,
+            "Repeated prepared binding duplicated ownership");
+        std::cout << "TEXTURE_PREPARED_BINDING_OK cases=6 unmountedOwner=1\n";
     }
 
     float Bc5Tolerance(TextureImageView image, unsigned mip, unsigned x, unsigned y, unsigned component, float expected)
@@ -177,6 +277,7 @@ namespace
         Check(mount.IsValid(), "Metadata mount failed: " + (issues.empty() ? std::string{} : issues.front().message));
         const AssetDepot::AssetLink<Texture> link{ reference.key };
         const auto snapshot = Finish(data.RequestAsync<Texture>(link));
+        own::shared_owner<const Texture> labeled;
         if (corrupt)
         {
             Check(snapshot.status == AssetDepot::AssetRequestStatus::Failed &&
@@ -188,8 +289,18 @@ namespace
         {
             Check(snapshot.status == AssetDepot::AssetRequestStatus::Ready && !!snapshot.asset,
                 "Cooked typed acquisition failed: " + snapshot.message);
+            AssetDepot::TextureAssetVariant variant;
+            variant.role = 99u;
+            const auto labeledState = Finish(data.RequestAsync<Texture>(link, variant));
+            Check(labeledState.status == AssetDepot::AssetRequestStatus::Ready && !!labeledState.asset,
+                "Labeled cooked typed acquisition failed: " + labeledState.message);
+            labeled = labeledState.asset;
         }
         Check(data.UnmountAssetSet(mount, issues), "Unmount failed");
+        if (!corrupt)
+        {
+            VerifyPreparedBinding(snapshot.asset, labeled);
+        }
         return snapshot.asset;
     }
 }
@@ -200,6 +311,7 @@ int main(int argc, char** argv)
     {
         Check(argc == 3, "fixture root and absolute shader path required");
         std::cout << std::unitbuf;
+        VerifyImageIdentity();
         const std::filesystem::path root = argv[1];
         const auto repo = std::filesystem::path(argv[2]).parent_path().parent_path().parent_path();
         auto* paths = InternalPath::GetInstance();

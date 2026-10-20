@@ -106,7 +106,6 @@ public:
 		return m_hashingMesh == _other.m_hashingMesh;
 	}
 
-	void AssetInit();
 	// DX11 드로우 8종은 T5에서, 정점·인덱스 버퍼는 D4에서, 그림자 최적화
 	// 계통은 여기(A-③)에서 걷었다 — .cpp 주석 참고.
 	// 이제 Mesh는 CPU 배열이 전부다. GPU 올리기는 DX12 쪽 소유다.

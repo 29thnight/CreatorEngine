@@ -8813,7 +8813,6 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
             ? RHIShaderBinary::SpirV : RHIShaderBinary::Dxil);
         state.ResetDisplaySnapshot();
         state.renderScene = std::make_shared<RenderScene>();
-        state.renderScene->Initialize();
 
         // 에디터 카메라는 여기서 만들지 않는다(E4-5) — Editor 세션이 소유하고
         // Host가 뷰 요청에 실어 넘긴다. Core는 씬 오버레이 뷰 판정도 하지 않는다.

@@ -155,15 +155,6 @@ namespace
 //   제품 경로는 해시로 고정된 엔진 배포본을 선택한다. C++/ScriptCore는
 //   다시 빌드하지 않고, 프로젝트의 게임 스크립트와 콘텐츠만 패키징한다.
 
-void GameBuilderSystem::Initialize()
-{
-	m_isInitialized = true;
-}
-
-void GameBuilderSystem::Finalize()
-{
-}
-
 bool GameBuilderSystem::BuildGame()
 {
 	const file::path projectRoot = PathFinder::BaseProjectPath();

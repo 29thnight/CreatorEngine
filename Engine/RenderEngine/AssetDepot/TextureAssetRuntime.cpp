@@ -861,10 +861,8 @@ namespace AssetDepot
         // Role/sampler labels and obsolete runtime processing hints do not split
         // identical payloads; distinct recipes are represented by distinct blobs.
         (void)variant;
-        TextureImageRecipe recipe;
-        recipe.version = 2u;
         return { blob.contentSha256, blob.byteSize, blob.kind, blob.representation,
-            blob.schemaVersion, blob.targetPlatform, blob.targetAbi, recipe };
+            blob.schemaVersion, blob.targetPlatform, blob.targetAbi, {} };
     }
 }
 

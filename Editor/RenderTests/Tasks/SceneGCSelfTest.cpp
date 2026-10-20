@@ -6,6 +6,15 @@
 #include "LifecycleRegistry.h"
 #include "ScriptObjectRegistry.h"
 #include "JobScheduler.h"
+#include "Terrain.h"
+#include "LightComponent.h"
+#include "SpriteRenderer.h"
+#include "ImageComponent.h"
+#include "TextComponent.h"
+#include "SpriteSheetComponent.h"
+#include "MeshRenderer.h"
+#include "FoliageComponent.h"
+#include "DecalComponent.h"
 
 #include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
@@ -17,6 +26,114 @@ namespace
         {
             throw std::runtime_error(message);
         }
+    }
+
+    template<class T>
+    void VerifyRenderRegistration(gc::domain& domain, Scene& scene, Entity& owner,
+        void (Scene::*collect)(T*), void (Scene::*uncollect)(T*))
+    {
+        auto component = Component::CreateManaged<T>(domain);
+        const auto before = scene.GetRenderProxyCommitMetrics();
+        // Null and ownerless admission must leave the scene unchanged.
+        (scene.*collect)(nullptr);
+        (scene.*uncollect)(nullptr);
+        (scene.*collect)(component.get());
+        Require(scene.RenderProxyComponentCount() == before.registered,
+            "Ownerless render component was admitted");
+
+        component->SetOwner(&owner);
+        (scene.*collect)(component.get());
+        (scene.*collect)(component.get());
+        const auto registered = scene.GetRenderProxyCommitMetrics();
+        Require(registered.registered == before.registered + 1
+            && registered.pending == before.pending + 1,
+            "Duplicate render admission changed registration or ticket count");
+        Require(scene.PublishRenderProxyDirty(component.get(), ProxyDirty::Transform),
+            "Registered render component rejected dirty publication");
+
+        (scene.*uncollect)(component.get());
+        (scene.*uncollect)(component.get());
+        Require(!scene.PublishRenderProxyDirty(component.get(), ProxyDirty::Transform),
+            "Removed render component accepted dirty publication");
+        // Re-admit the same address while the preceding generation is queued.
+        (scene.*collect)(component.get());
+        (scene.*uncollect)(component.get());
+        Require(scene.RenderProxyComponentCount() == before.registered,
+            "Render removal leaked a registration");
+        scene.CommitRenderProxies();
+        const auto drained = scene.GetRenderProxyCommitMetrics();
+        Require(drained.lastStale == 2 && drained.lastCommitted == 0 && drained.pending == 0,
+            "Retired render generations were dispatched or retained");
+        component->SetOwner(nullptr);
+        component->FinalizeManagedDestroy();
+    }
+
+    void VerifyLightCompaction(gc::domain& domain, Scene& scene, Entity& owner)
+    {
+        auto first = Component::CreateManaged<LightComponent>(domain);
+        auto second = Component::CreateManaged<LightComponent>(domain);
+        auto point = Component::CreateManaged<LightComponent>(domain);
+        first->SetOwner(&owner);
+        second->SetOwner(&owner);
+        point->SetOwner(&owner);
+        first->m_lightIndex = 2;
+        second->m_lightIndex = 5;
+        point->m_lightIndex = 0;
+        first->m_lightType = LightType::DirectionalLight;
+        second->m_lightType = LightType::DirectionalLight;
+        point->m_lightType = LightType::PointLight;
+        for (const size_t invalid : {
+            static_cast<size_t>((std::numeric_limits<int>::max)()) + 1u,
+            static_cast<size_t>(-2), (std::numeric_limits<size_t>::max)() })
+        {
+            bool rejected = false;
+            try
+            {
+                scene.EnsureLightSlot(invalid);
+            }
+            catch (const std::out_of_range&)
+            {
+                rejected = true;
+            }
+            Require(rejected, "Out-of-range light slot was not rejected");
+        }
+        Require(scene.AddLight() == 0, "Invalid light slot input mutated the registry");
+        scene.RemoveLight(0);
+        scene.EnsureLightSlot(0);
+        scene.EnsureLightSlot(2);
+        scene.EnsureLightSlot(5);
+        scene.CollectLightComponent(first.get());
+        scene.CollectLightComponent(second.get());
+        scene.CollectLightComponent(point.get());
+        scene.DestroyLight();
+        Require(first->m_lightIndex == 1 && second->m_lightIndex == 2 && point->m_lightIndex == 0,
+            "Sparse serialized light slots were remapped incorrectly");
+        Require(first->m_lightStatus == LightStatus::StaticShadows
+            && second->m_lightStatus == LightStatus::Enabled,
+            "Light compaction changed first-directional shadow selection");
+        Require(scene.AddLight() == 3, "Compacted light slot count was incorrect");
+        scene.RemoveLight(3);
+        scene.UnCollectLightComponent(first.get());
+        scene.RemoveLight(1);
+        for (int iteration = 0; iteration < 32; ++iteration)
+        {
+            scene.DestroyLight();
+            Require(second->m_lightIndex == 1 && point->m_lightIndex == 0,
+                "Repeated light compaction changed live indices");
+        }
+        Require(scene.AddLight() == 2, "Removed light slot survived compaction");
+        scene.RemoveLight(2);
+        scene.UnCollectLightComponent(second.get());
+        scene.UnCollectLightComponent(point.get());
+        scene.RemoveLight(0);
+        scene.RemoveLight(1);
+        scene.DestroyLight();
+        first->SetOwner(nullptr);
+        second->SetOwner(nullptr);
+        point->SetOwner(nullptr);
+        first->FinalizeManagedDestroy();
+        second->FinalizeManagedDestroy();
+        point->FinalizeManagedDestroy();
     }
 
     struct ProbeResults
@@ -148,6 +265,26 @@ namespace RenderTest
 
             Entity* first = source->CreateEntity("CycleFirst");
             Entity* second = source->CreateEntity("CycleSecond");
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectTerrainComponent, &Scene::UnCollectTerrainComponent);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectSpriteRenderer, &Scene::UnCollectSpriteRenderer);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectImageComponent, &Scene::UnCollectImageComponent);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectTextComponent, &Scene::UnCollectTextComponent);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectSpriteSheetComponent, &Scene::UnCollectSpriteSheetComponent);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectLightComponent, &Scene::UnCollectLightComponent);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectMeshRenderer, &Scene::UnCollectMeshRenderer);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectFoliageComponent, &Scene::UnCollectFoliageComponent);
+            VerifyRenderRegistration(domain, *source, *first,
+                &Scene::CollectDecalComponent, &Scene::UnCollectDecalComponent);
+            VerifyLightCompaction(domain, *source, *first);
+
             auto* firstProbe = first->AddComponent<CycleProbe>(results);
             auto* secondProbe = second->AddComponent<CycleProbe>(results);
             firstProbe->peer = secondProbe->root_from_this();
@@ -258,6 +395,7 @@ namespace RenderTest
                 "Regression leaked graph objects or unfinished cleanup obligations");
             Require(final.cycles_aborted == baseline.cycles_aborted,
                 "Collection aborted during the graph regression");
+            std::printf("SCENE_RENDER_REGISTRY_OK types=9 duplicate=9 ownerless=9 retiredGenerations=18 lightCompactions=33 invalidLightSlots=3\n");
             log = "SCENE_GC_OK cycle=2 lifecycle=2 staleHandles=2 selection=2 ddol=1 workerPin=1 incrementalSteps="
                 + std::to_string(incrementalSteps);
             return true;

@@ -10,11 +10,5 @@ private:
 	~GameBuilderSystem() = default;
 
 public:
-	void Initialize();
-	void Finalize();
-
 	bool BuildGame();
-
-private:
-	bool m_isInitialized{ false };
 };

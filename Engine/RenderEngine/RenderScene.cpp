@@ -10,10 +10,6 @@ RenderScene::~RenderScene()
 {
 }
 
-void RenderScene::Initialize()
-{
-}
-
 void RenderScene::Finalize()
 {
 	{
