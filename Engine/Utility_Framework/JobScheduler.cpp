@@ -263,6 +263,10 @@ bool job_scheduler::is_running() const
     std::lock_guard lock(state_->mutex_);
     return state_->accepting_;
 }
+std::size_t job_scheduler::worker_count() const
+{
+    return state_->pool_.size();
+}
 job_handle job_scheduler::submit(job_group group)
 {
     return submit_after({}, std::move(group));
