@@ -1,0 +1,347 @@
+{
+  "configuration": "Debug",
+  "scene": "CreatorRobot",
+  "playMode": true,
+  "workerCount": 8,
+  "softwareRhi": true,
+  "profilerBindingDetail": false,
+  "secondsPerWindow": 15,
+  "capture": {
+    "passed": true,
+    "workerCountRequested": 8,
+    "foregroundMode": "editor",
+    "normalExit": true,
+    "runtimeUnchanged": true,
+    "foregroundSamplesAccepted": true
+  },
+  "sourceVerification": {
+    "changedFiles": [],
+    "headUnchanged": true,
+    "sourceUnchanged": true
+  },
+  "etwLosses": {
+    "Buffers": 0,
+    "Events": 0
+  },
+  "rates": {
+    "baseline-live": {
+      "seconds": 15.1597393,
+      "completedViews": 778,
+      "completedViewsPerSecond": 51.32014374416056,
+      "axis": "completed real view renders, not displayed FPS"
+    },
+    "baseline-off-live": {
+      "seconds": 15.1353681,
+      "completedViews": 904,
+      "completedViewsPerSecond": 59.72765208135242,
+      "axis": "completed real view renders, not displayed FPS"
+    },
+    "etw-live": {
+      "seconds": 15.1888842,
+      "completedViews": 686,
+      "completedViewsPerSecond": 45.164607944012104,
+      "axis": "completed real view renders, not displayed FPS"
+    },
+    "etw-off-live": {
+      "seconds": 15.1671106,
+      "completedViews": 828,
+      "completedViewsPerSecond": 54.591808673169425,
+      "axis": "completed real view renders, not displayed FPS"
+    }
+  },
+  "profiles": {
+    "baseline": {
+      "renderGroups": [
+        {
+          "frameKind": 1,
+          "viewId": 2,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 396,
+          "cpuRenderSubmitMs": {
+            "mean": 12.654800757575758,
+            "p50": 12.684249999999999,
+            "p95": 14.6763,
+            "max": 18.1871
+          },
+          "cpuSamples": 396,
+          "gpuPassMs": {
+            "mean": 0.044060638761717896,
+            "p50": 0.0041,
+            "p95": 0.128,
+            "max": 1.5278
+          },
+          "gpuPassSamples": 55044
+        },
+        {
+          "frameKind": 1,
+          "viewId": 1,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 396,
+          "cpuRenderSubmitMs": {
+            "mean": 12.712292424242424,
+            "p50": 12.774149999999999,
+            "p95": 14.656,
+            "max": 17.0699
+          },
+          "cpuSamples": 396,
+          "gpuPassMs": {
+            "mean": 0.04200410798122066,
+            "p50": 0.0041,
+            "p95": 0.127,
+            "max": 1.5237
+          },
+          "gpuPassSamples": 56232
+        }
+      ],
+      "presenterReturns": {
+        "samples": 0,
+        "missingSequences": 0,
+        "unknownIdentities": 0,
+        "unsuccessfulOutcomes": 0,
+        "clockDomain": "qpc",
+        "ticksPerSecond": 10000000,
+        "monotonic": true,
+        "completeWithinObservedBounds": false,
+        "firstSequence": null,
+        "lastSequence": null,
+        "axis": "cpu-presenter-wrapper-return-observed",
+        "generatedOutputTimestampsAvailable": false,
+        "osDisplayedTimestampsAvailable": false,
+        "physicalPhotonTimestampsAvailable": false
+      },
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "droppedCounters": 0,
+      "recordingLosses": {
+        "droppedFrames": 0,
+        "droppedEvents": 0,
+        "droppedCounters": 0,
+        "sourceDroppedCounters": 0,
+        "sourceDroppedEvents": 0,
+        "sourceDroppedFrameBoundaries": 0,
+        "lateCpuEvents": 0,
+        "lateGpuSpans": 0
+      },
+      "gpuEvents": 111276,
+      "matchedGpuEvents": 111276,
+      "invalidProvenanceSamples": 0
+    },
+    "etw": {
+      "renderGroups": [
+        {
+          "frameKind": 1,
+          "viewId": 2,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 349,
+          "cpuRenderSubmitMs": {
+            "mean": 14.79816418338109,
+            "p50": 14.6886,
+            "p95": 18.0246,
+            "max": 22.429
+          },
+          "cpuSamples": 349,
+          "gpuPassMs": {
+            "mean": 0.043359652449959804,
+            "p50": 0.0051,
+            "p95": 0.1219,
+            "max": 1.9589
+          },
+          "gpuPassSamples": 48511
+        },
+        {
+          "frameKind": 1,
+          "viewId": 1,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 349,
+          "cpuRenderSubmitMs": {
+            "mean": 14.983529226361032,
+            "p50": 14.7955,
+            "p95": 18.2149,
+            "max": 22.9027
+          },
+          "cpuSamples": 349,
+          "gpuPassMs": {
+            "mean": 0.04153040679607732,
+            "p50": 0.0051,
+            "p95": 0.1249,
+            "max": 1.9538
+          },
+          "gpuPassSamples": 49558
+        }
+      ],
+      "presenterReturns": {
+        "samples": 0,
+        "missingSequences": 0,
+        "unknownIdentities": 0,
+        "unsuccessfulOutcomes": 0,
+        "clockDomain": "qpc",
+        "ticksPerSecond": 10000000,
+        "monotonic": true,
+        "completeWithinObservedBounds": false,
+        "firstSequence": null,
+        "lastSequence": null,
+        "axis": "cpu-presenter-wrapper-return-observed",
+        "generatedOutputTimestampsAvailable": false,
+        "osDisplayedTimestampsAvailable": false,
+        "physicalPhotonTimestampsAvailable": false
+      },
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "droppedCounters": 0,
+      "recordingLosses": {
+        "droppedFrames": 0,
+        "droppedEvents": 0,
+        "droppedCounters": 0,
+        "sourceDroppedCounters": 0,
+        "sourceDroppedEvents": 0,
+        "sourceDroppedFrameBoundaries": 0,
+        "lateCpuEvents": 0,
+        "lateGpuSpans": 0
+      },
+      "gpuEvents": 98069,
+      "matchedGpuEvents": 98069,
+      "invalidProvenanceSamples": 0
+    }
+  },
+  "majorScopes": {
+    "MaterialGraphScenePrepare": {
+      "wall": {
+        "count": 679,
+        "mean": 3.3816531664212075,
+        "p50": 3.3561,
+        "p95": 4.2577,
+        "p99": 4.8017,
+        "max": 5.2066
+      },
+      "meanStateMs": {
+        "Running": 3.060704123711356,
+        "Ready": 0.10243313696619781,
+        "Waiting": 0.21844226804122982,
+        "Unknown": 7.363770250261031e-05
+      }
+    },
+    "RenderGraphDeclare": {
+      "wall": {
+        "count": 678,
+        "mean": 5.096890412979351,
+        "p50": 4.8969000000000005,
+        "p95": 6.5304,
+        "p99": 7.3247,
+        "max": 9.7313
+      },
+      "meanStateMs": {
+        "Running": 5.035453244837743,
+        "Ready": 0.02285752212395312,
+        "Waiting": 0.03855162241889872,
+        "Unknown": 2.8023598820402406e-05
+      }
+    },
+    "RenderGraphCompile": {
+      "wall": {
+        "count": 678,
+        "mean": 0.8704662241887906,
+        "p50": 0.7961,
+        "p95": 1.2881,
+        "p99": 1.4197,
+        "max": 1.9699
+      },
+      "meanStateMs": {
+        "Running": 0.8694308259586885,
+        "Ready": 0.0008230088495595235,
+        "Waiting": 0.00021238938053131685,
+        "Unknown": 0.0
+      }
+    },
+    "RenderCommandRecord": {
+      "wall": {
+        "count": 678,
+        "mean": 2.2384362831858406,
+        "p50": 2.14425,
+        "p95": 2.801,
+        "p99": 3.1052,
+        "max": 3.3156
+      },
+      "meanStateMs": {
+        "Running": 0.30121150442481515,
+        "Ready": 0.013659882006010513,
+        "Waiting": 1.9235648967551433,
+        "Unknown": 0.0
+      }
+    },
+    "RHISoftwareTranslate": {
+      "wall": {
+        "count": 678,
+        "mean": 1.216538053097345,
+        "p50": 1.2005499999999998,
+        "p95": 1.4811,
+        "p99": 1.6326,
+        "max": 1.8894
+      },
+      "meanStateMs": {
+        "Running": 0.2943064896755548,
+        "Ready": 0.016761061946847032,
+        "Waiting": 0.9054705014749197,
+        "Unknown": 0.0
+      }
+    },
+    "RenderSubmit": {
+      "wall": {
+        "count": 678,
+        "mean": 0.39984100294985253,
+        "p50": 0.3833,
+        "p95": 0.5211,
+        "p99": 0.6265,
+        "max": 0.7436
+      },
+      "meanStateMs": {
+        "Running": 0.3994796460177131,
+        "Ready": 0.00028318584070931676,
+        "Waiting": 6.784660767136576e-05,
+        "Unknown": 1.0324483775902426e-05
+      }
+    }
+  },
+  "target": {
+    "fps": 120,
+    "budgetMs": 8.333333333333334
+  },
+  "manifest": "json/manifest.json"
+}

@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "filesVerified": 381,
+  "hashMismatches": 0,
+  "captureRoundTripEqual": true,
+  "etwLosses": {
+    "Buffers": 0,
+    "Events": 0
+  },
+  "sourceUnchanged": true
+}
