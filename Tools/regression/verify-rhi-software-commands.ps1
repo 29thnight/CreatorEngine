@@ -1,5 +1,8 @@
 #Requires -Version 7.0
-param([string]$VisualStudioInstallation = '')
+param(
+    [string]$VisualStudioInstallation = '',
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug'
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -21,7 +24,10 @@ if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation))
     $VisualStudioInstallation = @(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)[0]
 }
 $vcvars = Join-Path $VisualStudioInstallation 'VC/Auxiliary/Build/vcvars64.bat'
-$output = Join-Path $repo 'Build/Obj/RHISoftwareCommandsProbe'
+$suffix = if ($Configuration -eq 'Debug') { '' } else { '-Release' }
+$output = Join-Path $repo "Build/Obj/RHISoftwareCommandsProbe$suffix"
+$runtimeFlags = if ($Configuration -eq 'Debug') { '/MDd /D_DEBUG' } else { '/MD /DNDEBUG' }
+$optimization = if ($Configuration -eq 'Debug') { '/Od' } else { '/O2' }
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 @{methods=$baseMethods;overrides=$overrides;methodCount=$baseMethods.Count} |
     ConvertTo-Json -Depth 4 | Set-Content (Join-Path $output 'coverage.json')
@@ -31,7 +37,7 @@ $sources = @('Tools/regression/rhi_software_commands_probe.cpp',
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '
 $exe = Join-Path $output 'rhi_software_commands_probe.exe'
 $mimallocObject = Join-Path $output 'mimalloc-static.obj'
-$mimallocCompile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /TC /MDd /O2 /Zi /D_DEBUG /DMI_STATIC_LIB ' +
+$mimallocCompile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /TC ' + $runtimeFlags + ' /O2 /Zi /DMI_STATIC_LIB ' +
     '/I"' + (Join-Path $repo 'ThirdParty/mimalloc/include') + '" /c "' +
     (Join-Path $repo 'ThirdParty/mimalloc/src/static.c') + '" /Fo:"' + $mimallocObject + '"'
 & $env:ComSpec /d /s /c $mimallocCompile
@@ -41,7 +47,7 @@ if ($LASTEXITCODE -ne 0)
 }
 
 $compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++latest /permissive- /utf-8 ' +
-    '/DCE_CONTRACT_STANDALONE /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /MDd /Od /Zi ' +
+    '/DCE_CONTRACT_STANDALONE /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /Zi ' + $runtimeFlags + ' ' + $optimization + ' ' +
     '/Fo:"' + $output + '/" /Fd:"' + $output + '/probe.pdb" /Fe:"' + $exe + '" ' + $quoted + ' "' + $mimallocObject + '" advapi32.lib'
 & $env:ComSpec /d /s /c $compile
 if ($LASTEXITCODE -ne 0)

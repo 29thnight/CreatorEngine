@@ -105,6 +105,94 @@ int main()
 {
     try
     {
+        {
+            ce::render_arena_objects objects;
+            std::array<int, 4> destruction{};
+            size_t destroyed{};
+            struct Capture
+            {
+                std::shared_ptr<int> owner;
+                int id;
+                std::array<int, 4>* order;
+                size_t* count;
+                ~Capture() { (*order)[(*count)++] = id; }
+            };
+            auto owner = std::make_shared<int>(17);
+            std::weak_ptr<int> weak = owner;
+            auto* first = objects.emplace<Capture>(owner, 1, &destruction, &destroyed);
+            const auto address = reinterpret_cast<uintptr_t>(first);
+            Require(address % alignof(Capture) == 0, "Declaration capture alignment failed.");
+            objects.emplace<Capture>(owner, 2, &destruction, &destroyed);
+            std::array owners{owner, owner};
+            const auto copied = objects.copy(std::span<const std::shared_ptr<int>>{owners});
+            Require(copied.size() == 2 && *copied[1] == 17, "Declaration owner array copy failed.");
+            owners.fill({});
+            owner.reset();
+            Require(!weak.expired() && first->id == 1, "Declaration growth lost live captures.");
+            struct alignas(4096) AlignedCapture
+            {
+                std::byte bytes[4096]{};
+            };
+            auto* alignedCapture = objects.emplace<AlignedCapture>();
+            Require(reinterpret_cast<uintptr_t>(alignedCapture) % 4096 == 0, "Overaligned declaration capture failed.");
+            const auto retained = objects.stats().retainedBytes;
+            objects.reset();
+            Require(weak.expired() && destroyed == 2 && destruction[0] == 2 && destruction[1] == 1,
+                    "Declaration captures were not destroyed in reverse order.");
+            Require(objects.stats().retainedBytes == retained && objects.stats().usedBytes == 0,
+                    "Declaration reset failed to retain raw blocks.");
+            auto* recycled = objects.emplace<Capture>(std::shared_ptr<int>{}, 3, &destruction, &destroyed);
+            Require(reinterpret_cast<uintptr_t>(recycled) == address,
+                    "Declaration reset failed to reuse an aligned object address.");
+            objects.reset();
+        }
+        {
+            std::array<int, 4096> identities{};
+            ce::render_pointer_set<int> set;
+            for (size_t repeat = 0; repeat < 32; ++repeat)
+            {
+                set.reset(identities.size());
+                for (const auto& identity : identities)
+                {
+                    Require(set.insert(&identity) && !set.insert(&identity),
+                            "Flat declaration identity set lost uniqueness.");
+                }
+                set.clear();
+            }
+        }
+        {
+            ce::render_arena_objects objects;
+            int copies{};
+            int live{};
+            struct ThrowingCopy
+            {
+                int* copies;
+                int* live;
+                ThrowingCopy(int& count, int& owners) : copies(&count), live(&owners) { ++*live; }
+                ThrowingCopy(const ThrowingCopy& other) : copies(other.copies), live(other.live)
+                {
+                    if (++*copies == 2)
+                    {
+                        throw std::runtime_error("injected declaration copy failure");
+                    }
+                    ++*live;
+                }
+                ~ThrowingCopy() { --*live; }
+            };
+            const std::array values{ThrowingCopy(copies, live), ThrowingCopy(copies, live)};
+            bool rejected{};
+            try
+            {
+                objects.copy(std::span<const ThrowingCopy>{values});
+            }
+            catch (const std::runtime_error&)
+            {
+                rejected = true;
+            }
+            Require(rejected && live == 2, "Partial declaration copy retained constructed owners.");
+            objects.reset();
+            Require(live == 2, "Failed declaration copy destroyed source objects.");
+        }
         // The render allocator owns aligned storage, STL proxy/control blocks,
         // and objects released by a consumer on another thread.
         struct alignas(256) AlignedStorage

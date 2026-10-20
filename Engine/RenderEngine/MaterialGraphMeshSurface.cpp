@@ -2165,17 +2165,60 @@ namespace material_graph
     bool MeshSurfaceBatch::DeclareBatch(EnhancedRenderGraph& graph, std::span<const MeshSurfaceBatch* const> batches,
                                         std::string& error)
     {
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformed, reused;
-        std::vector<EnhancedRenderGraph::RGPassUsage> transformUses, readyUses, reuseUses, clusterUses,
-            clusterReadyUses;
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> direct;
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> aliases, producers;
-        std::set<const MeshSurfaceBatch*> selected, producerSet;
+        struct DeclarationScratch
+        {
+            std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformed, reused, direct, aliases, producers;
+            std::vector<EnhancedRenderGraph::RGPassUsage> transformUses, readyUses, reuseUses, clusterUses,
+                clusterReadyUses;
+            ce::render_pointer_set<MeshSurfaceBatch> selected, producerSet;
+            void Clear()
+            {
+                transformed.clear();
+                reused.clear();
+                direct.clear();
+                aliases.clear();
+                producers.clear();
+                transformUses.clear();
+                readyUses.clear();
+                reuseUses.clear();
+                clusterUses.clear();
+                clusterReadyUses.clear();
+                selected.clear();
+                producerSet.clear();
+            }
+        };
+        struct ScratchStack
+        {
+            ce::render_vector<ce::render_unique_ptr<DeclarationScratch>> entries;
+            size_t depth{};
+        };
+        static thread_local ScratchStack stack;
+        if (stack.depth == stack.entries.size())
+        {
+            stack.entries.push_back(ce::make_render_unique<DeclarationScratch>());
+        }
+        // Upload joins can assist another declaration on this thread. Each depth
+        // owns a separate stable object, including when the pointer array grows.
+        auto& scratch = *stack.entries[stack.depth++];
+        struct ClearScratch
+        {
+            DeclarationScratch& value;
+            size_t& depth;
+            ~ClearScratch()
+            {
+                value.Clear();
+                --depth;
+            }
+        } clearScratch{scratch, stack.depth};
+        auto& [transformed, reused, direct, aliases, producers, transformUses, readyUses, reuseUses, clusterUses,
+               clusterReadyUses, selected, producerSet] = scratch;
+        selected.reset(batches.size());
+        producerSet.reset(batches.size());
         for (const auto* batch : batches)
         {
             const auto instance = batch ? batch->self_.lock() : nullptr;
             if (!instance || &graph.DeviceServices() != instance->device_ || !instance->IsPreparedForGraph() ||
-                instance->declared_.load() || !selected.insert(instance.get()).second)
+                instance->declared_.load() || !selected.insert(instance.get()))
             {
                 return Fail(error, "Mesh declaration requires distinct fresh instances on their owning recording.");
             }
@@ -2184,7 +2227,7 @@ namespace material_graph
             {
                 producer = producer->declarationOwner_;
             }
-            if (producerSet.insert(producer.get()).second)
+            if (producerSet.insert(producer.get()))
             {
                 producers.push_back(producer);
             }
@@ -2193,7 +2236,7 @@ namespace material_graph
                 aliases.push_back(instance);
             }
         }
-        for (const auto& owner : producers)
+        for (const auto& owner : std::span{producers})
         {
             if (owner->HasGraphDeclaration())
             {
@@ -2230,7 +2273,7 @@ namespace material_graph
         }
         // Aliases publish the producer's exact version, never a second import
         // or write of the same physical buffer. No readiness/join pass is added.
-        for (const auto& instance : aliases)
+        for (const auto& instance : std::span{aliases})
         {
             auto producer = instance->declarationOwner_;
             while (producer->declarationOwner_)
@@ -2250,11 +2293,17 @@ namespace material_graph
         // Instances of one mesh share static inputs; a pass lists each version once.
         NormalizeSceneReads(graph, transformUses);
         NormalizeSceneReads(graph, reuseUses);
+        const auto reusedOwners =
+            graph.CopyDeclaration(std::span<const std::shared_ptr<const MeshSurfaceBatch>>{reused});
+        const auto directOwners =
+            graph.CopyDeclaration(std::span<const std::shared_ptr<const MeshSurfaceBatch>>{direct});
+        const auto transformedOwners =
+            graph.CopyDeclaration(std::span<const std::shared_ptr<const MeshSurfaceBatch>>{transformed});
         if (!reused.empty())
         {
             graph.AddPass(
                 "METEOR.MeshWorldReuse", reuseUses,
-                [reused](const auto&)
+                [reused = reusedOwners](const auto&)
                 {
                     for (const auto& owner : reused)
                     {
@@ -2272,7 +2321,7 @@ namespace material_graph
         {
             NormalizeSceneReads(graph, clusterUses);
             graph.AddPass("METEOR.ClusterPoseUpload", clusterUses,
-                          [direct](const auto& context)
+                          [direct = directOwners](const auto& context)
                           {
                               for (const auto& owner : direct)
                               {
@@ -2285,7 +2334,8 @@ namespace material_graph
                                   owner->recordedStages_.store(3);
                               }
                           });
-            graph.AddPass("METEOR.ClusterGeometryReady", clusterReadyUses, [direct](const auto&) {}, true);
+            graph.AddPass(
+                "METEOR.ClusterGeometryReady", clusterReadyUses, [direct = directOwners](const auto&) {}, true);
         }
         if (transformed.empty())
         {
@@ -2298,7 +2348,7 @@ namespace material_graph
             return false;
         }
         graph.AddPass("METEOR.TransformMeshWorld", transformUses,
-                      [transformed, dispatch](const auto& context)
+                      [transformed = transformedOwners, dispatch](const auto& context)
                       {
                           for (const auto& owner : transformed)
                           {
@@ -2315,7 +2365,7 @@ namespace material_graph
                       });
         graph.AddPass(
             "METEOR.MeshWorldReady", readyUses,
-            [transformed](const auto&)
+            [transformed = transformedOwners](const auto&)
             {
                 for (const auto& owner : transformed)
                 {

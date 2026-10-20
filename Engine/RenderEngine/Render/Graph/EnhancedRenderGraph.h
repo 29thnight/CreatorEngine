@@ -13,6 +13,7 @@ struct RHISoftwareBatchDesc;
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
 #include "../../RenderAllocator.h"
+#include "../../RenderArena.h"
 #include "../../RHI/RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../../RHI/RHIHandle.h"
 #include "../../RHI/RHIQueueContract.h"
@@ -271,6 +272,28 @@ public:
     };
 
     using ExecuteCallback = std::function<void(const ExecuteContext&)>;
+
+    // Graph ownership pins declaration data until recording consumers finish.
+    // Callbacks capture only stable pointers/spans; Reset releases the data after
+    // removing every callback. No per-pass shared control block is required.
+    template<class T, class... Args>
+    const T* RetainDeclaration(Args&&... args)
+    {
+        RequireQueueIdle();
+        return m_declarationData.emplace<T>(std::forward<Args>(args)...);
+    }
+    template<class T>
+    std::span<const T> CopyDeclaration(std::span<const T> values)
+    {
+        RequireQueueIdle();
+        return m_declarationData.copy(values);
+    }
+    template<class F>
+    ExecuteCallback StoreExecute(F&& execute)
+    {
+        const auto* stored = RetainDeclaration<std::decay_t<F>>(std::forward<F>(execute));
+        return [stored](const ExecuteContext& context) { (*stored)(context); };
+    }
 
     /// 쪼갤 수 있는 패스의 기록 콜백.
     ///
@@ -989,6 +1012,7 @@ private:
     bool m_poison{false};
     // Active declarations are a prefix of retained metadata. Reset releases all
     // callbacks/handles while keeping the empty containers and their capacities.
+    ce::render_arena_objects m_declarationData;
     ce::render_vector<Pass> m_passStorage;
     std::span<Pass> m_passes;
     std::vector<FinalStateRequirement> m_finalStateRequirements;

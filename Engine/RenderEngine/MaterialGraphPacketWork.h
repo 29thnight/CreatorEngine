@@ -204,7 +204,7 @@ namespace material_graph
         template<class Owner, class InputUses, class BindInputs>
         void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const Owner> owner,
                      const std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6>& pipelines,
-                     std::string name, bool tileWork, InputUses inputUses, BindInputs bindInputs) const
+                     const std::string& name, bool tileWork, InputUses inputUses, BindInputs bindInputs) const
         {
             if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
             {
@@ -226,9 +226,23 @@ namespace material_graph
             graphRanges = import(ranges, ".Ranges");
             graphPackets = import(packets, ".Packets");
             graphScratch = import(scratch, ".Scan");
+            struct Declaration
+            {
+                std::shared_ptr<const Owner> owner;
+                std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6> pipelines;
+                BindInputs bindInputs;
+            };
+            const auto* declaration =
+                graph.RetainDeclaration<Declaration>(std::move(owner), pipelines, std::move(bindInputs));
+            // Input-use callbacks only append reads; declaration never yields or
+            // recursively enters this packet stage. The graph copies each prefix.
+            static thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
             const auto add = [&](uint32_t stage, RHIBufferSlice stageConstants, uint32_t items, const char* suffix)
             {
-                std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                if (!uses.empty())
+                {
+                    uses.clear();
+                }
                 if (stage <= 3)
                 {
                     graphScratch = stage == 0 ? graph.Write(graphScratch) : graph.Modify(graphScratch);
@@ -254,25 +268,26 @@ namespace material_graph
                 {
                     inputUses(uses);
                 }
-                const auto pipeline = pipelines[stage];
                 const auto pass = graph.AddPass(
-                    (name + suffix).c_str(), std::move(uses),
-                    [this, owner, pipeline, bindInputs, stage, stageConstants, items, tileWork](const auto& execution)
-                    {
-                        auto& encoder = *execution.encoder;
-                        encoder.SetPipeline(RHIBindPoint::Compute, pipeline->GetHandle());
-                        encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, stageConstants);
-                        bindInputs(encoder, execution, stage);
-                        encoder.SetBindings(RHIBindPoint::Compute, 4, outputs);
-                        if (tileWork && (stage == 1 || stage == 5))
+                    (name + suffix).c_str(), std::span{uses},
+                    graph.StoreExecute(
+                        [this, declaration, stage, stageConstants, items, tileWork](const auto& execution)
                         {
-                            encoder.Dispatch((values.width + 7) / 8, (values.height + 7) / 8, 1);
-                        }
-                        else
-                        {
-                            DispatchLinear(encoder, items, stage == 2 ? ScanWidth : (!tileWork && stage == 5 ? 1 : 64));
-                        }
-                    });
+                            auto& encoder = *execution.encoder;
+                            encoder.SetPipeline(RHIBindPoint::Compute, declaration->pipelines[stage]->GetHandle());
+                            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, stageConstants);
+                            declaration->bindInputs(encoder, execution, stage);
+                            encoder.SetBindings(RHIBindPoint::Compute, 4, outputs);
+                            if (tileWork && (stage == 1 || stage == 5))
+                            {
+                                encoder.Dispatch((values.width + 7) / 8, (values.height + 7) / 8, 1);
+                            }
+                            else
+                            {
+                                DispatchLinear(encoder, items,
+                                               stage == 2 ? ScanWidth : (!tileWork && stage == 5 ? 1 : 64));
+                            }
+                        }));
                 graph.DeclareRecordingIndependent(pass);
             };
             add(0, constants, values.bucketCount, ".Reset");

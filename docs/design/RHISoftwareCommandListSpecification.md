@@ -2,7 +2,9 @@
 
 작성일: 2026-10-19. 상태: 단계별 구현 진행 중. 기준: CreatorEngine `2935f29452698d08f4c0cf720c255ae383c3ca3f` 및 작업 트리, 로컬 UE 5.6.1 소스. 본문은 전체 구현 계약이며 현재 추가된 범위는 아래 진행 기록으로 구분한다.
 
-최신 후속(권장 1→2→4→5)은 작업 그래프·입력·segment 객체·네이티브 상태를 재사용한다. 이번 동일 조건 비교에서 Game CPU 중앙값 14.1255→13.6965ms, 기록 평균 2.1666→1.9426ms, 번역 평균 1.9076→1.7150ms다. 120 FPS 예산은 미달이다. [후속 계측·검증](../analysis/RhiSoftwareFollowup20261020.md).
+GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프 아레나에 묶고, 기하·패킷·하이브리드 가시성의 임시 목록을 재사용한다. 평균 선언 5.3156→5.0129ms, 기하 선언 0.4685→0.3563ms, Game CPU 중앙값 13.8340→13.4333ms다. 기록 OFF 완료 뷰 처리량은 54.21→54.38뷰/초이며 120 FPS 예산은 미달이다. [선언 재사용 계측·검증](../analysis/GraphDeclarationReuse20261020.md).
+
+이전 후속(권장 1→2→4→5)은 작업 그래프·입력·segment 객체·네이티브 상태를 재사용한다. 이번 동일 조건 비교에서 Game CPU 중앙값 14.1255→13.6965ms, 기록 평균 2.1666→1.9426ms, 번역 평균 1.9076→1.7150ms다. 120 FPS 예산은 미달이다. [후속 계측·검증](../analysis/RhiSoftwareFollowup20261020.md).
 
 이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 [기록·번역 재사용 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 [비동기 제품 배선 검증](../../Artifacts/rhi-async-20261019/index.html)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계다.
 
@@ -27,6 +29,14 @@
 - 소프트웨어 명령 헤더는 payload 포인터를 바이트 오프셋으로 바꿔 32→24바이트, Draw 기록은 48→40바이트가 됐다. `arenaBlocks`/`allocatedBytes`는 활성 저장소를, `arenaCacheHits`는 새 backing 할당 없이 활성화한 retained block 수를 센다.
 - `DX12GpuProfiler::MergeSlices`는 재사용하는 연속 해시 버킷과 인덱스로 이름을 묶는다. 매 프레임 해시 노드를 할당·삭제하지 않는다. 합산 시간·span·첫 등장 순서·분할 suffix와 호출 종료 전 borrowed name 해제는 유지한다.
 - 측정·검증과 120 FPS 예산 비교는 [최적화 실행 기록](../analysis/RhiSoftwareArenaOptimization20261020.md)에 기록한다.
+
+### 2026-10-20 GraphDeclare 소유 데이터
+
+- `render_arena_objects`는 성공적으로 생성한 객체와 배열의 소멸 기록을 보관한다. 배열 복사 실패 시 부분 생성물을 즉시 해제하며 Reset은 역순 소멸 후 블록을 재사용한다.
+- 그래프의 `RetainDeclaration/CopyDeclaration/StoreExecute`가 선언 데이터와 큰 callback의 수명을 소유한다. 패스 callback 제거 후 선언 아레나를 Reset하며, 큐 기록이 점유한 그래프의 변경은 기존 idle 검사로 거절한다.
+- visibility stage는 공유 frame 배열을 한 번 보관하고 stage별로 포인터를 캡처한다. packet stage는 owner/pipeline/binding 함수를 한 번 보관한다. 기하 callback은 그래프가 소유하는 연속 owner 배열을 참조한다.
+- 기하 선언 scratch는 thread와 선언 깊이별로 독립된다. 합류 보조 실행의 재진입이 외부 선언 저장소를 덮지 않는다. 성공·실패·예외 반환 시 소유자와 borrowed pointer를 비운다. 중복 producer 집합은 용량을 유지하는 연속 pointer hash 슬롯을 사용한다.
+- GPU 버전·자원 상태·패스 순서와 프레임별 view/world/bone 정보는 기존 선언 계약을 따른다. [전후 측정과 회귀](../analysis/GraphDeclarationReuse20261020.md).
 
 ### 2026-10-20 작업 그래프·입력·기록 객체·네이티브 상태 재사용
 

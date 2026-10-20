@@ -80,7 +80,8 @@ void CheckCsmContracts(RecordingChangeDevice& device, const own::shared_owner<co
 }
 // Native SceneHost coverage and Decal regression. Reference material instances
 // use the observed GBuffer values, so derived lobes must be reevaluated as well.
-VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layered)
+VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layered,
+                                   std::optional<RHIShaderBinary> backend = std::nullopt)
 {
     LXMaterialAsset asset;
     const auto surface = asset.CreateNode("ShaderNodeBsdfPrincipled", 0, 0);
@@ -131,7 +132,7 @@ VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layer
     std::vector<LXMaterialDiagnostic> diagnostics;
     const auto program = GenerateMaterialSlang(asset, &diagnostics);
     Check(bool(program), "Shadow/Decal generation");
-    return CookedScene(*program, layered ? "shadow-decal-layered" : "shadow-decal-core");
+    return CookedScene(*program, layered ? "shadow-decal-layered" : "shadow-decal-core", backend);
 }
 
 void ShadowDecalPlane(Geometry& geometry, float u = .875f)

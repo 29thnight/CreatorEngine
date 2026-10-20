@@ -1,6 +1,9 @@
 #pragma once
 #include "RenderAllocator.h"
 #include <array>
+#include <algorithm>
+#include <span>
+#include <stdexcept>
 #include <map>
 #include <tuple>
 
@@ -58,6 +61,165 @@ namespace ce
         block* head_{};
         block* current_{};
         render_arena_stats stats_;
+    };
+
+    // Reusable declaration-local identity set. Reset reserves once and clears
+    // flat pointer slots; insertion neither allocates nodes nor takes a lock.
+    template<class T>
+    class render_pointer_set final
+    {
+      public:
+        void reset(size_t maximum)
+        {
+            if (maximum > (std::numeric_limits<size_t>::max)() / 2)
+            {
+                throw std::bad_array_new_length();
+            }
+            size_t slots = 8;
+            while (slots < maximum * 2)
+            {
+                if (slots > (std::numeric_limits<size_t>::max)() / 2)
+                {
+                    throw std::bad_array_new_length();
+                }
+                slots *= 2;
+            }
+            if (slots_.size() < slots)
+            {
+                slots_.resize(slots);
+            }
+            std::fill_n(slots_.data(), slots_.size(), nullptr);
+            maximum_ = maximum;
+            size_ = 0;
+        }
+        bool insert(const T* value)
+        {
+            if (!value || slots_.empty())
+            {
+                throw std::invalid_argument("Pointer identity set requires a nonnull value and reset capacity.");
+            }
+            auto hash = reinterpret_cast<uintptr_t>(value) >> 3;
+            hash ^= hash >> 17;
+            hash *= uintptr_t{0x9e3779b1};
+            size_t index = hash & (slots_.size() - 1);
+            while (const auto* occupied = slots_[index])
+            {
+                if (occupied == value)
+                {
+                    return false;
+                }
+                index = (index + 1) & (slots_.size() - 1);
+            }
+            if (size_ == maximum_)
+            {
+                throw std::length_error("Pointer identity set exceeded its reset capacity.");
+            }
+            slots_[index] = value;
+            ++size_;
+            return true;
+        }
+        void clear() noexcept
+        {
+            std::fill_n(slots_.data(), slots_.size(), nullptr);
+            size_ = 0;
+        }
+
+      private:
+        render_vector<const T*> slots_;
+        size_t maximum_{};
+        size_t size_{};
+    };
+
+    // Single-writer objects with stable addresses and reverse destruction order.
+    // Reset destroys captures before rewinding the retained non-pmr blocks.
+    class render_arena_objects final
+    {
+      public:
+        ~render_arena_objects() { reset(); }
+        render_arena_objects() = default;
+        render_arena_objects(const render_arena_objects&) = delete;
+        render_arena_objects& operator=(const render_arena_objects&) = delete;
+
+        template<class T, class... Args>
+        T* emplace(Args&&... args)
+        {
+            static_assert(std::is_nothrow_destructible_v<T>);
+            auto* record = static_cast<destructor_record*>(
+                resource_.allocate(sizeof(destructor_record), alignof(destructor_record)));
+            auto* memory = static_cast<T*>(resource_.allocate(sizeof(T), alignof(T)));
+            // A throwing constructor never publishes a destructor record.
+            auto* value = std::construct_at(memory, std::forward<Args>(args)...);
+            std::construct_at(record, destructor_record{head_, value, [](void* object) noexcept
+                                                        { std::destroy_at(static_cast<T*>(object)); }});
+            head_ = record;
+            return value;
+        }
+
+        template<class T>
+        std::span<const T> copy(std::span<const T> values)
+        {
+            if (values.empty())
+            {
+                return {};
+            }
+            struct array_owner
+            {
+                T* data;
+                size_t size{};
+                ~array_owner()
+                {
+                    while (size)
+                    {
+                        std::destroy_at(data + --size);
+                    }
+                }
+            };
+            if (values.size() > (std::numeric_limits<size_t>::max)() / sizeof(T))
+            {
+                throw std::bad_array_new_length();
+            }
+            auto* data = static_cast<T*>(resource_.allocate(values.size_bytes(), alignof(T)));
+            auto* owner = emplace<array_owner>(data);
+            try
+            {
+                for (const auto& value : values)
+                {
+                    std::construct_at(data + owner->size, value);
+                    ++owner->size;
+                }
+            }
+            catch (...)
+            {
+                while (owner->size)
+                {
+                    std::destroy_at(data + --owner->size);
+                }
+                throw;
+            }
+            return {data, owner->size};
+        }
+
+        void reset() noexcept
+        {
+            while (head_)
+            {
+                auto* record = head_;
+                head_ = record->previous;
+                record->destroy(record->value);
+            }
+            resource_.reset();
+        }
+        render_arena_stats stats() const noexcept { return resource_.stats(); }
+
+      private:
+        struct destructor_record
+        {
+            destructor_record* previous;
+            void* value;
+            void (*destroy)(void*) noexcept;
+        };
+        render_arena_resource resource_;
+        destructor_record* head_{};
     };
 
     // Stateful STL allocator without a virtual memory_resource dispatch. Nested

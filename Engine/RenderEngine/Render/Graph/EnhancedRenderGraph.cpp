@@ -185,6 +185,7 @@ void EnhancedRenderGraph::Reset()
         ClearPassMetadata(pass);
     }
     m_passes = {};
+    m_declarationData.reset();
     m_finalStateRequirements.clear();
     m_executeOrder.clear();
     m_timingSignature.reset();

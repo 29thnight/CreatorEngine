@@ -1612,27 +1612,35 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             owner->m_sharedBatch = shared;
         }
     }
+    struct Declaration
+    {
+        std::array<std::shared_ptr<const Frame>, kSharedViewCapacity> owners;
+        size_t count;
+        std::shared_ptr<SharedBatch> shared;
+    };
+    const auto* declaration = graph.RetainDeclaration<Declaration>(ownerStorage, ownerCount, shared);
     const auto declare =
         [&](const char* suffix, const std::vector<EnhancedRenderGraph::RGPassUsage>& uses, MeshletStage stage)
     {
-        const auto pass = graph.AddPass(
-            std::string(passPrefix) + suffix, uses,
-            [ownerStorage, ownerCount, shared, stage](const auto& execution)
-            {
-                for (const auto& owner : std::span{ownerStorage}.first(ownerCount))
-                {
-                    owner->CheckCurrent(execution.graph);
-                }
-                if (shared)
-                {
-                    shared->Dispatch(execution, stage);
-                    return;
-                }
-                const auto& owner = ownerStorage.front();
-                owner->DispatchMeshletStage(*execution.encoder, stage,
-                    stage == MeshletStage::Cull && owner->m_pyramid
-                        ? owner->m_pyramid->Bindings(execution) : RHIBindingTable{});
-            });
+        const auto pass =
+            graph.AddPass(std::string(passPrefix) + suffix, uses,
+                          [declaration, stage](const auto& execution)
+                          {
+                              for (const auto& owner : std::span{declaration->owners}.first(declaration->count))
+                              {
+                                  owner->CheckCurrent(execution.graph);
+                              }
+                              if (declaration->shared)
+                              {
+                                  declaration->shared->Dispatch(execution, stage);
+                                  return;
+                              }
+                              const auto& owner = declaration->owners.front();
+                              owner->DispatchMeshletStage(*execution.encoder, stage,
+                                                          stage == MeshletStage::Cull && owner->m_pyramid
+                                                              ? owner->m_pyramid->Bindings(execution)
+                                                              : RHIBindingTable{});
+                          });
         graph.DeclareComputeCompatible(pass);
         graph.DeclareRecordingIndependent(pass);
     };

@@ -15,17 +15,38 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
         return this->geometryTable->GraphTable(graph);
     }
     // Declare unique pose producers once; instance views retain their own worlds.
-    std::set<const MeshSurfaceBatch*> declaredGeometry;
-    std::vector<const MeshSurfaceBatch*> geometry;
-    for (const auto& draw : frame->draws)
+    static thread_local std::vector<const MeshSurfaceBatch*> geometry;
+    static thread_local ce::render_pointer_set<MeshSurfaceBatch> declaredGeometry;
+    declaredGeometry.reset(frame->draws.size() * 2 + frame->shadowDraws.size());
+    if (!geometry.empty())
     {
-        if (declaredGeometry.insert(draw.geometry.get()).second)
-            geometry.push_back(draw.geometry.get());
-        if (draw.previousGeometry && declaredGeometry.insert(draw.previousGeometry.get()).second)
+        geometry.clear();
+    }
+    struct ClearGeometry
+    {
+        std::vector<const MeshSurfaceBatch*>& values;
+        ce::render_pointer_set<MeshSurfaceBatch>& seen;
+        ~ClearGeometry()
         {
-            geometry.push_back(draw.previousGeometry.get());
+            values.clear();
+            seen.clear();
         }
-        for (const auto& texture : draw.bindings->resources.textures)
+    } clearGeometry{geometry, declaredGeometry};
+    const auto addGeometry = [&](const MeshSurfaceBatch* batch)
+    {
+        if (declaredGeometry.insert(batch))
+        {
+            geometry.push_back(batch);
+        }
+    };
+    for (const auto& draw : std::span{frame->draws})
+    {
+        addGeometry(draw.geometry.get());
+        if (draw.previousGeometry)
+        {
+            addGeometry(draw.previousGeometry.get());
+        }
+        for (const auto& texture : std::span{draw.bindings->resources.textures})
         {
             auto handle = graph.FindImportedTexture(texture.resource);
             if (!handle.IsValid())
@@ -35,12 +56,9 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
             }
         }
     }
-    for (const auto& draw : frame->shadowDraws)
+    for (const auto& draw : std::span{frame->shadowDraws})
     {
-        if (declaredGeometry.insert(draw.geometry.get()).second)
-        {
-            geometry.push_back(draw.geometry.get());
-        }
+        addGeometry(draw.geometry.get());
     }
     std::string error;
     if (!MeshSurfaceBatch::DeclareBatch(graph, geometry, error))
@@ -49,7 +67,9 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
     }
     this->geometryTable->Declare(graph, this->geometryTable);
     if (frame->sceneData)
+    {
         frame->sceneData->Declare(graph);
+    }
     frame->graph = &graph;
     frame->graphEpoch = graph.ResourceEpoch();
     return this->geometryTable->GraphTable(graph);

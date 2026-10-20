@@ -362,34 +362,37 @@ struct SceneHybridVisibility final
         graph.DeclareRecordingIndependent(initializePass);
         graphWork = graph.Write(graphWork);
         graphDispatchArguments = graph.Write(graphDispatchArguments);
-        std::vector<EnhancedRenderGraph::RGPassUsage> prepareUses{
-            {graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
-            {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
-            {geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}};
-        visible->AddVisibleIdsRead(graph, prepareUses);
-        const auto preparePass = graph.AddPass(
-            (name + ".PrepareClassify").c_str(), std::move(prepareUses), [owner](const auto& x) {
-                owner->Bind(*x.encoder, Pipeline::PrepareClassify);
-                x.encoder->Dispatch(1, 1, 1);
-            });
+        // The graph copies usages synchronously; no callback borrows this scratch.
+        static thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        uses.assign({{graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+                     {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+                     {geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}});
+        visible->AddVisibleIdsRead(graph, uses);
+        const auto preparePass = graph.AddPass((name + ".PrepareClassify").c_str(), std::span{uses},
+                                               [owner](const auto& x)
+                                               {
+                                                   owner->Bind(*x.encoder, Pipeline::PrepareClassify);
+                                                   x.encoder->Dispatch(1, 1, 1);
+                                               });
         graph.DeclareRecordingIndependent(preparePass);
         graphKeys = graph.AtomicMin64(graphKeys);
         graphRoutes = graph.Modify(graphRoutes);
         graphWork = graph.Modify(graphWork);
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite},
-            {graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite},
-            {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}};
+        uses.assign({{graphRoutes, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite},
+                     {graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite},
+                     {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}});
         GeometryReads(graph, uses);
         visible->AddVisibleIdsRead(graph, uses);
-        const auto classifyPass = graph.AddPass(
-            (name + ".Classify").c_str(), std::move(uses), [owner](const auto& x) {
-                owner->Bind(*x.encoder, Pipeline::Classify);
-                if (!x.encoder->DispatchIndirect(owner->dispatchArguments))
-                {
-                    throw std::runtime_error("METEOR classifier indirect dispatch failed.");
-                }
-            });
+        const auto classifyPass =
+            graph.AddPass((name + ".Classify").c_str(), std::span{uses},
+                          [owner](const auto& x)
+                          {
+                              owner->Bind(*x.encoder, Pipeline::Classify);
+                              if (!x.encoder->DispatchIndirect(owner->dispatchArguments))
+                              {
+                                  throw std::runtime_error("METEOR classifier indirect dispatch failed.");
+                              }
+                          });
         graph.DeclareRecordingIndependent(classifyPass);
     }
     void AddRasterUses(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
@@ -406,28 +409,31 @@ struct SceneHybridVisibility final
             throw std::runtime_error("METEOR software raster requires explicit classification.");
         }
         graphDispatchArguments = graph.Modify(graphDispatchArguments);
-        const auto preparePass = graph.AddPass(
-            (name + ".PrepareSoftware").c_str(),
-            {{graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
-             {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}},
-            [owner](const auto& x) {
-                owner->Bind(*x.encoder, Pipeline::PrepareSoftware);
-                x.encoder->Dispatch(1, 1, 1);
-            });
+        const auto preparePass =
+            graph.AddPass((name + ".PrepareSoftware").c_str(),
+                          {{graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                           {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::ReadWrite}},
+                          [owner](const auto& x)
+                          {
+                              owner->Bind(*x.encoder, Pipeline::PrepareSoftware);
+                              x.encoder->Dispatch(1, 1, 1);
+                          });
         graph.DeclareRecordingIndependent(preparePass);
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64},
-            {graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
-            {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}};
+        static thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        uses.assign({{graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64},
+                     {graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                     {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}});
         GeometryReads(graph, uses);
-        const auto rasterPass = graph.AddPass(
-            (name + ".SW").c_str(), std::move(uses), [owner](const auto& x) {
-                owner->Bind(*x.encoder, Pipeline::Rasterize);
-                if (!x.encoder->DispatchIndirect(owner->dispatchArguments, SoftwareArgumentsOffset))
-                {
-                    throw std::runtime_error("METEOR software raster indirect dispatch failed.");
-                }
-            });
+        const auto rasterPass =
+            graph.AddPass((name + ".SW").c_str(), std::span{uses},
+                          [owner](const auto& x)
+                          {
+                              owner->Bind(*x.encoder, Pipeline::Rasterize);
+                              if (!x.encoder->DispatchIndirect(owner->dispatchArguments, SoftwareArgumentsOffset))
+                              {
+                                  throw std::runtime_error("METEOR software raster indirect dispatch failed.");
+                              }
+                          });
         graph.DeclareRecordingIndependent(rasterPass);
     }
     // Occluder stage: the merged atomic keys become the HZB source depth.

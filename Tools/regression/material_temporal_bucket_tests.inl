@@ -3,7 +3,8 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                         const own::shared_owner<const Texture>& image, bool transmitting = false,
                         bool primitiveCache = false)
 {
-    const auto product = transmitting ? RefractionProduct(root, false) : ShadowDecalProduct(root, false);
+    const auto product =
+        transmitting ? RefractionProduct(root, false) : ShadowDecalProduct(root, false, RHIShaderCompiler::GetOutput());
     GenerationStore store;
     experiment::AssetId id;
     Check(Uuid::TryParse("DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD", id.value), "Temporal graph identity");

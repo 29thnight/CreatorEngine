@@ -2,6 +2,7 @@
 #include "RHI/DX12/DX12CommandTranslator.h"
 #include "RHI/RHISoftwareRecorder.h"
 #include "RenderArena.h"
+#include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/DX12GpuProfiler.h"
 
 namespace
@@ -68,6 +69,39 @@ namespace
                         "Flat GPU timing merge reused a freed name or dropped a zero-length slice.");
             }
             require(resources.Initialize(8, 8, error), error);
+            {
+                EnhancedRenderGraph graph(resources);
+                auto owner = std::make_shared<int>(41);
+                std::weak_ptr<int> weak = owner;
+                size_t calls{};
+                auto callback = graph.StoreExecute(
+                    [owner, &calls](const auto&)
+                    {
+                        if (*owner == 41)
+                        {
+                            ++calls;
+                        }
+                    });
+                owner.reset();
+                // Force multiple backing blocks after storing the first callback.
+                for (size_t index = 0; index < 10000; ++index)
+                {
+                    graph.RetainDeclaration<std::array<uint64_t, 16>>();
+                }
+                callback(EnhancedRenderGraph::ExecuteContext{});
+                require(calls == 1 && !weak.expired(), "Declaration arena lost a live callback capture.");
+                callback = {};
+                graph.Reset();
+                require(weak.expired(), "Graph reset retained declaration callback owners.");
+                auto last = std::make_shared<int>(53);
+                weak = last;
+                graph.StoreExecute([last](const auto&) {});
+                last.reset();
+                require(!weak.expired(), "Graph discarded declaration data before destruction.");
+                graph.Reset();
+                require(weak.expired(), "Repeated graph reset retained declaration owners.");
+            }
+
             require(pool.Initialize(resources, 1, 3, error), error);
             std::shared_ptr<IRHICommandQueue> primary;
             require(resources.GetPrimaryGraphicsQueue(primary, error), error);
