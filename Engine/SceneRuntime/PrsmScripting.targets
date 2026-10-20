@@ -21,6 +21,8 @@
     <ReflgenPrsmAdapterHeader>$(MSBuildThisFileDirectory)PrsmEngineAdapter.h</ReflgenPrsmAdapterHeader>
     <EnginePrsmToolchainDir Condition="'$(EnginePrsmToolchainDir)' == ''">$(SolutionDir)..\PrSM\target\release\</EnginePrsmToolchainDir>
     <PrsmLlvmCDll Condition="'$(PrsmLlvmCDll)' == ''">$(VCInstallDir)Tools\Llvm\x64\bin\LLVM-C.dll</PrsmLlvmCDll>
+    <!-- Player AOT 패키징(CreatorBuildTool)이 스크립트 모듈 DLL 을 링크하는 링커. 런타임에는 쓰지 않는다. -->
+    <PrsmLldLink Condition="'$(PrsmLldLink)' == ''">$(VCInstallDir)Tools\Llvm\x64\bin\lld-link.exe</PrsmLldLink>
     <PrsmDeployDir>$(EngineBinaryRoot)PrSM\</PrsmDeployDir>
   </PropertyGroup>
 
@@ -54,5 +56,8 @@
              Text="PrSM toolchain not found in $(EnginePrsmToolchainDir) (prsmc.exe, prsm_jit.dll). The editor will start without PrSM scripts. Set EnginePrsmToolchainDir." />
     <Warning Condition="!Exists('$(PrsmLlvmCDll)')"
              Text="LLVM-C.dll not found at $(PrsmLlvmCDll). Install the Visual Studio 'C++ Clang tools for Windows' component or set PrsmLlvmCDll." />
+    <Copy Condition="Exists('$(PrsmLldLink)')" SourceFiles="$(PrsmLldLink)" DestinationFolder="$(PrsmDeployDir)" SkipUnchangedFiles="true" />
+    <Warning Condition="!Exists('$(PrsmLldLink)')"
+             Text="lld-link.exe not found at $(PrsmLldLink). Packaging a project with PrSM scripts will fail. Set PrsmLldLink." />
   </Target>
 </Project>

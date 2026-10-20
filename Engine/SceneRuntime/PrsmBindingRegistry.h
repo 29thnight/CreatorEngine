@@ -13,7 +13,13 @@
 struct reflgen_prsm_binding_entry;
 
 // 생성된 바인딩이 호출마다 부르는 단일 검증기. PrsmBindingRegistry.cpp 가 정의한다.
-extern "C" std::int32_t ce_prsm_validate_binding(
+// 런타임 DLL 밖으로 내보낸다 — Player 의 AOT 스크립트 모듈 DLL 이 import 로 부른다(D-048).
+#if defined(_WIN32)
+#define CE_PRSM_VALIDATOR_API __declspec(dllexport)
+#else
+#define CE_PRSM_VALIDATOR_API __attribute__((visibility("default")))
+#endif
+extern "C" CE_PRSM_VALIDATOR_API std::int32_t ce_prsm_validate_binding(
     const std::uint8_t* symbol, std::uint32_t length, const std::uint8_t* digest) noexcept;
 
 namespace prsm_engine

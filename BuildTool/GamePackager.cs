@@ -53,6 +53,8 @@ internal static class GamePackager
             var work = Paths.Child(candidate, ".package-input"); var managed = Path.Combine(work, "Managed");
             context.Log("[2/6 BuildManaged]", "stage");
             await GameCompiler.Compile(context, engine, project, managed, config, options.Get("game-scripts-assembly"));
+            // PrSM 스크립트도 C# 과 같이 프로젝트 폴더에서 읽는다. 모듈 DLL 은 후보 루트에 바로 쓴다.
+            var prsmModule = await PrsmModuleBuilder.Build(context, engine, project, candidate, Path.Combine(work, "PrSM"), config);
             context.Log(prebuiltContent ? "[3/6 Prebuilt content]" : "[3/6 Cook]", "stage");
             var baseRoot = Path.Combine(work, "Base"); var generated = Path.Combine(work, "Generated"); var merged = Path.Combine(work, "Merged");
             foreach (var directory in new[] { baseRoot, generated, merged }) Directory.CreateDirectory(directory);
@@ -97,6 +99,7 @@ internal static class GamePackager
             }
             Metadata.AssertSourceOnlyAudio(runtimeSources.Select(entry => entry.Path));
             var rootFiles = new List<string>();
+            if (prsmModule != null) rootFiles.Add(prsmModule);
             // The scene renderer boots from cooked environment pixels. They are
             // common engine resources; no authoring EXR is packaged with a game.
             var environments = Paths.Child(engine.BinaryRoot, "Resources/Environment");

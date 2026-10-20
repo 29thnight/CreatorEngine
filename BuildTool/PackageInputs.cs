@@ -10,7 +10,10 @@ internal static class PackageInputs
     private static bool Generated(string relative) => relative.Equals("EngineSettings.asset", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".runtime.yml", StringComparison.OrdinalIgnoreCase);
     // Script identities belong to the managed assembly. Keeping their sidecars
     // in cook input would create CEMF entries for source files omitted from PAK.
-    private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase);
+    // PrSM 소스와 그 프로젝트 목록도 같다 — 패키지에는 링크된 모듈 DLL 만 들어간다.
+    private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase)
+        || relative.EndsWith(".prsm", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".prsm.meta", StringComparison.OrdinalIgnoreCase)
+        || relative.EndsWith("Scripts/PrSM/project.json", StringComparison.OrdinalIgnoreCase) || relative.EndsWith("Scripts/PrSM/project.json.meta", StringComparison.OrdinalIgnoreCase);
     public static HashSet<string>? ReadAssetList(string project, string listFile, string startupScene)
     {
         if (listFile.Length == 0) return null;

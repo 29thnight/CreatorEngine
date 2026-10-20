@@ -7,7 +7,12 @@
 // prsm_jit.dll(LLVM ORC)로 같은 프로세스에서 **활성화 전에 전부** 구체화한다. 모듈이
 // 참조하는 외부 심볼은 이 호스트가 명시한 것(ce_* 런타임, 태스크 브리지, 바인딩
 // 검증기, reflgen 이 생성한 엔진 바인딩)뿐이고, 그 밖의 참조는 JIT 이 코드를 받기 전에
-// 거부한다. Player 의 AOT 정적 링크는 같은 모듈 ABI 를 쓰는 별도 단계다.
+// 거부한다.
+//
+// Player(D-048 동적 AOT): 패키징이 같은 소스를 prsmc build-module 로 오브젝트로 만들고,
+// 런타임 DLL 의 import 라이브러리와 링크해 PrSM/GameScripts.prsm.dll 로 넣는다. Player 는
+// LLVM 없이 그 DLL 을 적재하고 prsm_module_get 의 표를 같은 방식으로 활성화한다. 엔진
+// 바인딩은 import 로 런타임 DLL 의 래퍼를 부르고, 호출마다 같은 검증기를 지난다.
 //
 // ── 소유와 스레드 ──
 //
@@ -64,6 +69,8 @@ public:
 
     // 게임 스레드에서 한 번. 도구·소스가 없으면 조용히 비활성으로 남는다(ClrHost 와 같다).
     bool Initialize();
+    // Player: 패키지의 AOT 모듈 DLL 을 적재한다. 파일이 없으면 PrSM 없이 비활성으로 남는다.
+    bool InitializeAot(const std::wstring& modulePath);
     void Shutdown();
 
     // 프로젝트 소스를 다시 컴파일해 세대를 교체한다. 살아 있는 인스턴스가 있으면 거부한다

@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <bit>
 #include <charconv>
+#include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <map>
@@ -223,6 +224,7 @@ struct PrsmScriptHost::Impl
 
     // ── 도구 ──
     HMODULE jitLibrary = nullptr;
+    HMODULE aotLibrary = nullptr;   // Player: 패키지의 모듈 DLL(세대 하나, 교체 없음)
     PrsmJitLoadModuleFn jitLoad = nullptr;
     PrsmJitModuleGetFn jitModuleGet = nullptr;
     PrsmJitUnloadModuleFn jitUnload = nullptr;
@@ -399,17 +401,67 @@ struct PrsmScriptHost::Impl
         }
         const PrsmModuleGetFn get = jitModuleGet(module);
         const PrsmModule* candidate = get ? get() : nullptr;
-        if (nullptr == candidate || PRSM_ABI_VERSION != candidate->abi_version
-            || (candidate->type_count && nullptr == candidate->types))
+        if (!ValidTable(candidate))
         {
             diagnostics += "generated module has an invalid table";
             jitUnload(module);
             return false;
         }
-
-        prsm::host::GcRuntime::Instance().RegisterModule(*candidate);
         jitModule = module;
-        table = candidate;
+        Activate(*candidate);
+        return true;
+    }
+
+    // JIT 세대와 AOT 모듈이 같은 검사를 지난다(harness loader 의 표 검사와 같은 조건).
+    static bool ValidTable(const PrsmModule* candidate)
+    {
+        if (nullptr == candidate || PRSM_ABI_VERSION != candidate->abi_version || candidate->type_count > 65536
+            || (candidate->type_count && nullptr == candidate->types)
+            || (!!candidate->task_resume != !!candidate->task_cancel))
+        {
+            return false;
+        }
+        for (std::uint32_t i = 0; i < candidate->type_count; ++i)
+        {
+            const PrsmTypeDesc* type = candidate->types[i];
+            if (nullptr == type || 0 == type->size || 0 == type->align || 0 != (type->align & (type->align - 1))
+                || type->align > 4096 || (type->ref_bitmap_words && nullptr == type->ref_bitmap))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Player: 패키징이 링크한 모듈 DLL. 런타임 DLL 의 export 를 import 로 부르므로 같은
+    // 프로세스의 그 DLL 에 묶인다. LLVM 은 필요 없다(D-048).
+    bool LoadAotModule(const file::path& modulePath)
+    {
+        diagnostics.clear();
+        aotLibrary = LoadLibraryExW(modulePath.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+        if (nullptr == aotLibrary)
+        {
+            diagnostics = "cannot load " + modulePath.string() + " (error " + std::to_string(GetLastError()) + ")";
+            return false;
+        }
+        const auto get = reinterpret_cast<PrsmModuleGetFn>(GetProcAddress(aotLibrary, PRSM_MODULE_GET_SYMBOL));
+        const PrsmModule* candidate = get ? get() : nullptr;
+        if (!ValidTable(candidate))
+        {
+            diagnostics = modulePath.string() + " has no valid " + PRSM_MODULE_GET_SYMBOL + " table (ABI "
+                + std::to_string(PRSM_ABI_VERSION) + " required)";
+            FreeLibrary(aotLibrary);
+            aotLibrary = nullptr;
+            return false;
+        }
+        Activate(*candidate);
+        return true;
+    }
+
+    void Activate(const PrsmModule& candidate)
+    {
+        prsm::host::GcRuntime::Instance().RegisterModule(candidate);
+        table = &candidate;
         scheduler = std::make_unique<prsm::host::TaskScheduler>(*table, [this](void* owner) {
             const auto found = slotOfObject.find(owner);
             if (found != slotOfObject.end())
@@ -426,7 +478,6 @@ struct PrsmScriptHost::Impl
                 types.emplace(Text(type->name), type);
             }
         }
-        return true;
     }
 
     // 세대를 내린다. GC 가 그 모듈 객체를 전부 회수한 뒤에만 코드를 놓는다.
@@ -447,14 +498,16 @@ struct PrsmScriptHost::Impl
         gc.CollectFull();
         if (gc.DrainModule(*table))
         {
-            jitUnload(jitModule);
+            if (nullptr != jitModule) jitUnload(jitModule);
+            if (nullptr != aotLibrary) FreeLibrary(aotLibrary);
         }
         else
         {
             // 아직 모듈 객체를 잡은 참조가 있다 — 코드를 남겨 두는 편이 안전하다(D-047).
-            PrsmLog(spdlog::level::warn, "모듈 객체가 남아 JIT 코드를 회수하지 않았습니다");
+            PrsmLog(spdlog::level::warn, "모듈 객체가 남아 스크립트 코드를 회수하지 않았습니다");
         }
         jitModule = nullptr;
+        aotLibrary = nullptr;
         table = nullptr;
         types.clear();
     }
@@ -492,6 +545,34 @@ bool PrsmScriptHost::Initialize()
         return false;
     }
     PrsmLog(spdlog::level::info, "스크립트 계층 준비 완료 — 컴포넌트 타입 " + std::to_string(impl.types.size()) + "개");
+    return true;
+}
+
+bool PrsmScriptHost::InitializeAot(const std::wstring& modulePath)
+{
+    Impl& impl = *m_impl;
+    if (impl.initialized) return IsReady();
+    impl.initialized = true;
+
+    prsm_engine::BindGameThread();
+    (void)prsm::host::GcRuntime::Instance();
+
+    const file::path path = file::path(modulePath).lexically_normal();
+    if (!file::exists(path))
+    {
+        // PrSM 스크립트가 없는 프로젝트의 정상 경로다.
+        PrsmLog(spdlog::level::info, "AOT 모듈이 없어 PrSM 스크립트 없이 시작합니다: " + path.string());
+        return false;
+    }
+    if (!impl.LoadAotModule(path))
+    {
+        PrsmLog(spdlog::level::err, "AOT 모듈 적재 실패: " + impl.diagnostics);
+        return false;
+    }
+    PrsmLog(spdlog::level::info, "AOT 스크립트 계층 준비 완료 — 컴포넌트 타입 " + std::to_string(impl.types.size()) + "개");
+    // 패키징 검증(PlayerVerification)과 회귀 게이트가 표준 출력에서 찾는 표지.
+    std::printf("[PRSM_AOT] loaded types=%zu\n", impl.types.size());
+    std::fflush(stdout);
     return true;
 }
 

@@ -8,7 +8,7 @@
 
 // 생성된 바인딩이 호출마다 부르는 단일 검증기(reflgen PrSM production ABI v1).
 // 문맥·스레드를 먼저 보고, 컴파일된 네이티브 표에서 기호·다이제스트를 맞춘다.
-extern "C" std::int32_t REFLGEN_PRSM_BINDING_CDECL ce_prsm_validate_binding(
+extern "C" CE_PRSM_VALIDATOR_API std::int32_t REFLGEN_PRSM_BINDING_CDECL ce_prsm_validate_binding(
     const std::uint8_t* symbol, std::uint32_t length, const std::uint8_t* digest) noexcept
 {
     if (!prsm_engine::OnGameThread())

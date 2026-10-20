@@ -171,6 +171,15 @@ internal static class EnginePublisher
                 }
                 Copy(Path.Combine(toolSource, name), Path.Combine(binaryTarget, "Tools/CreatorBuildTool", name));
             }
+            // PrSM 도구(에디터 JIT 와 Player AOT 패키징이 함께 쓴다): prsmc·prsm_jit·LLVM-C·lld-link 와
+            // 런타임 모듈마다의 바인딩 카탈로그. SceneRuntime 빌드가 배치한다. 없으면 PrSM 없는 배포본이다.
+            var prsmTools = Path.Combine(binarySource, "PrSM");
+            if (Directory.Exists(prsmTools))
+            {
+                foreach (var required in new[] { "prsmc.exe", "prsm_jit.dll", "LLVM-C.dll", "lld-link.exe" })
+                    if (!File.Exists(Path.Combine(prsmTools, required))) throw new BuildException($"Incomplete PrSM toolchain in {prsmTools}: {required}");
+                Tree(prsmTools, Path.Combine(binaryTarget, "PrSM"));
+            }
             Tree(Path.Combine(repository, "Tools/packaging/templates"), Path.Combine(candidate, "Tools/packaging/templates"));
             foreach (var file in Paths.Files(Path.Combine(repository, "ThirdParty")).Where(p => Regex.IsMatch(Path.GetFileName(p), "^(LICENSE|COPYING|NOTICE|README|PROVENANCE)", RegexOptions.IgnoreCase) && Path.GetExtension(p) is not (".dll" or ".lib")))
                 Copy(file, Paths.Child(candidate, "Licenses/ThirdParty/" + Paths.Relative(Path.Combine(repository, "ThirdParty"), file)));

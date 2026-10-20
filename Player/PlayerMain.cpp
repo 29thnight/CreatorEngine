@@ -277,8 +277,9 @@ void Player::PlayerMain::Initialize()
 	// CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
 	ClrHost::Get().Initialize();
-	// PrSM 스크립트 계층. Player AOT 패키징 전에는 도구가 없어 비활성으로 남는다.
-	PrsmScriptHost::Get().Initialize();
+	// PrSM 스크립트 계층(D-048 동적 AOT). 패키징이 PrSM/GameScripts.prsm.dll 을 넣었을 때만
+	// 켜진다. LLVM·컴파일러는 Player 에 없다.
+	PrsmScriptHost::Get().InitializeAot(PathFinder::RelativeToExecutable("PrSM\\GameScripts.prsm.dll").wstring());
 
     // Startup uses the same staged scene preparation as later transitions.
     // Metadata/payload jobs progress without blocking the owner or render thread;
