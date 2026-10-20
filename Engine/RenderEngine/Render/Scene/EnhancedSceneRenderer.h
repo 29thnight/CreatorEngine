@@ -3,6 +3,7 @@
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Graph/EnhancedRenderGraph.h"
+#include "../../RHI/RHICommandProvenance.h"
 #include <stdint.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
 
@@ -571,6 +572,7 @@ struct EnhancedLiveGpuSlice
     uint64_t    endCpuTick{ 0 };
     uint8_t     queueId{ 0 }; // 0 graphics, 1 compute; timestamps already in QPC domain.
     uint32_t    passIndex{ UINT32_MAX }; // Authored graph index, never the display name.
+    RHICommandProvenance rhi;
 };
 
 /// GPU 구간을 밖으로 흘리는 자리(§7.3 의 GPU Graphics queue).
@@ -594,6 +596,7 @@ struct EnhancedLiveGpuSpanOrigin
     uint64_t captureGeneration{ 0 };
     uint64_t fullSubmissionId{ 0 };
     TemporalMeasurementProvenance temporalProvenance;
+    RHICommandProvenance rhi;
 };
 
 struct EnhancedLiveGpuSpanSink

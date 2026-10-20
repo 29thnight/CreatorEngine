@@ -124,7 +124,26 @@ namespace ce
 	static_assert(sizeof(profile_event) == 64,
 	              "profile_event 의 크기가 바뀌었다 — 링 메모리가 그만큼 움직인다");
 
-	// GPU 구간이 들고 오는 귀속. 어느 제출의, 어느 뷰의, 어느 큐의 것인가.
+    inline profile_render_measurement make_rhi_measurement(const profile_event& event, const profile_rhi_context& rhi)
+    {
+        profile_render_measurement sample;
+        sample.engine_frame = event.frame;
+        sample.axis = profile_render_axis::rhi_scope;
+        sample.marker = event.marker;
+        sample.tick_begin = event.tick_begin;
+        sample.tick_end = event.tick_end;
+        sample.queue = event.queue;
+        sample.event_submission = event.submission;
+        sample.event_view = event.view;
+        sample.rhi_event_frame = event.frame;
+        sample.rhi_thread_slot = event.thread_slot;
+        sample.rhi_depth = event.depth;
+        sample.rhi_event_flags = static_cast<std::uint8_t>(event.flags);
+        sample.rhi = rhi;
+        return sample;
+    }
+
+    // GPU 구간이 들고 오는 귀속. 어느 제출의, 어느 뷰의, 어느 큐의 것인가.
 	//
 	// ★ 인자를 셋 더 늘리는 대신 묶었다. `write_span(id, begin, end, frame,
 	//   depth, submission, view, queue)` 는 같은 폭의 정수가 줄줄이 서서,
@@ -140,15 +159,16 @@ namespace ce
 		std::uint64_t generation = 0;
 		std::uint64_t submission_id = 0;
 		profile_render_provenance provenance;
-	};
+        profile_rhi_context rhi;
+    };
 
 	// 청크 하나의 이벤트 수. 프레임당 27~38 개가 현재 실측이므로 256 이면
 	// 게임 스레드는 여러 프레임에 한 번 봉인한다. 상수는 크게 잡아 문제를
 	// 숨기지 않는다(§6.2) — 부족하면 drop 이 아니라 봉인 빈도로 먼저 나타난다.
 	inline constexpr std::uint32_t kEventsPerChunk = 256;
 	inline constexpr std::uint32_t kProfilePageMagic = 0x43505246; // CPRF
-	inline constexpr std::uint16_t kProfilePageVersion = 3;
-	inline constexpr std::uint32_t kRenderMeasurementsPerChunk = 32;
+    inline constexpr std::uint16_t kProfilePageVersion = 4;
+    inline constexpr std::uint32_t kRenderMeasurementsPerChunk = 32;
 
 	// writer 전용 저장소. 봉인 전에는 오직 자기 스레드만, 봉인 뒤에는 오직
 	// 수집기만 만진다. 두 시기가 겹치지 않는다는 것이 이 타입의 계약 전부다.

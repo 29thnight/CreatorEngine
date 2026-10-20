@@ -1,4 +1,5 @@
 #include "../../RHI/RHISoftwareRecorder.h"
+#include "../../RHI/RHIProfilingContext.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
 #include "../../../Utility_Framework/JobScheduler.h"
@@ -4878,6 +4879,8 @@ bool EnhancedRenderGraph::RecordSoftware(IRHIParallelCommandPool& pool, uint32_t
     {
         return false;
     }
+    const ce::profile_rhi_context_scope context(MakeRHIProfileContext(batchDesc, recorder.GetRecordingId()));
+    ce::profile_rhi_scope record{ce::marker<"RHISoftwareRecord">()};
     auto desc = batchDesc;
     RHIRecordedBatch unused;
     RHIRecordedBatchDesc nativeDesc;
@@ -5558,9 +5561,12 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
 #if !CE_SHIPPING
         ce::profile_context_scope contextScope{recordingContext};
 #endif
+        const ce::profile_rhi_context_scope rhiScope(
+            software ? MakeRHIProfileContext(*softwareDesc, software->GetRecordingId(), worker)
+                     : ce::profile_rhi_context{});
         const auto workerMarker = worker < workerMarkers.size() ? workerMarkers[worker] :
             ce::marker<"RenderCommandRecord.WorkerOther">();
-        ce::profile_scope profile{workerMarker};
+        ce::profile_rhi_scope profile{workerMarker};
         ExecuteContext context{};
         context.graph = this;
 

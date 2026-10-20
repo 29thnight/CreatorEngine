@@ -97,6 +97,7 @@ public:
     /// 소유하고 등록한다. 놓을 때 vkDestroy 까지 한다.
     RHITextureHandle AddImage(const VulkanImageEntry& entry)
     {
+        const std::lock_guard lock(m_imageRegistryMutex);
         if (!entry.IsValid()) return {};
         return RHITextureHandle{ Acquire(m_images, m_imageFree, entry, true) };
     }
@@ -107,6 +108,7 @@ public:
     ///   놓으라고 할 때 자기 칸만 비우고 남의 리소스를 죽이지 않는다.
     RHITextureHandle AddExternalImage(const VulkanImageEntry& entry)
     {
+        const std::lock_guard lock(m_imageRegistryMutex);
         if (!entry.IsValid()) return {};
         return RHITextureHandle{ Acquire(m_images, m_imageFree, entry, false) };
     }
@@ -125,12 +127,17 @@ public:
 
     /// 무효 핸들이면 기본값(전부 VK_NULL_HANDLE)이다 — 호출부는 `IsValid()`
     /// 하나만 검사한다.
-    VulkanImageEntry  Resolve(RHITextureHandle handle) const { return ResolveIn(m_images, handle.id); }
+    VulkanImageEntry Resolve(RHITextureHandle handle) const
+    {
+        const std::lock_guard lock(m_imageRegistryMutex);
+        return ResolveIn(m_images, handle.id);
+    }
     VulkanBufferEntry Resolve(RHIBufferHandle handle) const { return ResolveBuffer(handle.id); }
 
     /// 레이아웃을 적어 둔다. 전이를 기록한 쪽이 부른다.
     void SetLayout(RHITextureHandle handle, VkImageLayout layout)
     {
+        const std::lock_guard lock(m_imageRegistryMutex);
         Slot<VulkanImageEntry>* const slot = Find(m_images, handle.id);
         if (nullptr != slot) slot->entry.layout = layout;
     }
@@ -151,7 +158,12 @@ public:
     /// 남은 것을 전부 놓는다. 디바이스 파괴 전에 한 번.
     void Shutdown(VkDevice device);
 
-    size_t LiveImageCount()  const { return m_images.size() - m_imageFree.size(); }
+    size_t LiveImageCount() const
+    {
+        const std::lock_guard lock(m_imageRegistryMutex);
+        return m_images.size() - m_imageFree.size();
+    }
+    void CollectRecordingLeases(VkDevice device);
     size_t LiveBufferCount() const { return m_liveBuffers.load(std::memory_order_acquire); }
     uint32_t BufferSlotHighWater() const
     {
@@ -162,19 +174,20 @@ public:
         return m_bufferSlotReuses.load(std::memory_order_acquire);
     }
 
-private:
-    template <typename T>
+  private:
+    friend class VulkanRecordingResources;
+    template<typename T>
     struct Slot
     {
-        T        entry{};
-        uint32_t generation{ 0 };
-        bool     alive{ false };
-        bool     owned{ false };
+        T entry{};
+        uint32_t generation{0};
+        bool alive{false};
+        bool owned{false};
+        std::shared_ptr<const void> m_lease;
     };
 
-    template <typename T>
-    static uint32_t Acquire(std::vector<Slot<T>>& slots, std::vector<uint32_t>& freeList,
-        const T& entry, bool owned)
+    template<typename T>
+    static uint32_t Acquire(std::vector<Slot<T>>& slots, std::vector<uint32_t>& freeList, const T& entry, bool owned)
     {
         uint32_t slot = 0;
         if (!freeList.empty())
@@ -190,6 +203,10 @@ private:
         }
 
         Slot<T>& target = slots[slot];
+        if (!target.m_lease || target.m_lease.use_count() != 1)
+        {
+            target.m_lease = std::make_shared<uint8_t>();
+        }
         target.entry = entry;
         target.alive = true;
         target.owned = owned;
@@ -227,6 +244,10 @@ private:
         }
 
         Slot<VulkanBufferEntry>& target = m_buffers[slot];
+        if (!target.m_lease || target.m_lease.use_count() != 1)
+        {
+            target.m_lease = std::make_shared<uint8_t>();
+        }
         target.entry = entry;
         target.alive = true;
         target.owned = owned;
@@ -238,6 +259,7 @@ private:
 
     VulkanBufferEntry ResolveBuffer(uint32_t id) const
     {
+        const std::lock_guard lock(m_bufferRegistryMutex);
         if (0 == id) return {};
         const uint32_t slot = RHIHandleBits::SlotOf(id);
         if (slot >= m_bufferHighWater.load(std::memory_order_acquire)) return {};
@@ -272,6 +294,9 @@ private:
     std::atomic<uint32_t> m_bufferHighWater{ 0 };
     std::atomic<uint32_t> m_liveBuffers{ 0 };
     std::atomic<uint64_t> m_bufferSlotReuses{ 0 };
+    std::vector<Slot<VulkanImageEntry>> m_pendingImages;
+    std::vector<Slot<VulkanBufferEntry>> m_pendingBuffers;
+    mutable std::mutex m_imageRegistryMutex;
     mutable std::mutex m_bufferRegistryMutex;
 };
 

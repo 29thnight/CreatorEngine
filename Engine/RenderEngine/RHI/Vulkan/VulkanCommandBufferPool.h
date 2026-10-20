@@ -1,11 +1,15 @@
 #pragma once
 #include "VulkanLoader.h"
+#include "VulkanFrameAllocators.h"
 #include "../RHIParallelCommandPool.h"
+#include "../RHIQueueContract.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
 
 class VulkanDeviceResources;
 class VulkanEncoder;
+class VulkanRecordingResources;
+class IRHICommandTranslator;
 
 /// 기록 구간마다 독립 VkCommandPool/VkCommandBuffer를 소유한다. 물리 스레드는
 /// 공용 job_scheduler가 소유하며, 구간 번호와 물리 워커 번호는 독립적이다.
@@ -26,6 +30,10 @@ public:
     uint32_t GetWorkerCount() const override { return m_workerCount; }
     void BeginFrame(uint32_t frameIndex) override;
     bool Prepare(std::string& outError) override;
+    bool CreateTranslationPool(std::shared_ptr<VulkanCommandBufferPool>& result, std::string& outError);
+    bool GetTranslationRecording(uint64_t& recordingId, uint64_t& descriptorVersion) const override;
+    std::shared_ptr<IRHICommandTranslator> GetTranslator(RHIQueueIdentity queue);
+    bool SupportsParallelTranslation() const override { return m_recordingResources != nullptr; }
     bool OpenWorker(uint32_t worker, std::string& outError) override;
     RHIEncoder& AcquireEncoder(uint32_t worker) override;
     bool CloseAll(std::string& outError) override;
@@ -66,6 +74,14 @@ private:
     uint32_t m_workerCount{ 0 };
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
+
+    std::shared_ptr<VulkanRecordingResources> m_recordingResources;
+    VulkanDescriptorPoolRecycler m_translationDescriptors;
+    std::vector<std::shared_ptr<VulkanCommandBufferPool>> m_translationPools;
+    uint64_t m_translationDescriptorRecording{};
+    std::shared_ptr<IRHICommandTranslator> m_translator;
+    RHIQueueIdentity m_translatorQueue;
+    RHIQueueIdentity m_translationQueue;
 
     std::atomic<uint32_t> m_encoderUnimplemented{ 0 };
     std::atomic<const char*> m_lastUnimplemented{ nullptr };

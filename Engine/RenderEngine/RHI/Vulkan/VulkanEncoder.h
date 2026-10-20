@@ -14,6 +14,12 @@ class VulkanResourceTable;
 class VulkanDescriptorPoolRecycler;
 class VulkanBindingTable;
 class VulkanSamplerTable;
+class VulkanRecordingResources;
+struct VulkanPipelineEntry;
+struct VulkanLayoutSlot;
+struct VulkanDescriptorRequirements;
+struct VulkanImageEntry;
+struct VulkanBufferEntry;
 
 // 커맨드 기록 — Vulkan (V8-a → 5c-4b 에서 상속).
 //
@@ -121,6 +127,7 @@ public:
         RHIMeshShaderCapabilities meshShaderCapabilities)
     {
         EndRenderTargets();
+        m_recordingResources = nullptr;
         m_commandBuffer = commandBuffer;
         m_pipelines = pipelines;
         m_resources = resources;
@@ -162,6 +169,7 @@ public:
     }
 
     bool UsesResources(const VulkanResourceTable* resources) const { return m_resources == resources; }
+    void SetRecordingResources(const VulkanRecordingResources* resources) { m_recordingResources = resources; }
 
     void ClearUnimplemented()
     {
@@ -321,6 +329,11 @@ private:
     ///
     /// ★ 바뀐 것이 없으면 아무것도 안 한다 — 이미 걸린 셋이 그대로 산다.
     ///   같은 바인딩으로 여러 번 그리는 흔한 경우에 셋을 다시 자르지 않는다.
+    VulkanPipelineEntry ResolvePipeline(RHIPipelineHandle handle) const;
+    VulkanLayoutSlot ResolveParam(RHIPipelineLayoutHandle handle, uint32_t parameter) const;
+    VulkanDescriptorRequirements ResolveDescriptorRequirements(RHIPipelineLayoutHandle handle) const;
+    VulkanImageEntry ResolveResource(RHITextureHandle handle) const;
+    VulkanBufferEntry ResolveResource(RHIBufferHandle handle) const;
     bool FlushDescriptors(RHIBindPoint bindPoint);
     bool IsPipelineBound(RHIBindPoint bindPoint, bool mesh = false) const;
 
@@ -370,7 +383,11 @@ private:
     RHIMeshShaderCapabilities m_meshShaderCapabilities;
     RHIPipelineHandle m_boundPipeline[2];
 
+    const VulkanRecordingResources* m_recordingResources{};
     std::vector<PendingBinding> m_pending[2];
+    std::vector<PendingBinding> m_resolvedBindingScratch;
+    std::vector<VkWriteDescriptorSet> m_descriptorWriteScratch;
+    std::vector<VkImageCopy> m_imageCopyScratch;
     bool m_descriptorsDirty[2]{ false, false };
 
     /// 이 command buffer가 기록한 이미지의 최신 layout. 병렬 기록에서는

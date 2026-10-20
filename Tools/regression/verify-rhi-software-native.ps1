@@ -50,12 +50,12 @@ try
     $graph = Get-SucceededCommand $rows 'dx12.rendergraph'
     $quit = Get-SucceededCommand $rows 'quit'
     if ($process.ExitCode -ne 0 -or $rows.Count -ne 2 -or $graph.passed -ne $true -or
-        $graph.log -notmatch 'RHI_SOFTWARE_NATIVE_OK commands=4 pixels=64 channels=4 staleRejected=true asynchronous=true frozenTargets=true uploadRollover=true poolReuse=true arenaRetirement=true gpuMergeReuse=true declarationMetadata=true parallelTranslation=true declarationPackets=true retainedBlackboard=true singleCopyPassUsages=true validationErrors=0')
+        $graph.log -notmatch 'RHI_SOFTWARE_NATIVE_OK commands=4 pixels=64 channels=4 staleRejected=true asynchronous=true frozenTargets=true uploadRollover=true poolReuse=true arenaRetirement=true gpuMergeReuse=true declarationMetadata=true parallelTranslation=true declarationPackets=true retainedBlackboard=true singleCopyPassUsages=true ownedQueue=true ownedPoolReuse=true multiqueueTimeline=true validationErrors=0')
     {
         throw 'Software RHI native output or full RenderGraph regression failed.'
     }
     @{passed=$true;normalExit=$true;nativeClearBarrierReadback=$true;fullRenderGraph=$true;
-        validation='gpu';asynchronousTranslation=$true;frozenTargets=$true;uploadRollover=$true;translationPoolReuse=$true;arenaRetirement=$true;gpuMergeReuse=$true;declarationMetadata=$true;parallelTranslation=$true;declarationPackets=$true;retainedBlackboard=$true;singleCopyPassUsages=$true;creatorRobotSoftwarePath=$false} | ConvertTo-Json | Set-Content "$out/result.json"
+        validation='gpu';asynchronousTranslation=$true;frozenTargets=$true;uploadRollover=$true;translationPoolReuse=$true;arenaRetirement=$true;gpuMergeReuse=$true;declarationMetadata=$true;parallelTranslation=$true;declarationPackets=$true;retainedBlackboard=$true;singleCopyPassUsages=$true;ownedQueue=$true;ownedPoolReuse=$true;multiqueueTimeline=$true;creatorRobotSoftwarePath=$false} | ConvertTo-Json | Set-Content "$out/result.json"
     $graph.log
 }
 finally

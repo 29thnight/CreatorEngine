@@ -1,0 +1,535 @@
+{
+  "schema_version": 1,
+  "subject": "Vulkan software RHI immutable recording, translation and retirement: exact production CPU contract evidence",
+  "recorded_utc": "2026-10-20T16:35:27.879924+00:00",
+  "base_commit": "088ea7b70c1a610e93fd2e0f6a2f35a2b9a5e175",
+  "worktree_changes_included": true,
+  "native_or_gpu_execution": false,
+  "conclusion": {
+    "status": "CPU contract PASS; native Vulkan/Windows acceptance remains unexecuted",
+    "normal_checks_passed": 393,
+    "asan_ubsan_checks_passed": 393,
+    "same_final_source_snapshot": true,
+    "verified_input_hash_count_per_run": 122,
+    "repository_input_count": 88,
+    "dependency_input_count": 34,
+    "verbatim_device_method_count": 6,
+    "disk_snapshot_mismatches_after_both_runs": 0,
+    "warm_snapshot_binding_operator_new_calls": 0,
+    "frame_or_native_speedup_claim": false
+  },
+  "reproduction": {
+    "working_directory": "repository root",
+    "normal_command": "python3 Tools/regression/verify-vulkan-software-commands.py --vulkan-headers /path/to/Vulkan-Headers --enkits /path/to/enkiTS --output /tmp/vulkan-software-normal.json",
+    "asan_ubsan_command": "python3 Tools/regression/verify-vulkan-software-commands.py --vulkan-headers /path/to/Vulkan-Headers --enkits /path/to/enkiTS --sanitize --output /tmp/vulkan-software-sanitized.json",
+    "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+    "compiler_standard": "C++23",
+    "runner_downloads_dependencies": false,
+    "actual_scheduler_workers": 8,
+    "translated_target_counts": [
+      1,
+      4,
+      8
+    ],
+    "sanitizer_note": "AddressSanitizer and UndefinedBehaviorSanitizer use -fno-sanitize-recover=all and halt_on_error=1. LeakSanitizer is disabled because the execution environment restricts /proc thread inspection. Explicit lease/weak-owner/retirement checks are not a process-wide leak scan.",
+    "dependencies": [
+      {
+        "name": "Vulkan-Headers",
+        "tag": "v1.3.290",
+        "git_verified_commit": "b379292b2ab6df5771ba9870d53cf8b2c9295daf",
+        "source_url": "https://github.com/KhronosGroup/Vulkan-Headers/tree/b379292b2ab6df5771ba9870d53cf8b2c9295daf",
+        "file_sha256": {
+          "include/vk_video/vulkan_video_codec_av1std.h": "f3ab53dbfdeb36a349f674656d50bd507f2e4b3c883343da74aace0df4f02a02",
+          "include/vk_video/vulkan_video_codec_av1std_decode.h": "96f923dc01cd3e266c081d88fa020525a20d63ffe4ce09a4c807a04ef3aaf97e",
+          "include/vk_video/vulkan_video_codec_h264std.h": "072ee6eac80e73d93bb4bfe0059f99e581fc8b55b1437236185bb4ff377914b1",
+          "include/vk_video/vulkan_video_codec_h264std_decode.h": "e1708b3996a740eeedb79f51d0f0e379f9bcae13566538375acaf73301023b58",
+          "include/vk_video/vulkan_video_codec_h264std_encode.h": "052a6e357be8d88bf4be0db1b3da5a9cc1a6011cf4b3533759ff588e1e26f9f1",
+          "include/vk_video/vulkan_video_codec_h265std.h": "0cbdfd6c45ee8ca902e9c961cd7e49a4d601d443ea0ef2a60a8496b127ed397c",
+          "include/vk_video/vulkan_video_codec_h265std_decode.h": "800946aa19d83d305d504e2e4141bc938f989e0cf8872cef97480238eefef1ea",
+          "include/vk_video/vulkan_video_codec_h265std_encode.h": "7239f9f4e811546639111e562a8be1ec73ad5bef1c23d5fad80889f35e125e9c",
+          "include/vk_video/vulkan_video_codecs_common.h": "78cf3c99d3d57afa7ab1782ec6018b4bcdbe273f2843d76e3375282db875b71e",
+          "include/vulkan/vk_icd.h": "6c80200a7fcc4c7da3170ef9dc674eab142c92767bfc9733c98649bce78aecb9",
+          "include/vulkan/vk_layer.h": "861cd0ea24c7d81b935e5726520d184dbbc00e571f9089e17a723ccbbc1944e2",
+          "include/vulkan/vk_platform.h": "c4cabbcf699c90cde344095ae54da9435d117951aad114ba3a540c5997d7906f",
+          "include/vulkan/vulkan.h": "52297513cc6b6cc8db2921aa849f72e3f55d678b3a58a2c3eb297c02ded7a837",
+          "include/vulkan/vulkan_android.h": "f815593b7d20f291850b8d85e21e3d47fb123932805ba3606df631bdff4cb1e7",
+          "include/vulkan/vulkan_beta.h": "fd7eaa882fb01dd0b798f3d11aeba0f20fc7de1b27dff50cae0a2b8ceb3ed373",
+          "include/vulkan/vulkan_core.h": "24b258dbfc5f177206fbffcf35f3a87cf756ee6f883167b92ecaeab16a5aa005",
+          "include/vulkan/vulkan_directfb.h": "dad1fe7c78d6d3113bc4416ee85530da221708bc2d505609e118115bf03b903f",
+          "include/vulkan/vulkan_fuchsia.h": "780e5d646ecc21e8884e8860be3c1afc0ac4aa165f5aaeca7cbd6238061d4a36",
+          "include/vulkan/vulkan_ggp.h": "fe67e4ff5d3442f4749096391a30bd4b7866f6ebf773739b06fe99a435013da5",
+          "include/vulkan/vulkan_ios.h": "341027604524623c7c8d9433b75d75e520f151fe691bd1bd92b212989391173b",
+          "include/vulkan/vulkan_macos.h": "5a2ac88f5ac809dab80a6353240302fac1d2fd7010eb377560996a12d392b030",
+          "include/vulkan/vulkan_metal.h": "ed0fb6ba231ec5e363487c062255667371914d7b79eb12eb39649bce0757b0d7",
+          "include/vulkan/vulkan_screen.h": "71bff61ec120bb60efdccf2fe7d40e64b52336232c32fbd85ae435ad23b43e54",
+          "include/vulkan/vulkan_vi.h": "73f34c7d87515ad6caf6d91bfad17d5d11959261f99386c14978ec7aba4d1f5a",
+          "include/vulkan/vulkan_wayland.h": "ebf1981d5b6cf3119f9945759e11f900918d911724bdd25ddf1706f1e323ac09",
+          "include/vulkan/vulkan_win32.h": "fa3a9263d1764b82b634180ec5d3010adc216108bae11c02b157f733073f87f8",
+          "include/vulkan/vulkan_xcb.h": "3d9c38165d2ffa24f585ae1b287ee89e32b54cc49bc28ac142f3ab92d00c8818",
+          "include/vulkan/vulkan_xlib.h": "e8878c1efe85ce965d3e5019c1ca48043671e1a782804c4ec68eb460d45f7042",
+          "include/vulkan/vulkan_xlib_xrandr.h": "b33d51ee2feb28890cb5b2db3cd4c8b0553553d81c71d6057ed91bb5029d844e"
+        }
+      },
+      {
+        "name": "enkiTS",
+        "requested_revision": "0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+        "revision_verification": "Dependency archive path is pinned; no .git metadata is present. The actual compiled and included files are identified by the SHA256 map below.",
+        "source_url": "https://github.com/dougbinks/enkiTS/tree/0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+        "file_sha256": {
+          "src/LockLessMultiReadPipe.h": "d346681dbdd7f6cadbc025341b9c41b14bde072496e9b9cd91677f57501d8eef",
+          "src/TaskScheduler.cpp": "84a886ace6ced064ec87764ed7c38df2084c0283e9540f91e109a3ff0f37112f",
+          "src/TaskScheduler.h": "b73962988486762da85bb837c7b1d38650696327ac4d89c7d9c7905a3374c22d",
+          "src/TaskScheduler_c.cpp": "3350850edfec28c1aa20851516a9c46c2ffd9d35a181502b5b20fe12f66b5761",
+          "src/TaskScheduler_c.h": "587bad327fe65ffa47211a1b8aac49e0af16ab783b79fcb0fffbb5a642374c35"
+        }
+      }
+    ]
+  },
+  "compiled_complete_production_cpp": [
+    "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.cpp",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanEncoder.cpp",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanResourceTable.cpp",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.cpp",
+    "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareBatch.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp",
+    "Engine/RenderEngine/RHI/RHISubmissionThread.cpp",
+    "Engine/RenderEngine/RHI/RHIDeviceMemoryBudgetCoordinator.cpp",
+    "Engine/RenderEngine/RenderArena.cpp",
+    "Engine/Utility_Framework/JobScheduler.cpp",
+    "Engine/Utility_Framework/ThreadPool.cpp"
+  ],
+  "compiled_external_cpp": [
+    "enkiTS/src/TaskScheduler.cpp"
+  ],
+  "compiled_verbatim_device_methods": {
+    "file": "Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp",
+    "method_sha256": {
+      "Initialize": "3ef2e4d096a07da141b3f8e8a5a0bc931d2de3fefa0b25127a415e613a3d06b7",
+      "Shutdown": "937c73ec741ee06bb7b7ef78ffaaddb5eb29f474175bd88d10c77ce1c762d459",
+      "PrepareParallelSubmission": "29c20b5c0bde09733209ef34ecf602c9f0601ae122986a52e61398c53a055350",
+      "AcceptParallelSubmission": "6e60944fc6328dd0bdd415d3d45fb9e26042814c491ee1a0b9983d7fd9fa8cfc",
+      "RejectNeverEnqueuedRecording": "ec80992b8dfd142da1b5fd7121ba311d02650d3b015064a8fc3b002784dd6eb7",
+      "SubmitParallelCommandBuffers": "c3c49408ff7fe13bcc0987f775a22aa7e30fa33cb8fabac05e0b85694645e894"
+    },
+    "note": "These six complete method bodies are extracted unchanged into the fixture translation unit. The remainder of VulkanDeviceResources.cpp is not compiled by this gate."
+  },
+  "product_wiring_static_review_only": {
+    "file": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+    "region": "VulkanLivePipeline",
+    "path": "CREATOR_RHI_SOFTWARE_COMMANDS=1 selects RecordSoftware, frozen Vulkan pool capture, identity-validated translator and the shared RHI submission FIFO.",
+    "note": "This renderer translation unit is not compiled or executed by the CPU fixture. Its final source identity is supplied by the PR commit, not by the tested input map below."
+  },
+  "test_boundary": {
+    "summary": "Compile and exercise Vulkan software recording against the official SDK ABI.\n\nThe Vulkan command pool, recording snapshot, validator, encoder, upload/descriptor\nallocators, resource/pipeline registries, common recorder/translator/FIFO and\nJobScheduler/enkiTS are the actual source. Vulkan function pointers are CPU mocks;\nthis does not run a Vulkan device or validate rendered pixels. A mirrored header\nexcludes unrelated texture-cache declarations/COM and trailing mesh declarations.\nOne pre-existing GCC aggregate assignment is spelled with its explicit type in\nthat mirror. Windows handle/environment/debug calls and the Win32 profiler's\nthread-name registration are mock boundaries. Device Initialize/Shutdown and\nadmission/submit bodies are exact; physical-device creation, WSI, prefix flush,\nmemory-budget refresh and lifecycle-idle proof are mocks. Completion advances\nonly when the fixture explicitly advances its fake fence. The mimalloc boundary\nuses libc allocation; the warm snapshot counter observes standard operator new.\nProduction is never edited, and neither renderer execution nor pixels are tested.",
+    "mirror_adaptations": {
+      "Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.h": "Exclude unrelated trailing VulkanTextureCache and its COM-dependent header; complete device class unchanged.",
+      "Engine/RenderEngine/RHI/IRenderDeviceServices.h": "Exclude trailing mesh declarations and their two Assets includes; complete service interface unchanged.",
+      "Engine/EngineDiagnostics/ProfileService.h": "No-op Win32 profiler thread-name registration boundary only; CE_SHIPPING removes profile events.",
+      "Engine/RenderEngine/RHI/RHIGraphicsPipelineRequest.h": "GCC compatibility spelling of pre-existing aggregate assignment; no Vulkan changed body adapted."
+    },
+    "platform_shims": [
+      "windows.h supplies handle typedefs, 32-bit DWORD, GetEnvironmentVariableA returning zero, and OutputDebugStringA no-op.",
+      "The mimalloc API boundary uses libc malloc/posix_memalign/free. Production allocator source is compiled, but this is not the Windows mimalloc implementation.",
+      "Official Vulkan SDK function-pointer types are installed with fixture CPU implementations; no Vulkan loader, driver or real device is used."
+    ],
+    "device_mock_endpoints": [
+      "CreateInstance / PickPhysicalDevice / CreateDevice / CreateFrameResources: assign fixture native identities instead of creating Vulkan objects.",
+      "DestroySwapChain: no-op WSI boundary.",
+      "RefreshUploadBudget / RefreshPersistentMemoryBudgets: no-op budget discovery boundary.",
+      "FlushCommandList: successful fixture upload-prefix boundary; no GPU upload submission is executed.",
+      "GetCompletedFenceValue: returns the explicitly controlled fixture completion counter.",
+      "DrainForLifecycle: mock proof of GPU idle; real resize, device-loss and shutdown-idle behavior is not tested.",
+      "AccumulateEncoderDiagnostics: no-op product diagnostics aggregation boundary; native encoder drops are asserted directly.",
+      "Destructor: test boundary; explicit production Shutdown body is executed.",
+      "Other uncalled virtual device/WSI endpoints throw on unexpected use."
+    ],
+    "shipping_configuration": [
+      "CE_CONTRACT_STANDALONE=1",
+      "CE_SHIPPING=1",
+      "CE_DX_TIMING_CAPTURE=0"
+    ],
+    "not_executed": [
+      "Windows MSVC product build and full renderer translation unit",
+      "Vulkan driver/device/validation layer execution or rendered pixels",
+      "Real GPU fence progress, WSI/resize/reload/device loss or device shutdown idle",
+      "Native upload-prefix submission and physical memory-budget discovery",
+      "Nonshipping CPU event/capture context runtime",
+      "Whole-frame performance or the cost of a full-scene immutable metadata snapshot"
+    ]
+  },
+  "functional_coverage": [
+    {
+      "probe": "verify_device_incarnations",
+      "contracts": [
+        "Two distinct device Initialize calls produce different queue identities.",
+        "Shutdown invalidates identity; reinitialization obtains a new incarnation.",
+        "Initialize and Shutdown production bodies execute with explicit native creation/idle mocks."
+      ]
+    },
+    {
+      "probe": "verify_validator",
+      "contracts": [
+        "Unsupported bool commands reject without command append.",
+        "Indirect ranges/alignment, raster state, viewport finite/device limits, scissor overflow and mesh dispatch limits.",
+        "Graphics then compute then graphics operations retain the correct pipeline for each bind point.",
+        "Successful recorded operations replay through the actual native VulkanEncoder with matching bool and drop behavior."
+      ]
+    },
+    {
+      "probe": "verify_snapshot_and_leases",
+      "contracts": [
+        "Image/buffer/pipeline/upload/partial RT view native leases survive mutable owner reset, release, pipeline invalidation and completed fences.",
+        "Binding metadata, cube-view key and native handles remain immutable; incompatible cube requests do not destroy the pinned view.",
+        "Sealed recording rejects further uploads, and pinned old upload storage cannot be reused.",
+        "Destruction occurs after the corresponding snapshot lease is released."
+      ]
+    },
+    {
+      "probe": "verify_descriptor_budget",
+      "contracts": [
+        "Live and frozen recyclers share one device budget.",
+        "Native pool create failure rolls back credit; retry succeeds.",
+        "Exact cap succeeds, excess private pool rejects, and shutdown returns credits."
+      ]
+    },
+    {
+      "probe": "verify_warm_storage",
+      "contracts": [
+        "128 warmed binding Reset/Add and immutable Capture/Reset iterations preserve retained storage without standard operator-new calls."
+      ]
+    },
+    {
+      "probe": "verify_translation_and_submission",
+      "contracts": [
+        "Actual RHISoftwareRecorder, Vulkan frozen pool, common RHI FIFO, translator, JobScheduler and enkiTS execute with 1, 4 and 8 targets.",
+        "300 plus target-index dispatch commands per target retain reverse target submission order and target-local counts.",
+        "Replay is paused deterministically while the owner advances its recording, resets binding/RT tables and releases live resource handles.",
+        "CPU completion retains graph lifetime and pool leases until the explicitly advanced mock GPU fence retires.",
+        "Pending pools cannot be reused; an exclusively owned completed pool is reused."
+      ]
+    },
+    {
+      "probe": "verify_fork_and_descriptor_failure",
+      "contracts": [
+        "Cold private descriptor initialization failure publishes no partial frozen pool, leaks no budget credit and remains retryable.",
+        "Foreign device queues and stale incarnations reject.",
+        "A previously held translator fails before native target open when the device identity changes even if live upload/descriptor numbers remain identical; frozen-invalid state cannot fall back to live IDs.",
+        "Descriptor allocation failure emits no native dispatch and surfaces an encoder diagnostic."
+      ]
+    },
+    {
+      "probe": "verify_last_segment_error",
+      "contracts": [
+        "An unsupported final CopyTexture void command fails translation rather than becoming a successful empty last segment."
+      ]
+    },
+    {
+      "probe": "verify_software_timestamps",
+      "contracts": [
+        "Software recording appends two query commands without native timestamp calls.",
+        "Replay invokes the native Vulkan timestamp boundary, resets the paired queries and writes begin/end timestamps.",
+        "The query pool is released after the fixture closes the native target; real GPU profiler results are not sampled."
+      ]
+    }
+  ],
+  "allocation_measurement": {
+    "probe": "verify_warm_storage",
+    "warmup_iterations": 1,
+    "measured_iterations": 128,
+    "measured_operations_per_iteration": [
+      "VulkanBindingTable::Reset",
+      "VulkanBindingTable::Add of one buffer view",
+      "VulkanRecordingResources::Capture",
+      "VulkanRecordingResources::Reset"
+    ],
+    "standard_operator_new_calls": 0,
+    "scope": "Counts standard operator new after the initial snapshot/binding warmup in this small fixed fixture. Includes standard container/control-block allocations on that path; does not count native Vulkan driver allocations or libc-backed mimalloc calls.",
+    "not_claimed": [
+      "Zero allocation for an entire software RHI frame",
+      "Zero cold/high-water allocation",
+      "Windows mimalloc or driver allocation counts",
+      "A measured native/frame time reduction"
+    ]
+  },
+  "implementation_scope_limits": [
+    "The existing Vulkan product graphics-pool route is wired to software recording and asynchronous translation. Vulkan still has no native owned/multiqueue IRHICommandQueueFactory backend; the generic adapter cannot create a backend that does not exist.",
+    "Existing unsupported native commands remain explicit rejection or translation failure. This change does not implement attachment-free raster, mesh indirect batches, ClearRenderTargetRect, CopyTexture, or CopyPartialToReadback on Vulkan.",
+    "Software capture timestamps replay through Vulkan native query calls, but an existing missing live calibrated Vulkan timing producer is not implemented here.",
+    "Native driver, GPU, Windows lifecycle and pixel acceptance remain unexecuted and must not be inferred from this CPU contract gate."
+  ],
+  "runs": [
+    {
+      "name": "normal",
+      "runner_command": [
+        "python3",
+        "Tools/regression/verify-vulkan-software-commands.py",
+        "--vulkan-headers",
+        "/tmp/creator-vulkan-headers-1.3.290",
+        "--enkits",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+        "--output",
+        "/tmp/creator-vulkan-software-check/normal-final.json",
+        "--keep-build",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final"
+      ],
+      "compiler_command": [
+        "/usr/bin/g++",
+        "-std=c++23",
+        "-O1",
+        "-g",
+        "-pthread",
+        "-DCE_CONTRACT_STANDALONE=1",
+        "-DCE_SHIPPING=1",
+        "-DCE_DX_TIMING_CAPTURE=0",
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+        "-Wno-missing-field-initializers",
+        "-Wno-unknown-pragmas",
+        "-I",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/include",
+        "-I",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror",
+        "-I",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/Utility_Framework",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Tools/regression/vulkan_software_commands_probe.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanEncoder.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanResourceTable.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHISoftwareBatch.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHISubmissionThread.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RHI/RHIDeviceMemoryBudgetCoordinator.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/RenderEngine/RenderArena.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/Utility_Framework/JobScheduler.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/mirror/Engine/Utility_Framework/ThreadPool.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/include/enkiTS/TaskScheduler.cpp",
+        "-o",
+        "/tmp/creator-vulkan-software-check/build-telemetry-final/vulkan-software"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0,
+      "compile_log_bytes": 0,
+      "compile_warning_count": 0,
+      "binary_sha256": "7aa61017dc5c03b1d8498fb92c70149592f15bcba2d076bb17a1836514c67e78",
+      "raw_result_json_sha256": "e2fe11d82297856f22cf6d51b837b7ffb089407304bad2ce441273237643dbf7",
+      "run_log_sha256": "a42b650eb8e4faa27a7c705a616b81a65175dc421843091b9a66b007c5db6277",
+      "result": {
+        "checks": 393,
+        "warm_snapshot_binding_heap_allocations": 0,
+        "native_gpu_executed": false,
+        "actual_scheduler_workers": 8,
+        "translated_target_counts": [
+          1,
+          4,
+          8
+        ],
+        "native_api_boundary": "mock"
+      },
+      "source_unchanged_after_execution": true,
+      "sanitizer_environment": {}
+    },
+    {
+      "name": "asan_ubsan",
+      "runner_command": [
+        "python3",
+        "Tools/regression/verify-vulkan-software-commands.py",
+        "--vulkan-headers",
+        "/tmp/creator-vulkan-headers-1.3.290",
+        "--enkits",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+        "--sanitize",
+        "--output",
+        "/tmp/creator-vulkan-software-check/asan-final.json",
+        "--keep-build",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final"
+      ],
+      "compiler_command": [
+        "/usr/bin/g++",
+        "-std=c++23",
+        "-O1",
+        "-g",
+        "-pthread",
+        "-DCE_CONTRACT_STANDALONE=1",
+        "-DCE_SHIPPING=1",
+        "-DCE_DX_TIMING_CAPTURE=0",
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-parameter",
+        "-Wno-missing-field-initializers",
+        "-Wno-unknown-pragmas",
+        "-I",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/include",
+        "-I",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror",
+        "-I",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/Utility_Framework",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Tools/regression/vulkan_software_commands_probe.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanEncoder.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanResourceTable.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHISoftwareBatch.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHISubmissionThread.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RHI/RHIDeviceMemoryBudgetCoordinator.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/RenderEngine/RenderArena.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/Utility_Framework/JobScheduler.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/mirror/Engine/Utility_Framework/ThreadPool.cpp",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/include/enkiTS/TaskScheduler.cpp",
+        "-o",
+        "/tmp/creator-vulkan-software-check/build-telemetry-asan-final/vulkan-software",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-fno-sanitize-recover=all"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0,
+      "compile_log_bytes": 0,
+      "compile_warning_count": 0,
+      "binary_sha256": "93c93c3b5ed2e58458c6d91751146986575ecae21cb9912779c86873a2370598",
+      "raw_result_json_sha256": "79556be6b9d105bf0762a528918e1daa481efe117a10d356e96490308578cd0a",
+      "run_log_sha256": "a42b650eb8e4faa27a7c705a616b81a65175dc421843091b9a66b007c5db6277",
+      "result": {
+        "checks": 393,
+        "warm_snapshot_binding_heap_allocations": 0,
+        "native_gpu_executed": false,
+        "actual_scheduler_workers": 8,
+        "translated_target_counts": [
+          1,
+          4,
+          8
+        ],
+        "native_api_boundary": "mock"
+      },
+      "source_unchanged_after_execution": true,
+      "sanitizer_environment": {
+        "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      }
+    }
+  ],
+  "source_identity": {
+    "policy": "Original source/probe/runner and dependency bytes are captured once, compiled from an immutable temporary mirror with the explicitly listed boundary adaptations, and checked byte-identical on disk after each run. Both runs share the exact input map. The following repository hashes refer to original bytes before adaptation.",
+    "probe_sha256": "f1d57eb838894e34b43fea794c1500b84ef9c18aaa307217090406697d9a9d9f",
+    "runner_sha256": "d2a93f382b88a78502d7e34d6469161af8e2549cdf6595345dfb57e547748b68",
+    "repository_sha256": {
+      "Engine/RenderEngine/RHI/Vulkan/VulkanCaptureGpuProfiler.h": "4fcacd30a32cbcae79607a2e71646c313d55eb668c8904bcc722a5eac20f83c3",
+      "Engine/Utility_Framework/StandardLibrary.h": "103811f4e6208c3ef680acb559d51ed394af5a879f469ba6282fd2e66dc5fd5a",
+      "Engine/RenderEngine/RHI/RHIProfilingContext.h": "b2c5d697b3e6d5489166a2a9b9f4b84d27d3a9cc845941cf79ac2064c32ce078",
+      "Engine/EngineDiagnostics/ProfileRhiContext.h": "e202178f2565fa520d1711870f2f43ad57d3c4c86d1759fe9dd434e97a10112d",
+      "Engine/RenderEngine/RHI/RHICommandProvenance.h": "5cc2be663b249bd81fb6e9f2bd5d6621341d475fd57da226a78e3a1c55787b54",
+      "Engine/RenderEngine/RHI/RHIQueueContract.h": "c6cae490ac251515651f38566a6d1fdbefaf368c0bc6d28f00944d0d9e5d407a",
+      "Engine/RenderEngine/RHI/RHICommandFailure.h": "9ee5b8e61235c9a69b9ab4587f530f8718df1646ac882637e1aae7d110feb9a0",
+      "Engine/RenderEngine/RHI/RHISoftwareBatch.h": "f5d6fab74f3fee88e05140d573a82564318410d14aa77817d3515d84b566d279",
+      "Engine/RenderEngine/RHI/RHIRecordedBatch.h": "c9d6156b3aa9d2b30bd4fca17576de1e8f14058fa1aba6846c25a9aaf3c7c9a1",
+      "Engine/EngineDiagnostics/DxCaptureSubmission.h": "d9ed1f26cc970105f566cf40018b4132afdaa746439a617d15ff094f679ae825",
+      "Engine/EngineDiagnostics/DxCaptureProtocol.h": "2fcf81e2c2942accf175b94109801734ec84f5fc57d1434c488478fae2883646",
+      "Engine/RenderEngine/RHI/RHIResourceTypes.h": "0a04c270894407305f95a9caaa4dbb2128a869048307996ff506db5bd201d61d",
+      "Engine/RenderEngine/RHI/RHIResourceState.h": "fbcdfe40ee54f490f922ea8a05444536a522c8294463f564088812b0e6201ccb",
+      "Engine/RenderEngine/RHI/RHIHandle.h": "756860eb0312c36215e7e352ec66d087d730312816050f2b1fd0a46978e3a8a8",
+      "Engine/RenderEngine/RHI/RHIFormat.h": "63a1bdb25452db3ca4fc0ffe5ec9b8892d2f60beac29a6cccac8d9bb62f710fd",
+      "Engine/RenderEngine/RHI/RHISoftwareEncoder.h": "7e86b95f1f985d3bbf2317e0c1504d15afa34b9d135f4ea9f0140beb918045ec",
+      "Engine/RenderEngine/RHI/RHISoftwareCommandList.h": "25baf52afe11bd13ae059049111fa5b607e9b10afabcc2d9f4ee44c3e825b775",
+      "Engine/RenderEngine/RenderArena.h": "d6cfdb6b071a11cdf9194704d0825061b6bb9c6b4683d6e17ef7326bc51804c6",
+      "Engine/RenderEngine/RenderAllocator.h": "3eed71244cea313c115b44abea65e22e5ca43b89fe8826f089a691daa9ede631",
+      "ThirdParty/mimalloc/include/mimalloc.h": "8ec1bff9902bab6682e3ecbf7613ccc915e082ca743fdd0c396d3954323fe8bf",
+      "Engine/RenderEngine/RHI/RHISoftwareCommandTypes.h": "ddc064b2bc008fd1decfed321afb2d0aaf3d30dadc5b9446537e2e18268e3d17",
+      "Engine/RenderEngine/RHI/RHIEncoder.h": "a38885ce9a1b5dc8dfdb708dc25588a6d0d1a840c7e826cb81877a9a25ff6300",
+      "Engine/RenderEngine/RHI/IRHIGpuProfiler.h": "1568966785e5b2f664cb11eaab8d15dd3872f9f3f6b24d4879d7f41131312d29",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanEncoder.h": "384056e960bf630d8b8b1c0810dbe0c25d8a0b661187a38c4b0e53566dfb7623",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanRenderTargetTable.h": "df11e5fda870b9a6ee0d7745fbfc4223d6c2fd4b36455c100677d9efeae2ec96",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanLoader.h": "437470148c07eabf0d3e44d3545478e92854e90e646d4f4451c24ef70d8c7ae6",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.h": "e742198bac0f8f4214d535de7aab1ab73e45c7ce8aa85d2e68c09d04f16dcfb2",
+      "Engine/RenderEngine/RHI/RHISubmissionThread.h": "634b29cf9781c13f4d980f61bcc36f22db216adc99f4303a91870565e60e382c",
+      "Engine/RenderEngine/RHI/RHIDeviceMemoryBudgetCoordinator.h": "b4e4d87c457c2afa9c4c455cd27002271d2aa714d908734374466c53851ee66c",
+      "Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h": "1324d85e07bda0fe24e588458f9dd9ed9c28f37c8d38db7b41fd4ec99671301d",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.h": "9bd461ba6fcae9ea58a35b8bf0da79cce4003d5cf133f86c6df0b4907d7b9071",
+      "Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h": "dd9193fabf19733dad1a95ee2174b1d291bd533a698635b9dc4782b6ff739b3f",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanDescriptorLayout.h": "2e2f56a5e9da58084a4ab5d1e09dead0c6c6aede7a67c5f03571f80cff5402c1",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanResourceTable.h": "fb9fd4e5770096df2994d3e3cca481bbe88b77a7a9e64c10fe8c03ea8f858523",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanBindingTable.h": "a74f8192d8878c205ef8e0623651a3f9fb00fce547046cbb202fce87ac2fb449",
+      "Engine/RenderEngine/RHI/RHIPipelineLayout.h": "fbc95bd59d4c084bb54d54d99d763b6041693d0e7170d105e90322e8efaa75af",
+      "Engine/RenderEngine/RHI/RHIAssetEvictionPolicy.h": "4d60417110d6583450bc740f82b76a743567b63214ec2bb2724b3a16559a6eff",
+      "Engine/RenderEngine/RHI/IRenderDeviceServices.h": "64f50f6dc05dc49eca909d889080025f6b147b745fb87966eee1a4287d8e1e1f",
+      "Engine/RenderEngine/RHI/RHITransientHeap.h": "ea40110fd1b0a7f70c65667d28035dd4c82a1324502583212251be858d0586cb",
+      "Engine/RenderEngine/Render/Temporal/TemporalReconstruction.h": "3fee4da00ac98bd9b07354531903c79dc7d04650529cbfa9a1ac64f43e2230d4",
+      "Engine/RenderEngine/RHI/IRHIDeviceResources.h": "6f04e1f750f423834b0d2e4ea4004a4ae2e234447ec0398ca088a1aff0da9a21",
+      "Tools/regression/vulkan_software_commands_probe.cpp": "f1d57eb838894e34b43fea794c1500b84ef9c18aaa307217090406697d9a9d9f",
+      "Engine/RenderEngine/RHI/IRHICommandTranslator.h": "351562f85a66d14e951f80ce2e181230c7cc6e476578d471c978c547006f539d",
+      "Engine/RenderEngine/RHI/RHISoftwareRecorder.h": "9b6409ef4c00649a8d02b184424dbf6db45bfac4e7fe27ec9955b237a3571fb7",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.h": "38877871050ab50a4454cb814da5c286a50da837b30717796823174cde8877e6",
+      "Engine/RenderEngine/RHI/RHIParallelCommandPool.h": "7899302e72c99ef86506872dcb866b63066e3565da10460be2c87b6d1a58d389",
+      "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h": "459de735e4b2027de6caff8d956198bd92873f4d0947d9951628bfaa278e1ed1",
+      "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h": "7f6ea7cc8c1bab9d906e06aae3d2c03dafb94756054a697ba610af80141637e9",
+      "Engine/Utility_Framework/JobScheduler.h": "22382a44d69ab02bb1a4e3373af1fd5a24799d3a93660ada6576a4a6b2e70c7a",
+      "Engine/Utility_Framework/JobGraph.h": "6f36d49d401ca096b1db8e9ea93c933d153857660b0a8b7b6cbab269e56600e0",
+      "Engine/Utility_Framework/ThreadPool.h": "e412cc9b6ee695c98bab3b6370928bdf61dc92a9905b5ddd06354e532b7628f1",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.h": "ae5500ecfff1496d419989acbaf0ae613f8ff3f1dab11b52f602fb755d625c7c",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.h": "cb843516d36ba16904cf15a01b41121172220eb7c23f61dd762085d5761c013f",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h": "3fb0c22e1bc530a170dbc4ef5287ac8d74e7a4131332b33e2b7fbf0e965c62bb",
+      "Engine/RenderEngine/RHI/IRenderPipelineCache.h": "d60e5086d4584b729ba7e37ae75198fa939e4645acb51c9a5ec627723c3cd8f9",
+      "Engine/RenderEngine/RHI/RHIPipelineState.h": "7c396a5da7cc95802009dedbd5f6fe7b95a821fe5363e3053f1adf1a0a726b89",
+      "Engine/RenderEngine/RHI/RHICompletionRetireQueue.h": "53c8005904bb3bcb89710aa71da6e77564db13c6aba01156d45726512e40c762",
+      "Engine/Utility_Framework/ThreadPool.cpp": "6cc3d9e0acc9c42b4a03dcbe3a1079b9a163833f75cd19e5b0591269c2df5a5b",
+      "Engine/Utility_Framework/JobScheduler.cpp": "f972c1c3f7b3753ab376d6fb4ebf6be2f0f7b34c7c25acc6ca708efad27fc2e2",
+      "Engine/RenderEngine/RenderArena.cpp": "a4efb38e96d31d350486fc08c3a4d3e6d35a3df38f561b57cfe290ad40853b33",
+      "Engine/RenderEngine/RHI/RHIDeviceMemoryBudgetCoordinator.cpp": "6ac5cab3437a2432b1d70ecbd5c4789c0ceed72574cd47a228b5298d5a2595ad",
+      "Engine/RenderEngine/RHI/RHISubmissionThread.cpp": "89d50bde0ba7d1014a37717527464f8c3a83aed8f52aaeed0bd728f1bd12fb0f",
+      "Engine/EngineDiagnostics/ProfileScope.h": "53544f76283bbde9f6f321285df4202fadf7c54cd8771972becf578dae364b35",
+      "Engine/EngineDiagnostics/ProfileService.h": "dc95ac9376da3ca725b46304d125e46099cd92485a99588efcd8754d75c6a6f7",
+      "Engine/EngineDiagnostics/ProfileThreadStream.h": "f8db066d695988ed3726ea6aff4f6d0fbe3d16c25a97eb7f580637a14d52d24c",
+      "Engine/EngineDiagnostics/ProfileEvent.h": "d8f808d4fc7528dc908fd80b53b21b2c95082fab2760388b02ff6a530a18f00c",
+      "Engine/EngineDiagnostics/ProfileRenderMeasurement.h": "339ec2c7f42e2347d9865c7be051f7e501af81719165bdf49de974e0a1344fb3",
+      "Engine/EngineDiagnostics/ProfileMarker.h": "95c7859e5abe5a0aed130158c94a56cb086eddcb8f10ea8f4fca3dc4dd8c577f",
+      "Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp": "c270a189c112254cd9802723c74b28cd50246d014315052a2a7ffa49f43d7c5a",
+      "Engine/RenderEngine/RHI/RHISoftwareBatch.cpp": "38079daca2f4860804f8dbc54d591d0989b59c26f1d74c507db1a7130a7d73b4",
+      "Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp": "b8d36223f377d944a820dfe9105a0b9394cd41eece56a7435dc0359d6f4fb572",
+      "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp": "a636a3653bed6e45028f030985f1fbc5d146cde9e9ebaf424239f6cd4d519ffa",
+      "Engine/RenderEngine/RHI/RHICommandTranslator.cpp": "a9d484c0e379df237909d68413f10d88a32c6898fe5adbe1dc6b84227716153e",
+      "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h": "16c3b98360a5a8622336f978215d6c146d4205f4397b90ae978c7c1ebf826dc6",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.cpp": "dbd0fac2de38f47a59ace1714a620f0a3809912433ebb75fccf1ef8c7bca411f",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanBindingModel.h": "bb2e6a09ee845832e3f09557a6b82ca836a58e598116035e46297c621ca4116c",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanFormat.h": "7216e4e431f6a4b042ce8420d221ca9e44efe33dd8938e40495a1863781619fb",
+      "Engine/RenderEngine/RHI/RHIGraphicsPipelineRequest.h": "12e92ac2a20ff5502381c573622e5c400e1d9595cea0756354b8c57d60b70e2e",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanResourceTable.cpp": "e56ea278bd0568ed46a1e953a23042b0a48ad05a96f74a22d0ddc395aa874044",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanResourceState.h": "b80e4cc51c52fb9a9431ee9e26f98acee2c6c35fdb27eb59fab777285b1e3bd7",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp": "c574bb2ca1e4b0a949d4ea41b3eee04815d993baa977b61bdea684cc72f5bf11",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp": "62238dba966f5e550376fa36347c530923667ee32e1e47a86f99c42d0aebbd05",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanCommandTranslator.h": "506ad5d29e8f0cd92e839c2acca352467a888b020292c0117b5bed55d6b100a8",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanEncoder.cpp": "08f1c2a3cd9530c5831c0cc9db0748788e5570f9514a74ab88938dc10ea1a760",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.cpp": "d6e3e07899e424a0bc98e7830d36748f542042fa686e21015ffe671bb5f7b58c",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp": "8a017d9f35918cd2608fcef35870460b3a5419356c897e1646938bc44b917adb",
+      "Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp": "984ccb4928b9ede8998dc35b1084a22acd5a4093107dc701bf13909be888894c",
+      "Tools/regression/verify-vulkan-software-commands.py": "d2a93f382b88a78502d7e34d6469161af8e2549cdf6595345dfb57e547748b68"
+    },
+    "device_body_sha256": {
+      "Initialize": "3ef2e4d096a07da141b3f8e8a5a0bc931d2de3fefa0b25127a415e613a3d06b7",
+      "Shutdown": "937c73ec741ee06bb7b7ef78ffaaddb5eb29f474175bd88d10c77ce1c762d459",
+      "PrepareParallelSubmission": "29c20b5c0bde09733209ef34ecf602c9f0601ae122986a52e61398c53a055350",
+      "AcceptParallelSubmission": "6e60944fc6328dd0bdd415d3d45fb9e26042814c491ee1a0b9983d7fd9fa8cfc",
+      "RejectNeverEnqueuedRecording": "ec80992b8dfd142da1b5fd7121ba311d02650d3b015064a8fc3b002784dd6eb7",
+      "SubmitParallelCommandBuffers": "c3c49408ff7fe13bcc0987f775a22aa7e30fa33cb8fabac05e0b85694645e894"
+    }
+  },
+  "telemetry_note": "This shipping Vulkan boundary gate was rerun against the final RHI failure/profiling headers. CE_SHIPPING=0 producer/codec identity validation is separately reported in RHISoftwareCompletion20261021-telemetry.json; this gate does not claim native query readback or live calibrated GPU timing."
+}

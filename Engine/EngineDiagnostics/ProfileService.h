@@ -180,7 +180,7 @@ namespace ce
 
         // --- 기록 --------------------------------------------------------
         // hot path. 상태가 recording 이 아니면 곧바로 돌아온다.
-        void begin_scope(marker_id id, const cpu_span_context& cpu = {});
+        void begin_scope(marker_id id, const cpu_span_context& cpu = {}, const profile_rhi_context* rhi = nullptr);
         void end_scope();
 
         // Owner-thread safe point: publish this producer's tail without creating

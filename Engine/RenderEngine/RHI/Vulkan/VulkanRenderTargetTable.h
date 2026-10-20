@@ -109,7 +109,15 @@ public:
     void Own(VkImageView view)
     {
         const std::lock_guard lock(m_mutex);
-        if (VK_NULL_HANDLE != view) m_ownedViews.push_back(view);
+        if (VK_NULL_HANDLE != view)
+        {
+            if (!m_ownedViews)
+            {
+                m_ownedViews = std::make_shared<OwnedViews>();
+                m_viewOwners.push_back(m_ownedViews);
+            }
+            m_ownedViews->m_views.push_back(view);
+        }
     }
 
     /// 프레임 시작에 비운다.
@@ -120,29 +128,47 @@ public:
     void Reset(VkDevice device)
     {
         const std::lock_guard lock(m_mutex);
-        if (VK_NULL_HANDLE != device)
+        m_ownedViews.reset();
+        for (auto& owner : m_viewOwners)
         {
-            // ★ 이름을 한정한다. 진입점이 `VulkanApi` 안에 있고, 헤더에서
-            //   `using namespace` 를 하면 이 헤더를 무는 모든 번역 단위에
-            //   그것이 샌다 — 유니티 빌드에서 특히 조용히 번진다.
-            for (VkImageView view : m_ownedViews)
+            if (owner.use_count() == 1)
             {
-                VulkanApi::vkDestroyImageView(device, view, nullptr);
+                owner->Reset(device);
+                if (!m_ownedViews)
+                {
+                    m_ownedViews = owner;
+                }
             }
         }
-        m_ownedViews.clear();
         m_bindings.clear();
     }
 
     size_t OwnedViewCount() const
     {
         const std::lock_guard lock(m_mutex);
-        return m_ownedViews.size();
+        return m_ownedViews ? m_ownedViews->m_views.size() : 0;
     }
 
 private:
+  friend class VulkanRecordingResources;
+  struct OwnedViews
+  {
+      std::vector<VkImageView> m_views;
+      void Reset(VkDevice device)
+      {
+          if (VK_NULL_HANDLE != device)
+          {
+              for (VkImageView view : m_views)
+              {
+                  VulkanApi::vkDestroyImageView(device, view, nullptr);
+              }
+          }
+          m_views.clear();
+      }
+  };
     std::vector<VulkanRenderTargetBinding> m_bindings;
-    std::vector<VkImageView>               m_ownedViews;
+    std::shared_ptr<OwnedViews> m_ownedViews;
+    std::vector<std::shared_ptr<OwnedViews>> m_viewOwners;
     mutable std::mutex                     m_mutex;
 };
 

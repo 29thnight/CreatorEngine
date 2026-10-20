@@ -267,6 +267,17 @@ namespace EngineBootstrap
                  gpu.generation = origin.captureGeneration;
                  gpu.submission_id = origin.fullSubmissionId;
                  gpu.provenance = ProfileRenderProvenance(origin.temporalProvenance);
+                 const auto& rhi = origin.rhi;
+                 gpu.rhi.recording_id = rhi.recordingId;
+                 gpu.rhi.source_engine_frame = rhi.sourceEngineFrame;
+                 gpu.rhi.source_engine_frame_available = rhi.sourceEngineFrameAvailable;
+                 gpu.rhi.frame_id = rhi.frameId;
+                 gpu.rhi.view_id = rhi.renderViewId;
+                 gpu.rhi.device_incarnation = rhi.queue.deviceGeneration;
+                 gpu.rhi.queue_id = rhi.queue.queueId;
+                 gpu.rhi.queue_kind = static_cast<std::uint8_t>(rhi.queue.kind);
+                 gpu.rhi.target_index = rhi.targetIndex;
+                 gpu.rhi.backend_generation = rhi.backendGeneration;
 
                  ce::profiler().submit_gpu_span(ce::intern_runtime_marker(name, ce::marker_kind::gpu_span), begin, end,
                                                 frame, gpu);

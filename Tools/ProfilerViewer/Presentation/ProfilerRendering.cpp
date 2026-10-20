@@ -212,7 +212,8 @@ namespace editor::profiler_view
             }
             ImGui::Text("CPU engine frame %u: %zu measured render samples", frame->engine_frame,
                 frame->render_measurements.size());
-            ImGui::TextDisabled("CPU submit / GPU pass / CPU presenter outcome; no display cadence is inferred.");
+            ImGui::TextDisabled(
+                "CPU submit / GPU pass / presenter return / RHI scope; no display cadence is inferred.");
             constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                 ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit;
             if (!ImGui::BeginTable("RecordedRenderMeasurements", 7, flags))
@@ -238,6 +239,66 @@ namespace editor::profiler_view
                 for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
                 {
                     const auto& sample = frame->render_measurements[static_cast<std::size_t>(index)];
+                    if (sample.axis == ce::profile_render_axis::rhi_scope)
+                    {
+                        const auto& rhi = sample.rhi;
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%s RHI: %s",
+                                    (sample.rhi_event_flags & static_cast<std::uint8_t>(ce::event_flags::gpu_span)) != 0
+                                        ? "GPU"
+                                        : "CPU",
+                                    marker_name(capture, sample.marker));
+                        ImGui::TableNextColumn();
+                        if (frequency != 0)
+                        {
+                            ImGui::Text("%.4f ms", static_cast<double>(sample.tick_end - sample.tick_begin) * 1000.0 /
+                                                       static_cast<double>(frequency));
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted("unknown clock");
+                        }
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted("n/a (RHI scope)");
+                        ImGui::TableNextColumn();
+                        ImGui::Text("recording %llu / frame %llu", static_cast<unsigned long long>(rhi.recording_id),
+                                    static_cast<unsigned long long>(rhi.frame_id));
+                        if (rhi.source_engine_frame_available)
+                        {
+                            ImGui::Text("source engine frame %llu",
+                                        static_cast<unsigned long long>(rhi.source_engine_frame));
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted("source engine frame: unknown");
+                        }
+                        ImGui::TableNextColumn();
+                        ImGui::Text("view %llu / backend generation %llu", static_cast<unsigned long long>(rhi.view_id),
+                                    static_cast<unsigned long long>(rhi.backend_generation));
+                        if (rhi.device_incarnation != 0 && rhi.queue_id != 0)
+                        {
+                            ImGui::Text("device %llu / queue %u / kind %u",
+                                        static_cast<unsigned long long>(rhi.device_incarnation), rhi.queue_id,
+                                        static_cast<unsigned>(rhi.queue_kind));
+                        }
+                        else
+                        {
+                            ImGui::TextUnformatted("queue identity: unknown");
+                        }
+                        ImGui::TableNextColumn();
+                        if (rhi.target_index == UINT32_MAX)
+                        {
+                            ImGui::TextUnformatted("target: aggregate / unknown");
+                        }
+                        else
+                        {
+                            ImGui::Text("target %u", rhi.target_index);
+                        }
+                        ImGui::TableNextColumn();
+                        ImGui::TextUnformatted("n/a (RHI scope)");
+                        continue;
+                    }
                     if (sample.axis == ce::profile_render_axis::cpu_presenter_return)
                     {
                         const auto& p = sample.presenter;

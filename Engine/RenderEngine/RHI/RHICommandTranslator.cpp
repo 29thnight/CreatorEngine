@@ -2,11 +2,15 @@
 #include "IRenderDeviceServices.h"
 #include "RHIParallelCommandPool.h"
 #include "RHITranslationWorkQueue.h"
+#include "RHIProfilingContext.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 
 bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHICommandTranslationOptions& options,
                                      RHITranslatedBatch& outBatch, RHICommandFailure& outFailure)
 {
+    const auto rhiContext = MakeRHIProfileContext(softwareBatch.GetDesc(), softwareBatch.GetRecordingId());
+    const ce::profile_rhi_context_scope context(rhiContext);
+    ce::profile_rhi_scope translate{ce::marker<"RHICommandTranslate">()};
     RHISoftwareBatch input(std::move(softwareBatch));
     outFailure.Reset();
     outFailure.stage = RHICommandFailureStage::Translation;
@@ -100,6 +104,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
         std::span(targetCosts.data(), jobs > 1 ? order.size() : 0));
     input.m_state = RHISoftwareBatchState::Translating;
     RHITranslatedBatch translated;
+    translated.m_provenance = MakeRHICommandProvenance(rhiContext);
     translated.m_stats.translationJobCount = jobs;
     std::string error;
     bool nativeOpened = false;
@@ -129,6 +134,10 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
     const auto replayTarget = [&](size_t index)
     {
         const auto target = order[index];
+        auto targetContext = rhiContext;
+        targetContext.target_index = target;
+        const ce::profile_rhi_context_scope context(targetContext);
+        ce::profile_rhi_scope replay{ce::marker<"RHICommandTranslate.Target">()};
         auto& result = results[index];
         try
         {
@@ -166,7 +175,8 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
 #if !CE_SHIPPING
         const ce::profile_context_scope context(cpuContext);
 #endif
-        ce::profile_scope replay{ce::marker<"RHISoftwareTranslate.Targets">()};
+        const ce::profile_rhi_context_scope rhiScope(rhiContext);
+        ce::profile_rhi_scope replay{ce::marker<"RHISoftwareTranslate.Targets">()};
         if (jobs == 1)
         {
             for (size_t index = 0; index < order.size(); ++index)
@@ -199,6 +209,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
         }
         if (jobs > 1)
         {
+            ce::profile_rhi_scope join{ce::marker<"RHICommandTranslateJoin">()};
             m_pool.RunParallel(replayTargets, jobs);
         }
         else

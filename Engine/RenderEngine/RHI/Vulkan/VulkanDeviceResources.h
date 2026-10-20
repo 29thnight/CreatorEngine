@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
+#include "../RHIQueueContract.h"
 #include "../../Render/Temporal/TemporalReconstruction.h"
 #include "../IRenderDeviceServices.h"   // 5c-4c — 5c-3 이 중립화하고 여기서 갈렸다
 #include "../IRenderTextureCache.h"
@@ -299,6 +300,12 @@ public:
     VkPhysicalDevice GetPhysicalDevice() const { return m_physicalDevice; }
     VkDevice        GetDevice() const { return m_device; }
     VkQueue         GetQueue() const { return m_queue; }
+    RHIQueueIdentity GetGraphicsQueueIdentity() const
+    {
+        return m_device && m_queue && m_deviceIncarnation
+                   ? RHIQueueIdentity{m_deviceIncarnation, 1, RHIQueueKind::Graphics}
+                   : RHIQueueIdentity{};
+    }
     uint32_t        GetQueueFamily() const { return m_queueFamily; }
     VkCommandBuffer GetCommandBuffer() const;
     VkImage         GetBackBuffer(uint32_t index) const;
@@ -334,6 +341,8 @@ public:
 
 private:
     friend class VulkanCommandBufferPool;
+    friend class VulkanRecordingResources;
+    friend class VulkanSoftwareCommandValidator;
 
     /// 미구현을 센다 (5c-4c). 인코더의 것과 같은 규약이다.
     void NoteUnimplemented(const char* name)
@@ -380,6 +389,7 @@ private:
     VkInstance       m_instance{ VK_NULL_HANDLE };
     VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
     VkDevice         m_device{ VK_NULL_HANDLE };
+    uint64_t m_deviceIncarnation{};
     VkQueue          m_queue{ VK_NULL_HANDLE };
     uint32_t         m_queueFamily{ UINT32_MAX };
     bool             m_memoryBudgetSupported{ false };

@@ -131,6 +131,7 @@ namespace ce
         event_flags flags = event_flags::none;
         std::uint64_t generation = 0;
         std::uint64_t token = 0;
+        bool rhi_available = false;
     };
 
     inline constexpr std::uint32_t kMaxScopeDepth = 64;
@@ -148,8 +149,8 @@ namespace ce
 
         void begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
                          const cpu_span_context& cpu = {});
-        void begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
-                         const cpu_span_context& cpu, std::uint64_t generation);
+        void begin_scope(marker_id id, profile_tick now, std::uint32_t frame, const cpu_span_context& cpu,
+                         std::uint64_t generation, const profile_rhi_context* rhi = nullptr);
         void end_scope(profile_tick now);
         void skip_scope();
 
@@ -205,13 +206,13 @@ namespace ce
         // 호출자는 스트림의 수명을 보장한다. 두 함수 모두 TLS/현재 청크를
         // 읽지 않으며, end_tick 뒤에 시작한 구간과 다른 세대는 제외한다.
         // snapshot은 일시적인 표시용이다. 완성 이벤트와 함께 저장하지 않는다.
-        std::uint32_t snapshot_open_scopes(std::uint64_t generation, profile_tick end_tick,
-                                          profile_event* output, std::uint32_t capacity) const;
+        std::uint32_t snapshot_open_scopes(std::uint64_t generation, profile_tick end_tick, profile_event* output,
+                                           std::uint32_t capacity, profile_rhi_context* rhi_output = nullptr) const;
 
         // Stop의 미응답 스트림에만 쓴다. 반환된 구간은 호출자가 캡처에 넣어야
         // 한다. 선점 후 주인이 깨어나도 같은 구간을 다시 적을 수 없다.
-        std::uint32_t claim_open_scopes(std::uint64_t generation, profile_tick end_tick,
-                                       profile_event* output, std::uint32_t capacity);
+        std::uint32_t claim_open_scopes(std::uint64_t generation, profile_tick end_tick, profile_event* output,
+                                        std::uint32_t capacity, profile_rhi_context* rhi_output = nullptr);
 
         const thread_info& info() const { return m_info; }
         std::uint32_t slot() const { return m_info.slot; }
@@ -261,8 +262,26 @@ namespace ce
             std::atomic<std::uint64_t> task{ 0 };
         };
 
+        // 일반 CPU 스코프에서는 쓰지 않는다. 해당 scope token과 함께 읽어야
+        // 다음 recording의 같은 stack slot을 예전 identity로 오인하지 않는다.
+        struct published_rhi_scope
+        {
+            std::atomic<std::uint64_t> token{0};
+            std::atomic<std::uint64_t> recording_id{0};
+            std::atomic<std::uint64_t> source_engine_frame{0};
+            std::atomic<std::uint64_t> frame_id{0};
+            std::atomic<std::uint64_t> view_id{0};
+            std::atomic<std::uint64_t> device_incarnation{0};
+            std::atomic<std::uint64_t> backend_generation{0};
+            std::atomic<std::uint32_t> queue_id{0};
+            std::atomic<std::uint32_t> target_index{UINT32_MAX};
+            std::atomic<std::uint8_t> queue_kind{0};
+            std::atomic<bool> source_engine_frame_available{false};
+        };
+
         bool ensure_chunk(std::uint64_t generation);
-        bool write(const profile_event& value, std::uint64_t generation, bool late_ingest = false);
+        bool write(const profile_event& value, std::uint64_t generation, bool late_ingest = false,
+                   const profile_rhi_context* rhi = nullptr);
         void seal_current(bool writing = false);
         void honor_seal_request();
         bool owned_by_caller() const;
@@ -270,8 +289,8 @@ namespace ce
         std::uint16_t recording_depth(std::uint64_t generation) const;
         void publish_open_scope(std::uint32_t index);
         bool claim_scope(std::uint32_t index);
-        bool read_open_scope(std::uint32_t index, std::uint64_t generation,
-                             profile_tick end_tick, profile_event& value, std::uint64_t& token) const;
+        bool read_open_scope(std::uint32_t index, std::uint64_t generation, profile_tick end_tick, profile_event& value,
+                             std::uint64_t& token, profile_rhi_context* rhi) const;
         void truncate_open_scopes(profile_tick freeze_tick, std::uint64_t generation);
 
         chunk_pool& m_pool;
@@ -281,6 +300,8 @@ namespace ce
 
         open_scope m_stack[kMaxScopeDepth]{};
         published_scope m_publishedScopes[kMaxScopeDepth]{};
+        profile_rhi_context m_rhiContexts[kMaxScopeDepth]{};
+        published_rhi_scope m_publishedRhiScopes[kMaxScopeDepth]{};
         std::uint32_t m_depth = 0;
         std::atomic<std::uint32_t> m_publishedDepth{ 0 };
         // 상한 밖의 자리만 개수로 센다. 이 구간에는 어떤 begin도 기록하지
