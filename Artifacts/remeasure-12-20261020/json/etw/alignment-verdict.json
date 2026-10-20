@@ -1,0 +1,1 @@
+{"passed":true,"cases":[{"variant":"current","passed":true,"referenceChecks":[],"events":{"ReadyThread":852350,"CSwitch":1495482,"Interrupt":47662,"DPC":115629,"DPCTmr":6105,"T-End":858,"T-Start":789},"unknownSwitchStates":{"Running":253},"threads":133}],"toleranceMs":0.005}

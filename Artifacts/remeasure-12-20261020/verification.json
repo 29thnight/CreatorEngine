@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "filesVerified": 377,
+  "hashMismatches": [],
+  "captureRoundTripEqual": true,
+  "etwLosses": {
+    "Buffers": 0,
+    "Events": 0
+  },
+  "sourceVerification": {
+    "headUnchanged": true,
+    "sourceUnchanged": true,
+    "changedFiles": []
+  },
+  "baseline": {
+    "complete": true,
+    "droppedEvents": 0,
+    "droppedCounters": 0,
+    "unacked": 0,
+    "gpuEvents": 114648,
+    "matchedGpuEvents": 114648,
+    "invalidProvenanceSamples": 0
+  },
+  "etw": {
+    "complete": true,
+    "droppedEvents": 0,
+    "droppedCounters": 0,
+    "unacked": 0,
+    "gpuEvents": 99335,
+    "matchedGpuEvents": 99335,
+    "invalidProvenanceSamples": 0
+  }
+}
