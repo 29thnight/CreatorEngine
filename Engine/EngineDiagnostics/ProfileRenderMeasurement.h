@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Utility_Framework/StandardLibrary.h"
+#include "ProfileRhiContext.h"
 
 namespace ce
 {
@@ -11,6 +12,7 @@ namespace ce
         cpu_render_submit = 1,
         gpu_pass = 2,
         cpu_presenter_return = 3,
+        rhi_scope = 4,
     };
 
     // Point sampled by the presentation owner after its native/SDK wrapper
@@ -103,6 +105,8 @@ namespace ce
     // Stable portable wire size: axes 1/2 use a 40-byte sample key + 60-byte
     // provenance. Axis 3 uses a distinct 95-byte payload after frame/axis and
     // is admitted only by snapshot v6 / stream v7 and newer readers.
+    // Axis 4 keeps the exact event key and the independent RHI identity in the
+    // same 100 bytes. Snapshot v8 / stream v9 introduce it; older files reject it.
     // The full submission/view/publication identities survive narrowing in the
     // legacy event key. A lookup must reject ambiguous keys, never pick latest.
     inline constexpr std::size_t kRenderMeasurementWireBytes = 100;
@@ -119,9 +123,18 @@ namespace ce
         std::uint64_t tick_end = 0;
         profile_render_provenance provenance;
         profile_presenter_return presenter;
+        profile_rhi_context rhi;
+        std::uint32_t rhi_event_frame = 0;
+        std::uint16_t rhi_thread_slot = 0;
+        std::uint16_t rhi_depth = 0;
+        std::uint8_t rhi_event_flags = 0;
 
         bool valid() const
         {
+            if (axis == profile_render_axis::rhi_scope)
+            {
+                return rhi.valid() && marker != 0 && tick_end >= tick_begin && (rhi_event_flags & ~0x07u) == 0;
+            }
             if (axis == profile_render_axis::cpu_presenter_return)
             {
                 return presenter.valid();
@@ -141,6 +154,32 @@ namespace ce
     {
         out.put(value.engine_frame);
         out.put(static_cast<std::uint8_t>(value.axis));
+        if (value.axis == profile_render_axis::rhi_scope)
+        {
+            out.put(value.rhi_event_frame);
+            out.put(value.marker);
+            out.put(value.tick_begin);
+            out.put(value.tick_end);
+            out.put(value.rhi_thread_slot);
+            out.put(value.rhi_depth);
+            out.put(value.rhi_event_flags);
+            out.put(value.queue);
+            out.put(value.event_submission);
+            out.put(value.event_view);
+            const auto& rhi = value.rhi;
+            out.put(rhi.recording_id);
+            out.put(rhi.source_engine_frame);
+            out.put(rhi.frame_id);
+            out.put(rhi.view_id);
+            out.put(rhi.device_incarnation);
+            out.put(rhi.backend_generation);
+            out.put(rhi.queue_id);
+            out.put(rhi.target_index);
+            out.put(rhi.queue_kind);
+            out.put(static_cast<std::uint8_t>(rhi.source_engine_frame_available));
+            out.put(std::uint8_t{0});
+            return;
+        }
         if (value.axis == profile_render_axis::cpu_presenter_return)
         {
             const auto& p = value.presenter;
@@ -184,7 +223,8 @@ namespace ce
     }
 
     template<typename Reader>
-    bool decode_render_measurement(Reader& in, profile_render_measurement& value, bool allow_presenter = true)
+    bool decode_render_measurement(Reader& in, profile_render_measurement& value, bool allow_presenter = true,
+                                   bool allow_rhi = true)
     {
         std::uint8_t axis = 0, native = 0, spatial = 0, deep = 0;
         if (!in.get(value.engine_frame) || !in.get(axis))
@@ -192,6 +232,27 @@ namespace ce
             return false;
         }
         value.axis = static_cast<profile_render_axis>(axis);
+        if (value.axis == profile_render_axis::rhi_scope)
+        {
+            if (!allow_rhi)
+            {
+                return false;
+            }
+            auto& rhi = value.rhi;
+            std::uint8_t available = 0, reserved = 0;
+            if (!in.get(value.rhi_event_frame) || !in.get(value.marker) || !in.get(value.tick_begin) ||
+                !in.get(value.tick_end) || !in.get(value.rhi_thread_slot) || !in.get(value.rhi_depth) ||
+                !in.get(value.rhi_event_flags) || !in.get(value.queue) || !in.get(value.event_submission) ||
+                !in.get(value.event_view) || !in.get(rhi.recording_id) || !in.get(rhi.source_engine_frame) ||
+                !in.get(rhi.frame_id) || !in.get(rhi.view_id) || !in.get(rhi.device_incarnation) ||
+                !in.get(rhi.backend_generation) || !in.get(rhi.queue_id) || !in.get(rhi.target_index) ||
+                !in.get(rhi.queue_kind) || !in.get(available) || !in.get(reserved) || available > 1 || reserved != 0)
+            {
+                return false;
+            }
+            rhi.source_engine_frame_available = available != 0;
+            return value.valid();
+        }
         if (value.axis == profile_render_axis::cpu_presenter_return)
         {
             if (!allow_presenter)

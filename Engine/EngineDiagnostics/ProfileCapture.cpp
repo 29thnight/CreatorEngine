@@ -771,17 +771,25 @@ namespace ce
             note_dropped(1);
             return;
         }
+        const bool cpuRhi = sample.axis == profile_render_axis::rhi_scope &&
+                            (sample.rhi_event_flags & static_cast<std::uint8_t>(event_flags::gpu_span)) == 0;
         for (auto it = m_frames.rbegin(); it != m_frames.rend(); ++it)
         {
-            if (it->engine_frame == sample.engine_frame)
+            // CPU spans belong to their end-tick frame; rhi_event_frame preserves
+            // the original begin-frame key even when a scope crosses a frame.
+            if (cpuRhi ? (sample.tick_end > it->tick_begin && sample.tick_end <= it->tick_end)
+                       : it->engine_frame == sample.engine_frame)
             {
                 const std::size_t before = it->memory_bytes();
-                it->render_measurements.push_back(sample);
+                auto stored = sample;
+                stored.engine_frame = it->engine_frame;
+                it->render_measurements.push_back(stored);
                 m_memoryBytes += it->memory_bytes() - before;
                 return;
             }
         }
-        if ((!m_frames.empty() && sample.engine_frame <= m_frames.back().engine_frame) ||
+        if ((!m_frames.empty() && (cpuRhi ? sample.tick_end <= m_frames.back().tick_end
+                                          : sample.engine_frame <= m_frames.back().engine_frame)) ||
             m_deferredRenderMeasurements.size() >= kMaxDeferredSpans)
         {
             // A missing/retired CPU frame is never replaced by the latest one.

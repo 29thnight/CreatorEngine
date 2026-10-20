@@ -4,6 +4,8 @@
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 #include "../RHISubmissionThread.h"
+#include "../../../EngineDiagnostics/DxCaptureSubmission.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include <stdint.h>
 #include <limits.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -12,7 +14,6 @@
 using Microsoft::WRL::ComPtr;
 namespace
 {
-    std::atomic<uint64_t> nextDeviceIncarnation{1};
     class DX12ServiceQueue;
     class DX12ServiceBatch;
 }
@@ -22,7 +23,7 @@ struct DX12QueueServiceState
     ComPtr<ID3D12Device> device;
     std::mutex admission;
     std::atomic<bool> active{true};
-    uint64_t incarnation{nextDeviceIncarnation.fetch_add(1)};
+    uint64_t incarnation{AllocateRHIDeviceIncarnation()};
     uint32_t nextQueue{1};
     uint64_t nextRecording{1};
     bool submissionClient{false};
@@ -39,6 +40,7 @@ namespace
     {
         ComPtr<ID3D12CommandAllocator> allocator;
         ComPtr<ID3D12GraphicsCommandList> list;
+        std::unique_ptr<DX12Encoder> encoder;
     };
 
     struct DX12QueueRecordingPool
@@ -78,25 +80,41 @@ namespace
 
     class DX12QueueRecording final : public IRHIQueueRecording
     {
-    public:
+      public:
+        static constexpr uint32_t kMaxTargets = 8;
+        using Targets = std::array<std::shared_ptr<DX12QueueRecordingLease>, kMaxTargets>;
         std::shared_ptr<IRHICommandQueue> queue;
-        std::shared_ptr<std::vector<std::shared_ptr<DX12QueueRecordingLease>>> leases{
-            std::make_shared<std::vector<std::shared_ptr<DX12QueueRecordingLease>>>()};
-        std::vector<std::unique_ptr<DX12Encoder>> encoders;
+        std::shared_ptr<Targets> leases{std::make_shared<Targets>()};
+        uint32_t targetCount{};
         bool finished{false};
 
         RHIEncoder& AcquireEncoder(uint32_t target) override
         {
-            if (finished || target >= encoders.size())
+            if (finished || target >= targetCount)
             {
                 throw std::logic_error("Queue recording target is unavailable.");
             }
-            auto& encoder = *encoders[target];
+            auto& encoder = *(*leases)[target]->storage->encoder;
             if (encoder.GetDroppedCount() != 0)
             {
                 throw std::runtime_error("Queue encoder dropped a command.");
             }
             encoder.ResetState((*leases)[target]->storage->list.Get());
+            return encoder;
+        }
+
+        RHIEncoder& AcquireTranslationEncoder(uint32_t target) override
+        {
+            if (finished || target >= targetCount)
+            {
+                throw std::logic_error("Queue translation target is unavailable.");
+            }
+            auto& encoder = *(*leases)[target]->storage->encoder;
+            if (encoder.GetDroppedCount() != 0)
+            {
+                throw std::runtime_error("Queue encoder dropped a command.");
+            }
+            encoder.ResetSoftwareSegment();
             return encoder;
         }
 
@@ -109,12 +127,11 @@ namespace
                 return false;
             }
             finished = true;
-            std::vector<ID3D12CommandList*> lists;
-            lists.reserve(leases->size());
-            for (size_t target = 0; target < leases->size(); ++target)
+            std::array<ID3D12CommandList*, kMaxTargets> lists{};
+            for (uint32_t target = 0; target < targetCount; ++target)
             {
                 auto& lease = (*leases)[target];
-                if (encoders[target]->GetDroppedCount() != 0)
+                if (lease->storage->encoder->GetDroppedCount() != 0)
                 {
                     error = "Queue encoder dropped a command.";
                     return false;
@@ -125,10 +142,10 @@ namespace
                     return false;
                 }
                 lease->closed = true;
-                lists.push_back(lease->storage->list.Get());
+                lists[target] = lease->storage->list.Get();
             }
             // One retirement owns all targets, in their original contiguous order.
-            return DX12SealQueueRecording(queue, lists, leases, batch, error);
+            return DX12SealQueueRecording(queue, std::span(lists.data(), targetCount), leases, batch, error);
         }
     };
 
@@ -136,8 +153,11 @@ namespace
         const std::function<HRESULT()>& operation, std::string& error)
     {
         HRESULT result = E_FAIL;
+        auto* const commandFailure = RHICommandFailureScope::Current();
         const auto work = [&](std::string&)
         {
+            const RHICommandFailureScope diagnostic(commandFailure ? commandFailure : RHICommandFailureScope::Current(),
+                                                    true);
             result = operation();
             return true; // Native rejection is handled by this queue, not a foreign owner.
         };
@@ -157,12 +177,17 @@ namespace
     {
         bool accepted = false;
         std::string dispatchError;
-        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(state.get(), "Q0 queue admission",
+        auto* const commandFailure = RHICommandFailureScope::Current();
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(
+            state.get(), "Q0 queue admission",
             [&](std::string&)
             {
+                const RHICommandFailureScope diagnostic(
+                    commandFailure ? commandFailure : RHICommandFailureScope::Current(), true);
                 accepted = operation();
                 return true; // Native failure is tracked by the queue service.
-            }, dispatchError);
+            },
+            dispatchError);
         if (!dispatched)
         {
             error = std::move(dispatchError);
@@ -172,23 +197,30 @@ namespace
 
     class DX12ServiceBatch final : public IRHIQueueCommandBatch
     {
-    public:
+      public:
         std::shared_ptr<DX12QueueServiceState> state;
         RHIQueueIdentity identity;
         uint64_t recording{0};
         bool consumed{false};
         ComPtr<ID3D12CommandAllocator> allocator;
         ComPtr<ID3D12GraphicsCommandList> list;
+        std::array<ComPtr<ID3D12CommandList>, DX12QueueRecording::kMaxTargets> inlineLists;
         std::vector<ComPtr<ID3D12CommandList>> sealedLists;
+        uint32_t sealedListCount{};
         ComPtr<ID3D12Resource> source, destination;
         std::shared_ptr<const void> token;
         RHIQueueIdentity GetQueueIdentity() const override { return identity; }
         uint64_t GetRecordingId() const override { return recording; }
+        std::span<const ComPtr<ID3D12CommandList>> GetSealedLists() const
+        {
+            return sealedListCount <= inlineLists.size() ? std::span(inlineLists).first(sealedListCount)
+                                                         : std::span<const ComPtr<ID3D12CommandList>>(sealedLists);
+        }
     };
 
     class DX12ServiceTimeline final : public IRHITimelineFence
     {
-    public:
+      public:
         std::shared_ptr<DX12QueueServiceState> state;
         ComPtr<ID3D12Fence> native;
         RHIQueueIdentity identity;
@@ -224,8 +256,10 @@ namespace
         {
             std::shared_ptr<DX12ServiceBatch> batch;
             uint64_t value;
+            ce::profile_rhi_context rhiContext;
         };
         std::vector<Retirement> pending;
+        std::vector<ID3D12CommandList*> submissionLists;
         bool faulted{false};
         RHIQueueIdentity GetIdentity() const override { return timeline->identity; }
         bool Signal(uint64_t value, RHITimelinePoint& point, std::string& error) override
@@ -318,26 +352,45 @@ namespace
                 error = "Injected rejection before native execution.";
                 return false;
             }
-            std::vector<ID3D12CommandList*> lists;
-            if (recording->sealedLists.empty())
+            // The owner serializes submissions. Retain pointer-array capacity
+            // between batches and clear borrowed pointers on every exit.
+            auto& lists = submissionLists;
+            lists.clear();
+            struct ClearSubmissionLists
+            {
+                std::vector<ID3D12CommandList*>& lists;
+                ~ClearSubmissionLists() { lists.clear(); }
+            } clearLists{lists};
+            const auto sealed = recording->GetSealedLists();
+            if (sealed.empty())
             {
                 lists.push_back(recording->list.Get());
             }
             else
             {
-                for (const auto& list : recording->sealedLists)
+                lists.reserve(sealed.size());
+                for (const auto& list : sealed)
                 {
                     lists.push_back(list.Get());
                 }
             }
-            pending.push_back({recording, 0}); // Allocate ownership before execution.
+            pending.push_back({recording, 0, ce::current_rhi_context}); // Own before native execution.
             bool executed = false;
-            const bool accepted = QueueOperation(timeline->state, [&]
-            {
-                native->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
-                executed = true;
-                return rejection == 2 ? E_FAIL : native->Signal(timeline->native.Get(), value);
-            }, error);
+            const bool accepted = QueueOperation(
+                timeline->state,
+                [&]
+                {
+                    {
+                        const ce::dx_capture::submission_scope capture(native.Get(),
+                                                                       static_cast<uint32_t>(lists.size()),
+                                                                       ce::dx_capture::current_submission_context());
+                        RHICommandFailureScope::SetExecutionUncertain(true);
+                        native->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+                    }
+                    executed = true;
+                    return rejection == 2 ? E_FAIL : native->Signal(timeline->native.Get(), value);
+                },
+                error);
             recording->consumed = executed;
             if (!executed)
             {
@@ -354,11 +407,12 @@ namespace
             pending.back().value = value;
             timeline->issued.store(value);
             point = {timeline, value};
+            RHICommandFailureScope::SetExecutionUncertain(false);
             return true;
         }
         size_t CollectCompleted() override
         {
-            std::vector<std::shared_ptr<DX12ServiceBatch>> released;
+            uint64_t completedValue{};
             {
                 std::lock_guard lock(timeline->state->admission);
                 const auto snapshot = timeline->QueryCompletion();
@@ -366,17 +420,44 @@ namespace
                 {
                     return 0;
                 }
-                released.reserve(pending.size());
-                for (auto& entry : pending)
-                {
-                    if (entry.value != 0 && snapshot.completedValue >= entry.value)
-                    {
-                        released.push_back(std::move(entry.batch));
-                    }
-                }
-                std::erase_if(pending, [](const Retirement& entry) { return !entry.batch; });
+                completedValue = snapshot.completedValue;
             }
-            return released.size(); // Destroy caller-owned tokens outside admission lock.
+            // Bounded batches release caller tokens outside admission without a
+            // fresh vector allocation on every collection. The initial fence
+            // snapshot prevents a reentrant token destructor from extending this
+            // collection to newly submitted work indefinitely.
+            std::array<Retirement, 8> released{};
+            size_t total{};
+            for (;;)
+            {
+                size_t count{};
+                {
+                    std::lock_guard lock(timeline->state->admission);
+                    for (auto& entry : pending)
+                    {
+                        if (entry.value != 0 && completedValue >= entry.value)
+                        {
+                            released[count++] = std::move(entry);
+                            if (count == released.size())
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    std::erase_if(pending, [](const Retirement& entry) { return !entry.batch; });
+                }
+                for (size_t index = 0; index < count; ++index)
+                {
+                    const ce::profile_rhi_context_scope context(released[index].rhiContext);
+                    ce::profile_rhi_scope retire{ce::marker<"RHIBatchRetire">()};
+                    released[index].batch.reset();
+                }
+                total += count;
+                if (count < released.size())
+                {
+                    return total;
+                }
+            }
         }
         size_t GetPendingBatchCount() const override
         {
@@ -806,6 +887,10 @@ bool DX12SealQueueRecording(const std::shared_ptr<IRHICommandQueue>& queue,
     result->identity = queue->GetIdentity();
     result->recording = state->nextRecording++;
     result->token = std::move(lifetimeToken);
+    if (lists.size() > result->inlineLists.size())
+    {
+        result->sealedLists.reserve(lists.size());
+    }
     for (auto* list : lists)
     {
         ComPtr<ID3D12Device> owner;
@@ -815,7 +900,15 @@ bool DX12SealQueueRecording(const std::shared_ptr<IRHICommandQueue>& queue,
             error = "Native list belongs to another device or queue kind.";
             return false;
         }
-        result->sealedLists.emplace_back(list);
+        if (lists.size() <= result->inlineLists.size())
+        {
+            result->inlineLists[result->sealedListCount] = list;
+        }
+        else
+        {
+            result->sealedLists.emplace_back(list);
+        }
+        ++result->sealedListCount;
     }
     batch = std::move(result);
     return true;
@@ -867,6 +960,7 @@ bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& 
     error.clear();
     const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
     if (!target || !token || targetCount == 0 || targetCount > workers_ ||
+        targetCount > DX12QueueRecording::kMaxTargets ||
         target->timeline->state->device.Get() != resources_.GetDevice() ||
         (queue->GetIdentity().kind != RHIQueueKind::Graphics && queue->GetIdentity().kind != RHIQueueKind::Compute))
     {
@@ -875,8 +969,6 @@ bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& 
     }
     auto result = std::make_shared<DX12QueueRecording>();
     result->queue = queue;
-    result->leases->reserve(targetCount);
-    result->encoders.reserve(targetCount);
     for (uint32_t index = 0; index < targetCount; ++index)
     {
         auto lease = std::make_shared<DX12QueueRecordingLease>();
@@ -916,8 +1008,16 @@ bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& 
             error = "Queue allocator/list creation failed.";
             return false;
         }
-        result->encoders.push_back(std::make_unique<DX12Encoder>(storage->list.Get(), &resources_));
-        result->leases->push_back(std::move(lease));
+        if (!storage->encoder || !storage->encoder->UsesResources(&resources_))
+        {
+            storage->encoder = std::make_unique<DX12Encoder>(storage->list.Get(), &resources_);
+        }
+        else
+        {
+            storage->encoder->ResetState(storage->list.Get());
+        }
+        (*result->leases)[index] = std::move(lease);
+        ++result->targetCount;
     }
     recording = std::move(result);
     return true;

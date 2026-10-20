@@ -1,5 +1,6 @@
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
+#include "../../RHI/RHIProfilingContext.h"
 #include <stdint.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
 
@@ -517,6 +518,11 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             {
                 auto& target = targets[targetIndex];
                 auto& recording = recordings[target.batch];
+                const auto provenance = recording.targets->GetCommandProvenance(target.local);
+                const ce::profile_rhi_context_scope rhiContext(MakeRHIProfileContext(provenance));
+                ce::profile_rhi_scope recordProfile{provenance.recordingId
+                                                        ? ce::marker<"RHISoftwareRecord">()
+                                                        : ce::marker<"RenderCommandRecord.OwnedTarget">()};
                 while (target.cursor < target.units.size())
                 {
                     const auto& unit = units[target.units[target.cursor]];
@@ -632,12 +638,17 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     cpu.phase = CpuReport::Phase::Submit;
     const auto failSubmission = [&]
     {
+        if (output.failure.message.empty())
+        {
+            output.failure.message = outError;
+        }
         output.recoveryRequired = true;
         m_transientPool = nullptr; // Partial execution cannot re-enter the reusable pool.
         return false;
     };
     try
     {
+        output.failure.stage = RHICommandFailureStage::Admission;
         if (!recorder.ExecuteSubmission([&](std::string& error)
         {
             size_t nextWait = 0;
@@ -645,12 +656,16 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             {
                 auto& recording = recordings[index];
                 auto& endpoint = *recording.endpoint;
+                output.failure.Reset();
+                output.failure.stage = RHICommandFailureStage::Submission;
+                output.failure.recordingId = recording.batch->GetRecordingId();
                 while (nextWait < diagnostic.waits.size() && diagnostic.waits[nextWait].consumerBatch == index)
                 {
                     auto& wait = diagnostic.waits[nextWait];
                     if (!points[wait.producerBatch].IsValid() ||
                         !endpoint.queue->Wait(points[wait.producerBatch], error))
                     {
+                        output.failure.message = error;
                         return false;
                     }
                     wait.submitted = true;
@@ -658,8 +673,10 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
                     ++nextWait;
                 }
                 output.submissionAttempted = true;
-                if (!endpoint.queue->Submit(recording.batch, endpoint.nextSignal, points[index], error))
+                if (!endpoint.queue->SubmitWithDiagnostics(recording.batch, endpoint.nextSignal, points[index],
+                                                           output.failure))
                 {
+                    error = output.failure.message;
                     return false;
                 }
                 ++endpoint.nextSignal;
@@ -684,11 +701,13 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     catch (const std::exception& exception)
     {
         outError = exception.what();
+        output.failure.message = outError;
         return failSubmission();
     }
     catch (...)
     {
         outError = "Queue submission threw an unknown exception";
+        output.failure.message = outError;
         return failSubmission();
     }
     m_statesCommitted = true;

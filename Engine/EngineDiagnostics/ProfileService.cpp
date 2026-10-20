@@ -452,7 +452,7 @@ namespace ce
     //   둘 다 조용하다 — 깊이만 밀릴 뿐 아무것도 실패하지 않는다. 툴바의
     //   Pause 단추도 다른 스레드가 구간 안에 있을 때 눌리므로, CLI 를 붙이기
     //   전에도 있던 결함이다.
-    void profiler_service::begin_scope(marker_id id, const cpu_span_context& cpu)
+    void profiler_service::begin_scope(marker_id id, const cpu_span_context& cpu, const profile_rhi_context* rhi)
     {
         thread_stream* stream = current_stream();
         if (!stream)
@@ -467,7 +467,7 @@ namespace ce
             return;
         }
 
-        stream->begin_scope(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu, generation);
+        stream->begin_scope(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu, generation, rhi);
     }
 
     void profiler_service::end_scope()
@@ -543,7 +543,7 @@ namespace ce
             {
                 if (page->magic != kProfilePageMagic || page->version != kProfilePageVersion ||
                     page->event_bytes != sizeof(profile_event) || page->count > kEventsPerChunk ||
-                    page->generation != generation)
+                    page->render_measurement_count > kRenderMeasurementsPerChunk || page->generation != generation)
                 {
                     continue;
                 }
@@ -555,6 +555,17 @@ namespace ce
                     {
                         event.tick_end = cutoff;
                         event.flags = event.flags | event_flags::truncated_end;
+                    }
+                }
+                for (std::uint32_t index = 0; index < page->render_measurement_count; ++index)
+                {
+                    auto& sample = page->render_measurements[index];
+                    if (sample.axis == profile_render_axis::rhi_scope &&
+                        (sample.rhi_event_flags & static_cast<std::uint8_t>(event_flags::gpu_span)) == 0 &&
+                        sample.tick_begin <= cutoff && sample.tick_end > cutoff)
+                    {
+                        sample.tick_end = cutoff;
+                        sample.rhi_event_flags |= static_cast<std::uint8_t>(event_flags::truncated_end);
                     }
                 }
             }
@@ -1594,8 +1605,32 @@ namespace ce
                 }
                 diagnostic->reset(entry.stream->slot(), 0);
                 diagnostic->generation = generation;
-                diagnostic->count = entry.stream->claim_open_scopes(
-                    generation, freezeTick, diagnostic->events, kMaxScopeDepth);
+                profile_rhi_context rhiContexts[kMaxScopeDepth]{};
+                diagnostic->count = entry.stream->claim_open_scopes(generation, freezeTick, diagnostic->events,
+                                                                    kMaxScopeDepth, rhiContexts);
+                event_chunk* diagnosticTail = diagnostic;
+                for (std::uint32_t index = 0; index < diagnostic->count; ++index)
+                {
+                    if (!rhiContexts[index].valid())
+                    {
+                        continue;
+                    }
+                    if (diagnosticTail->render_measurement_count == kRenderMeasurementsPerChunk)
+                    {
+                        event_chunk* next = m_pool->acquire();
+                        if (!next)
+                        {
+                            m_ring.note_dropped(1);
+                            continue;
+                        }
+                        next->reset(entry.stream->slot(), 0);
+                        next->generation = generation;
+                        diagnosticTail->next = next;
+                        diagnosticTail = next;
+                    }
+                    diagnosticTail->render_measurements[diagnosticTail->render_measurement_count++] =
+                        make_rhi_measurement(diagnostic->events[index], rhiContexts[index]);
+                }
                 profile_event timeout{};
                 timeout.tick_begin = freezeTick;
                 timeout.tick_end = freezeTick;
@@ -1612,7 +1647,7 @@ namespace ce
                 {
                     timeoutPages = diagnostic;
                 }
-                timeoutTail = diagnostic;
+                timeoutTail = diagnosticTail;
             }
         }
         // ingest snapshots the Stop cutoff under workLock. Never nest it under
@@ -1839,8 +1874,9 @@ namespace ce
             bool projected = false;
             const std::size_t remainingBytes = m_memoryBudget > live->memory_bytes()
                 ? m_memoryBudget - live->memory_bytes() : 0;
-            const std::size_t maximumProjected = remainingBytes > 8 * sizeof(profile_event)
-                ? (remainingBytes - 8 * sizeof(profile_event)) / (2 * sizeof(profile_event)) : 0;
+            constexpr std::size_t projectedBytes = sizeof(profile_event) + sizeof(profile_render_measurement);
+            const std::size_t maximumProjected =
+                remainingBytes > 8 * projectedBytes ? (remainingBytes - 8 * projectedBytes) / (2 * projectedBytes) : 0;
             std::size_t projectedCount = 0;
             {
                 std::lock_guard<std::mutex> guard(m_streamLock);
@@ -1851,8 +1887,9 @@ namespace ce
                         continue;
                     }
                     profile_event open[kMaxScopeDepth]{};
-                    const std::uint32_t count = entry.stream->snapshot_open_scopes(
-                        generation, last.tick_end, open, kMaxScopeDepth);
+                    profile_rhi_context rhiContexts[kMaxScopeDepth]{};
+                    const std::uint32_t count = entry.stream->snapshot_open_scopes(generation, last.tick_end, open,
+                                                                                   kMaxScopeDepth, rhiContexts);
                     for (std::uint32_t index = 0; index < count; ++index)
                     {
                         if (projectedCount >= maximumProjected)
@@ -1860,6 +1897,12 @@ namespace ce
                             break;
                         }
                         last.events.push_back(open[index]);
+                        if (rhiContexts[index].valid())
+                        {
+                            auto sample = make_rhi_measurement(open[index], rhiContexts[index]);
+                            sample.engine_frame = last.engine_frame;
+                            last.render_measurements.push_back(sample);
+                        }
                         ++projectedCount;
                         projected = true;
                     }

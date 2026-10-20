@@ -1,4 +1,5 @@
 #include "VulkanEncoder.h"
+#include "VulkanRecordingResources.h"
 #include "VulkanPipelineCache.h"
 #include "VulkanResourceTable.h"
 #include "VulkanResourceState.h"
@@ -154,7 +155,7 @@ void VulkanEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeli
     }
 
     // 핸들이 짝을 푼다. 어긋난 조합이 만들어질 자리가 없다.
-    const VulkanPipelineEntry entry = m_pipelines ? m_pipelines->Resolve(pipeline) : VulkanPipelineEntry{};
+    const VulkanPipelineEntry entry = m_pipelines ? ResolvePipeline(pipeline) : VulkanPipelineEntry{};
     if (VK_NULL_HANDLE == m_commandBuffer || !entry.IsValid() ||
         ((bindPoint == RHIBindPoint::Compute) != (entry.kind == VulkanPipelineKind::Compute)))
     {
@@ -196,7 +197,7 @@ bool VulkanEncoder::IsPipelineBound(RHIBindPoint bindPoint, bool mesh) const
         return false;
     }
     // Resolve again to reject handles invalidated after SetPipeline.
-    const auto entry = m_pipelines->Resolve(m_boundPipeline[index]);
+    const auto entry = ResolvePipeline(m_boundPipeline[index]);
     const auto expected = bindPoint == RHIBindPoint::Compute ? VulkanPipelineKind::Compute :
         (mesh ? VulkanPipelineKind::Mesh : VulkanPipelineKind::Graphics);
     return entry.IsValid() && entry.kind == expected && entry.layout == m_boundLayout[index];
@@ -213,7 +214,7 @@ void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
         return;
     }
 
-    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    const VulkanBufferEntry entry = ResolveResource(slice.buffer);
     if (!entry.IsValid()) return;
 
     PendingBinding pending{};
@@ -285,15 +286,16 @@ bool VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
         return false;
     }
 
-    const VkDescriptorSet set = m_descriptors->Allocate(m_device, setLayout,
-        m_pipelines->ResolveDescriptorRequirements(m_boundLayoutHandle[index]));
+    const VkDescriptorSet set =
+        m_descriptors->Allocate(m_device, setLayout, ResolveDescriptorRequirements(m_boundLayoutHandle[index]));
     if (VK_NULL_HANDLE == set)
     {
         NoteUnimplemented("FlushDescriptors(디스크립터 예산 소진)");
         return false;
     }
 
-    std::vector<VkWriteDescriptorSet> writes;
+    auto& writes = m_descriptorWriteScratch;
+    writes.clear();
     writes.reserve(pending.size());
 
     for (const PendingBinding& item : pending)
@@ -303,8 +305,7 @@ bool VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
         if (UINT32_MAX != item.param)
         {
             // 슬롯 번호 → binding 번호. 표가 없으면 그대로 쓰지 않고 버린다.
-            const VulkanLayoutSlot target =
-                m_pipelines->ResolveParam(m_boundLayoutHandle[index], item.param);
+            const VulkanLayoutSlot target = ResolveParam(m_boundLayoutHandle[index], item.param);
             if (!target.IsValid())
             {
                 NoteUnimplemented("FlushDescriptors(슬롯 번호표에 없다)");
@@ -375,7 +376,7 @@ void VulkanEncoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride
 
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
 
-    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    const VulkanBufferEntry entry = ResolveResource(slice.buffer);
     if (!entry.IsValid()) return;
 
     const VkDeviceSize offset = slice.offset;
@@ -391,7 +392,7 @@ void VulkanEncoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format
 {
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
 
-    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    const VulkanBufferEntry entry = ResolveResource(slice.buffer);
     if (!entry.IsValid()) return;
 
     vkCmdBindIndexBuffer(m_commandBuffer, entry.buffer, slice.offset,
@@ -421,7 +422,7 @@ bool VulkanEncoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
     {
         return false;
     }
-    const VulkanBufferEntry entry = m_resources->Resolve(arguments);
+    const VulkanBufferEntry entry = ResolveResource(arguments);
     if (!entry.IsValid() || !entry.allowIndirectArguments ||
         byteOffset > entry.bytes || sizeof(RHIDrawIndirectArguments) > entry.bytes - byteOffset ||
         !FlushDescriptors(RHIBindPoint::Graphics))
@@ -442,7 +443,7 @@ bool VulkanEncoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byte
     {
         return false;
     }
-    const VulkanBufferEntry entry = m_resources->Resolve(arguments);
+    const VulkanBufferEntry entry = ResolveResource(arguments);
     if (!entry.IsValid() || !entry.allowIndirectArguments ||
         byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
     {
@@ -481,7 +482,7 @@ bool VulkanEncoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byt
     {
         return false;
     }
-    const auto entry = m_resources->Resolve(arguments);
+    const auto entry = ResolveResource(arguments);
     if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         sizeof(RHIDispatchMeshIndirectArguments) > entry.bytes - byteOffset)
     {
@@ -514,7 +515,7 @@ bool VulkanEncoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOff
     {
         return false;
     }
-    const auto entry = m_resources->Resolve(arguments);
+    const auto entry = ResolveResource(arguments);
     if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         sizeof(RHIDispatchIndirectArguments) > entry.bytes - byteOffset ||
         !FlushDescriptors(RHIBindPoint::Compute))
@@ -562,26 +563,29 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         return;
     }
 
-    const std::vector<RHIBindingDesc>* const descs = m_bindingTables->Resolve(table);
-    if (nullptr == descs)
+    const auto* live = m_recordingResources ? nullptr : m_bindingTables->Resolve(table);
+    const auto descs = m_recordingResources ? m_recordingResources->Resolve(table)
+                       : live               ? std::span<const RHIBindingDesc>(*live)
+                                            : std::span<const RHIBindingDesc>{};
+    if (descs.empty())
     {
         NoteUnimplemented("SetBindings(만료된 요청)");
         return;
     }
 
-    const VulkanLayoutSlot target =
-        m_pipelines->ResolveParam(m_boundLayoutHandle[index], slot);
-    if (!target.IsValid() || target.count != descs->size())
+    const VulkanLayoutSlot target = ResolveParam(m_boundLayoutHandle[index], slot);
+    if (!target.IsValid() || target.count != descs.size())
     {
         NoteUnimplemented("SetBindings(레이아웃 개수 불일치)");
         return;
     }
 
-    std::vector<PendingBinding> resolved;
-    resolved.reserve(descs->size());
-    for (size_t i = 0; i < descs->size(); ++i)
+    auto& resolved = m_resolvedBindingScratch;
+    resolved.clear();
+    resolved.reserve(descs.size());
+    for (size_t i = 0; i < descs.size(); ++i)
     {
-        const RHIBindingDesc& desc = (*descs)[i];
+        const RHIBindingDesc& desc = descs[i];
         PendingBinding pending{};
         pending.binding = target.binding + (target.shaderArray ? 0u : static_cast<uint32_t>(i));
         pending.arrayElement = target.shaderArray ? static_cast<uint32_t>(i) : 0u;
@@ -601,7 +605,7 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
 
         if (RHIBindingDesc::Dim::Buffer == desc.dim)
         {
-            const VulkanBufferEntry entry = m_resources->Resolve(desc.bufferResource);
+            const VulkanBufferEntry entry = ResolveResource(desc.bufferResource);
             if (!entry.IsValid() && desc.allowNull)
             {
                 pending.value = PendingBinding::Value::Buffer;
@@ -632,7 +636,7 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
         }
         else
         {
-            const VulkanImageEntry entry = m_resources->Resolve(desc.resource);
+            const VulkanImageEntry entry = ResolveResource(desc.resource);
             if (!entry.IsValid() && desc.allowNull)
             {
                 pending.value = PendingBinding::Value::Image;
@@ -646,8 +650,11 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
             VkImageView view = entry.view;
             if (RHIBindingDesc::Dim::TextureCube == desc.dim)
             {
-                view = m_resources->GetOrCreateCubeView(m_device, desc.resource,
-                    desc.format, desc.mostDetailedMip, desc.mipLevels, desc.firstSlice);
+                view = m_recordingResources
+                           ? m_recordingResources->ResolveCubeView(desc.resource, desc.format, desc.mostDetailedMip,
+                                                                   desc.mipLevels, desc.firstSlice)
+                           : m_resources->GetOrCreateCubeView(m_device, desc.resource, desc.format,
+                                                              desc.mostDetailedMip, desc.mipLevels, desc.firstSlice);
             }
             else if (RHIBindingDesc::Dim::Default != desc.dim)
             {
@@ -735,22 +742,24 @@ void VulkanEncoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         return;
     }
 
-    const std::vector<VkSampler>* const samplers = m_samplerTables->Resolve(table);
-    const VulkanLayoutSlot target =
-        m_pipelines->ResolveParam(m_boundLayoutHandle[index], slot);
-    if (nullptr == samplers || !target.IsValid() ||
-        VK_DESCRIPTOR_TYPE_SAMPLER != target.type ||
-        target.count != samplers->size())
+    const auto* live = m_recordingResources ? nullptr : m_samplerTables->Resolve(table);
+    const auto samplers = m_recordingResources ? m_recordingResources->Resolve(table)
+                          : live               ? std::span<const VkSampler>(*live)
+                                               : std::span<const VkSampler>{};
+    const VulkanLayoutSlot target = ResolveParam(m_boundLayoutHandle[index], slot);
+    if (samplers.empty() || !target.IsValid() || VK_DESCRIPTOR_TYPE_SAMPLER != target.type ||
+        target.count != samplers.size())
     {
         NoteUnimplemented("SetSamplers(레이아웃 종류·개수 불일치)");
         return;
     }
 
-    std::vector<PendingBinding> resolved;
-    resolved.reserve(samplers->size());
-    for (size_t i = 0; i < samplers->size(); ++i)
+    auto& resolved = m_resolvedBindingScratch;
+    resolved.clear();
+    resolved.reserve(samplers.size());
+    for (size_t i = 0; i < samplers.size(); ++i)
     {
-        if (VK_NULL_HANDLE == (*samplers)[i])
+        if (VK_NULL_HANDLE == samplers[i])
         {
             NoteUnimplemented("SetSamplers(샘플러 무효)");
             return;
@@ -761,7 +770,7 @@ void VulkanEncoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
         pending.arrayElement = target.shaderArray ? static_cast<uint32_t>(i) : 0u;
         pending.type = VK_DESCRIPTOR_TYPE_SAMPLER;
         pending.value = PendingBinding::Value::Image;
-        pending.image.sampler = (*samplers)[i];
+        pending.image.sampler = samplers[i];
         resolved.push_back(pending);
     }
 
@@ -784,7 +793,7 @@ bool VulkanEncoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot
         return false;
     }
 
-    const VulkanBufferEntry entry = m_resources->Resolve(slice.buffer);
+    const VulkanBufferEntry entry = ResolveResource(slice.buffer);
     if (!entry.IsValid() || slice.offset >= entry.bytes)
     {
         NoteUnimplemented("SetRootBuffer(버퍼 범위 불완전)");
@@ -833,13 +842,14 @@ void VulkanEncoder::ClearDepthTarget(const RHIRenderTargetBinding& binding, floa
 ///   아니라 프레임이 넘어간 것이므로 세지 않는다).
 VulkanRenderTargetBinding VulkanEncoder::ResolveTargets(const RHIRenderTargetBinding& binding)
 {
-    if (nullptr == m_renderTargets)
+    if (nullptr == m_renderTargets && !m_recordingResources)
     {
         NoteUnimplemented("BindRenderTargets(표 없음)");
         return VulkanRenderTargetBinding{};
     }
     if (!binding.IsValid()) return VulkanRenderTargetBinding{};
-    return m_renderTargets->Resolve(binding.backend);
+    return m_recordingResources ? m_recordingResources->ResolveTargets(binding.backend)
+                                : m_renderTargets->Resolve(binding.backend);
 }
 
 void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
@@ -863,7 +873,7 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (const RHITransition& transition : batch.textureTransitions)
     {
-        const VulkanImageEntry entry = m_resources->Resolve(transition.texture);
+        const VulkanImageEntry entry = ResolveResource(transition.texture);
         if (!entry.IsValid()) continue;
 
         const VulkanBarrierState before = ToVulkan(transition.before, true);
@@ -887,7 +897,7 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
     {
-        const VulkanBufferEntry entry = m_resources->Resolve(transition.buffer);
+        const VulkanBufferEntry entry = ResolveResource(transition.buffer);
         if (!entry.IsValid()) continue;
 
         const VulkanBarrierState before = ToVulkan(transition.before, true);
@@ -907,7 +917,7 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (RHITextureHandle handle : batch.uavTextures)
     {
-        const VulkanImageEntry entry = m_resources->Resolve(handle);
+        const VulkanImageEntry entry = ResolveResource(handle);
         if (!entry.IsValid()) continue;
         VkImageMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2 };
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
@@ -927,7 +937,7 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (RHIBufferHandle handle : batch.uavBuffers)
     {
-        const VulkanBufferEntry entry = m_resources->Resolve(handle);
+        const VulkanBufferEntry entry = ResolveResource(handle);
         if (!entry.IsValid()) continue;
         VkBufferMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2 };
         barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
@@ -968,8 +978,8 @@ void VulkanEncoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
 void VulkanEncoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)
 {
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
-    const VulkanImageEntry src = m_resources->Resolve(source);
-    const VulkanImageEntry dst = m_resources->Resolve(destination);
+    const VulkanImageEntry src = ResolveResource(source);
+    const VulkanImageEntry dst = ResolveResource(destination);
     if (!src.IsValid() || !dst.IsValid()) return;
 
     // D3D12 CopyResource와 같은 계약: 크기·포맷·차원·밉 구조가 같은 두 이미지의
@@ -985,7 +995,8 @@ void VulkanEncoder::CopyResource(RHITextureHandle destination, RHITextureHandle 
     }
 
     EndRenderTargets();
-    std::vector<VkImageCopy> regions;
+    auto& regions = m_imageCopyScratch;
+    regions.clear();
     regions.reserve(src.mipLevels);
     for (uint32_t mip = 0; mip < src.mipLevels; ++mip)
     {
@@ -1017,7 +1028,7 @@ void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc& desc, const float
         nullptr == values || RHIBindingDesc::Dim::Buffer == desc.dim)
         return;
 
-    const VulkanImageEntry image = m_resources->Resolve(desc.resource);
+    const VulkanImageEntry image = ResolveResource(desc.resource);
     if (!image.IsValid()) return;
 
     EndRenderTargets();
@@ -1045,8 +1056,8 @@ void VulkanEncoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
     if (!readback.IsValid() || slice >= readback.sliceCount) return;
 
-    const VulkanImageEntry image = m_resources->Resolve(source);
-    const VulkanBufferEntry buffer = m_resources->Resolve(readback.buffer);
+    const VulkanImageEntry image = ResolveResource(source);
+    const VulkanBufferEntry buffer = ResolveResource(readback.buffer);
     if (!image.IsValid() || !buffer.IsValid()) return;
 
     // ★ 복사는 렌더링 밖이어야 한다. DX12 의 CopyTextureRegion 은 아무 데서나
@@ -1092,8 +1103,8 @@ void VulkanEncoder::CopyVolumeToReadback(const RHIReadback& readback,
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
         !readback.IsValid()) return;
 
-    const VulkanImageEntry image = m_resources->Resolve(source);
-    const VulkanBufferEntry buffer = m_resources->Resolve(readback.buffer);
+    const VulkanImageEntry image = ResolveResource(source);
+    const VulkanBufferEntry buffer = ResolveResource(readback.buffer);
     if (!image.IsValid() || !image.is3D || !buffer.IsValid() ||
         sourceSubresource >= image.mipLevels)
         return;
@@ -1129,7 +1140,7 @@ void VulkanEncoder::CopyPartialToReadback(const RHIReadback&, RHITextureHandle, 
 bool VulkanEncoder::CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source)
 {
     if (!m_commandBuffer || !m_resources || !source.size || destination.size != source.size) return false;
-    const auto src = m_resources->Resolve(source.buffer), dst = m_resources->Resolve(destination.buffer);
+    const auto src = ResolveResource(source.buffer), dst = ResolveResource(destination.buffer);
     if (!src.IsValid() || !dst.IsValid() || src.buffer == dst.buffer ||
         source.offset > src.bytes || source.size > src.bytes - source.offset ||
         destination.offset > dst.bytes || destination.size > dst.bytes - destination.offset) return false;
@@ -1144,8 +1155,8 @@ void VulkanEncoder::CopyBufferToReadback(const RHIReadback& readback,
 {
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
         !readback.IsValid()) return;
-    const VulkanBufferEntry src = m_resources->Resolve(source);
-    const VulkanBufferEntry dst = m_resources->Resolve(readback.buffer);
+    const VulkanBufferEntry src = ResolveResource(source);
+    const VulkanBufferEntry dst = ResolveResource(readback.buffer);
     if (!src.IsValid() || !dst.IsValid() || sourceOffset >= src.bytes) return;
 
     EndRenderTargets();
@@ -1252,4 +1263,39 @@ void VulkanEncoder::EndRenderTargets()
 
     vkCmdEndRendering(m_commandBuffer);
     m_renderingOpen = false;
+}
+
+VulkanPipelineEntry VulkanEncoder::ResolvePipeline(RHIPipelineHandle handle) const
+{
+    return m_recordingResources ? m_recordingResources->Resolve(handle)
+           : m_pipelines        ? m_pipelines->Resolve(handle)
+                                : VulkanPipelineEntry{};
+}
+
+VulkanLayoutSlot VulkanEncoder::ResolveParam(RHIPipelineLayoutHandle handle, uint32_t parameter) const
+{
+    return m_recordingResources ? m_recordingResources->ResolveParam(handle, parameter)
+           : m_pipelines        ? m_pipelines->ResolveParam(handle, parameter)
+                                : VulkanLayoutSlot{};
+}
+
+VulkanDescriptorRequirements VulkanEncoder::ResolveDescriptorRequirements(RHIPipelineLayoutHandle handle) const
+{
+    return m_recordingResources ? m_recordingResources->ResolveDescriptorRequirements(handle)
+           : m_pipelines        ? m_pipelines->ResolveDescriptorRequirements(handle)
+                                : VulkanDescriptorRequirements{};
+}
+
+VulkanImageEntry VulkanEncoder::ResolveResource(RHITextureHandle handle) const
+{
+    return m_recordingResources ? m_recordingResources->Resolve(handle)
+           : m_resources        ? m_resources->Resolve(handle)
+                                : VulkanImageEntry{};
+}
+
+VulkanBufferEntry VulkanEncoder::ResolveResource(RHIBufferHandle handle) const
+{
+    return m_recordingResources ? m_recordingResources->Resolve(handle)
+           : m_resources        ? m_resources->Resolve(handle)
+                                : VulkanBufferEntry{};
 }

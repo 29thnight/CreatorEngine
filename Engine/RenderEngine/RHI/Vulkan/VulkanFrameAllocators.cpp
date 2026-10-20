@@ -14,7 +14,7 @@ namespace
 
     uint64_t VulkanUploadAlignUp(uint64_t value, uint64_t alignment)
     {
-        alignment = (std::max)(alignment, 1ull);
+        alignment = (std::max)(alignment, uint64_t{1});
         if (value > (std::numeric_limits<uint64_t>::max)() - (alignment - 1))
             return (std::numeric_limits<uint64_t>::max)();
         return ((value + alignment - 1) / alignment) * alignment;
@@ -175,6 +175,10 @@ void VulkanUploadSegmentAllocator::Shutdown(VkDevice device)
     {
         for (const auto& segment : m_segments)
         {
+            if (segment->m_lease.use_count() != 1)
+            {
+                std::terminate();
+            }
             if (m_table && segment->handle.IsValid())
                 m_table->Release(device, segment->handle);
             if (segment->mapped && segment->memory)
@@ -233,7 +237,7 @@ uint64_t VulkanUploadSegmentAllocator::RequiredAlignment(
     case RHIUploadUsage::IndexData: required = 4; break;
     default: break;
     }
-    return (std::max)(required, (std::max)(request.minimumAlignment, 1ull));
+    return (std::max)(required, (std::max)(request.minimumAlignment, uint64_t{1}));
 }
 
 bool VulkanUploadSegmentAllocator::TryPack(uint64_t start, uint64_t capacity,
@@ -303,9 +307,11 @@ VulkanUploadSegmentAllocator::FindAvailableSegmentLocked(bool large,
     Segment* best = nullptr;
     for (const auto& candidate : m_segments)
     {
-        if (candidate->large != large ||
-            candidate->state != RHIUploadSegmentState::Available ||
-            candidate->capacity < minimumBytes) continue;
+        if (candidate->large != large || candidate->state != RHIUploadSegmentState::Available ||
+            candidate->m_lease.use_count() != 1 || candidate->capacity < minimumBytes)
+        {
+            continue;
+        }
         if (nullptr == best || candidate->capacity < best->capacity)
             best = candidate.get();
     }
@@ -321,6 +327,10 @@ uint64_t VulkanUploadSegmentAllocator::SegmentBytesLocked() const
 
 void VulkanUploadSegmentAllocator::ReleaseSegmentLocked(Segment& segment)
 {
+    if (segment.m_lease.use_count() != 1)
+    {
+        std::terminate();
+    }
     if (m_table && segment.handle.IsValid()) m_table->Release(m_device, segment.handle);
     segment.handle = {};
     if (segment.mapped && segment.memory) vkUnmapMemory(m_device, segment.memory);
@@ -339,7 +349,10 @@ void VulkanUploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure,
     uint64_t availableLargeBytes = 0;
     for (const auto& segment : m_segments)
     {
-        if (segment->state != RHIUploadSegmentState::Available) continue;
+        if (segment->state != RHIUploadSegmentState::Available || segment->m_lease.use_count() != 1)
+        {
+            continue;
+        }
         if (segment->large) availableLargeBytes += segment->capacity;
         else ++availableRegular;
     }
@@ -365,9 +378,11 @@ void VulkanUploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure,
         {
             for (auto it = m_segments.begin(); it != m_segments.end(); ++it)
             {
-                if ((*it)->state != RHIUploadSegmentState::Available ||
+                if ((*it)->state != RHIUploadSegmentState::Available || (*it)->m_lease.use_count() != 1 ||
                     !(*it)->large || !eligible(**it))
+                {
                     continue;
+                }
                 if (candidate == m_segments.end() || (*it)->capacity > (*candidate)->capacity)
                     candidate = it;
             }
@@ -377,7 +392,7 @@ void VulkanUploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure,
         {
             for (auto it = m_segments.begin(); it != m_segments.end(); ++it)
             {
-                if ((*it)->state == RHIUploadSegmentState::Available &&
+                if ((*it)->state == RHIUploadSegmentState::Available && (*it)->m_lease.use_count() == 1 &&
                     !(*it)->large && eligible(**it))
                 {
                     candidate = it;
@@ -473,6 +488,7 @@ void VulkanUploadSegmentAllocator::BeginRecording(uint64_t recordingId)
 {
     std::lock_guard lock(m_mutex);
     m_fastRegular.store(nullptr, std::memory_order_release);
+    m_sealedRecordingId.store(0, std::memory_order_release);
     m_currentRecordingId.store(recordingId, std::memory_order_release);
     m_recordingBytes.store(0, std::memory_order_release);
 }
@@ -486,7 +502,8 @@ bool VulkanUploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
         outError = "Vulkan 업로드 배치의 요청/출력 또는 recording id가 잘못됐다";
         return false;
     }
-    if (recordingId != m_currentRecordingId.load(std::memory_order_acquire))
+    if (recordingId != m_currentRecordingId.load(std::memory_order_acquire) ||
+        recordingId == m_sealedRecordingId.load(std::memory_order_acquire))
     {
         outError = "Vulkan 업로드 배치가 현재 recording과 일치하지 않는다";
         return false;
@@ -566,6 +583,28 @@ bool VulkanUploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
     }
 
     if (!large) m_fastRegular.store(segment, std::memory_order_release);
+    return true;
+}
+
+bool VulkanUploadSegmentAllocator::PinRecording(uint64_t recordingId, std::vector<std::shared_ptr<const void>>& leases,
+                                                std::string& outError)
+{
+    const std::lock_guard lock(m_mutex);
+    if (!recordingId || recordingId != m_currentRecordingId.load(std::memory_order_acquire))
+    {
+        outError = "Vulkan upload lease requires the current recording.";
+        return false;
+    }
+    leases.clear();
+    leases.reserve(m_segments.size());
+    for (const auto& segment : m_segments)
+    {
+        if (segment->recordingId == recordingId && segment->state == RHIUploadSegmentState::Active)
+        {
+            leases.push_back(segment->m_lease);
+        }
+    }
+    m_sealedRecordingId.store(recordingId, std::memory_order_release);
     return true;
 }
 
@@ -692,9 +731,9 @@ uint64_t VulkanUploadSegmentAllocator::GetRecordingUsedBytes() const
 
 // ────────────────────────────────────────────────────────────── 디스크립터 풀
 
-bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device,
-    uint32_t initialVersions,
-    std::string& outError, uint32_t maxIndexingPoolDescriptors)
+bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device, uint32_t initialVersions, std::string& outError,
+                                              uint32_t maxIndexingPoolDescriptors,
+                                              std::shared_ptr<VulkanDescriptorPoolBudget> budget)
 {
     if (VK_NULL_HANDLE == device || 0 == initialVersions)
     {
@@ -704,6 +743,14 @@ bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device,
 
     Shutdown(device);
     m_maxIndexingPoolDescriptors = maxIndexingPoolDescriptors;
+    m_poolBudget = budget ? std::move(budget) : std::make_shared<VulkanDescriptorPoolBudget>();
+    if (m_poolBudget->m_limit && m_poolBudget->m_limit != maxIndexingPoolDescriptors)
+    {
+        outError = "Vulkan descriptor pool budget belongs to a different device limit.";
+        m_poolBudget.reset();
+        return false;
+    }
+    m_poolBudget->m_limit = maxIndexingPoolDescriptors;
     m_versions.Reset(initialVersions);
     m_pools.resize(initialVersions);
     for (uint32_t slot = 0; slot < initialVersions; ++slot)
@@ -747,14 +794,23 @@ bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, si
         candidate.capacity[type] = budget[type].descriptorCount;
         descriptors += budget[type].descriptorCount;
     }
-    if (m_maxIndexingPoolDescriptors &&
-        descriptors > uint64_t(m_maxIndexingPoolDescriptors) - m_allocatedPoolDescriptors)
-    {
-        outError = "Vulkan descriptor pools exceed maxUpdateAfterBindDescriptorsInAllPools.";
-        return false;
-    }
-    // Allocate owner storage before creating the native object.
+    // Reserve owner storage before taking the device-wide native pool budget.
     m_pools[slot].reserve(page + 1);
+    uint64_t allocated = m_poolBudget->m_allocated.load(std::memory_order_relaxed);
+    for (;;)
+    {
+        if (m_maxIndexingPoolDescriptors && (allocated > m_maxIndexingPoolDescriptors ||
+                                             descriptors > uint64_t(m_maxIndexingPoolDescriptors) - allocated))
+        {
+            outError = "Vulkan descriptor pools exceed maxUpdateAfterBindDescriptorsInAllPools.";
+            return false;
+        }
+        if (m_poolBudget->m_allocated.compare_exchange_weak(allocated, allocated + descriptors,
+                                                            std::memory_order_acq_rel, std::memory_order_relaxed))
+        {
+            break;
+        }
+    }
 
     VkDescriptorPoolCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     // Layouts that select indexing limits require matching pools. Bindings
@@ -768,6 +824,7 @@ bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, si
     const VkResult made = vkCreateDescriptorPool(device, &info, nullptr, &pool);
     if (VK_SUCCESS != made)
     {
+        m_poolBudget->m_allocated.fetch_sub(descriptors, std::memory_order_acq_rel);
         outError = "디스크립터 pool version 생성 실패 — " + ResultToString(made);
         return false;
     }
@@ -790,6 +847,11 @@ void VulkanDescriptorPoolRecycler::Shutdown(VkDevice device)
         }
     }
     m_pools.clear();
+    if (m_poolBudget)
+    {
+        m_poolBudget->m_allocated.fetch_sub(m_allocatedPoolDescriptors, std::memory_order_acq_rel);
+        m_poolBudget.reset();
+    }
     m_allocatedPoolDescriptors = 0;
     m_maxIndexingPoolDescriptors = 0;
     m_versions.Reset();

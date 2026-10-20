@@ -884,6 +884,40 @@ struct EnhancedPbrCapture
         }
     }
 
+    void RecordRhiQuery(const std::string& name, uint64_t beginTicks, uint64_t endTicks, const char* clockDomain,
+                        uint32_t passIndex, const RHICommandProvenance& provenance)
+    {
+        auto measurement = manifest.rootref()["measurement"];
+        if (!measurement.has_child("queryIntervals"))
+        {
+            measurement["queryIntervals"] |= ryml::SEQ;
+        }
+        auto item = measurement["queryIntervals"].append_child();
+        item |= ryml::MAP;
+        item["name"] << name;
+        item["beginTicks"] << beginTicks;
+        item["endTicks"] << endTicks;
+        item["clockDomain"] << clockDomain;
+        item["passIndex"] << passIndex;
+        item["passIndexAvailable"] << (passIndex != UINT32_MAX);
+        item["recordingIdentityAvailable"] << (provenance.recordingId != 0);
+        item["recordingId"] << provenance.recordingId;
+        item["frameId"] << provenance.frameId;
+        item["renderViewId"] << provenance.renderViewId;
+        item["sourceEngineFrameAvailable"] << provenance.sourceEngineFrameAvailable;
+        if (provenance.sourceEngineFrameAvailable)
+        {
+            item["sourceEngineFrame"] << provenance.sourceEngineFrame;
+        }
+        item["queueIdentityAvailable"] << provenance.queue.IsValid();
+        item["deviceIncarnation"] << provenance.queue.deviceGeneration;
+        item["queueId"] << provenance.queue.queueId;
+        item["queueKind"] << static_cast<uint32_t>(provenance.queue.kind);
+        item["targetIndex"] << provenance.targetIndex;
+        item["targetIndexAvailable"] << (provenance.targetIndex != UINT32_MAX);
+        item["backendGeneration"] << provenance.backendGeneration;
+    }
+
     bool Declare(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         const LiveBlackboard& blackboard, uint32_t width, uint32_t height,
         std::string& error, uint32_t displayWidth = 0, uint32_t displayHeight = 0)

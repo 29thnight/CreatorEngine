@@ -1,5 +1,6 @@
 #pragma once
 #include "RHISoftwareBatch.h"
+#include "RHICommandProvenance.h"
 
 class IRHIParallelCommandPool;
 class IRenderDeviceServices;
@@ -35,16 +36,22 @@ class RHITranslatedBatch final
 
     RHITranslatedBatchKind GetKind() const
     {
-        return m_native.IsValid() ? RHITranslatedBatchKind::ParallelPool : RHITranslatedBatchKind::Empty;
+        return m_native.IsValid() ? RHITranslatedBatchKind::ParallelPool
+               : m_owned          ? RHITranslatedBatchKind::OwnedQueue
+                                  : RHITranslatedBatchKind::Empty;
     }
-    bool IsValid() const { return m_native.IsValid(); }
+    bool IsValid() const { return GetKind() != RHITranslatedBatchKind::Empty; }
     const RHICommandTranslationStats& GetTranslationStats() const { return m_stats; }
 
   private:
     friend class RHICommandTranslator;
+    friend class RHIQueueCommandTranslator;
+    friend class RHISoftwareCommandQueue;
     friend class RHISubmissionThread;
     RHIRecordedBatch m_native;
+    std::shared_ptr<IRHIQueueCommandBatch> m_owned;
     RHICommandTranslationStats m_stats;
+    RHICommandProvenance m_provenance;
 };
 
 class IRHICommandTranslator

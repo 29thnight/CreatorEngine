@@ -146,11 +146,14 @@ void RHISoftwareCommandList::Fail(const char* message)
     }
 }
 
-void* RHISoftwareCommandList::Allocate(size_t bytes, size_t alignment)
+void* RHISoftwareCommandList::Allocate(size_t bytes, size_t alignment, bool stickyFailure)
 {
     if (bytes > SIZE_MAX - alignment)
     {
-        Fail("Software arena allocation overflow.");
+        if (stickyFailure)
+        {
+            Fail("Software arena allocation overflow.");
+        }
         return nullptr;
     }
     try
@@ -160,7 +163,10 @@ void* RHISoftwareCommandList::Allocate(size_t bytes, size_t alignment)
     }
     catch (const std::bad_alloc&)
     {
-        Fail("Software arena allocation failed.");
+        if (stickyFailure)
+        {
+            Fail("Software arena allocation failed.");
+        }
         return nullptr;
     }
 }

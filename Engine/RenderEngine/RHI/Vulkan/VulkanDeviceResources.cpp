@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include "VulkanDeviceResources.h"
+#include "VulkanCommandBufferPool.h"
 #include "../RHIRecordedBatch.h"
+#include "../RHICommandFailure.h"
 #include "VulkanPipelineCache.h"
 
 #include <Windows.h>
@@ -168,6 +170,7 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
         return false;
     }
     m_submissionClient = true;
+    m_deviceIncarnation = AllocateRHIDeviceIncarnation();
     return true;
 }
 
@@ -898,6 +901,7 @@ void VulkanDeviceResources::Shutdown()
 
     m_physicalDevice = VK_NULL_HANDLE;
     m_queue = VK_NULL_HANDLE;
+    m_deviceIncarnation = 0;
     m_queueFamily = UINT32_MAX;
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
@@ -992,6 +996,7 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     RefreshUploadBudget();
     RefreshPersistentMemoryBudgets();
     const uint64_t completedFence = GetCompletedFenceValue();
+    m_resourceTable.CollectRecordingLeases(m_device);
     m_uploadAllocator.Collect(completedFence);
     m_descriptorRecycler.Collect(RHICompletionPoint{ completedFence });
     if (nullptr != m_pipelineCache)
@@ -1539,12 +1544,10 @@ bool VulkanDeviceResources::PrepareParallelSubmission(
 
 void VulkanDeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
 {
-    if (const auto batch = ticket.GetRecordedBatch())
+    const auto identity = ticket.GetIdentity();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
     {
-        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        {
-            listener->OnUploadAccepted(batch->GetRecordingId(), completion);
-        }
+        listener->OnUploadAccepted(identity.recordingId, completion);
     }
     m_frameFenceValues[m_frameIndex] = completion.value;
     m_frameSubmissionTickets[m_frameIndex] = ticket;
@@ -1581,7 +1584,12 @@ bool VulkanDeviceResources::SubmitParallelCommandBuffers(
         return false;
     }
 
-    std::vector<VkCommandBufferSubmitInfo> commandInfos(buffers.size());
+    std::array<VkCommandBufferSubmitInfo, IRHIParallelCommandPool::kMaxWorkers> commandInfos{};
+    if (buffers.size() > commandInfos.size())
+    {
+        outError = "Vulkan parallel submission exceeds its fixed target bound.";
+        return false;
+    }
     for (size_t i = 0; i < buffers.size(); ++i)
     {
         commandInfos[i].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
@@ -1592,10 +1600,11 @@ bool VulkanDeviceResources::SubmitParallelCommandBuffers(
     signal.value = completion.value;
     signal.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     VkSubmitInfo2 submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
-    submit.commandBufferInfoCount = static_cast<uint32_t>(commandInfos.size());
+    submit.commandBufferInfoCount = static_cast<uint32_t>(buffers.size());
     submit.pCommandBufferInfos = commandInfos.data();
     submit.signalSemaphoreInfoCount = 1;
     submit.pSignalSemaphoreInfos = &signal;
+    RHICommandFailureScope::SetExecutionUncertain(!buffers.empty());
     const VkResult submitted = vkQueueSubmit2(m_queue, 1, &submit, VK_NULL_HANDLE);
     if (VK_SUCCESS != submitted)
     {
@@ -1605,6 +1614,7 @@ bool VulkanDeviceResources::SubmitParallelCommandBuffers(
             GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
         return false;
     }
+    RHICommandFailureScope::SetExecutionUncertain(false);
     return true;
 }
 
