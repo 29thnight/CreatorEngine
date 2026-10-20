@@ -689,6 +689,7 @@ public:
         double submissionMilliseconds{0.0}; // Includes CPU submission-ticket waits, not GPU completion waits.
         double totalMilliseconds{0.0}; // Entire SubmitQueues call, including failed attempts.
         RHITimelinePoint completion; // Graphics epilogue joins both queues.
+        RHICommandFailure failure; // Immutable diagnostic result after SubmitQueues returns.
         uint32_t plannedBatches{0}, plannedComputeBatches{0}, plannedWaits{0};
         uint32_t submittedBatches{0}, computeBatches{0}, submittedWaits{0};
         uint32_t plannedBarriers{0}; // Includes queue boundary plans and repeated phases.

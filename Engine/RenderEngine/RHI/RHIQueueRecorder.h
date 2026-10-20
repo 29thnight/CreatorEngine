@@ -1,5 +1,6 @@
 #pragma once
 #include "RHIQueueContract.h"
+#include "RHICommandProvenance.h"
 #include "RHICommandRecordingJobs.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
@@ -14,6 +15,12 @@ class IRHIQueueRecording
 public:
     virtual ~IRHIQueueRecording() = default;
     virtual RHIEncoder& AcquireEncoder(uint32_t target) = 0;
+    // Software segments reset logical pass bindings. Backends may retain known
+    // native state on the uninterrupted target; direct callbacks still reset it.
+    virtual RHIEncoder& AcquireTranslationEncoder(uint32_t target) { return AcquireEncoder(target); }
+    // Unknown for legacy native adapters. Software recordings publish the same
+    // value identity before callbacks that their eventual sealed batch carries.
+    virtual RHICommandProvenance GetCommandProvenance(uint32_t) const { return {}; }
     virtual bool Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) = 0;
 };
 

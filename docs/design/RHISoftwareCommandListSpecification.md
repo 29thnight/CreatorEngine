@@ -1,14 +1,30 @@
 # 소프트웨어 RHI 명령 목록과 네이티브 번역 계층 구현 스펙
 
+### 2026-10-21 기존 제품 경로 연결과 수용 상태
+
+요청 기준 `09df9a16`의 문서를 master `088ea7b`의 구현·계측과 대조했다. 아래 본문은 전체 수용 계약이며, **구현된 경로와 실행으로 검증한 범위는 [구현·최적화 보고서](../analysis/RHISoftwareCompletion20261021.md)**에서 구분한다. 기본 경로 전환은 수용 전까지 보류한다.
+
+- `RHISoftwareQueueRecorder` / `RHISoftwareCommandQueue` / `RHISoftwareQueueFactory`와 owned translator를 추가했다. DX12 owned graphics/compute는 같은 native identity·timeline에서 소프트웨어 기록, 독립 target의 병렬 번역, native 제출을 한 owner transaction으로 수행한다. 실제 worker 수를 사용하며, 중복 alias 제출과 실패 후 replay를 거절한다.
+- Vulkan의 기존 graphics parallel-pool 제품 경로를 `CREATOR_RHI_SOFTWARE_COMMANDS=1`에 연결했다. immutable metadata snapshot, upload/resource/pipeline lease, 전용 descriptor recycler와 device 공통 pool budget을 사용한다. Vulkan native owned/multiqueue backend 자체를 신규 구현한 것은 아니다.
+- DX12/Vulkan device incarnation을 공통 발급하고 frozen translator가 실제 장치 identity를 확인한다. owner lifecycle generation을 장치 고유 ID로 재사용하지 않는다.
+- 활성 target 수와 보관 capacity를 분리해 8→1→8 기록 시 encoder/list/budget 객체를 재사용한다. DX12 owned encoder를 native allocator/list와 함께 GPU retirement 뒤 재사용하며, 제출 목록은 고정 배열 또는 owner 멤버 scratch를 사용한다.
+- bool 명령 예산 거절 시 opcode·payload·logical state·sticky error를 바꾸지 않도록 수정했다. 복사 span을 갖는 간접 batch도 하나의 예약으로 기록하며 fallback이 계속 가능하다. Vulkan graphics/compute의 독립 pipeline 상태와 rendering 상태도 보존한다.
+- 기존 FIFO의 queued+running software arena에 기본 256MiB admission을 추가했다. owned 경로는 같은 기본 한도에서 `Finish` 초과를 대기 없이 거절한다. CPU 저장소 해제와 GPU resource retirement는 별도이며, 아직 밀봉하지 않은 callback이나 전체 heap의 hard cap으로 해석하지 않는다.
+- `RHICommandFailure`의 stage/원래 opcode 위치/backend generation/`executionUncertain`을 graph execution, owner handoff 및 submission ticket까지 전달한다. 실제 native 실행 시도와 실행 전 거부를 구분하고 기존 quarantine을 유지한다.
+- record/seal/admission/translate/join/native-submit/retire 및 native query에 recording/frame/view/queue/target/backend identity를 연결했다. CPU 이벤트는 64B를 유지하고 100B sidecar를 snapshot 8/streaming 9에서 소비한다. ProfilerViewer와 Python 분석 도구는 exact/ambiguous/unmatched를 구분하며 RHI sidecar를 FPS 분모에 넣지 않는다. Vulkan offline raw timestamp와 기존에 없는 live calibrated timing producer는 구분한다.
+
+실제 공용 RHI와 scheduler/allocator를 사용한 CPU 회귀, source-hash 고정, sanitizer 검사 및 `CE_SHIPPING=0` profiler core/codec 검사를 수행한다. DX12 native 두 프레임 readback·owned queue·timeline·pool 재사용 회귀는 추가했으나 이 Linux 호스트에서 실행하지 않았다. Vulkan CPU native-boundary 검사를 Vulkan GPU validation으로 간주하지 않는다. 따라서 §12의 제품 수용·기본 전환은 실제 Windows/GPU 실행 전까지 보류한다. `RenderGraphDeclare` 전체 노드 callback 병렬화도 별도다.
+
+
 2026-10-20 shared visibility 입력 후속: shared descriptor scratch를 독점 non-pmr 아레나로 바꾸고, 고정 8뷰 메타데이터와 밀봉 count 입력을 재사용한다. 최종 shared 생성 평균 0.09636→0.09200ms(-4.52%), 기록 OFF 완료 처리량 55.35→57.02뷰/초(+3.00%)다. Game CPU p50은 13.41405→13.46990ms이며 120 FPS 목표는 미달이다. 32프레임·7212픽셀·shared queue header 224개 및 제품 출력 재생을 검증했다. [계측·검증](../analysis/SharedVisibilityInputs20261020.md).
 
-작성일: 2026-10-19. 상태: 단계별 구현 진행 중. 기준: CreatorEngine `2935f29452698d08f4c0cf720c255ae383c3ca3f` 및 작업 트리, 로컬 UE 5.6.1 소스. 본문은 전체 구현 계약이며 현재 추가된 범위는 아래 진행 기록으로 구분한다.
+작성일: 2026-10-19. 상태: 기존 제품 경로 연결 및 CPU 계약 검증, native 제품 수용 대기. 초기 기준: CreatorEngine `2935f29452698d08f4c0cf720c255ae383c3ca3f` 및 작업 트리, 로컬 UE 5.6.1 소스. 본문은 전체 구현 계약이며 현재 추가된 범위는 아래 진행 기록으로 구분한다.
 
 GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프 아레나에 묶고, 기하·패킷·하이브리드 가시성의 임시 목록을 재사용한다. 평균 선언 5.3156→5.0129ms, 기하 선언 0.4685→0.3563ms, Game CPU 중앙값 13.8340→13.4333ms다. 기록 OFF 완료 뷰 처리량은 54.21→54.38뷰/초이며 120 FPS 예산은 미달이다. [선언 재사용 계측·검증](../analysis/GraphDeclarationReuse20261020.md).
 
 이전 후속(권장 1→2→4→5)은 작업 그래프·입력·segment 객체·네이티브 상태를 재사용한다. 이번 동일 조건 비교에서 Game CPU 중앙값 14.1255→13.6965ms, 기록 평균 2.1666→1.9426ms, 번역 평균 1.9076→1.7150ms다. 120 FPS 예산은 미달이다. [후속 계측·검증](../analysis/RhiSoftwareFollowup20261020.md).
 
-이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 [기록·번역 재사용 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 [비동기 제품 배선 검증](../../Artifacts/rhi-async-20261019/index.html)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계다.
+이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 [기록·번역 재사용 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 [비동기 제품 배선 검증](../../Artifacts/rhi-async-20261019/index.html)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. 이 초기 기록 당시 owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계였다. 현재 연결 범위와 미완료 수용 항목은 문서 상단의 2026-10-21 기록을 따른다.
 
 ### 2026-10-19 구현 API와 수명
 
@@ -315,11 +331,13 @@ RT가 계속 recording하더라도 RHI 번역기의 native pool frame slot을 re
 
 큐 entry 제한, 소프트웨어 arena byte 제한, GPU in-flight slot 제한을 함께 적용한다. 소프트웨어 큐와 기존 네이티브 큐에 각각 최대 용량을 추가해 총 지연을 두 배로 늘리지 않는다. admission부터 retirement까지 공유되는 제출 credit을 사용하고 CPU arena byte credit은 번역·폐기 완료 시 별도로 반환한다. 제출 credit은 GPU 완료 또는 미제출 확정 취소 때 반환한다.
 
+현재 구현의 CPU 제한은 `RHISubmissionThread::kSoftwareByteCapacity`와 owned domain의 `RHISoftwareQueueOptions::maxPendingArenaBytes`로 각각 선택한 소비 경로에 적용한다. 한 software batch를 두 큐에 중복 접수하지 않는다. 전자는 기존 용량 3 FIFO의 대기 조건이며, 후자는 그래프가 기록을 먼저 모으는 계약 때문에 `Finish`에서 대기 없이 거절한다. `allocatedBytes`의 queued/sealed+running 합계를 세고 CPU 저장소 소멸 뒤 반환한다. 기존 backend frame slot·completion retirement가 GPU 자원 수명을 제한한다. 아직 Finish하지 않은 모든 producer 기록의 순간 arena peak나 전체 process RSS 상한을 추가한 것은 아니다.
+
 resize/reload/backend 교체는 이전 generation의 신규 admission을 차단하고, 미번역 batch를 취소하거나 명시적으로 drain한다. 이미 제출한 자원은 GPU 완료까지 보존한다. shutdown은 producer 중지 → recording jobs 합류 → admission 차단 → 번역/제출 drain → GPU retirement → profiler/native pool 해체 순서다. device loss 또는 실행 불명확 실패는 기존 quarantine 정책을 따른다.
 
 ## 11. 병렬 번역
 
-직렬 경로 수용 후 구현한다. 기본은 Serial이며 Parallel을 켜도 작은 명령 묶음은 RHI 소유자가 직접 번역한다. `minCommandsPerJob`는 조정 가능한 측정 파라미터로 두고 미측정 상수를 제품 기본값으로 확정하지 않는다.
+공용 `RHICommandTranslationOptions`의 기본은 Serial이다. 현재 소프트웨어 제품 선택 경로는 독립 target이 있는 pool/owned recorder에서 Parallel을 사용하되 작은 명령 묶음은 RHI 소유자가 직접 번역한다. `minCommandsPerJob`는 조정 가능한 측정 파라미터다. 연결부의 256은 master의 기존 정책을 유지한 값이며, 실제 장면에서 최적인 임계값으로 확정하거나 CPU fixture만으로 기본 경로 전환을 승인하지 않는다.
 
 분할 단위는 RDG가 허용한 독립 target/context 경계다. 한 stateful command stream을 임의 명령 번호에서 잘라 상태를 잃지 않는다. 앞 상태가 필요한 target은 명시적 state prologue 또는 동일 context 순차 실행으로 보장한다. native list 완료 순서와 제출 순서는 구별하고 compiled dependency/order를 제출 시 복원한다. 자원/descriptor registry 조회는 번역 중 안전한 immutable snapshot 또는 lease를 사용한다.
 

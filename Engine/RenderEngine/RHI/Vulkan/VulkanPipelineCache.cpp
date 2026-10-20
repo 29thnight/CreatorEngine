@@ -1,4 +1,5 @@
 #include "VulkanPipelineCache.h"
+#include "../RHIGraphicsPipelineRequest.h"
 #include "VulkanFormat.h"
 #include "VulkanBindingModel.h"
 
@@ -474,6 +475,10 @@ void VulkanPipelineCache::Shutdown()
 
     for (const PipelineSlot& slot : m_pipelines)
     {
+        if (slot.m_lease.use_count() > 1)
+        {
+            std::terminate();
+        }
         if (slot.alive && VK_NULL_HANDLE != slot.entry.pipeline)
             vkDestroyPipeline(m_device, slot.entry.pipeline, nullptr);
     }
@@ -481,11 +486,24 @@ void VulkanPipelineCache::Shutdown()
     m_pipelineFree.clear();
     m_pipelineByHash.clear();
 
-    m_retiredPipelines.Drain([this](VkPipeline& pipeline)
+    const auto destroyRetired = [this](RetiredPipeline& retired)
     {
-        if (VK_NULL_HANDLE != pipeline) vkDestroyPipeline(m_device, pipeline, nullptr);
-        pipeline = VK_NULL_HANDLE;
-    });
+        if (retired.m_lease.use_count() > 1)
+        {
+            std::terminate();
+        }
+        if (VK_NULL_HANDLE != retired.m_pipeline)
+        {
+            vkDestroyPipeline(m_device, retired.m_pipeline, nullptr);
+        }
+        retired = {};
+    };
+    m_retiredPipelines.Drain(destroyRetired);
+    for (auto& retired : m_pinnedRetiredPipelines)
+    {
+        destroyRetired(retired);
+    }
+    m_pinnedRetiredPipelines.clear();
 
     for (const VulkanPipelineLayoutEntry& entry : m_layouts)
     {
@@ -809,8 +827,8 @@ bool VulkanPipelineCache::InvalidatePipeline(RHIPipelineHandle handle,
     if (!RetirePipeline(handle, retireAfter)) return false;
 
     ++m_stats.invalidations;
-    m_stats.retiredPipelines = static_cast<std::uint32_t>(
-        m_retiredPipelines.GetPendingCount());
+    m_stats.retiredPipelines =
+        static_cast<std::uint32_t>(m_retiredPipelines.GetPendingCount() + m_pinnedRetiredPipelines.size());
     return true;
 }
 
@@ -830,7 +848,8 @@ bool VulkanPipelineCache::RetirePipeline(RHIPipelineHandle handle,
         return false;
 
     if (VK_NULL_HANDLE != slot.entry.pipeline)
-        m_retiredPipelines.Enqueue(retireAfter, slot.entry.pipeline);
+        m_retiredPipelines.Enqueue(retireAfter, RetiredPipeline{slot.entry.pipeline, slot.m_lease});
+    slot.m_lease.reset();
     slot.entry = {};
     slot.alive = false;
     slot.generation = (slot.generation + 1u) & RHIHandleBits::kIndexMask;
@@ -856,7 +875,8 @@ std::uint32_t VulkanPipelineCache::InvalidatePipelines(RHICompletionPoint retire
         if (!slot.alive) continue;
 
         if (VK_NULL_HANDLE != slot.entry.pipeline)
-            m_retiredPipelines.Enqueue(retireAfter, slot.entry.pipeline);
+            m_retiredPipelines.Enqueue(retireAfter, RetiredPipeline{slot.entry.pipeline, slot.m_lease});
+        slot.m_lease.reset();
         slot.entry = {};
         slot.alive = false;
         slot.generation = (slot.generation + 1u) & RHIHandleBits::kIndexMask;
@@ -866,8 +886,8 @@ std::uint32_t VulkanPipelineCache::InvalidatePipelines(RHICompletionPoint retire
 
     m_pipelineByHash.clear();
     if (0 != invalidated) ++m_stats.invalidations;
-    m_stats.retiredPipelines = static_cast<std::uint32_t>(
-        m_retiredPipelines.GetPendingCount());
+    m_stats.retiredPipelines =
+        static_cast<std::uint32_t>(m_retiredPipelines.GetPendingCount() + m_pinnedRetiredPipelines.size());
     return invalidated;
 }
 
@@ -875,17 +895,52 @@ std::uint32_t VulkanPipelineCache::CollectRetiredPipelines(
     RHICompletionPoint completed)
 {
     CollectAbandonedGraphics();
-    const RHIRetireCollection collected = m_retiredPipelines.Collect(
-        completed, [this](VkPipeline& pipeline)
+    // GPU completion alone does not prove an accepted software recording has
+    // released its immutable pipeline identity.
+    const auto release = [this](RetiredPipeline& retired)
+    {
+        if (VK_NULL_HANDLE != retired.m_pipeline)
         {
-            if (VK_NULL_HANDLE != pipeline)
-                vkDestroyPipeline(m_device, pipeline, nullptr);
-            pipeline = VK_NULL_HANDLE;
-        });
-    m_stats.retiredCollections += static_cast<std::uint32_t>(collected.count);
-    m_stats.retiredPipelines = static_cast<std::uint32_t>(
-        m_retiredPipelines.GetPendingCount());
-    return static_cast<std::uint32_t>(collected.count);
+            vkDestroyPipeline(m_device, retired.m_pipeline, nullptr);
+        }
+        retired = {};
+    };
+    uint32_t destroyed = 0;
+    size_t write = 0;
+    for (auto& retired : m_pinnedRetiredPipelines)
+    {
+        if (retired.m_lease.use_count() == 1)
+        {
+            release(retired);
+            ++destroyed;
+        }
+        else
+        {
+            if (&retired != &m_pinnedRetiredPipelines[write])
+            {
+                m_pinnedRetiredPipelines[write] = std::move(retired);
+            }
+            ++write;
+        }
+    }
+    m_pinnedRetiredPipelines.resize(write);
+    m_retiredPipelines.Collect(completed,
+                               [&](RetiredPipeline& retired)
+                               {
+                                   if (retired.m_lease.use_count() > 1)
+                                   {
+                                       m_pinnedRetiredPipelines.push_back(std::move(retired));
+                                   }
+                                   else
+                                   {
+                                       release(retired);
+                                       ++destroyed;
+                                   }
+                               });
+    m_stats.retiredCollections += destroyed;
+    m_stats.retiredPipelines =
+        static_cast<uint32_t>(m_retiredPipelines.GetPendingCount() + m_pinnedRetiredPipelines.size());
+    return destroyed;
 }
 
 RHIPipelineHandle VulkanPipelineCache::PublishPipeline(VulkanPipelineEntry entry)
@@ -904,6 +959,7 @@ RHIPipelineHandle VulkanPipelineCache::PublishPipeline(VulkanPipelineEntry entry
     }
 
     PipelineSlot& slot = m_pipelines[slotIndex];
+    slot.m_lease = std::make_shared<uint8_t>();
     slot.entry = entry;
     slot.alive = true;
     return { RHIHandleBits::Encode(slotIndex, slot.generation) };

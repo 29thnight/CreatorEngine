@@ -1,0 +1,1848 @@
+{
+  "schema": "creator.rhi_software_completion.baseline.v1",
+  "artifact_commit": "088ea7b70c1a610e93fd2e0f6a2f35a2b9a5e175",
+  "recorded_code_head": "c12fe3f21255c68388e033478b2a5ae152b09bce",
+  "capture": {
+    "configuration": "Debug",
+    "scene": "CreatorRobot",
+    "playMode": true,
+    "workerCount": 8,
+    "softwareRhi": true,
+    "profilerBindingDetail": false,
+    "secondsPerWindow": 15,
+    "capture": {
+      "foregroundMode": "editor",
+      "passed": true,
+      "workerCountRequested": 8,
+      "foregroundSamplesAccepted": true,
+      "normalExit": true,
+      "runtimeUnchanged": true
+    },
+    "sourceVerification": {
+      "headUnchanged": true,
+      "sourceUnchanged": true,
+      "changedFiles": []
+    },
+    "etwLosses": {
+      "Buffers": 0,
+      "Events": 0
+    },
+    "rates": {
+      "baseline-live": {
+        "seconds": 15.1547898,
+        "completedViews": 802,
+        "completedViewsPerSecond": 52.92056244818387,
+        "axis": "completed real view renders, not displayed FPS"
+      },
+      "baseline-off-live": {
+        "seconds": 15.13393,
+        "completedViews": 922,
+        "completedViewsPerSecond": 60.92270811349068,
+        "axis": "completed real view renders, not displayed FPS"
+      },
+      "etw-live": {
+        "seconds": 15.1689955,
+        "completedViews": 696,
+        "completedViewsPerSecond": 45.88306457075553,
+        "axis": "completed real view renders, not displayed FPS"
+      },
+      "etw-off-live": {
+        "seconds": 15.1599667,
+        "completedViews": 832,
+        "completedViewsPerSecond": 54.88138704156916,
+        "axis": "completed real view renders, not displayed FPS"
+      }
+    }
+  },
+  "source_identity": {
+    "reported_files": 715,
+    "dirty_entries": [
+      " M Editor/Editor.vcxproj",
+      " M Editor/EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp",
+      " M Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp",
+      " M Editor/EngineGUIWindow/MemoryProfilerSnapshot.cpp",
+      " M Editor/EngineGUIWindow/ReflectionTypedDraw.h",
+      " M Engine/SceneRuntime/SceneRuntime.vcxproj",
+      " M Tools/profiling-validation/README.md",
+      " M docs/analysis/LiveRenderWiring20261012.html",
+      " M docs/analysis/ReEngineMeshletComparison20261011.html",
+      " M docs/analysis/ReEngineMeshletGraphFeasibility20261011.html",
+      "?? CreatorEditor_20261017_193921_36168.txt",
+      "?? Dynamic_CPP/Saved/Editor/Cache/",
+      "?? Dynamic_CPP/Saved/Editor/Dump/",
+      "?? Dynamic_CPP/Saved/Editor/Editor/Workspaces/active.workspace.rejected",
+      "?? Tools/profiling-validation/attach-gpu-timeline.py",
+      "?? Tools/profiling-validation/gpu-timeline.html",
+      "?? Tools/profiling-validation/gpu-timeline.js",
+      "?? Tools/profiling-validation/lossless-profile-bundle.py",
+      "?? Tools/profiling-validation/test_gpu_timeline.py"
+    ],
+    "source_unchanged_during_capture": {
+      "headUnchanged": true,
+      "sourceUnchanged": true,
+      "changedFiles": []
+    },
+    "selected_rhi_inputs": [
+      {
+        "path": "Engine/RenderEngine/RenderArena.h",
+        "git_source_sha256": "d6cfdb6b071a11cdf9194704d0825061b6bb9c6b4683d6e17ef7326bc51804c6",
+        "capture_sha256": "bd8a57b6df78d18b31a115e787eed21ba39f1298594f899a9cbb78a4d5c1f6ec",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RenderArena.cpp",
+        "git_source_sha256": "a4efb38e96d31d350486fc08c3a4d3e6d35a3df38f561b57cfe290ad40853b33",
+        "capture_sha256": "d13ad04fb13cdc9f1e87e5c6358d0defdd2b2d3d52f69687d9e33dccc68841a9",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RenderAllocator.h",
+        "git_source_sha256": "3eed71244cea313c115b44abea65e22e5ca43b89fe8826f089a691daa9ede631",
+        "capture_sha256": "aecd08c532c3f4cddb2a690db289351cfb96aafa188aa868330776d1c42c1215",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/Utility_Framework/StandardLibrary.h",
+        "git_source_sha256": "103811f4e6208c3ef680acb559d51ed394af5a879f469ba6282fd2e66dc5fd5a",
+        "capture_sha256": "d3f6584f19d35fffd97bc66e3b8e0c5e905f4d6943d2f142142fdd28e8936fc9",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/Utility_Framework/ThreadPool.h",
+        "git_source_sha256": "e412cc9b6ee695c98bab3b6370928bdf61dc92a9905b5ddd06354e532b7628f1",
+        "capture_sha256": "5059795a50024073f99eef7c462df9563c89d144133212b995497a517c5c680a",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/Utility_Framework/ThreadPool.cpp",
+        "git_source_sha256": "6cc3d9e0acc9c42b4a03dcbe3a1079b9a163833f75cd19e5b0591269c2df5a5b",
+        "capture_sha256": "2ae800f1fa1a8621fc31557f628666ef8dbd794e03759391f8eb752b4afcfd1c",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/Utility_Framework/JobScheduler.h",
+        "git_source_sha256": "22382a44d69ab02bb1a4e3373af1fd5a24799d3a93660ada6576a4a6b2e70c7a",
+        "capture_sha256": "4176d169e8599545314ee7648e5459e4de09f21ff60f57644f95cace3c7276ca",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/Utility_Framework/JobScheduler.cpp",
+        "git_source_sha256": "f972c1c3f7b3753ab376d6fb4ebf6be2f0f7b34c7c25acc6ca708efad27fc2e2",
+        "capture_sha256": "fd641ddf2c75da69fa2e04b03194d892fdb89041712bcab3aa784363f266a0a8",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/Utility_Framework/JobGraph.h",
+        "git_source_sha256": "6f36d49d401ca096b1db8e9ea93c933d153857660b0a8b7b6cbab269e56600e0",
+        "capture_sha256": "963b5a68e8b48f4f7244428ea3a9973594cca040ac9a39a7a523a684e3341f2d",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareCommandList.h",
+        "git_source_sha256": "3167ffd613522a26f1a3522d706f2a9add9c9712ea25007366d5f0df59b41777",
+        "capture_sha256": "73932ef8a0bdf07502ab6bffbfa75898e5ec1af8c7d9530303d0d113f720f0ef",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp",
+        "git_source_sha256": "a549e3ab734238e7849462399df4fdbf323f7d0caf4d925d95435a29165cae57",
+        "capture_sha256": "b2bbf3f374b7890127b5863a9a027a90ce6d0775971ec3d3caa51b3a547366e5",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareEncoder.h",
+        "git_source_sha256": "7e86b95f1f985d3bbf2317e0c1504d15afa34b9d135f4ea9f0140beb918045ec",
+        "capture_sha256": "e2ce16c5bfd1bdfbdbf1f2c93022e49c71711a97d3965453c51253c22432ef80",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp",
+        "git_source_sha256": "8cc010470d50c8fbdc94b0050f8478f3c2f571284dc2b5699c9c32857279c712",
+        "capture_sha256": "37fa108098c57e76ced7e0874cd65cd16d3d3eeff00eefb44a2af67f4f2fff83",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareBatch.h",
+        "git_source_sha256": "cf7cd01dd90c4d48837f1de90163cd7c46f0f67cfc1ae0e7136829abd1d0964a",
+        "capture_sha256": "38ad8690c250228eea6b33cb043926927fae0a1c1586a5ea42e46adf36533292",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareBatch.cpp",
+        "git_source_sha256": "38079daca2f4860804f8dbc54d591d0989b59c26f1d74c507db1a7130a7d73b4",
+        "capture_sha256": "9a54ddda1da6fec486ab4398e1599648fba1758e647d428afc0f9a6ac5246a97",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareRecorder.h",
+        "git_source_sha256": "efac0659d196b5bfeecde73f661c118f152a166c31c1e3c12e7d8b1a892f18a9",
+        "capture_sha256": "16913429d0e7dcd6384ef0902e3b8af8ae217ae716b591b8b9798d935b55938d",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp",
+        "git_source_sha256": "010045eecaef5c0c861e7f8d125f2861bf10fe95fb8cbb7730c5df4487c5eaaf",
+        "capture_sha256": "06ac32f4b6092ea8d2bd9c2b46579c7ac3dc76e0b0390f7c9f91ae28d2d59e75",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/IRHICommandTranslator.h",
+        "git_source_sha256": "d013941ee34825287ccecf0e1a1bb08dc1278af4d6c3ec1dfabe7f5c81de5535",
+        "capture_sha256": "6276ad0f001716d578913759db35f7f97257a95870cb1a0984920c44f3679623",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/IRenderDeviceServices.h",
+        "git_source_sha256": "64f50f6dc05dc49eca909d889080025f6b147b745fb87966eee1a4287d8e1e1f",
+        "capture_sha256": "a22ce9deeb211a1be2a9ce0377b30cd7229ece454a851442b9a0a968e369d9c5",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIParallelCommandPool.h",
+        "git_source_sha256": "7899302e72c99ef86506872dcb866b63066e3565da10460be2c87b6d1a58d389",
+        "capture_sha256": "4bc7e84c5bbe2d4e1e871b3c3399172b9057f53f760a0bba06df939db7fc11eb",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
+        "git_source_sha256": "16c3b98360a5a8622336f978215d6c146d4205f4397b90ae978c7c1ebf826dc6",
+        "capture_sha256": "84f1adc4f20c3b03668a5bed02828a971c9556b41458df8b184f4f097525729d",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
+        "git_source_sha256": "459de735e4b2027de6caff8d956198bd92873f4d0947d9951628bfaa278e1ed1",
+        "capture_sha256": "dfa80d740f0eb7b588056db14391518fcbd637b4d8e920f084cdb968e241a7bb",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
+        "git_source_sha256": "7f6ea7cc8c1bab9d906e06aae3d2c03dafb94756054a697ba610af80141637e9",
+        "capture_sha256": "04aceefa401eae3b803839a59f6723863e103b78c602b1dd6203fa8552f64b2c",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIRecordedBatch.h",
+        "git_source_sha256": "c9d6156b3aa9d2b30bd4fca17576de1e8f14058fa1aba6846c25a9aaf3c7c9a1",
+        "capture_sha256": "22e74f2397a918ecb9a488c6b0a1bb60d6a7a316d319b731dc1932f29441a9c6",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareCommandTypes.h",
+        "git_source_sha256": "6c68da4f6b1c77690ef7d3445b622de7ed5c840595b58843f18340a67aeb9629",
+        "capture_sha256": "76ba18457629ce95ec25704482445f1e7b57abf5b54ee2481959364bafde002d",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIEncoder.h",
+        "git_source_sha256": "a38885ce9a1b5dc8dfdb708dc25588a6d0d1a840c7e826cb81877a9a25ff6300",
+        "capture_sha256": "b40eff8de1c37c69ddee3fd0de71d4fbbb8563252b11204301d447b332bc4a22",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
+        "git_source_sha256": "0a04c270894407305f95a9caaa4dbb2128a869048307996ff506db5bd201d61d",
+        "capture_sha256": "0a924cbbc4f36ee720ed884989a8ffcb16d7b49e9f8e73ea166a2ed1c03831e2",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIFormat.h",
+        "git_source_sha256": "63a1bdb25452db3ca4fc0ffe5ec9b8892d2f60beac29a6cccac8d9bb62f710fd",
+        "capture_sha256": "d87373862d08327b2b9426b4d1e938150948005d8d7ec98b27a03f437274d568",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIHandle.h",
+        "git_source_sha256": "756860eb0312c36215e7e352ec66d087d730312816050f2b1fd0a46978e3a8a8",
+        "capture_sha256": "13ffa249ecd908fb2361267a52ccbf88343478e0ce533d2ad85e8070f26bfe5a",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIResourceState.h",
+        "git_source_sha256": "fbcdfe40ee54f490f922ea8a05444536a522c8294463f564088812b0e6201ccb",
+        "capture_sha256": "c3f5c011ed516fa22ee2d0669c3c65d71de4210541b42f6f07ea3167df72ca4f",
+        "comparison": "unresolved"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIQueueContract.h",
+        "git_source_sha256": "02dc152fab4fb338a128e3248832256f3893132eb57df5b87f8b14d770cea3cb",
+        "capture_sha256": "3f75564259bb32a93f212724de3037eb3b001c2995257ed834467294f217064f",
+        "comparison": "uniform_lf_to_crlf"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+        "git_source_sha256": "a5eb70fe3239623b5cf7c3704085e475e29df8b75ee075b9b8f044dc08420153",
+        "capture_sha256": "f0339ac602ecc43e3a037b5c1dc94bdb468fd0542a40563aa611d604e77ebb15",
+        "comparison": "uniform_lf_to_crlf"
+      }
+    ],
+    "selected_unresolved": 1,
+    "scope_note": "Selected RHI/arena/scheduler inputs only. Does not claim all 715 files equal a pristine HEAD."
+  },
+  "inputs": [
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/baseline/summary.json",
+      "bytes": 1229736,
+      "sha256": "82329f8bbc7b2da850c21796455b6978c9ac7a446d38b1b8770a903616e9a502",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/conditions/baseline-live.json",
+      "bytes": 28427,
+      "sha256": "c798c69f3377bcbad4c1c3a3236ecbdd6299501c13d9c8df71756fee3cfea374",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/conditions/etw-live.json",
+      "bytes": 28276,
+      "sha256": "6f9e693b2eb83ad114401db2353d35013a0d92d3e47289ac09df3f2b08fc389b",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/conditions/experiment.json",
+      "bytes": 138,
+      "sha256": "919db1cb55f4a7ca4ad410bb67096843673f8c89ead63a473b418b36943840ed",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/conditions/identity.json",
+      "bytes": 473,
+      "sha256": "976f2d55feb2e23598f96d3503ab133ac093aaec872eab98a6611df2f8d9953a",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/etw/alignment-verdict.json",
+      "bytes": 275,
+      "sha256": "fd1739ba9e56963c2c6085ebc3a0c2603d4fa0485d3adce9177c04c040a7930f",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/etw/trace-statistics.json",
+      "bytes": 993,
+      "sha256": "f7a680d973b06eca2057793a052914125edf89635c7607b9a67b0d8df94720d4",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/etw/summary.json",
+      "bytes": 1556361,
+      "sha256": "050caf8be01138ed570d6d16becaaf3e90064bda8ab53d0a40d885c9434817b6",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/manifest.json",
+      "bytes": 62239,
+      "sha256": "4ff129497e3e5948d5d90c7e78b17aedb03b798beb68a795c118636716baacca",
+      "manifest_verified": false
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/measurement-windows.json",
+      "bytes": 113581,
+      "sha256": "1866270b8c14d8e36e5f4983306d97e8d7c56b23433f4d53748dc309dbd14227",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/scope-metrics.json",
+      "bytes": 67299,
+      "sha256": "19c15642911d37949889bbd3900210912243fcd7c2966cb797bb0eadc691173b",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/source-identity.json",
+      "bytes": 99451,
+      "sha256": "6a051540c284b7de3c2e90589888729a4be22cefca7524f7e85cc9b44fed636e",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/json/source-verification.json",
+      "bytes": 63,
+      "sha256": "518c674008d334eb5759bce4afe9ff7626f046e6515db600c1b5a6d5e51a23fd",
+      "manifest_verified": true
+    },
+    {
+      "repository_path": "Artifacts/remeasure-12-20261020/measurement.json",
+      "bytes": 9228,
+      "sha256": "02fa5e7c9a9356499467db10c7ecf72df225e10f64217cf71c59d65813a1365e",
+      "manifest_verified": false
+    }
+  ],
+  "cohorts": {
+    "baseline": {
+      "scope": "Full saved summary, not ETW-ON containment-selected cohort",
+      "engine_frames": 415,
+      "complete": true,
+      "unacked": 0,
+      "recordingLosses": {
+        "droppedFrames": 0,
+        "droppedEvents": 0,
+        "droppedCounters": 0,
+        "sourceDroppedCounters": 0,
+        "sourceDroppedEvents": 0,
+        "sourceDroppedFrameBoundaries": 0,
+        "lateCpuEvents": 0,
+        "lateGpuSpans": 0
+      },
+      "excludedBoundaryEvents": 14,
+      "renderGroups": [
+        {
+          "viewId": 2,
+          "cpu_samples": 408,
+          "cpuRenderSubmitMs": {
+            "mean": 12.24245612745098,
+            "p50": 12.2118,
+            "p95": 14.4929,
+            "max": 17.6949
+          },
+          "gpu_pass_samples": 56712,
+          "measured_gpu_pass_sum_ms_per_real_view": 5.807319852941177,
+          "top_passes": [
+            {
+              "name": "METEOR.Shared.ShadowRecovery.Cull",
+              "pass_samples": 408,
+              "total_ms": 412.1139,
+              "mean_pass_ms": 1.010083088235294
+            },
+            {
+              "name": "METEOR.Shared.First.Cull",
+              "pass_samples": 408,
+              "total_ms": 397.5855000000001,
+              "mean_pass_ms": 0.9744742647058825
+            },
+            {
+              "name": "METEOR.CameraMeshlet.Recovery.Cull",
+              "pass_samples": 408,
+              "total_ms": 195.94869999999997,
+              "mean_pass_ms": 0.48026642156862737
+            },
+            {
+              "name": "METEOR.Scene.Color",
+              "pass_samples": 408,
+              "total_ms": 141.05370000000002,
+              "mean_pass_ms": 0.3457198529411765
+            },
+            {
+              "name": "METEOR.Scene.Material.Resolve",
+              "pass_samples": 408,
+              "total_ms": 76.84309999999999,
+              "mean_pass_ms": 0.188340931372549
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C1.Build",
+              "pass_samples": 408,
+              "total_ms": 52.7033,
+              "mean_pass_ms": 0.1291747549019608
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C0.Build",
+              "pass_samples": 408,
+              "total_ms": 48.8941,
+              "mean_pass_ms": 0.11983848039215687
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C2.Build",
+              "pass_samples": 408,
+              "total_ms": 43.343199999999996,
+              "mean_pass_ms": 0.10623333333333332
+            }
+          ]
+        },
+        {
+          "viewId": 1,
+          "cpu_samples": 408,
+          "cpuRenderSubmitMs": {
+            "mean": 12.291293137254902,
+            "p50": 12.28135,
+            "p95": 14.2178,
+            "max": 16.166
+          },
+          "gpu_pass_samples": 57936,
+          "measured_gpu_pass_sum_ms_per_real_view": 5.7351664215686275,
+          "top_passes": [
+            {
+              "name": "METEOR.Shared.ShadowRecovery.Cull",
+              "pass_samples": 408,
+              "total_ms": 412.2977,
+              "mean_pass_ms": 1.0105335784313727
+            },
+            {
+              "name": "METEOR.Shared.First.Cull",
+              "pass_samples": 408,
+              "total_ms": 397.2806999999999,
+              "mean_pass_ms": 0.9737272058823527
+            },
+            {
+              "name": "METEOR.CameraMeshlet.Recovery.Cull",
+              "pass_samples": 408,
+              "total_ms": 193.7833,
+              "mean_pass_ms": 0.47495906862745096
+            },
+            {
+              "name": "METEOR.Scene.Color",
+              "pass_samples": 408,
+              "total_ms": 106.45079999999997,
+              "mean_pass_ms": 0.2609088235294117
+            },
+            {
+              "name": "METEOR.Scene.Material.Resolve",
+              "pass_samples": 408,
+              "total_ms": 73.07170000000002,
+              "mean_pass_ms": 0.17909730392156867
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C1.Build",
+              "pass_samples": 408,
+              "total_ms": 53.05789999999999,
+              "mean_pass_ms": 0.13004387254901958
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C0.Build",
+              "pass_samples": 408,
+              "total_ms": 51.825900000000004,
+              "mean_pass_ms": 0.12702426470588235
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C2.Build",
+              "pass_samples": 408,
+              "total_ms": 45.3776,
+              "mean_pass_ms": 0.11121960784313725
+            }
+          ]
+        }
+      ],
+      "major_cpu_markers": [
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 413,
+          "perEngineFrame": 28.169264819277107,
+          "mean": 28.305677723970945,
+          "p50": 28.2054,
+          "p95": 31.2231,
+          "max": 36.6291
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderView",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 24.269242650602408,
+          "mean": 12.31263533007335,
+          "p50": 12.29535,
+          "p95": 14.3703,
+          "max": 17.7542
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclare",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 8.061393253012048,
+          "mean": 4.089826650366748,
+          "p50": 3.96475,
+          "p95": 4.8432,
+          "max": 6.2793
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclareNodeBody",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 30266,
+          "perEngineFrame": 7.586645542168674,
+          "mean": 0.10402623075398136,
+          "p50": 0.0274,
+          "p95": 0.3897,
+          "max": 0.9001
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "MaterialGraphScenePrepare",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 5.560072530120482,
+          "mean": 2.8208191931540343,
+          "p50": 2.77385,
+          "p95": 3.4486,
+          "max": 4.2921
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 3.3568481927710847,
+          "mean": 1.7030464547677262,
+          "p50": 1.7071,
+          "p95": 1.9215,
+          "max": 2.231
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DispatchJoin",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 3.0087978313253014,
+          "mean": 1.526468337408313,
+          "p50": 1.5344,
+          "p95": 1.7333,
+          "max": 2.046
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DependencyGraph",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 3.0033889156626508,
+          "mean": 1.523724205378973,
+          "p50": 1.5318,
+          "p95": 1.7306,
+          "max": 2.0427
+        },
+        {
+          "thread": "[RHIThread]",
+          "name": "RHISoftwareTranslate",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 1.6787677108433734,
+          "mean": 0.8516975550122249,
+          "p50": 0.8231,
+          "p95": 1.0358,
+          "max": 1.3128
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphCompile",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 1.514308674698795,
+          "mean": 0.7682617359413203,
+          "p50": 0.73595,
+          "p95": 0.9819,
+          "max": 1.4255
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphReset",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 819,
+          "perEngineFrame": 1.2468715662650602,
+          "mean": 0.6318091575091576,
+          "p50": 0.5204,
+          "p95": 1.1894,
+          "max": 1.3763
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderSubmit",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 0.692786265060241,
+          "mean": 0.3514746943765281,
+          "p50": 0.3385,
+          "p95": 0.4539,
+          "max": 0.9647
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclarePacketBuild",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 1636,
+          "perEngineFrame": 0.07732746987951807,
+          "mean": 0.01961546454767726,
+          "p50": 0.0205,
+          "p95": 0.0267,
+          "max": 0.1275
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclarePacketJoin",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 0.021092771084337353,
+          "mean": 0.010701100244498777,
+          "p50": 0.0102,
+          "p95": 0.0135,
+          "max": 0.0764
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclarePacketMerge",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 818,
+          "perEngineFrame": 0.0022178313253012048,
+          "mean": 0.0011251833740831296,
+          "p50": 0.0011,
+          "p95": 0.0014,
+          "max": 0.0022
+        }
+      ],
+      "record_target_work": [
+        {
+          "logical_target": 0,
+          "calls": 818,
+          "total_inclusive_scope_ms": 191.1619,
+          "mean_inclusive_work_ms_per_record": 0.2336942542787286
+        },
+        {
+          "logical_target": 1,
+          "calls": 818,
+          "total_inclusive_scope_ms": 666.1698,
+          "mean_inclusive_work_ms_per_record": 0.8143885085574573
+        },
+        {
+          "logical_target": 2,
+          "calls": 818,
+          "total_inclusive_scope_ms": 718.0392,
+          "mean_inclusive_work_ms_per_record": 0.877798533007335
+        },
+        {
+          "logical_target": 3,
+          "calls": 1636,
+          "total_inclusive_scope_ms": 610.897,
+          "mean_inclusive_work_ms_per_record": 0.746817848410758
+        },
+        {
+          "logical_target": 4,
+          "calls": 2045,
+          "total_inclusive_scope_ms": 743.0677,
+          "mean_inclusive_work_ms_per_record": 0.9083957212713936
+        },
+        {
+          "logical_target": 5,
+          "calls": 818,
+          "total_inclusive_scope_ms": 292.4921,
+          "mean_inclusive_work_ms_per_record": 0.35756980440097796
+        },
+        {
+          "logical_target": 6,
+          "calls": 1636,
+          "total_inclusive_scope_ms": 529.6978,
+          "mean_inclusive_work_ms_per_record": 0.6475523227383864
+        },
+        {
+          "logical_target": 7,
+          "calls": 1636,
+          "total_inclusive_scope_ms": 974.9504,
+          "mean_inclusive_work_ms_per_record": 1.1918709046454767
+        }
+      ],
+      "translation_worker_scopes": [
+        {
+          "thread": "[Worker 1]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 886,
+          "perEngineFrame": 0.6882578313253013,
+          "mean": 0.3223781038374718,
+          "p50": 0.35340000000000005,
+          "p95": 0.4837,
+          "max": 0.7428
+        },
+        {
+          "thread": "[Worker 8]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 832,
+          "perEngineFrame": 0.6860221686746989,
+          "mean": 0.34218653846153846,
+          "p50": 0.3588,
+          "p95": 0.4878,
+          "max": 0.6629
+        },
+        {
+          "thread": "[Worker 4]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 844,
+          "perEngineFrame": 0.679126265060241,
+          "mean": 0.33393056872037913,
+          "p50": 0.3533,
+          "p95": 0.4948,
+          "max": 0.6642
+        },
+        {
+          "thread": "[Worker 5]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 860,
+          "perEngineFrame": 0.6768339759036145,
+          "mean": 0.3266117441860465,
+          "p50": 0.35040000000000004,
+          "p95": 0.4881,
+          "max": 0.8101
+        },
+        {
+          "thread": "[Worker 3]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 822,
+          "perEngineFrame": 0.6214481927710843,
+          "mean": 0.31374817518248177,
+          "p50": 0.3463,
+          "p95": 0.4857,
+          "max": 0.7303
+        },
+        {
+          "thread": "[Worker 7]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 747,
+          "perEngineFrame": 0.5881040963855422,
+          "mean": 0.32672449799196784,
+          "p50": 0.347,
+          "p95": 0.4895,
+          "max": 0.7132
+        },
+        {
+          "thread": "[Worker 6]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 806,
+          "perEngineFrame": 0.581189156626506,
+          "mean": 0.2992475186104218,
+          "p50": 0.33975,
+          "p95": 0.4755,
+          "max": 0.672
+        },
+        {
+          "thread": "[Worker 2]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 747,
+          "perEngineFrame": 0.5661465060240963,
+          "mean": 0.31452583668005357,
+          "p50": 0.3447,
+          "p95": 0.4754,
+          "max": 0.6907
+        }
+      ],
+      "live_start_native_record": {
+        "ms": 1.6372,
+        "recordingWaves": 3,
+        "jobDispatches": 1,
+        "ownerJoins": 1,
+        "dispatcherHandoffs": 1,
+        "batchedNativeGraph": true,
+        "workerJobs": 12,
+        "commandTargets": 8,
+        "recordUnits": 142,
+        "declaredBatchCost": 120,
+        "estimatedCpuWork": 1426,
+        "parallelDeclined": false,
+        "balanced": true,
+        "samples": 5349,
+        "axis": "native-graph-record-cpu-not-full-frame",
+        "temporalProvenance": {
+          "schemaVersion": 2,
+          "valid": true,
+          "frameKind": "real",
+          "realFrameId": "3672",
+          "publicationFrameId": "3672",
+          "viewId": "1",
+          "sceneEpoch": "3",
+          "generatedOrdinal": 0,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": "none",
+          "frameGenerator": "none",
+          "resolutionState": "native",
+          "spatialMode": "off",
+          "deepDvcApplied": false,
+          "nativeGateActive": false,
+          "goldenEligible": false
+        }
+      },
+      "live_end_native_record": {
+        "ms": 1.6729,
+        "recordingWaves": 3,
+        "jobDispatches": 1,
+        "ownerJoins": 1,
+        "dispatcherHandoffs": 1,
+        "batchedNativeGraph": true,
+        "workerJobs": 13,
+        "commandTargets": 8,
+        "recordUnits": 139,
+        "declaredBatchCost": 120,
+        "estimatedCpuWork": 1417,
+        "parallelDeclined": false,
+        "balanced": true,
+        "samples": 6151,
+        "axis": "native-graph-record-cpu-not-full-frame",
+        "temporalProvenance": {
+          "schemaVersion": 2,
+          "valid": true,
+          "frameKind": "real",
+          "realFrameId": "4075",
+          "publicationFrameId": "4075",
+          "viewId": "2",
+          "sceneEpoch": "3",
+          "generatedOrdinal": 0,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": "none",
+          "frameGenerator": "none",
+          "resolutionState": "native",
+          "spatialMode": "off",
+          "deepDvcApplied": false,
+          "nativeGateActive": false,
+          "goldenEligible": false
+        }
+      },
+      "backend": "dx12",
+      "pixelAcceptance": false,
+      "nativeQualityGateEligible": false,
+      "presenterReturns": {
+        "samples": 0,
+        "missingSequences": 0,
+        "unknownIdentities": 0,
+        "unsuccessfulOutcomes": 0,
+        "clockDomain": "qpc",
+        "ticksPerSecond": 10000000,
+        "monotonic": true,
+        "completeWithinObservedBounds": false,
+        "firstSequence": null,
+        "lastSequence": null,
+        "axis": "cpu-presenter-wrapper-return-observed",
+        "generatedOutputTimestampsAvailable": false,
+        "osDisplayedTimestampsAvailable": false,
+        "physicalPhotonTimestampsAvailable": false
+      }
+    },
+    "etw": {
+      "scope": "Full saved summary, not ETW-ON containment-selected cohort",
+      "engine_frames": 376,
+      "complete": true,
+      "unacked": 0,
+      "recordingLosses": {
+        "droppedFrames": 0,
+        "droppedEvents": 0,
+        "droppedCounters": 0,
+        "sourceDroppedCounters": 0,
+        "sourceDroppedEvents": 0,
+        "sourceDroppedFrameBoundaries": 0,
+        "lateCpuEvents": 0,
+        "lateGpuSpans": 0
+      },
+      "excludedBoundaryEvents": 15,
+      "renderGroups": [
+        {
+          "viewId": 2,
+          "cpu_samples": 353,
+          "cpuRenderSubmitMs": {
+            "mean": 14.456329178470256,
+            "p50": 14.3868,
+            "p95": 17.8148,
+            "max": 20.2857
+          },
+          "gpu_pass_samples": 49067,
+          "measured_gpu_pass_sum_ms_per_real_view": 5.73988045325779,
+          "top_passes": [
+            {
+              "name": "METEOR.Shared.ShadowRecovery.Cull",
+              "pass_samples": 353,
+              "total_ms": 342.83169999999996,
+              "mean_pass_ms": 0.9711946175637393
+            },
+            {
+              "name": "METEOR.Shared.First.Cull",
+              "pass_samples": 353,
+              "total_ms": 331.73839999999996,
+              "mean_pass_ms": 0.9397688385269121
+            },
+            {
+              "name": "METEOR.CameraMeshlet.Recovery.Cull",
+              "pass_samples": 353,
+              "total_ms": 167.387,
+              "mean_pass_ms": 0.4741841359773371
+            },
+            {
+              "name": "METEOR.Scene.Color",
+              "pass_samples": 353,
+              "total_ms": 115.163,
+              "mean_pass_ms": 0.32624079320113314
+            },
+            {
+              "name": "METEOR.Scene.Material.Resolve",
+              "pass_samples": 353,
+              "total_ms": 66.03510000000001,
+              "mean_pass_ms": 0.18706827195467426
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C1.Build",
+              "pass_samples": 353,
+              "total_ms": 53.78520000000001,
+              "mean_pass_ms": 0.15236600566572242
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C0.Build",
+              "pass_samples": 353,
+              "total_ms": 53.5637,
+              "mean_pass_ms": 0.1517385269121813
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C2.Build",
+              "pass_samples": 353,
+              "total_ms": 46.405199999999994,
+              "mean_pass_ms": 0.1314594900849858
+            }
+          ]
+        },
+        {
+          "viewId": 1,
+          "cpu_samples": 354,
+          "cpuRenderSubmitMs": {
+            "mean": 14.61199209039548,
+            "p50": 14.4448,
+            "p95": 18.0411,
+            "max": 20.6785
+          },
+          "gpu_pass_samples": 50268,
+          "measured_gpu_pass_sum_ms_per_real_view": 5.654761581920904,
+          "top_passes": [
+            {
+              "name": "METEOR.Shared.ShadowRecovery.Cull",
+              "pass_samples": 354,
+              "total_ms": 341.0589999999999,
+              "mean_pass_ms": 0.9634435028248585
+            },
+            {
+              "name": "METEOR.Shared.First.Cull",
+              "pass_samples": 354,
+              "total_ms": 331.99690000000004,
+              "mean_pass_ms": 0.937844350282486
+            },
+            {
+              "name": "METEOR.CameraMeshlet.Recovery.Cull",
+              "pass_samples": 354,
+              "total_ms": 168.59759999999997,
+              "mean_pass_ms": 0.4762644067796609
+            },
+            {
+              "name": "METEOR.Scene.Color",
+              "pass_samples": 354,
+              "total_ms": 88.6686,
+              "mean_pass_ms": 0.25047627118644067
+            },
+            {
+              "name": "METEOR.Scene.Material.Resolve",
+              "pass_samples": 354,
+              "total_ms": 62.13830000000002,
+              "mean_pass_ms": 0.17553192090395486
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C1.Build",
+              "pass_samples": 354,
+              "total_ms": 53.605599999999995,
+              "mean_pass_ms": 0.15142824858757062
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C0.Build",
+              "pass_samples": 354,
+              "total_ms": 53.511,
+              "mean_pass_ms": 0.15116101694915254
+            },
+            {
+              "name": "METEOR.Shadow.Occlusion.C2.Build",
+              "pass_samples": 354,
+              "total_ms": 46.37870000000001,
+              "mean_pass_ms": 0.1310132768361582
+            }
+          ]
+        }
+      ],
+      "major_cpu_markers": [
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 374,
+          "perEngineFrame": 32.01004867021277,
+          "mean": 32.18122540106952,
+          "p50": 33.34875,
+          "p95": 38.9645,
+          "max": 43.537
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderView",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 711,
+          "perEngineFrame": 27.591251329787234,
+          "mean": 14.591154008438819,
+          "p50": 14.4781,
+          "p95": 17.8845,
+          "max": 20.7282
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclare",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 711,
+          "perEngineFrame": 8.872920478723405,
+          "mean": 4.692289873417722,
+          "p50": 4.4716,
+          "p95": 6.2358,
+          "max": 7.6337
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclareNodeBody",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 26343,
+          "perEngineFrame": 8.360496010638297,
+          "mean": 0.11933137835478115,
+          "p50": 0.0301,
+          "p95": 0.4433,
+          "max": 1.3447
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "MaterialGraphScenePrepare",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 6.636191755319149,
+          "mean": 3.504505758426966,
+          "p50": 3.4937,
+          "p95": 4.336,
+          "max": 6.4149
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 3.962195212765957,
+          "mean": 2.0923952247191013,
+          "p50": 2.0701,
+          "p95": 2.468,
+          "max": 2.918
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DispatchJoin",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 3.5807356382978726,
+          "mean": 1.8909502808988765,
+          "p50": 1.8745,
+          "p95": 2.2188,
+          "max": 2.6108
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DependencyGraph",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 3.5748781914893617,
+          "mean": 1.88785702247191,
+          "p50": 1.8716,
+          "p95": 2.2155,
+          "max": 2.6068
+        },
+        {
+          "thread": "[RHIThread]",
+          "name": "RHISoftwareTranslate",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 1.9550321808510638,
+          "mean": 1.0324327247191012,
+          "p50": 0.99665,
+          "p95": 1.2893,
+          "max": 2.6334
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphCompile",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 1.6318638297872339,
+          "mean": 0.8617707865168539,
+          "p50": 0.7856,
+          "p95": 1.2589,
+          "max": 2.0822
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphReset",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 1.368683510638298,
+          "mean": 0.7227879213483146,
+          "p50": 0.8317,
+          "p95": 1.3826,
+          "max": 2.0889
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderSubmit",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 0.7869191489361702,
+          "mean": 0.4155640449438202,
+          "p50": 0.39165,
+          "p95": 0.5558,
+          "max": 0.9885
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclarePacketBuild",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 1424,
+          "perEngineFrame": 0.08485265957446808,
+          "mean": 0.02240491573033708,
+          "p50": 0.0211,
+          "p95": 0.0384,
+          "max": 0.3102
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclarePacketJoin",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 0.02478563829787234,
+          "mean": 0.013089044943820224,
+          "p50": 0.0113,
+          "p95": 0.0189,
+          "max": 0.2445
+        },
+        {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclarePacketMerge",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 712,
+          "perEngineFrame": 0.002331914893617021,
+          "mean": 0.0012314606741573033,
+          "p50": 0.0011,
+          "p95": 0.0018,
+          "max": 0.0155
+        }
+      ],
+      "record_target_work": [
+        {
+          "logical_target": 0,
+          "calls": 712,
+          "total_inclusive_scope_ms": 181.4317,
+          "mean_inclusive_work_ms_per_record": 0.2548198033707865
+        },
+        {
+          "logical_target": 1,
+          "calls": 712,
+          "total_inclusive_scope_ms": 694.0873,
+          "mean_inclusive_work_ms_per_record": 0.9748417134831461
+        },
+        {
+          "logical_target": 2,
+          "calls": 712,
+          "total_inclusive_scope_ms": 723.5126,
+          "mean_inclusive_work_ms_per_record": 1.016169382022472
+        },
+        {
+          "logical_target": 3,
+          "calls": 1424,
+          "total_inclusive_scope_ms": 639.2602,
+          "mean_inclusive_work_ms_per_record": 0.8978373595505619
+        },
+        {
+          "logical_target": 4,
+          "calls": 1780,
+          "total_inclusive_scope_ms": 763.473,
+          "mean_inclusive_work_ms_per_record": 1.0722935393258426
+        },
+        {
+          "logical_target": 5,
+          "calls": 712,
+          "total_inclusive_scope_ms": 305.63710000000003,
+          "mean_inclusive_work_ms_per_record": 0.4292655898876405
+        },
+        {
+          "logical_target": 6,
+          "calls": 1424,
+          "total_inclusive_scope_ms": 535.3988,
+          "mean_inclusive_work_ms_per_record": 0.7519646067415731
+        },
+        {
+          "logical_target": 7,
+          "calls": 1424,
+          "total_inclusive_scope_ms": 1008.3504,
+          "mean_inclusive_work_ms_per_record": 1.4162224719101124
+        }
+      ],
+      "translation_worker_scopes": [
+        {
+          "thread": "[Worker 1]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 768,
+          "perEngineFrame": 0.702131914893617,
+          "mean": 0.34375208333333335,
+          "p50": 0.3677,
+          "p95": 0.5607,
+          "max": 1.2168
+        },
+        {
+          "thread": "[Worker 8]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 741,
+          "perEngineFrame": 0.7019263297872341,
+          "mean": 0.3561731443994602,
+          "p50": 0.3725,
+          "p95": 0.5676,
+          "max": 1.448
+        },
+        {
+          "thread": "[Worker 4]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 756,
+          "perEngineFrame": 0.6954646276595745,
+          "mean": 0.3458924603174603,
+          "p50": 0.37055,
+          "p95": 0.5684,
+          "max": 1.2139
+        },
+        {
+          "thread": "[Worker 5]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 722,
+          "perEngineFrame": 0.6930992021276595,
+          "mean": 0.36094916897506923,
+          "p50": 0.37295,
+          "p95": 0.5562,
+          "max": 0.8758
+        },
+        {
+          "thread": "[Worker 7]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 649,
+          "perEngineFrame": 0.6383324468085106,
+          "mean": 0.3698197226502311,
+          "p50": 0.3753,
+          "p95": 0.6101,
+          "max": 1.6717
+        },
+        {
+          "thread": "[Worker 3]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 694,
+          "perEngineFrame": 0.628888829787234,
+          "mean": 0.3407236311239193,
+          "p50": 0.366,
+          "p95": 0.5591,
+          "max": 1.7329
+        },
+        {
+          "thread": "[Worker 6]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 697,
+          "perEngineFrame": 0.6192279255319149,
+          "mean": 0.3340454806312769,
+          "p50": 0.3627,
+          "p95": 0.5717,
+          "max": 0.8929
+        },
+        {
+          "thread": "[Worker 2]",
+          "name": "RHISoftwareTranslate.Targets",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 669,
+          "perEngineFrame": 0.6055183510638298,
+          "mean": 0.34032122571001494,
+          "p50": 0.3686,
+          "p95": 0.6025,
+          "max": 0.7955
+        }
+      ],
+      "live_start_native_record": {
+        "ms": 2.0682,
+        "recordingWaves": 3,
+        "jobDispatches": 1,
+        "ownerJoins": 1,
+        "dispatcherHandoffs": 1,
+        "batchedNativeGraph": true,
+        "workerJobs": 13,
+        "commandTargets": 8,
+        "recordUnits": 139,
+        "declaredBatchCost": 120,
+        "estimatedCpuWork": 1417,
+        "parallelDeclined": false,
+        "balanced": true,
+        "samples": 471,
+        "axis": "native-graph-record-cpu-not-full-frame",
+        "temporalProvenance": {
+          "schemaVersion": 2,
+          "valid": true,
+          "frameKind": "real",
+          "realFrameId": "1203",
+          "publicationFrameId": "1203",
+          "viewId": "2",
+          "sceneEpoch": "3",
+          "generatedOrdinal": 0,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": "none",
+          "frameGenerator": "none",
+          "resolutionState": "native",
+          "spatialMode": "off",
+          "deepDvcApplied": false,
+          "nativeGateActive": false,
+          "goldenEligible": false
+        }
+      },
+      "live_end_native_record": {
+        "ms": 2.2151,
+        "recordingWaves": 3,
+        "jobDispatches": 1,
+        "ownerJoins": 1,
+        "dispatcherHandoffs": 1,
+        "batchedNativeGraph": true,
+        "workerJobs": 13,
+        "commandTargets": 8,
+        "recordUnits": 139,
+        "declaredBatchCost": 120,
+        "estimatedCpuWork": 1417,
+        "parallelDeclined": false,
+        "balanced": true,
+        "samples": 1167,
+        "axis": "native-graph-record-cpu-not-full-frame",
+        "temporalProvenance": {
+          "schemaVersion": 2,
+          "valid": true,
+          "frameKind": "real",
+          "realFrameId": "1568",
+          "publicationFrameId": "1568",
+          "viewId": "2",
+          "sceneEpoch": "3",
+          "generatedOrdinal": 0,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": "none",
+          "frameGenerator": "none",
+          "resolutionState": "native",
+          "spatialMode": "off",
+          "deepDvcApplied": false,
+          "nativeGateActive": false,
+          "goldenEligible": false
+        }
+      },
+      "backend": "dx12",
+      "pixelAcceptance": false,
+      "nativeQualityGateEligible": false,
+      "presenterReturns": {
+        "samples": 0,
+        "missingSequences": 0,
+        "unknownIdentities": 0,
+        "unsuccessfulOutcomes": 0,
+        "clockDomain": "qpc",
+        "ticksPerSecond": 10000000,
+        "monotonic": true,
+        "completeWithinObservedBounds": false,
+        "firstSequence": null,
+        "lastSequence": null,
+        "axis": "cpu-presenter-wrapper-return-observed",
+        "generatedOutputTimestampsAvailable": false,
+        "osDisplayedTimestampsAvailable": false,
+        "physicalPhotonTimestampsAvailable": false
+      }
+    }
+  },
+  "etw_on_major_scopes": {
+    "MaterialGraphScenePrepare": {
+      "wall": {
+        "count": 689,
+        "mean": 3.498867779390421,
+        "p50": 3.488,
+        "p95": 4.336,
+        "p99": 4.6155,
+        "max": 6.4149
+      },
+      "meanStateMs": {
+        "Running": 3.138270391872298,
+        "Ready": 0.1086748911465595,
+        "Waiting": 0.25186298984039485,
+        "Unknown": 5.9506531200927235e-05
+      }
+    },
+    "RenderGraphDeclare": {
+      "wall": {
+        "count": 689,
+        "mean": 4.688407982583454,
+        "p50": 4.4629,
+        "p95": 6.2538,
+        "p99": 6.9487,
+        "max": 7.6337
+      },
+      "meanStateMs": {
+        "Running": 4.682907256894063,
+        "Ready": 0.004010159651664349,
+        "Waiting": 0.001477503628453007,
+        "Unknown": 1.3062409288845503e-05
+      }
+    },
+    "RenderGraphCompile": {
+      "wall": {
+        "count": 689,
+        "mean": 0.8592298984034833,
+        "p50": 0.7852,
+        "p95": 1.2589,
+        "p99": 1.3732,
+        "max": 2.0822
+      },
+      "meanStateMs": {
+        "Running": 0.8588293178519654,
+        "Ready": 0.00021335268505367325,
+        "Waiting": 0.00018722786647433224,
+        "Unknown": 0.0
+      }
+    },
+    "RenderCommandRecord": {
+      "wall": {
+        "count": 689,
+        "mean": 2.0913815674891145,
+        "p50": 2.0695,
+        "p95": 2.468,
+        "p99": 2.6958,
+        "max": 2.918
+      },
+      "meanStateMs": {
+        "Running": 0.33255718432506115,
+        "Ready": 0.015593613933295192,
+        "Waiting": 1.7432307692307925,
+        "Unknown": 0.0
+      }
+    },
+    "RHISoftwareTranslate": {
+      "wall": {
+        "count": 689,
+        "mean": 1.0312467343976779,
+        "p50": 0.9964,
+        "p95": 1.2714,
+        "p99": 1.4905,
+        "max": 2.6334
+      },
+      "meanStateMs": {
+        "Running": 0.3978345428156682,
+        "Ready": 0.020149492017466433,
+        "Waiting": 0.6132626995646029,
+        "Unknown": 0.0
+      }
+    },
+    "RenderSubmit": {
+      "wall": {
+        "count": 689,
+        "mean": 0.41380072568940496,
+        "p50": 0.3914,
+        "p95": 0.5533,
+        "p99": 0.7156,
+        "max": 0.9588
+      },
+      "meanStateMs": {
+        "Running": 0.4131824383163888,
+        "Ready": 0.0005965166908596981,
+        "Waiting": 2.1770682147195826e-05,
+        "Unknown": 0.0
+      }
+    }
+  },
+  "etw_on_named_declare_scopes": {
+    "RenderDeclare.METEOR.Scene.Cull.First": {
+      "wall": {
+        "count": 690,
+        "mean": 0.5390563768115942,
+        "p50": 0.4852,
+        "p95": 0.7666,
+        "p99": 0.9499,
+        "max": 1.3497
+      },
+      "meanStateMs": {
+        "Running": 0.5378627536232147,
+        "Ready": 0.0007762318840582009,
+        "Waiting": 0.00041739130434850097,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Shadow.Cull.Final": {
+      "wall": {
+        "count": 690,
+        "mean": 0.4814317391304348,
+        "p50": 0.4367,
+        "p95": 0.716,
+        "p99": 0.7882,
+        "max": 1.1156
+      },
+      "meanStateMs": {
+        "Running": 0.4812065217391572,
+        "Ready": 0.00022521739130613994,
+        "Waiting": 0.0,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Shadow.Occluder": {
+      "wall": {
+        "count": 690,
+        "mean": 0.4174091304347826,
+        "p50": 0.37224999999999997,
+        "p95": 0.6296,
+        "p99": 0.7755,
+        "max": 1.1306
+      },
+      "meanStateMs": {
+        "Running": 0.4163627536232143,
+        "Ready": 0.0007840579710134171,
+        "Waiting": 0.00026231884058108623,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Shadow.Raster": {
+      "wall": {
+        "count": 690,
+        "mean": 0.37750782608695654,
+        "p50": 0.34085,
+        "p95": 0.5613,
+        "p99": 0.7053,
+        "max": 1.0184
+      },
+      "meanStateMs": {
+        "Running": 0.3773107246376771,
+        "Ready": 0.00014057971014390996,
+        "Waiting": 5.652173913140491e-05,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Scene.Occluder": {
+      "wall": {
+        "count": 690,
+        "mean": 0.2839434782608696,
+        "p50": 0.25455,
+        "p95": 0.4182,
+        "p99": 0.6347,
+        "max": 0.8851
+      },
+      "meanStateMs": {
+        "Running": 0.28355942028981973,
+        "Ready": 0.0001724637681168067,
+        "Waiting": 0.00021159420289816057,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Shadow.History": {
+      "wall": {
+        "count": 690,
+        "mean": 0.2774063768115942,
+        "p50": 0.2534,
+        "p95": 0.4146,
+        "p99": 0.4968,
+        "max": 0.6294
+      },
+      "meanStateMs": {
+        "Running": 0.2772310144927284,
+        "Ready": 0.00016376811594375835,
+        "Waiting": 1.1594202898276559e-05,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Scene.Visibility": {
+      "wall": {
+        "count": 690,
+        "mean": 0.2628413043478261,
+        "p50": 0.23865,
+        "p95": 0.3968,
+        "p99": 0.5072,
+        "max": 1.0464
+      },
+      "meanStateMs": {
+        "Running": 0.2626702898550739,
+        "Ready": 0.00012898550724497435,
+        "Waiting": 4.202898550790016e-05,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Scene.Geometry": {
+      "wall": {
+        "count": 690,
+        "mean": 0.2391814492753623,
+        "p50": 0.21635,
+        "p95": 0.3343,
+        "p99": 0.4946,
+        "max": 0.7875
+      },
+      "meanStateMs": {
+        "Running": 0.2388385507246144,
+        "Ready": 0.00015159420289905215,
+        "Waiting": 0.00019130434782683564,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.SSGI": {
+      "wall": {
+        "count": 689,
+        "mean": 0.23588185776487663,
+        "p50": 0.2217,
+        "p95": 0.3406,
+        "p99": 0.4388,
+        "max": 0.5878
+      },
+      "meanStateMs": {
+        "Running": 0.23542612481857325,
+        "Ready": 0.00036139332365321886,
+        "Waiting": 9.433962264224865e-05,
+        "Unknown": 0.0
+      }
+    },
+    "RenderDeclare.METEOR.Scene.Cull.Final": {
+      "wall": {
+        "count": 690,
+        "mean": 0.21904362318840578,
+        "p50": 0.1937,
+        "p95": 0.3433,
+        "p99": 0.4544,
+        "max": 0.6618
+      },
+      "meanStateMs": {
+        "Running": 0.2188914492753759,
+        "Ready": 0.00013043478260758845,
+        "Waiting": 8.695652173048364e-06,
+        "Unknown": 1.3043478260890655e-05
+      }
+    }
+  },
+  "interpretation": [
+    "softwareRhi=true is software command recording followed by native DX12 replay/submission; not software GPU emulation.",
+    "Baseline full-summary and ETW ON differ in sample count and instrumentation. Do not compare their timings as a code change.",
+    "CPU marker means are inclusive. Record DispatchJoin includes DependencyGraph; parent and child are not additive.",
+    "Translation runs on RHIThread and replay scopes run on workers. Owner Waiting is a scheduler/join symptom, not idle-time proof or removable work.",
+    "Logical target worker numbers differ from physical Worker thread labels. Per-target work sums are not wall critical path.",
+    "GPU figures are sums/means of measured pass timestamps, not GPU queue interval unions or displayed FPS.",
+    "No native-software bypass A/B capture, full CPU allocation profile, latest Release capture, or per-command hardware-counter attribution is in this selected baseline.",
+    "Stored quality flags do not prove pixel correctness; pixelAcceptance/nativeQualityGateEligible are false.",
+    "This extraction downloaded summaries/conditions only, no raw ETW threads/kernel rows or full frames."
+  ],
+  "available_validation": {
+    "windows": [
+      "Tools/regression/verify-rhi-software-commands.ps1: Debug/Release, actual command/encoder/recorder/batch/arena + vendored mimalloc; 39 method coverage; fake native encoder.",
+      "Tools/regression/verify-rhi-software-native.ps1: built Debug CreatorEditor dx12.rendergraph with CREATOR_DX12_VALIDATION=gpu; clear/barrier/readback and full RenderGraph; not CreatorRobot throughput."
+    ],
+    "portable": [
+      "Tools/regression/verify-translation-work-queue.py: exact Translate body + fixed CPU RHI fixtures; optional actual scheduler/enkiTS; allocation/correctness, no GPU.",
+      "Tools/regression/verify-recording-task-graph.py: actual scheduler/enkiTS, physical workers 1/4/8 and eight targets; normal/mutation and optional sanitizer."
+    ],
+    "host_tools_observed": {
+      "g++": true,
+      "python3": true,
+      "pwsh": false,
+      "msbuild": false,
+      "dotnet": false,
+      "cmake": false,
+      "ninja": false,
+      "perf": false,
+      "vulkaninfo": false,
+      "vulkan_sdk": false,
+      "vulkan_icd": false,
+      "dev_dri": false
+    },
+    "native_gpu_tests_run_here": false
+  }
+}

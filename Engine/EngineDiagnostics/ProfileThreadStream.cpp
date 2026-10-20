@@ -328,7 +328,8 @@ namespace ce
         m_inHonor = false;
     }
 
-    bool thread_stream::write(const profile_event& value, std::uint64_t generation, bool late_ingest)
+    bool thread_stream::write(const profile_event& value, std::uint64_t generation, bool late_ingest,
+                              const profile_rhi_context* rhi)
     {
         if (generation != m_generation.load(std::memory_order_acquire))
         {
@@ -348,6 +349,11 @@ namespace ce
         m_writer->late_ingest = late_ingest;
         m_writer->events[m_writer->count] = value;
         m_writer->events[m_writer->count].thread_slot = static_cast<std::uint16_t>(m_info.slot);
+        if (rhi && rhi->valid())
+        {
+            m_writer->render_measurements[m_writer->render_measurement_count++] =
+                make_rhi_measurement(m_writer->events[m_writer->count], *rhi);
+        }
         ++m_writer->count;
         ++m_sequence;
         return true;
@@ -436,6 +442,23 @@ namespace ce
         published.session.store(scope.cpu.session, std::memory_order_release);
         published.tick.store(scope.cpu.tick, std::memory_order_release);
         published.task.store(scope.cpu.task, std::memory_order_release);
+        if (scope.rhi_available)
+        {
+            const auto& rhi = m_rhiContexts[index];
+            auto& target = m_publishedRhiScopes[index];
+            target.token.store(0, std::memory_order_release);
+            target.recording_id.store(rhi.recording_id, std::memory_order_release);
+            target.source_engine_frame.store(rhi.source_engine_frame, std::memory_order_release);
+            target.frame_id.store(rhi.frame_id, std::memory_order_release);
+            target.view_id.store(rhi.view_id, std::memory_order_release);
+            target.device_incarnation.store(rhi.device_incarnation, std::memory_order_release);
+            target.backend_generation.store(rhi.backend_generation, std::memory_order_release);
+            target.queue_id.store(rhi.queue_id, std::memory_order_release);
+            target.target_index.store(rhi.target_index, std::memory_order_release);
+            target.queue_kind.store(rhi.queue_kind, std::memory_order_release);
+            target.source_engine_frame_available.store(rhi.source_engine_frame_available, std::memory_order_release);
+            target.token.store(scope.token, std::memory_order_release);
+        }
         published.token.store(scope.token, std::memory_order_release);
     }
 
@@ -445,8 +468,8 @@ namespace ce
         begin_scope(id, now, frame, cpu, m_generation.load(std::memory_order_acquire));
     }
 
-    void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
-                                    const cpu_span_context& cpu, std::uint64_t generation)
+    void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame, const cpu_span_context& cpu,
+                                    std::uint64_t generation, const profile_rhi_context* rhi)
     {
         if (!owned_by_caller())
         {
@@ -474,6 +497,11 @@ namespace ce
         scope.marker = id;
         scope.frame = frame;
         scope.cpu = cpu;
+        scope.rhi_available = rhi && rhi->valid();
+        if (scope.rhi_available)
+        {
+            m_rhiContexts[m_depth] = *rhi;
+        }
         scope.flags = event_flags::none;
         scope.generation = generation;
         scope.depth = recording_depth(generation);
@@ -553,13 +581,12 @@ namespace ce
             value.tick_end = (std::min)(value.tick_end, cutoff);
             value.flags = value.flags | event_flags::truncated_end;
         }
-        write(value, scope.generation);
+        write(value, scope.generation, false, scope.rhi_available ? &m_rhiContexts[m_depth] : nullptr);
         honor_seal_request();
     }
 
-    bool thread_stream::read_open_scope(std::uint32_t index, std::uint64_t generation,
-                                       profile_tick end_tick, profile_event& value,
-                                       std::uint64_t& token) const
+    bool thread_stream::read_open_scope(std::uint32_t index, std::uint64_t generation, profile_tick end_tick,
+                                        profile_event& value, std::uint64_t& token, profile_rhi_context* rhi) const
     {
         const published_scope& published = m_publishedScopes[index];
         token = published.token.load(std::memory_order_acquire);
@@ -578,12 +605,36 @@ namespace ce
         value.cpu.tick = published.tick.load(std::memory_order_acquire);
         value.cpu.task = published.task.load(std::memory_order_acquire);
         value.thread_slot = static_cast<std::uint16_t>(m_info.slot);
+        if (rhi)
+        {
+            *rhi = {};
+            const auto& source = m_publishedRhiScopes[index];
+            if (source.token.load(std::memory_order_acquire) == token)
+            {
+                rhi->recording_id = source.recording_id.load(std::memory_order_acquire);
+                rhi->source_engine_frame = source.source_engine_frame.load(std::memory_order_acquire);
+                rhi->frame_id = source.frame_id.load(std::memory_order_acquire);
+                rhi->view_id = source.view_id.load(std::memory_order_acquire);
+                rhi->device_incarnation = source.device_incarnation.load(std::memory_order_acquire);
+                rhi->backend_generation = source.backend_generation.load(std::memory_order_acquire);
+                rhi->queue_id = source.queue_id.load(std::memory_order_acquire);
+                rhi->target_index = source.target_index.load(std::memory_order_acquire);
+                rhi->queue_kind = source.queue_kind.load(std::memory_order_acquire);
+                rhi->source_engine_frame_available =
+                    source.source_engine_frame_available.load(std::memory_order_acquire);
+                if (source.token.load(std::memory_order_acquire) != token)
+                {
+                    return false;
+                }
+            }
+        }
         return value.tick_begin <= end_tick
             && token == published.token.load(std::memory_order_acquire);
     }
 
     std::uint32_t thread_stream::snapshot_open_scopes(std::uint64_t generation, profile_tick end_tick,
-                                                     profile_event* output, std::uint32_t capacity) const
+                                                      profile_event* output, std::uint32_t capacity,
+                                                      profile_rhi_context* rhi_output) const
     {
         if (!output)
         {
@@ -594,7 +645,7 @@ namespace ce
         {
             profile_event value;
             std::uint64_t token = 0;
-            if (read_open_scope(i, generation, end_tick, value, token))
+            if (read_open_scope(i, generation, end_tick, value, token, rhi_output ? &rhi_output[count] : nullptr))
             {
                 output[count++] = value;
             }
@@ -603,7 +654,8 @@ namespace ce
     }
 
     std::uint32_t thread_stream::claim_open_scopes(std::uint64_t generation, profile_tick end_tick,
-                                                  profile_event* output, std::uint32_t capacity)
+                                                   profile_event* output, std::uint32_t capacity,
+                                                   profile_rhi_context* rhi_output)
     {
         if (!output)
         {
@@ -614,9 +666,9 @@ namespace ce
         {
             profile_event value;
             std::uint64_t token = 0;
-            if (read_open_scope(i, generation, end_tick, value, token)
-                && m_publishedScopes[i].token.compare_exchange_strong(
-                    token, token & ~std::uint64_t{ 1 }, std::memory_order_acq_rel))
+            if (read_open_scope(i, generation, end_tick, value, token, rhi_output ? &rhi_output[count] : nullptr) &&
+                m_publishedScopes[i].token.compare_exchange_strong(token, token & ~std::uint64_t{1},
+                                                                   std::memory_order_acq_rel))
             {
                 output[count++] = value;
             }
@@ -656,7 +708,7 @@ namespace ce
         value.queue = gpu.queue;
         // GPU는 Stop의 제출 cutoff까지 늦게 도착한다. CPU의 admission cutoff를
         // 적용하지 않고, 제출할 때 잡은 세대를 그대로 청크에 싣는다.
-        if (write(value, generation, true) && gpu.provenance.frame_kind != 0)
+        if (write(value, generation, true, &gpu.rhi) && gpu.provenance.frame_kind != 0)
         {
             profile_render_measurement sample;
             sample.engine_frame = frame;
@@ -819,7 +871,7 @@ namespace ce
             value.cpu = scope.cpu;
             value.depth = scope.depth;
             value.flags = scope.flags | event_flags::truncated_end;
-            write(value, scope.generation);
+            write(value, scope.generation, false, scope.rhi_available ? &m_rhiContexts[i - 1] : nullptr);
         }
     }
 

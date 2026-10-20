@@ -1,0 +1,128 @@
+{
+  "baseline_commit": "088ea7b70c1a610e93fd2e0f6a2f35a2b9a5e175",
+  "method": "Recreate the same locally present tracked header/source/project set in a separate directory, replace each changed tracked file with exact git-show baseline bytes, omit newly added files, and run the unchanged checker. Unchanged files are read-only symlinks; no allowlist or production source is changed.",
+  "limitation": "Linux checkout comparison, not a Windows full build or independently completed full checkout. Existing host/checker failures are reported, not waived.",
+  "mirrored_file_count": 1719,
+  "checker_sha256": "b73ed6c91d5b720b2fc7e093de3b115a04ee23093d2f1114e00650d0d7dad127",
+  "baseline_exit": 1,
+  "current_exit": 1,
+  "baseline_summary": [
+    "상향(역방향) include 간선: 27개 (허용 목록 0개)",
+    "[실패] 새 상향 간선 27개 — 아래층은 위층 헤더를 include할 수 없습니다:",
+    "물리 경계 부채: 69건 (허용 0건, 항목 69개)",
+    "[실패] 새 물리 경계 부채 69개:"
+  ],
+  "current_summary": [
+    "상향(역방향) include 간선: 27개 (허용 목록 0개)",
+    "[실패] 새 상향 간선 27개 — 아래층은 위층 헤더를 include할 수 없습니다:",
+    "물리 경계 부채: 69건 (허용 0건, 항목 69개)",
+    "[실패] 새 물리 경계 부채 69개:"
+  ],
+  "stdout_identical": true,
+  "stderr_identical": true,
+  "baseline_stdout": "상향(역방향) include 간선: 27개 (허용 목록 0개)\n  Editor -> Player: 16\n  Editor -> EngineGUIWindow: 6\n  Engine -> RenderEngine: 2\n  Engine -> SceneRuntime: 2\n  Engine -> Player: 1\n\n[실패] 새 상향 간선 27개 — 아래층은 위층 헤더를 include할 수 없습니다:\n  Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp -> Player/imgui.h\n  Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp -> Player/imgui.h\n  Editor/HostImGuiPresentation/RHI/ImGuiWin32Cursor.cpp -> Player/imgui.h\n  Editor/ImGuiHelper/BlueprintBuilder.cpp -> Player/imgui.h\n  Editor/ImGuiHelper/EditorAxisField3.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorIconAlignment.h -> Player/imgui.h\n  Editor/ImGuiHelper/EditorInspectorPanel.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorModeButton.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorPropertyRow.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorSectionHeader.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorTextFallback.h -> Player/imgui.h\n  Editor/ImGuiHelper/HorizontalLayout.h -> Player/imgui.h\n  Editor/ImGuiHelper/HorizontalLayout.h -> Player/imgui_internal.h\n  Editor/ImGuiHelper/ImGui.h -> Player/imgui.h\n  Editor/ImGuiHelper/ImGui.h -> Player/imgui_internal.h\n  Editor/ImGuiHelper/NodeEditor.h -> Player/imgui.h\n  Editor/ImGuiHelper/NodeEditor.h -> Player/imgui_internal.h\n  Editor/ImGuiHelper/ProfilerLauncher.cpp -> EngineGUIWindow/ProfilerLiveDiagnosticsBridge.h\n  Editor/ImGuiHelper/widgets.h -> Player/imgui.h\n  Editor/RenderTests/ExperimentParity/ExperimentTexturePipelineSelfTest.cpp -> Player/DirectXTex.h\n  Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp -> Player/DirectXTex.h\n  Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp -> Player/DirectXTex.h\n  Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp -> Player/DirectXTex.h\n  Engine/RenderEngine/Interfaces/AssetAuthoringPort.h -> RenderEngine/Texture.h\n  Engine/RenderEngine/Interfaces/FoliageType.h -> RenderEngine/AssetLink.h\n  Engine/Utility_Framework/ReflectionTypedYml.h -> SceneRuntime/SceneGC.h\n  Engine/Utility_Framework/ReflgenRuntime.h -> SceneRuntime/SceneGC.h\n물리 경계 부채: 69건 (허용 0건, 항목 69개)\n\n[실패] 새 물리 경계 부채 69개:\n  editor-platform-api | Engine/Utility_Framework/CrashReporterClient.h -> Editor-owned OS/file dialog API | 1 (허용 0, 초과 1)\n  editor-source-membership | Engine/SceneRuntime/SceneRuntime.vcxproj -> Audio/EditorAudioClipCache.cpp | 1 (허용 0, 초과 1)\n  editor-source-membership | Engine/SceneRuntime/SceneRuntime.vcxproj -> Audio/EditorAudioClipCache.h | 1 (허용 0, 초과 1)\n  forbidden-core-include | Engine/SceneRuntime/Audio/AudioCatalog.cpp -> Editor/ImGui include | 1 (허용 0, 초과 1)\n  forbidden-core-include | Engine/SceneRuntime/Audio/EditorAudioClipCache.cpp -> Editor/ImGui include | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/CommandService/CommandService.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/GCCE/GCCE.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/Physics/Physics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/SceneRuntime/SceneRuntime.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Tools/DxCaptureHelper/DxCaptureHelper.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> HostImGuiPresentation/HostImGuiPresentation.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> RenderTests/RenderTests.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/CommandService/CommandService.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/SceneRuntime/SceneRuntime.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj -> ../../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj -> ../../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj -> ../../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/RenderTests/RenderTests.vcxproj -> ../../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/RenderTests/RenderTests.vcxproj -> ../../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/RenderTests/RenderTests.vcxproj -> ../Editor.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/Physics/Physics.vcxproj -> ../EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/RenderEngine/RenderEngine.vcxproj -> ../EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/RenderEngine/RenderEngine.vcxproj -> ../Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/SceneRuntime/SceneRuntime.vcxproj -> ../GCCE/GCCE.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/CommandService/CommandService.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/GCCE/GCCE.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/Physics/Physics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/SceneRuntime/SceneRuntime.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unregistered-project | Engine/CommandService/CommandService.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Engine/Contracts/EngineContracts.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Engine/GCCE/GCCE.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/AssetCooker/AssetCooker.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/AssetCooker/EnvironmentCooker.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/DxCaptureHelper/DxCaptureHelper.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/LatticeExample/LatticeExample.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/ProfilerViewer/ProfilerViewer.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/Base0FilmUploadProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/Base0VulkanPsoProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/Base0VulkanTimingProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/ClusterTopologyPageProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/ColdGeometryDataSystemProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/GeometryConsumerCutoverProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/ImportStdProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialCommonConsumerProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialDataSystemProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialIblBakeProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialMatchedImageProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialMeshSurfaceProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialRasterSurfaceProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialRenderBindingsProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialScenePacketProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialSurfaceBatchProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialVulkanGenerationProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialVulkanSceneProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/SdfFontCpuProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureCookedGpuFixture.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureCookedGpuProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureCookedVulkanProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureImportLifecycleProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/runtime/RuntimeLauncher.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n",
+  "current_stdout": "상향(역방향) include 간선: 27개 (허용 목록 0개)\n  Editor -> Player: 16\n  Editor -> EngineGUIWindow: 6\n  Engine -> RenderEngine: 2\n  Engine -> SceneRuntime: 2\n  Engine -> Player: 1\n\n[실패] 새 상향 간선 27개 — 아래층은 위층 헤더를 include할 수 없습니다:\n  Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp -> Player/imgui.h\n  Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp -> Player/imgui.h\n  Editor/HostImGuiPresentation/RHI/ImGuiWin32Cursor.cpp -> Player/imgui.h\n  Editor/ImGuiHelper/BlueprintBuilder.cpp -> Player/imgui.h\n  Editor/ImGuiHelper/EditorAxisField3.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorIconAlignment.h -> Player/imgui.h\n  Editor/ImGuiHelper/EditorInspectorPanel.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorModeButton.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorPropertyRow.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorSectionHeader.cpp -> EngineGUIWindow/EditorTheme.h\n  Editor/ImGuiHelper/EditorTextFallback.h -> Player/imgui.h\n  Editor/ImGuiHelper/HorizontalLayout.h -> Player/imgui.h\n  Editor/ImGuiHelper/HorizontalLayout.h -> Player/imgui_internal.h\n  Editor/ImGuiHelper/ImGui.h -> Player/imgui.h\n  Editor/ImGuiHelper/ImGui.h -> Player/imgui_internal.h\n  Editor/ImGuiHelper/NodeEditor.h -> Player/imgui.h\n  Editor/ImGuiHelper/NodeEditor.h -> Player/imgui_internal.h\n  Editor/ImGuiHelper/ProfilerLauncher.cpp -> EngineGUIWindow/ProfilerLiveDiagnosticsBridge.h\n  Editor/ImGuiHelper/widgets.h -> Player/imgui.h\n  Editor/RenderTests/ExperimentParity/ExperimentTexturePipelineSelfTest.cpp -> Player/DirectXTex.h\n  Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp -> Player/DirectXTex.h\n  Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp -> Player/DirectXTex.h\n  Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp -> Player/DirectXTex.h\n  Engine/RenderEngine/Interfaces/AssetAuthoringPort.h -> RenderEngine/Texture.h\n  Engine/RenderEngine/Interfaces/FoliageType.h -> RenderEngine/AssetLink.h\n  Engine/Utility_Framework/ReflectionTypedYml.h -> SceneRuntime/SceneGC.h\n  Engine/Utility_Framework/ReflgenRuntime.h -> SceneRuntime/SceneGC.h\n물리 경계 부채: 69건 (허용 0건, 항목 69개)\n\n[실패] 새 물리 경계 부채 69개:\n  editor-platform-api | Engine/Utility_Framework/CrashReporterClient.h -> Editor-owned OS/file dialog API | 1 (허용 0, 초과 1)\n  editor-source-membership | Engine/SceneRuntime/SceneRuntime.vcxproj -> Audio/EditorAudioClipCache.cpp | 1 (허용 0, 초과 1)\n  editor-source-membership | Engine/SceneRuntime/SceneRuntime.vcxproj -> Audio/EditorAudioClipCache.h | 1 (허용 0, 초과 1)\n  forbidden-core-include | Engine/SceneRuntime/Audio/AudioCatalog.cpp -> Editor/ImGui include | 1 (허용 0, 초과 1)\n  forbidden-core-include | Engine/SceneRuntime/Audio/EditorAudioClipCache.cpp -> Editor/ImGui include | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/CommandService/CommandService.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/GCCE/GCCE.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/Physics/Physics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/SceneRuntime/SceneRuntime.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> ../Tools/DxCaptureHelper/DxCaptureHelper.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> HostImGuiPresentation/HostImGuiPresentation.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/CreatorEditor.vcxproj -> RenderTests/RenderTests.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/CommandService/CommandService.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/SceneRuntime/SceneRuntime.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/Editor.vcxproj -> ../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj -> ../../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj -> ../../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/HostImGuiPresentation/HostImGuiPresentation.vcxproj -> ../../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/RenderTests/RenderTests.vcxproj -> ../../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/RenderTests/RenderTests.vcxproj -> ../../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Editor/RenderTests/RenderTests.vcxproj -> ../Editor.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/Physics/Physics.vcxproj -> ../EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/RenderEngine/RenderEngine.vcxproj -> ../EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/RenderEngine/RenderEngine.vcxproj -> ../Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Engine/SceneRuntime/SceneRuntime.vcxproj -> ../GCCE/GCCE.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/CommandService/CommandService.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/EngineDiagnostics/EngineDiagnostics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/GCCE/GCCE.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/Physics/Physics.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/RenderEngine/RenderEngine.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/SceneRuntime/SceneRuntime.vcxproj | 1 (허용 0, 초과 1)\n  unknown-project-reference | Player/Player.vcxproj -> ../Engine/Utility_Framework/Utility_Framework.vcxproj | 1 (허용 0, 초과 1)\n  unregistered-project | Engine/CommandService/CommandService.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Engine/Contracts/EngineContracts.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Engine/GCCE/GCCE.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/AssetCooker/AssetCooker.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/AssetCooker/EnvironmentCooker.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/DxCaptureHelper/DxCaptureHelper.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/LatticeExample/LatticeExample.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/ProfilerViewer/ProfilerViewer.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/Base0FilmUploadProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/Base0VulkanPsoProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/Base0VulkanTimingProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/ClusterTopologyPageProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/ColdGeometryDataSystemProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/GeometryConsumerCutoverProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/ImportStdProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialCommonConsumerProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialDataSystemProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialIblBakeProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialMatchedImageProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialMeshSurfaceProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialRasterSurfaceProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialRenderBindingsProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialScenePacketProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialSurfaceBatchProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialVulkanGenerationProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/MaterialVulkanSceneProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/SdfFontCpuProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureCookedGpuFixture.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureCookedGpuProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureCookedVulkanProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/regression/TextureImportLifecycleProbe.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n  unregistered-project | Tools/runtime/RuntimeLauncher.vcxproj -> VCX_PROJECTS | 1 (허용 0, 초과 1)\n",
+  "baseline_stderr": "",
+  "current_stderr": "",
+  "new_native_project_membership": [
+    {
+      "path": "Engine/RenderEngine/RHI/RHICommandFailure.h",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHICommandProvenance.h",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHIProfilingContext.h",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.h",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.h",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.cpp",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.h",
+      "project_count": 1,
+      "filter_count": 1
+    },
+    {
+      "path": "Engine/EngineDiagnostics/ProfileRhiContext.h",
+      "project_count": 1,
+      "filter_count": 1
+    }
+  ],
+  "project_xml_parse": "PASS",
+  "new_file_format": {
+    "compiler_style_version": "clang-format 19.1.5",
+    "style": ".clang-format",
+    "result": "PASS",
+    "inputs": [
+      {
+        "path": "Engine/RenderEngine/RHI/RHICommandFailure.h",
+        "sha256": "9ee5b8e61235c9a69b9ab4587f530f8718df1646ac882637e1aae7d110feb9a0"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHICommandProvenance.h",
+        "sha256": "5cc2be663b249bd81fb6e9f2bd5d6621341d475fd57da226a78e3a1c55787b54"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHIProfilingContext.h",
+        "sha256": "b2c5d697b3e6d5489166a2a9b9f4b84d27d3a9cc845941cf79ac2064c32ce078"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp",
+        "sha256": "f1bce39d15f8ad5e858a365c01848702ebdd0f4c15a0dd8405df67bdc8a47c67"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.h",
+        "sha256": "a46e16aadf49d039f7a894a85bb08a86670b7d728fb31628793d0bc61ff7a354"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp",
+        "sha256": "8a017d9f35918cd2608fcef35870460b3a5419356c897e1646938bc44b917adb"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.h",
+        "sha256": "cb843516d36ba16904cf15a01b41121172220eb7c23f61dd762085d5761c013f"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.cpp",
+        "sha256": "d6e3e07899e424a0bc98e7830d36748f542042fa686e21015ffe671bb5f7b58c"
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/Vulkan/VulkanSoftwareCommandValidator.h",
+        "sha256": "ae5500ecfff1496d419989acbaf0ae613f8ff3f1dab11b52f602fb755d625c7c"
+      },
+      {
+        "path": "Engine/EngineDiagnostics/ProfileRhiContext.h",
+        "sha256": "e202178f2565fa520d1711870f2f43ad57d3c4c86d1759fe9dd434e97a10112d"
+      }
+    ]
+  },
+  "unchanged_include_allowlist": true
+}

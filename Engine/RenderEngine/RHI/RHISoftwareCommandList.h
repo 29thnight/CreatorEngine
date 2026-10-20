@@ -35,9 +35,14 @@ struct RHISoftwareRecordingBudget final
     uint64_t commandBytes{};
     uint64_t payloadBytes{};
 
+    static bool CanReserve(uint64_t used, uint64_t limit, uint64_t bytes)
+    {
+        return used <= limit && bytes <= limit - used;
+    }
+
     static bool TryReserve(uint64_t& used, uint64_t limit, uint64_t bytes)
     {
-        if (used > limit || bytes > limit - used)
+        if (!CanReserve(used, limit, bytes))
         {
             return false;
         }
@@ -83,7 +88,8 @@ class RHISoftwareCommandList final
     };
 
     template<typename Payload>
-    bool Append(RHISoftwareCommandType type, const Payload& payload, bool (*replay)(RHIEncoder&, const void*))
+    bool Append(RHISoftwareCommandType type, const Payload& payload, bool (*replay)(RHIEncoder&, const void*),
+                bool stickyFailure = true)
     {
         static_assert(alignof(Payload) <= alignof(std::max_align_t));
         static_assert(std::is_trivially_destructible_v<Payload>);
@@ -93,16 +99,22 @@ class RHISoftwareCommandList final
         constexpr size_t alignment = (std::max)(alignof(Command), alignof(Payload));
         if (!CanWrite() || bytes > m_maxCommandBytes - m_stats.commandBytes)
         {
-            Fail("Software command budget exceeded or list is not writable.");
+            if (stickyFailure)
+            {
+                Fail("Software command budget exceeded or list is not writable.");
+            }
             return false;
         }
         if (m_budget &&
             !RHISoftwareRecordingBudget::TryReserve(m_budget->commandBytes, m_budget->maxCommandBytes, bytes))
         {
-            Fail("Aggregate software command budget exceeded.");
+            if (stickyFailure)
+            {
+                Fail("Aggregate software command budget exceeded.");
+            }
             return false;
         }
-        auto* memory = static_cast<std::byte*>(Allocate(bytes, alignment));
+        auto* memory = static_cast<std::byte*>(Allocate(bytes, alignment, stickyFailure));
         if (!memory)
         {
             if (m_budget)
@@ -137,9 +149,83 @@ class RHISoftwareCommandList final
             {
                 m_budget->commandBytes -= bytes;
             }
-            Fail("Software command construction failed.");
+            if (stickyFailure)
+            {
+                Fail("Software command construction failed.");
+            }
             return false;
         }
+    }
+
+    template<typename Payload>
+    bool TryAppend(RHISoftwareCommandType type, const Payload& payload, bool (*replay)(RHIEncoder&, const void*))
+    {
+        return Append(type, payload, replay, false);
+    }
+
+    // Bool commands must leave a usable fallback path. Reserve command and
+    // copied span together, then publish both only after one allocation succeeds.
+    // No arena rollback, temporary container or per-command shared owner is needed.
+    template<typename Payload, typename T>
+    bool TryAppendWithSpan(RHISoftwareCommandType type, Payload payload, std::span<const T> source,
+                           std::span<const T> Payload::* member, bool (*replay)(RHIEncoder&, const void*))
+    {
+        static_assert(std::is_trivially_copyable_v<Payload> && std::is_trivially_copyable_v<T>);
+        static_assert(alignof(Payload) <= alignof(std::max_align_t) && alignof(T) <= alignof(std::max_align_t));
+        constexpr size_t payloadOffset = (sizeof(Command) + alignof(Payload) - 1) & ~(alignof(Payload) - 1);
+        static_assert(payloadOffset <= UINT8_MAX);
+        constexpr size_t commandBytes = payloadOffset + sizeof(Payload);
+        constexpr size_t spanOffset = (commandBytes + alignof(T) - 1) & ~(alignof(T) - 1);
+        constexpr size_t alignment = (std::max)({alignof(Command), alignof(Payload), alignof(T)});
+        if (!CanWrite() ||
+            !RHISoftwareRecordingBudget::CanReserve(m_stats.commandBytes, m_maxCommandBytes, commandBytes) ||
+            m_stats.payloadBytes > m_maxPayloadBytes ||
+            source.size() > (m_maxPayloadBytes - m_stats.payloadBytes) / sizeof(T) ||
+            source.size() > (SIZE_MAX - spanOffset) / sizeof(T))
+        {
+            return false;
+        }
+        const size_t payloadBytes = source.size_bytes();
+        if (m_budget &&
+            (!RHISoftwareRecordingBudget::CanReserve(m_budget->commandBytes, m_budget->maxCommandBytes, commandBytes) ||
+             !RHISoftwareRecordingBudget::CanReserve(m_budget->payloadBytes, m_budget->maxPayloadBytes, payloadBytes)))
+        {
+            return false;
+        }
+        auto* memory = static_cast<std::byte*>(Allocate(spanOffset + payloadBytes, alignment, false));
+        if (!memory)
+        {
+            return false;
+        }
+        auto* copied = reinterpret_cast<T*>(memory + spanOffset);
+        if (payloadBytes)
+        {
+            std::memcpy(copied, source.data(), payloadBytes);
+        }
+        payload.*member = std::span<const T>(copied, source.size());
+        new (memory + payloadOffset) Payload(payload);
+        auto* command = new (memory) Command{};
+        command->type = type;
+        command->payloadOffset = static_cast<uint8_t>(payloadOffset);
+        command->replay = replay;
+        if (m_tail)
+        {
+            m_tail->next = command;
+        }
+        else
+        {
+            m_head = command;
+        }
+        m_tail = command;
+        ++m_stats.commandCount;
+        m_stats.commandBytes += commandBytes;
+        m_stats.payloadBytes += payloadBytes;
+        if (m_budget)
+        {
+            m_budget->commandBytes += commandBytes;
+            m_budget->payloadBytes += payloadBytes;
+        }
+        return true;
     }
 
     template<typename T>
@@ -177,7 +263,7 @@ class RHISoftwareCommandList final
     }
 
     bool CanWrite() const { return !m_sealed && !m_consumed && m_error.empty(); }
-    void* Allocate(size_t bytes, size_t alignment);
+    void* Allocate(size_t bytes, size_t alignment, bool stickyFailure = true);
     void Fail(const char* message);
     void Clear() noexcept;
     void MoveFrom(RHISoftwareCommandList&& other) noexcept;

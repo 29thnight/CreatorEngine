@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "RHICommandFailure.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
 enum class RHIQueueKind : uint8_t
@@ -8,6 +9,19 @@ enum class RHIQueueKind : uint8_t
     Compute,
     Copy
 };
+
+// Both backends share this domain. An owner lifecycle generation starts at one
+// for each device and cannot identify a foreign device or a new native instance.
+inline uint64_t AllocateRHIDeviceIncarnation()
+{
+    static std::atomic<uint64_t> next{1};
+    const auto incarnation = next.fetch_add(1, std::memory_order_relaxed);
+    if (!incarnation)
+    {
+        std::terminate();
+    }
+    return incarnation;
+}
 
 // Native handles and backend queue-family indices stay behind the implementation.
 struct RHIQueueIdentity
@@ -170,6 +184,23 @@ public:
     // resources until this queue's GPU completion, including unfenced failures.
     virtual bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch,
         uint64_t value, RHITimelinePoint& point, std::string& error) = 0;
+    // Optional structured result for the same virtual Submit contract. The sink
+    // is request-local; synchronous owner handoffs must restore it explicitly.
+    // Native backends mark the actual API boundary, never infer execution from text.
+    bool SubmitWithDiagnostics(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value,
+                               RHITimelinePoint& point, RHICommandFailure& failure)
+    {
+        failure.Reset();
+        failure.stage = RHICommandFailureStage::Submission;
+        failure.recordingId = batch ? batch->GetRecordingId() : 0;
+        const RHICommandFailureScope diagnostic(&failure, true);
+        const bool accepted = Submit(batch, value, point, failure.message);
+        if (accepted)
+        {
+            failure.Reset();
+        }
+        return accepted;
+    }
     virtual size_t CollectCompleted() = 0;
     virtual size_t GetPendingBatchCount() const = 0;
 };

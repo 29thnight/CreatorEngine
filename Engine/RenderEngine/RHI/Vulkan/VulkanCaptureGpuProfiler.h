@@ -2,6 +2,8 @@
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
 #include "../IRHIGpuProfiler.h"
+#include "../RHISoftwareEncoder.h"
+#include "../RHIProfilingContext.h"
 #include <stdio.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
 
@@ -10,6 +12,15 @@
 class VulkanCaptureGpuProfiler final : public IRHIGpuProfiler
 {
 public:
+  struct QueryRecord
+  {
+      std::string name;
+      GpuPassTimingIdentity pass;
+      RHICommandProvenance rhi;
+      uint64_t beginTicks{};
+      uint64_t endTicks{};
+  };
+
     explicit VulkanCaptureGpuProfiler(VulkanDeviceResources& resources) : resources_(resources) {}
     ~VulkanCaptureGpuProfiler()
     {
@@ -72,34 +83,61 @@ public:
         { error = "Vulkan capture query pool creation failed"; return false; }
         used_.store(0);
         failed_.store(false);
+        m_collectedQueries = 0;
         return true;
     }
     uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
-        const GpuPassTimingIdentity& = {}) override
+                       const GpuPassTimingIdentity& identity = {}) override
     {
-        auto* vk = dynamic_cast<VulkanEncoder*>(&encoder);
         const uint32_t slot = used_.fetch_add(1, std::memory_order_relaxed);
-        if (!vk || pool_ == VK_NULL_HANDLE || slot >= kCapacity)
+        if (pool_ == VK_NULL_HANDLE || slot >= kCapacity)
         { failed_.store(true); return kInvalidSlot; }
-        names_[slot] = name;
-        const auto cmd = vk->GetCommandBuffer();
-        // A freshly acquired pass encoder has no open rendering instance.
-        // Each worker owns disjoint queries, so resets cannot race GPU writes.
-        VulkanApi::vkCmdResetQueryPool(cmd, pool_, slot * 2, 2);
-        VulkanApi::vkCmdWriteTimestamp(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, pool_, slot * 2);
+        auto& record = m_queries[slot];
+        record.name = name;
+        record.pass = identity;
+        record.rhi = MakeRHICommandProvenance(ce::current_rhi_context);
+        const Timestamp payload{pool_, slot * 2, true};
+        if (auto* software = dynamic_cast<RHISoftwareEncoder*>(&encoder))
+        {
+            if (!software->RecordGpuQuery(RHISoftwareCommandType::BeginGpuPass, payload, ReplayTimestamp))
+            {
+                failed_.store(true);
+                return kInvalidSlot;
+            }
+        }
+        else if (!ReplayTimestamp(encoder, &payload))
+        {
+            failed_.store(true);
+            return kInvalidSlot;
+        }
         return slot;
     }
     void EndPass(RHIEncoder& encoder, uint32_t slot) override
     {
-        auto* vk = dynamic_cast<VulkanEncoder*>(&encoder);
-        if (!vk || slot == kInvalidSlot) { failed_.store(true); return; }
-        VulkanApi::vkCmdWriteTimestamp(vk->GetCommandBuffer(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                      pool_, slot * 2 + 1);
+        if (pool_ == VK_NULL_HANDLE || slot >= kCapacity)
+        {
+            failed_.store(true);
+            return;
+        }
+        const Timestamp payload{pool_, slot * 2 + 1, false};
+        if (auto* software = dynamic_cast<RHISoftwareEncoder*>(&encoder))
+        {
+            if (!software->RecordGpuQuery(RHISoftwareCommandType::EndGpuPass, payload, ReplayTimestamp))
+            {
+                failed_.store(true);
+            }
+        }
+        else if (!ReplayTimestamp(encoder, &payload))
+        {
+            failed_.store(true);
+        }
     }
     struct Timing { std::string name; double milliseconds; };
     uint32_t SliceCount() const { return used_.load(); }
+    std::span<const QueryRecord> GetQueries() const { return {m_queries.data(), m_collectedQueries}; }
     bool Collect(std::vector<Timing>& passes, double& spanMs, double& busyMs, std::string& error)
     {
+        m_collectedQueries = 0;
         if (pool_ == VK_NULL_HANDLE || !resources_.IsInitialized())
         {
             error = "Vulkan capture query pool/device unavailable";
@@ -129,7 +167,10 @@ public:
         {
             const uint64_t begin = ticks[i * 2] & mask, end = ticks[i * 2 + 1] & mask;
             if (end < begin) { error = "Vulkan capture timestamp wrapped/reversed"; return false; }
-            totals[names_[i]] += static_cast<double>(end - begin) * period_ / 1e6;
+            auto& record = m_queries[i];
+            record.beginTicks = begin;
+            record.endTicks = end;
+            totals[record.name] += static_cast<double>(end - begin) * period_ / 1e6;
             intervals.emplace_back(begin, end);
         }
         std::sort(intervals.begin(), intervals.end());
@@ -145,15 +186,46 @@ public:
         spanMs = static_cast<double>(end - first) * period_ / 1e6;
         busyMs = static_cast<double>(busy) * period_ / 1e6;
         for (const auto& [name, milliseconds] : totals) passes.push_back({name, milliseconds});
+        m_collectedQueries = count;
         return true;
     }
 private:
+  struct Timestamp
+  {
+      VkQueryPool m_pool;
+      uint32_t m_query;
+      bool m_begin;
+  };
+  static bool ReplayTimestamp(RHIEncoder& encoder, const void* raw)
+  {
+      auto* native = dynamic_cast<VulkanEncoder*>(&encoder);
+      if (!native || !native->GetCommandBuffer() || !raw)
+      {
+          return false;
+      }
+      const auto& value = *static_cast<const Timestamp*>(raw);
+      if (!value.m_pool)
+      {
+          return false;
+      }
+      if (value.m_begin)
+      {
+          VulkanApi::vkCmdResetQueryPool(native->GetCommandBuffer(), value.m_pool, value.m_query, 2);
+      }
+      VulkanApi::vkCmdWriteTimestamp(native->GetCommandBuffer(),
+                                     value.m_begin ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+                                                   : VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                     value.m_pool, value.m_query);
+      return true;
+  }
+
     static constexpr uint32_t kCapacity = 512;
     VulkanDeviceResources& resources_;
     VkQueryPool pool_{VK_NULL_HANDLE};
     std::atomic<uint32_t> used_{0};
     std::atomic<bool> failed_{false};
-    std::array<std::string, kCapacity> names_;
+    std::array<QueryRecord, kCapacity> m_queries;
+    uint32_t m_collectedQueries{};
     float period_{};
     uint32_t bits_{};
 };

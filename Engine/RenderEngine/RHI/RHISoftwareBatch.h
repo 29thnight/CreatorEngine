@@ -5,6 +5,7 @@
 
 class RHISoftwareRecorder;
 class RHICommandTranslator;
+class RHIQueueCommandTranslator;
 
 struct RHISoftwareRecordingStorage
 {
@@ -14,6 +15,7 @@ struct RHISoftwareRecordingStorage
         size_t activeSegments{};
     };
     ce::render_vector<Target> targets;
+    uint32_t activeTargetCount{};
     ce::render_vector<uint32_t> targetOrder;
     ce::render_vector<std::shared_ptr<RHISoftwareRecordingBudget>> budgets;
     ce::render_vector<ce::render_unique_ptr<RHISoftwareEncoder>> encoders;
@@ -58,6 +60,7 @@ class RHISoftwareBatch final
   private:
     friend class RHISoftwareRecorder;
     friend class RHICommandTranslator;
+    friend class RHIQueueCommandTranslator;
     void MoveFrom(RHISoftwareBatch&& other) noexcept;
 
     std::shared_ptr<RHISoftwareRecordingStorage> m_storage;

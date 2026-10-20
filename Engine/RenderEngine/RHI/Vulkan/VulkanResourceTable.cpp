@@ -34,6 +34,7 @@ VkImageView VulkanResourceTable::GetOrCreateCubeView(VkDevice device,
     RHITextureHandle handle, RHIFormat format, uint32_t baseMip,
     uint32_t mipLevels, uint32_t firstSlice)
 {
+    const std::lock_guard lock(m_imageRegistryMutex);
     Slot<VulkanImageEntry>* const slot = Find(m_images, handle.id);
     if (nullptr == slot || VK_NULL_HANDLE == device) return VK_NULL_HANDLE;
 
@@ -107,10 +108,20 @@ void VulkanResourceTable::DestroyBuffer(VkDevice device, VulkanBufferEntry& entr
 
 void VulkanResourceTable::Release(VkDevice device, RHITextureHandle handle)
 {
+    const std::lock_guard lock(m_imageRegistryMutex);
     Slot<VulkanImageEntry>* const slot = Find(m_images, handle.id);
     if (nullptr == slot) return;   // 두 번 놓기 · 무효 핸들
 
-    if (slot->owned) DestroyImage(device, slot->entry);
+    if (slot->m_lease.use_count() > 1)
+    {
+        m_pendingImages.push_back(*slot);
+        slot->entry = {};
+        slot->m_lease.reset();
+    }
+    else if (slot->owned)
+    {
+        DestroyImage(device, slot->entry);
+    }
     else
     {
         // 이미지·기본 뷰는 외부 소유여도, 이 표가 지연 생성한 큐브 뷰는
@@ -134,19 +145,87 @@ void VulkanResourceTable::Release(VkDevice device, RHIBufferHandle handle)
     if (!slot->alive ||
         slot->generation != RHIHandleBits::GenerationOf(handle.id)) return;
 
-    slot->alive = false;
-    if (slot->owned) DestroyBuffer(device, slot->entry);
-    else             slot->entry = VulkanBufferEntry{};
+    if (slot->m_lease.use_count() > 1)
+    {
+        m_pendingBuffers.push_back(*slot);
+        slot->entry = {};
+        slot->m_lease.reset();
+    }
+    else if (slot->owned)
+    {
+        DestroyBuffer(device, slot->entry);
+    }
+    else
+    {
+        slot->entry = VulkanBufferEntry{};
+    }
 
+    slot->alive = false;
     ++slot->generation;
     m_bufferFree.push_back(index);
     m_liveBuffers.fetch_sub(1, std::memory_order_relaxed);
 }
 
+void VulkanResourceTable::CollectRecordingLeases(VkDevice device)
+{
+    const std::scoped_lock lock(m_imageRegistryMutex, m_bufferRegistryMutex);
+    const auto collect = [device](auto& entries, auto destroy)
+    {
+        size_t write = 0;
+        for (auto& slot : entries)
+        {
+            if (slot.m_lease.use_count() == 1)
+            {
+                destroy(device, slot);
+            }
+            else
+            {
+                if (&slot != &entries[write])
+                {
+                    entries[write] = std::move(slot);
+                }
+                ++write;
+            }
+        }
+        entries.resize(write);
+    };
+    collect(m_pendingImages,
+            [](VkDevice device, auto& slot)
+            {
+                if (slot.owned)
+                {
+                    DestroyImage(device, slot.entry);
+                }
+                else
+                {
+                    DestroyOwnedCubeView(device, slot.entry);
+                }
+            });
+    collect(m_pendingBuffers,
+            [](VkDevice device, auto& slot)
+            {
+                if (slot.owned)
+                {
+                    DestroyBuffer(device, slot.entry);
+                }
+            });
+}
+
 void VulkanResourceTable::Shutdown(VkDevice device)
 {
+    CollectRecordingLeases(device);
+    // Native owners cannot be torn down while a frozen recording still refers to them.
+    if (!m_pendingImages.empty() || !m_pendingBuffers.empty())
+    {
+        std::terminate();
+    }
+    const std::scoped_lock lock(m_imageRegistryMutex, m_bufferRegistryMutex);
     for (auto& slot : m_images)
     {
+        if (slot.m_lease.use_count() > 1)
+        {
+            std::terminate();
+        }
         if (slot.alive && slot.owned) DestroyImage(device, slot.entry);
         else if (slot.alive) DestroyOwnedCubeView(device, slot.entry);
         slot.alive = false;
@@ -155,6 +234,10 @@ void VulkanResourceTable::Shutdown(VkDevice device)
     for (uint32_t i = 0; i < bufferCount; ++i)
     {
         auto& slot = m_buffers[i];
+        if (slot.m_lease.use_count() > 1)
+        {
+            std::terminate();
+        }
         if (slot.alive && slot.owned) DestroyBuffer(device, slot.entry);
         else slot.entry = VulkanBufferEntry{};
         slot.alive = false;

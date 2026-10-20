@@ -1,6 +1,9 @@
 #pragma once
 #include "RHI/DX12/DX12CommandTranslator.h"
 #include "RHI/RHISoftwareRecorder.h"
+#include "RHI/RHISoftwareQueueRecorder.h"
+#include "RHI/DX12/DX12QueueRecorder.h"
+#include "RHI/DX12/DX12QueueService.h"
 #include "RenderArena.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
@@ -532,7 +535,108 @@ namespace
                 }
             }
             require(resources.DrainDebugMessages(validation) == 0, validation);
+            frozen.reset();
             pool.Shutdown();
+            {
+                auto nativeRecorder = std::make_shared<DX12QueueRecorder>(resources, 2);
+                auto ownedValidator = std::make_shared<SoftwareNativeProbeValidator>();
+                RHISoftwareQueueOptions ownedOptions;
+                ownedOptions.translation = {RHICommandTranslationMode::Parallel, 2, 0};
+                RHISoftwareQueueRecorder ownedRecorder(nativeRecorder, ownedValidator, ownedOptions);
+                std::shared_ptr<IRHICommandQueue> ownedGraphics;
+                require(ownedRecorder.WrapQueue(primary, ownedGraphics, error) &&
+                            ownedGraphics->GetIdentity() == primary->GetIdentity(),
+                        "Software owned queue changed the native queue identity.");
+                RHISoftwareQueueFactory ownedFactory(resources, ownedRecorder);
+                std::shared_ptr<IRHICommandQueue> ownedCompute;
+                require(ownedFactory.CreateQueue(RHIQueueKind::Compute, ownedCompute, error), error);
+                for (uint32_t iteration = 0; iteration < 2; ++iteration)
+                {
+                    require(resources.BeginFrame(error) && resources.BeginQueueFrame(primary, error), error);
+                    RHISoftwareBatchDesc ownedDesc;
+                    ownedDesc.frameId = 3 + iteration;
+                    ownedDesc.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&resources);
+                    ownedRecorder.SetFrameDesc(ownedDesc);
+                    const auto beforeReuse = DX12QueueService::QueryRecordingPool(primary);
+                    const auto ownedBinding =
+                        resources.CreateRenderTargets(std::span<const RHITextureHandle>{targets}, nullptr);
+                    require(ownedBinding.IsValid(), "Owned software target creation failed.");
+                    auto ownedLifetime = std::make_shared<int>(3 + iteration);
+                    std::weak_ptr<int> pendingOwned = ownedLifetime;
+                    std::shared_ptr<IRHIQueueRecording> ownedRecording;
+                    require(ownedRecorder.BeginRecording(ownedGraphics, 2, ownedLifetime, ownedRecording, error),
+                            error);
+                    auto& clear = ownedRecording->AcquireEncoder(0);
+                    const std::array<RHITransition, 1> toRenderTarget{
+                        RHITransition{texture, RHIResourceState::CopySource, RHIResourceState::RenderTarget}};
+                    barriers.textureTransitions = toRenderTarget;
+                    clear.ResourceBarriers(barriers);
+                    clear.BindRenderTargets(ownedBinding);
+                    const std::array<float, 4> ownedExpected{0, iteration == 0 ? 1.0f : 0.0f,
+                                                             iteration == 0 ? 0.0f : 1.0f, 1};
+                    clear.ClearRenderTargets(ownedBinding, ownedExpected.data());
+                    auto& copy = ownedRecording->AcquireEncoder(1);
+                    const std::array<RHITransition, 1> ownedToCopySource{
+                        RHITransition{texture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
+                    barriers.textureTransitions = ownedToCopySource;
+                    copy.ResourceBarriers(barriers);
+                    copy.CopyToReadback(readback, texture, 0, 0);
+                    std::shared_ptr<IRHIQueueCommandBatch> ownedBatch;
+                    require(ownedRecording->Finish(ownedBatch, error), error);
+                    ownedRecording.reset();
+                    ownedLifetime.reset();
+                    const uint64_t graphicsSignal = 2ull * iteration + 1;
+                    RHITimelinePoint ownedCompletion;
+                    require(ownedGraphics->Submit(ownedBatch, graphicsSignal, ownedCompletion, error) &&
+                                ownedCompletion.IsValid(),
+                            error);
+                    require(!pendingOwned.expired(), "Owned native batch lost its GPU lifetime after CPU translation.");
+                    RHITimelinePoint repeated;
+                    require(!ownedGraphics->Submit(ownedBatch, graphicsSignal + 1, repeated, error) &&
+                                !repeated.IsValid(),
+                            "Owned software batch was submitted twice or published an unissued signal.");
+                    ownedBatch.reset();
+
+                    // Native cross-queue waits/signals use the actual backend timeline.
+                    // The second frame also verifies post-retirement encoder/list reuse.
+                    RHITimelinePoint computeCompletion;
+                    RHITimelinePoint joinedCompletion;
+                    require(ownedCompute->Wait(ownedCompletion, error) &&
+                                ownedCompute->Signal(iteration + 1, computeCompletion, error) &&
+                                computeCompletion.IsValid() && ownedGraphics->Wait(computeCompletion, error) &&
+                                ownedGraphics->Signal(graphicsSignal + 1, joinedCompletion, error),
+                            error);
+                    require(resources.JoinQueueFrame(joinedCompletion, error) && resources.EndFrame(error) &&
+                                resources.WaitForLastFrameSubmission(error),
+                            error);
+                    resources.WaitForGpu();
+                    ownedGraphics->CollectCompleted();
+                    ownedCompute->CollectCompleted();
+                    require(pendingOwned.expired(), "Owned native completion retained the software recording owner.");
+                    const auto afterReuse = DX12QueueService::QueryRecordingPool(primary);
+                    require(afterReuse.leased == 0,
+                            "GPU-complete owned targets were not returned to their native pool.");
+                    if (iteration != 0)
+                    {
+                        require(afterReuse.created == beforeReuse.created &&
+                                    afterReuse.reused >= beforeReuse.reused + 2,
+                                "Warm owned software translation recreated native target storage.");
+                    }
+                    require(resources.MapReadback(readback, image, error), error);
+                    for (uint32_t y = 0; y < 8; ++y)
+                    {
+                        for (uint32_t x = 0; x < 8; ++x)
+                        {
+                            for (uint32_t channel = 0; channel < 4; ++channel)
+                            {
+                                require(std::abs(image.At(x, y, channel) - ownedExpected[channel]) <= 1.0f / 255.0f,
+                                        "Owned software translation changed native target order or pixels.");
+                            }
+                        }
+                    }
+                    require(resources.DrainDebugMessages(validation) == 0, validation);
+                }
+            }
             resources.ReleaseTexture(other);
             resources.ReleaseReadback(readback);
             resources.ReleaseTexture(texture);
@@ -540,7 +644,8 @@ namespace
             log += "RHI_SOFTWARE_NATIVE_OK commands=4 pixels=64 channels=4 staleRejected=true asynchronous=true "
                    "frozenTargets=true uploadRollover=true poolReuse=true arenaRetirement=true gpuMergeReuse=true "
                    "declarationMetadata=true parallelTranslation=true declarationPackets=true retainedBlackboard=true "
-                   "singleCopyPassUsages=true validationErrors=0\n";
+                   "singleCopyPassUsages=true ownedQueue=true ownedPoolReuse=true multiqueueTimeline=true "
+                   "validationErrors=0\n";
             return true;
         }
         catch (const std::exception& exception)

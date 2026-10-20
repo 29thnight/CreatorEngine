@@ -5,6 +5,7 @@
 #include "RHIParallelCommandPool.h"
 #include "RHIRecordedBatch.h"
 #include "IRHICommandTranslator.h"
+#include "RHIProfilingContext.h"
 
 #include <stdio.h>
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -57,6 +58,7 @@ struct RHISubmissionTicket::State
     std::atomic<bool> ready{ false };
     bool success{ false };
     std::string error;
+    RHICommandFailure commandFailure;
     std::shared_ptr<RHIRecordedBatch> recordedBatch;
     RHISubmissionIdentity identity;
 
@@ -72,6 +74,14 @@ struct RHISubmissionTicket::State
             }
             success = completedSuccessfully;
             error = std::move(completionError);
+            if (success)
+            {
+                commandFailure.Reset();
+            }
+            else
+            {
+                commandFailure.message = error;
+            }
             ready.store(true, std::memory_order_release);
         }
         wake.notify_all();
@@ -93,6 +103,7 @@ struct RHISubmissionThread::Impl
         bool submissionBlocked{ false };
         bool gpuIdleVerified{ false };
         std::string submissionError;
+        RHICommandFailure submissionFailure;
         std::string fault;
     };
 
@@ -108,6 +119,8 @@ struct RHISubmissionThread::Impl
         RHICompletionPoint retirementPoint{};
         CompletionQuery completionQuery;
         std::shared_ptr<const void> lifetimeToken;
+        uint64_t softwareBytes{};
+        ce::profile_rhi_context rhiContext;
     };
 
     struct Retirement
@@ -121,6 +134,7 @@ struct RHISubmissionThread::Impl
         std::shared_ptr<const void> lifetimeToken;
         bool failedSubmission{ false };
         bool releaseReady{ false };
+        ce::profile_rhi_context rhiContext;
     };
 
     mutable std::mutex mutex;
@@ -129,7 +143,7 @@ struct RHISubmissionThread::Impl
     std::condition_variable drainWake;
     std::deque<Entry> queue;
     std::vector<Retirement> retirements;
-    std::deque<std::pair<const void*, std::string>> failures;
+    std::deque<std::pair<const void*, RHICommandFailure>> failures;
     std::unordered_map<const void*, OwnerState> owners;
     std::thread thread;
     std::thread::id threadId{};
@@ -141,6 +155,7 @@ struct RHISubmissionThread::Impl
     bool stopRequested{ false };
     bool abandonRetirements{ false };
     RHISubmissionThreadStats stats{};
+    uint64_t softwareByteCapacity{RHISubmissionThread::kSoftwareByteCapacity};
 
     RHISubmissionOwnerStats GetOwnerStatsLocked(const void* owner) const
     {
@@ -293,9 +308,14 @@ struct RHISubmissionThread::Impl
 
             std::string error;
             bool success = false;
+            RHICommandFailure& commandFailure = entry.ticket->commandFailure;
+            commandFailure.stage = EntryKind::Lifecycle == entry.kind ? RHICommandFailureStage::Retirement
+                                                                      : RHICommandFailureStage::Submission;
+            const RHICommandFailureScope diagnostic(commandFailure);
+            const ce::profile_rhi_context_scope rhiContext(entry.rhiContext);
             try
             {
-                ce::profile_scope execute{ce::marker<"RHIExecuteWork">()};
+                ce::profile_rhi_scope execute{ce::marker<"RHIExecuteWork">()};
                 success = entry.work && entry.work(error);
             }
             catch (const std::exception& exception)
@@ -310,28 +330,41 @@ struct RHISubmissionThread::Impl
             {
                 error = entry.label + " 실패";
             }
+            if (!success)
+            {
+                commandFailure.message = error;
+            }
+            // CPU command arenas are no longer needed after translation. Release
+            // the work captures before returning their admission credits; native
+            // resources remain pinned by the separate GPU retirement token.
+            entry.work = {};
             {
                 std::lock_guard lock(mutex);
+                stats.pendingSoftwareBytes -= entry.softwareBytes;
+                if (entry.softwareBytes)
+                {
+                    spaceWake.notify_all();
+                }
                 ++stats.executed;
                 if (!success)
                 {
                     ++stats.failed;
-                    failures.emplace_back(entry.owner, error);
+                    failures.emplace_back(entry.owner, commandFailure);
                     OwnerState& owner = owners[entry.owner];
                     owner.submissionBlocked = true;
                     owner.gpuIdleVerified = false;
                     owner.submissionError = error;
+                    owner.submissionFailure = commandFailure;
                     owner.accepting = false;
                 }
                 if (entry.retirementPoint.IsValid() &&
                     entry.completionQuery && (entry.lifetimeToken ||
                         EntryKind::RecordedBatch == entry.kind))
                 {
-                    retirements.push_back(Retirement{
-                        entry.sequence, entry.generation, entry.owner, entry.kind,
-                        entry.retirementPoint,
-                        std::move(entry.completionQuery),
-                        std::move(entry.lifetimeToken), !success });
+                    retirements.push_back(Retirement{entry.sequence, entry.generation, entry.owner, entry.kind,
+                                                     entry.retirementPoint, std::move(entry.completionQuery),
+                                                     std::move(entry.lifetimeToken), !success, false,
+                                                     entry.rhiContext});
                 }
                 if (stats.lastCompletedSequence + 1 != entry.sequence)
                 {
@@ -375,6 +408,17 @@ bool RHISubmissionTicket::IsComplete() const
     return m_state && m_state->ready.load(std::memory_order_acquire);
 }
 
+bool RHISubmissionTicket::GetCommandFailure(RHICommandFailure& outFailure) const
+{
+    outFailure.Reset();
+    if (!m_state || !m_state->ready.load(std::memory_order_acquire) || m_state->success)
+    {
+        return false;
+    }
+    outFailure = m_state->commandFailure;
+    return true;
+}
+
 const RHIRecordedBatch* RHISubmissionTicket::GetRecordedBatch() const
 {
     return m_state ? m_state->recordedBatch.get() : nullptr;
@@ -385,9 +429,9 @@ RHIRecordedBatch* RHISubmissionTicket::GetRecordedBatch()
     return m_state ? m_state->recordedBatch.get() : nullptr;
 }
 
-RHISubmissionThread::RHISubmissionThread()
-    : m_impl(std::make_unique<Impl>())
+RHISubmissionThread::RHISubmissionThread(uint64_t softwareByteCapacity) : m_impl(std::make_unique<Impl>())
 {
+    m_impl->softwareByteCapacity = (std::max)(uint64_t{1}, softwareByteCapacity);
 }
 
 RHISubmissionThread::~RHISubmissionThread()
@@ -486,6 +530,7 @@ bool RHISubmissionThread::AcquireClient(const void* owner, std::string& outError
     ownerState.submissionBlocked = false;
     ownerState.gpuIdleVerified = false;
     ownerState.submissionError.clear();
+    ownerState.submissionFailure.Reset();
     ownerState.lastCommand = RHILifecycleCommand::None;
     ++impl.clientCount;
     return true;
@@ -555,12 +600,11 @@ bool RHISubmissionThread::Enqueue(const void* owner, const char* label, Work wor
         EntryKind::Submission, false, 0);
 }
 
-bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
-    Work work, RHISubmissionTicket& outTicket, std::string& outError,
-    RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
-    std::shared_ptr<const void> lifetimeToken, EntryKind kind,
-    bool allowTransition, uint64_t expectedGeneration,
-    std::shared_ptr<RHIRecordedBatch> recordedBatch, RHISubmissionIdentity identity)
+bool RHISubmissionThread::EnqueueInternal(
+    const void* owner, const char* label, Work work, RHISubmissionTicket& outTicket, std::string& outError,
+    RHICompletionPoint retirementPoint, CompletionQuery completionQuery, std::shared_ptr<const void> lifetimeToken,
+    EntryKind kind, bool allowTransition, uint64_t expectedGeneration, std::shared_ptr<RHIRecordedBatch> recordedBatch,
+    RHISubmissionIdentity identity, uint64_t softwareBytes, uint64_t commandRecordingId)
 {
     if (nullptr == owner || !work)
     {
@@ -574,6 +618,11 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
     }
 
     Impl& impl = *m_impl;
+    if (softwareBytes > impl.softwareByteCapacity)
+    {
+        outError = "Software command arenas exceed the RHI admission byte capacity.";
+        return false;
+    }
     auto state = std::make_shared<RHISubmissionTicket::State>();
     std::unique_lock lock(impl.mutex);
     const auto foundOwner = impl.owners.find(owner);
@@ -597,20 +646,25 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
         return false;
     }
     const uint64_t admittedGeneration = ownerState.generation;
-    bool countedSaturation = false;
-    std::chrono::steady_clock::time_point waitStarted{};
-    while (impl.queue.size() >= kQueueCapacity && impl.stats.accepting)
+    const auto exceedsSoftwareBytes = [&]
+    { return softwareBytes > impl.softwareByteCapacity - impl.stats.pendingSoftwareBytes; };
+    const auto lacksCapacity = [&] { return impl.queue.size() >= kQueueCapacity || exceedsSoftwareBytes(); };
+    const auto ownerAccepts = [&]
     {
-        if (!countedSaturation)
+        return ownerState.registered && ownerState.generation == admittedGeneration &&
+               (allowTransition || (ownerState.accepting && !ownerState.faulted && !ownerState.transitioning));
+    };
+    if (lacksCapacity() && impl.stats.accepting && ownerAccepts())
+    {
+        ce::profile_rhi_scope admissionWait{softwareBytes ? ce::marker<"RHISoftwareAdmissionWait">()
+                                                          : ce::marker<"RHIAdmissionWait">()};
+        ++impl.stats.saturationWaits;
+        impl.stats.softwareSaturationWaits += exceedsSoftwareBytes() ? 1u : 0u;
+        const auto waitStarted = std::chrono::steady_clock::now();
+        while (lacksCapacity() && impl.stats.accepting && ownerAccepts())
         {
-            ++impl.stats.saturationWaits;
-            countedSaturation = true;
-            waitStarted = std::chrono::steady_clock::now();
+            impl.spaceWake.wait(lock);
         }
-        impl.spaceWake.wait(lock);
-    }
-    if (countedSaturation)
-    {
         const uint64_t waited = static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - waitStarted).count());
@@ -642,10 +696,14 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
                                 recordedBatch->GetCompletionPoint()}
         : identity;
     state->recordedBatch = std::move(recordedBatch);
-    impl.queue.push_back(Impl::Entry{
-        sequence, ownerState.generation, owner, kind,
-        label ? label : "RHI submission", std::move(work), state,
-        retirementPoint, std::move(completionQuery), std::move(lifetimeToken) });
+    state->commandFailure.stage = RHICommandFailureStage::Admission;
+    state->commandFailure.recordingId = commandRecordingId ? commandRecordingId : state->identity.recordingId;
+    state->commandFailure.backendGeneration = ownerState.generation;
+    impl.queue.push_back(Impl::Entry{sequence, ownerState.generation, owner, kind, label ? label : "RHI submission",
+                                     std::move(work), state, retirementPoint, std::move(completionQuery),
+                                     std::move(lifetimeToken), softwareBytes, ce::current_rhi_context});
+    impl.stats.pendingSoftwareBytes += softwareBytes;
+    impl.stats.peakSoftwareBytes = (std::max)(impl.stats.peakSoftwareBytes, impl.stats.pendingSoftwareBytes);
     ++impl.nextSequence;
     ownerState.gpuIdleVerified = false;
     if (state->recordedBatch)
@@ -752,6 +810,9 @@ void RHISubmissionThread::CollectCompletedLifetimes(const void* owner)
             m_impl->retirements.erase(found);
         }
         // 추가 할당 없이 한 토큰씩 잠금 밖 producer에서 파괴한다.
+        const ce::profile_rhi_context_scope rhiContext(completed.rhiContext);
+        ce::profile_rhi_scope retire{ce::marker<"RHIBatchRetire">()};
+        completed.lifetimeToken.reset();
     }
 }
 
@@ -762,7 +823,7 @@ bool RHISubmissionThread::ConsumeFailure(const void* owner, std::string& outErro
     for (auto it = impl.failures.begin(); it != impl.failures.end(); ++it)
     {
         if (it->first != owner) continue;
-        outError = std::move(it->second);
+        outError = std::move(it->second.message);
         impl.failures.erase(it);
         return true;
     }
@@ -770,6 +831,30 @@ bool RHISubmissionThread::ConsumeFailure(const void* owner, std::string& outErro
     if (found != impl.owners.end() && found->second.submissionBlocked)
     {
         outError = found->second.submissionError;
+        return true;
+    }
+    return false;
+}
+
+bool RHISubmissionThread::ConsumeFailure(const void* owner, RHICommandFailure& outFailure)
+{
+    outFailure.Reset();
+    Impl& impl = *m_impl;
+    std::lock_guard lock(impl.mutex);
+    for (auto it = impl.failures.begin(); it != impl.failures.end(); ++it)
+    {
+        if (it->first != owner)
+        {
+            continue;
+        }
+        outFailure = std::move(it->second);
+        impl.failures.erase(it);
+        return true;
+    }
+    const auto found = impl.owners.find(owner);
+    if (found != impl.owners.end() && found->second.submissionBlocked)
+    {
+        outFailure = found->second.submissionFailure;
         return true;
     }
     return false;
@@ -837,6 +922,12 @@ bool RHISubmissionThread::ExecuteLifecycleDrain(const void* owner,
         state.transitioning = false;
         state.submissionBlocked = true;
         state.submissionError = outError;
+        if (!ticket.GetCommandFailure(state.submissionFailure))
+        {
+            state.submissionFailure.stage = RHICommandFailureStage::Retirement;
+            state.submissionFailure.backendGeneration = state.generation;
+            state.submissionFailure.message = outError;
+        }
         state.accepting = false;
         ++impl.stats.lifecycleFailures;
         return false;
@@ -884,6 +975,10 @@ bool RHISubmissionThread::ExecuteLifecycleDrain(const void* owner,
         outError = "lifecycle drain 뒤 owner pending이 0이 아니다";
         state.submissionBlocked = true;
         state.submissionError = outError;
+        state.submissionFailure.Reset();
+        state.submissionFailure.stage = RHICommandFailureStage::Retirement;
+        state.submissionFailure.backendGeneration = state.generation;
+        state.submissionFailure.message = outError;
         state.accepting = false;
         ++impl.stats.lifecycleFailures;
         return false;
@@ -907,6 +1002,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
     Impl& impl = *m_impl;
     std::vector<std::shared_ptr<RHISubmissionTicket::State>> cancelled;
     std::vector<Impl::Entry> cancelledEntries;
+    uint64_t cancelledSoftwareBytes{};
     std::unique_lock lock(impl.mutex);
     const auto found = impl.owners.find(owner);
     if (found == impl.owners.end() || !found->second.registered)
@@ -935,6 +1031,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
             continue;
         }
         cancelled.push_back(it->ticket);
+        cancelledSoftwareBytes += it->softwareBytes;
         cancelledEntries.push_back(std::move(*it));
         it = impl.queue.erase(it);
     }
@@ -969,6 +1066,13 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
     outResult.drained = true;
     lock.unlock();
 
+    cancelledEntries.clear();
+    if (cancelledSoftwareBytes)
+    {
+        std::lock_guard releaseLock(impl.mutex);
+        impl.stats.pendingSoftwareBytes -= cancelledSoftwareBytes;
+        impl.spaceWake.notify_all();
+    }
     for (const auto& ticketState : cancelled)
     {
         if (ticketState->recordedBatch)
@@ -1047,9 +1151,9 @@ uint64_t RHISubmissionThread::GetOwnerGeneration(const void* owner) const
     return GetOwnerStats(owner).generation;
 }
 
-bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
-    IRHIDeviceResources& completionSource, RHIRecordedBatch&& batch,
-    RHISubmissionTicket& outTicket, std::string& outError)
+bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner, IRHIDeviceResources& completionSource,
+                                               RHIRecordedBatch&& batch, RHISubmissionTicket& outTicket,
+                                               std::string& outError, uint64_t commandRecordingId)
 {
     IRHIParallelCommandPool* const pool = batch.m_pool;
     if (nullptr == pool)
@@ -1078,16 +1182,19 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
     const RHICompletionPoint completion = queuedBatch->GetCompletionPoint();
     // 완료 뒤에도 남는 ticket은 식별 정보만 보관한다. 그래프 자원은 retirement가 소유한다.
     auto lifetimeToken = std::move(queuedBatch->m_lifetimeToken);
-    if (!EnqueueInternal(owner, "recorded batch submit",
-        [pool, queuedBatch](std::string& error)
-        {
+    if (!EnqueueInternal(
+            owner, "recorded batch submit",
+            [pool, queuedBatch](std::string& error)
+            {
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
-            const ce::dx_capture::submission_context_scope captureContext(queuedBatch->GetCaptureContext());
+                const ce::dx_capture::submission_context_scope captureContext(queuedBatch->GetCaptureContext());
 #endif
-            return pool->SubmitRecordedBatch(*queuedBatch, error);
-        }, outTicket, outError, completion,
-        [&completionSource] { return completionSource.GetCompletedFenceValue(); },
-        std::move(lifetimeToken), EntryKind::RecordedBatch, false, generation, queuedBatch))
+                RHICommandFailureScope::SetStage(RHICommandFailureStage::Submission);
+                return pool->SubmitRecordedBatch(*queuedBatch, error);
+            },
+            outTicket, outError, completion, [&completionSource] { return completionSource.GetCompletedFenceValue(); },
+            std::move(lifetimeToken), EntryKind::RecordedBatch, false, generation, queuedBatch, {}, 0,
+            commandRecordingId))
     {
         return false;
     }
@@ -1103,6 +1210,15 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
     if (IsCurrentThread() || !pool || !translator || !batch.IsValid())
     {
         outError = "Software submission requires a producer, sealed batch, frozen pool and translator.";
+        return false;
+    }
+    const uint64_t softwareBytes = batch.GetRecordingStats().allocatedBytes;
+    const uint64_t commandRecordingId = batch.GetRecordingId();
+    const ce::profile_rhi_context_scope rhiContext(MakeRHIProfileContext(batch.GetDesc(), commandRecordingId));
+    if (softwareBytes > m_impl->softwareByteCapacity)
+    {
+        // Reject before reserving a native completion or advancing upload state.
+        outError = "Software command arenas exceed the RHI admission byte capacity.";
         return false;
     }
     CollectCompletedLifetimes(owner);
@@ -1141,39 +1257,46 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
 #if !CE_SHIPPING
     cpuContext = ce::current_cpu_context;
 #endif
-    if (!EnqueueInternal(owner, "software batch translate and submit",
-        [pool, translator, software, identity, cpuContext](std::string& error)
-        {
-#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
-            const ce::dx_capture::submission_context_scope context(software->GetDesc().captureContext);
-#endif
-            const ce::profile_context_scope recordingContext(cpuContext);
-            RHITranslatedBatch translated;
-            RHICommandFailure failure;
+    if (!EnqueueInternal(
+            owner, "software batch translate and submit",
+            [pool, translator, software, identity, cpuContext](std::string& error)
             {
-                ce::profile_scope translate{ce::marker<"RHISoftwareTranslate">()};
-                RHICommandTranslationOptions options;
-                if (pool->SupportsParallelTranslation())
+                RHICommandFailureScope::SetIdentity(software->GetRecordingId(), software->GetDesc().backendGeneration);
+                RHICommandFailureScope::SetStage(RHICommandFailureStage::Translation);
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+                const ce::dx_capture::submission_context_scope context(software->GetDesc().captureContext);
+#endif
+                const ce::profile_context_scope recordingContext(cpuContext);
+                RHITranslatedBatch translated;
+                RHICommandFailure failure;
                 {
-                    options.mode = RHICommandTranslationMode::Parallel;
-                    options.maxTranslationJobs =
-                        (std::min)(IRHIParallelCommandPool::kMaxWorkers, pool->GetWorkerCount());
-                    options.minCommandsPerJob = 256;
+                    ce::profile_rhi_scope translate{ce::marker<"RHISoftwareTranslate">()};
+                    RHICommandTranslationOptions options;
+                    if (pool->SupportsParallelTranslation())
+                    {
+                        options.mode = RHICommandTranslationMode::Parallel;
+                        options.maxTranslationJobs =
+                            (std::min)(IRHIParallelCommandPool::kMaxWorkers, pool->GetWorkerCount());
+                        options.minCommandsPerJob = 256;
+                    }
+                    if (!translator->Translate(std::move(*software), options, translated, failure))
+                    {
+                        RHICommandFailureScope::Report(failure);
+                        error = failure.message;
+                        return false;
+                    }
                 }
-                if (!translator->Translate(std::move(*software), options, translated, failure))
-                {
-                    error = failure.message;
-                    return false;
-                }
-            }
-            auto& native = translated.m_native;
-            native.m_recordingId = identity.recordingId;
-            native.m_completion = identity.completion;
-            native.m_admitted = true;
-            return pool->SubmitRecordedBatch(native, error);
-        }, outTicket, outError, completion,
-        [&completionSource] { return completionSource.GetCompletedFenceValue(); },
-        std::move(lifetime), EntryKind::RecordedBatch, false, generation, {}, identity))
+                auto& native = translated.m_native;
+                native.m_recordingId = identity.recordingId;
+                native.m_completion = identity.completion;
+                native.m_admitted = true;
+                RHICommandFailureScope::SetStage(RHICommandFailureStage::Submission);
+                ce::profile_rhi_scope nativeSubmit{ce::marker<"RHINativeSubmit">()};
+                return pool->SubmitRecordedBatch(native, error);
+            },
+            outTicket, outError, completion, [&completionSource] { return completionSource.GetCompletedFenceValue(); },
+            std::move(lifetime), EntryKind::RecordedBatch, false, generation, {}, identity, softwareBytes,
+            commandRecordingId))
     {
         return false;
     }
@@ -1191,7 +1314,9 @@ bool RHISubmissionThread::EnqueueTranslatedBatch(const void* owner,
         outError = "Translated submission requires a native parallel-pool batch.";
         return false;
     }
-    return EnqueueRecordedBatch(owner, completionSource, std::move(batch.m_native), outTicket, outError);
+    const ce::profile_rhi_context_scope rhiContext(MakeRHIProfileContext(batch.m_provenance));
+    return EnqueueRecordedBatch(owner, completionSource, std::move(batch.m_native), outTicket, outError,
+                                batch.m_provenance.recordingId);
 }
 
 RHISubmissionThread& GetRHISubmissionThread()

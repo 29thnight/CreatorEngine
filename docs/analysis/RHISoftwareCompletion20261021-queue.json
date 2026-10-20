@@ -1,0 +1,585 @@
+{
+  "schema_version": 1,
+  "subject": "Owned and multiqueue software RHI adapter: CPU correctness, structured failure diagnostics, ownership and allocation evidence",
+  "recorded_utc": "2026-10-20T16:30:25.400629+00:00",
+  "base_commit": "088ea7b70c1a610e93fd2e0f6a2f35a2b9a5e175",
+  "worktree_changes_included": true,
+  "native_or_gpu_execution": false,
+  "conclusion": {
+    "normal_checks_passed": 4845,
+    "asan_ubsan_checks_passed": 4845,
+    "same_final_source_snapshot": true,
+    "verified_input_hash_count_per_run": 100,
+    "repository_input_count": 97,
+    "dependency_input_count": 3,
+    "disk_snapshot_mismatches": 0,
+    "frame_or_native_speedup_claim": false
+  },
+  "reproduction": {
+    "working_directory": "repository root",
+    "normal_command": "python Tools/regression/verify-rhi-software-queue.py --enkits /path/to/enkiTS --output /tmp/software-queue-normal.json",
+    "asan_ubsan_command": "python Tools/regression/verify-rhi-software-queue.py --enkits /path/to/enkiTS --sanitize --output /tmp/software-queue-sanitized.json",
+    "dependency": {
+      "name": "enkiTS",
+      "version": "v1.12",
+      "commit": "0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+      "source_url": "https://github.com/dougbinks/enkiTS/tree/0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+      "file_sha256": {
+        "TaskScheduler.cpp": "84a886ace6ced064ec87764ed7c38df2084c0283e9540f91e109a3ff0f37112f",
+        "TaskScheduler.h": "b73962988486762da85bb837c7b1d38650696327ac4d89c7d9c7905a3374c22d",
+        "LockLessMultiReadPipe.h": "d346681dbdd7f6cadbc025341b9c41b14bde072496e9b9cd91677f57501d8eef"
+      }
+    },
+    "runner_downloads_dependencies": false,
+    "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+    "compiler_standard": "C++23",
+    "actual_scheduler_workers": 8,
+    "backend_worker_capabilities_tested": [
+      0,
+      1,
+      4,
+      8
+    ],
+    "translation_modes_tested": [
+      "Serial",
+      "Parallel"
+    ],
+    "sanitizer_note": "ASan and UBSan are fail-fast. LeakSanitizer is disabled because this execution environment restricts /proc thread inspection. Explicit weak-owner/control-block and cancellation checks cover the tested ownership cycles; this is not a process-wide leak scan."
+  },
+  "compiled_production_cpp": [
+    "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareBatch.cpp",
+    "Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp",
+    "Engine/RenderEngine/RenderArena.cpp",
+    "Engine/Utility_Framework/JobScheduler.cpp",
+    "Engine/Utility_Framework/ThreadPool.cpp"
+  ],
+  "test_boundary": {
+    "unchanged_product_code": "Complete production software recording/replay/owned translator/queue implementation and original transitive headers, including all of IRenderDeviceServices.h, compile from byte snapshots.",
+    "scheduler": "Actual JobScheduler.cpp, ThreadPool.cpp and pinned enkiTS TaskScheduler.cpp execute.",
+    "fixtures": [
+      "Native recorder and native encoder operations",
+      "Queue/timeline/completion and retirement behavior",
+      "Device service responses for upload/descriptor versions"
+    ],
+    "allocator": "A malloc-based mimalloc API shim counts renderer allocation requests and exposes heap accesses to sanitizers. Counts below are not Windows mimalloc measurements.",
+    "shipping_configuration": "CE_CONTRACT_STANDALONE=1, CE_SHIPPING=1",
+    "not_executed": [
+      "D3D12 or Vulkan driver submission",
+      "Windows engine build",
+      "GPU execution/readback",
+      "Real render-frame timing",
+      "Nonshipping profiler/capture runtime"
+    ]
+  },
+  "functional_coverage": [
+    {
+      "probe": "verify_basic",
+      "contracts": [
+        "Deferred replay; record callback executes once",
+        "Serial/parallel replay with backend capacities 0/1/4/8",
+        "Correct issued point; exactly-once submission and GPU owner retirement"
+      ]
+    },
+    {
+      "probe": "verify_failures",
+      "contracts": [
+        "Five translation failures and four submission failures preserve stage, sealed software recording ID and backend generation",
+        "Joined replay failures preserve original target index, command index and opcode",
+        "Preflight rejection/exception is executionUncertain=false; execute-attempt followed by signal failure/exception is true",
+        "Nested graph transaction sinks receive identical scalar failure metadata",
+        "Consumed-batch retries report Admission/false without replay or stale failure metadata",
+        "Executed-but-unfenced native owner quarantine survives unrelated completion",
+        "Unaccepted owner admission remains retryable; subsequent success clears failure output"
+      ]
+    },
+    {
+      "probe": "verify_failure_handoff",
+      "contracts": [
+        "Three submissions cross an actual separate std::thread simulating the synchronous native submission owner",
+        "Exceptions before and after the fake native execute point preserve caller and owner scalar failure metadata",
+        "Both threads restore the previous diagnostic TLS sink after return and exception unwinding",
+        "Successful handoff clears a deliberately stale failure result"
+      ]
+    },
+    {
+      "probe": "verify_failure_drain",
+      "contracts": [
+        "Held accepted work drains before failure returns",
+        "Disjoint target ownership and canonical failure selection"
+      ]
+    },
+    {
+      "probe": "verify_concurrent_aliases",
+      "contracts": [
+        "Concurrent aliases race for one sealed-to-consumed transition; only one submit wins"
+      ]
+    },
+    {
+      "probe": "verify_versions_and_cancel",
+      "contracts": [
+        "Upload/descriptor identity validation",
+        "Cancellation releases owners",
+        "Invalid/empty recording inputs reject consistently"
+      ]
+    },
+    {
+      "probe": "verify_direct_translator",
+      "contracts": [
+        "Original target order and per-target segment order",
+        "Parallel target exclusivity and original-order failure metadata",
+        "Legacy zero-worker recorder rejects multiple independent software segments before native replay"
+      ]
+    },
+    {
+      "probe": "verify_queue_transaction",
+      "contracts": [
+        "Graphics/compute queue waits and signals keep transaction order",
+        "Concurrent external queue operation cannot overtake a whole graph transaction"
+      ]
+    },
+    {
+      "probe": "verify_pool_lifetime",
+      "contracts": [
+        "Factory/wrapper ownership",
+        "65 concurrent leases exercise fixed 64-slot idle cache overflow",
+        "Last aliases and facades release backend/validator/frame owners without a control-block cycle"
+      ]
+    },
+    {
+      "probe": "verify_byte_admission",
+      "contracts": [
+        "Aggregate Finish admission is terminal and nonblocking when over budget",
+        "Translation returns CPU credit even while aliases and GPU owners survive",
+        "Last unsubmitted alias returns credit exactly once",
+        "Native/translation failure and cancellation permit later reuse",
+        "Owner admission rejection preserves credit until work is consumed/cancelled",
+        "Two concurrent seals competing for one measured-arena budget accept exactly one"
+      ]
+    },
+    {
+      "probe": "verify_warm_reuse",
+      "contracts": [
+        "Retained 8/1/8 target capacity and stable wrapper reuse",
+        "Allocation requests repeat without target storage regrowth",
+        "Injected warm shared-lease allocation failure recycles the object and releases the frame owner"
+      ]
+    }
+  ],
+  "memory_and_allocation": {
+    "max_targets_per_recording": 8,
+    "retained_idle_recording_slots": 64,
+    "default_max_command_bytes_per_recording": 67108864,
+    "default_max_payload_bytes_per_recording": 67108864,
+    "default_max_pending_arena_bytes_per_domain": 268435456,
+    "admission_charge": "Sealed software GetRecordingStats().allocatedBytes, reserved atomically under the domain recording mutex at Finish.",
+    "credit_release": "After accepted translation has joined and released CPU storage, including failure; or when the last unsubmitted alias cancels. Native GPU retention is separate.",
+    "cap_exclusions": [
+      "Unfinished recording callbacks before Finish",
+      "Idle retained arena capacity",
+      "Native command storage and GPU resource retirement"
+    ],
+    "warm_result": {
+      "test": "warm_record_cancel",
+      "target_shapes": [
+        8,
+        1,
+        8
+      ],
+      "repetitions": 128,
+      "render_allocator_calls": [
+        10,
+        3,
+        10
+      ],
+      "requested_bytes": [
+        400,
+        120,
+        400
+      ],
+      "includes_control_blocks": true,
+      "native_or_gpu": false
+    },
+    "warm_result_interpretation": "Each of 128 repeated 8/1/8 shape cycles observes 10/3/10 renderer allocation requests and 400/120/400 requested bytes respectively, including shared control blocks. These are stable warm-path counts, not a claim of zero allocations or reduced native frame time."
+  },
+  "profiling_and_capture": {
+    "verification": "Static-reviewed only in this CE_SHIPPING=1 probe.",
+    "cpu_context": "Caller CPU context is copied before backend submission handoff, restored inside the submission owner, and propagated to owned translation workers.",
+    "capture_context": "After the successful sealed-to-consumed CAS, queue Submit copies the sealed batch captureContext and installs submission_context_scope across translation and native Submit under !CE_SHIPPING && CE_DX_TIMING_CAPTURE. It does not read latest-frame global state.",
+    "scope_markers": [
+      "RHISoftwareRecord",
+      "RHICommandTranslate",
+      "RHICommandTranslateJoin",
+      "RHISoftwareTranslate.Targets",
+      "RHINativeSubmit"
+    ],
+    "not_claimed": "Nonshipping profiler/capture runtime execution is not claimed by this queue probe; event payload serialization is covered by the separate diagnostics validation.",
+    "rhi_identity": "Production source attaches value-only recording/source-frame availability/frame/view/queue/target/backend context to software recording, translation, native submission and retirement scopes; this CE_SHIPPING=1 executable does not exercise event emission."
+  },
+  "limitations": [
+    "No CPU timing or engine/GPU performance result is claimed by this queue adapter probe.",
+    "Native recorder/queue/fence behavior is deterministic fixture behavior, not native API validation.",
+    "Existing backend capability and borrowed device-service drain-before-destruction contracts remain required.",
+    "DX12 native Copy command recording is not enabled by this adapter; unsupported backend recording remains an explicit failure.",
+    "The source closure and dependency file hashes are authoritative for these uncommitted implementation bytes; base_commit alone does not identify the tested implementation."
+  ],
+  "implementation_and_harness_sha256": {
+    "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.h": "a46e16aadf49d039f7a894a85bb08a86670b7d728fb31628793d0bc61ff7a354",
+    "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp": "f1bce39d15f8ad5e858a365c01848702ebdd0f4c15a0dd8405df67bdc8a47c67",
+    "Engine/RenderEngine/RHI/IRHICommandTranslator.h": "351562f85a66d14e951f80ce2e181230c7cc6e476578d471c978c547006f539d",
+    "Engine/RenderEngine/RHI/RHISoftwareBatch.h": "f5d6fab74f3fee88e05140d573a82564318410d14aa77817d3515d84b566d279",
+    "Engine/RenderEngine/RHI/RHIQueueContract.h": "c6cae490ac251515651f38566a6d1fdbefaf368c0bc6d28f00944d0d9e5d407a",
+    "Tools/regression/rhi_software_queue_probe.cpp": "28ad7ff2b6f11c6d2323111eab8978dd591cc15275b88b335352efb1948f8f35",
+    "Tools/regression/verify-rhi-software-queue.py": "229ba3fc2aab1a5832e241c537cf362ae57ec52fc0aafe8b1fb163838a829f20",
+    "Engine/RenderEngine/RHI/RHICommandFailure.h": "9ee5b8e61235c9a69b9ab4587f530f8718df1646ac882637e1aae7d110feb9a0",
+    "Engine/RenderEngine/RHI/RHISoftwareCommandTypes.h": "ddc064b2bc008fd1decfed321afb2d0aaf3d30dadc5b9446537e2e18268e3d17",
+    "Engine/RenderEngine/RHI/RHICommandProvenance.h": "5cc2be663b249bd81fb6e9f2bd5d6621341d475fd57da226a78e3a1c55787b54",
+    "Engine/RenderEngine/RHI/RHIProfilingContext.h": "b2c5d697b3e6d5489166a2a9b9f4b84d27d3a9cc845941cf79ac2064c32ce078",
+    "Engine/RenderEngine/RHI/RHIQueueRecorder.h": "db07736df0e5e0da175ecad2a347c2c59ae927dbfaa3a1b306da9b5c84cb5efd"
+  },
+  "runs": {
+    "normal": {
+      "source_sha256": {
+        "Tools/regression/rhi_software_queue_probe.cpp": "28ad7ff2b6f11c6d2323111eab8978dd591cc15275b88b335352efb1948f8f35",
+        "Engine/RenderEngine/RHI/IRenderDeviceServices.h": "64f50f6dc05dc49eca909d889080025f6b147b745fb87966eee1a4287d8e1e1f",
+        "Engine/RenderEngine/Assets/ModelGeometryPayload.h": "f9dbb3a16b2b6b92a7ed281d9c91c995ce5cb82e995bdb199c4fee7f78b11ca0",
+        "Engine/RenderEngine/Assets/ModelMeshDescriptor.h": "65c0fdd3ceddbd5cf9fa20067e07dfc800c130529122c360ed70efe79c7236d7",
+        "Engine/Utility_Framework/StandardLibrary.h": "103811f4e6208c3ef680acb559d51ed394af5a879f469ba6282fd2e66dc5fd5a",
+        "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h": "8fb05c7c256aac0e843337193bb9e21c0963860790159c2c5dd399bc0abb4bc7",
+        "Engine/RenderEngine/Experiment/ModelData.h": "74458df435bb199ad13a4130a2ab90587200b5c76f992e0f91b892598a67e6a9",
+        "Engine/Utility_Framework/Ownership.h": "bd640e783c07b57558d1a06a8e58322fa806534a5b1d2892052026afd1dbfd1a",
+        "ThirdParty/ownership_cpp/include/own/ownership.hpp": "b3979daa1d1b9c290e422531aa4d4c166a00bc9c3864deca0571884550a8b8b5",
+        "ThirdParty/Mathematics/include/mathematics/vector4.hpp": "6593c2de12430565dd5a083504000cc8463ac9acb9d694d03cac603f3319d03d",
+        "ThirdParty/Mathematics/include/mathematics/vector_common.hpp": "c47fdeedba574efa54aa1be008be50a657f87dbad931bed8962ab3f6f2e90e05",
+        "ThirdParty/Mathematics/include/mathematics/vec_reg.hpp": "e6e34eeae80132ee9495f2ae7683cab2852d2bf6693c036e804cd3b4b0d056fe",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_select.hpp": "cbef5aa02cad5ea94ff6eeef749a05d45aae8592fcff21b513cef44729e4b584",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_scalar.hpp": "5bb223efd6b0199df012494885bd41e8b4ad79419a12e3ae7ac23e032da83f9d",
+        "ThirdParty/Mathematics/include/mathematics/arch/consteval_ops.hpp": "500491b5c43b4d430dd53e937363e4fb603d9097669e9c926e2a92632b153328",
+        "ThirdParty/Mathematics/include/mathematics/arch/reg.hpp": "d9964977541b09500ec5300de5ef2ed78a0ee581a320d373bc60a7cf5a0e8f15",
+        "ThirdParty/Mathematics/include/mathematics/config.hpp": "cc4114e10c1fd365c03fda1f6658796bf05602eb5f18b1a32ec61205c7d766b9",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_neon.hpp": "f8d66e1403578547a1622bfe787ade57bb0ddf6e593766c926297163b7d34744",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_sse.hpp": "a7112caadd79a8d3d7a18bd8dbe55ddd1d9564d1840f089ece6d582b1d286fca",
+        "ThirdParty/Mathematics/include/mathematics/scalar.hpp": "5a8f831c3160d923dce587c82ba374051c1cb5c18ae2510825016a774069fdc2",
+        "ThirdParty/Mathematics/include/mathematics/vector3.hpp": "2a418d5c5c61735b0c42bc99b2b9dcbaf75d180dbddc2c9ed35838f233705678",
+        "ThirdParty/Mathematics/include/mathematics/vector2.hpp": "4d47bc888f4c880258e4e9e4b8b6269f7d1937bfd463c4a94b3f29b8c8b550c5",
+        "ThirdParty/Mathematics/include/mathematics/quaternion.hpp": "bffb80cc5878bfc1c3a31653020e87ec37b7634322b37b816def75c6e02d09ec",
+        "ThirdParty/Mathematics/include/mathematics/vector.hpp": "49cc91a0e5e0ffb428a5c769b0531de83bbd8c1bcc99af6b075b3e310b5e234d",
+        "ThirdParty/Mathematics/include/mathematics/matrix.hpp": "90b94b4b0af1707ff1414a4662fb9049b751312a246dfe47c2f7ca6758998326",
+        "ThirdParty/Mathematics/include/mathematics/matrix4x4.hpp": "b7ee6f246ad8d31bb4215b6c9a65cc6e171267aeead5b9700c1f2135c2adbd81",
+        "ThirdParty/Mathematics/include/mathematics/matrix3x3.hpp": "3820bf74ef0c4217bf3652e28ef79ac224694a40a608dba3be1a61681c8df5a2",
+        "ThirdParty/Mathematics/include/mathematics/bounds.hpp": "1fb68eb6df108c94dc9abe92c89e48759281718719af77803688f753800bc52c",
+        "Engine/RenderEngine/Assets/TextureSampler.h": "460cbf5c5bd0640ec2e1fbbad5f95dd6cb2cd4997c84621be294af20bebc77f4",
+        "Engine/RenderEngine/RHI/RHIPipelineLayout.h": "fbc95bd59d4c084bb54d54d99d763b6041693d0e7170d105e90322e8efaa75af",
+        "Engine/RenderEngine/Assets/TextureCoordinates.h": "7e43c67d7d74b80ca1eb11190f6ec7b8565506d197de0f661a0049e4897c3a46",
+        "Engine/RenderEngine/Assets/MeshletCompression.h": "618d16a3aeff6c016f92b297f629d6f54449b4a62505a09e603f98c1930c2d9d",
+        "Engine/RenderEngine/Experiment/MeshletData.h": "f3b8c9e655f096f979e59527fa147f14b24f21993e69b35e23ed2a5fb353e9ac",
+        "Engine/RenderEngine/Assets/QuantizedGeometry.h": "3113febda31d52a64100708f3f709e3a8e49673fb717fdcd4302cdd4129259bf",
+        "Engine/RenderEngine/Assets/ModelVertexLayout.h": "a6feb36fa1d1a4b80f2723fbfcfe8eb82ae917d813d3eca5edec96da459574d6",
+        "Engine/RenderEngine/Experiment/MeshLodData.h": "90bfab94778a4a4340ee79da9def48507678e2fa96f62328c3ddfa682c143824",
+        "Engine/RenderEngine/Experiment/VertexLayout.h": "b23de6ceeceb78bb098ef7970491dd3ff4ba701dbd4b08519104ceec2b15fd14",
+        "Engine/Utility_Framework/Uuid.h": "0632fa2e42f84aa4794b8cdb6daca12731cbbcb1410ac3a91afb0fe8a08f810f",
+        "Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.h": "1e651563cf3c33854e49b19107146079fd6fc7777a486df04753fd6fa0f24eee",
+        "Engine/RenderEngine/Experiment/AssetIdentity.h": "db517c2dedce1d2e772dde046a466fb663c4e4673756da6c924d76bf4fde355c",
+        "Engine/RenderEngine/Assets/ModelSkeletonPayload.h": "4811ce3214fa4d6cd7c910dcde7554bf3f344c14e57615eacc113db7ea20409c",
+        "Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h": "9ad57aa5e9294d590c0e6dd29956d9943d8b233ec1c785e7de7d6967eb245a0f",
+        "Engine/RenderEngine/AssetDepot/AssetMountId.h": "0196fcec6921f490af7a1f37d9e318d949741d135bd78832d5f5cf4566e56145",
+        "Engine/RenderEngine/Experiment/Cooked/ArtifactByteSource.h": "aabad97cce3b2d0c5d06c06d0f9003e556245e8a43af8a908a4ae592c0960fa6",
+        "Engine/Utility_Framework/ArtifactStoreGuard.h": "8b5cac3dfd1e06927b7a58064322886e17bb652a4006e82d9564286d185077aa",
+        "Engine/RenderEngine/Assets/ModelAssetGeneration.h": "7736fbc61f1379193d59e1635abf087a25eedf5a1a6ca31e6270e10758604dc1",
+        "Engine/RenderEngine/RHI/RHIFormat.h": "63a1bdb25452db3ca4fc0ffe5ec9b8892d2f60beac29a6cccac8d9bb62f710fd",
+        "Engine/RenderEngine/Assets/ModelAssetPhaseTiming.h": "bd0ede8c801c02c3eaa692770a5f5d86966227cd458a1066febd74acc0d534ea",
+        "Engine/RenderEngine/Assets/AssetIdentityProfile.h": "6bcb2abd4bb9fe04346c34336ea171436cd841eecc8c013d9f21e5eceb761470",
+        "Engine/RenderEngine/RHI/RHITransientHeap.h": "ea40110fd1b0a7f70c65667d28035dd4c82a1324502583212251be858d0586cb",
+        "Engine/RenderEngine/RHI/RHIResourceTypes.h": "0a04c270894407305f95a9caaa4dbb2128a869048307996ff506db5bd201d61d",
+        "Engine/RenderEngine/RHI/RHIResourceState.h": "fbcdfe40ee54f490f922ea8a05444536a522c8294463f564088812b0e6201ccb",
+        "Engine/RenderEngine/RHI/RHIHandle.h": "756860eb0312c36215e7e352ec66d087d730312816050f2b1fd0a46978e3a8a8",
+        "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.h": "a46e16aadf49d039f7a894a85bb08a86670b7d728fb31628793d0bc61ff7a354",
+        "Engine/RenderEngine/RHI/RHISoftwareRecorder.h": "9b6409ef4c00649a8d02b184424dbf6db45bfac4e7fe27ec9955b237a3571fb7",
+        "Engine/RenderEngine/RHI/RHISoftwareBatch.h": "f5d6fab74f3fee88e05140d573a82564318410d14aa77817d3515d84b566d279",
+        "Engine/RenderEngine/RHI/RHIQueueContract.h": "c6cae490ac251515651f38566a6d1fdbefaf368c0bc6d28f00944d0d9e5d407a",
+        "Engine/RenderEngine/RHI/RHICommandFailure.h": "9ee5b8e61235c9a69b9ab4587f530f8718df1646ac882637e1aae7d110feb9a0",
+        "Engine/RenderEngine/RHI/RHIRecordedBatch.h": "c9d6156b3aa9d2b30bd4fca17576de1e8f14058fa1aba6846c25a9aaf3c7c9a1",
+        "Engine/EngineDiagnostics/DxCaptureSubmission.h": "d9ed1f26cc970105f566cf40018b4132afdaa746439a617d15ff094f679ae825",
+        "Engine/EngineDiagnostics/DxCaptureProtocol.h": "2fcf81e2c2942accf175b94109801734ec84f5fc57d1434c488478fae2883646",
+        "Engine/RenderEngine/RHI/RHISoftwareEncoder.h": "7e86b95f1f985d3bbf2317e0c1504d15afa34b9d135f4ea9f0140beb918045ec",
+        "Engine/RenderEngine/RHI/RHISoftwareCommandList.h": "25baf52afe11bd13ae059049111fa5b607e9b10afabcc2d9f4ee44c3e825b775",
+        "Engine/RenderEngine/RenderArena.h": "d6cfdb6b071a11cdf9194704d0825061b6bb9c6b4683d6e17ef7326bc51804c6",
+        "Engine/RenderEngine/RenderAllocator.h": "3eed71244cea313c115b44abea65e22e5ca43b89fe8826f089a691daa9ede631",
+        "ThirdParty/mimalloc/include/mimalloc.h": "8ec1bff9902bab6682e3ecbf7613ccc915e082ca743fdd0c396d3954323fe8bf",
+        "Engine/RenderEngine/RHI/RHISoftwareCommandTypes.h": "ddc064b2bc008fd1decfed321afb2d0aaf3d30dadc5b9446537e2e18268e3d17",
+        "Engine/RenderEngine/RHI/RHIEncoder.h": "a38885ce9a1b5dc8dfdb708dc25588a6d0d1a840c7e826cb81877a9a25ff6300",
+        "Engine/RenderEngine/RHI/RHIQueueRecorder.h": "db07736df0e5e0da175ecad2a347c2c59ae927dbfaa3a1b306da9b5c84cb5efd",
+        "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h": "459de735e4b2027de6caff8d956198bd92873f4d0947d9951628bfaa278e1ed1",
+        "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h": "7f6ea7cc8c1bab9d906e06aae3d2c03dafb94756054a697ba610af80141637e9",
+        "Engine/Utility_Framework/JobScheduler.h": "22382a44d69ab02bb1a4e3373af1fd5a24799d3a93660ada6576a4a6b2e70c7a",
+        "Engine/Utility_Framework/JobGraph.h": "6f36d49d401ca096b1db8e9ea93c933d153857660b0a8b7b6cbab269e56600e0",
+        "Engine/Utility_Framework/ThreadPool.h": "e412cc9b6ee695c98bab3b6370928bdf61dc92a9905b5ddd06354e532b7628f1",
+        "Engine/RenderEngine/RHI/RHICommandProvenance.h": "5cc2be663b249bd81fb6e9f2bd5d6621341d475fd57da226a78e3a1c55787b54",
+        "Engine/RenderEngine/RHI/IRHICommandTranslator.h": "351562f85a66d14e951f80ce2e181230c7cc6e476578d471c978c547006f539d",
+        "Engine/Utility_Framework/ThreadPool.cpp": "6cc3d9e0acc9c42b4a03dcbe3a1079b9a163833f75cd19e5b0591269c2df5a5b",
+        "Engine/Utility_Framework/JobScheduler.cpp": "f972c1c3f7b3753ab376d6fb4ebf6be2f0f7b34c7c25acc6ca708efad27fc2e2",
+        "Engine/RenderEngine/RenderArena.cpp": "a4efb38e96d31d350486fc08c3a4d3e6d35a3df38f561b57cfe290ad40853b33",
+        "Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp": "c270a189c112254cd9802723c74b28cd50246d014315052a2a7ffa49f43d7c5a",
+        "Engine/EngineDiagnostics/ProfileScope.h": "53544f76283bbde9f6f321285df4202fadf7c54cd8771972becf578dae364b35",
+        "Engine/EngineDiagnostics/ProfileService.h": "dc95ac9376da3ca725b46304d125e46099cd92485a99588efcd8754d75c6a6f7",
+        "Engine/EngineDiagnostics/ProfileThreadStream.h": "f8db066d695988ed3726ea6aff4f6d0fbe3d16c25a97eb7f580637a14d52d24c",
+        "Engine/EngineDiagnostics/ProfileEvent.h": "d8f808d4fc7528dc908fd80b53b21b2c95082fab2760388b02ff6a530a18f00c",
+        "Engine/EngineDiagnostics/ProfileRenderMeasurement.h": "339ec2c7f42e2347d9865c7be051f7e501af81719165bdf49de974e0a1344fb3",
+        "Engine/EngineDiagnostics/ProfileRhiContext.h": "e202178f2565fa520d1711870f2f43ad57d3c4c86d1759fe9dd434e97a10112d",
+        "Engine/EngineDiagnostics/ProfileMarker.h": "95c7859e5abe5a0aed130158c94a56cb086eddcb8f10ea8f4fca3dc4dd8c577f",
+        "Engine/EngineDiagnostics/ProfileCaptureFile.h": "c6c85fb200ddbff780478f00084d455218d21eb6bd790134ea799e5ccf5ef383",
+        "Engine/EngineDiagnostics/ProfileCapture.h": "ff5a8b85a4b2a0e6b36d146f66a1f4498176f9ba5c4cce8a1218531d50331d6f",
+        "Engine/EngineDiagnostics/ProfileCaptureAllocator.h": "59c56c7e5903aefb5b994e067755d918b4ef21100c4764ab50f70ad8fe5c15cf",
+        "Engine/RenderEngine/RHI/RHIProfilingContext.h": "b2c5d697b3e6d5489166a2a9b9f4b84d27d3a9cc845941cf79ac2064c32ce078",
+        "Engine/RenderEngine/RHI/RHISoftwareBatch.cpp": "38079daca2f4860804f8dbc54d591d0989b59c26f1d74c507db1a7130a7d73b4",
+        "Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp": "b8d36223f377d944a820dfe9105a0b9394cd41eece56a7435dc0359d6f4fb572",
+        "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp": "a636a3653bed6e45028f030985f1fbc5d146cde9e9ebaf424239f6cd4d519ffa",
+        "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp": "f1bce39d15f8ad5e858a365c01848702ebdd0f4c15a0dd8405df67bdc8a47c67",
+        "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h": "16c3b98360a5a8622336f978215d6c146d4205f4397b90ae978c7c1ebf826dc6",
+        "Tools/regression/verify-rhi-software-queue.py": "229ba3fc2aab1a5832e241c537cf362ae57ec52fc0aafe8b1fb163838a829f20",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71/src/TaskScheduler.cpp": "84a886ace6ced064ec87764ed7c38df2084c0283e9540f91e109a3ff0f37112f",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71/src/TaskScheduler.h": "b73962988486762da85bb837c7b1d38650696327ac4d89c7d9c7905a3374c22d",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71/src/LockLessMultiReadPipe.h": "d346681dbdd7f6cadbc025341b9c41b14bde072496e9b9cd91677f57501d8eef"
+      },
+      "sanitized": false,
+      "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+      "flags": [
+        "-std=c++23",
+        "-O2",
+        "-g",
+        "-pthread",
+        "-DCE_CONTRACT_STANDALONE=1",
+        "-DCE_SHIPPING=1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-Wno-unknown-pragmas"
+      ],
+      "boundary": "actual software queue/recording/replay + actual scheduler/enkiTS; CPU native recorder/fence fixture; malloc shim; no native GPU/frame execution",
+      "service_header": "Complete production IRenderDeviceServices.h and transitive model/math/ownership headers unchanged",
+      "rows": [
+        {
+          "test": "structured_failure_diagnostics",
+          "translation_failure_cases": 5,
+          "submission_failure_cases": 4,
+          "retry_admission_checks": 9,
+          "cross_thread_handoff_cases": 3,
+          "native_or_gpu": false
+        },
+        {
+          "test": "warm_record_cancel",
+          "target_shapes": [
+            8,
+            1,
+            8
+          ],
+          "repetitions": 128,
+          "render_allocator_calls": [
+            10,
+            3,
+            10
+          ],
+          "requested_bytes": [
+            400,
+            120,
+            400
+          ],
+          "includes_control_blocks": true,
+          "native_or_gpu": false
+        },
+        {
+          "test": "owned_software_queue",
+          "passed": true,
+          "checks": 4845,
+          "actual_scheduler_workers": 8,
+          "native_or_gpu": false
+        }
+      ]
+    },
+    "asan_ubsan": {
+      "source_sha256": {
+        "Tools/regression/rhi_software_queue_probe.cpp": "28ad7ff2b6f11c6d2323111eab8978dd591cc15275b88b335352efb1948f8f35",
+        "Engine/RenderEngine/RHI/IRenderDeviceServices.h": "64f50f6dc05dc49eca909d889080025f6b147b745fb87966eee1a4287d8e1e1f",
+        "Engine/RenderEngine/Assets/ModelGeometryPayload.h": "f9dbb3a16b2b6b92a7ed281d9c91c995ce5cb82e995bdb199c4fee7f78b11ca0",
+        "Engine/RenderEngine/Assets/ModelMeshDescriptor.h": "65c0fdd3ceddbd5cf9fa20067e07dfc800c130529122c360ed70efe79c7236d7",
+        "Engine/Utility_Framework/StandardLibrary.h": "103811f4e6208c3ef680acb559d51ed394af5a879f469ba6282fd2e66dc5fd5a",
+        "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h": "8fb05c7c256aac0e843337193bb9e21c0963860790159c2c5dd399bc0abb4bc7",
+        "Engine/RenderEngine/Experiment/ModelData.h": "74458df435bb199ad13a4130a2ab90587200b5c76f992e0f91b892598a67e6a9",
+        "Engine/Utility_Framework/Ownership.h": "bd640e783c07b57558d1a06a8e58322fa806534a5b1d2892052026afd1dbfd1a",
+        "ThirdParty/ownership_cpp/include/own/ownership.hpp": "b3979daa1d1b9c290e422531aa4d4c166a00bc9c3864deca0571884550a8b8b5",
+        "ThirdParty/Mathematics/include/mathematics/vector4.hpp": "6593c2de12430565dd5a083504000cc8463ac9acb9d694d03cac603f3319d03d",
+        "ThirdParty/Mathematics/include/mathematics/vector_common.hpp": "c47fdeedba574efa54aa1be008be50a657f87dbad931bed8962ab3f6f2e90e05",
+        "ThirdParty/Mathematics/include/mathematics/vec_reg.hpp": "e6e34eeae80132ee9495f2ae7683cab2852d2bf6693c036e804cd3b4b0d056fe",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_select.hpp": "cbef5aa02cad5ea94ff6eeef749a05d45aae8592fcff21b513cef44729e4b584",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_scalar.hpp": "5bb223efd6b0199df012494885bd41e8b4ad79419a12e3ae7ac23e032da83f9d",
+        "ThirdParty/Mathematics/include/mathematics/arch/consteval_ops.hpp": "500491b5c43b4d430dd53e937363e4fb603d9097669e9c926e2a92632b153328",
+        "ThirdParty/Mathematics/include/mathematics/arch/reg.hpp": "d9964977541b09500ec5300de5ef2ed78a0ee581a320d373bc60a7cf5a0e8f15",
+        "ThirdParty/Mathematics/include/mathematics/config.hpp": "cc4114e10c1fd365c03fda1f6658796bf05602eb5f18b1a32ec61205c7d766b9",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_neon.hpp": "f8d66e1403578547a1622bfe787ade57bb0ddf6e593766c926297163b7d34744",
+        "ThirdParty/Mathematics/include/mathematics/arch/simd_sse.hpp": "a7112caadd79a8d3d7a18bd8dbe55ddd1d9564d1840f089ece6d582b1d286fca",
+        "ThirdParty/Mathematics/include/mathematics/scalar.hpp": "5a8f831c3160d923dce587c82ba374051c1cb5c18ae2510825016a774069fdc2",
+        "ThirdParty/Mathematics/include/mathematics/vector3.hpp": "2a418d5c5c61735b0c42bc99b2b9dcbaf75d180dbddc2c9ed35838f233705678",
+        "ThirdParty/Mathematics/include/mathematics/vector2.hpp": "4d47bc888f4c880258e4e9e4b8b6269f7d1937bfd463c4a94b3f29b8c8b550c5",
+        "ThirdParty/Mathematics/include/mathematics/quaternion.hpp": "bffb80cc5878bfc1c3a31653020e87ec37b7634322b37b816def75c6e02d09ec",
+        "ThirdParty/Mathematics/include/mathematics/vector.hpp": "49cc91a0e5e0ffb428a5c769b0531de83bbd8c1bcc99af6b075b3e310b5e234d",
+        "ThirdParty/Mathematics/include/mathematics/matrix.hpp": "90b94b4b0af1707ff1414a4662fb9049b751312a246dfe47c2f7ca6758998326",
+        "ThirdParty/Mathematics/include/mathematics/matrix4x4.hpp": "b7ee6f246ad8d31bb4215b6c9a65cc6e171267aeead5b9700c1f2135c2adbd81",
+        "ThirdParty/Mathematics/include/mathematics/matrix3x3.hpp": "3820bf74ef0c4217bf3652e28ef79ac224694a40a608dba3be1a61681c8df5a2",
+        "ThirdParty/Mathematics/include/mathematics/bounds.hpp": "1fb68eb6df108c94dc9abe92c89e48759281718719af77803688f753800bc52c",
+        "Engine/RenderEngine/Assets/TextureSampler.h": "460cbf5c5bd0640ec2e1fbbad5f95dd6cb2cd4997c84621be294af20bebc77f4",
+        "Engine/RenderEngine/RHI/RHIPipelineLayout.h": "fbc95bd59d4c084bb54d54d99d763b6041693d0e7170d105e90322e8efaa75af",
+        "Engine/RenderEngine/Assets/TextureCoordinates.h": "7e43c67d7d74b80ca1eb11190f6ec7b8565506d197de0f661a0049e4897c3a46",
+        "Engine/RenderEngine/Assets/MeshletCompression.h": "618d16a3aeff6c016f92b297f629d6f54449b4a62505a09e603f98c1930c2d9d",
+        "Engine/RenderEngine/Experiment/MeshletData.h": "f3b8c9e655f096f979e59527fa147f14b24f21993e69b35e23ed2a5fb353e9ac",
+        "Engine/RenderEngine/Assets/QuantizedGeometry.h": "3113febda31d52a64100708f3f709e3a8e49673fb717fdcd4302cdd4129259bf",
+        "Engine/RenderEngine/Assets/ModelVertexLayout.h": "a6feb36fa1d1a4b80f2723fbfcfe8eb82ae917d813d3eca5edec96da459574d6",
+        "Engine/RenderEngine/Experiment/MeshLodData.h": "90bfab94778a4a4340ee79da9def48507678e2fa96f62328c3ddfa682c143824",
+        "Engine/RenderEngine/Experiment/VertexLayout.h": "b23de6ceeceb78bb098ef7970491dd3ff4ba701dbd4b08519104ceec2b15fd14",
+        "Engine/Utility_Framework/Uuid.h": "0632fa2e42f84aa4794b8cdb6daca12731cbbcb1410ac3a91afb0fe8a08f810f",
+        "Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.h": "1e651563cf3c33854e49b19107146079fd6fc7777a486df04753fd6fa0f24eee",
+        "Engine/RenderEngine/Experiment/AssetIdentity.h": "db517c2dedce1d2e772dde046a466fb663c4e4673756da6c924d76bf4fde355c",
+        "Engine/RenderEngine/Assets/ModelSkeletonPayload.h": "4811ce3214fa4d6cd7c910dcde7554bf3f344c14e57615eacc113db7ea20409c",
+        "Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h": "9ad57aa5e9294d590c0e6dd29956d9943d8b233ec1c785e7de7d6967eb245a0f",
+        "Engine/RenderEngine/AssetDepot/AssetMountId.h": "0196fcec6921f490af7a1f37d9e318d949741d135bd78832d5f5cf4566e56145",
+        "Engine/RenderEngine/Experiment/Cooked/ArtifactByteSource.h": "aabad97cce3b2d0c5d06c06d0f9003e556245e8a43af8a908a4ae592c0960fa6",
+        "Engine/Utility_Framework/ArtifactStoreGuard.h": "8b5cac3dfd1e06927b7a58064322886e17bb652a4006e82d9564286d185077aa",
+        "Engine/RenderEngine/Assets/ModelAssetGeneration.h": "7736fbc61f1379193d59e1635abf087a25eedf5a1a6ca31e6270e10758604dc1",
+        "Engine/RenderEngine/RHI/RHIFormat.h": "63a1bdb25452db3ca4fc0ffe5ec9b8892d2f60beac29a6cccac8d9bb62f710fd",
+        "Engine/RenderEngine/Assets/ModelAssetPhaseTiming.h": "bd0ede8c801c02c3eaa692770a5f5d86966227cd458a1066febd74acc0d534ea",
+        "Engine/RenderEngine/Assets/AssetIdentityProfile.h": "6bcb2abd4bb9fe04346c34336ea171436cd841eecc8c013d9f21e5eceb761470",
+        "Engine/RenderEngine/RHI/RHITransientHeap.h": "ea40110fd1b0a7f70c65667d28035dd4c82a1324502583212251be858d0586cb",
+        "Engine/RenderEngine/RHI/RHIResourceTypes.h": "0a04c270894407305f95a9caaa4dbb2128a869048307996ff506db5bd201d61d",
+        "Engine/RenderEngine/RHI/RHIResourceState.h": "fbcdfe40ee54f490f922ea8a05444536a522c8294463f564088812b0e6201ccb",
+        "Engine/RenderEngine/RHI/RHIHandle.h": "756860eb0312c36215e7e352ec66d087d730312816050f2b1fd0a46978e3a8a8",
+        "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.h": "a46e16aadf49d039f7a894a85bb08a86670b7d728fb31628793d0bc61ff7a354",
+        "Engine/RenderEngine/RHI/RHISoftwareRecorder.h": "9b6409ef4c00649a8d02b184424dbf6db45bfac4e7fe27ec9955b237a3571fb7",
+        "Engine/RenderEngine/RHI/RHISoftwareBatch.h": "f5d6fab74f3fee88e05140d573a82564318410d14aa77817d3515d84b566d279",
+        "Engine/RenderEngine/RHI/RHIQueueContract.h": "c6cae490ac251515651f38566a6d1fdbefaf368c0bc6d28f00944d0d9e5d407a",
+        "Engine/RenderEngine/RHI/RHICommandFailure.h": "9ee5b8e61235c9a69b9ab4587f530f8718df1646ac882637e1aae7d110feb9a0",
+        "Engine/RenderEngine/RHI/RHIRecordedBatch.h": "c9d6156b3aa9d2b30bd4fca17576de1e8f14058fa1aba6846c25a9aaf3c7c9a1",
+        "Engine/EngineDiagnostics/DxCaptureSubmission.h": "d9ed1f26cc970105f566cf40018b4132afdaa746439a617d15ff094f679ae825",
+        "Engine/EngineDiagnostics/DxCaptureProtocol.h": "2fcf81e2c2942accf175b94109801734ec84f5fc57d1434c488478fae2883646",
+        "Engine/RenderEngine/RHI/RHISoftwareEncoder.h": "7e86b95f1f985d3bbf2317e0c1504d15afa34b9d135f4ea9f0140beb918045ec",
+        "Engine/RenderEngine/RHI/RHISoftwareCommandList.h": "25baf52afe11bd13ae059049111fa5b607e9b10afabcc2d9f4ee44c3e825b775",
+        "Engine/RenderEngine/RenderArena.h": "d6cfdb6b071a11cdf9194704d0825061b6bb9c6b4683d6e17ef7326bc51804c6",
+        "Engine/RenderEngine/RenderAllocator.h": "3eed71244cea313c115b44abea65e22e5ca43b89fe8826f089a691daa9ede631",
+        "ThirdParty/mimalloc/include/mimalloc.h": "8ec1bff9902bab6682e3ecbf7613ccc915e082ca743fdd0c396d3954323fe8bf",
+        "Engine/RenderEngine/RHI/RHISoftwareCommandTypes.h": "ddc064b2bc008fd1decfed321afb2d0aaf3d30dadc5b9446537e2e18268e3d17",
+        "Engine/RenderEngine/RHI/RHIEncoder.h": "a38885ce9a1b5dc8dfdb708dc25588a6d0d1a840c7e826cb81877a9a25ff6300",
+        "Engine/RenderEngine/RHI/RHIQueueRecorder.h": "db07736df0e5e0da175ecad2a347c2c59ae927dbfaa3a1b306da9b5c84cb5efd",
+        "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h": "459de735e4b2027de6caff8d956198bd92873f4d0947d9951628bfaa278e1ed1",
+        "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h": "7f6ea7cc8c1bab9d906e06aae3d2c03dafb94756054a697ba610af80141637e9",
+        "Engine/Utility_Framework/JobScheduler.h": "22382a44d69ab02bb1a4e3373af1fd5a24799d3a93660ada6576a4a6b2e70c7a",
+        "Engine/Utility_Framework/JobGraph.h": "6f36d49d401ca096b1db8e9ea93c933d153857660b0a8b7b6cbab269e56600e0",
+        "Engine/Utility_Framework/ThreadPool.h": "e412cc9b6ee695c98bab3b6370928bdf61dc92a9905b5ddd06354e532b7628f1",
+        "Engine/RenderEngine/RHI/RHICommandProvenance.h": "5cc2be663b249bd81fb6e9f2bd5d6621341d475fd57da226a78e3a1c55787b54",
+        "Engine/RenderEngine/RHI/IRHICommandTranslator.h": "351562f85a66d14e951f80ce2e181230c7cc6e476578d471c978c547006f539d",
+        "Engine/Utility_Framework/ThreadPool.cpp": "6cc3d9e0acc9c42b4a03dcbe3a1079b9a163833f75cd19e5b0591269c2df5a5b",
+        "Engine/Utility_Framework/JobScheduler.cpp": "f972c1c3f7b3753ab376d6fb4ebf6be2f0f7b34c7c25acc6ca708efad27fc2e2",
+        "Engine/RenderEngine/RenderArena.cpp": "a4efb38e96d31d350486fc08c3a4d3e6d35a3df38f561b57cfe290ad40853b33",
+        "Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp": "c270a189c112254cd9802723c74b28cd50246d014315052a2a7ffa49f43d7c5a",
+        "Engine/EngineDiagnostics/ProfileScope.h": "53544f76283bbde9f6f321285df4202fadf7c54cd8771972becf578dae364b35",
+        "Engine/EngineDiagnostics/ProfileService.h": "dc95ac9376da3ca725b46304d125e46099cd92485a99588efcd8754d75c6a6f7",
+        "Engine/EngineDiagnostics/ProfileThreadStream.h": "f8db066d695988ed3726ea6aff4f6d0fbe3d16c25a97eb7f580637a14d52d24c",
+        "Engine/EngineDiagnostics/ProfileEvent.h": "d8f808d4fc7528dc908fd80b53b21b2c95082fab2760388b02ff6a530a18f00c",
+        "Engine/EngineDiagnostics/ProfileRenderMeasurement.h": "339ec2c7f42e2347d9865c7be051f7e501af81719165bdf49de974e0a1344fb3",
+        "Engine/EngineDiagnostics/ProfileRhiContext.h": "e202178f2565fa520d1711870f2f43ad57d3c4c86d1759fe9dd434e97a10112d",
+        "Engine/EngineDiagnostics/ProfileMarker.h": "95c7859e5abe5a0aed130158c94a56cb086eddcb8f10ea8f4fca3dc4dd8c577f",
+        "Engine/EngineDiagnostics/ProfileCaptureFile.h": "c6c85fb200ddbff780478f00084d455218d21eb6bd790134ea799e5ccf5ef383",
+        "Engine/EngineDiagnostics/ProfileCapture.h": "ff5a8b85a4b2a0e6b36d146f66a1f4498176f9ba5c4cce8a1218531d50331d6f",
+        "Engine/EngineDiagnostics/ProfileCaptureAllocator.h": "59c56c7e5903aefb5b994e067755d918b4ef21100c4764ab50f70ad8fe5c15cf",
+        "Engine/RenderEngine/RHI/RHIProfilingContext.h": "b2c5d697b3e6d5489166a2a9b9f4b84d27d3a9cc845941cf79ac2064c32ce078",
+        "Engine/RenderEngine/RHI/RHISoftwareBatch.cpp": "38079daca2f4860804f8dbc54d591d0989b59c26f1d74c507db1a7130a7d73b4",
+        "Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp": "b8d36223f377d944a820dfe9105a0b9394cd41eece56a7435dc0359d6f4fb572",
+        "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp": "a636a3653bed6e45028f030985f1fbc5d146cde9e9ebaf424239f6cd4d519ffa",
+        "Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp": "f1bce39d15f8ad5e858a365c01848702ebdd0f4c15a0dd8405df67bdc8a47c67",
+        "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h": "16c3b98360a5a8622336f978215d6c146d4205f4397b90ae978c7c1ebf826dc6",
+        "Tools/regression/verify-rhi-software-queue.py": "229ba3fc2aab1a5832e241c537cf362ae57ec52fc0aafe8b1fb163838a829f20",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71/src/TaskScheduler.cpp": "84a886ace6ced064ec87764ed7c38df2084c0283e9540f91e109a3ff0f37112f",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71/src/TaskScheduler.h": "b73962988486762da85bb837c7b1d38650696327ac4d89c7d9c7905a3374c22d",
+        "/tmp/enkiTS-0289cf6ffce86697e1f46cb4eeca1c946bffec71/src/LockLessMultiReadPipe.h": "d346681dbdd7f6cadbc025341b9c41b14bde072496e9b9cd91677f57501d8eef"
+      },
+      "sanitized": true,
+      "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+      "flags": [
+        "-std=c++23",
+        "-O2",
+        "-g",
+        "-pthread",
+        "-DCE_CONTRACT_STANDALONE=1",
+        "-DCE_SHIPPING=1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-Wno-unknown-pragmas"
+      ],
+      "boundary": "actual software queue/recording/replay + actual scheduler/enkiTS; CPU native recorder/fence fixture; malloc shim; no native GPU/frame execution",
+      "service_header": "Complete production IRenderDeviceServices.h and transitive model/math/ownership headers unchanged",
+      "rows": [
+        {
+          "test": "structured_failure_diagnostics",
+          "translation_failure_cases": 5,
+          "submission_failure_cases": 4,
+          "retry_admission_checks": 9,
+          "cross_thread_handoff_cases": 3,
+          "native_or_gpu": false
+        },
+        {
+          "test": "warm_record_cancel",
+          "target_shapes": [
+            8,
+            1,
+            8
+          ],
+          "repetitions": 128,
+          "render_allocator_calls": [
+            10,
+            3,
+            10
+          ],
+          "requested_bytes": [
+            400,
+            120,
+            400
+          ],
+          "includes_control_blocks": true,
+          "native_or_gpu": false
+        },
+        {
+          "test": "owned_software_queue",
+          "passed": true,
+          "checks": 4845,
+          "actual_scheduler_workers": 8,
+          "native_or_gpu": false
+        }
+      ]
+    }
+  },
+  "structured_failure_diagnostics": {
+    "result": {
+      "test": "structured_failure_diagnostics",
+      "translation_failure_cases": 5,
+      "submission_failure_cases": 4,
+      "retry_admission_checks": 9,
+      "cross_thread_handoff_cases": 3,
+      "native_or_gpu": false
+    },
+    "executed_here": [
+      "IRHICommandQueue::SubmitWithDiagnostics",
+      "RHICommandFailureScope nested and cross-thread synchronous handoff",
+      "RHISoftwareCommandQueue and RHIQueueCommandTranslator failure publication"
+    ],
+    "integration_consumers": [
+      "EnhancedRenderGraph::QueueExecution.failure and QueueDiagnostics.execution snapshot",
+      "RHISubmissionTicket::GetCommandFailure after ready acquire",
+      "RHISubmissionThread::ConsumeFailure(owner, RHICommandFailure&)"
+    ],
+    "integration_boundary": "The listed FIFO/graph integration consumers and actual DX12/Vulkan execute markers are outside this queue executable; FIFO behavior is verified in the separate software-translation/FIFO probe and backend API execution remains untested here.",
+    "compatibility": "The existing virtual Submit signature and string ConsumeFailure overload remain available. No message parsing is used.",
+    "hot_path": "The diagnostic sink and synchronous forwarding copy scalar context only. Existing ticket/owner storage retains the value; failure messages allocate only on failure as before. No per-frame local dynamic container is added by diagnostic propagation."
+  }
+}

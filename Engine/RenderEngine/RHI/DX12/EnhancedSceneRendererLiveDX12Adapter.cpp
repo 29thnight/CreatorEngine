@@ -1,6 +1,7 @@
 #include "DX12SoftwareCommandValidator.h"
 #include "DX12CommandTranslator.h"
 #include "../RHISoftwareRecorder.h"
+#include "../RHISoftwareQueueRecorder.h"
 #include "../../Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h"
 
 #include "../../GpuDiagnostics.h"
@@ -104,6 +105,11 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     DX12GpuProfiler::FrameTimings computeTimings;
     std::vector<DX12GpuProfiler::PassTiming> computeMerged;
     EnhancedRenderGraph::QueueEndpoint graphics;
+    std::shared_ptr<DX12QueueRecorder> ownedRecorder;
+    std::shared_ptr<DX12SoftwareCommandValidator> softwareValidator;
+    std::unique_ptr<RHISoftwareQueueRecorder> softwareQueueRecorder;
+    std::shared_ptr<IRHICommandQueue> softwareGraphicsQueue;
+    std::shared_ptr<IRHICommandQueue> softwareComputeQueue;
     bool ownedQueueExecution{false};
     std::optional<uint32_t> queueExecutionModeOverride;
     uint32_t profilerPassCapacity{kLiveProfilerPassCapacity};
@@ -312,6 +318,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     impl.reportedProfilerTokens = {};
     impl.minimumMeasurementSubmitTick = 0;
     impl.graphics = {};
+    impl.softwareGraphicsQueue.reset();
+    impl.softwareComputeQueue.reset();
+    impl.softwareQueueRecorder.reset();
+    impl.softwareValidator.reset();
+    impl.ownedRecorder.reset();
     impl.queueSubmissions = impl.queueBatches = 0;
     impl.queueBarriers = impl.lastQueueBarriers = 0;
     impl.computeSubmittedFrames = impl.measuredOverlapSubmissions = impl.predictedGainNanoseconds = 0;
@@ -359,6 +370,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
         return false;
     }
     impl.profilerPassCapacity = profilerPassCapacity;
+    impl.ownedRecorder = std::make_shared<DX12QueueRecorder>(impl.resources, commandWorkers);
     if (!impl.ConfigureQueueExecution(impl.queueExecutionModeOverride.value_or(LiveDx12RequestedQueueExecutionMode()), outError))
     {
         return false;
@@ -470,6 +482,11 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
             static_cast<unsigned long long>(impl.predictedGainNanoseconds));
     }
     impl.graphics = {};
+    impl.softwareGraphicsQueue.reset();
+    impl.softwareComputeQueue.reset();
+    impl.softwareQueueRecorder.reset();
+    impl.softwareValidator.reset();
+    impl.ownedRecorder.reset();
     impl.commandPool.Shutdown();
     impl.textureCache.Shutdown();
     impl.meshCache.Shutdown();
@@ -618,12 +635,47 @@ bool EnhancedSceneRendererLiveDX12Adapter::BeginOwnedQueueRecording(std::string&
     return m_impl->resources.BeginQueueFrame(m_impl->graphics.queue, outError);
 }
 
-bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
-    const std::shared_ptr<EnhancedRenderGraph>& graph, std::shared_ptr<const void> owner,
-    double& recordingMilliseconds, std::string& outError)
+bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph,
+                                                            std::shared_ptr<const void> owner,
+                                                            const RHIRecordedBatchDesc& desc,
+                                                            double& recordingMilliseconds, std::string& outError)
 {
     Impl& impl = *m_impl;
-    DX12QueueRecorder recorder(impl.resources);
+    IRHIQueueRecorder* recorder = impl.ownedRecorder.get();
+    auto graphics = impl.graphics;
+    auto compute = impl.compute;
+    if (UsesSoftwareRecording())
+    {
+        if (!impl.softwareQueueRecorder)
+        {
+            impl.softwareValidator = std::make_shared<DX12SoftwareCommandValidator>(impl.resources);
+            RHISoftwareQueueOptions options;
+            options.translation.mode = RHICommandTranslationMode::Parallel;
+            options.translation.maxTranslationJobs = impl.commandPool.GetWorkerCount();
+            options.translation.minCommandsPerJob = 256;
+            impl.softwareQueueRecorder =
+                std::make_unique<RHISoftwareQueueRecorder>(impl.ownedRecorder, impl.softwareValidator, options);
+        }
+        if ((!impl.softwareGraphicsQueue &&
+             !impl.softwareQueueRecorder->WrapQueue(impl.graphics.queue, impl.softwareGraphicsQueue, outError)) ||
+            (impl.asyncCompute && !impl.softwareComputeQueue &&
+             !impl.softwareQueueRecorder->WrapQueue(impl.compute.queue, impl.softwareComputeQueue, outError)))
+        {
+            return false;
+        }
+        RHISoftwareBatchDesc software;
+        software.frameId = desc.frameId;
+        software.backendGeneration = desc.backendGeneration;
+        software.displayToken = desc.displayToken;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+        software.captureContext = desc.captureContext;
+        software.renderViewId = desc.captureContext.render_view_id;
+#endif
+        impl.softwareQueueRecorder->SetFrameDesc(software);
+        recorder = impl.softwareQueueRecorder.get();
+        graphics.queue = impl.softwareGraphicsQueue;
+        compute.queue = impl.softwareComputeQueue;
+    }
     EnhancedRenderGraph::QueueExecution execution;
     const auto domain = graph->GetMeasurementDomain();
     if (impl.currentProfilerToken.IsValid() &&
@@ -674,9 +726,14 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
         const auto& costs = view->nanoseconds;
         return signatureMatches && identity.passIndex < costs.size() ? costs[identity.passIndex] : std::nullopt;
     });
-    if (!graph->SubmitQueues(graph, recorder, impl.graphics, impl.asyncCompute ? &impl.compute : nullptr,
-        hints, impl.asyncCompute ? 1000 : 0,
-        std::move(owner), execution, outError))
+    const bool submitted =
+        graph->SubmitQueues(graph, *recorder, graphics, impl.asyncCompute ? &compute : nullptr, hints,
+                            impl.asyncCompute ? 1000 : 0, std::move(owner), execution, outError);
+    // A partially accepted transaction has already issued real native signals.
+    // Preserve their next values even when a later translation or submit fails.
+    impl.graphics.nextSignal = graphics.nextSignal;
+    impl.compute.nextSignal = compute.nextSignal;
+    if (!submitted)
     {
         return false;
     }
@@ -820,7 +877,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::UsesSoftwareRecording() const
         std::free(value);
         return result;
     }();
-    return !UsesOwnedQueueExecution() && enabled;
+    return enabled;
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::RecordSoftwareGraph(EnhancedRenderGraph& graph, uint32_t workerCount,
@@ -1460,6 +1517,7 @@ namespace
             {
                 outSlices[i].queueId = 0;
                 outSlices[i].passIndex = timings.slices[i].identity.passIndex;
+                outSlices[i].rhi = timings.slices[i].rhi;
                 outSlices[i].name.assign(timings.slices[i].name);
                 outSlices[i].beginCpuTick =
                     profiler.GpuTickToCpuTick(timings.slices[i].beginTicks);

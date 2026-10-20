@@ -254,6 +254,9 @@
     <ClCompile Include="RHI\RHISoftwareEncoder.cpp" />
     <ClCompile Include="RHI\RHISoftwareBatch.cpp" />
     <ClCompile Include="RHI\RHISoftwareRecorder.cpp" />
+    <ClCompile Include="RHI\RHISoftwareQueueRecorder.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanRecordingResources.cpp" />
+    <ClCompile Include="RHI\Vulkan\VulkanSoftwareCommandValidator.cpp" />
     <ClCompile Include="RHI\RHICommandTranslator.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
@@ -759,6 +762,7 @@
     <ClInclude Include="RHI\RHIDisplayFrame.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />
     <ClInclude Include="RHI\RHIQueueContract.h" />
+    <ClInclude Include="RHI\RHICommandFailure.h" />
     <ClInclude Include="RHI\RHIQueueRecorder.h" />
     <ClInclude Include="RHI\DX12\DX12QueueRecorder.h" />
     <ClInclude Include="RHI\RHIDescriptorVersionPolicy.h" />
@@ -939,10 +943,15 @@
     <ClInclude Include="RHI\RHISoftwareEncoder.h" />
     <ClInclude Include="RHI\RHISoftwareBatch.h" />
     <ClInclude Include="RHI\RHISoftwareRecorder.h" />
+    <ClInclude Include="RHI\RHIProfilingContext.h" />
+    <ClInclude Include="RHI\RHICommandProvenance.h" />
+    <ClInclude Include="RHI\RHISoftwareQueueRecorder.h" />
     <ClInclude Include="RHI\IRHICommandTranslator.h" />
     <ClInclude Include="RHI\DX12\DX12CommandTranslator.h" />
     <ClInclude Include="RHI\DX12\DX12SoftwareCommandValidator.h" />
     <ClInclude Include="RHI\Vulkan\VulkanCommandTranslator.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanRecordingResources.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanSoftwareCommandValidator.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />

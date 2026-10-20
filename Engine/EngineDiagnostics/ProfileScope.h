@@ -13,6 +13,7 @@
 // 않는다 — 새 매크로를 만들지 않고 Directory.Build.targets 가 이미 전
 // 프로젝트에 정의하는 것을 문다(§5.2 "만들 것이 아니라 물 것이다").
 #include "ProfileMarker.h"
+#include "ProfileRhiContext.h"
 #include "ProfileService.h"
 
 namespace ce
@@ -45,7 +46,16 @@ namespace ce
 		profile_scope& operator=(const profile_scope&) = delete;
 	};
 
-	inline void profile_scope_begin(marker_id) {}
+    class profile_rhi_scope
+    {
+      public:
+        explicit profile_rhi_scope(marker_id) {}
+        profile_rhi_scope(profiler_service&, marker_id) {}
+        profile_rhi_scope(const profile_rhi_scope&) = delete;
+        profile_rhi_scope& operator=(const profile_rhi_scope&) = delete;
+    };
+
+    inline void profile_scope_begin(marker_id) {}
 	inline void profile_scope_end() {}
 	inline void profile_instant(marker_id) {}
 
@@ -98,7 +108,25 @@ namespace ce
 		profiler_service* m_service;
 	};
 
-	// ★ 여는 일과 닫는 일이 **다른 함수로 갈리는 경계**에서만 쓴다 — 수명
+    // 고정 RHI 스코프에서만 별도 identity를 붙인다. 일반 profile_scope는
+    // 같은 TLS 안에 있어도 그대로여서 명령별 메타데이터가 늘지 않는다.
+    class profile_rhi_scope
+    {
+      public:
+        explicit profile_rhi_scope(marker_id id) : profile_rhi_scope(profiler(), id) {}
+        profile_rhi_scope(profiler_service& service, marker_id id) : m_service(&service)
+        {
+            m_service->begin_scope(id, current_cpu_context, &current_rhi_context);
+        }
+        ~profile_rhi_scope() { m_service->end_scope(); }
+        profile_rhi_scope(const profile_rhi_scope&) = delete;
+        profile_rhi_scope& operator=(const profile_rhi_scope&) = delete;
+
+      private:
+        profiler_service* m_service;
+    };
+
+    // ★ 여는 일과 닫는 일이 **다른 함수로 갈리는 경계**에서만 쓴다 — 수명
 	//   훅처럼 콜백이 두 개로 오는 자리다. 그 자리에서는 RAII 를 쓸 수 없지만,
 	//   그렇다고 `profiler()` 를 직접 부르면 CE_SHIPPING 약속이 이 파일 밖으로
 	//   샌다 — 구성으로 계측을 끄는 계약은 한 곳에서만 지켜져야 한다. 그래서
