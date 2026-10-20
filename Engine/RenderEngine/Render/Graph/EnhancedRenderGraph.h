@@ -897,6 +897,14 @@ private:
 private:
     struct Resource
     {
+        Resource() = default;
+        Resource(const Resource&) = delete;
+        Resource& operator=(const Resource&) = delete;
+        // 기본 할당자의 vector 이동은 저장 주소를 유지한다. 활성 span도 함께
+        // 옮겨 외부 resource 저장소가 자라더라도 버전 주소가 달라지지 않는다.
+        Resource(Resource&&) noexcept = default;
+        Resource& operator=(Resource&&) noexcept = default;
+
         RGTextureDesc    desc;
         RGBufferDesc bufferDesc;
         bool bufferKind{false};
@@ -924,7 +932,8 @@ private:
         uint64_t allocationBytes{0};
         std::string name;
         struct Version { uint16_t parent; bool modify; bool atomicMin64{false}; };
-        std::vector<Version> versions;
+        std::vector<Version> versionStorage;
+        std::span<Version> versions;
     };
 
     struct PhaseBarrierPlan
@@ -938,7 +947,7 @@ private:
     struct Pass
     {
         std::string              name;
-        std::vector<RGPassUsage> usages;
+        std::span<const RGPassUsage> usages;
         ExecuteCallback          execute;
         SplitExecuteCallback     splitExecute;
         uint32_t                 maxSlices{ 1 };
