@@ -1,7 +1,7 @@
 # PrSM runtime provenance
 
 - Upstream: https://github.com/29thnight/PrSM
-- Pinned commit: `6e380ba0e4933b37c9c45fe66f1d86473e336a8a` (branch `feat/creatorengine-integration`, 2026-10-19)
+- Pinned commit: `6e380ba0e4933b37c9c45fe66f1d86473e336a8a` (branch `main`, 2026-10-19)
 - License: Apache License 2.0 (`LICENSE`, `NOTICE`), copied byte-for-byte
 - Vendored scope: the engine-independent script runtime only, byte-for-byte unmodified:
   - `abi/prsm_abi.h` — the module/host C ABI (authoritative upstream copy)
