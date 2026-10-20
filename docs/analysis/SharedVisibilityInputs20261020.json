@@ -1,0 +1,522 @@
+{
+  "baseCommit": "b7ccc2b1aca7e2d376dcff392bd9b80ab70f5ef9",
+  "configuration": "Debug",
+  "softwareRhi": true,
+  "workers": 8,
+  "views": 2,
+  "resolution": [
+    1186,
+    514
+  ],
+  "profileSeconds": 15,
+  "recordingOffSeconds": 15,
+  "etw": false,
+  "comparisonPairs": 1,
+  "finalVariant": "after-safe",
+  "runs": {
+    "before": {
+      "sha256": "b01f9fc4571f62bfe7465d9a3b8e960a70ac5206281ebc1d67861ad910b46fe6",
+      "complete": true,
+      "frames": 386,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "invalidProvenanceSamples": 0,
+      "gpuEvents": 104532,
+      "matchedGpuEvents": 104532,
+      "nativeRealPerformanceGateEligible": true,
+      "renderGroups": [
+        {
+          "frameKind": 1,
+          "viewId": 2,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 372,
+          "cpuRenderSubmitMs": {
+            "mean": 13.461526344086021,
+            "p50": 13.41405,
+            "p95": 15.865,
+            "max": 18.7334
+          },
+          "cpuSamples": 372,
+          "gpuPassMs": {
+            "mean": 0.044521153399860756,
+            "p50": 0.0051,
+            "p95": 0.128,
+            "max": 1.6722
+          },
+          "gpuPassSamples": 51708
+        },
+        {
+          "frameKind": 1,
+          "viewId": 1,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 372,
+          "cpuRenderSubmitMs": {
+            "mean": 13.593126612903227,
+            "p50": 13.5779,
+            "p95": 15.8493,
+            "max": 19.857
+          },
+          "cpuSamples": 372,
+          "gpuPassMs": {
+            "mean": 0.0430961362259579,
+            "p50": 0.0051,
+            "p95": 0.126,
+            "max": 1.6845
+          },
+          "gpuPassSamples": 52824
+        }
+      ],
+      "markers": {
+        "GpuVisibility.SharedBuild": {
+          "calls": 1500,
+          "meanMs": 0.09635533333333335
+        },
+        "GpuVisibility.SharedBindings": {
+          "calls": 1500,
+          "meanMs": 0.0404494
+        },
+        "RenderDeclare.METEOR.Scene.Cull.First": {
+          "calls": 750,
+          "meanMs": 0.7032265333333333
+        },
+        "RenderDeclare.METEOR.Shadow.Cull.Final": {
+          "calls": 750,
+          "meanMs": 0.46306613333333335
+        },
+        "RenderGraphDeclare": {
+          "calls": 750,
+          "meanMs": 5.049502666666666
+        },
+        "RenderGraphCompile": {
+          "calls": 750,
+          "meanMs": 0.8151453333333333
+        },
+        "RenderCommandRecord": {
+          "calls": 750,
+          "meanMs": 1.912986
+        },
+        "RenderCommandRecord.DependencyGraph": {
+          "calls": 750,
+          "meanMs": 1.7348382666666666
+        },
+        "RHISoftwareTranslate": {
+          "calls": 750,
+          "meanMs": 1.721024
+        },
+        "MaterialGraphScenePrepare": {
+          "calls": 750,
+          "meanMs": 2.838813866666667
+        },
+        "GameSceneLockWait": {
+          "calls": 385,
+          "meanMs": 0.3642303896103896
+        }
+      },
+      "recordingOff": {
+        "elapsedSeconds": 15.1387063,
+        "completedViews": 838,
+        "completedViewsPerSecond": 55.35479606999179
+      },
+      "binaryIdentity": {
+        "runtimePdbSha256": "7712955D53DD0B3F99E23F711133940E726BE8694B90A5704A510B41BCD35E6D",
+        "validation": "off",
+        "runtimeSha256": "32A99754041943A68619473EFE54E700FF153D10CC0FC1FAC67DC34606BADBD3",
+        "engineBuildPerformed": true,
+        "utc": "2026-10-20T01:34:52.6681663Z",
+        "project": "C:\\Users\\lance\\source\\CreatorEngine/Build/Obj/MaterialProductProbe/SharedVisibility-Debug-20261020-before/Project",
+        "trace": "CPU sampling, CSwitch/ReadyThread stacks and DxgKrnl 0x277",
+        "configuration": "Debug"
+      }
+    },
+    "after": {
+      "sha256": "ca8683935386d52ff64a909c858fab567b47ab016365cc241579ca7827a27618",
+      "complete": true,
+      "frames": 380,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "invalidProvenanceSamples": 0,
+      "gpuEvents": 104251,
+      "matchedGpuEvents": 104251,
+      "nativeRealPerformanceGateEligible": true,
+      "renderGroups": [
+        {
+          "frameKind": 1,
+          "viewId": 1,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 371,
+          "cpuRenderSubmitMs": {
+            "mean": 13.559833423180592,
+            "p50": 13.5683,
+            "p95": 15.575,
+            "max": 18.999
+          },
+          "cpuSamples": 371,
+          "gpuPassMs": {
+            "mean": 0.04365649367905546,
+            "p50": 0.0051,
+            "p95": 0.1259,
+            "max": 1.6732
+          },
+          "gpuPassSamples": 52682
+        },
+        {
+          "frameKind": 1,
+          "viewId": 2,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 371,
+          "cpuRenderSubmitMs": {
+            "mean": 13.488310242587602,
+            "p50": 13.4699,
+            "p95": 15.746,
+            "max": 18.6171
+          },
+          "cpuSamples": 371,
+          "gpuPassMs": {
+            "mean": 0.04560403924838566,
+            "p50": 0.0051,
+            "p95": 0.128,
+            "max": 1.664
+          },
+          "gpuPassSamples": 51569
+        }
+      ],
+      "markers": {
+        "GpuVisibility.SharedBuild": {
+          "calls": 1496,
+          "meanMs": 0.09200454545454545
+        },
+        "GpuVisibility.SharedBindings": {
+          "calls": 1496,
+          "meanMs": 0.04047205882352941
+        },
+        "RenderDeclare.METEOR.Scene.Cull.First": {
+          "calls": 748,
+          "meanMs": 0.6988545454545455
+        },
+        "RenderDeclare.METEOR.Shadow.Cull.Final": {
+          "calls": 748,
+          "meanMs": 0.45586042780748665
+        },
+        "RenderGraphDeclare": {
+          "calls": 748,
+          "meanMs": 5.045241310160428
+        },
+        "RenderGraphCompile": {
+          "calls": 748,
+          "meanMs": 0.8292136363636363
+        },
+        "RenderCommandRecord": {
+          "calls": 748,
+          "meanMs": 1.939585294117647
+        },
+        "RenderCommandRecord.DependencyGraph": {
+          "calls": 748,
+          "meanMs": 1.7600487967914438
+        },
+        "RHISoftwareTranslate": {
+          "calls": 748,
+          "meanMs": 1.7077549465240645
+        },
+        "MaterialGraphScenePrepare": {
+          "calls": 747,
+          "meanMs": 2.8216781793842034
+        },
+        "GameSceneLockWait": {
+          "calls": 379,
+          "meanMs": 0.38174168865435354
+        }
+      },
+      "recordingOff": {
+        "elapsedSeconds": 15.153171,
+        "completedViews": 864,
+        "completedViewsPerSecond": 57.017768756123715
+      },
+      "binaryIdentity": {
+        "engineBuildPerformed": true,
+        "configuration": "Debug",
+        "validation": "off",
+        "runtimePdbSha256": "6A5CDA498A9D3DEE3D76B17A893AC1878E69BD8930E2A271D072CE95F6132D8D",
+        "trace": "CPU sampling, CSwitch/ReadyThread stacks and DxgKrnl 0x277",
+        "runtimeSha256": "62FD215912E7703F1273DDFA8A897AD7BC9C7CBB171565A8EF76174986848314",
+        "project": "C:\\Users\\lance\\source\\CreatorEngine/Build/Obj/MaterialProductProbe/SharedVisibility-Debug-20261020-after-safe/Project",
+        "utc": "2026-10-20T02:42:15.1763798Z"
+      }
+    }
+  },
+  "target": {
+    "fps": 120,
+    "budgetMs": 8.333333333333334,
+    "gameCpuP50Ms": 13.4699,
+    "achieved": false
+  },
+  "native": {
+    "creatorRobotSoftwarePath": false,
+    "arenaRetirement": true,
+    "fullRenderGraph": true,
+    "passed": true,
+    "asynchronousTranslation": true,
+    "uploadRollover": true,
+    "normalExit": true,
+    "translationPoolReuse": true,
+    "validation": "gpu",
+    "gpuMergeReuse": true,
+    "frozenTargets": true,
+    "nativeClearBarrierReadback": true
+  },
+  "material": {
+    "gpuValidation": "on",
+    "passed": true,
+    "configuration": "Debug",
+    "sourceStable": true,
+    "runs": [
+      {
+        "mode": "--meshlet-dispatch-only",
+        "timedOut": false,
+        "exitCode": 0,
+        "passed": true,
+        "gpuValidationCoverageNotices": 0,
+        "missingMarkers": []
+      },
+      {
+        "mode": "--meshlet-hzb-only",
+        "timedOut": false,
+        "exitCode": 0,
+        "passed": true,
+        "gpuValidationCoverageNotices": 0,
+        "missingMarkers": []
+      },
+      {
+        "mode": "--temporal-bucket-only",
+        "timedOut": false,
+        "exitCode": 0,
+        "passed": true,
+        "gpuValidationCoverageNotices": 1,
+        "missingMarkers": []
+      }
+    ]
+  },
+  "sharedQueue": {
+    "configuration": "Debug",
+    "gpuValidation": "on",
+    "runs": [
+      {
+        "gpuValidationCoverageNotices": 0,
+        "missingMarkers": [],
+        "mode": "--cluster-lod-only",
+        "exitCode": 0,
+        "passed": true,
+        "timedOut": false
+      }
+    ],
+    "passed": true,
+    "sourceStable": true
+  },
+  "replay": {
+    "before/replay-verdict.json": {
+      "inputsExact": true,
+      "sourceDrawOrderSame": true,
+      "attachments": {
+        "depth": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "baseColor": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "normal": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "metalRough": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "emissive": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "sceneHdr": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        }
+      },
+      "passed": true
+    },
+    "after-safe/replay-verdict.json": {
+      "inputsExact": true,
+      "sourceDrawOrderSame": true,
+      "attachments": {
+        "depth": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "baseColor": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "normal": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "metalRough": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "emissive": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "sceneHdr": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        }
+      },
+      "passed": true
+    },
+    "after-safe/reload-replay-verdict.json": {
+      "inputsExact": true,
+      "sourceDrawOrderSame": true,
+      "attachments": {
+        "depth": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "baseColor": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "normal": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "metalRough": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "emissive": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        },
+        "sceneHdr": {
+          "different": 0,
+          "over1e4": 0,
+          "maxAbs": 0.0
+        }
+      },
+      "passed": true
+    }
+  },
+  "nativeIdentity": {
+    "testsSha256": "66D9ABD309B5E746BCE038AFCF6D1D4FB7373B1D4A5C97626698357C075B8972",
+    "head": "b7ccc2b1aca7e2d376dcff392bd9b80ab70f5ef9",
+    "translatorSha256": "58FA051141EF47FAFCBDEDE1F501EC80F28F72B9AD35C445E6D81A32F6E44D5B",
+    "validation": "gpu",
+    "configuration": "Debug",
+    "runtimeSha256": "62FD215912E7703F1273DDFA8A897AD7BC9C7CBB171565A8EF76174986848314"
+  },
+  "baselineComparison": {
+    "exitCode": 0,
+    "baselineEngine": true,
+    "diagnosticFixture": "corrected queue publication contract"
+  },
+  "acceptedSourceScope": [
+    "GpuGeometryVisibility.cpp",
+    "GpuGeometryVisibilityShared.inl",
+    "ClusterLodProbe.inl"
+  ],
+  "sourceStyle": [
+    {
+      "path": "Engine/RenderEngine/GpuGeometryVisibility.cpp",
+      "passed": true,
+      "diagnostics": ""
+    },
+    {
+      "path": "Engine/RenderEngine/GpuGeometryVisibilityShared.inl",
+      "passed": true,
+      "diagnostics": ""
+    },
+    {
+      "path": "Tools/regression/support/ClusterLodProbe.inl",
+      "passed": true,
+      "diagnostics": ""
+    }
+  ],
+  "comparisonBuildSourceIdentity": {
+    "Engine/RenderEngine/GpuGeometryVisibility.cpp": {
+      "baseSha256": "61b2e3738b457569c55dc4d483401088d21bac2bbb9bc5b7ec2d3b6090495390",
+      "optimizedSha256": "486af502b71b76e33285e4635ecd07f0d5d954f1e1df420823a0b35f5dea3456"
+    },
+    "Engine/RenderEngine/GpuGeometryVisibilityShared.inl": {
+      "baseSha256": "4ee4ba4d505b4f0faa583801a98354c7836cee7fa1a76207f0c882e4e2b1d2b6",
+      "optimizedSha256": "236103b48b8f9cda151acf38e9b4539fa063aaafbadb3b1af5ae0edb28437f14"
+    },
+    "Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp": {
+      "baseSha256": "f9cfe3541337f8a115ef95c6abc9b42a226cdaebdd438d31c4db7eb75e9b5ed0",
+      "optimizedSha256": "db90a5fbbaa62b7b5224c4b74e382eb49fe22c81f7974edd7250f8f18dbdff1f"
+    }
+  },
+  "finalSourceIdentity": {
+    "Engine/RenderEngine/GpuGeometryVisibility.cpp": "69c21adb5f5821a7c2459e7b089b1ab7172d2c7a9867f06c03034f397bd9c028",
+    "Engine/RenderEngine/GpuGeometryVisibilityShared.inl": "0fa3789781bd48456747b88cb1066a4cef51a20a28d55f9262cd2ae1f42f33f7",
+    "Tools/regression/support/ClusterLodProbe.inl": "687bff328ac276d18e8a2d54f71352da6108e741306ac58f5bbdfc9f1fe7d9e9"
+  },
+  "rejectedVariants": [
+    "after",
+    "after-final",
+    "visibility-only"
+  ]
+}

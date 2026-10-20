@@ -1,4 +1,5 @@
 #include "GpuGeometryVisibility.h"
+#include "RenderArena.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphMeshSurface.h"
 #include "MaterialGraphSceneAccess.h"

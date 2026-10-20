@@ -101,7 +101,9 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     FrameCameraSnapshot camera;camera.view=camera.projection=math::matrix4x4::identity();camera.projection.m[2][2]=.05f;
     camera.eyePosition={0,0,-2};context.camera=&camera;
     WaitSceneProgram(host,context,material->generation);
-    unsigned frames{},pixelChecks{},transitionChecks{},mixedFrames{},sharedQueueReads{},fallbackFrames{},evictionFrames{};
+    unsigned frames{}, pixelChecks{}, transitionChecks{}, mixedFrames{}, sharedQueueReads{}, fallbackFrames{},
+        evictionFrames{};
+    std::uint64_t sealedQueueJobs{}, publishedQueueJobs{};
     std::vector<uint32_t> previousResident;
     std::vector<float> thresholds;for(const auto& g:chain.groups)if(g.lodIndex&&g.geometricError>0)thresholds.push_back(g.geometricError);
     std::sort(thresholds.begin(),thresholds.end());
@@ -342,19 +344,43 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             {
                 RHIReadbackImage queueImage;
                 Check(device.MapReadback(queueRead, queueImage, error), "Production queue header map");
+                Check(queueImage.ElementCount<std::uint32_t>() ==
+                          GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots,
+                      "Production queue readback size");
                 const auto header = queueImage.Elements<std::uint32_t>();
-                Check(queueImage.ElementCount<std::uint32_t>() == GpuGeometryVisibility::kWorkRingHeaderWords + GpuGeometryVisibility::kWorkRingSlots &&
-                    header[0] == queueWork->WorkQueueTaskCount() && header[1] == header[0] && header[2] == 0 && header[3] != 0 && header[6] == queueWork->WorkQueuePartitionCount() && header[11] > 0 && header[11] <= 64 && header[9] == GpuGeometryVisibility::kWorkRingSlots,
-                    "SceneHost camera/shadow queues claimed and completed every task without invalid records");
-                Check(header[5] == header[0] + header[7] && header[4] == header[1] + header[8] && header[4] % header[11] == 0,
-                    "Production lane-batched head/tail reservation accounting");
+                // LOD selection/residency filters jobs before publication. The
+                // sealed source count is an upper bound, not the published count.
+                const bool complete = header[0] <= queueWork->WorkQueueTaskCount() && header[1] == header[0] &&
+                                      header[2] == 0 && (header[0] ? header[3] != 0 : header[3] == 0) &&
+                                      header[6] == queueWork->WorkQueuePartitionCount() && header[11] > 0 &&
+                                      header[11] <= 64 && header[9] == GpuGeometryVisibility::kWorkRingSlots;
+                if (!complete)
+                {
+                    std::cerr << "SHARED_QUEUE_HEADER frame=" << context.frameId << " workers=" << workers
+                              << " views=" << queueWork->WorkQueueViewCount()
+                              << " jobs=" << queueWork->WorkQueueTaskCount()
+                              << " partitions=" << queueWork->WorkQueuePartitionCount() << " words=";
+                    for (size_t word = 0; word < GpuGeometryVisibility::kWorkRingHeaderWords; ++word)
+                    {
+                        std::cerr << header[word] << ',';
+                    }
+                    std::cerr << '\n';
+                }
+                Check(complete, "SceneHost queues completed every published task without invalid records");
+                sealedQueueJobs += queueWork->WorkQueueTaskCount();
+                publishedQueueJobs += header[0];
+                Check(header[15] <= header[10], "Rejected partitions are a subset of nonempty source partitions");
+                Check(header[5] == header[0] + header[7] && header[4] == header[1] + header[8] &&
+                          header[4] % header[11] == 0,
+                      "Production lane-batched head/tail reservation accounting");
                 Check(header[12] == 0 && header[13] == 0 && header[14] == 0,
-                    "Queue count, producer leases and consumer leases quiesced");
-                Check(header[10] == queueWork->WorkQueueNonemptyPartitions(header[11]), "Production initial partition coverage");
+                      "Queue count, producer leases and consumer leases quiesced");
+                Check(header[10] == queueWork->WorkQueueNonemptyPartitions(header[11]),
+                      "Production initial partition coverage");
                 if (queueWork->WorkQueueViewCount() > 1)
                 {
                     Check(queueWork->WorkQueueViewCount() == 3 || queueWork->WorkQueueViewCount() == 4,
-                        "Production shares three cascades or camera plus three cascades");
+                          "Production shares three cascades or camera plus three cascades");
                     ++sharedQueueReads;
                 }
                 for (unsigned slot = 0; slot < GpuGeometryVisibility::kWorkRingSlots; ++slot)
@@ -471,7 +497,13 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
         }
     }
     Check(sharedQueueReads == frames * 6u, "Every shadow first/final view uses its shared batch queue");
-    std::cout << "METEOR_STREAMING_FEEDBACK_OK frames=" << frames << " sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0\n";
+    Check(publishedQueueJobs > 0 && publishedQueueJobs < sealedQueueJobs,
+          "Production fixture exercises nonempty publication and pre-queue LOD/residency filtering");
+    std::cout << "METEOR_PRODUCTION_QUEUE_FILTER_OK sealedJobs=" << sealedQueueJobs
+              << " publishedJobs=" << publishedQueueJobs << " filteredJobs=" << sealedQueueJobs - publishedQueueJobs
+              << '\n';
+    std::cout << "METEOR_STREAMING_FEEDBACK_OK frames=" << frames
+              << " sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0\n";
     std::cout << "METEOR_PRODUCTION_SHARED_QUEUE_OK headers=" << frames * 7u << " cameraFrames=" << frames << " shadowFrames=" << frames << " sharedReads=" << sharedQueueReads << " validation=0\n";
     host.ShutdownAfterIdle();
     if (streamingTest)

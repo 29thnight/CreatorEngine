@@ -1,4 +1,22 @@
 // Included after BufferPool in GpuGeometryVisibility.cpp.
+namespace
+{
+    ce::RenderArenaLease AcquireVisibilityInputs()
+    {
+        // Each call owns its storage, including nested declarations assisted by
+        // an upload join. The existing pool returns raw blocks through CAS slots.
+        static const ce::RenderArenaPool pool;
+        return pool.Acquire();
+    }
+
+    template<class T>
+    T* VisibilityInputArray(const ce::RenderArenaLease& arena, size_t count)
+    {
+        static_assert(std::is_trivially_destructible_v<T>);
+        return static_cast<T*>(arena->Resource(0).allocate(count * sizeof(T), alignof(T)));
+    }
+} // namespace
+
 struct GpuGeometryVisibility::SharedBatch
 {
     struct ViewData
@@ -14,10 +32,12 @@ struct GpuGeometryVisibility::SharedBatch
     RGHandle graphQueue;
     std::uint32_t jobs{}, groups{}, bins{}, views{};
     bool ordered{};
-    std::vector<std::uint32_t> counts;
+    // Sealed inputs have no back-reference to Frame. Keep diagnostic counts
+    // through these owners instead of copying them or retaining upload scratch.
+    std::array<std::shared_ptr<const MeshletInputs>, kSharedViewCapacity> inputs;
     RHIBufferSlice constants, candidates, binData, worlds, viewData;
     RHIBindingTable outputs, vertices, topologies, ids, arguments, first;
-    std::vector<std::shared_ptr<const GpuGeometryOcclusion::Pyramid>> pyramids;
+    std::array<std::shared_ptr<const GpuGeometryOcclusion::Pyramid>, kSharedViewCapacity> pyramids;
     std::shared_ptr<const LX::Runtime::ComputeGeneration> reset, cull, count, finalize, scatter;
     static constexpr std::uint64_t kQueueBytes = (kWorkRingHeaderWords + kWorkRingSlots) * sizeof(std::uint32_t);
     ~SharedBatch()
@@ -32,9 +52,11 @@ struct GpuGeometryVisibility::SharedBatch
     void Dispatch(const EnhancedRenderGraph::ExecuteContext& execution, MeshletStage stage) const
     {
         auto& encoder = *execution.encoder;
-        const auto& pipeline = stage == MeshletStage::Reset ? reset :
-                               stage == MeshletStage::Cull ? cull : stage == MeshletStage::Count ? count :
-                               stage == MeshletStage::Finalize ? finalize : scatter;
+        const auto& pipeline = stage == MeshletStage::Reset      ? reset
+                               : stage == MeshletStage::Cull     ? cull
+                               : stage == MeshletStage::Count    ? count
+                               : stage == MeshletStage::Finalize ? finalize
+                                                                 : scatter;
         encoder.SetPipeline(RHIBindPoint::Compute, pipeline->GetHandle());
         encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, constants);
         encoder.SetRootBuffer(RHIBindPoint::Compute, 1, candidates);
@@ -70,7 +92,8 @@ struct GpuGeometryVisibility::SharedBatch
         DispatchGroups(encoder, stage == MeshletStage::Cull
                                     ? (std::min)(bins * kInitialSubdivisions, kPersistentConsumerGroups)
                                 : stage == MeshletStage::Count || stage == MeshletStage::Scatter ? groups
-                                : stage == MeshletStage::Finalize && !ordered ? VisibilityGroups(bins) : bins);
+                                : stage == MeshletStage::Finalize && !ordered ? VisibilityGroups(bins)
+                                                                              : bins);
     }
 };
 
@@ -108,9 +131,15 @@ std::uint32_t GpuGeometryVisibility::Frame::WorkQueueNonemptyPartitions(std::uin
     std::uint32_t count{};
     if (m_sharedBatch)
     {
-        for (const auto meshlets : m_sharedBatch->counts)
+        for (const auto& input : m_sharedBatch->inputs)
         {
-            count += (std::min)(kInitialSubdivisions, (meshlets + width - 1u) / width);
+            if (input)
+            {
+                for (const auto& bin : std::span(input->bins.data(), input->bins.size()))
+                {
+                    count += (std::min)(kInitialSubdivisions, (bin.indexCount + width - 1u) / width);
+                }
+            }
         }
     }
     else
@@ -212,7 +241,12 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     std::span<const std::shared_ptr<const Frame>> frames)
 {
     ce::profile_scope profile{ce::marker<"GpuVisibility.SharedBuild">()};
-    auto batch = std::make_shared<SharedBatch>();
+    if (frames.empty() || frames.size() > kSharedViewCapacity)
+    {
+        throw std::runtime_error("Shared visibility requires one to eight sealed views.");
+    }
+    auto batch = ce::make_render_shared<SharedBatch>();
+    const auto arena = AcquireVisibilityInputs();
     const auto& firstFrame = *frames.front();
     batch->device = firstFrame.m_device;
     batch->pool = firstFrame.m_bufferPool;
@@ -221,12 +255,6 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     batch->count = firstFrame.m_sharedCount;
     batch->finalize = firstFrame.m_sharedFinalize;
     batch->scatter = firstFrame.m_sharedScatter;
-    auto& scratch = batch->pool->m_upload;
-    const std::lock_guard scratchLock{scratch.m_mutex};
-    auto& vertices = scratch.m_vertices;
-    auto& topologies = scratch.m_topologies;
-    vertices.clear();
-    topologies.clear();
     std::array<RHIBindingDesc, kSharedViewCapacity> ids, arguments, first;
     std::size_t totalBins{};
     for (const auto& frame : frames)
@@ -235,9 +263,15 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         if (!frame->m_meshletInputs || frame->m_device != firstFrame.m_device ||
             frame->m_recording != firstFrame.m_recording || frame->m_descriptors != firstFrame.m_descriptors ||
             frames.size() > kSharedViewCapacity)
+        {
             throw std::runtime_error("Shared visibility requires one sealed device/upload/descriptor recording.");
+        }
         totalBins += frame->m_binCount;
         batch->ordered = batch->ordered || frame->m_ordered;
+    }
+    if (totalBins == 0 || totalBins > kMeshletBinCapacity)
+    {
+        throw std::runtime_error("Shared visibility exceeds its bounded bin capacity.");
     }
     const RHIUploadRequest requests[]{
         {sizeof(GeometryVisibilityConstants), RHIUploadUsage::ConstantBuffer, 256},
@@ -250,7 +284,9 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     std::string error;
     if (!batch->device->ReserveUploadBatch(requests, uploads, error) ||
         std::ranges::any_of(uploads, [](const auto& upload) { return !upload.IsWritable(); }))
+    {
         throw std::runtime_error("Shared visibility upload failed: " + error);
+    }
     batch->constants = uploads[0];
     batch->candidates = uploads[1];
     batch->binData = uploads[2];
@@ -263,10 +299,8 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     auto* worlds = static_cast<math::vector4*>(batch->worlds.cpuAddress);
     auto* views = static_cast<SharedBatch::ViewData*>(batch->viewData.cpuAddress);
     const auto descriptorCount = MeshletDescriptorCount(*batch->device, static_cast<std::uint32_t>(totalBins));
-    vertices.reserve(descriptorCount);
-    topologies.reserve(descriptorCount);
-    batch->counts.reserve(totalBins);
-    batch->pyramids.reserve(frames.size());
+    auto* vertices = VisibilityInputArray<RHIBindingDesc>(arena, descriptorCount);
+    auto* topologies = VisibilityInputArray<RHIBindingDesc>(arena, descriptorCount);
     std::uint64_t jobs{};
     std::uint32_t viewIndex{}, binIndex{};
     for (const auto& frame : frames)
@@ -299,7 +333,8 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
             }
         }
         views[viewIndex] = view;
-        batch->pyramids.push_back(frame->m_pyramid);
+        batch->inputs[viewIndex] = frame->m_meshletInputs;
+        batch->pyramids[viewIndex] = frame->m_pyramid;
         ids[viewIndex] =
             RHIBindingDesc::UavBuffer(frame->m_visibleIds, static_cast<std::uint32_t>(frame->m_visibleBytes / 4), 4);
         arguments[viewIndex] =
@@ -323,36 +358,43 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
             bins[binIndex].preservedInstanceCount = batch->groups;
             batch->groups += VisibilityGroups(originalBins[bin].indexCount);
             jobs += originalBins[bin].indexCount;
-            batch->counts.push_back(originalBins[bin].indexCount);
             const auto& geometry = frame->m_meshletGeometries[bin];
             const auto& world = geometry->ObjectToWorld();
             for (unsigned column = 0; column < 3; ++column)
+            {
                 worlds[binIndex * kMeshletInstanceRows + column] = {world.m[0][column], world.m[1][column],
                                                                     world.m[2][column], world.m[3][column]};
+            }
             const bool instanceBounds = geometry->UsesDirectClusters() && geometry->IsObjectSpace();
             worlds[binIndex * kMeshletInstanceRows + 3u] =
                 instanceBounds ? geometry->Input()->InstanceMinimum() : math::vector4{};
             worlds[binIndex * kMeshletInstanceRows + 4u] =
                 instanceBounds ? geometry->Input()->InstanceMaximum() : math::vector4{};
-            vertices.push_back(RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
-                                                         material_graph::MeshSurfaceBatch::GeometryViewStride));
+            std::construct_at(vertices + binIndex,
+                              RHIBindingDesc::SrvBuffer(geometry->Buffer(), geometry->GeometryViewElements(),
+                                                        material_graph::MeshSurfaceBatch::GeometryViewStride));
             const auto topology = geometry->Meshlets();
-            topologies.push_back(RHIBindingDesc::SrvBuffer(topology.buffer,
-                                                           static_cast<std::uint32_t>(topology.size / 4), 0,
-                                                           static_cast<std::uint32_t>(topology.offset / 4)));
+            std::construct_at(topologies + binIndex,
+                              RHIBindingDesc::SrvBuffer(topology.buffer, static_cast<std::uint32_t>(topology.size / 4),
+                                                        0, static_cast<std::uint32_t>(topology.offset / 4)));
             ++binIndex;
         }
         ++viewIndex;
     }
     batch->jobs = static_cast<std::uint32_t>(jobs);
     batch->bins = binIndex;
-    vertices.resize(descriptorCount, vertices.front());
-    topologies.resize(descriptorCount, topologies.front());
+    for (size_t bin = binIndex; bin < descriptorCount; ++bin)
+    {
+        std::construct_at(vertices + bin, vertices[0]);
+        std::construct_at(topologies + bin, topologies[0]);
+    }
     GeometryVisibilityConstants constants{};
     constants.candidateCount = constants.binCount = batch->bins;
     constants.planeMask = kWaveWorkQueue;
     if (batch->ordered)
+    {
         constants.planeMask |= kOrderedScanDispatch;
+    }
     constants.padding = batch->jobs; // Diagnostic only; JOB_COUNT controls completion.
     std::memcpy(batch->constants.cpuAddress, &constants, sizeof(constants));
     for (std::size_t index = 0; index < frames.size(); ++index)
@@ -384,8 +426,8 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
         // CPU 배열 조립과 descriptor 테이블 생성은 같은 Declare 안에서도 별도 비용이다.
         ce::profile_scope bindingsProfile{ce::marker<"GpuVisibility.SharedBindings">()};
         batch->outputs = batch->device->CreateBindings(outputs);
-        batch->vertices = batch->device->CreateBindings(vertices);
-        batch->topologies = batch->device->CreateBindings(topologies);
+        batch->vertices = batch->device->CreateBindings({vertices, descriptorCount});
+        batch->topologies = batch->device->CreateBindings({topologies, descriptorCount});
         batch->ids = batch->device->CreateBindings(ids);
         batch->arguments = batch->device->CreateBindings(arguments);
         batch->first = batch->device->CreateBindings(first);
@@ -398,6 +440,8 @@ std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame
     const bool occlusion = std::ranges::any_of(batch->pyramids, [](const auto& pyramid) { return bool(pyramid); });
     batch->cull = occlusion ? firstFrame.m_sharedOcclusion : firstFrame.m_sharedCull;
     for (const auto& frame : frames)
+    {
         frame->CheckCurrent();
+    }
     return batch;
 }
