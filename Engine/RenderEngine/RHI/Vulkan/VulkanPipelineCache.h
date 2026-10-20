@@ -8,7 +8,6 @@
 #include "../RHIPipelineState.h"
 #include "../RHIResourceTypes.h"
 #include "../IRenderPipelineCache.h"
-#include "../RHIGraphicsPipelineRequest.h"
 #include "JobScheduler.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -193,6 +192,7 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     Stats GetStats() const { return m_stats; }
 
   private:
+    friend class VulkanRecordingResources;
     static VkPipeline CreateOne(VkDevice device, const RHIGraphicsPipelineDesc& desc, VkPipelineLayout layout,
                                 std::string& outError);
     static VkPipeline CreateMeshOne(VkDevice device, const RHIMeshPipelineDesc& desc, VkPipelineLayout layout,
@@ -232,12 +232,19 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
         VulkanPipelineEntry entry{};
         std::uint32_t generation{0};
         bool alive{false};
+        std::shared_ptr<const void> m_lease;
     };
     // M5-C3b1: lookup에서 제거한 slot은 generation을 올려 재사용한다. VkPipeline은
     // 제출 완료를 이 cache가 직접 알기 전까지 retired 목록에 보존한다.
     std::vector<PipelineSlot> m_pipelines;
     std::vector<std::uint32_t> m_pipelineFree;
-    RHICompletionRetireQueue<VkPipeline> m_retiredPipelines;
+    struct RetiredPipeline
+    {
+        VkPipeline m_pipeline{VK_NULL_HANDLE};
+        std::shared_ptr<const void> m_lease;
+    };
+    RHICompletionRetireQueue<RetiredPipeline> m_retiredPipelines;
+    std::vector<RetiredPipeline> m_pinnedRetiredPipelines;
     std::vector<VulkanPipelineLayoutEntry> m_layouts;
 
     Stats m_stats;

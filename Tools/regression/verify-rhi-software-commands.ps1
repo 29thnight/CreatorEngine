@@ -47,7 +47,7 @@ if ($LASTEXITCODE -ne 0)
 }
 
 $compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++latest /permissive- /utf-8 ' +
-    '/DCE_CONTRACT_STANDALONE /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /Zi ' + $runtimeFlags + ' ' + $optimization + ' ' +
+    '/DCE_CONTRACT_STANDALONE /DCE_SHIPPING=1 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /Zi ' + $runtimeFlags + ' ' + $optimization + ' ' +
     '/Fo:"' + $output + '/" /Fd:"' + $output + '/probe.pdb" /Fe:"' + $exe + '" ' + $quoted + ' "' + $mimallocObject + '" advapi32.lib'
 & $env:ComSpec /d /s /c $compile
 if ($LASTEXITCODE -ne 0)

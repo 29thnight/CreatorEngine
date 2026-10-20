@@ -38,6 +38,8 @@
 #include "../../RHI/IDisplayPresentationSink.h"
 #include "../../RHI/Vulkan/VulkanDeviceResources.h"
 #include "../../RHI/Vulkan/VulkanCommandBufferPool.h"
+#include "../../RHI/Vulkan/VulkanSoftwareCommandValidator.h"
+#include "../../RHI/RHISoftwareRecorder.h"
 #include "../../RHI/Vulkan/VulkanPipelineCache.h"
 #include "../../RHI/RHIShaderCompiler.h"
 #include "../../RHI/RHIShaderSource.h"
@@ -956,6 +958,22 @@ namespace
         VulkanMeshCache meshCache;
         VulkanTextureCache textureCache;
         VulkanCommandBufferPool commandPool;
+        VulkanSoftwareCommandValidator softwareValidator{resources};
+        RHISoftwareRecorder softwareRecorder{softwareValidator};
+
+        static bool UsesSoftwareRecording()
+        {
+            static const bool enabled = []
+            {
+                char* value{};
+                size_t length{};
+                const bool available = _dupenv_s(&value, &length, "CREATOR_RHI_SOFTWARE_COMMANDS") == 0;
+                const bool result = available && value && std::strcmp(value, "1") == 0;
+                std::free(value);
+                return result;
+            }();
+            return enabled;
+        }
 
         // W8 — capture 프레임은 Render 안에서 인코더 drop을 비워 manifest에
         // 싣는다. 그렇게 비운 수를 여기 맡겨 두어야 TickLive의 프레임 집계가
@@ -1574,12 +1592,34 @@ namespace
             batchDesc.captureContext = { sourceFrameId, 0, viewPacket.key.viewId, false };
 #endif
             RHIRecordedBatch batch;
+            RHISoftwareBatch softwareBatch;
+            const bool softwareRecording = UsesSoftwareRecording();
             RHISubmissionTicket batchTicket;
             LiveStopwatch recordWatch;
             recordWatch.Start();
             {
                 RenderThreadPhaseScope record(RenderPhase::command_record);
-                if (!graph.RecordParallel(commandPool, commandPool.GetWorkerCount(), batchDesc, batch, outError))
+                if (softwareRecording)
+                {
+                    RHISoftwareBatchDesc software;
+                    software.frameId = batchDesc.frameId;
+                    software.sourceEngineFrame = sourceEngineFrame;
+                    software.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
+                    software.renderViewId = viewPacket.key.viewId;
+                    software.backendGeneration = backendGeneration;
+                    software.displayToken = batchDesc.displayToken;
+                    software.queue = resources.GetGraphicsQueueIdentity();
+                    software.lifetimeToken = batchDesc.lifetimeToken;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+                    software.captureContext = batchDesc.captureContext;
+#endif
+                    if (!graph.RecordSoftware(commandPool, commandPool.GetWorkerCount(), softwareRecorder, software,
+                                              softwareBatch, outError))
+                    {
+                        return false;
+                    }
+                }
+                else if (!graph.RecordParallel(commandPool, commandPool.GetWorkerCount(), batchDesc, batch, outError))
                 {
                     return false;
                 }
@@ -1592,14 +1632,29 @@ namespace
             }
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
-                if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
-                        resources, std::move(batch), batchTicket, outError))
+                if (softwareRecording)
+                {
+                    std::shared_ptr<VulkanCommandBufferPool> frozen;
+                    if (!commandPool.CreateTranslationPool(frozen, outError))
+                    {
+                        return false;
+                    }
+                    auto translator = frozen->GetTranslator(softwareBatch.GetDesc().queue);
+                    if (!GetRHISubmissionThread().EnqueueSoftwareBatch(&resources, resources, frozen,
+                                                                       std::move(translator), std::move(softwareBatch),
+                                                                       batchTicket, outError))
+                    {
+                        return false;
+                    }
+                }
+                else if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources, resources, std::move(batch),
+                                                                        batchTicket, outError))
                 {
                     return false;
                 }
                 // Queue admission already transferred graph ownership. Attach its
                 // completion before a separate immediate tail submission can fail.
-                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                const auto graphCompletion = batchTicket.GetIdentity().completion;
                 if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
                         graphCompletion, outError, batchTicket))
                 {
@@ -1717,6 +1772,11 @@ namespace
                 for (const auto& timing : nativeTimings)
                     captureTimings.push_back({timing.name, timing.milliseconds, timing.milliseconds});
                 capture->RecordGpuTiming(captureTimings, captureSpan, captureSpan.busyMs, timingError);
+                for (const auto& query : retainedCaptureProfiler->GetQueries())
+                {
+                    capture->RecordRhiQuery(query.name, query.beginTicks, query.endTicks, "vulkan-queue-timestamp",
+                                            query.pass.passIndex, query.rhi);
+                }
                 if (!capture->Save(resources, graph.GetStats(), outError,
                         validationCount, validation)) return false;
             }
@@ -7106,7 +7166,7 @@ namespace
                 {
                     if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink)
                         temporalSink->MarkTemporalLatency(view.temporal.frame.realFrameId,RHITemporalLatencyMarker::RenderSubmitStart);
-                    if (!dx12.SubmitOwnedGraph(slot.graph, pipeline, ownedRecordingMilliseconds, outError))
+                    if (!dx12.SubmitOwnedGraph(slot.graph, pipeline, batchDesc, ownedRecordingMilliseconds, outError))
                     {
                         return false;
                     }
@@ -7339,6 +7399,11 @@ namespace
                         captureSpan, captureTotalMs, timingError) && timingError.empty())
                     timingError = "capture submission timestamps unavailable";
                 capture->RecordGpuTiming(captureTimings, captureSpan, captureTotalMs, timingError);
+                for (const auto& slice : captureSlices)
+                {
+                    capture->RecordRhiQuery(slice.name, slice.beginCpuTick, slice.endCpuTick, "qpc", slice.passIndex,
+                                            slice.rhi);
+                }
                 if (!capture->Save(dx12.Resources(), graph.GetStats(), outError,
                         validationCount, validation)) return false;
             }
@@ -7939,6 +8004,7 @@ namespace
                                         scopeName += std::to_string(++scopeOrdinal);
                                         scopeName += ']';
                                         origin.queueId = slice.queueId;
+                                        origin.rhi = slice.rhi;
                                         sink.on_span(scopeName.c_str(), slice.beginCpuTick,
                                                      slice.endCpuTick, frameLabel, origin);
                                         ++state.gpuSpansEmitted;

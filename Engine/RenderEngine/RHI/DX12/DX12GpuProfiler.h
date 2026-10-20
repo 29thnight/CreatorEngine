@@ -4,6 +4,7 @@
 #include <d3d12.h>
 
 #include "../IRHIGpuProfiler.h"
+#include "../RHICommandProvenance.h"
 
 // 패스별 GPU 시간 측정 (PHASE 3-6).
 //
@@ -41,6 +42,7 @@ class DX12GpuProfiler : public IRHIGpuProfiler
         uint64_t beginTicks{0};
         uint64_t endTicks{0};
         GpuPassTimingIdentity identity;
+        RHICommandProvenance rhi;
     };
 
     /// CPU(QPC)와 GPU 큐 timestamp 를 **한 순간에 함께 읽은** 표본(§5.1).
@@ -195,6 +197,7 @@ class DX12GpuProfiler : public IRHIGpuProfiler
     {
         std::string name;
         GpuPassTimingIdentity identity;
+        RHICommandProvenance rhi;
         uint32_t beginQuery{0};
         uint32_t endQuery{0};
         bool used{false};

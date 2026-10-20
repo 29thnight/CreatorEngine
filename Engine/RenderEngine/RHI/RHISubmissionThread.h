@@ -1,4 +1,5 @@
 #pragma once
+#include "RHICommandFailure.h"
 #include "RHIResourceTypes.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -106,6 +107,9 @@ struct RHISubmissionThreadStats
     uint64_t failed{ 0 };
     uint64_t retired{ 0 };
     uint64_t saturationWaits{ 0 };
+    uint64_t softwareSaturationWaits{0};
+    uint64_t pendingSoftwareBytes{0};
+    uint64_t peakSoftwareBytes{0};
     uint64_t producerWaitNanoseconds{ 0 };
     uint64_t maxProducerWaitNanoseconds{ 0 };
     uint64_t drainCount{ 0 };
@@ -132,6 +136,8 @@ public:
     RHISubmissionIdentity GetIdentity() const;
     /// CPU 제출 결과의 acquire 경계다. GPU 완료와 자원 재사용은 별도 fence가 보장한다.
     bool IsComplete() const;
+    /// Returns a failure only after the completion acquire; pending/successful tickets leave it empty.
+    bool GetCommandFailure(RHICommandFailure& outFailure) const;
     /// 예약된 식별 정보는 enqueue 뒤 읽을 수 있다. 제출 중 바뀌는 상태는 완료 뒤 읽는다.
     RHIRecordedBatch* GetRecordedBatch();
     const RHIRecordedBatch* GetRecordedBatch() const;
@@ -153,11 +159,12 @@ class RHISubmissionThread final
 {
 public:
     static constexpr uint32_t kQueueCapacity = 3;
+    static constexpr uint64_t kSoftwareByteCapacity = 256ull << 20;
 
     using Work = std::function<bool(std::string&)>;
     using CompletionQuery = std::function<uint64_t()>;
 
-    RHISubmissionThread();
+    explicit RHISubmissionThread(uint64_t softwareByteCapacity = kSoftwareByteCapacity);
     ~RHISubmissionThread();
     RHISubmissionThread(const RHISubmissionThread&) = delete;
     RHISubmissionThread& operator=(const RHISubmissionThread&) = delete;
@@ -182,6 +189,7 @@ public:
     /// 완료된 자원 토큰의 소멸은 producer가 맡는다. 콜백/캐시를 RHI worker에서 파괴하지 않는다.
     void CollectCompletedLifetimes(const void* owner);
     bool ConsumeFailure(const void* owner, std::string& outError);
+    bool ConsumeFailure(const void* owner, RHICommandFailure& outFailure);
 
     /// 앞선 owner 제출을 FIFO로 지난 뒤 backend의 GPU-idle 작업을 RHI thread에서
     /// 실행한다. 성공하면 generation을 올리고 pending 세 값을 각각 0으로 단정한다.
@@ -205,9 +213,8 @@ public:
     uint64_t GetOwnerGeneration(const void* owner) const;
 
     /// batch completion을 producer에서 예약한 뒤 값 자체를 FIFO로 이동한다.
-    bool EnqueueRecordedBatch(const void* owner,
-        IRHIDeviceResources& completionSource, RHIRecordedBatch&& batch,
-        RHISubmissionTicket& outTicket, std::string& outError);
+    bool EnqueueRecordedBatch(const void* owner, IRHIDeviceResources& completionSource, RHIRecordedBatch&& batch,
+                              RHISubmissionTicket& outTicket, std::string& outError, uint64_t commandRecordingId = 0);
 
     bool EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources& completionSource,
         std::shared_ptr<IRHIParallelCommandPool> pool, std::shared_ptr<IRHICommandTranslator> translator,
@@ -219,15 +226,12 @@ public:
 
 private:
     enum class EntryKind : uint8_t;
-    bool EnqueueInternal(const void* owner, const char* label, Work work,
-        RHISubmissionTicket& outTicket, std::string& outError,
-        RHICompletionPoint retirementPoint,
-        CompletionQuery completionQuery,
-        std::shared_ptr<const void> lifetimeToken,
-        EntryKind kind, bool allowTransition,
-        uint64_t expectedGeneration = 0,
-        std::shared_ptr<RHIRecordedBatch> recordedBatch = {},
-        RHISubmissionIdentity identity = {});
+    bool EnqueueInternal(const void* owner, const char* label, Work work, RHISubmissionTicket& outTicket,
+                         std::string& outError, RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
+                         std::shared_ptr<const void> lifetimeToken, EntryKind kind, bool allowTransition,
+                         uint64_t expectedGeneration = 0, std::shared_ptr<RHIRecordedBatch> recordedBatch = {},
+                         RHISubmissionIdentity identity = {}, uint64_t softwareBytes = 0,
+                         uint64_t commandRecordingId = 0);
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;

@@ -5,6 +5,7 @@
 #include "../Temporal/TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include "../RHIRecordedBatch.h"
+#include "../RHICommandFailure.h"
 #include "DX12Encoder.h" // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <stdint.h>
 #include <stdio.h>
@@ -1400,6 +1401,7 @@ bool DX12DeviceResources::SubmitCommandLists(std::span<ID3D12CommandList* const>
     {
         const ce::dx_capture::submission_scope capture(m_queue.Get(), static_cast<std::uint32_t>(lists.size()),
                                                        ce::dx_capture::current_submission_context());
+        RHICommandFailureScope::SetExecutionUncertain(true);
         m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
     }
     HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
@@ -1423,6 +1425,7 @@ bool DX12DeviceResources::SubmitCommandLists(std::span<ID3D12CommandList* const>
         }
         return false;
     }
+    RHICommandFailureScope::SetExecutionUncertain(false);
     return true;
 }
 

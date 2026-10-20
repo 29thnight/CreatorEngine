@@ -72,8 +72,8 @@ public:
     // the pipeline. An unset override reads the environment at each frame boundary.
     bool SetQueueExecutionMode(uint32_t mode, std::string& outError);
     bool BeginOwnedQueueRecording(std::string& outError);
-    bool SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph,
-        std::shared_ptr<const void> owner, double& recordingMilliseconds, std::string& outError);
+    bool SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph, std::shared_ptr<const void> owner,
+                          const RHIRecordedBatchDesc& desc, double& recordingMilliseconds, std::string& outError);
     IRHIParallelCommandPool& CommandPool();
     uint64_t GetBackendGeneration() const;
     bool EnqueueRecordedBatch(RHIRecordedBatch&& batch,

@@ -22,13 +22,13 @@ bool RHISoftwareEncoder::SetViewport(float x, float y, uint32_t width, uint32_t 
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::SetViewport, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareSetViewportArguments*>(raw);
-                                             return encoder.SetViewport(value.x, value.y, value.width, value.height);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::SetViewport, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareSetViewportArguments*>(raw);
+                                                return encoder.SetViewport(value.x, value.y, value.width, value.height);
+                                            });
     return accepted;
 }
 
@@ -40,13 +40,13 @@ bool RHISoftwareEncoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::SetScissor, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareSetScissorArguments*>(raw);
-                                             return encoder.SetScissor(value.x, value.y, value.width, value.height);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::SetScissor, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareSetScissorArguments*>(raw);
+                                                return encoder.SetScissor(value.x, value.y, value.width, value.height);
+                                            });
     return accepted;
 }
 
@@ -65,6 +65,11 @@ void RHISoftwareEncoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle p
     {
         m_state.boundPipeline = pipeline;
         m_state.bindPoint = bindPoint;
+        const auto index = static_cast<size_t>(bindPoint);
+        if (index < m_state.pipelines.size())
+        {
+            m_state.pipelines[index] = pipeline;
+        }
     }
     static_cast<void>(accepted);
 }
@@ -151,12 +156,12 @@ bool RHISoftwareEncoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t
     }
     payload.value.cpuAddress = nullptr;
     const bool accepted =
-        m_list->Append(RHISoftwareCommandType::SetRootUnorderedBuffer, payload,
-                       [](RHIEncoder& encoder, const void* raw)
-                       {
-                           const auto& value = *static_cast<const RHISoftwareSetRootUnorderedBufferArguments*>(raw);
-                           return encoder.SetRootUnorderedBuffer(value.bindPoint, value.slot, value.value);
-                       });
+        m_list->TryAppend(RHISoftwareCommandType::SetRootUnorderedBuffer, payload,
+                          [](RHIEncoder& encoder, const void* raw)
+                          {
+                              const auto& value = *static_cast<const RHISoftwareSetRootUnorderedBufferArguments*>(raw);
+                              return encoder.SetRootUnorderedBuffer(value.bindPoint, value.slot, value.value);
+                          });
     return accepted;
 }
 
@@ -229,13 +234,13 @@ bool RHISoftwareEncoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOf
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::DrawIndirect, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareDrawIndirectArguments*>(raw);
-                                             return encoder.DrawIndirect(value.arguments, value.byteOffset);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::DrawIndirect, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareDrawIndirectArguments*>(raw);
+                                                return encoder.DrawIndirect(value.arguments, value.byteOffset);
+                                            });
     return accepted;
 }
 
@@ -247,13 +252,13 @@ bool RHISoftwareEncoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::DrawIndexedIndirect, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareDrawIndexedIndirectArguments*>(raw);
-                                             return encoder.DrawIndexedIndirect(value.arguments, value.byteOffset);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::DrawIndexedIndirect, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareDrawIndexedIndirectArguments*>(raw);
+                                                return encoder.DrawIndexedIndirect(value.arguments, value.byteOffset);
+                                            });
     return accepted;
 }
 
@@ -265,13 +270,13 @@ bool RHISoftwareEncoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t by
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::DispatchIndirect, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareDispatchIndirectArguments*>(raw);
-                                             return encoder.DispatchIndirect(value.arguments, value.byteOffset);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::DispatchIndirect, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareDispatchIndirectArguments*>(raw);
+                                                return encoder.DispatchIndirect(value.arguments, value.byteOffset);
+                                            });
     if (accepted)
     {
         ++m_list->m_stats.computeDispatchCommands;
@@ -287,13 +292,13 @@ bool RHISoftwareEncoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::DispatchMeshIndirect, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareDispatchMeshIndirectArguments*>(raw);
-                                             return encoder.DispatchMeshIndirect(value.arguments, value.byteOffset);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::DispatchMeshIndirect, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareDispatchMeshIndirectArguments*>(raw);
+                                                return encoder.DispatchMeshIndirect(value.arguments, value.byteOffset);
+                                            });
     return accepted;
 }
 
@@ -306,9 +311,9 @@ bool RHISoftwareEncoder::DispatchMeshIndirectBatch(RHIBufferHandle arguments, ui
     {
         return false;
     }
-    payload.roots = m_list->CopySpan(roots);
-    const bool accepted = m_list->Append(
-        RHISoftwareCommandType::DispatchMeshIndirectBatch, payload,
+    const bool accepted = m_list->TryAppendWithSpan(
+        RHISoftwareCommandType::DispatchMeshIndirectBatch, payload, roots,
+        &RHISoftwareDispatchMeshIndirectBatchArguments::roots,
         [](RHIEncoder& encoder, const void* raw)
         {
             const auto& value = *static_cast<const RHISoftwareDispatchMeshIndirectBatchArguments*>(raw);
@@ -326,9 +331,9 @@ bool RHISoftwareEncoder::DrawIndexedIndirectBatch(RHIBufferHandle arguments, uin
     {
         return false;
     }
-    payload.roots = m_list->CopySpan(roots);
-    const bool accepted = m_list->Append(
-        RHISoftwareCommandType::DrawIndexedIndirectBatch, payload,
+    const bool accepted = m_list->TryAppendWithSpan(
+        RHISoftwareCommandType::DrawIndexedIndirectBatch, payload, roots,
+        &RHISoftwareDrawIndexedIndirectBatchArguments::roots,
         [](RHIEncoder& encoder, const void* raw)
         {
             const auto& value = *static_cast<const RHISoftwareDrawIndexedIndirectBatchArguments*>(raw);
@@ -362,13 +367,13 @@ bool RHISoftwareEncoder::DispatchMesh(uint32_t x, uint32_t y, uint32_t z)
     {
         return false;
     }
-    const bool accepted = m_list->Append(RHISoftwareCommandType::DispatchMesh, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareDispatchMeshArguments*>(raw);
-                                             return encoder.DispatchMesh(value.x, value.y, value.z);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::DispatchMesh, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareDispatchMeshArguments*>(raw);
+                                                return encoder.DispatchMesh(value.x, value.y, value.z);
+                                            });
     return accepted;
 }
 
@@ -381,13 +386,13 @@ bool RHISoftwareEncoder::BeginRasterWithoutAttachments(uint32_t width, uint32_t 
         return false;
     }
     const bool accepted =
-        m_list->Append(RHISoftwareCommandType::BeginRasterWithoutAttachments, payload,
-                       [](RHIEncoder& encoder, const void* raw)
-                       {
-                           const auto& value =
-                               *static_cast<const RHISoftwareBeginRasterWithoutAttachmentsArguments*>(raw);
-                           return encoder.BeginRasterWithoutAttachments(value.width, value.height);
-                       });
+        m_list->TryAppend(RHISoftwareCommandType::BeginRasterWithoutAttachments, payload,
+                          [](RHIEncoder& encoder, const void* raw)
+                          {
+                              const auto& value =
+                                  *static_cast<const RHISoftwareBeginRasterWithoutAttachmentsArguments*>(raw);
+                              return encoder.BeginRasterWithoutAttachments(value.width, value.height);
+                          });
     return accepted;
 }
 
@@ -402,6 +407,10 @@ void RHISoftwareEncoder::BindRenderTargets(const RHIRenderTargetBinding& binding
                                              encoder.BindRenderTargets(value.binding);
                                              return true;
                                          });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::BindRenderTargets, &payload, sizeof(payload), m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -455,6 +464,10 @@ void RHISoftwareEncoder::ResourceBarriers(const RHIBarrierBatch& barriers)
                                              encoder.ResourceBarriers(value.barriers);
                                              return true;
                                          });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::ResourceBarriers, &payload, sizeof(payload), m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -470,6 +483,10 @@ void RHISoftwareEncoder::UavBarrier(std::span<const RHITextureHandle> textures)
                                              encoder.UavBarrier(value.textures);
                                              return true;
                                          });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::UavBarrier, &payload, sizeof(payload), m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -485,6 +502,10 @@ void RHISoftwareEncoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buff
                                              encoder.UavBarrierBuffers(value.buffers);
                                              return true;
                                          });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::UavBarrierBuffers, &payload, sizeof(payload), m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -499,6 +520,10 @@ void RHISoftwareEncoder::CopyResource(RHITextureHandle destination, RHITextureHa
                                              encoder.CopyResource(value.destination, value.source);
                                              return true;
                                          });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::CopyResource, &payload, sizeof(payload), m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -518,6 +543,11 @@ void RHISoftwareEncoder::ClearUnorderedAccess(const RHIBindingDesc& view, const 
                                              encoder.ClearUnorderedAccess(value.view, value.rgba.data());
                                              return true;
                                          });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::ClearUnorderedAccess, &payload, sizeof(payload),
+                                        m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -533,6 +563,10 @@ void RHISoftwareEncoder::CopyToReadback(const RHIReadback& readback, RHITextureH
                            encoder.CopyToReadback(value.readback, value.source, value.slice, value.sourceSubresource);
                            return true;
                        });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::CopyToReadback, &payload, sizeof(payload), m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -563,6 +597,11 @@ void RHISoftwareEncoder::CopyVolumeToReadback(const RHIReadback& readback, RHITe
                            encoder.CopyVolumeToReadback(value.readback, value.source, value.sourceSubresource);
                            return true;
                        });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::CopyVolumeToReadback, &payload, sizeof(payload),
+                                        m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -578,6 +617,11 @@ void RHISoftwareEncoder::CopyBufferToReadback(const RHIReadback& readback, RHIBu
                            encoder.CopyBufferToReadback(value.readback, value.source, value.sourceOffset, value.bytes);
                            return true;
                        });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::CopyBufferToReadback, &payload, sizeof(payload),
+                                        m_state);
+    }
     static_cast<void>(accepted);
 }
 
@@ -591,13 +635,17 @@ bool RHISoftwareEncoder::CopyBuffer(const RHIBufferSlice& destination, const RHI
     }
     payload.destination.cpuAddress = nullptr;
     payload.source.cpuAddress = nullptr;
-    const bool accepted = m_list->Append(RHISoftwareCommandType::CopyBuffer, payload,
-                                         [](RHIEncoder& encoder, const void* raw)
-                                         {
-                                             const auto& value =
-                                                 *static_cast<const RHISoftwareCopyBufferArguments*>(raw);
-                                             return encoder.CopyBuffer(value.destination, value.source);
-                                         });
+    const bool accepted = m_list->TryAppend(RHISoftwareCommandType::CopyBuffer, payload,
+                                            [](RHIEncoder& encoder, const void* raw)
+                                            {
+                                                const auto& value =
+                                                    *static_cast<const RHISoftwareCopyBufferArguments*>(raw);
+                                                return encoder.CopyBuffer(value.destination, value.source);
+                                            });
+    if (accepted)
+    {
+        m_validator->ApplyRecordedState(RHISoftwareCommandType::CopyBuffer, &payload, sizeof(payload), m_state);
+    }
     return accepted;
 }
 

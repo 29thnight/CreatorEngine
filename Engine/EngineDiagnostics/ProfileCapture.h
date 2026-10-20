@@ -204,6 +204,28 @@ namespace ce
                    render_measurements.capacity() * sizeof(profile_render_measurement);
         }
 
+        const profile_rhi_context* rhi_context_for(const profile_event& event) const
+        {
+            const profile_rhi_context* match = nullptr;
+            for (const auto& sample : render_measurements)
+            {
+                if (sample.axis == profile_render_axis::rhi_scope && sample.rhi_event_frame == event.frame &&
+                    sample.marker == event.marker && sample.tick_begin == event.tick_begin &&
+                    sample.tick_end == event.tick_end && sample.rhi_thread_slot == event.thread_slot &&
+                    sample.rhi_depth == event.depth &&
+                    sample.rhi_event_flags == static_cast<std::uint8_t>(event.flags) && sample.queue == event.queue &&
+                    sample.event_submission == event.submission && sample.event_view == event.view)
+                {
+                    if (match)
+                    {
+                        return nullptr; // 동일 event key가 둘이면 latest를 추측하지 않는다.
+                    }
+                    match = &sample.rhi;
+                }
+            }
+            return match;
+        }
+
         const profile_render_measurement* render_measurement_for(const profile_event& event) const
         {
             const profile_render_measurement* match = nullptr;

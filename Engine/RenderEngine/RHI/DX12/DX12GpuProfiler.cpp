@@ -1,6 +1,7 @@
 #include "../RHISoftwareEncoder.h"
 #include "DX12GpuProfiler.h"
 #include "DX12Encoder.h"
+#include "../RHIProfilingContext.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
 
@@ -354,6 +355,7 @@ uint32_t DX12GpuProfiler::ReservePass(const std::string& name, const GpuPassTimi
     PassRecord& record = m_records[RecordIndex(m_recordingSlot, slot)];
     record.name = name;
     record.identity = identity;
+    record.rhi = MakeRHICommandProvenance(ce::current_rhi_context);
     record.beginQuery = base;
     record.endQuery = base + 1;
     record.used = true;
@@ -537,6 +539,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token, FrameTimings& outTimin
         PassSlice& slice = outTimings.slices[sliceCount++];
         slice.name.assign(record.name);
         slice.identity = record.identity;
+        slice.rhi = record.rhi;
         slice.beginTicks = begin;
         slice.endTicks = end;
     }

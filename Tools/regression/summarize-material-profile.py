@@ -1,9 +1,10 @@
-"""Read CEPROF snapshots (1/2/4/6) and finalized recordings (3/5/7).
+"""Read CEPROF snapshots (1/2/4/6/8) and finalized recordings (3/5/7/9).
 
 Engine-frame duration, real-view render cost and presented cadence are distinct.
 Only recorded, exact-key provenance can qualify render measurements. Old files
 remain readable but cannot acquire provenance from current live settings.
 Execution artifacts retain their own binary identity and acceptance scope.
+RHI scope identities use an independent exact event key, never render/FPS samples.
 """
 import argparse
 import collections
@@ -72,8 +73,24 @@ def counter(reader, version):
     return cid, value, owner
 
 
-def measurement(reader, allow_presenter=False):
+def measurement(reader, allow_presenter=False, allow_rhi=False):
     engine_frame, axis = reader.get('IB')
+    if axis == 4:
+        require(allow_rhi, 'RHI axis requires snapshot v8 / stream v9')
+        keys = ('eventFrame', 'marker', 'begin', 'end', 'slot', 'depth', 'flags', 'queue',
+                'eventSubmission', 'eventView', 'recordingId', 'sourceEngineFrame', 'frameId',
+                'viewId', 'deviceIncarnation', 'backendGeneration', 'queueId', 'targetIndex',
+                'queueKind', 'sourceEngineFrameAvailable', 'reserved')
+        value = dict(zip(keys, reader.get('IIQQHHBBIHQQQQQQIIBBB')))
+        value.update(engineFrame=engine_frame, axis=axis)
+        require(value['recordingId'] != 0 and value['marker'] != 0 and value['end'] >= value['begin'] and
+                value['flags'] <= 7 and value['queueKind'] <= 2 and
+                value['sourceEngineFrameAvailable'] in (0, 1) and value['reserved'] == 0,
+                'Invalid RHI scope identity')
+        require(value['sourceEngineFrameAvailable'] or value['sourceEngineFrame'] == 0,
+                'Unavailable RHI source frame must be zero')
+        require((value['deviceIncarnation'] == 0) == (value['queueId'] == 0), 'Invalid RHI queue identity')
+        return value
     if axis == 3:
         require(allow_presenter, 'Presenter axis requires snapshot v6 / stream v7')
         keys = ('observedQpc', 'sequence', 'realFrameId', 'publicationFrameId', 'viewId', 'sceneEpoch',
@@ -132,11 +149,11 @@ def snapshot(data):
     reader = Reader(data)
     require(bytes(reader.take(8)) == b'CEPROF\0\0', 'Not a CEPROF capture')
     version, count = reader.get('II')
-    require(version in (1, 2, 4, 6) and 4 <= count <= 64, 'Unsupported snapshot layout')
+    require(version in (1, 2, 4, 6, 8) and 4 <= count <= 64, 'Unsupported snapshot layout')
     chunks, ranges = {}, []
     for _ in range(count):
         kind, chunk_version, offset, size, checksum, reserved = reader.get('IIQQII')
-        supported = {1: (1,), 2: (1,), 3: (1, 2), 4: (1, 2), 5: (1, 2), 6: (1,), 7: (1, 2)}
+        supported = {1: (1,), 2: (1,), 3: (1, 2), 4: (1, 2), 5: (1, 2), 6: (1,), 7: (1, 2, 3)}
         require(kind in supported and chunk_version in supported[kind] and kind not in chunks and reserved == 0,
                 'Unknown/duplicate snapshot chunk')
         require(offset >= 16 + 32 * count and offset + size <= len(data) and
@@ -148,7 +165,7 @@ def snapshot(data):
     require(all(key in chunks for key in (1, 2, 3, 4)) and (version < 4 or 7 in chunks), 'Missing required chunk')
     require(version >= 4 or 7 not in chunks, 'Legacy capture cannot carry new provenance')
     if 7 in chunks:
-        require(chunks[7][0] == (2 if version >= 6 else 1), 'Measurement chunk/version mismatch')
+        require(chunks[7][0] == {4: 1, 6: 2, 8: 3}[version], 'Measurement chunk/version mismatch')
     env = chunks[1][1]
     hz, complete, unacked = env.get('QBI')
     require(hz > 0 and complete in (0, 1), 'Invalid capture environment')
@@ -197,7 +214,7 @@ def snapshot(data):
         require(r.get('I') == len(frames), 'Provenance/frame count mismatch')
         for frame in frames:
             require(r.get('I') == frame['id'], 'Provenance/frame identity mismatch')
-            frame['measurements'] = [measurement(r, version >= 6) for _ in range(r.count(100))]
+            frame['measurements'] = [measurement(r, version >= 6, version == 8) for _ in range(r.count(100))]
         r.end()
     return dict(version=version, hz=hz, complete=bool(complete), unacked=unacked, frames=frames,
                 markers=markers, threads=threads, descriptors=descriptors, droppedCounters=dropped_counters,
@@ -209,10 +226,10 @@ def read_capture(path):
     data = path.read_bytes()
     require(len(data) >= 16 and data[:8] == b'CEPROF\0\0', 'Not a CEPROF capture')
     version, count = struct.unpack_from('<II', data, 8)
-    if version in (1, 2, 4, 6):
+    if version in (1, 2, 4, 6, 8):
         result = snapshot(data)
     else:
-        require(version in (3, 5, 7) and count == 0, 'Unsupported CEPROF recording version')
+        require(version in (3, 5, 7, 9) and count == 0, 'Unsupported CEPROF recording version')
         r, sequence, metadata, frames, footer = Reader(data[16:]), 0, None, [], None
         while r.pos < len(r.data):
             header = r.take(32)
@@ -239,7 +256,8 @@ def read_capture(path):
                              events=[event(body, 2) for _ in range(events)],
                              counters=[counter(body, 2) for _ in range(counters)], measurements=[])
                 if version >= 5:
-                    frame['measurements'] = [measurement(body, version >= 7) for _ in range(body.count(100))]
+                    frame['measurements'] = [measurement(body, version >= 7, version == 9)
+                                             for _ in range(body.count(100))]
                 body.end()
                 frames.append(frame)
             elif kind == 3:
@@ -267,7 +285,17 @@ def sample_key(value):
             value['queue'], value['eventSubmission'], value['eventView'])
 
 
-def analyze(path):
+def rhi_sample_key(value):
+    return tuple(value[k] for k in ('eventFrame', 'marker', 'begin', 'end', 'slot', 'depth', 'flags',
+                                    'queue', 'eventSubmission', 'eventView'))
+
+
+def rhi_event_key(value):
+    return tuple(value[k] for k in ('frame', 'marker', 'begin', 'end', 'slot', 'depth', 'flags',
+                                    'queue', 'submission', 'view'))
+
+
+def analyze(path, include_rhi_identities=False):
     capture = read_capture(Path(path))
     frames, hz = capture['frames'], capture['hz']
     require(frames, 'Empty capture is not a measurement')
@@ -275,14 +303,40 @@ def analyze(path):
     cpu_sessions, cpu_ticks, cpu_tasks, counter_owners = set(), set(), set(), set()
     boundary, gpu_events, matched_gpu, invalid_provenance = 0, 0, 0, 0
     schedule_reuses = 0
+    rhi = dict(samples=0, exactEventMatches=0, ambiguousSamples=0, unmatchedSamples=0,
+               sourceFrameUnavailableSamples=0, queueIdentityUnavailableSamples=0,
+               axis='rhi-scope-identity-not-render-or-presentation',
+               matchingPolicy='unique-full-event-key-within-stored-engine-frame',
+               sourceFrameInference=False)
+    if include_rhi_identities:
+        rhi['records'] = []
     measurements, presenter, groups = [], [], collections.defaultdict(lambda: {'cpu': [], 'gpu': [], 'realFrames': set()})
     for frame in frames:
         gpu_keys = collections.Counter(sample_key(m) for m in frame['measurements'] if m['axis'] == 2)
+        rhi_keys = collections.Counter(rhi_sample_key(m) for m in frame['measurements'] if m['axis'] == 4)
+        rhi_event_keys = collections.Counter(rhi_event_key(e) for e in frame['events']) if rhi_keys else {}
         used_keys = collections.Counter()
         for m in frame['measurements']:
             require(m['engineFrame'] == frame['id'], 'Stored provenance belongs to another engine frame')
             if m['axis'] == 3:
                 presenter.append(m)
+                continue
+            if m['axis'] == 4:
+                key = rhi_sample_key(m)
+                event_count = rhi_event_keys.get(key, 0)
+                ambiguous = rhi_keys[key] != 1 or event_count > 1
+                matched = not ambiguous and event_count == 1
+                rhi['samples'] += 1
+                rhi['exactEventMatches'] += matched
+                rhi['ambiguousSamples'] += ambiguous
+                rhi['unmatchedSamples'] += not ambiguous and not matched
+                rhi['sourceFrameUnavailableSamples'] += not m['sourceEngineFrameAvailable']
+                rhi['queueIdentityUnavailableSamples'] += m['deviceIncarnation'] == 0
+                if include_rhi_identities:
+                    rhi['records'].append(dict(m, identityAvailable=matched,
+                        eventMatch='ambiguous' if ambiguous else 'exact' if matched else 'unmatched',
+                        resolvedSourceEngineFrame=m['sourceEngineFrame']
+                            if matched and m['sourceEngineFrameAvailable'] else None))
                 continue
             measurements.append(m)
             available = m['frameKind'] in (1, 2) and m['viewId'] > 0 and m['sceneEpoch'] > 0 and m['spatialProvenanceAvailable']
@@ -334,7 +388,7 @@ def analyze(path):
     require(len({p['sequence'] for p in presenter}) == len(presenter), 'Duplicate presenter sequence')
     presenter_gaps = sum(b['sequence'] - a['sequence'] - 1 for a, b in zip(presenter, presenter[1:]))
     presenter_monotonic = all(a['observedQpc'] <= b['observedQpc'] for a, b in zip(presenter, presenter[1:]))
-    eligible = bool(clean and capture['version'] in (4, 5, 6, 7) and measurements and gpu_events and
+    eligible = bool(clean and capture['version'] in (4, 5, 6, 7, 8, 9) and measurements and gpu_events and
                     matched_gpu == gpu_events and invalid_provenance == 0)
     real = eligible and all(m['frameKind'] == 1 for m in measurements)
     native = real and all(m['resolutionState'] == 1 and m['upscaler'] == m['frameGenerator'] == 0 and
@@ -362,6 +416,7 @@ def analyze(path):
                 spatialProvenanceStatus='recorded-per-measurement' if eligible else 'unavailable-or-incomplete',
                 gpuEvents=gpu_events, matchedGpuEvents=matched_gpu, invalidProvenanceSamples=invalid_provenance,
                 renderMeasurementCount=len(measurements), renderGroups=group_rows,
+                rhiScopeIdentity=rhi,
                 presenterReturns=dict(samples=len(presenter), missingSequences=presenter_gaps,
                     unknownIdentities=sum(not p['valid'] for p in presenter),
                     unsuccessfulOutcomes=sum(p['status'] != 0 or p['nativeCode'] != 0 for p in presenter),
@@ -377,10 +432,12 @@ def analyze(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--require-native-real', action='store_true')
+    parser.add_argument('--include-rhi-identities', action='store_true',
+                        help='Retain raw RHI sidecars and exact-match status outside render/FPS aggregates')
     parser.add_argument('paths', nargs='+')
     args = parser.parse_args()
     for path in args.paths:
-        result = analyze(path)
+        result = analyze(path, args.include_rhi_identities)
         Path(str(path) + '.summary.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
         print(json.dumps(dict(result, markers=result['markers'][:35]), indent=2))
         require(not args.require_native_real or result['nativeRealPerformanceGateEligible'],

@@ -472,7 +472,44 @@ int main()
         RHISoftwareEncoder tinyPayloadWriter(tinyPayload, validator);
         std::array<uint32_t, 3> slots{7, 8, 9};
         Require(!tinyPayloadWriter.DispatchMeshIndirectBatch({1}, 0, 1, slots), "Payload budget overflow accepted.");
-        Require(!tinyPayload.Seal(error), "Payload budget overflow sealed successfully.");
+        Require(tinyPayload.GetCommandCount() == 0 && tinyPayload.GetPayloadBytes() == 0 &&
+                    tinyPayload.GetRecordingStats().allocatedBytes == 0 && tinyPayload.GetError().empty(),
+                "Rejected bool payload changed command state, budget or arena storage.");
+        tinyPayloadWriter.Draw(71, 1, 0, 0);
+        Require(tinyPayload.Seal(error) && tinyPayload.Replay(native, stats, failure) && stats.commandCount == 1 &&
+                    native.order.back() == 71,
+                "Bool payload rejection prevented the direct draw fallback.");
+        {
+            // Both indirect-batch bool APIs must preflight the opcode before
+            // copying roots. A smaller direct Draw still fits the same target.
+            for (uint32_t mode = 0; mode < 2; ++mode)
+            {
+                auto budget = ce::make_render_shared<RHISoftwareRecordingBudget>();
+                budget->maxCommandBytes = 48;
+                budget->maxPayloadBytes = 12;
+                RHISoftwareCommandList bounded(1024, 1024, budget);
+                RHISoftwareEncoder boundedWriter(bounded, validator);
+                const bool accepted = mode == 0 ? boundedWriter.DispatchMeshIndirectBatch({1}, 0, 1, slots)
+                                                : boundedWriter.DrawIndexedIndirectBatch({1}, 0, 1, slots);
+                Require(!accepted && bounded.GetError().empty() && bounded.GetCommandCount() == 0 &&
+                            budget->commandBytes == 0 && budget->payloadBytes == 0 &&
+                            bounded.GetRecordingStats().allocatedBytes == 0,
+                        "Bool command rejection consumed a shared target's payload budget.");
+                boundedWriter.Draw(72 + mode, 1, 0, 0);
+                Require(bounded.Seal(error) && bounded.Replay(native, stats, failure) && stats.commandCount == 1 &&
+                            native.order.back() == 72 + mode && budget->commandBytes == 0 && budget->payloadBytes == 0,
+                        "Shared target budget did not recover for bool fallback and replay.");
+            }
+            RHISoftwareCommandList fixedBudget(48, 1024);
+            RHISoftwareEncoder fixedWriter(fixedBudget, validator);
+            Require(!fixedWriter.CopyBuffer({}, {}) && fixedBudget.GetError().empty() &&
+                        fixedBudget.GetCommandBytes() == 0,
+                    "Fixed bool command budget failure became sticky.");
+            fixedWriter.Draw(74, 1, 0, 0);
+            Require(fixedBudget.Seal(error) && fixedBudget.Replay(native, stats, failure) && stats.commandCount == 1 &&
+                        native.order.back() == 74,
+                    "Fixed bool command rejection blocked its fallback.");
+        }
 
         RHISoftwareCommandList rejected(1024, 1024);
         RHISoftwareEncoder rejectedWriter(rejected, validator);
@@ -496,8 +533,12 @@ int main()
                 "Native exception lost.");
         RHISoftwareRecorder recorder(validator);
         RHISoftwareRecordingDesc recordingDesc{{1, 1, RHIQueueKind::Graphics}, 2, 16384, 16384};
+        Require(recorder.GetRecordingId() == 0, "Inactive recorder published a recording identity.");
         Require(recorder.BeginRecording(recordingDesc, error), "Recording session failed.");
+        const uint64_t firstRecordingId = recorder.GetRecordingId();
+        Require(firstRecordingId != 0, "Successful BeginRecording did not publish a recording identity.");
         Require(!recorder.BeginRecording(recordingDesc, error), "Active session overwritten.");
+        Require(recorder.GetRecordingId() == firstRecordingId, "Rejected BeginRecording replaced the active identity.");
         recorder.AcquireEncoder(0).Draw(1, 1, 0, 0);
         recorder.AcquireEncoder(0).Draw(2, 1, 0, 0);
         recorder.AcquireEncoder(1).Draw(3, 1, 0, 0);
@@ -512,22 +553,35 @@ int main()
         Require(!recorder.FinishRecording(duplicate, batchDesc, batch, error), "Duplicate target accepted.");
         const std::array<uint32_t, 1> omitted{0};
         Require(!recorder.FinishRecording(omitted, batchDesc, batch, error), "Nonempty target omitted.");
+        Require(recorder.GetRecordingId() == firstRecordingId, "Rejected seal replaced the active recording identity.");
         const std::array<uint32_t, 2> order{0, 1};
         Require(recorder.FinishRecording(order, batchDesc, batch, error), "Software batch seal failed.");
+        Require(batch.GetRecordingId() == firstRecordingId && recorder.GetRecordingId() == 0,
+                "Sealing did not transfer the recording identity to the batch.");
         Require(batch.IsValid() && batch.GetRecordingStats().commandCount == 3 && batch.GetTargetCount() == 2,
                 "Software batch metadata incorrect.");
         RHISoftwareBatch movedBatch(std::move(batch));
         Require(!batch.IsValid() && movedBatch.IsValid(), "Software batch move duplicated submission rights.");
+        Require(batch.GetRecordingId() == 0 && movedBatch.GetRecordingId() == firstRecordingId,
+                "Moving a sealed batch lost or duplicated its recording identity.");
         batchDesc.lifetimeToken.reset();
         owner.reset();
         Require(!weakOwner.expired(), "Software batch lost its lifetime owner.");
         movedBatch = RHISoftwareBatch{};
         Require(weakOwner.expired(), "Cancelled software batch retained its lifetime owner.");
         Require(recorder.BeginRecording(recordingDesc, error), "Recorder could not restart.");
+        const uint64_t cancelledRecordingId = recorder.GetRecordingId();
+        Require(cancelledRecordingId != 0 && cancelledRecordingId != firstRecordingId,
+                "Restarted recorder reused a sealed recording identity.");
         recorder.AcquireEncoder(0).Draw(1, 1, 0, 0);
         recorder.CancelRecording();
+        Require(recorder.GetRecordingId() == 0, "Cancelled recorder retained its recording identity.");
         Require(recorder.GetRecordingStats().commandCount == 0, "Cancelled commands survived.");
         Require(recorder.BeginRecording(recordingDesc, error), "Cancelled recorder could not restart.");
+        const uint64_t restartedRecordingId = recorder.GetRecordingId();
+        Require(restartedRecordingId != 0 && restartedRecordingId != cancelledRecordingId &&
+                    restartedRecordingId != firstRecordingId,
+                "A new session reused a cancelled recording identity.");
         recorder.AcquireEncoder(0).ClearRenderTargets({}, nullptr);
         batchDesc.lifetimeToken = std::make_shared<uint32_t>(1);
         Require(!recorder.FinishRecording(omitted, batchDesc, batch, error), "Null color accepted.");
@@ -550,6 +604,7 @@ int main()
 
         recordingDesc.maxCommandBytes = 65536;
         Require(recorder.BeginRecording(recordingDesc, error), "Concurrent recording session failed.");
+        const uint64_t concurrentRecordingId = recorder.GetRecordingId();
         std::array<std::exception_ptr, 2> workerErrors;
         std::array<std::thread, 2> threads;
         for (uint32_t target = 0; target < 2; ++target)
@@ -559,6 +614,8 @@ int main()
                 {
                     try
                     {
+                        Require(concurrentRecordingId != 0 && recorder.GetRecordingId() == concurrentRecordingId,
+                                "Recording worker did not observe the owner's recording identity.");
                         auto& encoder = recorder.AcquireEncoder(target);
                         for (uint32_t index = 0; index < 200; ++index)
                         {
@@ -577,6 +634,8 @@ int main()
         }
         Require(!workerErrors[0] && !workerErrors[1], "Independent recording targets failed.");
         Require(recorder.FinishRecording(order, batchDesc, batch, error), "Concurrent targets did not seal.");
+        Require(batch.GetRecordingId() == concurrentRecordingId && recorder.GetRecordingId() == 0,
+                "Concurrent recording workers and the sealed batch used different identities.");
         Require(batch.GetRecordingStats().commandCount == 400, "Concurrent recording lost commands.");
         batch = RHISoftwareBatch{};
         recordingDesc.targetCount = 1;
@@ -637,9 +696,59 @@ int main()
                     "Recycled encoder retained its previous recorder validator.");
             differentValidator.CancelRecording();
         }
+        {
+            std::array<RHIEncoder*, 8> retainedTargets{};
+            std::array<uint32_t, 8> wideOrder{};
+            recordingDesc.targetCount = static_cast<uint32_t>(retainedTargets.size());
+            recordingDesc.maxCommandBytes = 65536;
+            recordingDesc.maxPayloadBytes = 65536;
+            Require(recorder.BeginRecording(recordingDesc, error), "Wide target warmup failed.");
+            for (uint32_t target = 0; target < retainedTargets.size(); ++target)
+            {
+                wideOrder[target] = target;
+                retainedTargets[target] = &recorder.AcquireEncoder(target);
+                retainedTargets[target]->Draw(target + 1, 1, 0, 0);
+            }
+            recorder.CancelRecording();
+            recordingDesc.targetCount = 1;
+            Require(recorder.BeginRecording(recordingDesc, error), "Narrow target session failed.");
+            recorder.AcquireEncoder(0).Draw(29, 1, 0, 0);
+            Require(!recorder.HasRecorded(7), "Inactive retained target became visible.");
+            bool inactiveRejected = false;
+            try
+            {
+                recorder.AcquireEncoder(7);
+            }
+            catch (const std::out_of_range&)
+            {
+                inactiveRejected = true;
+            }
+            Require(inactiveRejected, "Inactive retained target accepted a writer.");
+            const std::array<uint32_t, 2> inactiveOrder{0, 7};
+            Require(!recorder.FinishRecording(inactiveOrder, batchDesc, batch, error),
+                    "Inactive retained target was accepted in submission order.");
+            Require(recorder.FinishRecording(std::span(wideOrder).first(1), batchDesc, batch, error),
+                    "Narrow batch did not seal after rejecting an inactive target.");
+            Require(batch.GetTargetCount() == 1 && batch.GetRecordingStats().commandCount == 1,
+                    "Retained targets contaminated narrow recording statistics.");
+            batch = RHISoftwareBatch{};
+            recordingDesc.targetCount = static_cast<uint32_t>(retainedTargets.size());
+            Require(recorder.BeginRecording(recordingDesc, error), "Wide target reuse failed.");
+            for (uint32_t target = 0; target < retainedTargets.size(); ++target)
+            {
+                auto& encoder = recorder.AcquireEncoder(target);
+                Require(&encoder == retainedTargets[target], "Narrow batch discarded a retained target encoder.");
+                encoder.Draw(target + 41, 1, 0, 0);
+            }
+            Require(recorder.FinishRecording(wideOrder, batchDesc, batch, error), "Reused wide targets did not seal.");
+            Require(batch.GetTargetCount() == 8 && batch.GetRecordingStats().commandCount == 8,
+                    "Wide target reuse replayed inactive or previous commands.");
+            batch = RHISoftwareBatch{};
+        }
         recordingDesc.maxCommandBytes = 1;
         recordingDesc.targetCount = 2;
         Require(!recorder.BeginRecording(recordingDesc, error), "Budget smaller than target count accepted.");
+        Require(recorder.GetRecordingId() == 0, "Rejected inactive BeginRecording published an identity.");
         RHIDescriptorVersionPolicy versions;
         versions.Reset(1);
         const auto first = versions.BeginRecording(101).handle;
@@ -665,7 +774,7 @@ int main()
                      "sharedArena=true mimallocArena=true crossThreadFree=true ownerThreadExit=true "
                      "arenaResetReuse=true arenaAsyncOwners=true arenaParallelDomains=true arenaBoundedCache=true "
                      "arenaEarlyExit=true alignedAllocation=true arenaNestedAllocator=true arenaConcurrentPool=true "
-                     "resetEncoder=true nativeExecution=false\n";
+                     "resetEncoder=true boolBudgetFallback=true recordingIdentity=true nativeExecution=false\n";
         return 0;
     }
     catch (const std::exception& error)

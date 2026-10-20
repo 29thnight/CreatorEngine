@@ -1,0 +1,501 @@
+{
+  "schema": "creator.rhi_software.completion_cpu.v1",
+  "status": "PASS",
+  "validation": {
+    "path": "RHISoftwareCompletion20261021-validation.json",
+    "sha256": "8a256268c76edf57c5e654f6a593fffdb4a0217e0434f7a1e9a52bb09fae9af5"
+  },
+  "code_source": {
+    "probe_sha256": "655e7068d0f6bb261cae374023ffee656ab4fbbda304fab0c063dd6b22cb4289",
+    "runner_sha256": "2918b4f7007fa9dd96d31abb4aaa23977b11e98c05a50f20a2f9fd7ca418c7d2",
+    "normal_gate_sha256": "71dcbf275255a6d09ff548bcc0e1bb16b8a3b593e9d1d329513c80a47f47b543",
+    "binary_sha256": "bee999f7dd8739404ea09252eb3e1cdadd82ff7a7575cf1c010f64896c902111"
+  },
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+  "flags": [
+    "-std=c++23",
+    "-O2",
+    "-g",
+    "-pthread",
+    "-DCE_CONTRACT_STANDALONE=1",
+    "-DCE_SHIPPING=1",
+    "-DMI_STATIC_LIB"
+  ],
+  "host": {
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "cpu_affinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "cgroup_cpu_max": "800000 100000"
+  },
+  "allocator_comparison": {
+    "scope": "BeginRecording+AcquireEncoder+FinishRecording; actual std new and mimalloc API requests",
+    "warmup": 16,
+    "samples_per_case": 17,
+    "statistic": "median request count",
+    "commands": 312,
+    "baseline": {
+      "scope": "BeginRecording+AcquireEncoder+FinishRecording; actual std new and mimalloc API requests",
+      "stable8": {
+        "standard": 0,
+        "mimalloc": 9
+      },
+      "scale8_1_8": {
+        "standard": 0,
+        "mimalloc": 65
+      },
+      "allocated_arena_bytes": 524408,
+      "commands": 312
+    },
+    "current": {
+      "scope": "BeginRecording+AcquireEncoder+FinishRecording; actual std new and mimalloc API requests",
+      "stable8": {
+        "standard": 0,
+        "mimalloc": 9
+      },
+      "scale8_1_8": {
+        "standard": 0,
+        "mimalloc": 9
+      },
+      "allocated_arena_bytes": 524408,
+      "commands": 312
+    },
+    "scale_change": {
+      "mimalloc_requests": -56,
+      "percent": -86.15384615384616,
+      "standard_new_requests": 0
+    },
+    "limitations": [
+      "Counts cover BeginRecording, AcquireEncoder, and FinishRecording only; destruction is outside the observation interval.",
+      "Counts are actual allocation API requests, not zero-allocation proof, requested bytes, resident memory, or a full-frame allocation count.",
+      "Stable eight-target recording is unchanged at nine mimalloc requests; the measured reduction is the re-expansion after an eight-to-one-to-eight target sequence."
+    ]
+  },
+  "timing": {
+    "scope": "actual production Translate with fake native encoder CPU hashing; recording occurs outside timed intervals",
+    "method": "16 warm pairs, 65 serial/parallel alternating paired samples per condition; dedicated team timing window; no CPU affinity modification",
+    "quantiles": {
+      "p50": "sorted sample index floor(65/2)=32",
+      "p95": "sorted sample index floor(0.95*65)=61; no interpolation"
+    },
+    "native_encoder_work": "A CPU digest implementation checks replayed commands. uniform_cpu_work additionally performs 32 rounds of explicit integer work per command; it is not a native driver model.",
+    "input_shapes": {
+      "small": {
+        "draws_per_segment": 1
+      },
+      "uniform": {
+        "draws_per_segment": 4096
+      },
+      "skew": {
+        "draws_per_segment": 128,
+        "extra_draws_per_segment_last_target": 16384
+      },
+      "uniform_cpu_work": {
+        "draws_per_segment": 1024,
+        "explicit_cpu_work_rounds": 32
+      }
+    },
+    "targets": 8,
+    "segments_per_target": 4,
+    "policies": {
+      "serial": {
+        "max_jobs": 1,
+        "minimum_commands_per_job": 0
+      },
+      "parallel": {
+        "max_jobs": 8,
+        "minimum_commands_per_job": 256
+      }
+    },
+    "worker_distribution": {
+      "sample_count": 1,
+      "method": "One additional parallel replay after the 65 timed pairs; per-encoder command counts are summed by execution thread.",
+      "array_slots": {
+        "0_to_7": "Physical pool workers; engine hook IDs 1..8 are normalized by subtracting one.",
+        "8": "A thread without a worker-start hook, including the owner inline path or an external dispatcher; not physical worker eight."
+      },
+      "legacy_output_field": "observed_commands_by_worker_then_owner",
+      "limitations": "Command counts are not CPU busy/wait time. Equal command counts do not prove equal driver cost. A single observation does not prove every worker participates in every replay."
+    },
+    "rows": [
+      {
+        "case": "small",
+        "physical_workers": 1,
+        "parallel_jobs": 1,
+        "min_commands_per_job": 256,
+        "commands": 224,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 2.203,
+          "p95": 2.233
+        },
+        "parallel_us": {
+          "p50": 2.204,
+          "p95": 2.244
+        },
+        "observed_commands_by_worker_then_owner": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          224
+        ]
+      },
+      {
+        "case": "uniform",
+        "physical_workers": 1,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 131264,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 1034.289,
+          "p95": 1247.51
+        },
+        "parallel_us": {
+          "p50": 1089.372,
+          "p95": 1337.886
+        },
+        "observed_commands_by_worker_then_owner": [
+          131264,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "skew",
+        "physical_workers": 1,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 69824,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 501.375,
+          "p95": 755.108
+        },
+        "parallel_us": {
+          "p50": 610.069,
+          "p95": 843.791
+        },
+        "observed_commands_by_worker_then_owner": [
+          69824,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "uniform_cpu_work",
+        "physical_workers": 1,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 32960,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 1596.146,
+          "p95": 2151.222
+        },
+        "parallel_us": {
+          "p50": 1668.355,
+          "p95": 2228.679
+        },
+        "observed_commands_by_worker_then_owner": [
+          32960,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "small",
+        "physical_workers": 4,
+        "parallel_jobs": 1,
+        "min_commands_per_job": 256,
+        "commands": 224,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 2.804,
+          "p95": 3.034
+        },
+        "parallel_us": {
+          "p50": 2.794,
+          "p95": 2.935
+        },
+        "observed_commands_by_worker_then_owner": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          224
+        ]
+      },
+      {
+        "case": "uniform",
+        "physical_workers": 4,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 131264,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 963.532,
+          "p95": 1220.99
+        },
+        "parallel_us": {
+          "p50": 654.617,
+          "p95": 945.114
+        },
+        "observed_commands_by_worker_then_owner": [
+          32816,
+          32816,
+          16408,
+          49224,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "skew",
+        "physical_workers": 4,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 69824,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 505.021,
+          "p95": 702.098
+        },
+        "parallel_us": {
+          "p50": 602.698,
+          "p95": 818.828
+        },
+        "observed_commands_by_worker_then_owner": [
+          66072,
+          2144,
+          1072,
+          536,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "uniform_cpu_work",
+        "physical_workers": 4,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 32960,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 1542.044,
+          "p95": 2031.171
+        },
+        "parallel_us": {
+          "p50": 673.595,
+          "p95": 871.243
+        },
+        "observed_commands_by_worker_then_owner": [
+          12360,
+          4120,
+          12360,
+          4120,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "small",
+        "physical_workers": 8,
+        "parallel_jobs": 1,
+        "min_commands_per_job": 256,
+        "commands": 224,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 2.885,
+          "p95": 6.84
+        },
+        "parallel_us": {
+          "p50": 2.925,
+          "p95": 5.789
+        },
+        "observed_commands_by_worker_then_owner": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          224
+        ]
+      },
+      {
+        "case": "uniform",
+        "physical_workers": 8,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 131264,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 936.571,
+          "p95": 1305.257
+        },
+        "parallel_us": {
+          "p50": 587.025,
+          "p95": 893.696
+        },
+        "observed_commands_by_worker_then_owner": [
+          16408,
+          16408,
+          16408,
+          0,
+          32816,
+          32816,
+          16408,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "skew",
+        "physical_workers": 8,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 69824,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 491.57,
+          "p95": 733.025
+        },
+        "parallel_us": {
+          "p50": 595.057,
+          "p95": 895.235
+        },
+        "observed_commands_by_worker_then_owner": [
+          536,
+          1608,
+          0,
+          0,
+          1608,
+          0,
+          66072,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "uniform_cpu_work",
+        "physical_workers": 8,
+        "parallel_jobs": 8,
+        "min_commands_per_job": 256,
+        "commands": 32960,
+        "samples": 65,
+        "warmup_pairs": 16,
+        "alternating_serial_parallel": true,
+        "serial_us": {
+          "p50": 1530.837,
+          "p95": 1934.836
+        },
+        "parallel_us": {
+          "p50": 554.936,
+          "p95": 951.223
+        },
+        "observed_commands_by_worker_then_owner": [
+          4120,
+          4120,
+          4120,
+          4120,
+          4120,
+          4120,
+          4120,
+          4120,
+          0
+        ]
+      }
+    ],
+    "source_mismatches_after_timing": [],
+    "diagnostic_only_process_wall_seconds": 4.7569118609972065
+  },
+  "raw_timing_report_identity": {
+    "name": "creator-rhi-portable-timing.json",
+    "bytes": 9431,
+    "sha256": "cff176b2f690414920851e19ae6bcdd13b87f76b0e7b5f8512e88b90e2ce9598"
+  },
+  "interpretation": [
+    "All twelve rows are retained, including slower parallel cases; this is a current-code serial-versus-parallel control, not an old-versus-new frame comparison.",
+    "Small inputs are admitted as one job and stay on the owner path. Unequal indivisible target work can leave a long critical path even when all eight target jobs are admitted.",
+    "Team compilation and regression runs were paused during the timing window; no CPU affinity was changed. The observed host CPU quota and affinity remain environment limits, not a dedicated physical machine guarantee.",
+    "The 256-command policy was exercised as the existing live policy, not established as a Windows Debug optimum by this fixture."
+  ],
+  "limitations": [
+    "No GPU, Windows driver, Editor, profiler Debug cost or frame performance",
+    "One additional parallel replay provides command distribution by physical worker; not scheduler busy/wait utilization",
+    "Serial versus parallel is a current-code control, not a measured old/new frame speedup",
+    "Counts cover BeginRecording, AcquireEncoder, and FinishRecording only; destruction is outside the observation interval.",
+    "Counts are actual allocation API requests, not zero-allocation proof, requested bytes, resident memory, or a full-frame allocation count.",
+    "Stable eight-target recording is unchanged at nine mimalloc requests; the measured reduction is the re-expansion after an eight-to-one-to-eight target sequence."
+  ],
+  "reproduce": "python3 Tools/regression/verify-rhi-software-portable.py --enkits /path/to/enkiTS --benchmark --output /tmp/rhi-portable-cpu.json"
+}

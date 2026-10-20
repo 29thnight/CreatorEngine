@@ -1,6 +1,7 @@
 #pragma once
 #include "VulkanLoader.h"
 #include "../RHIResourceTypes.h"
+#include "../RHIPipelineLayout.h"
 
 #include <stdint.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -22,7 +23,7 @@ public:
     void Reset()
     {
         const std::lock_guard lock(m_mutex);
-        m_requests.clear();
+        m_activeRequests = 0;
         ++m_epoch;
         if (0 == m_epoch) ++m_epoch;
     }
@@ -31,15 +32,17 @@ public:
     {
         if (descs.empty() || descs.size() > UINT32_MAX) return {};
 
-        auto request = std::make_unique<Request>();
-        request->descs.assign(descs.begin(), descs.end());
-
         const std::lock_guard lock(m_mutex);
-        m_requests.push_back(std::move(request));
+        if (m_activeRequests == m_requests.size())
+        {
+            m_requests.push_back(std::make_unique<Request>());
+        }
+        m_requests[m_activeRequests]->descs.assign(descs.begin(), descs.end());
+        ++m_activeRequests;
 
         RHIBindingTable table{};
         // 0은 디버깅할 때도 명백한 무효 값으로 남겨 둔다.
-        table.backend = static_cast<uint64_t>(m_requests.size());
+        table.backend = static_cast<uint64_t>(m_activeRequests);
         table.count = static_cast<uint32_t>(descs.size());
         table.version = m_epoch;
         return table;
@@ -51,7 +54,10 @@ public:
         if (!table.IsValid() || 0 == table.backend || table.version != m_epoch)
             return nullptr;
         const uint64_t index = table.backend - 1;
-        if (index >= m_requests.size()) return nullptr;
+        if (index >= m_activeRequests)
+        {
+            return nullptr;
+        }
 
         const std::vector<RHIBindingDesc>& descs =
             m_requests[static_cast<size_t>(index)]->descs;
@@ -60,9 +66,11 @@ public:
     }
 
 private:
-    struct Request
-    {
-        std::vector<RHIBindingDesc> descs;
+  friend class VulkanRecordingResources;
+  size_t m_activeRequests{};
+  struct Request
+  {
+      std::vector<RHIBindingDesc> descs;
     };
 
     // Request를 따로 할당해 Add의 vector 재할당 중에도 Resolve가 돌려준 descs
@@ -148,10 +156,11 @@ public:
     }
 
 private:
-    struct Request
-    {
-        std::vector<RHISamplerDesc> descs;
-        std::vector<VkSampler> samplers;
+  friend class VulkanRecordingResources;
+  struct Request
+  {
+      std::vector<RHISamplerDesc> descs;
+      std::vector<VkSampler> samplers;
     };
 
     static bool Same(const RHISamplerDesc& a, const RHISamplerDesc& b)

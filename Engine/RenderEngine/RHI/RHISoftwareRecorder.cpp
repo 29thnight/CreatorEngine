@@ -1,4 +1,6 @@
 #include "RHISoftwareRecorder.h"
+#include "RHIProfilingContext.h"
+#include "../../EngineDiagnostics/ProfileScope.h"
 
 void RHISoftwareRecordingStorage::Reset() noexcept
 {
@@ -28,6 +30,7 @@ void RHISoftwareRecordingStorage::Reset() noexcept
             encoder->ReleaseRecording();
         }
     }
+    activeTargetCount = 0;
     targetOrder.clear();
 }
 
@@ -138,9 +141,22 @@ bool RHISoftwareRecorder::BeginRecording(const RHISoftwareRecordingDesc& desc, s
         return false;
     }
     m_storage = AcquireSoftwareStorage();
-    m_storage->targets.resize(desc.targetCount);
-    m_storage->encoders.resize(desc.targetCount);
-    m_storage->budgets.resize(desc.targetCount);
+    // Owned queues alternate between one-target barriers and wider pass batches.
+    // Keep inactive target objects so the next wide batch reuses its segments,
+    // encoders and budgets instead of allocating them again.
+    if (m_storage->targets.size() < desc.targetCount)
+    {
+        m_storage->targets.resize(desc.targetCount);
+    }
+    if (m_storage->encoders.size() < desc.targetCount)
+    {
+        m_storage->encoders.resize(desc.targetCount);
+    }
+    if (m_storage->budgets.size() < desc.targetCount)
+    {
+        m_storage->budgets.resize(desc.targetCount);
+    }
+    m_storage->activeTargetCount = desc.targetCount;
     for (uint32_t target = 0; target < desc.targetCount; ++target)
     {
         auto& budget = m_storage->budgets[target];
@@ -154,13 +170,20 @@ bool RHISoftwareRecorder::BeginRecording(const RHISoftwareRecordingDesc& desc, s
             desc.maxPayloadBytes / desc.targetCount + (target < desc.maxPayloadBytes % desc.targetCount ? 1 : 0);
     }
     m_desc = desc;
+    // The record scopes and the sealed batch share one identity. Reserving it
+    // only at Finish would leave every recording worker without provenance.
+    m_recordingId = g_softwareRecordingId.fetch_add(1, std::memory_order_relaxed);
+    if (!m_recordingId)
+    {
+        std::terminate();
+    }
     m_active = true;
     return true;
 }
 
 RHIEncoder& RHISoftwareRecorder::AcquireEncoder(uint32_t target)
 {
-    if (!m_active || target >= m_storage->targets.size())
+    if (!m_active || target >= m_storage->activeTargetCount)
     {
         throw std::out_of_range("Software encoder target is outside the active session.");
     }
@@ -204,7 +227,7 @@ RHICommandRecordingStats RHISoftwareRecorder::GetRecordingStats() const
     {
         return total;
     }
-    for (const auto& target : std::span(m_storage->targets.data(), m_storage->targets.size()))
+    for (const auto& target : std::span(m_storage->targets.data(), m_storage->activeTargetCount))
     {
         for (const auto& segment : std::span(target.segments.data(), target.activeSegments))
         {
@@ -217,6 +240,8 @@ RHICommandRecordingStats RHISoftwareRecorder::GetRecordingStats() const
 bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder, const RHISoftwareBatchDesc& desc,
                                           RHISoftwareBatch& outBatch, std::string& outError)
 {
+    const ce::profile_rhi_context_scope context(MakeRHIProfileContext(desc, m_recordingId));
+    ce::profile_rhi_scope seal{ce::marker<"RHISoftwareSeal">()};
     outError.clear();
     if (!m_active || outBatch.GetState() != RHISoftwareBatchState::Empty || desc.queue != m_desc.queue ||
         !desc.backendGeneration || !desc.lifetimeToken)
@@ -227,14 +252,15 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
     std::bitset<8> seen;
     for (const uint32_t target : targetOrder)
     {
-        if (target >= m_storage->targets.size() || seen.test(target) || m_storage->targets[target].activeSegments == 0)
+        if (target >= m_storage->activeTargetCount || seen.test(target) ||
+            m_storage->targets[target].activeSegments == 0)
         {
             outError = "Software target order has an invalid, duplicate or unopened target.";
             return false;
         }
         seen.set(target);
     }
-    for (size_t target = 0; target < m_storage->targets.size(); ++target)
+    for (size_t target = 0; target < m_storage->activeTargetCount; ++target)
     {
         for (const auto& segment :
              std::span(m_storage->targets[target].segments.data(), m_storage->targets[target].activeSegments))
@@ -252,7 +278,7 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
         outError = "Software recording exceeded its aggregate byte budget.";
         return false;
     }
-    for (auto& target : std::span(m_storage->targets.data(), m_storage->targets.size()))
+    for (auto& target : std::span(m_storage->targets.data(), m_storage->activeTargetCount))
     {
         for (auto& segment : std::span(target.segments.data(), target.activeSegments))
         {
@@ -270,10 +296,11 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
     m_storage->targetOrder.assign(targetOrder.begin(), targetOrder.end());
     batch.m_desc = desc;
     batch.m_stats = stats;
-    batch.m_recordingId = g_softwareRecordingId.fetch_add(1, std::memory_order_relaxed);
+    batch.m_recordingId = m_recordingId;
     batch.m_storage = std::move(m_storage);
     batch.m_state = RHISoftwareBatchState::Sealed;
     m_active = false;
+    m_recordingId = 0;
     outBatch = std::move(batch);
     return true;
 }
@@ -282,4 +309,5 @@ void RHISoftwareRecorder::CancelRecording()
 {
     m_storage.reset();
     m_active = false;
+    m_recordingId = 0;
 }

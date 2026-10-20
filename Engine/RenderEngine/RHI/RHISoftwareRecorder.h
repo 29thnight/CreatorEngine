@@ -18,9 +18,10 @@ class RHISoftwareRecorder final
     bool FinishRecording(std::span<const uint32_t> targetOrder, const RHISoftwareBatchDesc& desc,
                          RHISoftwareBatch& outBatch, std::string& outError);
     void CancelRecording();
+    uint64_t GetRecordingId() const { return m_recordingId; }
     bool HasRecorded(uint32_t target) const
     {
-        return m_storage && target < m_storage->targets.size() && m_storage->targets[target].activeSegments != 0;
+        return m_storage && target < m_storage->activeTargetCount && m_storage->targets[target].activeSegments != 0;
     }
     RHICommandRecordingStats GetRecordingStats() const;
 
@@ -28,5 +29,6 @@ class RHISoftwareRecorder final
     const IRHISoftwareCommandValidator& m_validator;
     std::shared_ptr<RHISoftwareRecordingStorage> m_storage;
     RHISoftwareRecordingDesc m_desc;
+    uint64_t m_recordingId{};
     bool m_active{};
 };
