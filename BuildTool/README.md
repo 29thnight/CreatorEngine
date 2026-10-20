@@ -55,6 +55,10 @@ $tool = "$engine\Bin\x64-Debug\Tools\CreatorBuildTool\CreatorBuildTool.exe"
 - `compile-game`: 정확한 엔진 pin을 확인하고 포함된 Roslyn으로 `Assets/Script/**/*.cs`를 컴파일한다.
   성공한 DLL의 엔진 ID·API·해시를 sidecar에 기록한다. C# 컴파일 실패는 기존 DLL을 교체하지 않는다.
   `--prebuilt-assembly`도 동일 엔진 ID와 해시가 필요하다. 별도 NuGet 복원은 지원하지 않는다.
+- PrSM: `publish-engine`은 `Bin/<구성>/PrSM`이 있으면 prsmc·prsm_jit·LLVM-C·lld-link와 바인딩 카탈로그를 함께 배포한다.
+  `package-game`은 프로젝트에 `Assets/Scripts/PrSM/project.json`이 있으면 그 스크립트를 `PrSM/GameScripts.prsm.dll`로
+  링크한다. import 라이브러리는 배포본 `Player.runtime.dll`의 실제 export 표에서 만들므로 없는 심볼은 패키징에서 실패한다.
+  `.prsm` 소스와 `project.json`은 PAK에 넣지 않는다.
 - `package-game`: Project/Workspace/Tracked 입력, 모델 generation, cook 결과, CEDO 문서, PAK 재열거,
   격리된 Player smoke와 추출 파일 해시를 검증한다. 성공한 candidate만 불변 release로 옮긴 뒤 current pointer를 교체한다.
 - `select-engine` / `open-project`: 기존 개발용 프로젝트 pin·`--development-project` adapter를 사용한다.
