@@ -1185,6 +1185,9 @@
     <ClInclude Include="RHI\RHICommandRecordingJobs.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHITranslationWorkQueue.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\RHIRecordingTaskGraph.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>

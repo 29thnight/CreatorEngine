@@ -69,6 +69,8 @@ class job_scheduler
     void start(std::size_t worker_count = 0);
     void shutdown() noexcept;
     bool is_running() const;
+    // 주입된 스케줄러의 실제 풀 크기. 전역 풀 상태로 다른 소유자의 작업을 제한하지 않는다.
+    std::size_t worker_count() const;
     job_handle submit(job_group group);
     template<class F>
     job_handle submit(F&& task)

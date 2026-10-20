@@ -1100,10 +1100,13 @@ namespace
 
             pipelines.Initialize(resources.GetDevice());
             resources.SetPipelineCache(&pipelines);
-            if (!meshCache.Initialize(&resources, outError) ||
-                !textureCache.Initialize(&resources, outError) ||
-                !commandPool.Initialize(resources, 4,
-                    VulkanDeviceResources::kFrameCount, outError)) return false;
+            const auto commandWorkers = static_cast<uint32_t>(
+                (std::clamp)(ce::get_thread_pool().size(), size_t{1}, size_t{IRHIParallelCommandPool::kMaxWorkers}));
+            if (!meshCache.Initialize(&resources, outError) || !textureCache.Initialize(&resources, outError) ||
+                !commandPool.Initialize(resources, commandWorkers, VulkanDeviceResources::kFrameCount, outError))
+            {
+                return false;
+            }
             width = newWidth;
             height = newHeight;
             frameContext = {};
@@ -1576,8 +1579,10 @@ namespace
             recordWatch.Start();
             {
                 RenderThreadPhaseScope record(RenderPhase::command_record);
-                if (!graph.RecordParallel(commandPool, 4, batchDesc, batch, outError))
+                if (!graph.RecordParallel(commandPool, commandPool.GetWorkerCount(), batchDesc, batch, outError))
+                {
                     return false;
+                }
             }
             lastNativeRecordMs = recordWatch.ElapsedMs();
             if (capture && !capture->RecordCompiledGraph(graph, lastNativeRecordMs, compileMs))
@@ -7107,8 +7112,10 @@ namespace
                     }
                 }
                 else if (!(softwareRecording
-                    ? dx12.RecordSoftwareGraph(graph, 4, batchDesc, softwareBatch, outError)
-                    : graph.RecordParallel(dx12.CommandPool(), 4, batchDesc, batch, outError)))
+                               ? dx12.RecordSoftwareGraph(graph, dx12.CommandPool().GetWorkerCount(), batchDesc,
+                                                          softwareBatch, outError)
+                               : graph.RecordParallel(dx12.CommandPool(), dx12.CommandPool().GetWorkerCount(),
+                                                      batchDesc, batch, outError)))
                 {
                     return false;
                 }

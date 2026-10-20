@@ -947,6 +947,7 @@
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
     <ClInclude Include="RHI\RHICommandRecordingJobs.h" />
+    <ClInclude Include="RHI\RHITranslationWorkQueue.h" />
     <ClInclude Include="RHI\RHIRecordingTaskGraph.h" />
     <ClInclude Include="RHI\RHIRecordingDiagnostics.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />

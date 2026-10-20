@@ -36,25 +36,47 @@ namespace material_graph
         {
             try
             {
+                return AddIndexed(
+                    marker, 1, [task = std::forward<F>(task)](std::size_t, std::string& failure) mutable
+                    { return task(failure); }, error);
+            }
+            catch (const std::exception& failure)
+            {
+                error = failure.what();
+                return false;
+            }
+        }
+        template<class F>
+        bool AddIndexed(ce::marker_id marker, std::size_t count, F&& task, std::string& error)
+        {
+            try
+            {
+                if (!count)
+                {
+                    return true;
+                }
                 ce::cpu_span_context cpuContext{};
 #if !CE_SHIPPING
                 cpuContext = ce::current_cpu_context;
 #endif
                 // 호출자를 여기서 한 번 더 type-erasure하면 캡처가 큰 작업마다 별도 할당이 붙는다.
                 // scheduler에 넘길 때만 소유 callback으로 만들고, inline 경로는 직접 호출한다.
-                auto execute = [marker, cpuContext, task = std::forward<F>(task)]() mutable
+                auto execute = [marker, cpuContext, task = std::forward<F>(task)](std::size_t index) mutable
                 {
                     ce::profile_context_scope context{cpuContext};
                     ce::profile_scope profile{marker};
                     std::string failure;
-                    if (!task(failure))
+                    if (!task(index, failure))
                     {
                         throw std::runtime_error(failure.empty() ? "Scene preparation task failed." : failure);
                     }
                 };
                 if (!parallel_)
                 {
-                    execute();
+                    for (std::size_t index = 0; index < count; ++index)
+                    {
+                        execute(index);
+                    }
                 }
                 else
                 {
@@ -66,8 +88,9 @@ namespace material_graph
                     // or allocation can lose the handle of already accepted work.
                     auto& slot = work_[count_++];
                     // A leaf preparation has no dependency graph to construct.
-                    slot = scheduler_.submit_indexed(1, [execute = std::move(execute)](std::size_t) mutable
-                                                     { execute(); });
+                    // 각 index의 결과와 실패 문자열은 호출자가 서로 다른 저장소에 둔다.
+                    // callback 하나를 공유하므로 작은 leaf마다 별도 admission을 만들지 않는다.
+                    slot = scheduler_.submit_indexed(count, std::move(execute));
                 }
                 return true;
             }

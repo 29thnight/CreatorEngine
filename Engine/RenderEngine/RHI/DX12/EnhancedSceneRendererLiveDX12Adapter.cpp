@@ -345,14 +345,16 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
         std::printf("[GPU profiler] query capacity %u (Debug validation)\n",
             profilerPassCapacity);
 #endif
-    if (!impl.commandPool.Initialize(impl.resources, 4, kFrameCount, outError) ||
-        !impl.pipelines.Initialize(&impl.resources,
-            PathFinder::CachePath("RHI/DX12/dx12_live.cache").wstring(), outError) ||
+    const auto commandWorkers = static_cast<uint32_t>(
+        (std::clamp)(ce::get_thread_pool().size(), size_t{1}, size_t{IRHIParallelCommandPool::kMaxWorkers}));
+    if (!impl.commandPool.Initialize(impl.resources, commandWorkers, kFrameCount, outError) ||
+        !impl.pipelines.Initialize(&impl.resources, PathFinder::CachePath("RHI/DX12/dx12_live.cache").wstring(),
+                                   outError) ||
         !impl.rootSignatures.Initialize(&impl.resources, outError) ||
         !impl.meshCache.Initialize(&impl.resources, outError) ||
         !impl.textureCache.Initialize(&impl.resources, outError) ||
-        !impl.profiler.Initialize(impl.resources.GetDevice(),
-            profilerQueue, profilerPassCapacity, kFrameCount, outError))
+        !impl.profiler.Initialize(impl.resources.GetDevice(), profilerQueue, profilerPassCapacity, kFrameCount,
+                                  outError))
     {
         return false;
     }
