@@ -1,0 +1,1966 @@
+{
+  "date": "2026-10-21",
+  "status": "PASS",
+  "incomingRemoteHead": "0ecb5556a16f8ff97d4f4dcc75a21d0632056bd2",
+  "documentationCommitBeforeIntegrationFixes": "efa60231f06601245bb3807b9bee68bade7aa8fd",
+  "fixedAuditSnapshot": "27de3f5a02aadde7456aab680db3184c36ee735e",
+  "conflictResolution": {
+    "path": "docs/design/RHISoftwareCommandListSpecification.md",
+    "policy": "Retain upstream 2026-10-21 implementation/acceptance section and corrected history; preserve fixed-snapshot citations and unavailable-evidence labels."
+  },
+  "verification": {
+    "master": "27de3f5a02aadde7456aab680db3184c36ee735e",
+    "currentMaster": "efa60231f06601245bb3807b9bee68bade7aa8fd",
+    "allowDescendantMaster": true,
+    "status": "PASS",
+    "updatedMarkdownDocuments": 316,
+    "standaloneReports": 14,
+    "apiPages": 31,
+    "apiMembers": 224,
+    "documentationFilesInspected": 977,
+    "localLinksInspected": 6235,
+    "brokenLinks": [],
+    "originalReportedMissingLinks": 732,
+    "sourceFilesVerified": 648,
+    "sourceCitationsVerified": 4182,
+    "visualPagesVerified": 320,
+    "dashboardPreserved": true,
+    "problems": []
+  },
+  "scriptVerification": {
+    "pages": 658,
+    "scripts": 338,
+    "failures": []
+  },
+  "documentationSiteBuild": "PASS",
+  "deploymentVerification": {
+    "filesCompared": 1555,
+    "deployedLocalLinksInspected": 2530,
+    "status": "PASS",
+    "problems": []
+  },
+  "visualEvidenceLF": [
+    {
+      "source": "docs/plans/archive/BehaviorTreeManagedPlan.src.html",
+      "html": "docs/plans/archive/BehaviorTreeManagedPlan.html",
+      "sourceSha256LF": "5c09510c656b6fd339902bef3d56f281b96627016f2152c6148f1485fcfb96f2",
+      "htmlSha256LF": "8f6cd080b41a95913ed50e4a883e514fb0db477e9240038ed32d1a1593a027f8"
+    },
+    {
+      "source": "docs/plans/AnimationSchedulerPlan.src.html",
+      "html": "docs/plans/AnimationSchedulerPlan.html",
+      "sourceSha256LF": "5539c3ea5ba8b215ffd641530ba825589e31a2361c8b45279778c1426975b456",
+      "htmlSha256LF": "da9f8f20347044eb8060b7195c59d3758bcb66a63697ba1f5f9389ae0a8f79e5"
+    },
+    {
+      "source": "docs/plans/archive/AssetResidencyPlan.src.html",
+      "html": "docs/plans/archive/AssetResidencyPlan.html",
+      "sourceSha256LF": "66eee0e27021828e349c0144e145ce239d443b84ce62c2a08ce09ba1861c8bad",
+      "htmlSha256LF": "93fbcdad6ff8f7904e9a00d6d8cc2dfbbfd902e938f0a75969e641b8ed0654b0"
+    },
+    {
+      "source": "docs/plans/archive/LifecycleRedesignPlan.src.html",
+      "html": "docs/plans/archive/LifecycleRedesignPlan.html",
+      "sourceSha256LF": "09ade19809bb7f9685fc0eec0532e8f0ec3cb45b645084bbb6607441eb41b73d",
+      "htmlSha256LF": "0d9d361199b930fa4b6260997ca0fdd4730c4a701a23fed3baa8abb1de86b824"
+    },
+    {
+      "source": "docs/plans/archive/MaterialPipelinePlan.src.html",
+      "html": "docs/plans/archive/MaterialPipelinePlan.html",
+      "sourceSha256LF": "46facf6f566bf869beca4982e6f18d5b1927160b6748f571494b0703e6ec609b",
+      "htmlSha256LF": "6e737e00a4099fbd39d61fb24a1a2ee4373486ba2c28aa23e99f861dcfc36266"
+    },
+    {
+      "source": "docs/plans/archive/LivePipelineDescPlan.src.html",
+      "html": "docs/plans/archive/LivePipelineDescPlan.html",
+      "sourceSha256LF": "4f66761c12cd7136484c88640f30cb5b7b3c7f52b94d5ec5d056dfdd43fc7c9a",
+      "htmlSha256LF": "014f4253cee945e4f0f0cf13f8a16a273d4589912b782eef48647cf9259444b4"
+    },
+    {
+      "source": "docs/plans/archive/ModelImportPipelinePlan.src.html",
+      "html": "docs/plans/archive/ModelImportPipelinePlan.html",
+      "sourceSha256LF": "72883025380149a98a70aea4eb5cb19b36891edd20c84ecbe3d06e567dc3c70b",
+      "htmlSha256LF": "260cd09ba8984ba42a894e505d8e198ae8e530eb46bb749dfab5e4db87885a14"
+    },
+    {
+      "source": "docs/plans/archive/ModelAssetBigBangCutoverBaseline.src.html",
+      "html": "docs/plans/archive/ModelAssetBigBangCutoverBaseline.html",
+      "sourceSha256LF": "5e30d96c29d0b2092f4bca5921534a1b123c0340b20cb502c0cf5a120d667c91",
+      "htmlSha256LF": "ec157a0d20368bb33eb5ae27aea67a59d05538e6f5f72b568032e9b7fb637108"
+    },
+    {
+      "source": "docs/plans/archive/ModelAssetBigBangCutoverPlan.src.html",
+      "html": "docs/plans/archive/ModelAssetBigBangCutoverPlan.html",
+      "sourceSha256LF": "7ba532358863cd678f124228791607687a2a64e71060c9f18a064ca967e9bd6b",
+      "htmlSha256LF": "022adf694c8bc9707351c1642f5454fd53d63080ec4e45bc0db6d036f359572b"
+    },
+    {
+      "source": "docs/plans/archive/Phase425ImplementationHistory.src.html",
+      "html": "docs/plans/archive/Phase425ImplementationHistory.html",
+      "sourceSha256LF": "9f4f4467014a3903ebaa8144602208cf10f1d56a6b007248c70229547cfe091a",
+      "htmlSha256LF": "c4c94d0e5ca506c25f251dea0c4411409bc574b8467269ad413d3eb76780336b"
+    },
+    {
+      "source": "docs/plans/archive/MultiCameraRenderPlan.src.html",
+      "html": "docs/plans/archive/MultiCameraRenderPlan.html",
+      "sourceSha256LF": "958ad65564125e1c5443f47d534dc38b0428e5426ad6a878ef9a3281e4363b1f",
+      "htmlSha256LF": "2d219f74263b472313b13636534f5f9e770d0f8d6a80992ec1a1214847c87b90"
+    },
+    {
+      "source": "docs/plans/archive/Phase5CouplingPlan.src.html",
+      "html": "docs/plans/archive/Phase5CouplingPlan.html",
+      "sourceSha256LF": "2a4ace061ef49b8dffddd3a7224eb02417b52c642f6aaa307cf14f1ea467ef9d",
+      "htmlSha256LF": "b48212a7a9adf5b7c436c2e8139ff7fecea127eede40491eb90498a22fd8aec2"
+    },
+    {
+      "source": "docs/plans/archive/README.src.html",
+      "html": "docs/plans/archive/README.html",
+      "sourceSha256LF": "74ad395886dd28eb816218ade53ed3c23219545cc82b87de8ed772e15169af26",
+      "htmlSha256LF": "5d8320c178082f7cd042b27912697230e757a045ee60191932e7b49ef7c35e5e"
+    },
+    {
+      "source": "docs/plans/archive/RenderSceneViewPlan.src.html",
+      "html": "docs/plans/archive/RenderSceneViewPlan.html",
+      "sourceSha256LF": "8fca716e13610f6133a4a25a5d2691c815b8933ff111d6765cd9df71cf093c58",
+      "htmlSha256LF": "0c8f1eaa0c77e73d8dcb02f40e84d4170cca45ab93ecc156e03bd53a7ccb2f75"
+    },
+    {
+      "source": "docs/plans/archive/ReflectionRedesignPlan.src.html",
+      "html": "docs/plans/archive/ReflectionRedesignPlan.html",
+      "sourceSha256LF": "4721721ce52c6279931d7fdca23ec6abd4434fc59f10a5e19c7f79fb9d381485",
+      "htmlSha256LF": "bbc8d0c0b09d27483b0115980a69f81621d1c076749ece2dc582fe04d82103ff"
+    },
+    {
+      "source": "docs/plans/archive/RhiBoundaryPlan.src.html",
+      "html": "docs/plans/archive/RhiBoundaryPlan.html",
+      "sourceSha256LF": "47164213d5ec6aa50fdf0f697cf60f4005e545806e6f8e43b4a265da5ae18021",
+      "htmlSha256LF": "93ede154621bf94c8ccf86e3bf2e055b95f7bef8e494b04f10fe0ef7e752af5e"
+    },
+    {
+      "source": "docs/plans/archive/SceneGraphRedesignPlan.src.html",
+      "html": "docs/plans/archive/SceneGraphRedesignPlan.html",
+      "sourceSha256LF": "ddae71cdc04ae2e34df8b6cd03d25df6c6102672d63616aae24f47a8e8f9cd40",
+      "htmlSha256LF": "b452000be87170803feb96e57d4fa241d9ee90cea7a2af664228a32d9ccb89e8"
+    },
+    {
+      "source": "docs/plans/archive/ScriptApiMigrationPlan.src.html",
+      "html": "docs/plans/archive/ScriptApiMigrationPlan.html",
+      "sourceSha256LF": "e38e70d6841b24ab0ab3b05badaafd361e5e59d8896122b8ac7c5ecd47835665",
+      "htmlSha256LF": "8c875b900a9df10e39ca01f295ce470a4609e236ea21e1eb34e87a19b85763e1"
+    },
+    {
+      "source": "docs/plans/archive/ScriptLifecycleContractHardeningPlan.src.html",
+      "html": "docs/plans/archive/ScriptLifecycleContractHardeningPlan.html",
+      "sourceSha256LF": "8fe9576e7923827077af2048e3f14f1b6edc07e3f4c13b4e96f92bb09b977007",
+      "htmlSha256LF": "e9e54f8b564fa6ea88743a8159ba2b620ead2abcad4817960b5c381ba1983231"
+    },
+    {
+      "source": "docs/plans/archive/TransformUpdatePipeline.src.html",
+      "html": "docs/plans/archive/TransformUpdatePipeline.html",
+      "sourceSha256LF": "d6de10c61cb4a9bf4a242c20ea6585d24d11d36c2f79717eaa28acc0e5f30904",
+      "htmlSha256LF": "6bad457150b32e84285427ab065e64b494ea373f6965dca94daeaf6a49b709d1"
+    },
+    {
+      "source": "docs/plans/archive/TransformExecutionGraphPlan.src.html",
+      "html": "docs/plans/archive/TransformExecutionGraphPlan.html",
+      "sourceSha256LF": "7ca0e5c4f79d2cfd62f6d1ddf3af63edbff30cc52f198a0c075828df8dd59ba5",
+      "htmlSha256LF": "81305454a9eb922136b91843532d70636b1a5af1edb6569e28e482de31ab703a"
+    },
+    {
+      "source": "docs/plans/archive/TransformUpdatePlan.src.html",
+      "html": "docs/plans/archive/TransformUpdatePlan.html",
+      "sourceSha256LF": "51c8c4ac1652011065899268e9b4e4bc1e6a744c94adc7deceb487ff78cd92df",
+      "htmlSha256LF": "cbe77f4afc737f0d6c95da6d9ed88577db54a332cf0fcc88f91b4daaea5801dc"
+    },
+    {
+      "source": "docs/plans/AssetDepotImplementationPlan.src.html",
+      "html": "docs/plans/AssetDepotImplementationPlan.html",
+      "sourceSha256LF": "5b9b0b4d302822208c37addf3009c2c88b6ce557d865c63a0d9e1f20b51d9650",
+      "htmlSha256LF": "c08887cd4f8c2428501694ee6817ea578beae4e0f588f4289d1a2b44af417fa3"
+    },
+    {
+      "source": "docs/plans/AudioBackendModernizationPlan.src.html",
+      "html": "docs/plans/AudioBackendModernizationPlan.html",
+      "sourceSha256LF": "4ddad7d4039558ef29baa796e9f998f438af194db41e70ab8548b22af8b53ef9",
+      "htmlSha256LF": "06fa8d7aae484835ab0bda933f09018cfb9894fe0e1c995c224275142d642594"
+    },
+    {
+      "source": "docs/plans/BackendParityPlan.src.html",
+      "html": "docs/plans/BackendParityPlan.html",
+      "sourceSha256LF": "55b69b781cc62b4d39225770d43b0730a0b501587eab6d5dba3b2a93cca58103",
+      "htmlSha256LF": "fd1f1ee92377eaab384cefd12bfb6f6a5084c7aa7bdbdce9d296e85e6cfe68d0"
+    },
+    {
+      "source": "docs/plans/BlenderMaterialGraphPlan.src.html",
+      "html": "docs/plans/BlenderMaterialGraphPlan.html",
+      "sourceSha256LF": "4e9c2066b2aa7e7ecb25920d350af6420eb942a00041bfe257e4afd3f12f5cb5",
+      "htmlSha256LF": "3381d67d8d56bc731b7c8fb668b550d446580b64d34b38742981bbdfbf8b7cb9"
+    },
+    {
+      "source": "docs/plans/BuildPipelinePlan.src.html",
+      "html": "docs/plans/BuildPipelinePlan.html",
+      "sourceSha256LF": "a08fd6a7d5cb9b417a86f0f891042a115386bc65aab2faf4c929e362889179ea",
+      "htmlSha256LF": "f03e2cd9a202d7074a6431a5fb9ee0132943a55b1ab0ac8708b4dd63e4e3aa78"
+    },
+    {
+      "source": "docs/plans/DxrShaderTraversalExperimentPlan.src.html",
+      "html": "docs/plans/DxrShaderTraversalExperimentPlan.html",
+      "sourceSha256LF": "ed55c5635503079ac3664ab52b231fd29f8d29ed041a0e7c0a6a491d36ef017b",
+      "htmlSha256LF": "4516d591d93632555764bce0a55b90370cb035bc524993993b562b1ce75f938e"
+    },
+    {
+      "source": "docs/plans/EditorAutomationCLIPlan.src.html",
+      "html": "docs/plans/EditorAutomationCLIPlan.html",
+      "sourceSha256LF": "d0769802ba635472d903fdd7211d77d36f1b3db06c97407f52a9beb2536e962e",
+      "htmlSha256LF": "d22731cb69abb0bfaa9fba6d9c29152c7dc02e020650e769c5251edf5c277557"
+    },
+    {
+      "source": "docs/plans/EditorRenderingSurfacesPlan.src.html",
+      "html": "docs/plans/EditorRenderingSurfacesPlan.html",
+      "sourceSha256LF": "9b962b0a81694a78691b1a2798e59bc311c8d056f09ff3e9bd887bdf98b33276",
+      "htmlSha256LF": "fe62b897396486c80bcf8c83fefacd853464df139f7d8435d3da3aeee55f296b"
+    },
+    {
+      "source": "docs/plans/EditorWorkspaceRedesignPlan.src.html",
+      "html": "docs/plans/EditorWorkspaceRedesignPlan.html",
+      "sourceSha256LF": "ec2e8bfea4dc53779088dcb67fe93efa1198045dedc99fd18f82c4727c1afbe1",
+      "htmlSha256LF": "8b96cd327cd5fee6b1ff8571f92f795001ec369b3fbb1a0c67145e01649890b5"
+    },
+    {
+      "source": "docs/plans/EngineFeatureDemoPlan.src.html",
+      "html": "docs/plans/EngineFeatureDemoPlan.html",
+      "sourceSha256LF": "ecddf3b174dd0b0839751edd66a683ecba19606b92b75c56ecbeb9bced5d7f88",
+      "htmlSha256LF": "645dd1fdd2d030590dd4c26493a616c8515f5b190cd2e2e971c51b3988347d85"
+    },
+    {
+      "source": "docs/plans/EngineDistributionAndLauncherPlan.src.html",
+      "html": "docs/plans/EngineDistributionAndLauncherPlan.html",
+      "sourceSha256LF": "00336516fde3a8e2c35cce6e1b47294d72ab2280956c9041a6b7648c1f3af6c0",
+      "htmlSha256LF": "e8a9fcabcd509cc93b5d84d183e3779ea301726355bb88d4162b9b733f3262d9"
+    },
+    {
+      "source": "docs/plans/EngineLayerSeparationPlan.src.html",
+      "html": "docs/plans/EngineLayerSeparationPlan.html",
+      "sourceSha256LF": "d73490ab3d7645f79f224418060eb222d8affe86e39be291da951e6cf114ebbe",
+      "htmlSha256LF": "e47f72fa11d9b8c5b726731b3ef91a5817d204c8d4d188443edc1f84b5f64ce5"
+    },
+    {
+      "source": "docs/plans/EnvironmentRenderingPlan.src.html",
+      "html": "docs/plans/EnvironmentRenderingPlan.html",
+      "sourceSha256LF": "e78915e319f0917a4279cd19ecbec6b8f78610f8ca795b0194e3a0664ae48118",
+      "htmlSha256LF": "bcdbc6047f7ff04516994ac9ad744681252ffb9fe3e5aa2b304b9cd007424ee6"
+    },
+    {
+      "source": "docs/plans/EnginePackagingPlan.src.html",
+      "html": "docs/plans/EnginePackagingPlan.html",
+      "sourceSha256LF": "76d547d3b8e032bbd533c918401215c2dbe75b28c7af67ee0721faf4571c03f5",
+      "htmlSha256LF": "b0e21ab8c0de37e2532289ab98b18418d4388fe917f5af37d97d7a8b91b92c50"
+    },
+    {
+      "source": "docs/plans/GpuDrivenGeometryImplementationPlan.src.html",
+      "html": "docs/plans/GpuDrivenGeometryImplementationPlan.html",
+      "sourceSha256LF": "35a20c1ca6ededa39d48a867e913efb0f3f5fdf33a38a4c7c2fff667fcc62b53",
+      "htmlSha256LF": "14f808c790f0ad2f9dfd1b721eb9c8821aa64764ae8192eb48d7a464447f60dc"
+    },
+    {
+      "source": "docs/plans/LatticeAdoptionPlan.src.html",
+      "html": "docs/plans/LatticeAdoptionPlan.html",
+      "sourceSha256LF": "2ef40b9dc1e99f4048b790bf5bc3ebcd5351498231d385a3f3f66a19004bbe15",
+      "htmlSha256LF": "5d8d5c4cd4275df97ecab2d0abf3ba532d005eac6dbda128487efb1b93d21fce"
+    },
+    {
+      "source": "docs/plans/GpuFeaturePlanningPlan.src.html",
+      "html": "docs/plans/GpuFeaturePlanningPlan.html",
+      "sourceSha256LF": "021576850de6e238e11398d44196f0d30eb93030a56c50f0cbafafd35acf7ec7",
+      "htmlSha256LF": "3a8fa14d5fe75b4e13fe37e3461a39197ceb74aed79ede7ecc720cb236243e74"
+    },
+    {
+      "source": "docs/plans/LightmapBakerPlan.src.html",
+      "html": "docs/plans/LightmapBakerPlan.html",
+      "sourceSha256LF": "7e1222485906aa40e098049698d7788a6f03423b96912adf00f4a6fdb175ceb2",
+      "htmlSha256LF": "bdcb42443c66259b22ef98372b12a11dbaaca663b33897d618a8b6ae547f6519"
+    },
+    {
+      "source": "docs/plans/MemoryProfilerPlan.src.html",
+      "html": "docs/plans/MemoryProfilerPlan.html",
+      "sourceSha256LF": "46bb06378478d3f0dfa2104f0d337d159fc651d1e9f19b9aec917342da2b79b3",
+      "htmlSha256LF": "a88d3b9330f949c2e144877e3c2585beb34c498057da0d506b479b31695aa614"
+    },
+    {
+      "source": "docs/plans/MathematicsMigrationPlan.src.html",
+      "html": "docs/plans/MathematicsMigrationPlan.html",
+      "sourceSha256LF": "af9bbfbc790809f30d3cebc41f126e2f5297993cf6bc0b0f47f668c383540b78",
+      "htmlSha256LF": "baccb619f828870e8c4544eacb631167a2e5394726a3127c5f7aa61cbc05ba31"
+    },
+    {
+      "source": "docs/plans/ModelGeometryTextureImprovementPlan.src.html",
+      "html": "docs/plans/ModelGeometryTextureImprovementPlan.html",
+      "sourceSha256LF": "40e15afaa2a287d64ba0d8e6409b0e6f0cbe5b70f4790a363f98036b5823994e",
+      "htmlSha256LF": "5909eacc5a8ed89ef54471ce9d15007d33b19cf50d948cab98fdb1e63ac55ddf"
+    },
+    {
+      "source": "docs/plans/NativeObjectMemoryPolicyPlan.src.html",
+      "html": "docs/plans/NativeObjectMemoryPolicyPlan.html",
+      "sourceSha256LF": "d42abaf3cb834260ac14e6ba890185443bf9c49bd26cc9de895b079497e1657c",
+      "htmlSha256LF": "99b18d1efd865be552be54b221854823c9788acf9ba86404d1da12ae19cb9f99"
+    },
+    {
+      "source": "docs/plans/NetworkFrameworkPlan.src.html",
+      "html": "docs/plans/NetworkFrameworkPlan.html",
+      "sourceSha256LF": "ff94d310fe971f42ee441a4c84ac4c111f618b13313bf29f8acb453cfbf3894a",
+      "htmlSha256LF": "f83db6b15822c54dc89219fea207fdcd1f0ad7ca602c8660e17a3f33be864942"
+    },
+    {
+      "source": "docs/plans/PathTracingHybridPipelinePlan.src.html",
+      "html": "docs/plans/PathTracingHybridPipelinePlan.html",
+      "sourceSha256LF": "c533261d6464919270a94f7fe51297dbf97868f4b95285d04df67182c96b3e8c",
+      "htmlSha256LF": "412f2dedc930bd572b793e39a32fc0799d0622a69025a43d4117d0f74b7ebff8"
+    },
+    {
+      "source": "docs/plans/Phase4UnifiedPlan.src.html",
+      "html": "docs/plans/Phase4UnifiedPlan.html",
+      "sourceSha256LF": "8dad443c37a8d0f8bd7270c5dd74ed57a81487f9a926e425f08879073795defb",
+      "htmlSha256LF": "5eda49827ca328738733e2285d6102edc997b1c79f8fde850c30d3b28778bfe7"
+    },
+    {
+      "source": "docs/plans/PBRWiringStabilizationPlan.src.html",
+      "html": "docs/plans/PBRWiringStabilizationPlan.html",
+      "sourceSha256LF": "599437f7af4d051cc8068359e230b04560972b7f81258dc025ec9c89c4d595a5",
+      "htmlSha256LF": "9b2dabf68549e012fac80887ef695e367eb2d85def3b5f4b7d6b0aec134fc394"
+    },
+    {
+      "source": "docs/plans/PhysicsRedesignPlan.src.html",
+      "html": "docs/plans/PhysicsRedesignPlan.html",
+      "sourceSha256LF": "e7e9040980da261f0a01587ab5a95fb88eb806390b459ba887d9d48cc9bf3412",
+      "htmlSha256LF": "70aa6920b70ba3e1ef3c876c41269502a549202da41608917f8e9a29f078738b"
+    },
+    {
+      "source": "docs/plans/ProfilingCapturePlan.src.html",
+      "html": "docs/plans/ProfilingCapturePlan.html",
+      "sourceSha256LF": "a644eb59bca4f1a354393e9d1045d78f10af61875e901cc53c6c0c3d192c9e36",
+      "htmlSha256LF": "49d93218b3cea22c374e84717173d30f0522c21889911358d53ec48db8c186a2"
+    },
+    {
+      "source": "docs/plans/RendererQualityPlan.src.html",
+      "html": "docs/plans/RendererQualityPlan.html",
+      "sourceSha256LF": "066bc7b04e5b28d9e08d494a5d49801249446c45908fc5fe91569d3611ddc13e",
+      "htmlSha256LF": "d8028f3dad41d5c8aecfe545a53331d5de632ecb4b5e82e23b2fd17fe525a9ac"
+    },
+    {
+      "source": "docs/plans/RenderFrameDebuggerPlan.src.html",
+      "html": "docs/plans/RenderFrameDebuggerPlan.html",
+      "sourceSha256LF": "35371b470812b56afdfb74d0f8bd2b331a145597ac76e1b7f99809c94b2f4f05",
+      "htmlSha256LF": "a7518bc05b729c875be3fcf4ee7e6f87e56fa18e75e46ef1faf3613370b067bd"
+    },
+    {
+      "source": "docs/plans/RenderGraphDependencySchedulingPlan.src.html",
+      "html": "docs/plans/RenderGraphDependencySchedulingPlan.html",
+      "sourceSha256LF": "17768ec6f69a9551919a6e70cf4d81fbdceae6e756adc272b76d049373bedf17",
+      "htmlSha256LF": "92a97f146c18c78a49adaad8da7e1a915d7ecd27197178b768800f8fa9159efd"
+    },
+    {
+      "source": "docs/plans/RenderPhaseEffortEstimate.src.html",
+      "html": "docs/plans/RenderPhaseEffortEstimate.html",
+      "sourceSha256LF": "3d6cc213df0bd59b5091965e2954a45b63b093708e67775dac323f3591a4c7ef",
+      "htmlSha256LF": "bafeb62cff74e7b467d2d41993a2cbfe53716d05588ed5ae7e37f8c006773df9"
+    },
+    {
+      "source": "docs/plans/RenderPhaseRoadmap.src.html",
+      "html": "docs/plans/RenderPhaseRoadmap.html",
+      "sourceSha256LF": "560e571c46d0559142c78354f750e5738413bc3a957ad2e1cef28dd474e8a76d",
+      "htmlSha256LF": "f1482a62e874ae02fd40f572bc65ad13d63931e0abdf9415abf4da68ee170fb1"
+    },
+    {
+      "source": "docs/plans/RenderRg8UnifiedExecution20261009.src.html",
+      "html": "docs/plans/RenderRg8UnifiedExecution20261009.html",
+      "sourceSha256LF": "cb23a148b7699683bc928c50ccb97b183c23a8b954c60b7a4764a2b3dccef3d2",
+      "htmlSha256LF": "32c4f3f6f8e75b48aee47cac7dc1f03a7118a90ba3afa3ef3b990f0fe87985eb"
+    },
+    {
+      "source": "docs/plans/ScriptSurfacePlan.src.html",
+      "html": "docs/plans/ScriptSurfacePlan.html",
+      "sourceSha256LF": "843e9d25b5c2c1705fcf0ff0619037dc8b9179175f03a23350809bb8fa445721",
+      "htmlSha256LF": "99368ebaef818d191ba5748de2a79cc6a96c5da42dd323e516fa132eda5ac4bb"
+    },
+    {
+      "source": "docs/plans/SerializationPlan.src.html",
+      "html": "docs/plans/SerializationPlan.html",
+      "sourceSha256LF": "f94d6fb170ff8dec403e60f3433c9d552a88608795281e95fcbd6a157917752c",
+      "htmlSha256LF": "0634b1c4ba64d5b6105e8ba446f2afc5ce3b61a4e049e1a9a544b7b22159479f"
+    },
+    {
+      "source": "docs/plans/ShadowMeshletGpuCullingPlan.src.html",
+      "html": "docs/plans/ShadowMeshletGpuCullingPlan.html",
+      "sourceSha256LF": "4977dca4b6060ddd318eddc081ef6da95c481a3ca0e8292279b785ed046b5110",
+      "htmlSha256LF": "ed7b4222544f00396a18bd721f15375b38c3e90ca149417d0c6f3aac49876707"
+    },
+    {
+      "source": "docs/plans/SimulationEffectContractPlan.src.html",
+      "html": "docs/plans/SimulationEffectContractPlan.html",
+      "sourceSha256LF": "b722dbf9161761ada5da25bbd7c635f27069a91c09a82bb2f4586434c75ded8b",
+      "htmlSha256LF": "62c7f78095caba9d40414706c1d8c2999af28bb030112f31819f1d32345075ca"
+    },
+    {
+      "source": "docs/plans/TaskSchedulerUnificationPlan.src.html",
+      "html": "docs/plans/TaskSchedulerUnificationPlan.html",
+      "sourceSha256LF": "e8713d25aab50ed0ecd6d90778ea784a0a2deb079e59e06f778240a330d5070e",
+      "htmlSha256LF": "771729296d60c971d05c2eaf9f21af2150476b5f67ff00c39667c97998d38e01"
+    },
+    {
+      "source": "docs/plans/TemporalReconstructionPlan.src.html",
+      "html": "docs/plans/TemporalReconstructionPlan.html",
+      "sourceSha256LF": "fe0bd3c8f3b3118914510d7aa3b6b4b6f2989c9e72abe3d1b5eb95a1458b6466",
+      "htmlSha256LF": "651d50f5b2d35d92bc2cc73a352ad42b48e57c8413ca980e086782de35bbfa04"
+    },
+    {
+      "source": "docs/plans/TemporalVendorIntegration20261009.src.html",
+      "html": "docs/plans/TemporalVendorIntegration20261009.html",
+      "sourceSha256LF": "fbb6e057c750fb54d4177bd20e70f03a32bb1790963ffb82bbefd88e011bd8c7",
+      "htmlSha256LF": "44fef8e924b150658193e4b0b725ae475a07ca40fa1bb5a1a696fff4d950097d"
+    },
+    {
+      "source": "docs/plans/TexturePipelinePlan.src.html",
+      "html": "docs/plans/TexturePipelinePlan.html",
+      "sourceSha256LF": "95f168a3169a5a377a2630765ee3f78fb3ca21ca4f081c45cee6c0ac976fcb26",
+      "htmlSha256LF": "ca956a684c6911744082e7472ff5f861678a52c3cb66eea7a764bdef2e4c6308"
+    },
+    {
+      "source": "docs/plans/UtilityFrameworkModernizationPlan.src.html",
+      "html": "docs/plans/UtilityFrameworkModernizationPlan.html",
+      "sourceSha256LF": "92585a5f2ad897f162617436eccebebdcda572c1370ce3e1d1416920dbcd436a",
+      "htmlSha256LF": "c8df74a3e8160e7b6baf9a0f8b49a64c37eda34c96f436cacdae857dccf78d74"
+    },
+    {
+      "source": "docs/plans/UISystemRedesignPlan.src.html",
+      "html": "docs/plans/UISystemRedesignPlan.html",
+      "sourceSha256LF": "611cf47d08386f9db70ecca20c3e845c0cfe7067a770ed88222506e651a22e2e",
+      "htmlSha256LF": "e93b6ee6d3d6d8f31241ce9828c9b24071e605796d10504ddddb3158e846e6dd"
+    },
+    {
+      "source": "docs/plans/MasterPlanAudit20261020.src.html",
+      "html": "docs/plans/MasterPlanAudit20261020.html",
+      "sourceSha256LF": "6655c53426939c2270ba015819185c0f7bfaaad89bbe1b0224ad4e3a50c7b60d",
+      "htmlSha256LF": "197cb022f4eb5573fcd64a5b34e6a8c7f97385691a59e5a40d664c3b445a70f4"
+    },
+    {
+      "source": "docs/analysis/AutomaticResourceEditingValidation20261010.src.html",
+      "html": "docs/analysis/AutomaticResourceEditingValidation20261010.html",
+      "sourceSha256LF": "f8acf8fd5146758c9ead977de3d2b2a996dc678f2940b5f8af0850dcd5021120",
+      "htmlSha256LF": "6e9feffc605523c5e9fd96c946880c5a5cef043795d785dcccefdd9c016f2391"
+    },
+    {
+      "source": "docs/analysis/ClosedPlanCommandletRetirement.src.html",
+      "html": "docs/analysis/ClosedPlanCommandletRetirement.html",
+      "sourceSha256LF": "cbb3a76dc905f65603afa0fd78708b9e9e95741d00622f071d56ce30e1e88671",
+      "htmlSha256LF": "697a681fb8a9d55c8b37650fd7ab67ed3cf129c934fb3fadc55c742ff59460c8"
+    },
+    {
+      "source": "docs/analysis/CommandletRetirementAudit.src.html",
+      "html": "docs/analysis/CommandletRetirementAudit.html",
+      "sourceSha256LF": "76616890d0fb539be9ea3cbafb008a10a223ef63836c25d0ba3b50457226ac92",
+      "htmlSha256LF": "acb35a377ac3ee13517dc9135e2cb8623ad285e9b2b04979f090fc820a8bf311"
+    },
+    {
+      "source": "docs/analysis/CommandRegistryAudit.src.html",
+      "html": "docs/analysis/CommandRegistryAudit.html",
+      "sourceSha256LF": "689fd81fe054d86bfe0d54274e136d9351938c85a22d87955cf29345b9828001",
+      "htmlSha256LF": "47286f71b675ea7d1aa28e861c1a173c69a87b63457ad4c913d301cc2c89ef46"
+    },
+    {
+      "source": "docs/analysis/CommandSurfaceImplementation.src.html",
+      "html": "docs/analysis/CommandSurfaceImplementation.html",
+      "sourceSha256LF": "1e25cfa4221db0f2848c690d2355043131254521794b2c32c5f6487e12805c49",
+      "htmlSha256LF": "b7d045f75327580b879b6982bbb9bc11eb242c173d0d02a4e1cb105d96706bb6"
+    },
+    {
+      "source": "docs/analysis/CommandSurfaceTable.src.html",
+      "html": "docs/analysis/CommandSurfaceTable.html",
+      "sourceSha256LF": "74fb88650e165fe27d7a5f793e2f8b498fe908ea97e5e6b1835359aeb32cb343",
+      "htmlSha256LF": "519580714f2f63b6d9c0195ae5f299851ba659e51f773303246da045fefa938f"
+    },
+    {
+      "source": "docs/analysis/ConditionalAssetPublishValidation20261010.src.html",
+      "html": "docs/analysis/ConditionalAssetPublishValidation20261010.html",
+      "sourceSha256LF": "1a46c21cb092c6a7b7f0b7e30b1f5e7d9525bf6e6c55aefb2904f911e4bab7ea",
+      "htmlSha256LF": "55eaa23aeee36095b1c0c5975eab4842e0e587308faa04a9271340c724e533af"
+    },
+    {
+      "source": "docs/analysis/ConditionalPublishActualInspectorValidation20261010.src.html",
+      "html": "docs/analysis/ConditionalPublishActualInspectorValidation20261010.html",
+      "sourceSha256LF": "6d44202de558c575099710e04f8c9bab019f3aff43c2d90146f73b215acddb65",
+      "htmlSha256LF": "c18910def8b2e7207dcc83ce399eca7fb57c29a821b1e962496d75df292defa6"
+    },
+    {
+      "source": "docs/analysis/CreatorBuildToolValidation.src.html",
+      "html": "docs/analysis/CreatorBuildToolValidation.html",
+      "sourceSha256LF": "f7316373e94bf41fc72b540209c3c429c5ae2f7c727dd81fe4df99cc75c0b16a",
+      "htmlSha256LF": "6360493c7c02c065ca153a4497ac6f89bc29d19298526b7ecd8c37e0794be9de"
+    },
+    {
+      "source": "docs/analysis/CsmCorrectnessOptimization.src.html",
+      "html": "docs/analysis/CsmCorrectnessOptimization.html",
+      "sourceSha256LF": "aff99b0f95ea3cfd2afb066703876dbef162f06788cdc0871f8bde9d7f9200c6",
+      "htmlSha256LF": "81c766c9dd8b93f122240ef47849f8fe45c3c4c4856cfdcd994c53ef8836751a"
+    },
+    {
+      "source": "docs/analysis/EditorAddComponentBrowserValidation.src.html",
+      "html": "docs/analysis/EditorAddComponentBrowserValidation.html",
+      "sourceSha256LF": "0df999cad78c43f4c77817eb2564e12da7b7c8926c31507f7a8e470f49ad53bf",
+      "htmlSha256LF": "7f10440fe39d0903011e0831cbe7e1894c8606c466cccd609f0c7a090bd2d740"
+    },
+    {
+      "source": "docs/analysis/EditorContentBrowserLayoutValidation.src.html",
+      "html": "docs/analysis/EditorContentBrowserLayoutValidation.html",
+      "sourceSha256LF": "bc7d7e14821aabdf80032a8e24d6bf7500b0cc2d0d2e8516916fede70daf07a3",
+      "htmlSha256LF": "8c9cedd4e00b908690f3cdeaab3e428434c0ab6eaa632aad76d41ba61237dfd3"
+    },
+    {
+      "source": "docs/analysis/EditorControlDensityValidation.src.html",
+      "html": "docs/analysis/EditorControlDensityValidation.html",
+      "sourceSha256LF": "874e070c4937c7970b050a97c76b6aa322a825545ebe47a8de48c08c3d1196a1",
+      "htmlSha256LF": "e40d2b9344becb4af78bb9f691fab542faec3ca30d9c14e67e5c893aa98c7d99"
+    },
+    {
+      "source": "docs/analysis/EditorEntityHeaderPolishValidation.src.html",
+      "html": "docs/analysis/EditorEntityHeaderPolishValidation.html",
+      "sourceSha256LF": "c28058baa48b7ec880d164b866d7eeea78b94dfdcd69b4458b6cd8ba414ba0d6",
+      "htmlSha256LF": "069958c701c8d76cb3a497ecb0e891045a431af053e8621a8cdf70d6a67b3563"
+    },
+    {
+      "source": "docs/analysis/EditorEntityNavigationValidation.src.html",
+      "html": "docs/analysis/EditorEntityNavigationValidation.html",
+      "sourceSha256LF": "e42ce7eef838f922bf8c4bf01f67f1a32825311745076fa0906ccd0e84b06972",
+      "htmlSha256LF": "d8981e41153ab47fc8733e24433ad235fe6088677b4b1770be8e2efdac78dea2"
+    },
+    {
+      "source": "docs/analysis/EditorFluentEmojiValidation.src.html",
+      "html": "docs/analysis/EditorFluentEmojiValidation.html",
+      "sourceSha256LF": "3503adb552079342f71878ae7ed0a52aec7578065d2d1985227474fab80e37fc",
+      "htmlSha256LF": "12ececf30c37c4440618138f4d430b8520f7b174200d346a4adaf875d145da4e"
+    },
+    {
+      "source": "docs/analysis/EditorHierarchyStyleValidation.src.html",
+      "html": "docs/analysis/EditorHierarchyStyleValidation.html",
+      "sourceSha256LF": "24f8d1463afe2a971010f048e313c98208f847bbe2d95f73c7a7ec4a66d9e234",
+      "htmlSha256LF": "586f795bd0df27f816e7bc57875b0f20a31d240df2be8b51a9fe959215bd1ca7"
+    },
+    {
+      "source": "docs/analysis/EditorIconAlignmentValidation.src.html",
+      "html": "docs/analysis/EditorIconAlignmentValidation.html",
+      "sourceSha256LF": "803a210614c5d2e1e78f8b8fd974e91515a21301769ca6a2fbc8ad250b6674ba",
+      "htmlSha256LF": "c8c687d4d851d3b9f36f1123c8ab60e57bfeb30a4ac77a9fd742c93bbd909ef9"
+    },
+    {
+      "source": "docs/analysis/EditorIconSelectionStudy.src.html",
+      "html": "docs/analysis/EditorIconSelectionStudy.html",
+      "sourceSha256LF": "793be46d74bb6fc98e47a64bc2d1b33b8eb9cda3cffb2b76cab0f4cd6456386f",
+      "htmlSha256LF": "bd82f01199e7c539f9f35766930438b422a7bace67e10c312e55404b5a39b65a"
+    },
+    {
+      "source": "docs/analysis/EditorInspectorLayoutW2I.src.html",
+      "html": "docs/analysis/EditorInspectorLayoutW2I.html",
+      "sourceSha256LF": "5e180c41032d04f710d9a0c6e5240661822be0d40c40cc0fc06e03160d0d27a7",
+      "htmlSha256LF": "f84d8d434dd1e4a36f5a85a0bd9a755a566f271bc35802f1966a8d82a7cd9ea8"
+    },
+    {
+      "source": "docs/analysis/EditorInspectorStyleValidation.src.html",
+      "html": "docs/analysis/EditorInspectorStyleValidation.html",
+      "sourceSha256LF": "fd9df9996f12e8b643bba4f9b9d4d45e33d72cebc047e967d964fcf54271e50d",
+      "htmlSha256LF": "b5f089dba469baab93e047a63e559b03966eac04800b69514b307ab10f4761ad"
+    },
+    {
+      "source": "docs/analysis/EditorLogStorageValidation.src.html",
+      "html": "docs/analysis/EditorLogStorageValidation.html",
+      "sourceSha256LF": "ae379d48f86534331db935c747ba7285ec9de3573628da670aff125c5dfdc4c7",
+      "htmlSha256LF": "77c46b01d3b52769db03342ae8c846eaab7b10e9951413124b5b368adf63a966"
+    },
+    {
+      "source": "docs/analysis/EditorMaterialSymbolsW1Validation.src.html",
+      "html": "docs/analysis/EditorMaterialSymbolsW1Validation.html",
+      "sourceSha256LF": "2fff4eeaca95b3872f72257f73c3c5f9c0309ad758b65def7f12de4ef56c563c",
+      "htmlSha256LF": "26357fad1ad556b76de5840376d1479aa74d6f68b74e6970972ee968260d0327"
+    },
+    {
+      "source": "docs/analysis/EditorMenuSurfaceAndPhase21Preflight.src.html",
+      "html": "docs/analysis/EditorMenuSurfaceAndPhase21Preflight.html",
+      "sourceSha256LF": "01ec93b13aa35cb54d5bd6a57fe25b6503dd40f51c418d2096745cb27709d06e",
+      "htmlSha256LF": "2d311d218df5a3035d1b5c810c5a37aeac3db5a56034285de912f059882667da"
+    },
+    {
+      "source": "docs/analysis/EditorPanelCostBaselineW7.src.html",
+      "html": "docs/analysis/EditorPanelCostBaselineW7.html",
+      "sourceSha256LF": "d83d812b16f405ace611e9db22b2f395687003f1aa214df700b2b87bfd48dd04",
+      "htmlSha256LF": "8bc4ecf189eaadbc39585493f0bc78843b5c435dae845d1478e865c8aa43ca41"
+    },
+    {
+      "source": "docs/analysis/EditorRenderingSurfacesValidation.src.html",
+      "html": "docs/analysis/EditorRenderingSurfacesValidation.html",
+      "sourceSha256LF": "a0f110201662f1abf081ebd23a906cdb3c5f4e9abb60a4eab547b725983dc1c2",
+      "htmlSha256LF": "927329b6b117d6ad597b334cb9bc3ff3ea06d4d17a5c2f567670bde7a7ba367e"
+    },
+    {
+      "source": "docs/analysis/EditorSceneCropValidation.src.html",
+      "html": "docs/analysis/EditorSceneCropValidation.html",
+      "sourceSha256LF": "183d9742d2d1ee04d0e899af9fd3de1911698c1005b841dc74a647c20a171bd8",
+      "htmlSha256LF": "3f6efe59b070e53f1e632c4aa0a539b1b821348c0d61bee33e3331146c37b525"
+    },
+    {
+      "source": "docs/analysis/EditorSceneViewportOverlayValidation.src.html",
+      "html": "docs/analysis/EditorSceneViewportOverlayValidation.html",
+      "sourceSha256LF": "5b998524a6b9c08da93de9ce1e89ac5e24df994ffb97bccf18d609c387f3a53d",
+      "htmlSha256LF": "c21dce3fef31a0e1d01a7333dca1383c010c84a0aa7e3dd0a4471102202f8e05"
+    },
+    {
+      "source": "docs/analysis/EditorThemeW1Validation.src.html",
+      "html": "docs/analysis/EditorThemeW1Validation.html",
+      "sourceSha256LF": "6167f64008d641698c40482b16f3fd648250e4b404dcdd589e3c5f5e5c256134",
+      "htmlSha256LF": "88e4efc5fa691fff19259bbbc34f7d0da8ea16a1ba02259dbe04ef720ee81f4d"
+    },
+    {
+      "source": "docs/analysis/EditorTitleBarValidation.src.html",
+      "html": "docs/analysis/EditorTitleBarValidation.html",
+      "sourceSha256LF": "1c67f1cc19e33c80f3857a4a7dfc174015c2ed56b4b6793685bc459a4cf105f5",
+      "htmlSha256LF": "a89d9531c7afaa69c7a2d6ad66b7cb61b6b585d55725cf93f430b80e22e751e5"
+    },
+    {
+      "source": "docs/analysis/EditorW1DpiResizeRootCauseAndFixPlan.src.html",
+      "html": "docs/analysis/EditorW1DpiResizeRootCauseAndFixPlan.html",
+      "sourceSha256LF": "1b3d0b892abe69b2a81a5b39494cff0611f23ad4914637ef0971152c4294b3c6",
+      "htmlSha256LF": "e0184b18445a70e22194c56c0c780cfcda2d07a5a834792e153b51cb66f26b7a"
+    },
+    {
+      "source": "docs/analysis/EditorW1Dx12ResizeValidation.src.html",
+      "html": "docs/analysis/EditorW1Dx12ResizeValidation.html",
+      "sourceSha256LF": "0bc23d5be05ae5e4c3d975fb165f8d0aeeacd4ebbad2a58afe64e5860645fd59",
+      "htmlSha256LF": "97ef2375e13a95ff272bf7f870e9bb6ebc232dd16b361e8e966092afec9a879e"
+    },
+    {
+      "source": "docs/analysis/EditorW1InteractiveValidation.src.html",
+      "html": "docs/analysis/EditorW1InteractiveValidation.html",
+      "sourceSha256LF": "b9a6d87c0eb85f059ba7066e9f3e06eff78090439fa206d8c0fcb4dc474d84f0",
+      "htmlSha256LF": "49673fb0fb79cc00c62631ae6a0dc8a96be4aca2efdee65870ea0b34a0f6a1ca"
+    },
+    {
+      "source": "docs/analysis/EditorWidgetInheritanceW2.src.html",
+      "html": "docs/analysis/EditorWidgetInheritanceW2.html",
+      "sourceSha256LF": "1d1f04d69cb29bed2291e7d10f30c8ca0d992c6c76652caa1c6312f41153346b",
+      "htmlSha256LF": "50166b128d4831b7cdbbd4754ba675257468ad5a5c69b084d4c9579757e42443"
+    },
+    {
+      "source": "docs/analysis/EditorWorkspaceW0Baseline.src.html",
+      "html": "docs/analysis/EditorWorkspaceW0Baseline.html",
+      "sourceSha256LF": "5c41c6df2e7aa3208877f546564773bf75d188fad116f0252ea16d8654ce9a59",
+      "htmlSha256LF": "91fb7b2e8ca746543c6e9b01cdd3f83e555a81c1f03b37e047dda0b28368e90d"
+    },
+    {
+      "source": "docs/analysis/EngineSynchronizationArchitecture.src.html",
+      "html": "docs/analysis/EngineSynchronizationArchitecture.html",
+      "sourceSha256LF": "ef91e90c984706e548e7c12d1d8a609431cc4f9a5a3932c0f74be7c19c3d2e88",
+      "htmlSha256LF": "a7d9258ca6cdca6771d1cabfd89ecec3ad03c7a2a965a09d86b56dd6b265ec6d"
+    },
+    {
+      "source": "docs/analysis/GCCEValidation20261009.src.html",
+      "html": "docs/analysis/GCCEValidation20261009.html",
+      "sourceSha256LF": "02062b4a84db5e0faec275caaf7e1f9ba890d6aebea7e099241e9a9a96afec85",
+      "htmlSha256LF": "fce7ace970750cba2b83a55ca2514d2bd7be56eb1b6fc8bb2ed34e3065f4d54d"
+    },
+    {
+      "source": "docs/analysis/GitHubIssueRemediation20261008.src.html",
+      "html": "docs/analysis/GitHubIssueRemediation20261008.html",
+      "sourceSha256LF": "da7fcf743fbcb2148dd15f241bba77be3e18b52f8fbc8c672e1d4ae1d617e9c7",
+      "htmlSha256LF": "5ddcecedbbfc8caa56883db864bafc1e817a01dfab3a71e66ca4693453793c1a"
+    },
+    {
+      "source": "docs/analysis/GpuDrivenGeometryStaticReview.src.html",
+      "html": "docs/analysis/GpuDrivenGeometryStaticReview.html",
+      "sourceSha256LF": "332366b5b0dd0b8ecdf92d2d50bb9f2c5acd3cde2f5148db3f171b07d53e8ebb",
+      "htmlSha256LF": "b966596271670ed6c058fec608a856cbb4c79a08ce6f61d4fc25c1074dc369bd"
+    },
+    {
+      "source": "docs/analysis/ArtifactRetention20261011.src.html",
+      "html": "docs/analysis/ArtifactRetention20261011.html",
+      "sourceSha256LF": "d50cff6b79633f7b31fa7676a43e64a589618250b1945aa752978ed1dc3dd9cd",
+      "htmlSha256LF": "eed97a4375ba289ddd9ba6bd5e48a303a4f537507378ddd8225ffaad0a57a55b"
+    },
+    {
+      "source": "docs/analysis/GpuDrivenRenderGraphTransition.src.html",
+      "html": "docs/analysis/GpuDrivenRenderGraphTransition.html",
+      "sourceSha256LF": "e38e59b44d9154a0a2613132a5066b0fdf585d4ca8e5a177b9f83c00b7673935",
+      "htmlSha256LF": "02140a35aede26c5987f99a37c9d1b3184bc00ec0ebfb43ab64db169cf64a105"
+    },
+    {
+      "source": "docs/analysis/GpuDrivenMaterialCoverage.src.html",
+      "html": "docs/analysis/GpuDrivenMaterialCoverage.html",
+      "sourceSha256LF": "a005ae4260f87d40bebf0b33061d3fab35beffb4770de3e9130497b4e8117af9",
+      "htmlSha256LF": "aeff67b0f3f68c426d39511e83160defe01a10da6f0816f11aba040d79bdb19a"
+    },
+    {
+      "source": "docs/analysis/GraphDeclarationReuse20261020.src.html",
+      "html": "docs/analysis/GraphDeclarationReuse20261020.html",
+      "sourceSha256LF": "d61d4f5a9beea13cbae515dca4f382177b6b3686976b284d970eb5d39b954382",
+      "htmlSha256LF": "aeaaaf31e21e346ed8a1937e6699ba5eb93bef2d4b8c9727200336ffe2505cca"
+    },
+    {
+      "source": "docs/analysis/GraphOnlyMaterialCleanup20261008.src.html",
+      "html": "docs/analysis/GraphOnlyMaterialCleanup20261008.html",
+      "sourceSha256LF": "c260454199cc9270d2dc60c4f3ceb3f4dca0c61f272b6402e85bd0c148ff1246",
+      "htmlSha256LF": "9944b7f89529510ce5962bef8f884d09a0faab469e604fc01acb8b4cf7bb9394"
+    },
+    {
+      "source": "docs/analysis/GraphOnlyMaterialPasses20261007.src.html",
+      "html": "docs/analysis/GraphOnlyMaterialPasses20261007.html",
+      "sourceSha256LF": "4f1561b71f7d4c59ab708ad2ef9c6553bbaf577cd70d13032dcb8041e7d27eea",
+      "htmlSha256LF": "d01f06c82ea0907f31486fd7d3eea607779dc9f24d7f047b9a3913fa2b855c3f"
+    },
+    {
+      "source": "docs/analysis/GraphRecoveryRgV20261007.src.html",
+      "html": "docs/analysis/GraphRecoveryRgV20261007.html",
+      "sourceSha256LF": "04bf6734597901c3042ec6e120e853382e3e80b6c24405910b340338cf4908eb",
+      "htmlSha256LF": "7dca999a81558da616fb17edfa642ad19d0414aefa985fe88931b4f993eb755f"
+    },
+    {
+      "source": "docs/analysis/HierarchyOrder20261008.src.html",
+      "html": "docs/analysis/HierarchyOrder20261008.html",
+      "sourceSha256LF": "0f29324eca2c64ad483608df9ca6be243ee60a32e20d16205ac608b26205de00",
+      "htmlSha256LF": "288754e3ca4404c8918dca145e3672d988a20fb1d9b57864a87ebf0907c81f27"
+    },
+    {
+      "source": "docs/analysis/JobSystemFeasibilityAnalysis.src.html",
+      "html": "docs/analysis/JobSystemFeasibilityAnalysis.html",
+      "sourceSha256LF": "9bfb5c3ac8ea20c8775c517461c314acf78525ec336ba5eb312de88fbe88008d",
+      "htmlSha256LF": "6168d7fe91877270601105ab2c7652a9d1c6eef4564f88d6671d754e351cfbee"
+    },
+    {
+      "source": "docs/analysis/LatticeGeometryIntegration20261009.src.html",
+      "html": "docs/analysis/LatticeGeometryIntegration20261009.html",
+      "sourceSha256LF": "a8f52cf8056e3786a1f05a278635a64c1a211f0d290c6aab082f939fb1ab7bc3",
+      "htmlSha256LF": "71191b7aba82308ca32185bbcf1bfe8adde285036d089f90569749b03db75c5d"
+    },
+    {
+      "source": "docs/analysis/LatticeMeshletRendering20261009.src.html",
+      "html": "docs/analysis/LatticeMeshletRendering20261009.html",
+      "sourceSha256LF": "642141eff86a5d8a6155ca7fb628298596504703953eabed73904488fff22d8e",
+      "htmlSha256LF": "9301aa37e959481a13dd55b44cd3a0e41d94177ac2ad3fa954a943c37ad79bdd"
+    },
+    {
+      "source": "docs/analysis/LxHdrCutover20261012.src.html",
+      "html": "docs/analysis/LxHdrCutover20261012.html",
+      "sourceSha256LF": "3f3d0fac53fac1ff507c6a8f51ae20fcef3090091d35e7f9a5869eab420aade1",
+      "htmlSha256LF": "4838918c9721696e311885e671c8d75add472d428614c8c06f809fbdf4ccc191"
+    },
+    {
+      "source": "docs/analysis/LxMeshletGeometryContract20261012.src.html",
+      "html": "docs/analysis/LxMeshletGeometryContract20261012.html",
+      "sourceSha256LF": "9c0cbd6c234c01ffba1c6b1c5f6337c6552f6df5fd9ba8bd09d707927d1d3b5b",
+      "htmlSha256LF": "31f5f9d8619316629a4404adc37387f60d014385b56590e2e6964134c788dacd"
+    },
+    {
+      "source": "docs/analysis/LxSceneBigBangCutover20261012.src.html",
+      "html": "docs/analysis/LxSceneBigBangCutover20261012.html",
+      "sourceSha256LF": "7d7fb1fd6236e71c50a65227f50ca485604a182f775119762371aef5a76e99f6",
+      "htmlSha256LF": "1c79d449739871a34fcda725e0e4d5c78361ecc6fc145f023e1e6f5e885286eb"
+    },
+    {
+      "source": "docs/analysis/LxShadowBaseline20261011.src.html",
+      "html": "docs/analysis/LxShadowBaseline20261011.html",
+      "sourceSha256LF": "38b0edcf0dd2d2f1992b57689c663fdbf31e21496479a9669614001ccb430ab0",
+      "htmlSha256LF": "5138c6c596ecafc4eb3095462b34df16afeb24eb6e76cfdf0d8fcf92507afd1c"
+    },
+    {
+      "source": "docs/analysis/LxShadowCases20261012.src.html",
+      "html": "docs/analysis/LxShadowCases20261012.html",
+      "sourceSha256LF": "bdb65b28c35b4886054fb216618e9b2b8b70232f0f47b02c2f759d344c8ea00f",
+      "htmlSha256LF": "bf98e49f4380357905e167944985eefbc7f257abbb47235499417a7bafde3b2d"
+    },
+    {
+      "source": "docs/analysis/LxShadowComputeCulling20261012.src.html",
+      "html": "docs/analysis/LxShadowComputeCulling20261012.html",
+      "sourceSha256LF": "41f4067fd46e2ece3b55bac2460b29693cdf920fc9e05073ba16e6232e54ffae",
+      "htmlSha256LF": "5d58afa2e8e5a39b4f56ddc742a4bb484b8bcdd240c44058c1511bb22d645ac0"
+    },
+    {
+      "source": "docs/analysis/LxShadowEquivalence20261012.src.html",
+      "html": "docs/analysis/LxShadowEquivalence20261012.html",
+      "sourceSha256LF": "1288e2481db3b40783cb6206ecde4dc5db81ee91d73ded51aab1adc10514537f",
+      "htmlSha256LF": "f22728271e365cab539ee53a02016ef0229aa2175a264b0b3ff6b42c5f03cefb"
+    },
+    {
+      "source": "docs/analysis/LxShadowMeshletOmission20261012.src.html",
+      "html": "docs/analysis/LxShadowMeshletOmission20261012.html",
+      "sourceSha256LF": "02d4f9f6ce3c51aacbcd20f75f51925edeb11b71da67a85a3218b7fe355be132",
+      "htmlSha256LF": "888d78c1da5b1b0f693d7e86f6bb73084694c40b6ca99ce65747473ac57340e7"
+    },
+    {
+      "source": "docs/analysis/LxShadowRepeatedPerformance20261012.src.html",
+      "html": "docs/analysis/LxShadowRepeatedPerformance20261012.html",
+      "sourceSha256LF": "16fbead0233b32f4331d4070cc16dbeb546eae06360f1f41515c1e192bd44703",
+      "htmlSha256LF": "8c525ff8b6ea50a7e7912f08ad7fbb5cfe2ac7f86ed4e97bebc7fffc2b20394e"
+    },
+    {
+      "source": "docs/analysis/LxTransformDispatch20261012.src.html",
+      "html": "docs/analysis/LxTransformDispatch20261012.html",
+      "sourceSha256LF": "88888484dcae737fa9a7c0dd6ad5a50eee2044e29d592e0301aa42b08c32e5c9",
+      "htmlSha256LF": "b92eb8505c33497cad1df00e11895e1cb8536e61f8c1d66bc2ffa6d941300959"
+    },
+    {
+      "source": "docs/analysis/LxTransformResidency20261012.src.html",
+      "html": "docs/analysis/LxTransformResidency20261012.html",
+      "sourceSha256LF": "61e7b2f8d728b1176a22e61a4107c0db3b13113e32a70a75ae16c75446bbb4a9",
+      "htmlSha256LF": "d446d9bea2df8f6a330128ffdde18ced0101b82ac5abffc0582a3a55c1ddf1d5"
+    },
+    {
+      "source": "docs/analysis/MAT7CodeToLXRuntime.src.html",
+      "html": "docs/analysis/MAT7CodeToLXRuntime.html",
+      "sourceSha256LF": "a7bee1140a365c3ec41dc602d1c43e4f8206d11da73866fa2c626aa42baa5dd8",
+      "htmlSha256LF": "f5b5825239aa88ee084ed3a7390a7730d6d2673a2a5e3da8eb652f94916605b1"
+    },
+    {
+      "source": "docs/analysis/MAT7CommonForwardBlend.src.html",
+      "html": "docs/analysis/MAT7CommonForwardBlend.html",
+      "sourceSha256LF": "305da4c01fc28d198e131a677523ca0756572d45f96e44537a922e771a360252",
+      "htmlSha256LF": "6b7bab74989cc8272e2b1ecebf4e7de78e2fdb15038067becbd59ba75cd548fe"
+    },
+    {
+      "source": "docs/analysis/MAT7CommonMaterialConsumption.src.html",
+      "html": "docs/analysis/MAT7CommonMaterialConsumption.html",
+      "sourceSha256LF": "2681e3fcc4f5fe1cd38e282bb6c9499a82b84250ad35c6dd21d3f705f3c4d128",
+      "htmlSha256LF": "c3e3af73b49ec4ffeb082d2d371d26b219d61e44c1ee6b9b774f01d965334ff1"
+    },
+    {
+      "source": "docs/analysis/MAT7ComputePipelineOwnership.src.html",
+      "html": "docs/analysis/MAT7ComputePipelineOwnership.html",
+      "sourceSha256LF": "22b1677715058701045118300cca9d73790d12275c4a2901a91e945a39ba3d7f",
+      "htmlSha256LF": "7cd71f44afcb57fb5aad10d046489fec8157ff22169168e1082967374b0a14ef"
+    },
+    {
+      "source": "docs/analysis/MAT7ForwardTransportComposition.src.html",
+      "html": "docs/analysis/MAT7ForwardTransportComposition.html",
+      "sourceSha256LF": "1e954d2d22732c9634feb399ccd2867ab5e26f1998babb05e66fd2d47c013594",
+      "htmlSha256LF": "0027ba2a600d9a109c9b99c0e9d57cf821ef9d5be8404ffb3ec84b174cd85376"
+    },
+    {
+      "source": "docs/analysis/MAT7GraphicsPipelineOwnership.src.html",
+      "html": "docs/analysis/MAT7GraphicsPipelineOwnership.html",
+      "sourceSha256LF": "66f74bc81b093638b5dd6d67321fd3fd04a2c457dac744c3c4f4b7b1e65bca22",
+      "htmlSha256LF": "2abb386949c988ca76369d73dcd3dc0477672e9659eef86e25b69bdd5126372b"
+    },
+    {
+      "source": "docs/analysis/MAT7ProductEditingRecovery.src.html",
+      "html": "docs/analysis/MAT7ProductEditingRecovery.html",
+      "sourceSha256LF": "d4c1ea53c6ee21ee7ac3690a965a63e0e07881951e04ccd5f0b61ee8b6f80bb6",
+      "htmlSha256LF": "5c620d6643c7771648d5183daf68aa24b0e4c545b6f937a23b547168e1948fc8"
+    },
+    {
+      "source": "docs/analysis/MAT7ShaderMetaAdapter.src.html",
+      "html": "docs/analysis/MAT7ShaderMetaAdapter.html",
+      "sourceSha256LF": "545c99f5bd2fe0c5ab55cfc0f58c4226af5498012649607b2ed172aa841877c9",
+      "htmlSha256LF": "c3472c4f300178c1a3bba24121f67d97b37b68dc68ebd71efb781d32900d6fa3"
+    },
+    {
+      "source": "docs/analysis/MAT9BlenderImageComparison.src.html",
+      "html": "docs/analysis/MAT9BlenderImageComparison.html",
+      "sourceSha256LF": "d5b6bfce76a230e5e762a21c3b35e416710dabcc3ffc0799355ca9dcfc9febed",
+      "htmlSha256LF": "8204970fffb356e05824d549af549ef62d26fdda4af0bf781e7b3a7349e3e815"
+    },
+    {
+      "source": "docs/analysis/MAT9GgxClosureComparison.src.html",
+      "html": "docs/analysis/MAT9GgxClosureComparison.html",
+      "sourceSha256LF": "42f04df319dcd48223cc9807dee27536bf6bc5dcc1fa7b8299928572549748d5",
+      "htmlSha256LF": "f7a5be5fa47b9905f19eacb6f11967c79bb0ead0f4cfe49400c985561aab73bc"
+    },
+    {
+      "source": "docs/analysis/MAT9HdriConvergence.src.html",
+      "html": "docs/analysis/MAT9HdriConvergence.html",
+      "sourceSha256LF": "612168255e02535c995e00c7c318b094a26f572ba28fd639a86fa05f95c9bac9",
+      "htmlSha256LF": "be0443c65d4025900e033464ede6eef0c256151b19193dc66234ec5d07b32346"
+    },
+    {
+      "source": "docs/analysis/MAT9HdriImageComparison.src.html",
+      "html": "docs/analysis/MAT9HdriImageComparison.html",
+      "sourceSha256LF": "558776a0260a761161a53379f2c3c4e1adec5914b7ff5af258a82e40c74ba22d",
+      "htmlSha256LF": "449d8549adade4fab2f21041c0a319c31c6f26a13d9f0971e6b70c6d27e520c2"
+    },
+    {
+      "source": "docs/analysis/MAT9HdriMis.src.html",
+      "html": "docs/analysis/MAT9HdriMis.html",
+      "sourceSha256LF": "b6cb77d0bb7dc1bcbd9915e769bd99a12fca538356ae28de3c8a7961498c8531",
+      "htmlSha256LF": "f9ee88b67f8982b4afb7cb24642041c67cea55f3863516c7a1eb613806633d35"
+    },
+    {
+      "source": "docs/analysis/MAT9HdriRange.src.html",
+      "html": "docs/analysis/MAT9HdriRange.html",
+      "sourceSha256LF": "b506d41f284e8340ebdaa966306c2338b874f05864ad37594fe89b9b14e82c46",
+      "htmlSha256LF": "2450d947d28932af9510b1bc4735d801aeeb32a081269eafbdd9c542df56dd9c"
+    },
+    {
+      "source": "docs/analysis/MAT9IntegrationCheckpoint20261001.src.html",
+      "html": "docs/analysis/MAT9IntegrationCheckpoint20261001.html",
+      "sourceSha256LF": "030b12cc7e06aa3b1a3575aae6dd81b6d9d3f18df9be9653ea0e6040f77310d4",
+      "htmlSha256LF": "b3df02ddb7975f753d94fd7778a1091228dfdfeca5d7ce2722191a5249716331"
+    },
+    {
+      "source": "docs/analysis/MAT9MaterialScenePerformance.src.html",
+      "html": "docs/analysis/MAT9MaterialScenePerformance.html",
+      "sourceSha256LF": "f7a39e3c513ad9da059b61695a53e45bd42d1679350f502c3b110e9201392afc",
+      "htmlSha256LF": "bf03725b1130458c57243f5e688beef9976d3071787cabe2c5b7271dd336d097"
+    },
+    {
+      "source": "docs/analysis/MAT9MirrorSampling.src.html",
+      "html": "docs/analysis/MAT9MirrorSampling.html",
+      "sourceSha256LF": "f5bafc6c1f1b466cfe74fa5e94ad44f36c5418521fecd38e6eb67c2fc8d95c07",
+      "htmlSha256LF": "4421907e43c12da3aaccd07519c343c8a4f078b91fe6d06a8cc680bca2bce6ff"
+    },
+    {
+      "source": "docs/analysis/MAT9NearCameraPerformance.src.html",
+      "html": "docs/analysis/MAT9NearCameraPerformance.html",
+      "sourceSha256LF": "e86db76f202431633bdc5b66fa992ee560468f7217763e7e61d4c1a0140ded29",
+      "htmlSha256LF": "8976e9ecd75555c337f4f8e9357d44db4691d9b21cc24b37bd816ce7d8d52b21"
+    },
+    {
+      "source": "docs/analysis/MAT9NodeEditorPerformance.src.html",
+      "html": "docs/analysis/MAT9NodeEditorPerformance.html",
+      "sourceSha256LF": "0afd41ff5d837fe47824d0436ded5d4891537fe24f2b40a045bacc3de4410c46",
+      "htmlSha256LF": "de01cc29fee47efecb6aa6ff1752eeba970cf137258e1fb106da00b44dd68ee0"
+    },
+    {
+      "source": "docs/analysis/MAT9SpecialProfileCorrection.src.html",
+      "html": "docs/analysis/MAT9SpecialProfileCorrection.html",
+      "sourceSha256LF": "3b6096d6437ba23bfae2fe337ceef2581492a9e93b3d6584b2bb5ed7fa05742f",
+      "htmlSha256LF": "9f89b76131445bd43f80c33197c937cdb412e0b71f7684a0d84aecab3e4dc218"
+    },
+    {
+      "source": "docs/analysis/MAT9SpecialTransportComparison.src.html",
+      "html": "docs/analysis/MAT9SpecialTransportComparison.html",
+      "sourceSha256LF": "7351280a58899236bdd387d9d4d4bb7b579af4b0ca1cc272c064e28d72d4c6fb",
+      "htmlSha256LF": "8b17281987ce5b9dfb8233092e1b9a5577744b676369b7627c8a1dbfd40acf09"
+    },
+    {
+      "source": "docs/analysis/MAT9SplitSumLiveLookupDifference.src.html",
+      "html": "docs/analysis/MAT9SplitSumLiveLookupDifference.html",
+      "sourceSha256LF": "65dfef17572e8b3c8a9fc208a53ffaf3efc622f5bea0e43d9e6ea73cb8e9ccf1",
+      "htmlSha256LF": "aafccb01c913102b3867558cbd308e18aa899f953696eb874a8f8161dd1a869e"
+    },
+    {
+      "source": "docs/analysis/MAT9ThinFilmAcceptance.src.html",
+      "html": "docs/analysis/MAT9ThinFilmAcceptance.html",
+      "sourceSha256LF": "6140617f5cc91caec82a1d818c53a2296221271db2387cc6daed8637cf9e0499",
+      "htmlSha256LF": "887fb7faff79c14655634fa562c10b06b103162e16b989210434bb0e56fb5f51"
+    },
+    {
+      "source": "docs/analysis/MAT9ThinFilmAndEnvironment.src.html",
+      "html": "docs/analysis/MAT9ThinFilmAndEnvironment.html",
+      "sourceSha256LF": "2ac93f0462d87592ad92c1c0e8481de3d14a0d8aa62819904f6d8718f4bdb23c",
+      "htmlSha256LF": "66100f23a6848db7ac4e30108e8b7de245a60093fbbd662c73ff0319802e9ca4"
+    },
+    {
+      "source": "docs/analysis/MaterialGraphScenePrepare20261019.src.html",
+      "html": "docs/analysis/MaterialGraphScenePrepare20261019.html",
+      "sourceSha256LF": "d97e49cd9fe6e294070aa747760b948f73db781fb7ad13ae0b74d4e09f5fb445",
+      "htmlSha256LF": "703f870d358e11624ee858c768c1db96da370b877ed966ee1181a70ef0ee1ee2"
+    },
+    {
+      "source": "docs/analysis/measurements/20261019-remeasure-10/README.src.html",
+      "html": "docs/analysis/measurements/20261019-remeasure-10/README.html",
+      "sourceSha256LF": "baa81b6be84d6158da3e8ed71419c5cd6f332d2bc33fe4da58d5fd5b718f5403",
+      "htmlSha256LF": "4d2a0333824bb5f6d57d169b1ee5753d10370a76947530f5a538f8e0e134a25a"
+    },
+    {
+      "source": "docs/analysis/MergedPrReview20261007.src.html",
+      "html": "docs/analysis/MergedPrReview20261007.html",
+      "sourceSha256LF": "5746b206b9b5d985e726d6d27b8263cff30ae0fa840448d9fed2a6744cf22b08",
+      "htmlSha256LF": "b0322ac8cc2a802f6123b08b13f392f61b9499d5056bf8a658aaa52e545d75b2"
+    },
+    {
+      "source": "docs/analysis/MeteorCameraMeshletCulling20261013.src.html",
+      "html": "docs/analysis/MeteorCameraMeshletCulling20261013.html",
+      "sourceSha256LF": "5c1440ca1366ebccf9549b7969b72e89153f63130c5187d6a1871b690bde0c83",
+      "htmlSha256LF": "36e11e22813b0a5b0e60c872fd5aaa5fb2fd625647cea31980df2e47575d3a63"
+    },
+    {
+      "source": "docs/analysis/Phase14_5Closure.src.html",
+      "html": "docs/analysis/Phase14_5Closure.html",
+      "sourceSha256LF": "e4350cf6a26aa08ddef9154a912e977d7ed2fb265228d9d5154da5033cf08bdf",
+      "htmlSha256LF": "7a4481c2f1124b34785215c7edb1b071964f5cfe392645c40cac961e5ee58e08"
+    },
+    {
+      "source": "docs/analysis/Phase14_5ManualGuiChecklist.src.html",
+      "html": "docs/analysis/Phase14_5ManualGuiChecklist.html",
+      "sourceSha256LF": "cf5eaf2cf4913c479f0ac049f31f761a41124278fc89bf3990a4f8b60314680f",
+      "htmlSha256LF": "5e338ab8ad1a9182d0d3e1d27be0651b759d4dcaea5c750ed797a4100ddb2dd0"
+    },
+    {
+      "source": "docs/analysis/Phase14_5MergePreparation.src.html",
+      "html": "docs/analysis/Phase14_5MergePreparation.html",
+      "sourceSha256LF": "8658e78acfdbd75270ac680255e640e610387016eb34fddcad27f4904cc19c17",
+      "htmlSha256LF": "c0e09d8410df97efd13f052ecde3bbabed7e3e3c6f8fb6309509c05f40a7b9a3"
+    },
+    {
+      "source": "docs/analysis/Phase22AudioCloudValidation.src.html",
+      "html": "docs/analysis/Phase22AudioCloudValidation.html",
+      "sourceSha256LF": "4e41f54035215c6c6d34a89ca176fa54b4b5f1622f7a2de7a4127b95ae20266b",
+      "htmlSha256LF": "804f49b89156cc56928d46bed73f53bb7498fe1fe2abb6c41c2760e7c8a4399b"
+    },
+    {
+      "source": "docs/analysis/Phase22AudioPreflight.src.html",
+      "html": "docs/analysis/Phase22AudioPreflight.html",
+      "sourceSha256LF": "ba8602933927cd33039e81c400d67cc0aefb736f98a637604b4063826d501d53",
+      "htmlSha256LF": "f4759a480f672a71293fc0af2ec1f3a95e375afce9a4ce8f7585113802572b79"
+    },
+    {
+      "source": "docs/analysis/Phase22AudioWindowsAcceptance20261007.src.html",
+      "html": "docs/analysis/Phase22AudioWindowsAcceptance20261007.html",
+      "sourceSha256LF": "553ea2c9eb54deb625c441759af3f0c69573f822c7e57327efb2ce4478761896",
+      "htmlSha256LF": "a94fa23347825904126f2104a9699a1be7e54a471bd847e3c0b615b83696de4e"
+    },
+    {
+      "source": "docs/analysis/Phase23LauncherReadiness.src.html",
+      "html": "docs/analysis/Phase23LauncherReadiness.html",
+      "sourceSha256LF": "09659bf942236a86107ecbb0f668344ecca3d212706e61048908c768da6d646c",
+      "htmlSha256LF": "dfcb61fe42cada7e06a6cd1ac64cb61708e0446df2a6b12b97adc047ff219b23"
+    },
+    {
+      "source": "docs/analysis/Phase475AxisClassification.src.html",
+      "html": "docs/analysis/Phase475AxisClassification.html",
+      "sourceSha256LF": "72c77cbc5ab9cb8ac3990e3a6cf2bd812419fbd0033afd859ca5151cbe247901",
+      "htmlSha256LF": "6745972f8533f3f98398fee5b0c7bb82a5a41bd7ed5e939048acf2e9b48f1daa"
+    },
+    {
+      "source": "docs/analysis/PhysicsCutoverAudit.src.html",
+      "html": "docs/analysis/PhysicsCutoverAudit.html",
+      "sourceSha256LF": "c7b960d8341dc2da07b0b8d4e4f80acedc37d9e72fe414be63b09f8780032f58",
+      "htmlSha256LF": "e117a155c7678cd8a807298fdae8e49bd2655b7a5f4b91510144f6fb54b5eff6"
+    },
+    {
+      "source": "docs/analysis/PlayerModuleBoundaryAnalysis.src.html",
+      "html": "docs/analysis/PlayerModuleBoundaryAnalysis.html",
+      "sourceSha256LF": "65457bab6fd950e55536c4a8dd6d5ceca8f90ada39c19c4bb6da14cb78b74d91",
+      "htmlSha256LF": "f5113d486eb81b0e60f215fa329ba9480d53b4a6e9b6db0eaf891490b5988bda"
+    },
+    {
+      "source": "docs/analysis/PPLContainerMigrationAnalysis.src.html",
+      "html": "docs/analysis/PPLContainerMigrationAnalysis.html",
+      "sourceSha256LF": "c9c3aec63b1a2b6355ad1d65695828f4bead12120c6468e60eb85081481c650e",
+      "htmlSha256LF": "3537e69c36fd7dec48a03bc90980e90f89c38d9788dac22ae4ca74c99fb800de"
+    },
+    {
+      "source": "docs/analysis/reac-20261019/baseline/provenance/README.src.html",
+      "html": "docs/analysis/reac-20261019/baseline/provenance/README.html",
+      "sourceSha256LF": "08fdc409d27379d2560acc8dcb8a8e6367d69e0c57cfb38686019c60468c3416",
+      "htmlSha256LF": "2c8d69fc133a8e05866e3987e77fbf75f62acbc00590066656029427e6f9e42e"
+    },
+    {
+      "source": "docs/analysis/REACPipelineImplementation20261019.src.html",
+      "html": "docs/analysis/REACPipelineImplementation20261019.html",
+      "sourceSha256LF": "2b71ac360b2b55127796877a8ad3e60c4fdffdefda70f50e87c2b2c5b04fbbd2",
+      "htmlSha256LF": "1867f7a2d2cbab70b8d0fd93d79531b805f2f46dc5564fe536bd635de4c30254"
+    },
+    {
+      "source": "docs/analysis/ReflectionSystemAnalysis.src.html",
+      "html": "docs/analysis/ReflectionSystemAnalysis.html",
+      "sourceSha256LF": "8dc2b0e093bcc5682e449ad2ef11c2d9f573f5ef77fcd4be62b9dce88e808b30",
+      "htmlSha256LF": "6d341b96da8a91b303dfb519b6ebf72f97cb5e22aa0b104bba0bb0a71441753b"
+    },
+    {
+      "source": "docs/analysis/ReflgenPhase425Integration.src.html",
+      "html": "docs/analysis/ReflgenPhase425Integration.html",
+      "sourceSha256LF": "b5600b5ae8e778dca5da3e6347a5993e3e6a800313e62d311f3b61a9349f871c",
+      "htmlSha256LF": "55a6fbebcb1bfaa2223cc2e8d41e1d9a3eb46e6dfd4307f6dfec712c8c6a77ef"
+    },
+    {
+      "source": "docs/analysis/RenderBase0Baseline.src.html",
+      "html": "docs/analysis/RenderBase0Baseline.html",
+      "sourceSha256LF": "94760476bceb791bdd841f8015ef36df3b9f0ee006819c7ca96a3974f27ab84f",
+      "htmlSha256LF": "1993c5b238e9c41ddb5bf672743fbd8da933aad7480fc90b2138de676964ed6b"
+    },
+    {
+      "source": "docs/analysis/RenderGraphDeclareParallel20261019.src.html",
+      "html": "docs/analysis/RenderGraphDeclareParallel20261019.html",
+      "sourceSha256LF": "402b23ebca22df13e4f7d38b05697fca545e22152c5a32fc55bef0bfe5cf2c35",
+      "htmlSha256LF": "224d742c15c00b41aede52149bcc6edbbf3d7f800b550a96f9d3faeea7a4568c"
+    },
+    {
+      "source": "docs/analysis/RenderingPipelineMermaid20261016.src.html",
+      "html": "docs/analysis/RenderingPipelineMermaid20261016.html",
+      "sourceSha256LF": "d4e533971e5cfc1bca3849cfc694c0f207952a590a6e1e97a0ea2ddbc9bf4b12",
+      "htmlSha256LF": "8c9e94f8f1b2a08b6a81ca3caaa277d3c20b692a2b2359e0c0c3b8e4d294bd17"
+    },
+    {
+      "source": "docs/analysis/RenderPipelineFlow.src.html",
+      "html": "docs/analysis/RenderPipelineFlow.html",
+      "sourceSha256LF": "2117b4664503bab02c49b2b3436a34131acfd634fe2363e9c9829cb68d62db28",
+      "htmlSha256LF": "e1f28bc09422b9710d9bada6c9d7b8aaf935b9d12b80f887caf47daf2e3fd9f9"
+    },
+    {
+      "source": "docs/analysis/RenderProfileAutomaticSaveConflictValidation20261010.src.html",
+      "html": "docs/analysis/RenderProfileAutomaticSaveConflictValidation20261010.html",
+      "sourceSha256LF": "d3ff9e0cbfa17c7a1ecc0bed2c4595d96c70fb3596c8463fd820f0e5ba51964b",
+      "htmlSha256LF": "eac1cbb8380459ec5c4a1a027d6b893b521b769bedd8cd9dd7adc63128f1a42b"
+    },
+    {
+      "source": "docs/analysis/RenderRg1Scheduling.src.html",
+      "html": "docs/analysis/RenderRg1Scheduling.html",
+      "sourceSha256LF": "3a13affaabf72cea7a9452a35915ac996cff42692d398207c0adf7e22b2d410d",
+      "htmlSha256LF": "9a35c253a3d115212311f57a0d8b4198a188282a04b7ff63732a44aa2159b27d"
+    },
+    {
+      "source": "docs/analysis/RenderRg2Versions.src.html",
+      "html": "docs/analysis/RenderRg2Versions.html",
+      "sourceSha256LF": "5ee496af532016bbf550d97298ac8b584c6f69e065f0ab73adc60ee30022ccbd",
+      "htmlSha256LF": "df99d878dad2d9c7a3c55e7ecd2da32a0de1232d9717605a6a8b2fd6c71fae9e"
+    },
+    {
+      "source": "docs/analysis/RenderRg3LifetimeBarriers.src.html",
+      "html": "docs/analysis/RenderRg3LifetimeBarriers.html",
+      "sourceSha256LF": "5600b1f8e458c1dbb499f0fe1c6d64d25517d0c09fc5a4646d38bb2b91cc5936",
+      "htmlSha256LF": "efcf6d02e7f1a3e5a3d5ecfb6412b7669521dac1526c6b35fe448ff69b21b72d"
+    },
+    {
+      "source": "docs/analysis/RenderRg4RecordingWaves.src.html",
+      "html": "docs/analysis/RenderRg4RecordingWaves.html",
+      "sourceSha256LF": "5c0b7f4f53822c5e67f7d427cff01af3dc48c012d5beb46ba5213d06f0f2f93c",
+      "htmlSha256LF": "2c0d04f279f84d5631e65629f6c669884ac27d09105922d3542098c292c8d9f8"
+    },
+    {
+      "source": "docs/analysis/RenderRg5Closure20261007.src.html",
+      "html": "docs/analysis/RenderRg5Closure20261007.html",
+      "sourceSha256LF": "5186d04ab49cc562d8c49185a56bdd5a76809cdf0b7dfe9a117b4df3b1cd5467",
+      "htmlSha256LF": "4b1e26874c8f79e13cac95c6827ed0ab05d43309cb986a6455e006e7dc1c7805"
+    },
+    {
+      "source": "docs/analysis/RenderRg5ConsumerMigration.src.html",
+      "html": "docs/analysis/RenderRg5ConsumerMigration.html",
+      "sourceSha256LF": "29eec679f92e489e8d36a17746c47fa900b578241676fc74df8714507bdff730",
+      "htmlSha256LF": "e76d55e97d779fcf0e4ce54e3f3f5a8aac76455d3ca7f1aa79a5cc15ef9f1869"
+    },
+    {
+      "source": "docs/analysis/RenderRg5DecalMigration.src.html",
+      "html": "docs/analysis/RenderRg5DecalMigration.html",
+      "sourceSha256LF": "7f6909451edeaa7117e88c1b6a5156f83c83dc13354931909a9d53aa6a9177b3",
+      "htmlSha256LF": "24316c7e66d5cf6877de3cd86ac402961b07d1c8a038c675e896841372fcfc03"
+    },
+    {
+      "source": "docs/analysis/RenderRg5FinalAcceptance20261007.src.html",
+      "html": "docs/analysis/RenderRg5FinalAcceptance20261007.html",
+      "sourceSha256LF": "29fea4c978e5cede0ebb4d9e197d304529d0c6000ac7a8392eac15c7f5ffe509",
+      "htmlSha256LF": "dd7014d944a0723ee96e0c72b5bb750b226fbe2b5c3ae14903dcc8cea98f06f8"
+    },
+    {
+      "source": "docs/analysis/RenderRg5ForwardCodeMigration.src.html",
+      "html": "docs/analysis/RenderRg5ForwardCodeMigration.html",
+      "sourceSha256LF": "afcee8ef93fd3d576db3cf0933f5290ba4951300937b84bba9a3570e36278ff3",
+      "htmlSha256LF": "85e4ba6891606cd96649c7cee604981c7d474afb54ea372d9cb34c3d0f1456cc"
+    },
+    {
+      "source": "docs/analysis/RenderRg5IndirectMigration.src.html",
+      "html": "docs/analysis/RenderRg5IndirectMigration.html",
+      "sourceSha256LF": "c26bed3d57a2b7efd76d7f69ed94c74b3d83c6d2aab7e05ec6568b84c866c89a",
+      "htmlSha256LF": "67d16b162e5c890c41941fabeaa8a92e8acdcb100e85f21b2e8fd1b4da9e45c0"
+    },
+    {
+      "source": "docs/analysis/RenderRg5IntegrationBaseline.src.html",
+      "html": "docs/analysis/RenderRg5IntegrationBaseline.html",
+      "sourceSha256LF": "3f3522b51f4a9abe5c49345b245bc3cacebd5213023a2cd830b9d1cc2c65e78e",
+      "htmlSha256LF": "fb5aff91f0cbcb3494847585e757ee968fd82fb7b9037d1126bfdaa1c4755fd1"
+    },
+    {
+      "source": "docs/analysis/RenderRg5LookupMigration.src.html",
+      "html": "docs/analysis/RenderRg5LookupMigration.html",
+      "sourceSha256LF": "1eadd4130db7606cd3278d174625ddf71fd5ce10c603aa3bf4dee2d1f94cbf11",
+      "htmlSha256LF": "9edb5db2d4f4873f3183df82339cbd54771f7713ba0c910e50c347dcb87dcb1f"
+    },
+    {
+      "source": "docs/analysis/RenderRg5MixedGpuAcceptance.src.html",
+      "html": "docs/analysis/RenderRg5MixedGpuAcceptance.html",
+      "sourceSha256LF": "46be7acbb2cf8fa10ea397681cdd2deaf26bd8106eb25eade610952c8b0ab3fe",
+      "htmlSha256LF": "458d7f8a3b6f22cd92193f80bf8c37fb97842a60db5a63a7923e7935b2a1943a"
+    },
+    {
+      "source": "docs/analysis/RenderRg5OrderPolicy.src.html",
+      "html": "docs/analysis/RenderRg5OrderPolicy.html",
+      "sourceSha256LF": "c4c83ba4f12a6b7c9654386ed256655fc5373dac425f18973d50a8d27e748b74",
+      "htmlSha256LF": "17f5e35f1ef2757e7bf7239c6258775e2aaa20b0bb3c7f5d13d8dfe1f087bc13"
+    },
+    {
+      "source": "docs/analysis/RenderRg5ProducerMigration.src.html",
+      "html": "docs/analysis/RenderRg5ProducerMigration.html",
+      "sourceSha256LF": "81d4b1c30679dcb26a3e962e482ab5fa737e3cb24d116657d23b92d005555e90",
+      "htmlSha256LF": "61c82ddf1b15139b98d7540da46df43a31b881bfef63c4c7cab4f0a49a0f59c2"
+    },
+    {
+      "source": "docs/analysis/RenderRg5ReferenceMigration20261007.src.html",
+      "html": "docs/analysis/RenderRg5ReferenceMigration20261007.html",
+      "sourceSha256LF": "8b95f92853fde90e69aea71ec8920505089be7dcd0ee88d4b1a06b803c2b8837",
+      "htmlSha256LF": "2ebcd9efbb7f64802fb55e2c3c7650316cc071ccc330f48a4b8322da1f710ca2"
+    },
+    {
+      "source": "docs/analysis/RenderRg5ScreenMigration.src.html",
+      "html": "docs/analysis/RenderRg5ScreenMigration.html",
+      "sourceSha256LF": "d9dffda97e9086ecd74f9eca99bb0bd445e7d5c9f4e811c9c9af8c1801c23e00",
+      "htmlSha256LF": "2959f4b4d8a5a1fb398add6bbc378ee9e0c252804801ddd0d1c75b4a7e7d018b"
+    },
+    {
+      "source": "docs/analysis/RenderRg5SpecialMigration.src.html",
+      "html": "docs/analysis/RenderRg5SpecialMigration.html",
+      "sourceSha256LF": "48b5c03eb575a757df3ef2debd1244a81fb85d36f81052918efe66fcc257ff41",
+      "htmlSha256LF": "9c9bf8c7d4b7eba42704e575ef3b5cbefd97f3a5deb328dc23eff780d99d3c5a"
+    },
+    {
+      "source": "docs/analysis/RenderRg5SpriteMigration.src.html",
+      "html": "docs/analysis/RenderRg5SpriteMigration.html",
+      "sourceSha256LF": "a7f0a18dd799a7c37999c7f65cfc78238b34edd1cec33316eb02e1553891ba49",
+      "htmlSha256LF": "8e3a370c128bb73ec73f56c93a8f0f1f5ae4bfca28cf27031c687eea0daf79c2"
+    },
+    {
+      "source": "docs/analysis/RenderRg5SurfaceMigration.src.html",
+      "html": "docs/analysis/RenderRg5SurfaceMigration.html",
+      "sourceSha256LF": "e452a8c515ac3770068ef012c1ea3f0d40096f81a1280e17b90a0e19d77d47cb",
+      "htmlSha256LF": "9e445242f2c12b48de82deea76bba6ea1ea32d26eec0fa55875e4ce7fe06f68e"
+    },
+    {
+      "source": "docs/analysis/RenderRg6Acceptance20261007.src.html",
+      "html": "docs/analysis/RenderRg6Acceptance20261007.html",
+      "sourceSha256LF": "8e0fc02ad02c6c9609d13cf8e091d30648492e5325361b73db36a722fd7211b2",
+      "htmlSha256LF": "b0ac229497416a909c073a2ee12858dda43aa369827f326ef187224e3961f9a9"
+    },
+    {
+      "source": "docs/analysis/RenderRg7Closure20261008.src.html",
+      "html": "docs/analysis/RenderRg7Closure20261008.html",
+      "sourceSha256LF": "4ae5d32096ed4f7602f5a60478b4406810f309bd47624400cb8a6577ff05a058",
+      "htmlSha256LF": "72908085f535313dbe50e18a3186a4938f14e9f32222aeef9557aa1bd791d89f"
+    },
+    {
+      "source": "docs/analysis/RenderRg7Implementation20261008.src.html",
+      "html": "docs/analysis/RenderRg7Implementation20261008.html",
+      "sourceSha256LF": "c48e639a65ee1006cb0ae788d085f03d5df5b217315b01fd3313c3525fa027b4",
+      "htmlSha256LF": "d56731d34e868712905f82ee80ee6be461e9fceae7624a49c345ee4473baffe2"
+    },
+    {
+      "source": "docs/analysis/RenderRg7Rg8StructuralAudit20261009.src.html",
+      "html": "docs/analysis/RenderRg7Rg8StructuralAudit20261009.html",
+      "sourceSha256LF": "fa22aa3fb358ee11157ec53aedf134511b07e46228f8a9db8ff2deebc112ea98",
+      "htmlSha256LF": "4cc654b0a886ccfc051a4d38312a866daa05a68fa652c21fda3cfefa693a1e1b"
+    },
+    {
+      "source": "docs/analysis/RenderRg8Barriers20261009.src.html",
+      "html": "docs/analysis/RenderRg8Barriers20261009.html",
+      "sourceSha256LF": "926f7fbd1b7a004ea8c6a463da5ef08b12fe4e4f448a9e422dee90de63b6e268",
+      "htmlSha256LF": "8a28f8cf58cb37bc320bfa3b3b4f079e064d73b95d17d37393cec0f2d5acb7f2"
+    },
+    {
+      "source": "docs/analysis/RenderRg8Batching20261009.src.html",
+      "html": "docs/analysis/RenderRg8Batching20261009.html",
+      "sourceSha256LF": "713eed1839999093de0693d65b772c3d8daf497fd9bdf8dbeb8f7dc23273351b",
+      "htmlSha256LF": "eb1ea8e05c5b59292edcbbf35f298750af6a0e4a1dee275e624df83a8395b7f8"
+    },
+    {
+      "source": "docs/analysis/RenderRg8Closure20261009.src.html",
+      "html": "docs/analysis/RenderRg8Closure20261009.html",
+      "sourceSha256LF": "ac72feb12b226354f73c3e986f36943d041bb5919ee0dbe19c7a3880266cdb27",
+      "htmlSha256LF": "25d49005a31bb070e98ec223327adf3b1edfffefe0f7b54ce69e1099b5912537"
+    },
+    {
+      "source": "docs/analysis/RenderRg8GraphicsRetention20261009.src.html",
+      "html": "docs/analysis/RenderRg8GraphicsRetention20261009.html",
+      "sourceSha256LF": "8180b5bf7129b3ece89bbf9c55866a199a15c9210febef1266fd9ae5458980b7",
+      "htmlSha256LF": "33bdcd3bb3f0fde8a4939ddeaca61cad7fc25bb9822186da887547022a26b361"
+    },
+    {
+      "source": "docs/analysis/RenderRg8HistoryFix20261009.src.html",
+      "html": "docs/analysis/RenderRg8HistoryFix20261009.html",
+      "sourceSha256LF": "5505598d2e99128fa14e1ed47f66d2ba845a050ba6eb99d27de098dc490bbac0",
+      "htmlSha256LF": "65ca43941ab0569734eff2c5c0948c3bc0c81c5c8e84481b039258edd36e3caa"
+    },
+    {
+      "source": "docs/analysis/RenderRg8OrderSearch20261009.src.html",
+      "html": "docs/analysis/RenderRg8OrderSearch20261009.html",
+      "sourceSha256LF": "66f7ebc1a2a5fd01b4f2588d3c4b0a71f0bbd347ae1bc7051f663d81f8e38978",
+      "htmlSha256LF": "c6f9e2d4501cb0beeb4ca89f713007b2b60b388205e0781f9c4caad809190a30"
+    },
+    {
+      "source": "docs/analysis/RenderRg8Pr167Followup20261009.src.html",
+      "html": "docs/analysis/RenderRg8Pr167Followup20261009.html",
+      "sourceSha256LF": "4488ff7475fbe76b7890773433bd7590fa9795055f70fee7c45657f19a8169e1",
+      "htmlSha256LF": "956d8d899548e3ba361c80d5a442df876b9be9ffe7a5e000245d38914a3edd06"
+    },
+    {
+      "source": "docs/analysis/RenderRg8Pr168Measurement20261009.src.html",
+      "html": "docs/analysis/RenderRg8Pr168Measurement20261009.html",
+      "sourceSha256LF": "ef0a63f4929155d4d2ab2440eda5c9355cab6a47a9dcc476497cbbf54c431a7a",
+      "htmlSha256LF": "1503475c91a096a787f8ce34a341a2ce9243a5ded459d00725711da7f1e6af64"
+    },
+    {
+      "source": "docs/analysis/RenderRg8QueueExecution20261009.src.html",
+      "html": "docs/analysis/RenderRg8QueueExecution20261009.html",
+      "sourceSha256LF": "a6d30e3a0234a5a147a94135a69a95c9e08d35fcd234c359f55bfe8c17087d3f",
+      "htmlSha256LF": "83bed62be6f74822729ccc4b788ce357d335282a3c8cfd90a67132b898c749e6"
+    },
+    {
+      "source": "docs/analysis/RenderRg8QueueSchedule20261008.src.html",
+      "html": "docs/analysis/RenderRg8QueueSchedule20261008.html",
+      "sourceSha256LF": "4651b8d9ff40d5b999e7f70dda251b7119461b7c741a0da209737e8366169c85",
+      "htmlSha256LF": "559c472ab8d29e3a2c8ea6e84b147d304296bc1bdd1f243c433f4e21974490a2"
+    },
+    {
+      "source": "docs/analysis/RenderRg8SchedulerCost20261009.src.html",
+      "html": "docs/analysis/RenderRg8SchedulerCost20261009.html",
+      "sourceSha256LF": "817f829c87c85077fd86fb154ee4d35573c871aac625a7619365e141fd96fc13",
+      "htmlSha256LF": "704e7d9ac2fc4a7ab12fad0274507dfd4cb5be160ee13eb77c67ff58b29144d5"
+    },
+    {
+      "source": "docs/analysis/RenderRg8UnifiedExecution20261009.src.html",
+      "html": "docs/analysis/RenderRg8UnifiedExecution20261009.html",
+      "sourceSha256LF": "af6bf861c8a7fabdfa26489eb9aa47d63e63eada9eec35c239a1d4471e969b48",
+      "htmlSha256LF": "05c642bf07724be846b531c7c5e5c5ad9d574f30718fa2fc031c7194becc237d"
+    },
+    {
+      "source": "docs/analysis/RhiQueueContractQ0_20261008.src.html",
+      "html": "docs/analysis/RhiQueueContractQ0_20261008.html",
+      "sourceSha256LF": "480209e7ded130cbac87fd14b3f39ff4c6fb15a0807f55c574a04873a62c4f0c",
+      "htmlSha256LF": "76b965519dad5acc4e6a7db7bd8aa8193764eaa6afe480f6fc04f19db07a6fad"
+    },
+    {
+      "source": "docs/analysis/RhiSoftwareArenaOptimization20261020.src.html",
+      "html": "docs/analysis/RhiSoftwareArenaOptimization20261020.html",
+      "sourceSha256LF": "627ab1ed1b226ee2da9b11d04c2070f420fa2b58d43f96fb9f9e77c3081d3903",
+      "htmlSha256LF": "bb012148cc88af0845f4304b3d295bcdad50e3c5fdfd15fc0527a81ac64a6050"
+    },
+    {
+      "source": "docs/analysis/RhiSoftwareFollowup20261020.src.html",
+      "html": "docs/analysis/RhiSoftwareFollowup20261020.html",
+      "sourceSha256LF": "b95809d53a1915445c89e1014b81dd598f7e072666f79da25c42a153044ba456",
+      "htmlSha256LF": "75588c10382840ceccad8dc20d4049c9771aa32f12f6fc1e2b7fbd9310138d30"
+    },
+    {
+      "source": "docs/analysis/ScriptBinderSplitAnalysis.src.html",
+      "html": "docs/analysis/ScriptBinderSplitAnalysis.html",
+      "sourceSha256LF": "2e9c0e7b0bf39b14970b0578f42fd96100cccc493577546a9e0d395e358bb2bc",
+      "htmlSha256LF": "40197a509e108db74ac204cd7847e6d44e0a7651a2701a351dc11945d26d708e"
+    },
+    {
+      "source": "docs/analysis/SharedRuntimeDistributionValidation.src.html",
+      "html": "docs/analysis/SharedRuntimeDistributionValidation.html",
+      "sourceSha256LF": "97c70df572e0d7453d4e6dd647090cbb1bb986a31f26cadbb81e59794f23bb1f",
+      "htmlSha256LF": "a71235075cfb007e7bc0d5502ae155fa857f2807b1ab9209c48d9a5de4424000"
+    },
+    {
+      "source": "docs/analysis/SharedVisibilityInputs20261020.src.html",
+      "html": "docs/analysis/SharedVisibilityInputs20261020.html",
+      "sourceSha256LF": "5de38afef1966b6521b731f17daa52ed0188f78afad711179dceacac364b4197",
+      "htmlSha256LF": "3712348cb1e381edf5633c8887b92d8a7d2d7f13aa4eab9ad15aea921acf9ec4"
+    },
+    {
+      "source": "docs/analysis/TemporalBalancedHierarchyRace20261011.src.html",
+      "html": "docs/analysis/TemporalBalancedHierarchyRace20261011.html",
+      "sourceSha256LF": "b7c5306ac01f0c7dff2579ce6d7a187ed17859776ec30ee2bb451759d7c91a18",
+      "htmlSha256LF": "5b83bb29cf5f8c8ecbdd815bccf55be1a63b2bb0b34d901a3b142634e58950f4"
+    },
+    {
+      "source": "docs/analysis/TemporalBase0ConsumerWorkload20261011.src.html",
+      "html": "docs/analysis/TemporalBase0ConsumerWorkload20261011.html",
+      "sourceSha256LF": "191aff73619dfbe1bf806a41020869757b6ab2b958feecf6a00c559aef0fa0ec",
+      "htmlSha256LF": "80953ff1fd8f8c4fdb61023de969a5117db9a4337b803b0bd6b19cc4b024bea1"
+    },
+    {
+      "source": "docs/analysis/TemporalClosureCheckpoint20261010.src.html",
+      "html": "docs/analysis/TemporalClosureCheckpoint20261010.html",
+      "sourceSha256LF": "2a07e1f094fb2c7aa441ad171efcf3280f7bf9114715e0299dc0163fb094c71e",
+      "htmlSha256LF": "6f336160a61e603bd4df65f1726cd0da577e27299007a0f1341672545adf1587"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssDisocclusion20261011.src.html",
+      "html": "docs/analysis/TemporalDlssDisocclusion20261011.html",
+      "sourceSha256LF": "e1cc8f1df092141a0c470db5fb2f3e84b523cdaae3aff277e09de8e40e755633",
+      "htmlSha256LF": "89053d485a1a30d6687c97d1a45bd710a0eef799bd3fa32aea7a50bdac84b1f6"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssFinalBuild20261011.src.html",
+      "html": "docs/analysis/TemporalDlssFinalBuild20261011.html",
+      "sourceSha256LF": "53c4109948942ced6da792d20f833cc3b32fc2546e86ed287e70f7b4224a616e",
+      "htmlSha256LF": "90ccf30e96b00ebe17a498eb0dccf3ec887a6fda88d2765afdb3af097fdf80e7"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssLens20261011.src.html",
+      "html": "docs/analysis/TemporalDlssLens20261011.html",
+      "sourceSha256LF": "780476f782854e8c51a09037aa78bbbb45aa1077a3df5248e72b1e03a7ea4a18",
+      "htmlSha256LF": "99c1084e77dd4d6affdaacedb4bd69636564ddb6e29e609d514663538a591bb8"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssNativeAA20261011.src.html",
+      "html": "docs/analysis/TemporalDlssNativeAA20261011.html",
+      "sourceSha256LF": "da01551c66db863d4df3fbd2fff271d653a4aded55b9124b7cdeecf0c77e36ed",
+      "htmlSha256LF": "ff968551b80cde0b370232e9b0fe84d7af206788142ed70f99a5da54264f2e74"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssPerformance20261011.src.html",
+      "html": "docs/analysis/TemporalDlssPerformance20261011.html",
+      "sourceSha256LF": "e7e0303efa9df23d8ad4a888e3db8332feab7a8d4f04a16a11dcb616716e685b",
+      "htmlSha256LF": "69524a73499824eff5df4ff8b8888fe09bde7babee79df54c2f7d4692995a9bc"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssStartup20261011.src.html",
+      "html": "docs/analysis/TemporalDlssStartup20261011.html",
+      "sourceSha256LF": "68b5e38c0f0163c6dfab08493f6f17e34008d709e8ed87c3f608458c6544eecc",
+      "htmlSha256LF": "9d5e60fdc1b48585de4797e4b9256d762615be11024832a675f9fc1201147907"
+    },
+    {
+      "source": "docs/analysis/TemporalDlssTransitions20261011.src.html",
+      "html": "docs/analysis/TemporalDlssTransitions20261011.html",
+      "sourceSha256LF": "ed32be0c9cf80ee8296757f02e9cfa955db15bc8c2e58ed817c93ac0fcf2c773",
+      "htmlSha256LF": "60c4426a0608811eb51908899c062ce8fc281eb14f2b0a52fce2a10984f51e68"
+    },
+    {
+      "source": "docs/analysis/TemporalMeasurementCheckpoint20261010.src.html",
+      "html": "docs/analysis/TemporalMeasurementCheckpoint20261010.html",
+      "sourceSha256LF": "4fb14871e70c86e71372d1782dbe03dc99bb7be5953d55b354bc13580c3ad26b",
+      "htmlSha256LF": "0671f4f66fc6dfc5c94a28a3bfa806459b8f9f7611243e2d8b6ac434dbdd603b"
+    },
+    {
+      "source": "docs/analysis/TemporalMeasurementConsumers20261010.src.html",
+      "html": "docs/analysis/TemporalMeasurementConsumers20261010.html",
+      "sourceSha256LF": "c45a9cc7601808a19412ef97d344c7340739535b3fa8b4f438461c5eb0b56f0c",
+      "htmlSha256LF": "2009169a6b19cc2ec62071ff9cbbba06a0313cac70b1df6ad42bf6e64c9979e3"
+    },
+    {
+      "source": "docs/analysis/TemporalMeasurementSurfaces20261011.src.html",
+      "html": "docs/analysis/TemporalMeasurementSurfaces20261011.html",
+      "sourceSha256LF": "a66022d7f3e392d35960e96d76e21710f36eca4808dbfc37b670b9d15ab4dff0",
+      "htmlSha256LF": "633490ac6365caccf62038017032bc460c6277249780261227d0cda78378561c"
+    },
+    {
+      "source": "docs/analysis/TemporalPhase45Closure20261011.src.html",
+      "html": "docs/analysis/TemporalPhase45Closure20261011.html",
+      "sourceSha256LF": "24d00415dda1a53761ce30928d7063a9b18636e18f72e10ef0426e27541b6ddf",
+      "htmlSha256LF": "e41ed93c57aec6e1852979583b8bd2783ba8be7f2ce941d5731244b11761d28a"
+    },
+    {
+      "source": "docs/analysis/TemporalRg6ABAcceptance20261011.src.html",
+      "html": "docs/analysis/TemporalRg6ABAcceptance20261011.html",
+      "sourceSha256LF": "7a6a5f351fbc099e566aba55c113b3268afd47746e77efd5a33daf630f4571b6",
+      "htmlSha256LF": "277d3cf7945262110a512191250a5abf44e3ffe2a082e2e9982798be94f648f5"
+    },
+    {
+      "source": "docs/analysis/TemporalRg6CpuRecording20261011.src.html",
+      "html": "docs/analysis/TemporalRg6CpuRecording20261011.html",
+      "sourceSha256LF": "37c1f2f7fe50dab9e3f65154f13ea69d2a2f1fb983d7e928fb800c987d07e347",
+      "htmlSha256LF": "dc1175f15f896edee71d402b81f92486950ec4502555fa009bcf0055844e4f90"
+    },
+    {
+      "source": "docs/analysis/TemporalRg6CpuRecordingTail20261011.src.html",
+      "html": "docs/analysis/TemporalRg6CpuRecordingTail20261011.html",
+      "sourceSha256LF": "c4d42440e85e48fd4f5212e1be52810c3291cd61ce8712dda05d950004af2cdc",
+      "htmlSha256LF": "4ca5eb3bdd44f3a349d44b76836ef480eccebe9b45f8c6e4f486a322445ed2dc"
+    },
+    {
+      "source": "docs/analysis/TextureActualInspectorShutdownRepeatValidation20261010.src.html",
+      "html": "docs/analysis/TextureActualInspectorShutdownRepeatValidation20261010.html",
+      "sourceSha256LF": "9ab6dbd244e37eef097532849d6b3b853cf460350740d2de69b5300416488f15",
+      "htmlSha256LF": "64dba62c58eeaf44ff93e4fb66414bd7c8b703523dcd5a74170ed0f75620a39f"
+    },
+    {
+      "source": "docs/analysis/TextureAutomaticInspectorConflictValidation20261010.src.html",
+      "html": "docs/analysis/TextureAutomaticInspectorConflictValidation20261010.html",
+      "sourceSha256LF": "cd107957e5c883b6361ce4661494efcef2d329594acc55c4738184b9b4dae708",
+      "htmlSha256LF": "2db6ef43d8795110752da3333cdd541ed171142af0b1fc592856e494965974de"
+    },
+    {
+      "source": "docs/analysis/TextureAutomaticInspectorDebugFailureValidation20261010.src.html",
+      "html": "docs/analysis/TextureAutomaticInspectorDebugFailureValidation20261010.html",
+      "sourceSha256LF": "2d7f5236bd7c8233bce496b047b46ebe4f6348bd19048d17f6f1ad1ab142c3ec",
+      "htmlSha256LF": "f037e20de5e203127e67cd91d3b609e3911346326f707317905532df39975526"
+    },
+    {
+      "source": "docs/analysis/TextureAutomaticInspectorReleaseValidation20261010.src.html",
+      "html": "docs/analysis/TextureAutomaticInspectorReleaseValidation20261010.html",
+      "sourceSha256LF": "07e0a9dddadd41aa9023b83beee7afd36d6b76c5b632234be8c36c9050a0420a",
+      "htmlSha256LF": "0bd54565c86ef24162da6a008b7ed1659f920240c84f3f565a30c73b2060432a"
+    },
+    {
+      "source": "docs/analysis/TextureAutomaticInspectorUiValidation20261010.src.html",
+      "html": "docs/analysis/TextureAutomaticInspectorUiValidation20261010.html",
+      "sourceSha256LF": "a041137b23bdbbbf19a5b540c46ad06ade9043177dd3a958a831614fadce0a86",
+      "htmlSha256LF": "60e7865cc083b82959208a06d23f4d50de661a95850fa5135f5e4bd2721fe380"
+    },
+    {
+      "source": "docs/analysis/TextureAutomaticSaveSoakValidation20261010.src.html",
+      "html": "docs/analysis/TextureAutomaticSaveSoakValidation20261010.html",
+      "sourceSha256LF": "d4afc6bd595c374143dd952e55cacafbbe350df8dcaecdbfd1032306a2021b46",
+      "htmlSha256LF": "c1c903a14ce2d8d541f1cd5dfe6949eecfefec251346e1fde4b2dfa9508ecd32"
+    },
+    {
+      "source": "docs/analysis/TextureCookedGpuValidation20261010.src.html",
+      "html": "docs/analysis/TextureCookedGpuValidation20261010.html",
+      "sourceSha256LF": "05f77078ccf4b958e1995c657869d0ae8789a2ed88b62da94b4ad87d29e87e8b",
+      "htmlSha256LF": "18d4d913d2139dd0e4b8d3bfe725bc38e7645c1ff513e8aa837a750273f25f53"
+    },
+    {
+      "source": "docs/analysis/TextureCookedVulkanValidation20261010.src.html",
+      "html": "docs/analysis/TextureCookedVulkanValidation20261010.html",
+      "sourceSha256LF": "25afc571062d96efd2d40de11757cd8efefe54a9645814366e8c633b21a6ca73",
+      "htmlSha256LF": "a007962f46b42d8f4d05d8b11ea764ff8872547a76dcc330d27a71616a3e4a7b"
+    },
+    {
+      "source": "docs/analysis/TextureImportLifecycleValidation20261010.src.html",
+      "html": "docs/analysis/TextureImportLifecycleValidation20261010.html",
+      "sourceSha256LF": "72fe27488c3b01d8d14d6c858dcbfccc31a5f34a437e301bc537ffbeee3b5e84",
+      "htmlSha256LF": "f6c6545d6d113f7c828682c3f2a2a779cc2802c35d19241838a04dd8395f32db"
+    },
+    {
+      "source": "docs/analysis/TextureInspectorScaleDockValidation20261010.src.html",
+      "html": "docs/analysis/TextureInspectorScaleDockValidation20261010.html",
+      "sourceSha256LF": "081554f3c48434ec7e6eb08109644d1b04c9eda823037778435deb693f589f0b",
+      "htmlSha256LF": "5b4acc3ef1bc93d52db7a2495dd5e6f6a370993d22a614bbcfd86061ec441997"
+    },
+    {
+      "source": "docs/analysis/TextureInspectorUiValidation20261010.src.html",
+      "html": "docs/analysis/TextureInspectorUiValidation20261010.html",
+      "sourceSha256LF": "32a2f667b4b42d379fe8bba37bea5985c1a927d033eaeb7184340872f80f1c4d",
+      "htmlSha256LF": "40455225d4ca8d1f2a4e055db46c502ba0a865bd497ba1d0a80f5fd551d2962e"
+    },
+    {
+      "source": "docs/analysis/TexturePendingMetadataShutdownValidation20261010.src.html",
+      "html": "docs/analysis/TexturePendingMetadataShutdownValidation20261010.html",
+      "sourceSha256LF": "faa792ed287e58aa99e09ca40aa6730ee552db5828bcd2c5c05c1d07aa33c935",
+      "htmlSha256LF": "95dfc967844f5cf809540bc58b916e666a5767f0297b99767795d36958be0e21"
+    },
+    {
+      "source": "docs/analysis/TexturePendingMetadataValidation20261010.src.html",
+      "html": "docs/analysis/TexturePendingMetadataValidation20261010.html",
+      "sourceSha256LF": "096769d444091fb6af048fc0cafac0c65400e3fdf04d4d2cecf95452d317a46f",
+      "htmlSha256LF": "caf79700e65263e382cb7620a151fbc2f2aa7bcbf5eb8d1e6e5cd2fe81b46c2a"
+    },
+    {
+      "source": "docs/analysis/TexturePendingNativeCloseValidation20261010.src.html",
+      "html": "docs/analysis/TexturePendingNativeCloseValidation20261010.html",
+      "sourceSha256LF": "a89a0747ffe31ba4c12e475604dd86507b6220bc996faeb849b0a86c66e9c785",
+      "htmlSha256LF": "02fe5fe15dd38f290a5741070688c6b301671cbfd48b8bea8d3f0f41ad330052"
+    },
+    {
+      "source": "docs/analysis/TexturePipelineValidation20261009.src.html",
+      "html": "docs/analysis/TexturePipelineValidation20261009.html",
+      "sourceSha256LF": "880167eb7aca6d4cef267f09325a6791c5ee2356cf0a08adbaefe67f9c12b157",
+      "htmlSha256LF": "e56bea98062b7d651c6bf76190e14252ec06114d0393068a5543b78adf4647ed"
+    },
+    {
+      "source": "docs/analysis/TextureReimportSceneValidation20261010.src.html",
+      "html": "docs/analysis/TextureReimportSceneValidation20261010.html",
+      "sourceSha256LF": "0de4d482a0f83759c7a165835635d31c323520cbd21f6a08ec6fb967842775a5",
+      "htmlSha256LF": "05730feb7ad34df768b2251c22dcdd755066953fd386fe8c42f46eeca8edcbde"
+    },
+    {
+      "source": "docs/analysis/TextureSceneReloadValidation20261010.src.html",
+      "html": "docs/analysis/TextureSceneReloadValidation20261010.html",
+      "sourceSha256LF": "ff19f73514cc0fd874a261ea9120448482dabef7d55580a79990d83c9d7b0449",
+      "htmlSha256LF": "87a0d1ec0e7bc01383e0513b7c2d3ee3fcbfcff7eee0bc2c75816fff9b584f8d"
+    },
+    {
+      "source": "docs/analysis/TextureShippingArtifactFailureValidation20261010.src.html",
+      "html": "docs/analysis/TextureShippingArtifactFailureValidation20261010.html",
+      "sourceSha256LF": "d7929c8650ced9882d02bf15ee588e81d1e0659a9fa40901c2c1adc06a394feb",
+      "htmlSha256LF": "1a736056ec911d6166faf23aeaf80654b3b1605768fdf309038f315ffc47ec58"
+    },
+    {
+      "source": "docs/analysis/TextureShippingCoreValidation20261010.src.html",
+      "html": "docs/analysis/TextureShippingCoreValidation20261010.html",
+      "sourceSha256LF": "9a5baed2f56c44c8a0f2b03277c1c0cf1bb19f5d7c40ea3fdf763d85f3f42bac",
+      "htmlSha256LF": "a58ed76421ba232303760d5a960127f18c069a8e0a6475a20eaf3bb0badf5084"
+    },
+    {
+      "source": "docs/analysis/TextureSidecarDiagnosticsValidation20261010.src.html",
+      "html": "docs/analysis/TextureSidecarDiagnosticsValidation20261010.html",
+      "sourceSha256LF": "6fcc16f0f80791fcc279208089615078c7c5ddeb7ab10364d614c0feb8978b8d",
+      "htmlSha256LF": "42f3cfee9a49348ccfea8abcc125cf5fa4d134f77b4e191279935b8f4823e888"
+    },
+    {
+      "source": "docs/analysis/TextureSpriteReimportValidation20261010.src.html",
+      "html": "docs/analysis/TextureSpriteReimportValidation20261010.html",
+      "sourceSha256LF": "38943f5c9ed5a6f35bce6ac5f11db2efa97636a924844a8238fbf27a8f33c92d",
+      "htmlSha256LF": "5cbcedf873b07220d48dda97be065d13e0fbe8390cb3ca5b293b89d80fc755aa"
+    },
+    {
+      "source": "docs/analysis/TextureStagedPublishConflictValidation20261010.src.html",
+      "html": "docs/analysis/TextureStagedPublishConflictValidation20261010.html",
+      "sourceSha256LF": "5b12ec2c3e9df4ab665000b58dddf360749d747e12d6879ea736c25c16b9d390",
+      "htmlSha256LF": "119fdab1129de561cbea81b26b3b4df187aaa0fdba20e75d2e9c86f3ee3afe1a"
+    },
+    {
+      "source": "docs/design/ArtifactStoreLeaseProtocol.src.html",
+      "html": "docs/design/ArtifactStoreLeaseProtocol.html",
+      "sourceSha256LF": "ee91e96492366b1bb34fd57e6297afb521a4c790db36319900ab8554c7fb7c5a",
+      "htmlSha256LF": "497aa3fa1c191c96b8a2ccffcf45097029cf8fda494ad39a17d80eea995201c3"
+    },
+    {
+      "source": "docs/design/AssetSetImportReceipts.src.html",
+      "html": "docs/design/AssetSetImportReceipts.html",
+      "sourceSha256LF": "963952b2b565c2269dfe3a24016c09151f39de5d90dfcdb4e56be5b4d1d24a31",
+      "htmlSha256LF": "daa7fa46be0cc1a4002724c10a651951b349a1a17f27e00b33236b0494949484"
+    },
+    {
+      "source": "docs/design/AsyncAssetPreparation.src.html",
+      "html": "docs/design/AsyncAssetPreparation.html",
+      "sourceSha256LF": "e0c5778bd95b0f06d48e3378bba3a99c3ae45200e92ef29d55fa5207d1d79805",
+      "htmlSha256LF": "8bb7e364002df496296b6299eed89c51b372e42682e89af8b9fcd8f43e62902c"
+    },
+    {
+      "source": "docs/design/CodeMaterialAssetSet.src.html",
+      "html": "docs/design/CodeMaterialAssetSet.html",
+      "sourceSha256LF": "979331f803a01b65d2734782fbce7c268a9ae398e1a9ede1b6bd5ea23160030d",
+      "htmlSha256LF": "4f3ba3a342107c0624d3f596c10b5d54ed973f906a8e321971c525f65f9385a9"
+    },
+    {
+      "source": "docs/design/CodingConventions.src.html",
+      "html": "docs/design/CodingConventions.html",
+      "sourceSha256LF": "abbd327b9de5a6f9466c07732d96040e87a45c0e54439e36240350e4ad110375",
+      "htmlSha256LF": "78b0502f9cd6d4ea80035ab7ba9c2e6685e4746935f3f886f41d18200fe2c5ef"
+    },
+    {
+      "source": "docs/design/ContainerLibraryDesign.src.html",
+      "html": "docs/design/ContainerLibraryDesign.html",
+      "sourceSha256LF": "98e4d3494141f5206362c4ca1a8d9fcb29682bb1d182cd3a05c8594bfd6c0cd4",
+      "htmlSha256LF": "673fbb0d77e2913523d4d26e98c762ac87d50ec6a12b0d2dc0ef97b41160bb6f"
+    },
+    {
+      "source": "docs/design/Dx12DeepCapture.src.html",
+      "html": "docs/design/Dx12DeepCapture.html",
+      "sourceSha256LF": "8047e1a94691bc075d8f0823fb702ea33bec68a000220171868524da143c43f3",
+      "htmlSha256LF": "e6a9989855f1b2bd19bcd96802aeb580e10c025fddb5885ca133b2a3a9d50de2"
+    },
+    {
+      "source": "docs/design/EngineVersionPolicy.src.html",
+      "html": "docs/design/EngineVersionPolicy.html",
+      "sourceSha256LF": "23fb1aeceba5621d9544c87e54df4c75765595efb1d535a35b07d59a772a3839",
+      "htmlSha256LF": "35d82b330db872f83e608c3caa24838528e4be83e993407833d1a322b81ea0fc"
+    },
+    {
+      "source": "docs/design/FoliageAssetDepot.src.html",
+      "html": "docs/design/FoliageAssetDepot.html",
+      "sourceSha256LF": "2a60accb4ff37d2511fd1d6d7ffaef4278c973bb24a7fc1cbc965e38ddd1d1d8",
+      "htmlSha256LF": "fad4d79397f91e24645c7297aac1a0ccee308a9e250c947ec76305b49a1ce4db"
+    },
+    {
+      "source": "docs/design/GCCEIntegration.src.html",
+      "html": "docs/design/GCCEIntegration.html",
+      "sourceSha256LF": "9cb6ccb3ba0a4968575e80cb243048b31970fb3ad7e354f6ed3a28f7f1d16f8a",
+      "htmlSha256LF": "6555e4b6423ca218d6725d16ffceb165cdff24b7ae950d2fbd57281ef8768421"
+    },
+    {
+      "source": "docs/design/GpuDrivenMeshletDxrWiring.src.html",
+      "html": "docs/design/GpuDrivenMeshletDxrWiring.html",
+      "sourceSha256LF": "09bd3d49da0bf9bae8e784961e99d3779681b149f4e90718ad3481fdad1bcdcd",
+      "htmlSha256LF": "e3dbac673c6c02565abeb36e639936a03433df72b1549e830b9b6f891ad8fbb3"
+    },
+    {
+      "source": "docs/design/JobSchedulerDesign.src.html",
+      "html": "docs/design/JobSchedulerDesign.html",
+      "sourceSha256LF": "7a8c2ea60aceb4ff8690552df6c86aec11aadf247a1ad24e8058d13e0faed875",
+      "htmlSha256LF": "1db0ba5902f3255a9eff77bd9c04f759f3eab76f3d3789fff87f03c0f085aa32"
+    },
+    {
+      "source": "docs/design/LatticeMaterialBlenderParity.src.html",
+      "html": "docs/design/LatticeMaterialBlenderParity.html",
+      "sourceSha256LF": "a4c37684d56c9926c437f509ab1bfb352dd0607ac269a976f62dd181dad773fb",
+      "htmlSha256LF": "3ea086f1a783e1285f88e6382599773806abbfbe20ede51459ab4cb50841bff1"
+    },
+    {
+      "source": "docs/design/LatticeNodeSystem.src.html",
+      "html": "docs/design/LatticeNodeSystem.html",
+      "sourceSha256LF": "83b30d83cc17b22c07cd81436aa89a9616fb12905e1676afeee4ca7fc778a348",
+      "htmlSha256LF": "f877e77dc22f1eb82e384c1fcb34ed2f504f4f57c8b36d3ecc2c4ad2abc53a96"
+    },
+    {
+      "source": "docs/design/MaterialAssetAuthoring.src.html",
+      "html": "docs/design/MaterialAssetAuthoring.html",
+      "sourceSha256LF": "e83b1bc275868070d8920a5099eaec5b9792822f320f59297db89a1b4990903f",
+      "htmlSha256LF": "799717505ae5a6b9e50745e3490fe86af7da43390bc40f665f6ccd80ab132d7b"
+    },
+    {
+      "source": "docs/design/MaterialGraphMeshSurface.src.html",
+      "html": "docs/design/MaterialGraphMeshSurface.html",
+      "sourceSha256LF": "e8d1a533a6284a4491680b350387036515bb872b141b985dfeae622c8580c317",
+      "htmlSha256LF": "25f950346269052d51cb5266d5940658edb72d0e0e4765d215dc3d215f7ee79f"
+    },
+    {
+      "source": "docs/design/MaterialGraphPassRecording.src.html",
+      "html": "docs/design/MaterialGraphPassRecording.html",
+      "sourceSha256LF": "021c31206fedd8f9f6d18c9f6d9499dfe6903fe42e05cb57c35f413c22681321",
+      "htmlSha256LF": "c36198d60101af4c4795484597cbe409ec640d85378cf5147e01bcf840bede57"
+    },
+    {
+      "source": "docs/design/MaterialGraphProduct.src.html",
+      "html": "docs/design/MaterialGraphProduct.html",
+      "sourceSha256LF": "612e74ce6abeae9486ae1082b36e8bdcdc2b42f9788c3d9cc4eabe4b51b28ac8",
+      "htmlSha256LF": "30d2212887e7338047114d71b406e313742b2338900fc0e998707691c8501452"
+    },
+    {
+      "source": "docs/design/MaterialGraphProductIntegration.src.html",
+      "html": "docs/design/MaterialGraphProductIntegration.html",
+      "sourceSha256LF": "5698ddef6b7954434129d2eb740920c987c2c6cd4deb9eb10c995c8f3bee0e81",
+      "htmlSha256LF": "eb7f548a6a4aa5f4445f0cc40447f6d41809f2571cbff3be83403cf8a315b95b"
+    },
+    {
+      "source": "docs/design/MaterialGraphRasterSurface.src.html",
+      "html": "docs/design/MaterialGraphRasterSurface.html",
+      "sourceSha256LF": "c0e054d0efa9295c55765e91f6ca1f05e2a2a6e956f53ae9a293d54b2623dd22",
+      "htmlSha256LF": "32001adc7c65f94e7f2829a35054d24475bfa89ea6aca2c5ed2f62eb22f945d1"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneCook.src.html",
+      "html": "docs/design/MaterialGraphSceneCook.html",
+      "sourceSha256LF": "57b4387f5e9b414dc7bf7e5b51c02b453927cb1701cde31aa7fae9ae17e3eb3b",
+      "htmlSha256LF": "726413c222393afa6504ed51b83042f11b66a6ecad687113cb73ee7f76751211"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneGeneration.src.html",
+      "html": "docs/design/MaterialGraphSceneGeneration.html",
+      "sourceSha256LF": "c80c5d01726c39347a12966fe4da1300e44d8c78ee5c24fe556e7828f1311428",
+      "htmlSha256LF": "5549cc96662a6a916ec4db7a42cfa29236f42ac4b3703a846c2be17a075ca84c"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneHost.src.html",
+      "html": "docs/design/MaterialGraphSceneHost.html",
+      "sourceSha256LF": "b459c8bd8d8c858015265d95d38fb30b3845fba7204c91d6cb2e97dd06242805",
+      "htmlSha256LF": "ec881fe036eabf509bf2a8ec4d26000e22896f169ba0f9837803e82cb7632732"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneInput.src.html",
+      "html": "docs/design/MaterialGraphSceneInput.html",
+      "sourceSha256LF": "3a1bf3ad03535ae1ac0ba213185e0806aec5a940604d215da4e0fde44edff5a0",
+      "htmlSha256LF": "3d11f75882f16bcaa42073e4d3a226b942020cb6b3f1e04f5c76ca80b7ead084"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneLookup.src.html",
+      "html": "docs/design/MaterialGraphSceneLookup.html",
+      "sourceSha256LF": "a5c0ce93a2307cd2e66b6e670b5588dfb6b3368d7e0b2104371e699541b6c91d",
+      "htmlSha256LF": "bce758d45e452b21eaae40ecb6bd89fa7a76774cad0beed3e47ec4a63fb809dc"
+    },
+    {
+      "source": "docs/design/MaterialGraphScenePacket.src.html",
+      "html": "docs/design/MaterialGraphScenePacket.html",
+      "sourceSha256LF": "a882295d8609a6b406dccba19d8cdfa2053ba9288a62577283ca29b307800f75",
+      "htmlSha256LF": "d7e46599f7e386ba30f9a25c2cb5e185307b83c9273bf8dbc1e60a0500528c96"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneRefraction.src.html",
+      "html": "docs/design/MaterialGraphSceneRefraction.html",
+      "sourceSha256LF": "165c06c0ec467e651bebb0f94181e61755460f61541e71beb2137e3f29a16764",
+      "htmlSha256LF": "fa89389945634dffb0e356ddc0ec751c29e6d5da5d299c3ad118360609040ecd"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneShadowDecal.src.html",
+      "html": "docs/design/MaterialGraphSceneShadowDecal.html",
+      "sourceSha256LF": "623bdcf392400b575ee276c65872ec4cdf11fc9802762774e2b6e48a36640daa",
+      "htmlSha256LF": "bc2c401b97be9ccf0bb975168e764dba06ccb2c68e9c5f2a77d90b2333b2c816"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneSubsurface.src.html",
+      "html": "docs/design/MaterialGraphSceneSubsurface.html",
+      "sourceSha256LF": "e8b52149c63e134dfb6cabb5181cd1f633c77e709f6b811af26b08f9c027ebb2",
+      "htmlSha256LF": "6064ed702f78c97f8e5c2a95f67e6151e2a9f2a02295226d823a7d4cc39f9c9c"
+    },
+    {
+      "source": "docs/design/MaterialGraphSceneVolume.src.html",
+      "html": "docs/design/MaterialGraphSceneVolume.html",
+      "sourceSha256LF": "ad5ada499d22865a8850d3e8ca66358ef0a0682a1038c519061f1b9a21f1cee4",
+      "htmlSha256LF": "b31cef90368050f7b2203fc8dcef31a78c1b058a85fe5d60d7f405803d7e8bf5"
+    },
+    {
+      "source": "docs/design/MaterialGraphSchema.src.html",
+      "html": "docs/design/MaterialGraphSchema.html",
+      "sourceSha256LF": "2fa927ee512468928463e79cd9cac198dbc0fc7f0bf672aa92c524d7f7e4cae8",
+      "htmlSha256LF": "ffbc97ec0452437d2752be21219ae6ffbe6d6f2382a6c938f05a0c919bad1394"
+    },
+    {
+      "source": "docs/design/MaterialGraphSharedDepth.src.html",
+      "html": "docs/design/MaterialGraphSharedDepth.html",
+      "sourceSha256LF": "cec8f24c64c4f261914000f2bae4faa7b4ee0916fece36d22e0a91d2cb5b8d24",
+      "htmlSha256LF": "460151ba329207ec4cb46607f3d954d99df348f814c0720a9d349b24bbe247fe"
+    },
+    {
+      "source": "docs/design/MaterialGraphSurfaceBatch.src.html",
+      "html": "docs/design/MaterialGraphSurfaceBatch.html",
+      "sourceSha256LF": "7662a483878a8b113eb944119dcbe8162c02246057a3f8babb7f2b8e8f548639",
+      "htmlSha256LF": "84a561d4aaf68956294719368da2eb823d48c73c5cd76e3631615d3c4cefbcf9"
+    },
+    {
+      "source": "docs/design/MaterialGraphTextureFootprints.src.html",
+      "html": "docs/design/MaterialGraphTextureFootprints.html",
+      "sourceSha256LF": "657e2b77807b408d899e4d870e126f70d14a5b4559894b486b4910de539592d5",
+      "htmlSha256LF": "b667270bbd07e054b820de1b83ab1d6646cc257f69f1c142afb73a8c85b9e445"
+    },
+    {
+      "source": "docs/design/MaterialNodeEditor.src.html",
+      "html": "docs/design/MaterialNodeEditor.html",
+      "sourceSha256LF": "33cd89bc0788f12edb8f732b909ea78edd3bb50ece69e43e922a92d07090a989",
+      "htmlSha256LF": "3cf82d4a7e0eb6f37da38fc9121328261ce0c1becc7b952013d827c207fc1633"
+    },
+    {
+      "source": "docs/design/MaterialSlangCodegen.src.html",
+      "html": "docs/design/MaterialSlangCodegen.html",
+      "sourceSha256LF": "8ad5b3bc4b9737595e73f8e030db00410ad2eb703a0f8346c1426620306567b3",
+      "htmlSha256LF": "755e702e997b86f07ff9e60de10609e9473dd2d56657f5f127bc22f1f0789396"
+    },
+    {
+      "source": "docs/design/ModelAnimationStorageSharing.src.html",
+      "html": "docs/design/ModelAnimationStorageSharing.html",
+      "sourceSha256LF": "f44ab5c86973fd57340d15da23f550fe5ccfa1e56c021d2d75ec0100734f54ed",
+      "htmlSha256LF": "b566e384961e849610a7e2bf9782aa507787120231f232bf2135821051fa90f2"
+    },
+    {
+      "source": "docs/design/OwnedBoundedPresentation.src.html",
+      "html": "docs/design/OwnedBoundedPresentation.html",
+      "sourceSha256LF": "08c6a78f6974c351951b5f3c53ad3bcd176261e54b7fa65f4a9e659f44e010b8",
+      "htmlSha256LF": "39e23bfa706d43cc0df4ce5d3888a815921edf0ace29e5b59f8a7c297cb7c657"
+    },
+    {
+      "source": "docs/design/PhysicsAPIContract.src.html",
+      "html": "docs/design/PhysicsAPIContract.html",
+      "sourceSha256LF": "4ce048df63306a62ce818f2833add564c2896041cee689fb3c1cab222a136635",
+      "htmlSha256LF": "4d2ef82350c419cf5a75841f75111ebc6f2d82969a6e8033abba31eb5f12dac3"
+    },
+    {
+      "source": "docs/design/PhysicsComponentDesign.src.html",
+      "html": "docs/design/PhysicsComponentDesign.html",
+      "sourceSha256LF": "c4cab25a827136c0482f83ccee262da16e762c6648ffbd46164cc156d56808a0",
+      "htmlSha256LF": "9b7bf1ec3307c82967e0b3d5b3a956b6d62814be7b916f48f1358bdda5dba553"
+    },
+    {
+      "source": "docs/design/PhysicsContactExecutionContract.src.html",
+      "html": "docs/design/PhysicsContactExecutionContract.html",
+      "sourceSha256LF": "ab915c96a7795b5cc2c24898684cb1b90e57f97903324556134f0de171605c53",
+      "htmlSha256LF": "2ba585185d7647f20b45e302056b13ab7a95d1c8038800cf2b6f0afd7b6a21fa"
+    },
+    {
+      "source": "docs/design/PlayerNativePresentation.src.html",
+      "html": "docs/design/PlayerNativePresentation.html",
+      "sourceSha256LF": "43b1cf68a29d4b2d1595abe80ec23c0d2112a9828ff79c772014382bb34c78cf",
+      "htmlSha256LF": "9c7d0e14f1a716c36f1f0106d8037489bbb66a6835d45dd62fe56a91bca84ea1"
+    },
+    {
+      "source": "docs/design/PrincipledCoreSemantics.src.html",
+      "html": "docs/design/PrincipledCoreSemantics.html",
+      "sourceSha256LF": "1276052f70cbbb8345180b3a9de3f7bd3af8a787c04f039a0fbf06723e78a181",
+      "htmlSha256LF": "64aa4473e74208ccf4c977781390699d5b4d2fd131baecc38d5d47de399114f2"
+    },
+    {
+      "source": "docs/design/PrincipledIblBake.src.html",
+      "html": "docs/design/PrincipledIblBake.html",
+      "sourceSha256LF": "255f259d9817a38b63b6f3b307b4c1084bdadf871bb0a3d196532a43f9a7db32",
+      "htmlSha256LF": "53782ddb7f034959aabff45f623fb7eb8a1bb8c84a8c075f022dca361c8e0648"
+    },
+    {
+      "source": "docs/design/PrincipledLayeredSemantics.src.html",
+      "html": "docs/design/PrincipledLayeredSemantics.html",
+      "sourceSha256LF": "a254c12d3858332c50e3328852d042e0c624ec19c3f5bf02c9baa4753f130a0a",
+      "htmlSha256LF": "df6829e70cf816f72232f5f9ad807276164a010eb1f1cd0b4d7c191dec81074a"
+    },
+    {
+      "source": "docs/design/PrincipledMaterialAbi.src.html",
+      "html": "docs/design/PrincipledMaterialAbi.html",
+      "sourceSha256LF": "cf9466f34eeacdf423f29c1ce7e6168706b09dafab45ad9c71b7c755c3dbc5f8",
+      "htmlSha256LF": "a17acc595f4f9aaf8ba389e32b6c87cdc34ee2d177f6eac915031fef30f23566"
+    },
+    {
+      "source": "docs/design/PrincipledSpecialSemantics.src.html",
+      "html": "docs/design/PrincipledSpecialSemantics.html",
+      "sourceSha256LF": "440216f945885adb081e88569ed4f11bb716faca1c2bbfbc7f076b71b001e21c",
+      "htmlSha256LF": "32a92f6e72156768789d5b40304c5dbaa9569c47531969d56f216f7becd33d39"
+    },
+    {
+      "source": "docs/design/ProfilerContinuousRecording.src.html",
+      "html": "docs/design/ProfilerContinuousRecording.html",
+      "sourceSha256LF": "6f90fe5bb5d056ee0b175c34b3a9369b71a4dfba1c0e574f68eed9198b7b05a2",
+      "htmlSha256LF": "03429b65f896e4762040b4b44e86a886dffb0ba72f194e5a28256e597d170466"
+    },
+    {
+      "source": "docs/design/ProfilerViewerProcess.src.html",
+      "html": "docs/design/ProfilerViewerProcess.html",
+      "sourceSha256LF": "250b135b3a095fd25a0f63b9c416a8196dab6c6383fb12264cfa359da3f145ad",
+      "htmlSha256LF": "2a8db876d0c44a8e68d74ade94a202b5f973b4d5ea7c4677d6017b760a267eaa"
+    },
+    {
+      "source": "docs/design/ReflectionDesign.src.html",
+      "html": "docs/design/ReflectionDesign.html",
+      "sourceSha256LF": "b279d577dc099bb2093e9208444e8344302589611d9b69e044dab7ab0f38f92b",
+      "htmlSha256LF": "602fbcdec682830bff9ae24abe34a80afabfb663c69e1456e5b6fb98f7b3b6fb"
+    },
+    {
+      "source": "docs/design/ReflectionRetentionDecision.src.html",
+      "html": "docs/design/ReflectionRetentionDecision.html",
+      "sourceSha256LF": "ba24d10627509aa11a2bdaaca4658a8f32d042b4e3e9d86b98d29bb055976e03",
+      "htmlSha256LF": "c47576ba2b42ea90dfa40ce6afdc672228efa83c79ece1de5de5c2ab353d7626"
+    },
+    {
+      "source": "docs/design/RenderPipelineTargetArchitecture.src.html",
+      "html": "docs/design/RenderPipelineTargetArchitecture.html",
+      "sourceSha256LF": "dd0241eede0bdc57bea202a84a64c0e230134c556f83568a2991c64bd10d1462",
+      "htmlSha256LF": "07554c0f512a91cb41d23bf7a77ba9d366b8e1ccfdb327ca3fb6de3903531ecb"
+    },
+    {
+      "source": "docs/design/RhiGpuMemoryLifetimeDesign.src.html",
+      "html": "docs/design/RhiGpuMemoryLifetimeDesign.html",
+      "sourceSha256LF": "f93adf7aa45a5141bf4967daa17a6bfd964e3b5961e5c9c55e4701063dcec5b8",
+      "htmlSha256LF": "b78c37c93327673531e1c155e482cde9573e9d59c220a89e64a12e3366657e43"
+    },
+    {
+      "source": "docs/design/RHISoftwareCommandListSpecification.src.html",
+      "html": "docs/design/RHISoftwareCommandListSpecification.html",
+      "sourceSha256LF": "6c31b50feee31bffc3bc41b5770ad4b8425743e600ce69f1c27d468c018e9d0b",
+      "htmlSha256LF": "7a0e433a4a44d50ee687de9a15938e0730dcbdafbdd1f026783b6d86d8073d69"
+    },
+    {
+      "source": "docs/design/SdfTextRendering.src.html",
+      "html": "docs/design/SdfTextRendering.html",
+      "sourceSha256LF": "c20388c2469db03a030f512fa39217f34668023a2146b372238f70674eb4873f",
+      "htmlSha256LF": "9122527e8a296702f7d992444c207b6d689e7682d7447a960fa128fc26d460dc"
+    },
+    {
+      "source": "docs/design/SourceFreeAssetSetPackaging.src.html",
+      "html": "docs/design/SourceFreeAssetSetPackaging.html",
+      "sourceSha256LF": "d52ea7a89f1f71620bd26a74f38b88e422ba6941b86334e8416dac16bd5a7e2f",
+      "htmlSha256LF": "ec84c7c4c83cb94048fff81cae3e1460ef449c65796e4e11936e5a35bce1b2ed"
+    },
+    {
+      "source": "docs/design/TextureCodecBoundaryDesign.src.html",
+      "html": "docs/design/TextureCodecBoundaryDesign.html",
+      "sourceSha256LF": "fb300192f253db38bc1080d0873831a9a707ff2c076699fe12d17d33237b82d2",
+      "htmlSha256LF": "4addf80beebd23d2b106d09ba3665334575781e6e5415b15b286a25f9e2a2934"
+    },
+    {
+      "source": "docs/README.src.html",
+      "html": "docs/README.html",
+      "sourceSha256LF": "7a6e1de54f219c946c0a532950b771d8bd35dada57b84d8d2f50bbf635092640",
+      "htmlSha256LF": "96af5fadbd00b27c138afc18df6e13b9fbc6395c29274f14abb4a21cbaa28155"
+    },
+    {
+      "source": "docs/TechnicalGuide.src.html",
+      "html": "docs/TechnicalGuide.html",
+      "sourceSha256LF": "212b3276aa8e997dd3a0cdbdaf3fefd85bbbd0c59d5bbebc7e4f7baab2cca431",
+      "htmlSha256LF": "d676d65447a22f02f672280f0a5df2558c1ad846bcd52ae1266a5bdc0953d1f3"
+    },
+    {
+      "source": "docs/WEBSITE.src.html",
+      "html": "docs/WEBSITE.html",
+      "sourceSha256LF": "13b15e52b957e85eba11664b6bf3e383f08295dde09aaef823d7eb046fbb046d",
+      "htmlSha256LF": "7a39743efed511044b4076f75810db7ed7feecda75931960447d23b33bf82421"
+    },
+    {
+      "source": "docs/analysis/MasterDocumentationAudit20261020.src.html",
+      "html": "docs/analysis/MasterDocumentationAudit20261020.html",
+      "sourceSha256LF": "a51200283a856a4b119a6c0d004a1ec49f32467f903749ad83a502d227b221d2",
+      "htmlSha256LF": "ad6d35c259d4c689ada6a4e57e6e88388cdf840df4fbc4353ad8ee00d9192472"
+    },
+    {
+      "source": "docs/analysis/EngineWiringAudit20261020.src.html",
+      "html": "docs/analysis/EngineWiringAudit20261020.html",
+      "sourceSha256LF": "c1d6534b84e5d2b987554646f5761c8c947cbfae5a9c48224273447330e0e532",
+      "htmlSha256LF": "877b84649bae05d92efbdf7587d5675943e2bfa132058910195407b2f3906ce5"
+    },
+    {
+      "source": "docs/analysis/MasterStructureReduction20261020.src.html",
+      "html": "docs/analysis/MasterStructureReduction20261020.html",
+      "sourceSha256LF": "3fc59ad65f4a683a01980bbed5b36d099ee81e155dfe6ac453f28f2fb6cd5093",
+      "htmlSha256LF": "a3f715a411268197a163545163f6d778ad5ea01860e01871d1fbb1c72d2b6248"
+    }
+  ],
+  "hashPolicy": "Rendered HTML and source hashes use CRLF-to-LF normalization, matching Git canonical text and HTML parser newline handling. Prior working-tree receipts remain historical.",
+  "acceptanceBoundary": "This is repository integration and documentation validation. The 2026-10-20 source audit remains pinned to 27de3f5; incoming engine/GPU changes are not represented as a new full engine acceptance run."
+}

@@ -19,6 +19,8 @@ const GENERATOR = 'Tools/docs/render-markdown-docs.mjs';
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 });
 const toPosix = p => p.replace(/\\/g, '/');
+const sourceRevision = git('rev-parse', 'HEAD').trim();
+const sourcePaths = new Set(git('ls-tree','-r','--name-only',sourceRevision).trim().split(/\r?\n/));
 
 // 추적·미추적(무시 제외) Markdown 전부. 지운 파일이 목록에 남지 않도록 실재를 확인한다.
 function listMarkdown() {
@@ -180,8 +182,12 @@ function renderDocument(source, file, markdownSet) {
 function rewriteHref(href, here, markdownSet) {
   if (!href || /^(?:[a-z]+:|#|\/\/)/i.test(href)) return href;
   const [path, hash] = href.split('#');
+  const target = posix.normalize(posix.join(here, decodeURI(path.split('?')[0])));
+  if (!target.startsWith('docs/')) {
+    if (sourcePaths.has(target)) return `https://github.com/29thnight/CreatorEngine/blob/${sourceRevision}/${target}${hash ? '#'+hash : ''}`;
+    if ([...sourcePaths].some(p=>p.startsWith(target.replace(/\/$/,'')+'/'))) return `https://github.com/29thnight/CreatorEngine/tree/${sourceRevision}/${target}`;
+  }
   if (!path.toLowerCase().endsWith('.md')) return href;
-  const target = posix.normalize(posix.join(here, decodeURI(path)));
   if (!markdownSet.has(target)) return href;
   return path.replace(/\.md$/i, '.html') + (hash !== undefined ? `#${hash}` : '');
 }

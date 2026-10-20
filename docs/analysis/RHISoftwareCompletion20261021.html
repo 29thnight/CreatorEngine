@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RHISoftwareCompletion20261021.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>소프트웨어 RHI 명령 목록: 기존 제품 경로 연결과 할당 최적화</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-판정과-범위">1. 판정과 범위</a></li><li><a href="#2-최신-master-계측으로-정한-기준선">2. 최신 master 계측으로 정한 기준선</a></li><li><a href="#3-owned-queue의-기록번역제출-계약">3. owned queue의 기록·번역·제출 계약</a></li><li><a href="#4-분배와-재사용-최적화">4. 분배와 재사용 최적화</a></li><li><a href="#5-바이트-admission과-cpugpu-수명">5. 바이트 admission과 CPU/GPU 수명</a></li><li><a href="#6-bool-실패와-상태-보존">6. bool 실패와 상태 보존</a></li><li><a href="#7-vulkan-고정-recording과-native-수명">7. Vulkan 고정 recording과 native 수명</a></li><li><a href="#8-rhi-identity-계측과-소비">8. RHI identity 계측과 소비</a></li><li><a href="#9-성능-공학-근거와-검증-원칙">9. 성능 공학 근거와 검증 원칙</a></li><li><a href="#10-재현-및-제품-수용">10. 재현 및 제품 수용</a></li><li><a href="#11-최종-cpu-검증과-측정-결과">11. 최종 CPU 검증과 측정 결과</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RHISoftwareCompletion20261021.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>소프트웨어 RHI 명령 목록: 기존 제품 경로 연결과 할당 최적화</h1>
+<div class="meta"><p>기준일: 2026-10-21 KST / 2026-10-20 UTC. 기준 master는 <code>088ea7b70c1a610e93fd2e0f6a2f35a2b9a5e175</code>다. 요청한 <a href="https://github.com/29thnight/CreatorEngine/blob/09df9a16b775029ae55c7a2553e4ca8e4bcd87a4/docs/design/RHISoftwareCommandListSpecification.md">09df9a16의 구현 스펙</a>은 이 master의 스펙과 내용이 같다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">7<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 7"><i class="ok" style="flex:7"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 7</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 11개의 분량 막대">
+<a class="map-row" href="#1-판정과-범위"><span class="ve-label">§1</span><span class="map-name">판정과 범위</span><span class="map-bar"><i style="width:37.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-최신-master-계측으로-정한-기준선"><span class="ve-label">§2</span><span class="map-name">최신 master 계측으로 정한 기준선</span><span class="map-bar"><i style="width:43.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-owned-queue의-기록번역제출-계약"><span class="ve-label">§3</span><span class="map-name">owned queue의 기록·번역·제출 계약</span><span class="map-bar"><i style="width:30.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-분배와-재사용-최적화"><span class="ve-label">§4</span><span class="map-name">분배와 재사용 최적화</span><span class="map-bar"><i style="width:40.2%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#5-바이트-admission과-cpugpu-수명"><span class="ve-label">§5</span><span class="map-name">바이트 admission과 CPU/GPU 수명</span><span class="map-bar"><i style="width:36.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-bool-실패와-상태-보존"><span class="ve-label">§6</span><span class="map-name">bool 실패와 상태 보존</span><span class="map-bar"><i style="width:32.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-vulkan-고정-recording과-native-수명"><span class="ve-label">§7</span><span class="map-name">Vulkan 고정 recording과 native 수명</span><span class="map-bar"><i style="width:33.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-rhi-identity-계측과-소비"><span class="ve-label">§8</span><span class="map-name">RHI identity 계측과 소비</span><span class="map-bar"><i style="width:67.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-성능-공학-근거와-검증-원칙"><span class="ve-label">§9</span><span class="map-name">성능 공학 근거와 검증 원칙</span><span class="map-bar"><i style="width:11.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#10-재현-및-제품-수용"><span class="ve-label">§10</span><span class="map-name">재현 및 제품 수용</span><span class="map-bar"><i style="width:47.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#11-최종-cpu-검증과-측정-결과"><span class="ve-label">§11</span><span class="map-name">최종 CPU 검증과 측정 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">6</span></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 11개 가운데 「11. 최종 CPU 검증과 측정 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-1-판정과-범위">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-판정과-범위">1. 판정과 범위</h2></div>
+<div class="prose"><p>DX12의 기존 parallel-pool 소프트웨어 기록 경로에 더해 <strong>DX12 owned/multiqueue 소비 어댑터와 Vulkan의 기존 graphics parallel-pool 제품 연결</strong>을 구현했다. 명령 수락·번역·native 제출·GPU 완료를 구분하고, CPU 저장소를 GPU 완료까지 불필요하게 붙잡지 않도록 했다. target 저장소와 native encoder의 재사용, bounded admission, bool 실패 후 fallback을 함께 보완했다.</p>
+<p>기능 구현, CPU 계약 검사, 실제 GPU 제품 수용은 서로 다른 판정이다. 이 변경은 <code>CREATOR_RHI_SOFTWARE_COMMANDS=1</code>의 명시적 선택을 유지한다. Windows Editor와 실제 DX12/Vulkan GPU에서의 픽셀·validation·lifecycle 검사 및 CreatorRobot 전후 계측이 끝나기 전에는 기본 경로 전환이나 120 FPS 달성을 승인하지 않는다. CPU fixture의 native 경계는 GPU/driver 동작을 증명하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th>기준 master</th><th>이번 변경</th><th>수용 범위</th></tr></thead>
+<tbody><tr><td>DX12 graphics parallel pool</td><td>소프트웨어 기록, 고정 자원, 직렬/병렬 번역, 기존 FIFO 연결</td><td>target 수 축소/재확장 재사용, 바이트 admission, bool 계약, 계측 보강</td><td>실제 공용 코드 CPU 검사; 새 제품 GPU 실행 필요</td></tr>
+<tr><td>DX12 owned graphics/compute</td><td>native recorder만 제품에 연결</td><td>소프트웨어 recorder/queue/factory, 병렬 번역과 실제 queue transaction 연결</td><td>CPU queue 계약 검사; native 두 프레임 readback 및 timeline 회귀 추가</td></tr>
+<tr><td>Vulkan graphics parallel pool</td><td>typed translator가 있으나 제품 software 경로와 고정 자원 수명 연결 부족</td><td>validator, immutable recording snapshot, private descriptor pool, 기존 FIFO 연결</td><td>공식 Vulkan 헤더를 사용한 CPU 계약 검사; 실제 Vulkan GPU 실행 필요</td></tr>
+<tr><td>Vulkan owned/multiqueue native backend</td><td>native factory/recorder 자체가 없음</td><td>이번 변경의 기존 제품 소비 경로에 포함되지 않음</td><td>generic adapter 구현을 Vulkan owned 지원으로 확대 해석하지 않음</td></tr>
+<tr><td>native encoder 자체의 미지원 기능</td><td>백엔드별 차이 존재</td><td>bool 미지원은 기록 전에 false, void 미지원은 번역 실패로 보존</td><td>미지원 native 기능을 성공으로 위장하지 않음</td></tr></tbody></table></div>
+<p>이번 fork/join의 대상은 <strong>선언이 끝난 그래프의 명령 기록과 독립 native target의 번역</strong>이다. <code>RenderGraphDeclare</code>의 모든 노드 callback을 병렬화한 변경이 아니며, <code>MaterialGraphScenePrepare</code>의 준비 작업을 직접 단축한 변경도 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-최신-master-계측으로-정한-기준선">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-최신-master-계측으로-정한-기준선">2. 최신 master 계측으로 정한 기준선</h2></div>
+<div class="prose"><p><a href="RHISoftwareCompletion20261021-baseline.json">기준선 추출 JSON</a>은 <code>Artifacts/remeasure-12-20261020</code>의 manifest, 조건, summary, scope 지표 및 소스 identity를 추적한다. 자료를 커밋한 HEAD는 <code>088ea7b…</code>, 자료가 보고한 실행 코드 HEAD는 <code>c12fe3f…</code>다. Debug CreatorRobot Play, 8 workers, software RHI 활성, Scene/Game 1186×514, window당 약 15초 조건이다.</p>
+<h3 id="전체-baseline-summary">전체 baseline summary</h3>
+<p>같은 전체 summary의 호출당 inclusive wall time이다. 아래 부모/자식 구간이나 다른 스레드의 구간을 더해 전체 프레임 시간을 계산하면 안 된다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>구간</th><th style="text-align:right">표본 수</th><th style="text-align:right">평균 ms</th><th style="text-align:right">p50 ms</th><th style="text-align:right">p95 ms</th></tr></thead>
+<tbody><tr><td>RenderGraphDeclare</td><td class="num" style="text-align:right">818</td><td class="num" style="text-align:right">4.089827</td><td class="num" style="text-align:right">3.964750</td><td class="num" style="text-align:right">4.843200</td></tr>
+<tr><td>MaterialGraphScenePrepare</td><td class="num" style="text-align:right">818</td><td class="num" style="text-align:right">2.820819</td><td class="num" style="text-align:right">2.773850</td><td class="num" style="text-align:right">3.448600</td></tr>
+<tr><td>RenderCommandRecord</td><td class="num" style="text-align:right">818</td><td class="num" style="text-align:right">1.703046</td><td class="num" style="text-align:right">1.707100</td><td class="num" style="text-align:right">1.921500</td></tr>
+<tr><td>RHISoftwareTranslate / RHIThread</td><td class="num" style="text-align:right">818</td><td class="num" style="text-align:right">0.851698</td><td class="num" style="text-align:right">0.823100</td><td class="num" style="text-align:right">1.035800</td></tr>
+<tr><td>RenderGraphCompile</td><td class="num" style="text-align:right">818</td><td class="num" style="text-align:right">0.768262</td><td class="num" style="text-align:right">0.735950</td><td class="num" style="text-align:right">0.981900</td></tr>
+<tr><td>RenderView</td><td class="num" style="text-align:right">818</td><td class="num" style="text-align:right">12.312635</td><td class="num" style="text-align:right">12.295350</td><td class="num" style="text-align:right">14.370300</td></tr></tbody></table></div>
+<p>별도 ETW ON containment-selected 689개 구간에서 <code>RenderGraphDeclare</code>는 평균 4.688408ms 중 Running 4.682907ms다. <code>RenderCommandRecord</code>는 wall 2.091382ms, owner Waiting 1.743231ms이고, <code>RHISoftwareTranslate</code>는 wall 1.031247ms, owner Waiting 0.613263ms다. 이 대기는 join/작업 의존성의 관측값이며, 그대로 제거할 수 있는 낭비 시간이라는 뜻은 아니다. ETW ON과 위 baseline은 계측 조건·표본 집합이 달라 코드 변경 전후로 비교하지 않는다.</p>
+<p>전체 baseline의 logical target별 기록 작업 합계/record는 target 0<del>7 순서로 <code>0.233694, 0.814389, 0.877799, 0.746818, 0.908396, 0.357570, 0.647552, 1.191871ms</code>다. 이는 물리 Worker 0</del>7의 실행 시간이 아니다. target 하나에 여러 segment가 속할 수 있고, 구간 합계는 critical path와 다르다. 큰 target을 먼저 맡기고 빈 worker가 다음 target을 가져가는 정책을 유지한 이유이며, 그래프 의존성이나 stateful target을 무시하고 8등분할 근거는 아니다.</p>
+<p>기록 ON/OFF의 완료 real view 처리량은 각각 52.92056/60.92271뷰/초다. 한 publication에 여러 뷰가 있으므로 displayed FPS로 바꾸지 않는다. 이 캡처는 direct-native/software A/B가 아니다. 기록 중 파일이 바뀌지 않았다는 <code>sourceUnchanged=true</code>는 pristine HEAD 증명이 아니다. 선택한 RHI 입력 32개 중 31개는 exact 또는 균일 LF→CRLF 비교로 대응하며 <code>RHIResourceState.h</code> 1개는 미해결이다. 전체 715개 입력의 완전 재현을 주장하지 않는다. pixel acceptance/native quality gate도 이 자료만으로 통과하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-owned-queue의-기록번역제출-계약">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-owned-queue의-기록번역제출-계약">3. owned queue의 기록·번역·제출 계약</h2></div>
+<div class="prose"><p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.h">RHISoftwareQueueRecorder</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/RHISoftwareQueueRecorder.cpp">구현</a>은 <code>IRHIQueueRecorder</code>의 기존 호출면을 유지한다. callback은 software encoder에 한 번 기록되고, <code>Finish</code>는 native list를 열지 않고 소프트웨어 batch를 밀봉한다. wrapper는 native queue와 동일한 <code>RHIQueueIdentity</code>와 timeline을 사용하며 새 GPU queue를 만들지 않는다.</p>
+<p><code>Submit</code>은 backend의 <code>ExecuteSubmission</code>에 전체 transaction을 한 번 전달한다. owner 내부에서 독립 target들을 번역하고 합류한 뒤 native <code>Submit</code>을 수행하며, 실제 signal이 발행된 경우에만 timeline point를 반환한다. CPU 번역 완료만으로 issued point를 미리 만들지 않는다. <code>Wait</code>, <code>Signal</code>, <code>Submit</code>은 같은 transaction 직렬화 경계를 사용한다. 호출 스레드가 mutex를 가진 채 다른 owner의 응답을 기다리지 않도록 잠금은 owner callback 안에서 획득한다.</p>
+<p>밀봉 batch의 제출 권한은 CAS로 한 번만 소비한다. 같은 <code>shared_ptr</code>의 여러 alias가 동시에 제출해도 replay는 한 번이며, 실패 후 재시도로 이미 기록한 draw prefix를 다시 실행하지 않는다. CPU 번역 오류와 native 실행 후 fence 불명확 실패의 소유권은 별도다. 후자는 기존 backend quarantine 경로에 남는다. worker 0개를 보고하는 legacy recorder는 한 target의 한 segment만 허용한다. pass 상태 초기화 계약이 없는 native callback에 여러 segment를 이어 붙이지 않는다.</p>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp">DX12 제품 어댑터</a>는 recorder를 프레임마다 만들지 않고 보존하며, 기존 기본값 4가 아닌 실제 command worker 수를 전달한다. graphics/compute endpoint의 native identity를 유지하고 제출 함수에만 software wrapper를 전달한다. transaction 도중 앞 batch가 제출된 뒤 뒤 batch가 실패해도 이미 사용한 <code>nextSignal</code>을 되돌리지 않는다. owned 경로의 자원 버전 고정은 기존 동기 <code>ExecuteSubmission</code> rendezvous와 <code>BeginQueueFrame</code> 이후 descriptor/upload 준비 계약에 의존한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-분배와-재사용-최적화">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-분배와-재사용-최적화">4. 분배와 재사용 최적화</h2></div>
+<div class="prose"><p>번역은 기존 <code>job_scheduler</code>/enkiTS와 <code>RHITranslationWorkQueue</code>를 사용한다. target별 명령 수를 비용 추정치로 삼아 큰 target부터 배치하고, 각 job이 다음 target을 동적으로 가져간다. target 안의 segment/opcode 순서는 유지하며 최종 native 제출 순서는 compiled <code>targetOrder</code>로 복원한다. 오류도 완료가 빠른 worker 순서 대신 원래 target 순서로 확정한다. 새로운 스레드 풀이나 target 수만큼의 프레임 지역 동적 컨테이너를 만들지 않는다.</p>
+<p>작은 batch는 owner에서 직렬로 처리한다. 제품 연결의 <code>minCommandsPerJob=256</code>은 master가 이미 사용한 보수적 정책을 이어 받은 값이다. CPU synthetic 결과만으로 실제 장면의 최적 임계값이라고 확정하지 않는다. 명령 종류별 native 비용이 다르므로 opcode 수는 비용의 근사이며, 큰 stateful target 하나의 내부를 임의로 잘라 완전 균등 분배를 보장하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>저장소</th><th>변경</th><th>수명/할당 경계</th></tr></thead>
+<tbody><tr><td>software targets/encoders/budgets</td><td>별도 <code>activeTargetCount</code>, 보관 배열은 축소하지 않음</td><td>8→1→8일 때 비활성 객체를 재사용; 활성 prefix만 검사·통계·밀봉</td></tr>
+<tr><td>software owned wrapper</td><td>domain당 최대 64개 객체 보관</td><td>마지막 alias에서 CPU 입력/owner 해제; shared control block 할당까지 0이라는 주장은 하지 않음</td></tr>
+<tr><td>DX12 owned target</td><td>allocator/list와 encoder를 같은 pool storage에 보관</td><td>미제출 확정 취소 또는 native GPU retirement 뒤 재사용</td></tr>
+<tr><td>DX12 target 목록</td><td>최대 8개의 고정 배열, 일반 외부 API overflow에는 기존 확장 저장소</td><td>일상적인 1~8 target 경로의 지역 vector 제거</td></tr>
+<tr><td>DX12 native submit 포인터 목록</td><td>queue 멤버 scratch의 capacity 보존</td><td>기존 admission 직렬화 아래 사용; 모든 반환 경로에서 borrowed pointer 제거</td></tr>
+<tr><td><span class="chip ok">DX12 완료 batch 수집</span></td><td>최대 8개의 고정 retirement 배열로 나누어 수집</td><td>한 번 읽은 fence 완료값을 기준으로 선별하고 잠금 밖에서 해제; 지역 vector 재할당 제거</td></tr>
+<tr><td>Vulkan metadata</td><td>frozen pool 멤버 vector와 내부 capacity 보존</td><td>완료 전 외부 owner가 있으면 재사용 금지</td></tr>
+<tr><td>Vulkan native 제출 목록</td><td>최대 8개의 command buffer / submit-info 고정 배열</td><td>프레임 지역 vector 제거</td></tr></tbody></table></div>
+<p><code>IRHIQueueRecording::AcquireTranslationEncoder</code>는 논리 pass 상태 초기화와 native cache 초기화를 구분한다. DX12는 segment마다 pipeline 유효성을 비우면서 같은 native target의 PSO/root-signature/heap cache를 보존한다. 새 native list recording에서는 전체 상태를 reset한다. 캐시된 encoder가 다른 <code>DX12DeviceResources</code> facade에 속하면 재생성한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-바이트-admission과-cpugpu-수명">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-바이트-admission과-cpugpu-수명">5. 바이트 admission과 CPU/GPU 수명</h2></div>
+<div class="prose"><p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/RHISubmissionThread.cpp">RHISubmissionThread</a>는 기존 용량 3의 FIFO에 기본 256MiB의 queued+running software arena 수용 제한을 추가한다. 단위는 <code>GetRecordingStats().allocatedBytes</code>로, arena chunk의 예약 용량이다. native 완료점 예약/upload 진행 전에 단일 batch 초과를 거절하고, 합계 초과 시 기존 FIFO의 condition variable을 사용한다. 대기 중 owner 취소·세대 변경·fault도 재검사한다.</p>
+<p>번역/취소 work capture의 소멸이 끝난 다음 CPU byte credit을 반환한다. 취소된 토큰의 소멸자가 진행 중인 상황에서도 메모리가 먼저 재사용된 것으로 계산하지 않는다. CPU credits가 반환돼도 native batch, upload, descriptor, GPU resource owner는 기존 completion/timeline retirement가 유지한다.</p>
+<p>owned queue는 <code>Finish</code>에서 domain 전체 sealed/running arena를 기본 256MiB까지 접수한다. RDG가 여러 callback을 먼저 기록하고 이후 제출하기 때문에 한도 초과 시 blocking wait를 하지 않고 terminal failure를 반환한다. 번역 합류 후 또는 마지막 미제출 alias 폐기 시 credit을 정확히 한 번 돌려준다. <strong>이 제한은 아직 Finish하지 않은 callback들의 순간 메모리, 프로세스 전체 RSS, GPU 자원 메모리의 hard cap이 아니다.</strong> 기존 GPU frame slot/retirement 제한과 역할을 구분한다.</p>
+<p>기존 제품의 DX12/Vulkan 렌더러는 각 view의 <code>BeginFrame</code>부터 prefix/body 제출을 거쳐 <code>EndFrame</code>까지 같은 backend frame slot을 사용한다. 두 backend의 3개 frame slot은 재사용 전에 이전 ticket 및 GPU fence를 기다리며, tail fence를 저장한 다음에만 다음 slot으로 이동한다. 따라서 software용으로 별도 GPU batch 3개 제한을 덧붙이지 않았다. prefix/body와 여러 큐가 한 frame credit을 공유하는 기존 계약을 사용한다. 독립적인 generic queue API에 프로세스 전체 GPU batch 개수 제한이 생겼다는 의미는 아니다.</p>
+<p>upload prefix는 기존 FIFO의 준비 작업에서 본문보다 먼저 처리하며 frozen version이 stale/duplicate 사용을 거부한다. prefix가 이미 실행된 뒤 본문 번역이 실패한 경우 앞의 GPU 작업을 취소된 것으로 바꾸지 않는다. abort는 현재 미제출 기록에만 적용하고 이전 prefix의 fence를 지우지 않는다. 실행 불명확 실패는 숫자 fence만으로 해제하지 않고 기존 device-loss/drain 증명 또는 quarantine을 따른다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-bool-실패와-상태-보존">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-bool-실패와-상태-보존">6. bool 실패와 상태 보존</h2></div>
+<div class="prose"><p>스펙 §6의 <code>false</code>는 fallback을 계속 기록할 수 있어야 한다. 기존 <code>CopySpan</code> 후 <code>Append</code> 방식은 간접 batch의 payload만 소비한 뒤 명령 예산에 걸리거나 sticky error를 남길 수 있었다.</p>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/RHISoftwareCommandList.h">RHISoftwareCommandList</a>는 고정 payload의 <code>TryAppend</code>와 opcode+span을 함께 예약하는 <code>TryAppendWithSpan</code>을 사용한다. list/공유 target 예산과 overflow를 먼저 검사하고 한 arena allocation이 성공한 후 header, span, 통계를 함께 게시한다. 거절 시 opcode, payload 예산, logical encoder 상태, sticky error를 변경하지 않는다. void API의 실패는 기존처럼 sticky recording failure이며 부분 정상 명령만 골라 제출하지 않는다. GPU begin/end query의 불완전 기록도 session 실패로 유지한다.</p>
+<p>Vulkan validator는 accepted command 이후에만 rendering-open 상태를 갱신한다. 그래픽/컴퓨트 pipeline을 별도 고정 2-entry 상태로 보존해 native Vulkan의 interleaved binding 의미를 맞췄다. DX12의 기존 마지막 pipeline/bind point 의미는 유지한다.</p>
+<p><code>RHICommandFailure</code>는 recording ID, backend generation, 원래 target/opcode 위치와 함께 recording/admission/translation/submission/retirement 단계를 전달한다. DX12 <code>ExecuteCommandLists</code> 및 Vulkan <code>vkQueueSubmit2</code> 호출 직전에 <code>executionUncertain</code>을 설정하고 완료 signal이 수락된 경우에만 해제한다. 실행 전 거부와 실제 실행 시도 뒤 실패를 구분하며, 재시도로 draw를 중복 실행하지 않는다.</p>
+<p>범위가 제한된 TLS 진단 sink는 동기 owner handoff에서 값만 전달한다. worker는 공유 sink에 쓰지 않고 join 후 원래 target 순서로 선택한 결과를 전달한다. <code>SubmitWithDiagnostics</code>, 그래프의 <code>QueueExecution.failure</code>, 제출 티켓의 <code>GetCommandFailure</code>, structured <code>ConsumeFailure</code>까지 같은 상태를 보존한다. 티켓은 완료를 acquire로 확인한 뒤 결과를 읽는다. 기존 문자열 오류 API는 유지하며, 이 변경이 오류 객체의 별도 capture JSON 형식을 추가하는 것은 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-vulkan-고정-recording과-native-수명">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-vulkan-고정-recording과-native-수명">7. Vulkan 고정 recording과 native 수명</h2></div>
+<div class="prose"><p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/Vulkan/VulkanRecordingResources.cpp">VulkanRecordingResources</a>는 binding/sampler 요청, render target, pipeline/layout metadata, resource handle generation과 native object lease를 기록 시점에 고정한다. 번역 worker는 mutable current frame registry를 다시 해석하지 않는다. 필요한 cube view는 producer가 snapshot 전에 준비한다. 기존 cube view와 호환되지 않는 요청을 기존 view 파괴·대체로 처리하지 않는다.</p>
+<p>image/buffer/pipeline을 live registry에서 해제하거나 invalidation해도 고정 recording이 남아 있으면 실제 native object 파괴를 늦춘다. upload recording은 pin 뒤 추가 할당을 밀봉하며, CPU snapshot이 남은 segment는 GPU 완료처럼 보이더라도 recycle/trim하지 않는다. frame-slot별 frozen pool은 외부 shared owner가 없을 때만 재사용한다. native 장치 파괴 전에는 기존 drain/retirement 계약을 완료해야 한다.</p>
+<p>각 frozen pool의 전용 descriptor recycler는 producer의 mutable active pool과 분리하지만 device 전체 <code>maxUpdateAfterBindDescriptorsInAllPools</code> 예산은 공유 atomic credit으로 제한한다. native pool 생성 실패 시 예약 credit을 반환한다. 별도 pool을 만들 때마다 device 제한이 새로 생긴 것으로 계산하지 않는다.</p>
+<p>실제 primary graphics queue identity는 device 초기화마다 공유 incarnation 발급기로 만든다. owner lifecycle generation은 별도다. frozen translator는 캡처한 identity와 현재 device identity가 모두 일치해야 하며, 다른 device나 재초기화 이전 batch를 같은 queue로 취급하지 않는다.</p>
+<p>Vulkan의 <code>AcceptParallelSubmission</code>과 그래프 자원 게시에서는 software ticket의 native batch pointer가 없다는 계약을 반영해 <code>GetIdentity().recordingId/completion</code>을 사용한다. 마지막 segment의 미지원 명령도 join 후 진단에 포함한다. 기존 Vulkan native가 지원하지 않는 <code>CopyTexture</code>, <code>CopyPartialToReadback</code>, <code>ClearRenderTargetRect</code>를 no-op 성공으로 인정하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-rhi-identity-계측과-소비">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-rhi-identity-계측과-소비">8. RHI identity 계측과 소비</h2></div>
+<div class="prose"><p><code>RHISoftwareRecord</code>, <code>RHISoftwareSeal</code>, <code>RHISoftwareAdmissionWait</code>, <code>RHICommandTranslate</code>, <code>RHICommandTranslateJoin</code>, <code>RHINativeSubmit</code>, <code>RHIBatchRetire</code> scope를 추가했다. 기존 <code>RHISoftwareTranslate</code>는 기준선 연결을 위해 유지한다. <code>RHICommandTranslateJoin</code>은 동기 <code>RunParallel</code> 호출 구간이므로 worker 실행 시간을 포함하며 pure waiting으로 해석하지 않는다.</p>
+<p>성공한 <code>BeginRecording</code>에서 process-unique recording ID를 발급하고 같은 값을 record/Seal/translate/submit/retire 및 native GPU query까지 전달한다. 실패한 Begin이나 취소한 recording은 다음 세션의 ID로 재사용되지 않는다. aggregate 이벤트의 target은 sentinel이며, target 작업은 원래 software target index를 남긴다. source engine frame의 availability, 64-bit frame/view/device/backend identity를 값으로 전달하고 CPU task나 native submission 번호로 대체하지 않는다.</p>
+<p><code>profile_rhi_scope</code>는 해당 이벤트와 identity를 기존 bounded page의 sidecar로 함께 기록한다. 일반 CPU 이벤트 구조는 64B를 유지하며 모든 opcode에 스코프를 만들지 않는다. sidecar의 wire record는 100B다. snapshot format 8, streaming format 9 및 measurement chunk version 3에서 새 RHI axis를 읽고 쓴다. 기존 형식은 계속 읽으며, 예전 version으로 위장한 새 axis는 거부한다. 64-bit identity를 float나 32-bit GPU submission 번호로 줄이지 않는다.</p>
+<p>계측에는 고정 메모리 비용이 있다. 같은 GCC/비 Shipping ABI에서 기준 master와 새 헤더의 실제 <code>sizeof</code>를 비교하면 다음과 같다. Windows/MSVC ABI 크기를 대신하는 값은 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>profiler 저장소</th><th style="text-align:right">master</th><th style="text-align:right">이번 구현</th><th>의미</th></tr></thead>
+<tbody><tr><td><code>profile_event</code></td><td style="text-align:right">64B</td><td style="text-align:right">64B</td><td>일반 이벤트 크기 유지</td></tr>
+<tr><td><code>profile_render_measurement</code></td><td style="text-align:right">200B</td><td style="text-align:right">280B</td><td>identity sidecar의 메모리 표현 80B 증가; wire는 100B 유지</td></tr>
+<tr><td><code>event_chunk</code></td><td style="text-align:right">22,840B</td><td style="text-align:right">25,400B</td><td>page당 2,560B 증가, 약 11.2%</td></tr>
+<tr><td><code>thread_stream</code></td><td style="text-align:right">8,432B</td><td style="text-align:right">17,648B</td><td>열린 scope 최대 64개용 context·atomic publication 저장소 9,216B 증가</td></tr></tbody></table></div>
+<p>page의 sidecar 상한은 32개다. 초과 시 기존 pool에서 다음 page를 얻고, pool/ring 예산이 부족하면 기존 drop 정책을 따른다. 256-page 초기 pool의 증가분은 0.625MiB이며, 기존 최대 8,192-page cap에 도달하면 구조체 총량은 178.4375→198.4375MiB다. capture ring 예산과 live snapshot 투영은 커진 실제 구조체 크기를 계산하고, 별도 producer pool은 기존 page 개수 cap을 유지한다. 예산과 무관하게 지역 컨테이너를 늘리거나 이벤트마다 heap 객체를 만들지 않는다. 계측 OFF 및 warm producer의 무할당 검사는 이 저장소 경계만 검증하며 cold pool 확장이나 전체 renderer의 무할당을 뜻하지 않는다.</p>
+<p>연결 키는 이벤트의 frame/thread/depth/flags/queue/submission/view/ticks/marker 전체다. cross-frame 및 Stop에서 잘린 스코프도 같은 키를 유지한다. 중복 매칭이나 없는 정보는 unknown으로 표시하며 가장 가까운 시간이나 마지막 제출에서 추측하지 않는다. ProfilerViewer 타임라인과 Python 분석 도구는 RHI identity를 표시하고, 이 sidecar를 real-view/GPU 처리량·FG·FPS의 분모에 섞지 않는다. Python의 <code>--include-rhi-identities</code>는 원본 identity와 exact/ambiguous/unmatched 판정을 내보낸다.</p>
+<p>owned 경로는 caller의 CPU context를 RHI owner/worker에 전달하고 batch의 frozen capture context를 native submit까지 보존한다. DX12 <code>submission_scope</code>는 실제 <code>ExecuteCommandLists</code>만 감싸며 뒤의 Signal 시간이나 GPU 실행 시간과 혼합하지 않는다. native DX12 query와 Vulkan offline capture query는 recording/target/pass identity를 보존하고 capture manifest의 query interval로 소비한다. Vulkan의 raw queue timestamp는 clock domain을 명시하며, 기존에 없는 Vulkan live calibrated GPU timing producer를 구현했다고 판정하지 않는다. Present와의 연관은 실제로 보존된 publication/view provenance가 있는 경우에만 사용할 수 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-성능-공학-근거와-검증-원칙">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-성능-공학-근거와-검증-원칙">9. 성능 공학 근거와 검증 원칙</h2></div>
+<div class="prose"><p>참고 저장소 <a href="https://github.com/usamahz/cpu-performance-engineering">cpu-performance-engineering</a>의 측정 우선·원인 분리·재현 가능한 benchmark 원칙을 적용했다. 현재 연결된 도구에는 해당 MCP가 없다. 저장소의 <a href="reac-20261019/shaders/cpu-perf-evidence.json">기존 MCP/CLI 확인 기록</a>은 CLI selftest 성공과 MCP stdio initialize timeout을 구분한다. CLI 가용성을 MCP 접속 성공으로 보고하지 않는다.</p>
+<p>이번 증거는 실제 소스 입력 bytes와 SHA-256, compiler/flags, pinned enkiTS/mimalloc, 실행 명령을 보존한다. synthetic CPU 경계와 실제 backend를 구분하고 correctness를 먼저 검사한다. 바뀌기 전 mirror의 기능 PASS를 최종 수정 소스의 PASS로 바꾸지 않는다. allocator 호출 계수와 elapsed time을 구분하며 하드웨어 counter/실제 GPU 검증이 없는 범위를 명시한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-10-재현-및-제품-수용">
+<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-재현-및-제품-수용">10. 재현 및 제품 수용</h2></div>
+<div class="prose"><p>CPU 회귀 runner는 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Tools/regression/verify-rhi-software-portable.py">verify-rhi-software-portable.py</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Tools/regression/verify-rhi-software-queue.py">verify-rhi-software-queue.py</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Tools/regression/verify-vulkan-software-commands.py">verify-vulkan-software-commands.py</a>다. 입력 의존성을 고정 mirror로 복사하고 최종 live hash와 비교한다. runner별 결과의 native 경계 설명을 함께 읽어야 한다.</p>
+<p>비 Shipping profiler의 실제 collector/producer/ring/codec은 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Tools/regression/verify-profile-rhi-context.py">verify-profile-rhi-context.py</a>의 <code>--compat</code> 및 <code>--sanitize</code>로 검사한다. Windows QPC/thread ID/process counter만 명시적인 portable boundary로 대체한다. Python 소비자 호환은 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Tools/regression/verify-material-profile-format.py">verify-material-profile-format.py</a>로 검사한다. ProfilerViewer의 실제 UI 실행을 이 CPU 검사로 대체하지 않는다.</p>
+<p><a href="RHISoftwareCompletion20261021-static.json">정적 검사 근거</a>는 신규 native 소스 10개의 project/filter 단일 등록과 XML 파싱을 확인한다. <code>git diff --check</code>는 통과했다. <code>scripts/check_include_boundary.py</code>는 이 Linux checkout에서 <strong>실패</strong>했으며, 같은 파일 집합의 master를 별도 디렉터리로 재구성해 비교한 결과 stdout/stderr가 완전히 같았다. 두 실행 모두 상향 include 27개·물리 경계 부채 69개를 보고했다. 이 변경에 의해 늘어난 항목은 없었지만 전역 gate를 PASS로 바꾸지 않았고 allowlist도 수정하지 않았다.</p>
+<p>Windows에서는 먼저 실제 Editor/RenderEngine Debug 빌드를 완료한 뒤 다음 명령을 새 출력 디렉터리로 실행한다.</p>
+<pre><code class="language-powershell">pwsh -File Tools/regression/verify-rhi-software-commands.ps1 -Configuration Debug
+pwsh -File Tools/regression/verify-rhi-software-commands.ps1 -Configuration Release
+pwsh -File Tools/regression/verify-rhi-software-native.ps1 -OutputDirectory Artifacts/rhi-software-completion-native</code></pre>
+<p>DX12 native 회귀에는 owned graphics의 두 프레임 clear/barrier/readback, duplicate submit 거부, 실제 graphics↔compute timeline wait/signal, GPU 완료 후 owner 반환과 native target pool 재사용 검사를 추가했다. compute 테스트는 timeline 검증이며 compute workload 성능 측정은 아니다. 이 호스트에는 MSVC/Windows SDK, 실행 가능한 CreatorEditor, GPU/Vulkan ICD가 없어 이 native 회귀를 실행하지 않았다.</p>
+<p>최종 제품 수용은 같은 CreatorRobot 장면·해상도·worker 수·전경·워밍업에서 direct/serial/parallel을 순서를 바꾸어 반복하고 기록 ON/OFF와 ETW를 분리해야 한다. 색상·깊이·readback, query identity, 플레이 시작/종료, reload/resize, 정상 shutdown, device-loss quarantine을 백엔드별로 확인한다. 평균/p50/p95/p99, 전체 critical path, CPU Running/Ready/Waiting, allocator, GPU in-flight, publication→presentation을 함께 비교해야 한다. 기존 허용 오차를 완화하거나 software 실패 시 자동 native fallback으로 오류를 숨기지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-11-최종-cpu-검증과-측정-결과">
+<div class="sec-head"><p class="ve-label">§11</p><h2 id="11-최종-cpu-검증과-측정-결과">11. 최종 CPU 검증과 측정 결과</h2></div>
+<div class="prose"><h3 id="기능-및-메모리-계약">기능 및 메모리 계약</h3>
+<p>검증 대상은 표에 적은 실제 엔진 소스다. native device/queue/encoder 또는 WSI 경계에는 CPU fixture를 사용했다. 정상 실행과 ASan/UBSan 실행은 같은 최종 입력 SHA-256을 사용했고 실행 후 소스 불일치는 없었다. 공용 RHI·queue·Vulkan 검사는 <code>CE_SHIPPING=1</code> 조건으로 실행했다. 별도 profiler 검사는 <code>CE_SHIPPING=0</code>의 실제 EngineDiagnostics를 실행했으며, 두 종류 모두 실제 native driver나 전체 Editor 실행을 포함하지 않는다. LeakSanitizer는 이 호스트의 프로세스 검사 제약 때문에 비활성화했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>근거</th><th style="text-align:right">최종 일반 실행</th><th style="text-align:right">최종 ASan/UBSan</th><th>검사 범위</th></tr></thead>
+<tbody><tr><td><a href="RHISoftwareCompletion20261021-validation.json">공용 명령·번역·FIFO</a></td><td style="text-align:right">33,883 checks / 1,755 scenarios PASS</td><td style="text-align:right">33,883 checks / 1,755 scenarios PASS</td><td>실제 recorder/list/translator/submission thread/arena/mimalloc/scheduler; 입력 137개</td></tr>
+<tr><td><a href="RHISoftwareCompletion20261021-queue.json">Owned queue 어댑터</a></td><td style="text-align:right"><span class="chip ok">4,845 checks PASS</span></td><td style="text-align:right"><span class="chip ok">4,845 checks PASS</span></td><td>실제 queue wrapper와 scheduler; 입력 100개</td></tr>
+<tr><td><a href="RHISoftwareCompletion20261021-vulkan.json">Vulkan 계약</a></td><td style="text-align:right"><span class="chip ok">393 checks PASS</span></td><td style="text-align:right"><span class="chip ok">393 checks PASS</span></td><td>실제 Vulkan translation units 및 명시된 device 함수 본문; 입력 122개, 공식 Vulkan 1.3.290 헤더, native/WSI fixture</td></tr>
+<tr><td><a href="RHISoftwareCompletion20261021-telemetry.json">비 Shipping profiler</a></td><td style="text-align:right">identity 517 + 기존 core 1,396 checks PASS; 기존 render measurement exit 0</td><td style="text-align:right"><span class="chip ok">동일 결과 PASS</span></td><td>실제 EngineDiagnostics 8개 TU와 codec; 입력 30개, QPC/process-counter 및 test-allocator boundary</td></tr>
+<tr><td><a href="RHISoftwareCompletion20261021-validation.json">Python capture 소비자</a></td><td style="text-align:right"><span class="chip ok">135 checks PASS</span></td><td style="text-align:right">해당 없음</td><td>snapshot/streaming 1~9 호환, 64-bit identity, FPS 분모 보존</td></tr></tbody></table></div>
+<p>공용 회귀는 worker 1/2/4/8, target 1/2/4/8, target당 segment 1/3/17, 번역 job 상한 1/2/4/8, 직렬/병렬·역순·불균등 입력을 검사한다. 명령 digest와 개수, 원래 제출 순서, producer payload 파괴, bool fallback, deterministic failure, peer worker 합류, 중복 제출, CPU/GPU 소유권 경계를 확인한다. CPU byte admission 검사는 단일 batch 초과, 합계 제한 대기, owner 취소 및 quarantine뿐 아니라 <strong>취소된 자원의 소멸자가 아직 실행 중이면 credit을 반환하지 않는지</strong>까지 검사한다. 기존 39개 encoder 메서드 coverage 검사도 통과했다.</p>
+<p>기준 master의 공용 검사는 같은 외부 번역 fixture로 33,810 checks / 1,748 scenarios를 통과했다. baseline/current의 차이는 새 byte admission 5개 및 structured failure 2개 시나리오 등이며, 검사 개수 증가를 성능 개선으로 해석하지 않는다. Vulkan 증거는 전체 Windows Editor 빌드가 아니다. <code>VulkanDeviceResources.cpp</code>의 플랫폼 의존 구간은 증거 파일에 명시한 실제 함수 본문을 추출해 검사했다.</p>
+<h3 id="실제-allocator-호출-비교">실제 allocator 호출 비교</h3>
+<p><a href="RHISoftwareCompletion20261021-cpu.json">CPU 측정 JSON</a>의 비교는 <code>BeginRecording → AcquireEncoder → FinishRecording</code> 구간이다. 실제 mimalloc allocator 요청을 관찰했으며, 16회 워밍업 후 17개 표본의 중앙값이다. 소멸자는 측정 구간 밖이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>기록 형태</th><th style="text-align:right">master <code>088ea7b</code> mimalloc 호출</th><th style="text-align:right">이번 구현 mimalloc 호출</th><th>변화</th></tr></thead>
+<tbody><tr><td>8 target 유지</td><td class="num" style="text-align:right">9</td><td class="num" style="text-align:right">9</td><td>동일</td></tr>
+<tr><td>8→1→8로 축소 후 재확장</td><td class="num" style="text-align:right">65</td><td class="num" style="text-align:right">9</td><td>56회 감소, <strong>86.15% 감소</strong></td></tr></tbody></table></div>
+<p>두 경우 모두 이 구간의 <code>std::operator new</code> 호출은 0이었다. 이는 renderer의 실제 allocator 요청 9회가 남는다는 사실과 함께 읽어야 한다. 전체 프레임 무할당, RSS 감소, 프레임 시간 감소를 뜻하지 않는다. 별도 owned wrapper의 128회 반복 8/1/8 warm cycle은 shared control block을 포함해 각각 10/3/10회, 요청 바이트 400/120/400으로 일정했다. Vulkan의 warm snapshot/binding fixture는 128회 동안 <code>std::operator new</code> 0회를 확인했으며 native driver 내부 할당은 측정하지 않았다.</p>
+<h3 id="현재-구현의-직렬병렬-cpu-대조-실험">현재 구현의 직렬/병렬 CPU 대조 실험</h3>
+<p>아래는 변경 전후 속도 비교가 아니라 <strong>현재 실제 translator의 Serial/Parallel 비교</strong>다. GPU 대신 명령 digest를 계산하는 native encoder 경계를 사용하고, 기록은 측정 구간 밖에서 수행했다. 조건마다 16쌍 워밍업 후 직렬/병렬 순서를 교대해 65쌍을 측정했다. compiler는 GCC 13.3, 기존 정책은 <code>minCommandsPerJob=256</code>, target 8개/각 segment 4개다. 컴파일과 다른 회귀 실행을 멈춘 약 5초의 실험이지만 전용 물리 머신이나 Windows 환경은 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th style="text-align:right">물리 worker</th><th>입력 형태</th><th style="text-align:right">명령 수</th><th style="text-align:right">Serial p50/p95 µs</th><th style="text-align:right">Parallel p50/p95 µs</th></tr></thead>
+<tbody><tr><td class="num" style="text-align:right">1</td><td>작은 batch</td><td class="num" style="text-align:right">224</td><td style="text-align:right">2.203 / 2.233</td><td style="text-align:right">2.204 / 2.244</td></tr>
+<tr><td class="num" style="text-align:right">1</td><td>균등</td><td class="num" style="text-align:right">131,264</td><td style="text-align:right">1,034.289 / 1,247.510</td><td style="text-align:right">1,089.372 / 1,337.886</td></tr>
+<tr><td class="num" style="text-align:right">1</td><td>단일 target 집중</td><td class="num" style="text-align:right">69,824</td><td style="text-align:right">501.375 / 755.108</td><td style="text-align:right">610.069 / 843.791</td></tr>
+<tr><td class="num" style="text-align:right">1</td><td>균등 + 명시적 CPU 작업</td><td class="num" style="text-align:right">32,960</td><td style="text-align:right">1,596.146 / 2,151.222</td><td style="text-align:right">1,668.355 / 2,228.679</td></tr>
+<tr><td class="num" style="text-align:right">4</td><td>작은 batch</td><td class="num" style="text-align:right">224</td><td style="text-align:right">2.804 / 3.034</td><td style="text-align:right">2.794 / 2.935</td></tr>
+<tr><td class="num" style="text-align:right">4</td><td>균등</td><td class="num" style="text-align:right">131,264</td><td style="text-align:right">963.532 / 1,220.990</td><td style="text-align:right">654.617 / 945.114</td></tr>
+<tr><td class="num" style="text-align:right">4</td><td>단일 target 집중</td><td class="num" style="text-align:right">69,824</td><td style="text-align:right">505.021 / 702.098</td><td style="text-align:right">602.698 / 818.828</td></tr>
+<tr><td class="num" style="text-align:right">4</td><td>균등 + 명시적 CPU 작업</td><td class="num" style="text-align:right">32,960</td><td style="text-align:right">1,542.044 / 2,031.171</td><td style="text-align:right">673.595 / 871.243</td></tr>
+<tr><td class="num" style="text-align:right">8</td><td>작은 batch</td><td class="num" style="text-align:right">224</td><td style="text-align:right">2.885 / 6.840</td><td style="text-align:right">2.925 / 5.789</td></tr>
+<tr><td class="num" style="text-align:right">8</td><td>균등</td><td class="num" style="text-align:right">131,264</td><td style="text-align:right">936.571 / 1,305.257</td><td style="text-align:right">587.025 / 893.696</td></tr>
+<tr><td class="num" style="text-align:right">8</td><td>단일 target 집중</td><td class="num" style="text-align:right">69,824</td><td style="text-align:right">491.570 / 733.025</td><td style="text-align:right">595.057 / 895.235</td></tr>
+<tr><td class="num" style="text-align:right">8</td><td>균등 + 명시적 CPU 작업</td><td class="num" style="text-align:right">32,960</td><td style="text-align:right">1,530.837 / 1,934.836</td><td style="text-align:right">554.936 / 951.223</td></tr></tbody></table></div>
+<p>작은 batch는 병렬 옵션에서도 job 1개로 owner에서 처리한다. 균등 + CPU 작업은 명령마다 32회 정수 연산을 추가한 fixture이며 native driver의 비용 모델이 아니다. 8-worker 균등 입력의 p50은 약 37.3% 짧았지만 단일 target 집중 입력은 약 21.1% 길었다. 명령이 큰 target 하나에 몰리면 동적 target 배분만으로 그 target의 critical path를 줄일 수 없다.</p>
+<p>측정 뒤 별도 1회 실행의 물리 worker별 명령 수는 8-worker 균등 + CPU 작업에서 각 4,120개였다. 균등 입력은 6개 worker가 참여했고, 집중 입력은 4개 worker가 참여했으며 한 target의 66,072개 명령이 전체 69,824개 중 대부분을 차지했다. 이 단일 관측은 매 실행의 균등 참여나 CPU 이용률 증명이 아니다. 물리 worker hook ID 1<del>8을 배열 0</del>7로 정규화했고 owner는 별도 8번 칸이다.</p>
+<p>이 결과만으로 명령 종류별 비용, 실제 driver, Debug 계측 및 GPU overlap을 포함하는 제품 임계값을 다시 정하지 않았다. 검증된 개선은 저장소 재확장의 allocator 요청 감소이며, 전체 프레임 개선량은 §10의 native 전후 계측이 필요하다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RHISoftwareCompletion20261021.md"><code>docs/analysis/RHISoftwareCompletion20261021.md</code></a> · 마지막 커밋 2026-10-21 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>
