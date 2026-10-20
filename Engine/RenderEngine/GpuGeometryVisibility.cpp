@@ -1505,6 +1505,14 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         ordered = ordered || frame->m_ordered;
     }
     const auto owners = std::span{ownerStorage}.first(ownerCount);
+    // Upload assembly does not borrow declaration metadata. Finish it before
+    // acquiring the pool's usage-list lock, including any assisted upload work.
+    const auto shared = owners.size() > 1 ? BuildShared(owners) : std::shared_ptr<SharedBatch>{};
+    if (!shared)
+    {
+        owners.front()->UploadMeshletInputs();
+    }
+
     auto& scratch = owners.front()->m_bufferPool->m_declaration;
     render_graph_declaration_lock scratchLock(scratch.m_mutex);
     if (!scratchLock.owns_lock())
@@ -1520,8 +1528,17 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     auto& countUses = scratch.m_uses[2];
     auto& finalizeUses = scratch.m_uses[3];
     auto& scatterUses = scratch.m_uses[4];
-    scratch.m_geometrySeen.clear();
-    scratch.m_geometrySeen.reserve(pendingBins);
+    size_t geometrySlots = 8;
+    while (geometrySlots < size_t(pendingBins) * 2)
+    {
+        geometrySlots *= 2;
+    }
+    if (scratch.m_geometrySeen.size() < geometrySlots)
+    {
+        scratch.m_geometrySeen.resize(geometrySlots);
+    }
+    const auto geometrySeen = std::span{scratch.m_geometrySeen}.first(geometrySlots);
+    std::fill_n(geometrySeen.data(), geometrySeen.size(), nullptr);
     resetUses.reserve(pendingBins + ownerCount * 2u + 1u);
     cullUses.reserve(pendingBins * 2u + ownerCount * (3u + GpuGeometryOcclusion::kMaximumLevels) + 1u);
     finalizeUses.reserve(ownerCount * 2u);
@@ -1551,14 +1568,20 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         graph.RequireImportedFinalState(frame->m_graphArguments, RHIResourceState::Common);
         advance(*frame, resetUses, true);
         advance(*frame, cullUses, false);
-        for (const auto& geometry : frame->m_meshletGeometries)
+        for (const auto& geometry : std::span{frame->m_meshletGeometries})
         {
-            const auto seen = std::span{scratch.m_geometrySeen};
-            if (std::ranges::find(seen, geometry.get()) != seen.end())
+            auto hash = reinterpret_cast<uintptr_t>(geometry.get()) >> 3;
+            hash ^= hash >> 17;
+            size_t slot = (hash * uintptr_t{0x9e3779b1}) & (geometrySlots - 1);
+            while (geometrySeen[slot] && geometrySeen[slot] != geometry.get())
+            {
+                slot = (slot + 1) & (geometrySlots - 1);
+            }
+            if (geometrySeen[slot])
             {
                 continue;
             }
-            scratch.m_geometrySeen.push_back(geometry.get());
+            geometrySeen[slot] = geometry.get();
             const auto topology = geometry->GraphMeshlets(graph);
             resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
             if (geometry->UsesDirectClusters() && geometry->IsObjectSpace() &&
@@ -1594,11 +1617,6 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     // 풀 소유 해시 scratch를 재사용한다.
     material_graph::NormalizeSceneReads(graph, resetUses, scratch.m_normalize);
     material_graph::NormalizeSceneReads(graph, cullUses, scratch.m_normalize);
-    const auto shared = owners.size() > 1 ? BuildShared(owners) : std::shared_ptr<SharedBatch>{};
-    if (!shared)
-    {
-        owners.front()->UploadMeshletInputs();
-    }
     if (shared)
     {
         auto queue = graph.ImportBuffer(shared->queue, RHIResourceState::Common, "METEOR.SharedVisibility.Queue");

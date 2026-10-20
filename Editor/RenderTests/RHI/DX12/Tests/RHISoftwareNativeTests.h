@@ -70,6 +70,49 @@ namespace
             }
             require(resources.Initialize(8, 8, error), error);
             {
+                // Declaration-only handles exercise full generation identity and
+                // probe collisions without allocating thousands of GPU objects.
+                EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned);
+                for (uint32_t iteration = 0; iteration < 3; ++iteration)
+                {
+                    std::array<RGHandle, 2048> imported;
+                    for (uint32_t index = 0; index < imported.size(); ++index)
+                    {
+                        const uint32_t id = RHIHandleBits::Encode(index % 128, index / 128 + iteration * 32);
+                        imported[index] = graph.ImportBuffer({id}, RHIResourceState::Common, "IndexProbe");
+                        const auto duplicate = graph.ImportBuffer({id}, RHIResourceState::Common, "Duplicate");
+                        const auto texture = graph.ImportTexture({id}, RHIResourceState::Common, "TextureProbe");
+                        require(imported[index].IsValid() && duplicate.index != imported[index].index &&
+                                    graph.FindImportedBuffer({id}).index == imported[index].index &&
+                                    graph.FindImportedTexture({id}).index == texture.index,
+                                "Import index lost first declaration, full generation or resource kind.");
+                    }
+                    for (uint32_t index = 0; index < imported.size(); ++index)
+                    {
+                        const uint32_t id = RHIHandleBits::Encode(index % 128, index / 128 + iteration * 32);
+                        require(graph.FindImportedBuffer({id}).index == imported[index].index,
+                                "Import index rehash lost an earlier entry.");
+                    }
+                    const auto output = graph.Write(imported.front());
+                    std::array<EnhancedRenderGraph::RGPassUsage, 1> uses{
+                        {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
+                    graph.AddPass("UsageCopyProbe", std::span{uses}, nullptr, true);
+                    uses.front().handle = {};
+                    // Grow multiple arena blocks while the first pass remains live.
+                    for (size_t index = 0; index < 4096; ++index)
+                    {
+                        graph.AddPass("UsageGrowthProbe",
+                                      {{output, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr);
+                    }
+                    require(graph.HasDeclaredWriter(output, "UsageCopyProbe"),
+                            "Pass usages borrowed caller storage or moved after arena growth.");
+                    graph.Reset();
+                    require(!graph.FindImportedBuffer({RHIHandleBits::Encode(0, iteration * 32)}).IsValid() &&
+                                !graph.HasDeclaredWriter(output, "UsageCopyProbe"),
+                            "Graph reset retained a previous import or usage epoch.");
+                }
+            }
+            {
                 EnhancedRenderGraph graph(resources);
                 auto owner = std::make_shared<int>(41);
                 std::weak_ptr<int> weak = owner;
@@ -282,7 +325,7 @@ namespace
             resources.Shutdown();
             log += "RHI_SOFTWARE_NATIVE_OK commands=4 pixels=64 channels=4 staleRejected=true asynchronous=true "
                    "frozenTargets=true uploadRollover=true poolReuse=true arenaRetirement=true gpuMergeReuse=true "
-                   "validationErrors=0\n";
+                   "declarationMetadata=true validationErrors=0\n";
             return true;
         }
         catch (const std::exception& exception)

@@ -57,6 +57,41 @@ namespace
         }
     }
 
+    void CopyPassUsages(std::vector<EnhancedRenderGraph::RGPassUsage>& destination,
+                        std::span<const EnhancedRenderGraph::RGPassUsage> source)
+    {
+        if (destination.size() != source.size())
+        {
+            destination.resize(source.size());
+        }
+        std::copy_n(source.data(), source.size(), destination.data());
+    }
+
+    void ResetImportedIndices(std::unordered_map<uint32_t, uint16_t>& indices)
+    {
+        constexpr size_t kMaximumRetainedIndices = 4096;
+        if (indices.size() > kMaximumRetainedIndices)
+        {
+            indices.clear();
+            return;
+        }
+        for (auto& entry : indices)
+        {
+            entry.second = RGHandle::kInvalid;
+        }
+    }
+
+    bool RememberImportedIndex(std::unordered_map<uint32_t, uint16_t>& indices, uint32_t id, uint16_t index)
+    {
+        const auto [entry, inserted] = indices.try_emplace(id, index);
+        if (!inserted && entry->second != RGHandle::kInvalid)
+        {
+            return false;
+        }
+        entry->second = index;
+        return true;
+    }
+
     template<class Values>
     void ClearNonempty(Values& values)
     {
@@ -175,8 +210,8 @@ void EnhancedRenderGraph::Reset()
         resource = emptyResource;
     }
     m_resources = {};
-    m_importedTextures.clear();
-    m_importedBuffers.clear();
+    ResetImportedIndices(m_importedTextures);
+    ResetImportedIndices(m_importedBuffers);
     m_atomicResources.clear();
     m_activeStructuralSchedule.reset();
     m_executeOrderOverridden = false;
@@ -210,7 +245,7 @@ RHIBufferHandle EnhancedRenderGraph::ResolveBufferHandle(RGHandle handle) const
 RGHandle EnhancedRenderGraph::FindImportedBuffer(RHIBufferHandle buffer) const
 {
     const auto found = m_importedBuffers.find(buffer.id);
-    if (buffer.IsValid() && found != m_importedBuffers.end())
+    if (buffer.IsValid() && found != m_importedBuffers.end() && found->second != RGHandle::kInvalid)
     {
         return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(found->second, 0) : RGHandle{found->second};
     }
@@ -220,7 +255,7 @@ RGHandle EnhancedRenderGraph::FindImportedBuffer(RHIBufferHandle buffer) const
 RGHandle EnhancedRenderGraph::FindImportedTexture(RHITextureHandle texture) const
 {
     const auto found = m_importedTextures.find(texture.id);
-    if (texture.IsValid() && found != m_importedTextures.end())
+    if (texture.IsValid() && found != m_importedTextures.end() && found->second != RGHandle::kInvalid)
     {
         return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(found->second, 0) : RGHandle{found->second};
     }
@@ -299,7 +334,7 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     entry.name = name;
 
     handle.index = static_cast<uint16_t>(m_resources.size() - 1);
-    entry.firstImport = m_importedBuffers.try_emplace(resource.id, handle.index).second;
+    entry.firstImport = RememberImportedIndex(m_importedBuffers, resource.id, handle.index);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
@@ -327,7 +362,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
     entry.name = name;
 
     handle.index = static_cast<uint16_t>(m_resources.size() - 1);
-    entry.firstImport = m_importedTextures.try_emplace(resource.id, handle.index).second;
+    entry.firstImport = RememberImportedIndex(m_importedTextures, resource.id, handle.index);
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
         m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
@@ -574,7 +609,8 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     pass.splitExecute = {};
     pass.repeatedExecute = {};
     ClearNonempty(pass.name);
-    ClearNonempty(pass.usages);
+    // Inactive passes are outside m_passes. Retain constructed usage records
+    // and their proxy; the next AddPass overwrites the entire active range.
     ClearNonempty(pass.transitions);
     ClearNonempty(pass.bufferTransitions);
     ClearNonempty(pass.uavBarriers);
@@ -585,10 +621,6 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     ClearNonempty(pass.aliasBuffers);
     ClearNonempty(pass.poisonBuffers);
     ClearNonempty(pass.aliasClears);
-    for (auto& phase : std::span{pass.phaseStorage})
-    {
-        ClearNonempty(phase.usages);
-    }
     pass.phases = {};
     ClearNonempty(pass.firstPhaseBarriers);
     ClearNonempty(pass.repeatPhaseBarriers);
@@ -633,7 +665,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages = usages;
+    CopyPassUsages(pass.usages, usages);
     pass.execute = std::move(execute);
     return id;
 }
@@ -663,7 +695,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages.assign(usages.begin(), usages.end());
+    CopyPassUsages(pass.usages, {usages.begin(), usages.size()});
     pass.execute = std::move(execute);
     return id;
 }
@@ -678,7 +710,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name, std::span<const R
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages.assign(usages.begin(), usages.end());
+    CopyPassUsages(pass.usages, {usages.begin(), usages.size()});
     pass.execute = std::move(execute);
     return id;
 }
@@ -726,7 +758,7 @@ RGPassId EnhancedRenderGraph::AddRepeatedPassView(const std::string& name, std::
         auto& destination = pass.phaseStorage[index];
         const auto& source = phases[index];
         destination.name.assign(source.name);
-        destination.usages.assign(source.usages.begin(), source.usages.end());
+        CopyPassUsages(destination.usages, source.usages);
     }
     pass.phases = std::span{pass.phaseStorage}.first(phases.size());
     pass.repeated = true;
@@ -747,7 +779,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages = usages;
+    CopyPassUsages(pass.usages, usages);
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.recordCost = recordCost;
@@ -783,7 +815,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages.assign(usages.begin(), usages.end());
+    CopyPassUsages(pass.usages, {usages.begin(), usages.size()});
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.recordCost = recordCost;
@@ -1108,7 +1140,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         for (size_t p = 0; p < count; ++p)
         {
             ce::render_arena_vector<uint16_t> seen{arena};
-            for (const auto& u : m_passes[p].usages)
+            for (const auto& u : std::span{m_passes[p].usages})
             {
                 const auto fail = [&](const std::string& why)
                 {
@@ -1414,7 +1446,7 @@ void EnhancedRenderGraph::CullPasses()
     ce::render_arena_vector<ce::render_arena_vector<size_t>> writers(m_resources.size(), arena);
     for (size_t i = 0; i < passCount; ++i)
     {
-        for (const auto& usage : m_passes[i].usages)
+        for (const auto& usage : std::span{m_passes[i].usages})
         {
             if (usage.handle.IsValid() && usage.handle.index < writers.size() && Writes(usage))
             {
@@ -1432,7 +1464,7 @@ void EnhancedRenderGraph::CullPasses()
         bool isRoot = m_passes[i].hasSideEffect;
         if (!isRoot)
         {
-            for (const auto& usage : m_passes[i].usages)
+            for (const auto& usage : std::span{m_passes[i].usages})
             {
                 if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
                 {
@@ -1459,7 +1491,7 @@ void EnhancedRenderGraph::CullPasses()
         const size_t current = stack.back();
         stack.pop_back();
 
-        for (const auto& usage : m_passes[current].usages)
+        for (const auto& usage : std::span{m_passes[current].usages})
         {
             if (!Reads(usage))
             {
@@ -1767,7 +1799,7 @@ void EnhancedRenderGraph::UpdateResourceUses()
     const auto& executeOrder = GetExecuteOrder();
     for (uint32_t order = 0; order < executeOrder.size(); ++order)
     {
-        for (const auto& usage : m_passes[executeOrder[order]].usages)
+        for (const auto& usage : std::span{m_passes[executeOrder[order]].usages})
         {
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
             Resource& resource = m_resources[usage.handle.index];
@@ -3940,7 +3972,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             // Report resource hazards; non-resource recording fences still require
             // a GPU wait and use the explicit invalid-resource diagnostic sentinel.
             const auto waitBegin = plan.waits.size();
-            for (const auto& usage : m_passes[pass].usages)
+            for (const auto& usage : std::span{m_passes[pass].usages})
             {
                 const auto resource = usage.handle.index;
                 const bool shared = std::any_of(m_passes[producer].usages.begin(), m_passes[producer].usages.end(),

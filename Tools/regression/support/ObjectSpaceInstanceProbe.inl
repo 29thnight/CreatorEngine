@@ -1,7 +1,8 @@
 // Production SceneHost oracle: one skinned stream, independent per-instance worlds,
 // two poses, normal-map TBN, world/pose motion, and warm cross-frame reuse.
 void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
-    ProbeTextures& textures, ProbePool& pool, bool cold = false)
+                             ProbeTextures& textures, ProbePool& pool, bool cold = false,
+                             std::optional<RHIShaderBinary> backend = std::nullopt)
 {
     std::string error;
     LXMaterialAsset asset;
@@ -13,7 +14,7 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
     Check(asset.graph.Connect(Pin(asset.graph,normal,"Normal",Direction::Output),Pin(asset.graph,bsdf,"Normal",Direction::Input)).has_value(),"Object TBN link");
     Check(asset.graph.Connect(Pin(asset.graph,bsdf,"BSDF",Direction::Output),Pin(asset.graph,out,"Surface",Direction::Input)).has_value(),"Object surface link");
     const auto program=GenerateMaterialSlang(asset); Check(bool(program),"Object material generation");
-    auto product=CookedScene(*program,"object-space-instances");
+    auto product = CookedScene(*program, "object-space-instances", backend);
     Generation value; Check(Uuid::TryParse("EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE",value.assetId.value),"Object material id");
     value.generation=1; value.cooked={std::move(product),{}, {}};
     const auto generation=own::make_shared<const Generation>(std::move(value));

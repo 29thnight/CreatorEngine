@@ -4,8 +4,9 @@ param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][ValidateSet('--shadow-decal-only','--subsurface-only','--refraction-only','--refraction-film-only','--volume-only',
         '--forward-blend','--rg5-mixed','--rg5-decal','--rg5-reference','--scene-only','--lx-meshlet-only',
-        '--temporal-transmission-only','--shadow-correctness-only','--cluster-lod-only','--object-space-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--cluster-streaming-only','--cluster-storage-only','--quantized-geometry-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only','--primitive-cache-only')][string[]]$Modes,
-    [ValidateRange(60,1800)][int]$TimeoutSeconds=1200
+        '--temporal-transmission-only','--shadow-correctness-only','--cluster-lod-only','--object-space-only','--object-space-dx12-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--cluster-streaming-only','--cluster-storage-only','--quantized-geometry-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only','--primitive-cache-only')][string[]]$Modes,
+    [ValidateRange(60,1800)][int]$TimeoutSeconds=1200,
+    [ValidateSet('gpu','off')][string]$Validation='gpu'
 )
 $ErrorActionPreference='Stop'
 . "$PSScriptRoot/ArtifactRetention.ps1"
@@ -32,6 +33,7 @@ $required=@{
     '--temporal-transmission-only'=@('METEOR_TEMPORAL_TRANSMISSION_OK frames=6 instances=2 validation=0')
     '--cluster-lod-only'=@('METEOR_CLUSTER_LOD_OK frames=32 partitions=2 malformed=9','METEOR_PRODUCTION_SHARED_QUEUE_OK headers=224 cameraFrames=32 shadowFrames=32 sharedReads=192 validation=0')
     '--object-space-only'=@('METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3','METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0')
+    '--object-space-dx12-only'=@('METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3','METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0','METEOR_OBJECT_SPACE_DX12_OK cold=1 validation=0')
     '--hybrid-visibility-only'=@('METEOR_HYBRID_VISIBILITY_OK frames=24 cases=8 partitions=3 validation=0')
     '--atomic-reduction-only'=@('METEOR_ATOMIC_REDUCTION_OK permutations=24 frames=6 validation=0')
     '--visibility-reconstruction-only'=@('METEOR_VISIBILITY_RECONSTRUCTION_OK frames=32 partitions=3 footprintFrames=8 validation=0')
@@ -71,7 +73,7 @@ foreach($mode in $Modes){
     $bins=@("$repo/vcpkg_installed/x64-windows/$relative","$repo/vcpkg_installed/x64-windows/x64-windows/$relative")|
         Where-Object {Test-Path -LiteralPath $_}
     $start.Environment['PATH']=($bins -join ';')+';'+$env:PATH
-    $start.Environment['CREATOR_DX12_VALIDATION']='gpu'
+    $start.Environment['CREATOR_DX12_VALIDATION']=$Validation
     $proc=[Diagnostics.Process]::Start($start)
     $stdout=$proc.StandardOutput.ReadToEndAsync();$stderr=$proc.StandardError.ReadToEndAsync()
     $timedOut=$false
@@ -83,7 +85,7 @@ foreach($mode in $Modes){
     $log=(Get-Content "$out/$name.stdout.log" -Raw)+(Get-Content "$out/$name.stderr.log" -Raw)
     $missing=@($required[$mode]|Where-Object {$log -notmatch ('(?m)^'+[regex]::Escape($_)+'(?: |\r?$)')})
     $passed=!$timedOut -and $proc.ExitCode -eq 0 -and !$missing.Count -and
-        $log -match 'GPUValidation=on' -and $log -notmatch 'PROBE_CHECK_FAIL|RASTER_SURFACE_FAIL'
+        $log -match ('GPUValidation='+$(if($Validation -eq 'gpu'){'on'}else{'off'})) -and $log -notmatch 'PROBE_CHECK_FAIL|RASTER_SURFACE_FAIL'
     $coverageNotices=[regex]::Matches($log,'(?m)^DX12_GBV_COVERAGE_LIMIT id=1044 ').Count
     $runs+=@{mode=$mode;passed=$passed;exitCode=$proc.ExitCode;timedOut=$timedOut;missingMarkers=$missing;
         gpuValidationCoverageNotices=$coverageNotices}
@@ -95,6 +97,6 @@ $after=Snapshot
 $after|ConvertTo-Json -Depth 4|Set-Content "$out/identity-after.json"
 $stable=($before|ConvertTo-Json -Depth 4 -Compress) -eq ($after|ConvertTo-Json -Depth 4 -Compress)
 $passed=$stable -and $runs.Count -eq $Modes.Count -and @($runs|Where-Object {!$_.passed}).Count -eq 0
-@{passed=$passed;configuration=$Configuration;sourceStable=$stable;gpuValidation='on';runs=$runs}|
+@{passed=$passed;configuration=$Configuration;sourceStable=$stable;gpuValidation=$(if($Validation -eq 'gpu'){'on'}else{'off'});runs=$runs}|
     ConvertTo-Json -Depth 6|Set-Content "$out/verdict.json"
 if(!$passed){throw "METEOR material probe gate failed: $out"}

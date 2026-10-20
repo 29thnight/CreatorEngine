@@ -4509,6 +4509,14 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         return;
     }
     if (mode == "--cluster-lod-only") { RunClusterLod(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--object-space-dx12-only")
+    {
+        RunObjectSpaceInstances(device, roots, pipelines, textures, pool, false, RHIShaderBinary::Dxil);
+        RunObjectSpaceInstances(device, roots, pipelines, textures, pool, true, RHIShaderBinary::Dxil);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        std::cout << "METEOR_OBJECT_SPACE_DX12_OK cold=1 validation=0\n";
+        return;
+    }
     if (mode == "--object-space-only") { RunObjectSpaceInstances(device, roots, pipelines, textures, pool); RunObjectSpaceInstances(device, roots, pipelines, textures, pool, true); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--hybrid-visibility-only") { RunHybridVisibility(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
     if (mode == "--atomic-reduction-only") { RunAtomicReduction(device, roots, pipelines, root, pool); ShutdownNative(device, roots, pipelines, textures, pool); return; }
@@ -5202,6 +5210,7 @@ int main(int argc, char** argv)
                     std::string_view(argv[2]) == "--shadow-correctness-recreated" ||
                     std::string_view(argv[2]) == "--cluster-lod-only" ||
                     std::string_view(argv[2]) == "--object-space-only" ||
+                    std::string_view(argv[2]) == "--object-space-dx12-only" ||
                     std::string_view(argv[2]) == "--hybrid-visibility-only" ||
                     std::string_view(argv[2]) == "--atomic-reduction-only" ||
                     std::string_view(argv[2]) == "--meshlet-hzb-only" ||
