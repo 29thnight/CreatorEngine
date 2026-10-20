@@ -1,0 +1,2 @@
+# Preserve upstream bytes and whitespace; vendor-manifest.json verifies hashes.
+* -text -whitespace

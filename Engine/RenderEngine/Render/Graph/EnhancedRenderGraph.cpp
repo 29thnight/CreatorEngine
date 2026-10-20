@@ -1,10 +1,21 @@
+#include "../../RHI/RHISoftwareRecorder.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
+#include "../../RenderArena.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <stdint.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
+
+namespace
+{
+    ce::RenderArenaLease AcquireRdgScratch()
+    {
+        static ce::RenderArenaPool pool;
+        return pool.Acquire();
+    }
+}
 
 namespace
 {
@@ -573,7 +584,11 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     ClearNonempty(pass.aliasBuffers);
     ClearNonempty(pass.poisonBuffers);
     ClearNonempty(pass.aliasClears);
-    ClearNonempty(pass.phases);
+    for (auto& phase : std::span{pass.phaseStorage})
+    {
+        ClearNonempty(phase.usages);
+    }
+    pass.phases = {};
     ClearNonempty(pass.firstPhaseBarriers);
     ClearNonempty(pass.repeatPhaseBarriers);
     pass.maxSlices = 1;
@@ -652,6 +667,21 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     return id;
 }
 
+RGPassId EnhancedRenderGraph::AddPass(const std::string& name, std::span<const RGPassUsage> usages,
+                                      ExecuteCallback execute, bool hasSideEffect)
+{
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
+    const auto id = InitializePass(name, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.usages.assign(usages.begin(), usages.end());
+    pass.execute = std::move(execute);
+    return id;
+}
+
 RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
     std::vector<RGPassUsage> usages, std::vector<RepeatedPhase> phases,
     uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
@@ -665,7 +695,40 @@ RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
     }
     auto& pass = m_passes[id.index];
     pass.repeated = true;
-    pass.phases = std::move(phases);
+    pass.phaseStorage = std::move(phases);
+    pass.phases = pass.phaseStorage;
+    pass.repeatCount = repeatCount;
+    pass.repeatedExecute = std::move(execute);
+    pass.recordCost = recordCost;
+    return id;
+}
+
+RGPassId EnhancedRenderGraph::AddRepeatedPassView(const std::string& name, std::span<const RGPassUsage> usages,
+                                                  std::span<const RepeatedPhaseView> phases, uint32_t repeatCount,
+                                                  RepeatedExecuteCallback execute, bool hasSideEffect,
+                                                  uint32_t recordCost)
+{
+    ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddRepeatedPass">()};
+    RequireQueueIdle();
+    const auto id = AddPass(name, usages, {}, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    if (pass.phaseStorage.size() < phases.size())
+    {
+        pass.phaseStorage.resize(phases.size());
+    }
+    for (size_t index = 0; index < phases.size(); ++index)
+    {
+        auto& destination = pass.phaseStorage[index];
+        const auto& source = phases[index];
+        destination.name.assign(source.name);
+        destination.usages.assign(source.usages.begin(), source.usages.end());
+    }
+    pass.phases = std::span{pass.phaseStorage}.first(phases.size());
+    pass.repeated = true;
     pass.repeatCount = repeatCount;
     pass.repeatedExecute = std::move(execute);
     pass.recordCost = recordCost;
@@ -728,14 +791,23 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
 
 bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
 {
+    auto temporaryStorage = AcquireRdgScratch();
+    auto* arena = &temporaryStorage->Resource(0);
     ce::profile_scope orderProfile{ce::marker<"RenderGraphDependencyOrder">()};
     m_executeOrder.clear();
     const size_t count = m_passes.size();
     if (count > RGPassId::kInvalid || m_resources.size() > RGHandle::kInvalid)
-    { outError = "RG1 declaration exceeds handle capacity"; return false; }
-    struct Edge { uint16_t to, resource; uint16_t version{0}; };
-    std::vector<std::vector<Edge>> edges(count);
-    std::vector<uint32_t> incoming(count, 0);
+    {
+        outError = "RG1 declaration exceeds handle capacity";
+        return false;
+    }
+    struct Edge
+    {
+        uint16_t to, resource;
+        uint16_t version{0};
+    };
+    ce::render_arena_vector<ce::render_arena_vector<Edge>> edges(count, arena);
+    ce::render_arena_vector<uint32_t> incoming(count, 0, arena);
     ce::dynamic_bitset alive(count, true);
     m_versionEdges.clear();
     if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
@@ -743,73 +815,113 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         using Reason = DiagnosticSnapshot::VersionEdge::Reason;
         // Flatten cold-compile access lists instead of allocating a Debug STL
         // container/proxy for every resource version and its producer/consumer.
-        std::vector<size_t> versionOffsets(m_resources.size() + 1, 0);
+        ce::render_arena_vector<size_t> versionOffsets(m_resources.size() + 1, 0, arena);
         for (size_t resource = 0; resource < m_resources.size(); ++resource)
         {
             versionOffsets[resource + 1] = versionOffsets[resource] + m_resources[resource].versions.size();
         }
         const size_t versionCount = versionOffsets.back();
-        std::vector<size_t> producerCounts(versionCount, 0), consumerCounts(versionCount, 0);
-        const auto fail = [&](const std::string& why, size_t r, uint16_t v) {
-            outError = "RG2 " + why + ": " + m_resources[r].name + " v" + std::to_string(v); return false;
-        };
-        for (size_t r=0; r<m_resources.size(); ++r)
+        ce::render_arena_vector<size_t> producerCounts(versionCount, 0, arena);
+        ce::render_arena_vector<size_t> consumerCounts(versionCount, 0, arena);
+        const auto fail = [&](const std::string& why, size_t r, uint16_t v)
         {
-            const auto& resource=m_resources[r];
+            outError = "RG2 " + why + ": " + m_resources[r].name + " v" + std::to_string(v);
+            return false;
+        };
+        for (size_t r = 0; r < m_resources.size(); ++r)
+        {
+            const auto& resource = m_resources[r];
             // One physical storage must have one logical version chain.
             if (resource.imported && !resource.firstImport)
             {
-                return fail("duplicate physical import; reuse its handle",r,0);
+                return fail("duplicate physical import; reuse its handle", r, 0);
             }
-            for (size_t v=resource.imported ? 1 : 0; v<resource.versions.size(); ++v)
+            for (size_t v = resource.imported ? 1 : 0; v < resource.versions.size(); ++v)
             {
-                const auto parent=resource.versions[v].parent;
-                if (parent != (v==0 ? RGHandle::kInvalid : v-1))
-                    return fail("forked/stale write parent",r,static_cast<uint16_t>(v));
-                if (resource.versions[v].modify && parent==RGHandle::kInvalid)
-                    return fail("Modify has no initialized input",r,static_cast<uint16_t>(v));
+                const auto parent = resource.versions[v].parent;
+                if (parent != (v == 0 ? RGHandle::kInvalid : v - 1))
+                {
+                    return fail("forked/stale write parent", r, static_cast<uint16_t>(v));
+                }
+                if (resource.versions[v].modify && parent == RGHandle::kInvalid)
+                {
+                    return fail("Modify has no initialized input", r, static_cast<uint16_t>(v));
+                }
             }
         }
-        for (size_t p=0; p<count; ++p)
+        for (size_t p = 0; p < count; ++p)
         {
-            std::vector<uint16_t> seen;
-            for (const auto& u:std::span{m_passes[p].usages})
+            ce::render_arena_vector<uint16_t> seen{arena};
+            for (const auto& u : std::span{m_passes[p].usages})
             {
-                const auto bad = [&](const std::string& why) {
-                    outError="RG2 pass '"+m_passes[p].name+"': "+why;
-                    if(u.handle.index<m_resources.size()) outError += ": "+m_resources[u.handle.index].name;
-                    outError += " [resource="+std::to_string(u.handle.index)+", v"+std::to_string(u.handle.version)+"]";
+                const auto bad = [&](const std::string& why)
+                {
+                    outError = "RG2 pass '" + m_passes[p].name + "': " + why;
+                    if (u.handle.index < m_resources.size())
+                    {
+                        outError += ": " + m_resources[u.handle.index].name;
+                    }
+                    outError +=
+                        " [resource=" + std::to_string(u.handle.index) + ", v" + std::to_string(u.handle.version) + "]";
                     return false;
                 };
-                if (!ValidVersionHandle(u.handle)) return bad("stale/foreign/invalid resource version or kind");
-                const auto r=u.handle.index, v=u.handle.version;
-                if (std::ranges::find(std::span{seen}, r)!=std::span{seen}.end()) return bad("duplicate resource access; use Modify: "+m_resources[r].name);
-                seen.push_back(r);
-                if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite && u.access!=RGAccessMode::AtomicMin64)
-                    return bad("explicit access required");
-                if (u.state<RHIResourceState::Common || u.state>RHIResourceState::VertexAndShaderResource ||
-                    ((u.state==RHIResourceState::IndirectArgument || u.state==RHIResourceState::VertexAndShaderResource) &&
-                        (!m_resources[r].IsBuffer() || u.access!=RGAccessMode::Read)) ||
-                    (Writes(u) && !IsWriteState(u.state)) ||
-                    (u.access==RGAccessMode::Read && IsWriteState(u.state) && u.state!=RHIResourceState::UnorderedAccess))
+                if (!ValidVersionHandle(u.handle))
                 {
-                    return bad("access/state mismatch: "+m_resources[r].name);
+                    return bad("stale/foreign/invalid resource version or kind");
+                }
+                const auto r = u.handle.index, v = u.handle.version;
+                if (std::ranges::find(std::span{seen}, r) != std::span{seen}.end())
+                {
+                    return bad("duplicate resource access; use Modify: " + m_resources[r].name);
+                }
+                seen.push_back(r);
+                if (u.access != RGAccessMode::Read && u.access != RGAccessMode::Write &&
+                    u.access != RGAccessMode::ReadWrite && u.access != RGAccessMode::AtomicMin64)
+                {
+                    return bad("explicit access required");
+                }
+                if (u.state < RHIResourceState::Common || u.state > RHIResourceState::VertexAndShaderResource ||
+                    ((u.state == RHIResourceState::IndirectArgument ||
+                      u.state == RHIResourceState::VertexAndShaderResource) &&
+                     (!m_resources[r].IsBuffer() || u.access != RGAccessMode::Read)) ||
+                    (Writes(u) && !IsWriteState(u.state)) ||
+                    (u.access == RGAccessMode::Read && IsWriteState(u.state) &&
+                     u.state != RHIResourceState::UnorderedAccess))
+                {
+                    return bad("access/state mismatch: " + m_resources[r].name);
                 }
                 if (Writes(u))
                 {
-                    if (m_resources[r].imported && v==0) return fail("cannot overwrite imported v0; call Write/Modify",r,v);
-                    const auto& declaration=m_resources[r].versions[v];
+                    if (m_resources[r].imported && v == 0)
+                    {
+                        return fail("cannot overwrite imported v0; call Write/Modify", r, v);
+                    }
+                    const auto& declaration = m_resources[r].versions[v];
                     if (declaration.atomicMin64 != (u.access == RGAccessMode::AtomicMin64) ||
-                        declaration.modify != (u.access == RGAccessMode::ReadWrite || u.access == RGAccessMode::AtomicMin64))
-                        return fail("Write/Modify/AtomicMin64 access mismatch",r,v);
-                    if (declaration.atomicMin64 && (!m_resources[r].IsBuffer() ||
-                        u.state != RHIResourceState::UnorderedAccess))
-                        return fail("AtomicMin64 requires a buffer UAV",r,v);
-                    if (!declaration.atomicMin64 && producerCounts[versionOffsets[r] + v] != 0) return fail("multiple version producers",r,v);
+                        declaration.modify !=
+                            (u.access == RGAccessMode::ReadWrite || u.access == RGAccessMode::AtomicMin64))
+                    {
+                        return fail("Write/Modify/AtomicMin64 access mismatch", r, v);
+                    }
+                    if (declaration.atomicMin64 &&
+                        (!m_resources[r].IsBuffer() || u.state != RHIResourceState::UnorderedAccess))
+                    {
+                        return fail("AtomicMin64 requires a buffer UAV", r, v);
+                    }
+                    if (!declaration.atomicMin64 && producerCounts[versionOffsets[r] + v] != 0)
+                    {
+                        return fail("multiple version producers", r, v);
+                    }
                     ++producerCounts[versionOffsets[r] + v];
-                    if (declaration.modify) ++consumerCounts[versionOffsets[r] + declaration.parent];
+                    if (declaration.modify)
+                    {
+                        ++consumerCounts[versionOffsets[r] + declaration.parent];
+                    }
                 }
-                else ++consumerCounts[versionOffsets[r] + v];
+                else
+                {
+                    ++consumerCounts[versionOffsets[r] + v];
+                }
             }
         }
         for (size_t r = 0; r < m_resources.size(); ++r)
@@ -822,13 +934,15 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 }
             }
         }
-        std::vector<size_t> producerOffsets(versionCount + 1, 0), consumerOffsets(versionCount + 1, 0);
+        ce::render_arena_vector<size_t> producerOffsets(versionCount + 1, 0, arena);
+        ce::render_arena_vector<size_t> consumerOffsets(versionCount + 1, 0, arena);
         for (size_t version = 0; version < versionCount; ++version)
         {
             producerOffsets[version + 1] = producerOffsets[version] + producerCounts[version];
             consumerOffsets[version + 1] = consumerOffsets[version] + consumerCounts[version];
         }
-        std::vector<uint16_t> producerStorage(producerOffsets.back()), consumerStorage(consumerOffsets.back());
+        ce::render_arena_vector<uint16_t> producerStorage(producerOffsets.back(), arena);
+        ce::render_arena_vector<uint16_t> consumerStorage(consumerOffsets.back(), arena);
         std::ranges::fill(std::span{producerCounts}, 0);
         std::ranges::fill(std::span{consumerCounts}, 0);
         for (size_t pass = 0; pass < count; ++pass)
@@ -844,7 +958,8 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                     if (m_resources[resource].versions[version].modify)
                     {
                         const auto parent = versionOffsets[resource] + m_resources[resource].versions[version].parent;
-                        consumerStorage[consumerOffsets[parent] + consumerCounts[parent]++] = static_cast<uint16_t>(pass);
+                        consumerStorage[consumerOffsets[parent] + consumerCounts[parent]++] =
+                            static_cast<uint16_t>(pass);
                     }
                 }
                 else
@@ -866,7 +981,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         // Only data dependencies retain work. WAR/WAW constrain surviving
         // accesses; they must not keep discarded versions or dead readers alive.
         alive.assign(count, false);
-        std::vector<uint16_t> roots;
+        ce::render_arena_vector<uint16_t> roots{arena};
         const auto retain = [&](uint16_t p)
         {
             if (!alive.test(p))
@@ -875,40 +990,70 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 roots.push_back(p);
             }
         };
-        for(size_t p=0; p<count; ++p) if(m_passes[p].hasSideEffect) retain(static_cast<uint16_t>(p));
-        for(size_t r=0; r<m_resources.size(); ++r)
-            if(m_resources[r].imported && m_resources[r].versions.size()>1)
-                for (const auto producer : producers(r, m_resources[r].versions.size() - 1)) retain(producer);
-        while(!roots.empty())
+        for (size_t p = 0; p < count; ++p)
         {
-            const auto p=roots.back(); roots.pop_back();
-            for(const auto& u:std::span{m_passes[p].usages})
+            if (m_passes[p].hasSideEffect)
             {
-                if(!Reads(u)) continue;
-                const auto r=u.handle.index;
-                const auto v=(u.access==RGAccessMode::ReadWrite || u.access==RGAccessMode::AtomicMin64) ? m_resources[r].versions[u.handle.version].parent : u.handle.version;
-                for (const auto producer : producers(r, v)) retain(producer);
+                retain(static_cast<uint16_t>(p));
+            }
+        }
+        for (size_t r = 0; r < m_resources.size(); ++r)
+        {
+            if (m_resources[r].imported && m_resources[r].versions.size() > 1)
+            {
+                for (const auto producer : producers(r, m_resources[r].versions.size() - 1))
+                {
+                    retain(producer);
+                }
+            }
+        }
+        while (!roots.empty())
+        {
+            const auto p = roots.back();
+            roots.pop_back();
+            for (const auto& u : std::span{m_passes[p].usages})
+            {
+                if (!Reads(u))
+                {
+                    continue;
+                }
+                const auto r = u.handle.index;
+                const auto v = (u.access == RGAccessMode::ReadWrite || u.access == RGAccessMode::AtomicMin64)
+                                   ? m_resources[r].versions[u.handle.version].parent
+                                   : u.handle.version;
+                for (const auto producer : producers(r, v))
+                {
+                    retain(producer);
+                }
             }
         }
         for (size_t p = 0; p < count; ++p)
         {
             m_passes[p].culled = !alive.test(p);
         }
-        const auto edge = [&](int32_t from, uint16_t to, uint16_t r, uint16_t v, Reason reason) {
-            if (from<0 || from==to) return;
-            m_versionEdges.push_back({static_cast<uint32_t>(from),to,r,v,reason});
-            auto& outgoing=edges[from];
-            if (std::ranges::none_of(std::span{outgoing},[&](const Edge& e){return e.to==to;}))
-            { outgoing.push_back({to,r,v}); ++incoming[to]; }
+        const auto edge = [&](int32_t from, uint16_t to, uint16_t r, uint16_t v, Reason reason)
+        {
+            if (from < 0 || from == to)
+            {
+                return;
+            }
+            m_versionEdges.push_back({static_cast<uint32_t>(from), to, r, v, reason});
+            auto& outgoing = edges[from];
+            if (std::ranges::none_of(std::span{outgoing}, [&](const Edge& e) { return e.to == to; }))
+            {
+                outgoing.push_back({to, r, v});
+                ++incoming[to];
+            }
         };
-        std::vector<uint16_t> previousWriters, current;
-        std::vector<std::pair<uint16_t, uint16_t>> pendingReaders;
-        for (size_t r=0; r<m_resources.size(); ++r)
+        ce::render_arena_vector<uint16_t> previousWriters{arena};
+        ce::render_arena_vector<uint16_t> current{arena};
+        ce::render_arena_vector<std::pair<uint16_t, uint16_t>> pendingReaders{arena};
+        for (size_t r = 0; r < m_resources.size(); ++r)
         {
             previousWriters.clear();
             pendingReaders.clear();
-            uint16_t previousVersion=0;
-            for (size_t v=0; v<m_resources[r].versions.size(); ++v)
+            uint16_t previousVersion = 0;
+            for (size_t v = 0; v < m_resources[r].versions.size(); ++v)
             {
                 current.clear();
                 for (const auto producer : producers(r, v))
@@ -923,15 +1068,21 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                     for (const auto producer : std::span{current})
                     {
                         for (const auto previous : std::span{previousWriters})
-                            edge(previous,producer,static_cast<uint16_t>(r),previousVersion,Reason::WAW);
-                        for (const auto& [reader,readVersion] : std::span{pendingReaders})
+                        {
+                            edge(previous, producer, static_cast<uint16_t>(r), previousVersion, Reason::WAW);
+                        }
+                        for (const auto& [reader, readVersion] : std::span{pendingReaders})
                         {
                             // Atomic writers consume initialization, not sibling results.
-                            if (std::ranges::find(std::span{current}, reader)==std::span{current}.end())
-                                edge(reader,producer,static_cast<uint16_t>(r),readVersion,Reason::WAR);
+                            if (std::ranges::find(std::span{current}, reader) == std::span{current}.end())
+                            {
+                                edge(reader, producer, static_cast<uint16_t>(r), readVersion, Reason::WAR);
+                            }
                         }
                     }
-                    pendingReaders.clear(); previousWriters=current; previousVersion=static_cast<uint16_t>(v);
+                    pendingReaders.clear();
+                    previousWriters = current;
+                    previousVersion = static_cast<uint16_t>(v);
                 }
                 for (const auto reader : consumers(r, v))
                 {
@@ -940,70 +1091,106 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                         continue;
                     }
                     for (const auto producer : std::span{current})
-                        edge(producer,reader,static_cast<uint16_t>(r),static_cast<uint16_t>(v),Reason::RAW);
-                    pendingReaders.push_back({reader,static_cast<uint16_t>(v)});
+                    {
+                        edge(producer, reader, static_cast<uint16_t>(r), static_cast<uint16_t>(v), Reason::RAW);
+                    }
+                    pendingReaders.push_back({reader, static_cast<uint16_t>(v)});
                 }
             }
         }
     }
     else
     {
-    std::vector<int32_t> writer(m_resources.size(), -1);
-    std::vector<std::vector<uint16_t>> readers(m_resources.size());
-    ce::dynamic_bitset modifies(m_resources.size(), false);
-    for (size_t p = 0; p < count; ++p)
-    {
-        std::vector<uint16_t> seen;
-        for (const auto& u : m_passes[p].usages)
+        ce::render_arena_vector<int32_t> writer(m_resources.size(), -1, arena);
+        ce::render_arena_vector<ce::render_arena_vector<uint16_t>> readers(m_resources.size(), arena);
+        ce::dynamic_bitset modifies(m_resources.size(), false);
+        for (size_t p = 0; p < count; ++p)
         {
-            const auto fail = [&](const std::string& why) {
-                outError = "RG1 pass '" + m_passes[p].name + "': " + why; return false;
-            };
-            if (!u.handle.IsValid() || u.handle.index >= m_resources.size()) return fail("invalid resource handle");
-            const auto r = u.handle.index;
-            if (std::find(seen.begin(), seen.end(), r) != seen.end()) return fail("duplicate access: " + m_resources[r].name);
-            seen.push_back(r);
-            if (u.access != RGAccessMode::Read && u.access != RGAccessMode::Write && u.access != RGAccessMode::ReadWrite)
-                return fail("explicit Read/Write/ReadWrite required: " + m_resources[r].name);
-            if (u.state < RHIResourceState::Common || u.state > RHIResourceState::VertexAndShaderResource ||
-                ((u.state == RHIResourceState::IndirectArgument || u.state == RHIResourceState::VertexAndShaderResource) &&
-                    (!m_resources[r].IsBuffer() || u.access != RGAccessMode::Read)))
+            ce::render_arena_vector<uint16_t> seen{arena};
+            for (const auto& u : m_passes[p].usages)
             {
-                return fail("invalid resource state: " + m_resources[r].name);
-            }
-            if ((Writes(u) && !IsWriteState(u.state)) ||
-                (u.access == RGAccessMode::Read && IsWriteState(u.state) && u.state != RHIResourceState::UnorderedAccess))
-                return fail("access/state mismatch: " + m_resources[r].name);
-            if (Writes(u))
-            {
-                if (writer[r] >= 0) return fail("multiple writers require RG2 versions: " + m_resources[r].name
-                    + " (first: " + m_passes[writer[r]].name + ")");
-                writer[r] = static_cast<int32_t>(p);
-                modifies.set(r, u.access == RGAccessMode::ReadWrite);
-                if (modifies.test(r) && !m_resources[r].imported)
+                const auto fail = [&](const std::string& why)
                 {
-                    return fail("ReadWrite needs initialized imported input: " + m_resources[r].name);
+                    outError = "RG1 pass '" + m_passes[p].name + "': " + why;
+                    return false;
+                };
+                if (!u.handle.IsValid() || u.handle.index >= m_resources.size())
+                {
+                    return fail("invalid resource handle");
+                }
+                const auto r = u.handle.index;
+                if (std::find(seen.begin(), seen.end(), r) != seen.end())
+                {
+                    return fail("duplicate access: " + m_resources[r].name);
+                }
+                seen.push_back(r);
+                if (u.access != RGAccessMode::Read && u.access != RGAccessMode::Write &&
+                    u.access != RGAccessMode::ReadWrite)
+                {
+                    return fail("explicit Read/Write/ReadWrite required: " + m_resources[r].name);
+                }
+                if (u.state < RHIResourceState::Common || u.state > RHIResourceState::VertexAndShaderResource ||
+                    ((u.state == RHIResourceState::IndirectArgument ||
+                      u.state == RHIResourceState::VertexAndShaderResource) &&
+                     (!m_resources[r].IsBuffer() || u.access != RGAccessMode::Read)))
+                {
+                    return fail("invalid resource state: " + m_resources[r].name);
+                }
+                if ((Writes(u) && !IsWriteState(u.state)) || (u.access == RGAccessMode::Read && IsWriteState(u.state) &&
+                                                              u.state != RHIResourceState::UnorderedAccess))
+                {
+                    return fail("access/state mismatch: " + m_resources[r].name);
+                }
+                if (Writes(u))
+                {
+                    if (writer[r] >= 0)
+                    {
+                        return fail("multiple writers require RG2 versions: " + m_resources[r].name +
+                                    " (first: " + m_passes[writer[r]].name + ")");
+                    }
+                    writer[r] = static_cast<int32_t>(p);
+                    modifies.set(r, u.access == RGAccessMode::ReadWrite);
+                    if (modifies.test(r) && !m_resources[r].imported)
+                    {
+                        return fail("ReadWrite needs initialized imported input: " + m_resources[r].name);
+                    }
+                }
+                if (Reads(u))
+                {
+                    readers[r].push_back(static_cast<uint16_t>(p));
                 }
             }
-            if (Reads(u)) readers[r].push_back(static_cast<uint16_t>(p));
         }
-    }
-    for (size_t r = 0; r < m_resources.size(); ++r)
-        for (const auto consumer : readers[r])
+        for (size_t r = 0; r < m_resources.size(); ++r)
         {
-            if (writer[r] < 0)
+            for (const auto consumer : readers[r])
             {
-                if (!m_resources[r].imported)
-                { outError = "RG1 missing writer: " + m_resources[r].name + " read by " + m_passes[consumer].name; return false; }
-                continue;
+                if (writer[r] < 0)
+                {
+                    if (!m_resources[r].imported)
+                    {
+                        outError = "RG1 missing writer: " + m_resources[r].name + " read by " + m_passes[consumer].name;
+                        return false;
+                    }
+                    continue;
+                }
+                const auto producer = static_cast<uint16_t>(writer[r]);
+                if (producer == consumer)
+                {
+                    continue; // sole imported ReadWrite
+                }
+                if (modifies.test(r))
+                {
+                    outError = "RG1 ambiguous ReadWrite chain requires RG2 versions: " + m_resources[r].name;
+                    return false;
+                }
+                auto& outgoing = edges[producer];
+                if (std::none_of(outgoing.begin(), outgoing.end(), [&](const Edge& e) { return e.to == consumer; }))
+                {
+                    outgoing.push_back({consumer, static_cast<uint16_t>(r)});
+                    ++incoming[consumer];
+                }
             }
-            const auto producer = static_cast<uint16_t>(writer[r]);
-            if (producer == consumer) continue; // sole imported ReadWrite
-            if (modifies.test(r))
-            { outError = "RG1 ambiguous ReadWrite chain requires RG2 versions: " + m_resources[r].name; return false; }
-            auto& outgoing = edges[producer];
-            if (std::none_of(outgoing.begin(), outgoing.end(), [&](const Edge& e) { return e.to == consumer; }))
-            { outgoing.push_back({consumer, static_cast<uint16_t>(r)}); ++incoming[consumer]; }
         }
     }
     // CPU callbacks with undeclared external effects are explicit owner-thread
@@ -1028,11 +1215,12 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 outgoing.push_back({to, RGHandle::kInvalid});
                 ++incoming[to];
             }
-            m_versionEdges.push_back({from, to, RGHandle::kInvalid, 0,
-                DiagnosticSnapshot::VersionEdge::Reason::RecordingSideEffect});
+            m_versionEdges.push_back(
+                {from, to, RGHandle::kInvalid, 0, DiagnosticSnapshot::VersionEdge::Reason::RecordingSideEffect});
         }
     }
-    std::priority_queue<uint16_t, std::vector<uint16_t>, std::greater<uint16_t>> ready;
+    std::priority_queue<uint16_t, ce::render_arena_vector<uint16_t>, std::greater<uint16_t>> ready{
+        std::greater<uint16_t>{}, ce::render_arena_vector<uint16_t>{arena}};
     for (size_t p = 0; p < count; ++p)
     {
         if (alive.test(p) && !incoming[p])
@@ -1040,50 +1228,79 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             ready.push(static_cast<uint16_t>(p));
         }
     }
-    std::vector<uint16_t> order;
+    ce::render_arena_vector<uint16_t> order{arena};
     while (!ready.empty())
     {
-        const auto p = ready.top(); ready.pop(); order.push_back(p);
-        for (const auto& e : edges[p]) if (--incoming[e.to] == 0) ready.push(e.to);
+        const auto p = ready.top();
+        ready.pop();
+        order.push_back(p);
+        for (const auto& e : edges[p])
+        {
+            if (--incoming[e.to] == 0)
+            {
+                ready.push(e.to);
+            }
+        }
     }
     if (order.size() != alive.count())
     {
         // Iterative DFS: report a real cycle with resource labels, without
         // recursion depth depending on the number of authored passes.
-        std::vector<uint8_t> color(count, 0);
-        struct Visit { uint16_t pass; size_t next; };
-        std::vector<Visit> stack;
+        ce::render_arena_vector<uint8_t> color(count, 0, arena);
+        struct Visit
+        {
+            uint16_t pass;
+            size_t next;
+        };
+        ce::render_arena_vector<Visit> stack{arena};
         for (size_t root = 0; root < count; ++root)
         {
             if (!alive.test(root) || color[root])
             {
                 continue;
             }
-            stack.push_back({static_cast<uint16_t>(root), 0}); color[root] = 1;
+            stack.push_back({static_cast<uint16_t>(root), 0});
+            color[root] = 1;
             while (!stack.empty())
             {
                 auto& top = stack.back();
-                if (top.next == edges[top.pass].size()) { color[top.pass] = 2; stack.pop_back(); continue; }
+                if (top.next == edges[top.pass].size())
+                {
+                    color[top.pass] = 2;
+                    stack.pop_back();
+                    continue;
+                }
                 const auto edge = edges[top.pass][top.next++];
-                if (color[edge.to] == 2) continue;
+                if (color[edge.to] == 2)
+                {
+                    continue;
+                }
                 if (color[edge.to] == 1)
                 {
-                    outError = m_scheduling==RGSchedulingMode::ExplicitVersioned ? "RG2 cycle: " : "RG1 cycle: ";
-                    const auto start = std::find_if(stack.begin(), stack.end(), [&](const Visit& v) { return v.pass == edge.to; });
+                    outError = m_scheduling == RGSchedulingMode::ExplicitVersioned ? "RG2 cycle: " : "RG1 cycle: ";
+                    const auto start =
+                        std::find_if(stack.begin(), stack.end(), [&](const Visit& v) { return v.pass == edge.to; });
                     for (auto it = start; it != stack.end(); ++it)
                     {
-                        const auto resource = (it + 1 == stack.end()) ? edge.resource : edges[it->pass][it->next - 1].resource;
-                        const auto v=(it+1==stack.end()) ? edge.version : edges[it->pass][it->next-1].version;
-                        outError += m_passes[it->pass].name + " --" +
-                            (resource == RGHandle::kInvalid ? std::string("recording side effect") : m_resources[resource].name)
-                            + (m_scheduling==RGSchedulingMode::ExplicitVersioned ? " v"+std::to_string(v) : "") + "--> ";
+                        const auto resource =
+                            (it + 1 == stack.end()) ? edge.resource : edges[it->pass][it->next - 1].resource;
+                        const auto v = (it + 1 == stack.end()) ? edge.version : edges[it->pass][it->next - 1].version;
+                        outError +=
+                            m_passes[it->pass].name + " --" +
+                            (resource == RGHandle::kInvalid ? std::string("recording side effect")
+                                                            : m_resources[resource].name) +
+                            (m_scheduling == RGSchedulingMode::ExplicitVersioned ? " v" + std::to_string(v) : "") +
+                            "--> ";
                     }
-                    outError += m_passes[edge.to].name; return false;
+                    outError += m_passes[edge.to].name;
+                    return false;
                 }
-                color[edge.to] = 1; stack.push_back({edge.to, 0});
+                color[edge.to] = 1;
+                stack.push_back({edge.to, 0});
             }
         }
-        outError = "RG1 cycle"; return false;
+        outError = "RG1 cycle";
+        return false;
     }
     if (m_orderPolicy == RGOrderPolicy::PreserveDeclarationOrder)
     {
@@ -1097,14 +1314,15 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 {
                     outError = "Declaration order violates dependency: " + m_passes[from].name + " -> " +
                                m_passes[edge.to].name + " resource=" +
-                               (edge.resource == RGHandle::kInvalid ? std::string("recording side effect") : m_resources[edge.resource].name);
+                               (edge.resource == RGHandle::kInvalid ? std::string("recording side effect")
+                                                                    : m_resources[edge.resource].name);
                     return false;
                 }
             }
         }
         std::sort(order.begin(), order.end());
     }
-    m_executeOrder.swap(order);
+    m_executeOrder.assign(order.data(), order.data() + order.size());
     outError.clear();
     return true;
 }
@@ -1176,27 +1394,38 @@ bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 
 void EnhancedRenderGraph::CullPasses()
 {
+    auto temporaryStorage = AcquireRdgScratch();
+    auto* arena = &temporaryStorage->Resource(0);
     ce::profile_scope profile{ce::marker<"RenderGraphCull">()};
     const size_t passCount = m_passes.size();
-    if(m_scheduling==RGSchedulingMode::ExplicitVersioned)
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
     {
-        m_stats.passesCulled=static_cast<uint32_t>(passCount-m_executeOrder.size());
+        m_stats.passesCulled = static_cast<uint32_t>(passCount - m_executeOrder.size());
         return; // Version-producer reachability preceded the stable sort.
     }
-    for (auto& pass : m_passes) pass.culled = true;
+    for (auto& pass : m_passes)
+    {
+        pass.culled = true;
+    }
 
     // Index writers once rather than scanning every pass and usage for each read.
     // Keep all writers, including later declarations, to preserve reachability semantics.
-    std::vector<std::vector<size_t>> writers(m_resources.size());
+    ce::render_arena_vector<ce::render_arena_vector<size_t>> writers(m_resources.size(), arena);
     for (size_t i = 0; i < passCount; ++i)
+    {
         for (const auto& usage : m_passes[i].usages)
+        {
             if (usage.handle.IsValid() && usage.handle.index < writers.size() && Writes(usage))
+            {
                 writers[usage.handle.index].push_back(i);
+            }
+        }
+    }
 
     // 뿌리: 부작용이 있는 패스(결과가 그래프 밖으로 나간다)와 외부 리소스에 쓰는 패스.
     // 후자를 넣는 이유는, 임포트한 리소스는 그래프가 수명을 모르므로 그 쓰기가
     // 밖에서 쓰일 수 있다고 봐야 하기 때문이다.
-    std::vector<size_t> stack;
+    ce::render_arena_vector<size_t> stack{arena};
     for (size_t i = 0; i < passCount; ++i)
     {
         bool isRoot = m_passes[i].hasSideEffect;
@@ -1204,7 +1433,10 @@ void EnhancedRenderGraph::CullPasses()
         {
             for (const auto& usage : m_passes[i].usages)
             {
-                if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
+                if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
+                {
+                    continue;
+                }
                 if (m_resources[usage.handle.index].imported && Writes(usage))
                 {
                     isRoot = true;
@@ -1228,12 +1460,21 @@ void EnhancedRenderGraph::CullPasses()
 
         for (const auto& usage : m_passes[current].usages)
         {
-            if (!Reads(usage)) continue;
-            if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
+            if (!Reads(usage))
+            {
+                continue;
+            }
+            if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
+            {
+                continue;
+            }
 
             for (const size_t producer : writers[usage.handle.index])
             {
-                if (!m_passes[producer].culled) continue;
+                if (!m_passes[producer].culled)
+                {
+                    continue;
+                }
                 m_passes[producer].culled = false;
                 stack.push_back(producer);
             }
@@ -1241,15 +1482,18 @@ void EnhancedRenderGraph::CullPasses()
     }
 
     // 실행 순서에서 걷어낸 패스를 뺀다.
-    std::vector<uint16_t> survivors;
+    ce::render_arena_vector<uint16_t> survivors{arena};
     survivors.reserve(m_executeOrder.size());
     for (uint16_t index : std::span{m_executeOrder})
     {
-        if (!m_passes[index].culled) survivors.push_back(index);
+        if (!m_passes[index].culled)
+        {
+            survivors.push_back(index);
+        }
     }
 
     m_stats.passesCulled = static_cast<uint32_t>(m_executeOrder.size() - survivors.size());
-    m_executeOrder.swap(survivors);
+    m_executeOrder.assign(survivors.data(), survivors.data() + survivors.size());
 }
 
 RHITransientResourceDesc EnhancedRenderGraph::TransientDescription(const Resource& resource) const
@@ -1760,9 +2004,11 @@ void EnhancedRenderGraph::ReleaseResources()
 
 bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
 {
+    auto temporaryStorage = AcquireRdgScratch();
+    auto* arena = &temporaryStorage->Resource(0);
     ce::profile_scope profile{ce::marker<"RenderGraphValidateRepeated">()};
-    std::vector<size_t> outerIndices(m_resources.size(), SIZE_MAX);
-    std::vector<size_t> seenPhase(m_resources.size(), SIZE_MAX);
+    ce::render_arena_vector<size_t> outerIndices(m_resources.size(), SIZE_MAX, arena);
+    ce::render_arena_vector<size_t> seenPhase(m_resources.size(), SIZE_MAX, arena);
     for (const auto& pass : m_passes)
     {
         if (!pass.repeated)
@@ -1774,9 +2020,8 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
             outError = "RenderGraph repeated pass '" + pass.name + "': " + reason;
             return false;
         };
-        if (m_scheduling != RGSchedulingMode::ExplicitVersioned || !pass.repeatedExecute ||
-            pass.phases.empty() || pass.phases.size() > kMaxRepeatedPhases ||
-            pass.repeatCount == 0 || pass.repeatCount > kMaxPassRepetitions)
+        if (m_scheduling != RGSchedulingMode::ExplicitVersioned || !pass.repeatedExecute || pass.phases.empty() ||
+            pass.phases.size() > kMaxRepeatedPhases || pass.repeatCount == 0 || pass.repeatCount > kMaxPassRepetitions)
         {
             return fail("requires versioned access, a callback, and bounded nonempty phases/repetitions");
         }
@@ -1815,9 +2060,8 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
                 }
                 const auto index = outerIndices[resourceIndex];
                 const auto* found = &pass.usages[index];
-                if (!ValidVersionHandle(usage.handle) ||
-                    found->handle.version != usage.handle.version || found->handle.kind != usage.handle.kind ||
-                    found->handle.epoch != usage.handle.epoch)
+                if (!ValidVersionHandle(usage.handle) || found->handle.version != usage.handle.version ||
+                    found->handle.kind != usage.handle.kind || found->handle.epoch != usage.handle.epoch)
                 {
                     return fail("undeclared or different resource version in phase '" + phase.name + "'");
                 }
@@ -1826,20 +2070,23 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
                     return fail("duplicate resource in phase '" + phase.name + "'");
                 }
                 seenPhase[resourceIndex] = phaseIndex;
-                if (usage.access == RGAccessMode::LegacyState ||
-                    usage.access < RGAccessMode::Read || usage.access > RGAccessMode::ReadWrite ||
-                    usage.state < RHIResourceState::Common || usage.state > RHIResourceState::VertexAndShaderResource ||
+                if (usage.access == RGAccessMode::LegacyState || usage.access < RGAccessMode::Read ||
+                    usage.access > RGAccessMode::ReadWrite || usage.state < RHIResourceState::Common ||
+                    usage.state > RHIResourceState::VertexAndShaderResource ||
                     (Writes(usage) && !IsWriteState(usage.state)) ||
                     (Reads(usage) && usage.access == RGAccessMode::Read && IsWriteState(usage.state) &&
-                        usage.state != RHIResourceState::UnorderedAccess) ||
+                     usage.state != RHIResourceState::UnorderedAccess) ||
                     (!m_resources[usage.handle.index].IsBuffer() &&
-                        (usage.state == RHIResourceState::IndexBuffer || usage.state == RHIResourceState::IndirectArgument ||
-                            usage.state == RHIResourceState::VertexAndShaderResource)) ||
+                     (usage.state == RHIResourceState::IndexBuffer ||
+                      usage.state == RHIResourceState::IndirectArgument ||
+                      usage.state == RHIResourceState::VertexAndShaderResource)) ||
                     (m_resources[usage.handle.index].IsBuffer() &&
-                        (usage.state == RHIResourceState::RenderTarget || usage.state == RHIResourceState::DepthWrite ||
-                            usage.state == RHIResourceState::DepthRead || usage.state == RHIResourceState::DepthReadShaderResource)) ||
-                    ((usage.state == RHIResourceState::IndirectArgument || usage.state == RHIResourceState::VertexAndShaderResource)
-                        && usage.access != RGAccessMode::Read))
+                     (usage.state == RHIResourceState::RenderTarget || usage.state == RHIResourceState::DepthWrite ||
+                      usage.state == RHIResourceState::DepthRead ||
+                      usage.state == RHIResourceState::DepthReadShaderResource)) ||
+                    ((usage.state == RHIResourceState::IndirectArgument ||
+                      usage.state == RHIResourceState::VertexAndShaderResource) &&
+                     usage.access != RGAccessMode::Read))
                 {
                     return fail("access/state mismatch in phase '" + phase.name + "'");
                 }
@@ -1851,7 +2098,7 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
                     (Reads(usage) && !initialized.test(index)))
                 {
                     return fail("phase writes an external Read or reads an uninitialized output: " +
-                        m_resources[usage.handle.index].name);
+                                m_resources[usage.handle.index].name);
                 }
                 used.set(index, true);
                 if (Writes(usage))
@@ -1989,24 +2236,23 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, ce::dynamic_bitset& p
     }
 }
 
-void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds,
-    PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue,
-    const ce::dynamic_bitset* retainedGraphicsTextures)
+void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds, PhaseBarrierPlan* prologue,
+                                       PhaseBarrierPlan* epilogue, const ce::dynamic_bitset* retainedGraphicsTextures)
 {
+    auto temporaryStorage = AcquireRdgScratch();
+    auto* arena = &temporaryStorage->Resource(0);
     const auto& executeOrder = GetExecuteOrder();
     ce::profile_scope profile{ce::marker<"RenderGraphPlanBarriers">()};
     const bool queuePlan = batchEnds != nullptr;
     m_stats.barriersEmitted = 0;
     m_stats.barrierBatches = 0;
-    ce::dynamic_bitset previousWrite(m_resources.size(),true);
-    std::vector<uint16_t> previousAtomicVersion(m_resources.size(), RGHandle::kInvalid);
-    std::vector<RHIResourceState> finalStates;
+    ce::dynamic_bitset previousWrite(m_resources.size(), true);
+    ce::render_arena_vector<uint16_t> previousAtomicVersion(m_resources.size(), RGHandle::kInvalid, arena);
+    ce::render_arena_vector<RHIResourceState> finalStates{arena};
     const auto retainsState = [&](size_t index)
-    {
-        return retainedGraphicsTextures && retainedGraphicsTextures->test(index);
-    };
-    const auto appendTransition = [](PhaseBarrierPlan& plan, const Resource& resource,
-        RHIResourceState before, RHIResourceState after)
+    { return retainedGraphicsTextures && retainedGraphicsTextures->test(index); };
+    const auto appendTransition =
+        [](PhaseBarrierPlan& plan, const Resource& resource, RHIResourceState before, RHIResourceState after)
     {
         if (before == after)
         {
@@ -2125,9 +2371,9 @@ void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds,
                 }
                 Resource& resource = m_resources[usage.handle.index];
                 const bool siblingAtomic = usage.access == RGAccessMode::AtomicMin64 &&
-                    previousAtomicVersion[usage.handle.index] == usage.handle.version;
-                previousAtomicVersion[usage.handle.index] = usage.access == RGAccessMode::AtomicMin64
-                    ? usage.handle.version : RGHandle::kInvalid;
+                                           previousAtomicVersion[usage.handle.index] == usage.handle.version;
+                previousAtomicVersion[usage.handle.index] =
+                    usage.access == RGAccessMode::AtomicMin64 ? usage.handle.version : RGHandle::kInvalid;
 
                 // ★ 핸들이 유효한가만 본다 (G-2). 예전에는 여기서 `Resolve` 로
                 //   포인터를 풀어 배리어 구조체에 박았는데, 그 한 줄 때문에
@@ -2143,7 +2389,8 @@ void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds,
                     // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
                     // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
                     if (RHIResourceState::UnorderedAccess == usage.state && !siblingAtomic &&
-                        (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite.test(usage.handle.index) || Writes(usage)))
+                        (m_scheduling != RGSchedulingMode::ExplicitVersioned ||
+                         previousWrite.test(usage.handle.index) || Writes(usage)))
                     {
                         if (resource.IsBuffer())
                         {
@@ -2160,22 +2407,21 @@ void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds,
 
                 if (resource.IsBuffer())
                 {
-                    pass.bufferTransitions.push_back(RHIBufferTransition{
-                        resource.buffer, resource.state, usage.state });
+                    pass.bufferTransitions.push_back(RHIBufferTransition{resource.buffer, resource.state, usage.state});
                 }
                 else
                 {
-                    pass.transitions.push_back(RHITransition{
-                        resource.handle, resource.state, usage.state });
+                    pass.transitions.push_back(RHITransition{resource.handle, resource.state, usage.state});
                 }
 
                 resource.state = usage.state;
                 previousWrite.set(usage.handle.index, Writes(usage));
             }
 
-            const size_t barrierCount = pass.transitions.size() +
-                pass.bufferTransitions.size() + pass.uavBarriers.size() +
-                pass.uavBufferBarriers.size() + pass.aliasTextures.size() + pass.aliasBuffers.size() + pass.poisonBuffers.size();
+            const size_t barrierCount = pass.transitions.size() + pass.bufferTransitions.size() +
+                                        pass.uavBarriers.size() + pass.uavBufferBarriers.size() +
+                                        pass.aliasTextures.size() + pass.aliasBuffers.size() +
+                                        pass.poisonBuffers.size();
             m_stats.barriersEmitted += static_cast<uint32_t>(barrierCount);
             m_stats.barrierBatches += static_cast<uint32_t>(pass.poisonBuffers.size());
             if (0 != barrierCount)
@@ -2246,9 +2492,13 @@ void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds,
         auto& pass = m_passes[executeOrder[resource.lastUse]];
         const bool firstFinalBarrier = pass.finalTransitions.empty() && pass.finalBufferTransitions.empty();
         if (resource.IsBuffer())
+        {
             pass.finalBufferTransitions.push_back({resource.buffer, resource.state, requirement.state});
+        }
         else
+        {
             pass.finalTransitions.push_back({resource.handle, resource.state, requirement.state});
+        }
         resource.state = requirement.state;
         ++m_stats.barriersEmitted;
         if (firstFinalBarrier)
@@ -2533,30 +2783,47 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
 
 void EnhancedRenderGraph::BuildDependencyWaves()
 {
-    m_dependencyWaves.assign(m_passes.size(),-1);
+    auto temporaryStorage = AcquireRdgScratch();
+    auto* arena = &temporaryStorage->Resource(0);
+    m_dependencyWaves.assign(m_passes.size(), -1);
     m_criticalPath.clear();
-    if(m_scheduling!=RGSchedulingMode::ExplicitVersioned) return;
-    std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
-    for(const auto& edge:m_versionEdges) predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
-    std::vector<uint16_t> parent(m_passes.size(),RGPassId::kInvalid);
-    uint16_t last=RGPassId::kInvalid;
-    for(const auto p:std::span{m_executeOrder})
+    if (m_scheduling != RGSchedulingMode::ExplicitVersioned)
     {
-        m_dependencyWaves[p]=0;
-        for(const auto producer:predecessors[p])
-        {
-            const auto depth=m_dependencyWaves[producer]+1;
-            if(depth>m_dependencyWaves[p] || (depth==m_dependencyWaves[p] && producer<parent[p]))
-            { m_dependencyWaves[p]=depth; parent[p]=producer; }
-        }
-        if(last==RGPassId::kInvalid || m_dependencyWaves[p]>m_dependencyWaves[last] ||
-            (m_dependencyWaves[p]==m_dependencyWaves[last] && p<last)) last=p;
+        return;
     }
-    if(last!=RGPassId::kInvalid)
+    ce::render_arena_vector<ce::render_arena_vector<uint16_t>> predecessors(m_passes.size(), arena);
+    for (const auto& edge : m_versionEdges)
     {
-        m_stats.dependencyWaveCount=static_cast<uint32_t>(m_dependencyWaves[last]+1);
-        for(auto p=last;p!=RGPassId::kInvalid;p=parent[p]) m_criticalPath.push_back(p);
-        std::reverse(m_criticalPath.begin(),m_criticalPath.end());
+        predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
+    }
+    ce::render_arena_vector<uint16_t> parent(m_passes.size(), RGPassId::kInvalid, arena);
+    uint16_t last = RGPassId::kInvalid;
+    for (const auto p : std::span{m_executeOrder})
+    {
+        m_dependencyWaves[p] = 0;
+        for (const auto producer : predecessors[p])
+        {
+            const auto depth = m_dependencyWaves[producer] + 1;
+            if (depth > m_dependencyWaves[p] || (depth == m_dependencyWaves[p] && producer < parent[p]))
+            {
+                m_dependencyWaves[p] = depth;
+                parent[p] = producer;
+            }
+        }
+        if (last == RGPassId::kInvalid || m_dependencyWaves[p] > m_dependencyWaves[last] ||
+            (m_dependencyWaves[p] == m_dependencyWaves[last] && p < last))
+        {
+            last = p;
+        }
+    }
+    if (last != RGPassId::kInvalid)
+    {
+        m_stats.dependencyWaveCount = static_cast<uint32_t>(m_dependencyWaves[last] + 1);
+        for (auto p = last; p != RGPassId::kInvalid; p = parent[p])
+        {
+            m_criticalPath.push_back(p);
+        }
+        std::reverse(m_criticalPath.begin(), m_criticalPath.end());
     }
 }
 
@@ -2722,7 +2989,7 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
         auto& declaration = schedule.passes.emplace_back();
         declaration.name = pass.name;
         declaration.usages = pass.usages;
-        declaration.phases = pass.phases;
+        declaration.phases.assign(pass.phases.begin(), pass.phases.end());
         forgetEpochs(declaration.usages);
         for (auto& phase : declaration.phases)
         {
@@ -3892,10 +4159,51 @@ void EnhancedRenderGraph::RecordPassFinalBarriers(RHIEncoder& encoder, const Pas
     encoder.ResourceBarriers(batch);
 }
 
-bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
-    uint32_t workerCount, const RHIRecordedBatchDesc& batchDesc,
-    RHIRecordedBatch& outBatch, std::string& outError)
+bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool, uint32_t workerCount,
+    const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch, std::string& outError)
 {
+    return RecordParallelInternal(pool, workerCount, batchDesc, outBatch, outError, nullptr, nullptr, nullptr);
+}
+
+bool EnhancedRenderGraph::RecordSoftware(IRHIParallelCommandPool& pool, uint32_t workerCount,
+    RHISoftwareRecorder& recorder, const RHISoftwareBatchDesc& batchDesc, RHISoftwareBatch& outBatch,
+    std::string& outError)
+{
+    if (outBatch.IsValid())
+    {
+        outError = "Software graph recording output is not empty.";
+        return false;
+    }
+    const RHISoftwareRecordingDesc recording{batchDesc.queue, pool.GetWorkerCount(), 64ull << 20, 64ull << 20};
+    if (!recorder.BeginRecording(recording, outError))
+    {
+        return false;
+    }
+    auto desc = batchDesc;
+    RHIRecordedBatch unused;
+    RHIRecordedBatchDesc nativeDesc;
+    if (!RecordParallelInternal(pool, workerCount, nativeDesc, unused, outError, &recorder, &desc, &outBatch))
+    {
+        recorder.CancelRecording();
+        return false;
+    }
+    return true;
+}
+
+bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, uint32_t workerCount,
+    const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch, std::string& outError,
+    RHISoftwareRecorder* software, RHISoftwareBatchDesc* softwareDesc, RHISoftwareBatch* softwareBatch)
+{
+    const auto finalize = [&](std::span<const uint32_t> order)
+    {
+        if (software)
+        {
+            softwareDesc->uploadRecordingId = m_deviceServices->GetCurrentUploadRecordingId();
+            softwareDesc->descriptorVersion = m_deviceServices->GetDescriptorVersionToken();
+            return software->FinishRecording(order, *softwareDesc, *softwareBatch, outError);
+        }
+        return pool.FinalizeRecordedBatch(order, batchDesc, outBatch, outError);
+    };
     const auto& executeOrder = GetExecuteOrder();
     if (!m_queueLease.expired() || m_queueExecutionAttempted)
     {
@@ -3930,7 +4238,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     const size_t passCount = executeOrder.size();
     if (0 == passCount)
     {
-        if (!pool.FinalizeRecordedBatch({}, batchDesc, outBatch, outError))
+        if (!finalize({}))
         {
             return false;
         }
@@ -4020,7 +4328,9 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     const uint32_t poolWorkers = declineParallel ? 1u : (std::max)(1u,
         (std::min)(workerCount, pool.GetWorkerCount()));
 
-    std::vector<RecordUnit> units;
+    auto temporaryStorage = AcquireRdgScratch();
+    auto* arena = &temporaryStorage->Resource(0);
+    ce::render_arena_vector<RecordUnit> units{arena};
     units.reserve(passCount * 2);
 
     for (size_t order = 0; order < passCount; ++order)
@@ -4395,7 +4705,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     m_stats.recordingNativeGraph = false;
     m_stats.recordingDiagnostics.reset();
     m_stats.recordingWorkerJobCount = 0;
-    std::vector<size_t> workerCursors(workers, 0);
+    ce::render_arena_vector<size_t> workerCursors(workers, 0, arena);
     uint32_t activeWave = 0;
 
     const auto& recordingPolicy = RHIRecordingPolicy::Get();
@@ -4494,8 +4804,18 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
     const auto discardRecording = [&]
     {
-        std::string closeError;
-        if (!pool.CloseAll(closeError)) outError += " / 기록 폐기 중 닫기 실패: " + closeError;
+        if (software)
+        {
+            software->CancelRecording();
+        }
+        else
+        {
+            std::string closeError;
+            if (!pool.CloseAll(closeError))
+            {
+                outError += " / 기록 폐기 중 닫기 실패: " + closeError;
+            }
+        }
     };
 
     // 리스트를 먼저 전부 연다.
@@ -4506,7 +4826,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.Open">()};
         for (uint32_t worker = 0; worker < workers; ++worker)
         {
-            if (!pool.OpenWorker(worker, outError))
+            if (!software && !pool.OpenWorker(worker, outError))
             {
                 discardRecording();
                 return false;
@@ -4516,7 +4836,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
     // 워커에서 터진 예외를 삼키지 않는다. 조용히 사라지면 '가끔 화면이 빈다'가
     // 되고, 그 상태는 원인을 찾기가 매우 어렵다.
-    std::vector<std::string> workerErrors(workers);
+    ce::render_arena_vector<std::string> workerErrors(workers, arena);
     std::atomic<bool> failed{ false };
 #if !CE_SHIPPING
     const auto recordingContext = ce::current_cpu_context;
@@ -4558,7 +4878,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
                 // 순차 경로와 같은 이유로 조각마다 새로 만든다(Execute 주석 참고).
                 // 워커마다 자기 커맨드 리스트라 조각끼리도 섞이지 않아야 한다.
-                RHIEncoder& encoder = pool.AcquireEncoder(worker);
+                RHIEncoder& encoder = software ? software->AcquireEncoder(worker) : pool.AcquireEncoder(worker);
                 context.encoder = &encoder;
 
                 // 패스별 GPU 시간을 병렬 경로에서도 잰다.
@@ -4677,7 +4997,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
             // 연달아 오면 그 묶음을 Job 하나가 차례 순서대로 기록한다 — 합류 조건과
             // 리스트 순서 제약이 그대로이고, 기록은 여전히 공용 워커에서만 일어난다.
             constexpr uint32_t kMaskedWorkers = 32;
-            std::vector<uint32_t> waveWorkerMask(waveCount, 0);
+            ce::render_arena_vector<uint32_t> waveWorkerMask(waveCount, 0, arena);
             for (size_t i = 0; i < unitCount && workers <= kMaskedWorkers; ++i)
             {
                 waveWorkerMask[unitWave[i]] |= 1u << unitWorker[i];
@@ -4694,7 +5014,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     activeWave = wave++;
                     // Dispatch only targets with units in this wave. The owner
                     // still joins every submitted job before advancing the wave.
-                    std::vector<uint32_t> active;
+                    ce::render_arena_vector<uint32_t> active{arena};
                     for (uint32_t worker = 0; worker < workers; ++worker)
                     {
                         const auto cursor = workerCursors[worker];
@@ -4773,11 +5093,14 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     }
 
     // batch 순서는 워커 번호 순서다. 연속 블록 배분이므로 그것이 곧 선언 순서다.
-    std::vector<uint32_t> submission;
+    ce::render_arena_vector<uint32_t> submission{arena};
     submission.reserve(workers);
     for (uint32_t worker = 0; worker < workers; ++worker)
     {
-        if (!pool.HasRecorded(worker)) continue;
+        if (!(software ? software->HasRecorded(worker) : pool.HasRecorded(worker)))
+        {
+            continue;
+        }
         submission.push_back(worker);
     }
 
@@ -4785,7 +5108,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // slot과 순서를 batch 값에 밀봉하고 제출은 호출부(향후 RHI thread)가 한다.
     {
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.Finalize">()};
-        if (!pool.FinalizeRecordedBatch(submission, batchDesc, outBatch, outError))
+        if (!finalize(submission))
         {
             return false;
         }

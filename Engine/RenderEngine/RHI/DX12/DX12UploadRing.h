@@ -17,35 +17,33 @@ class DX12ResourceTable;
 /// 호출하는 recording 경계다.
 class DX12UploadSegmentAllocator
 {
-public:
-    static constexpr uint64_t kConstantBufferAlignment =
-        D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
-    static constexpr uint64_t kTexturePlacementAlignment =
-        D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT;
+  public:
+    static constexpr uint64_t kConstantBufferAlignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+    static constexpr uint64_t kTexturePlacementAlignment = D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT;
 
     /// backend 성능/회귀 검사만 쓰는 네이티브 관측값. 패스와 캐시는
     /// RHIBufferSlice 계약을 사용한다.
     struct Allocation
     {
-        void* cpuAddress{ nullptr };
-        D3D12_GPU_VIRTUAL_ADDRESS gpuAddress{ 0 };
-        ID3D12Resource* resource{ nullptr };
-        uint64_t offset{ 0 };
-        uint64_t size{ 0 };
-        uint32_t segment{ 0 };
+        void* cpuAddress{nullptr};
+        D3D12_GPU_VIRTUAL_ADDRESS gpuAddress{0};
+        ID3D12Resource* resource{nullptr};
+        uint64_t offset{0};
+        uint64_t size{0};
+        uint32_t segment{0};
         bool IsValid() const { return nullptr != cpuAddress; }
     };
 
-    bool Initialize(ID3D12Device* device, DX12ResourceTable& table,
-        const RHIUploadSegmentPolicy& policy, std::string& outError);
+    bool Initialize(ID3D12Device* device, DX12ResourceTable& table, const RHIUploadSegmentPolicy& policy,
+                    std::string& outError);
     void Shutdown();
 
     void Collect(uint64_t completedValue);
     void BeginRecording(uint64_t recordingId);
-    bool ReserveBatch(uint64_t recordingId,
-        std::span<const RHIUploadRequest> requests,
-        std::span<RHIBufferSlice> outSlices,
-        std::string& outError);
+    bool ReserveBatch(uint64_t recordingId, std::span<const RHIUploadRequest> requests,
+                      std::span<RHIBufferSlice> outSlices, std::string& outError);
+    // Recording owner calls after all allocation writers join.
+    std::shared_ptr<const void> PinRecording(uint64_t recordingId);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
     void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
@@ -54,37 +52,36 @@ public:
     uint64_t GetRecordingUsedBytes() const;
     uint64_t GetRegularSegmentBytes() const { return m_regularSegmentBytes; }
     void UpdateBudget(uint64_t softBudgetBytes, bool memoryPressure);
-    void SetBudgetForTesting(uint64_t softBudgetBytes,
-        uint64_t largeCacheBudgetBytes, bool memoryPressure);
+    void SetBudgetForTesting(uint64_t softBudgetBytes, uint64_t largeCacheBudgetBytes, bool memoryPressure);
     void ClearBudgetOverrideForTesting();
     Allocation Allocate(uint64_t bytes, uint64_t alignment);
     uint64_t GetBytesPerFrame() const { return m_regularSegmentBytes; }
     uint32_t GetFrameCount() const { return 3; }
     uint64_t GetFrameUsedBytes() const { return GetRecordingUsedBytes(); }
 
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Segment
     {
         ComPtr<ID3D12Resource> buffer;
-        uint8_t* mapped{ nullptr };
+        uint8_t* mapped{nullptr};
         RHIBufferHandle handle;
-        uint64_t capacity{ 0 };
-        std::atomic<uint64_t> cursor{ 0 };
-        uint64_t recordingId{ 0 };
-        uint64_t completionValue{ 0 };
-        uint64_t lastCollectedEpoch{ 0 };
-        bool large{ false };
-        RHIUploadSegmentState state{ RHIUploadSegmentState::Available };
+        uint64_t capacity{0};
+        std::atomic<uint64_t> cursor{0};
+        uint64_t recordingId{0};
+        uint64_t completionValue{0};
+        uint64_t lastCollectedEpoch{0};
+        bool large{false};
+        std::weak_ptr<const void> translationLease;
+        RHIUploadSegmentState state{RHIUploadSegmentState::Available};
     };
 
     uint64_t RequiredAlignment(const RHIUploadRequest& request) const;
-    bool TryPack(uint64_t start, uint64_t capacity,
-        std::span<const RHIUploadRequest> requests, uint64_t& outEnd) const;
-    bool TryReserveAtomic(Segment& segment,
-        std::span<const RHIUploadRequest> requests,
-        std::span<RHIBufferSlice> outSlices, bool fastPath);
+    bool TryPack(uint64_t start, uint64_t capacity, std::span<const RHIUploadRequest> requests, uint64_t& outEnd) const;
+    bool TryReserveAtomic(Segment& segment, std::span<const RHIUploadRequest> requests,
+                          std::span<RHIBufferSlice> outSlices, bool fastPath);
     Segment* CreateSegment(uint64_t bytes, bool large, std::string& outError);
     Segment* FindAvailableSegmentLocked(bool large, uint64_t minimumBytes);
     uint64_t SegmentBytesLocked() const;
@@ -93,41 +90,41 @@ private:
     void EnsureBudgetForCreateLocked(uint64_t bytesNeeded);
     void UpdatePeakRecordingBytes(uint64_t value);
 
-    ID3D12Device* m_device{ nullptr };
-    DX12ResourceTable* m_table{ nullptr };
+    ID3D12Device* m_device{nullptr};
+    DX12ResourceTable* m_table{nullptr};
     std::vector<std::unique_ptr<Segment>> m_segments;
-    uint64_t m_regularSegmentBytes{ 0 };
-    uint64_t m_largeThreshold{ 0 };
-    uint32_t m_standbyRegularSegments{ 0 };
-    uint32_t m_trimDelayCollects{ 0 };
-    uint64_t m_defaultLargeCacheBudgetBytes{ 0 };
-    uint64_t m_collectEpoch{ 0 };
-    std::atomic<Segment*> m_fastRegular{ nullptr };
-    std::atomic<uint64_t> m_currentRecordingId{ 0 };
-    std::atomic<uint64_t> m_recordingBytes{ 0 };
-    std::atomic<uint64_t> m_peakRecordingBytes{ 0 };
-    std::atomic<uint64_t> m_slowPathCreates{ 0 };
-    std::atomic<uint64_t> m_reuses{ 0 };
-    std::atomic<uint64_t> m_fastPathReservations{ 0 };
-    std::atomic<uint64_t> m_slowPathReservations{ 0 };
-    std::atomic<uint64_t> m_casRetries{ 0 };
-    std::atomic<uint64_t> m_workerSegmentCreates{ 0 };
-    std::atomic<uint64_t> m_tailWasteBytes{ 0 };
-    std::atomic<uint64_t> m_reclaimLag{ 0 };
-    std::atomic<uint64_t> m_batchRollbacks{ 0 };
-    std::atomic<uint64_t> m_oomFailures{ 0 };
-    std::atomic<uint64_t> m_allocations{ 0 };
-    std::atomic<uint64_t> m_bytesAllocated{ 0 };
-    std::atomic<uint64_t> m_softBudgetBytes{ 0 };
-    std::atomic<uint64_t> m_largeCacheBudgetBytes{ 0 };
-    std::atomic<bool> m_memoryPressure{ false };
-    std::atomic<bool> m_budgetOverrideForTesting{ false };
-    std::atomic<uint64_t> m_trimmedSegments{ 0 };
-    std::atomic<uint64_t> m_trimmedBytes{ 0 };
-    std::atomic<uint64_t> m_budgetPressureEvents{ 0 };
-    std::atomic<uint64_t> m_budgetRetries{ 0 };
-    std::atomic<uint64_t> m_budgetOvercommits{ 0 };
+    uint64_t m_regularSegmentBytes{0};
+    uint64_t m_largeThreshold{0};
+    uint32_t m_standbyRegularSegments{0};
+    uint32_t m_trimDelayCollects{0};
+    uint64_t m_defaultLargeCacheBudgetBytes{0};
+    uint64_t m_collectEpoch{0};
+    std::atomic<Segment*> m_fastRegular{nullptr};
+    std::atomic<uint64_t> m_currentRecordingId{0};
+    std::atomic<uint64_t> m_sealedRecordingId{0};
+    std::atomic<uint64_t> m_recordingBytes{0};
+    std::atomic<uint64_t> m_peakRecordingBytes{0};
+    std::atomic<uint64_t> m_slowPathCreates{0};
+    std::atomic<uint64_t> m_reuses{0};
+    std::atomic<uint64_t> m_fastPathReservations{0};
+    std::atomic<uint64_t> m_slowPathReservations{0};
+    std::atomic<uint64_t> m_casRetries{0};
+    std::atomic<uint64_t> m_workerSegmentCreates{0};
+    std::atomic<uint64_t> m_tailWasteBytes{0};
+    std::atomic<uint64_t> m_reclaimLag{0};
+    std::atomic<uint64_t> m_batchRollbacks{0};
+    std::atomic<uint64_t> m_oomFailures{0};
+    std::atomic<uint64_t> m_allocations{0};
+    std::atomic<uint64_t> m_bytesAllocated{0};
+    std::atomic<uint64_t> m_softBudgetBytes{0};
+    std::atomic<uint64_t> m_largeCacheBudgetBytes{0};
+    std::atomic<bool> m_memoryPressure{false};
+    std::atomic<bool> m_budgetOverrideForTesting{false};
+    std::atomic<uint64_t> m_trimmedSegments{0};
+    std::atomic<uint64_t> m_trimmedBytes{0};
+    std::atomic<uint64_t> m_budgetPressureEvents{0};
+    std::atomic<uint64_t> m_budgetRetries{0};
+    std::atomic<uint64_t> m_budgetOvercommits{0};
     std::thread::id m_ownerThread;
     mutable std::mutex m_mutex;
 };
-

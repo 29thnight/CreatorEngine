@@ -1,0 +1,365 @@
+{
+  "before": {
+    "gameCpuMs": {
+      "mean": 14.292620728291316,
+      "p50": 14.1133,
+      "p95": 17.4203,
+      "max": 20.3617
+    },
+    "groups": [
+      {
+        "viewId": 1,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "realFrameCount": 357
+      },
+      {
+        "viewId": 2,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "realFrameCount": 357
+      }
+    ],
+    "quality": {
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "gpuEvents": 100317,
+      "matchedGpuEvents": 100317,
+      "invalidProvenanceSamples": 0
+    },
+    "markers": {
+      "RenderGraphDeclare": {
+        "thread": "[RenderThread]",
+        "name": "RenderGraphDeclare",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 718,
+        "perEngineFrame": 10.49467857142857,
+        "mean": 5.525053621169916,
+        "p50": 5.224,
+        "p95": 7.5101,
+        "max": 9.991
+      },
+      "MaterialGraphScenePrepare": {
+        "thread": "[RenderThread]",
+        "name": "MaterialGraphScenePrepare",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 718,
+        "perEngineFrame": 5.484757936507936,
+        "mean": 2.887518802228412,
+        "p50": 2.82925,
+        "p95": 3.6256,
+        "max": 4.3679
+      },
+      "RenderCommandRecord": {
+        "thread": "[RenderThread]",
+        "name": "RenderCommandRecord",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 718,
+        "perEngineFrame": 4.123942328042328,
+        "mean": 2.171100557103064,
+        "p50": 2.07505,
+        "p95": 2.6782,
+        "max": 3.2326
+      },
+      "RHISoftwareTranslate": {
+        "thread": "[RHIThread]",
+        "name": "RHISoftwareTranslate",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 718,
+        "perEngineFrame": 3.521862962962963,
+        "mean": 1.8541284122562673,
+        "p50": 1.7647,
+        "p95": 2.5075,
+        "max": 3.9182
+      },
+      "RenderGraphCompile": {
+        "thread": "[RenderThread]",
+        "name": "RenderGraphCompile",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 718,
+        "perEngineFrame": 1.5526904761904763,
+        "mean": 0.817433147632312,
+        "p50": 0.7658,
+        "p95": 1.1825,
+        "max": 1.6073
+      }
+    },
+    "rates": {
+      "baseline-live": 46.418062819028165,
+      "baseline-off-live": 51.61933381685203
+    },
+    "capture": {
+      "normalExit": true,
+      "runtimeUnchanged": true,
+      "foregroundSamplesAccepted": true,
+      "passed": true,
+      "workerCountRequested": 8,
+      "foregroundMode": "editor"
+    },
+    "replay": true,
+    "reload": true,
+    "runtimeSha256": "000E111DE12A1D056FBB4170641EF9BBC38A443DA0A94C1A8E1C38F23908A588"
+  },
+  "after": {
+    "gameCpuMs": {
+      "mean": 15.083266568914956,
+      "p50": 15.1127,
+      "p95": 18.0442,
+      "max": 22.4109
+    },
+    "groups": [
+      {
+        "viewId": 1,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "realFrameCount": 341
+      },
+      {
+        "viewId": 2,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "realFrameCount": 341
+      }
+    ],
+    "quality": {
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "gpuEvents": 95821,
+      "matchedGpuEvents": 95821,
+      "invalidProvenanceSamples": 0
+    },
+    "markers": {
+      "RenderGraphDeclare": {
+        "thread": "[RenderThread]",
+        "name": "RenderGraphDeclare",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 685,
+        "perEngineFrame": 10.3505016,
+        "mean": 5.66633299270073,
+        "p50": 5.3592,
+        "p95": 7.5573,
+        "max": 9.8585
+      },
+      "MaterialGraphScenePrepare": {
+        "thread": "[RenderThread]",
+        "name": "MaterialGraphScenePrepare",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 685,
+        "perEngineFrame": 5.5462048,
+        "mean": 3.036243503649635,
+        "p50": 3.0193,
+        "p95": 3.6828,
+        "max": 4.1894
+      },
+      "RenderCommandRecord": {
+        "thread": "[RenderThread]",
+        "name": "RenderCommandRecord",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 686,
+        "perEngineFrame": 4.5715168,
+        "mean": 2.499006997084548,
+        "p50": 2.4425,
+        "p95": 3.0981,
+        "max": 3.3779
+      },
+      "RHISoftwareTranslate": {
+        "thread": "[RHIThread]",
+        "name": "RHISoftwareTranslate",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 686,
+        "perEngineFrame": 3.685249866666666,
+        "mean": 2.0145316326530613,
+        "p50": 1.86285,
+        "p95": 2.748,
+        "max": 3.584
+      },
+      "RenderGraphCompile": {
+        "thread": "[RenderThread]",
+        "name": "RenderGraphCompile",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 686,
+        "perEngineFrame": 1.5340880000000001,
+        "mean": 0.8386049562682216,
+        "p50": 0.77495,
+        "p95": 1.2691,
+        "max": 1.6779
+      }
+    },
+    "rates": {
+      "baseline-live": 44.20909399670922,
+      "baseline-off-live": 51.254714756746246
+    },
+    "capture": {
+      "foregroundSamplesAccepted": true,
+      "passed": true,
+      "runtimeUnchanged": true,
+      "foregroundMode": "editor",
+      "workerCountRequested": 8,
+      "normalExit": true
+    },
+    "replay": true,
+    "reload": true,
+    "runtimeSha256": "2FC0CBFEFE7BB8E20B21240922C2514292C444E5A2CE97CB4820DEA501F9753B"
+  },
+  "after-fast": {
+    "gameCpuMs": {
+      "mean": 13.939117403314917,
+      "p50": 13.919699999999999,
+      "p95": 16.2151,
+      "max": 19.8621
+    },
+    "groups": [
+      {
+        "viewId": 2,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "realFrameCount": 362
+      },
+      {
+        "viewId": 1,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "realFrameCount": 362
+      }
+    ],
+    "quality": {
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "gpuEvents": 101722,
+      "matchedGpuEvents": 101722,
+      "invalidProvenanceSamples": 0
+    },
+    "markers": {
+      "RenderGraphDeclare": {
+        "thread": "[RenderThread]",
+        "name": "RenderGraphDeclare",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 729,
+        "perEngineFrame": 10.24225582010582,
+        "mean": 5.310799314128944,
+        "p50": 5.1489,
+        "p95": 6.3263,
+        "max": 8.6927
+      },
+      "MaterialGraphScenePrepare": {
+        "thread": "[RenderThread]",
+        "name": "MaterialGraphScenePrepare",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 729,
+        "perEngineFrame": 5.4272685185185185,
+        "mean": 2.814139231824417,
+        "p50": 2.7531,
+        "p95": 3.4119,
+        "max": 5.3174
+      },
+      "RenderCommandRecord": {
+        "thread": "[RenderThread]",
+        "name": "RenderCommandRecord",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 730,
+        "perEngineFrame": 4.077841534391534,
+        "mean": 2.111539863013699,
+        "p50": 2.0477999999999996,
+        "p95": 2.5189,
+        "max": 2.9526
+      },
+      "RHISoftwareTranslate": {
+        "thread": "[RHIThread]",
+        "name": "RHISoftwareTranslate",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 730,
+        "perEngineFrame": 3.5898986772486774,
+        "mean": 1.8588790410958904,
+        "p50": 1.79755,
+        "p95": 2.2495,
+        "max": 2.8568
+      },
+      "RenderGraphCompile": {
+        "thread": "[RenderThread]",
+        "name": "RenderGraphCompile",
+        "gpu": false,
+        "view": 0,
+        "file": "",
+        "calls": 730,
+        "perEngineFrame": 1.5795124338624338,
+        "mean": 0.8178845205479452,
+        "p50": 0.78525,
+        "p95": 1.0161,
+        "max": 1.5678
+      }
+    },
+    "rates": {
+      "baseline-live": 47.146213296705966,
+      "baseline-off-live": 53.26285155786671
+    },
+    "capture": {
+      "runtimeUnchanged": true,
+      "foregroundSamplesAccepted": true,
+      "workerCountRequested": 8,
+      "normalExit": true,
+      "passed": true,
+      "foregroundMode": "editor"
+    },
+    "replay": true,
+    "reload": true,
+    "runtimeSha256": "758B799B9D6616BCE7DE021958D0F2376F87AAD4FB19D42DCB9FAB9EDBC9E07D"
+  },
+  "gameCpuReductionPercent": 1.371755719782064,
+  "target120CpuBudgetMet": false,
+  "nativeGpuRegression": {
+    "uploadRollover": true,
+    "validation": "gpu",
+    "frozenTargets": true,
+    "passed": true,
+    "fullRenderGraph": true,
+    "asynchronousTranslation": true,
+    "normalExit": true,
+    "gpuMergeReuse": true,
+    "nativeClearBarrierReadback": true,
+    "translationPoolReuse": true,
+    "creatorRobotSoftwarePath": false,
+    "arenaRetirement": true
+  },
+  "checks": {
+    "cpuProbe": true,
+    "nativeGpu": true,
+    "pixelReplay": true,
+    "reloadReplay": true,
+    "format19": true,
+    "packetPlanOnly": true,
+    "materialCodegen": true,
+    "fullMaterialSurfaceSuite": "stopped_scope_changed_to_packet_plan_only",
+    "target120": false
+  }
+}

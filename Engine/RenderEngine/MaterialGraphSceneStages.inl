@@ -66,7 +66,7 @@ struct SceneHost::ShadowFirstCullStage
     std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 3> meshlets;
     std::optional<GpuGeometryOcclusion::ViewKey> m_cameraPredictionView;
     mutable SceneShadowResources outputs{};
-    SceneShadowResources Declare(const own::shared_owner<const FrameInput>& frame, EnhancedRenderGraph& graph,
+    SceneShadowResources Declare(const own::shared_owner<const Frame>& frame, EnhancedRenderGraph& graph,
                                  RGHandle geometry, RGHandle cameraOccluderDepth) const;
 };
 

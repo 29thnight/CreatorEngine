@@ -1,4 +1,7 @@
 #pragma once
+class RHISoftwareRecorder;
+class RHISoftwareBatch;
+struct RHISoftwareBatchDesc;
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../../RHI/IRenderDeviceServices.h"
@@ -9,6 +12,7 @@
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
+#include "../../RenderAllocator.h"
 #include "../../RHI/RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../../RHI/RHIHandle.h"
 #include "../../RHI/RHIQueueContract.h"
@@ -489,6 +493,8 @@ public:
         ExecuteCallback execute, bool hasSideEffect = false);
     RGPassId AddPass(const std::string& name, std::vector<RGPassUsage>&& usages,
         ExecuteCallback execute, bool hasSideEffect = false);
+    RGPassId AddPass(const std::string& name, std::span<const RGPassUsage> usages, ExecuteCallback execute,
+                     bool hasSideEffect = false);
     // 중괄호 목록은 그래프가 소유한 저장 공간으로 바로 복사한다.
     // 반환 전에 복사를 끝내므로 임시 배열의 참조가 다음 기록까지 남지 않는다.
     RGPassId AddPass(const std::string& name, std::initializer_list<RGPassUsage> usages,
@@ -498,6 +504,11 @@ public:
     {
         std::string name;
         std::vector<RGPassUsage> usages;
+    };
+    struct RepeatedPhaseView
+    {
+        std::string_view name;
+        std::span<const RGPassUsage> usages;
     };
     using RepeatedExecuteCallback =
         std::function<void(const ExecuteContext&, uint32_t iterationIndex, uint32_t phaseIndex)>;
@@ -509,6 +520,11 @@ public:
     RGPassId AddRepeatedPass(const std::string& name, std::vector<RGPassUsage> usages,
         std::vector<RepeatedPhase> phases, uint32_t repeatCount,
         RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
+    // Views are copied before returning. Reset retains the owned phase/name/usage
+    // capacity, never a reference to the caller's declaration scratch.
+    RGPassId AddRepeatedPassView(const std::string& name, std::span<const RGPassUsage> usages,
+                                 std::span<const RepeatedPhaseView> phases, uint32_t repeatCount,
+                                 RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
 
     /// 여러 커맨드 리스트에 나눠 기록할 수 있는 패스.
     ///
@@ -819,6 +835,9 @@ public:
         std::string& outError);
 
 
+    bool RecordSoftware(IRHIParallelCommandPool& pool, uint32_t workerCount, RHISoftwareRecorder& recorder,
+                        const RHISoftwareBatchDesc& batchDesc, RHISoftwareBatch& outBatch, std::string& outError);
+
     bool IsPassCulled(RGPassId pass) const;
     /// Total planned resource barriers, including repeated phases and final-state
     /// restoration. Counts emitted barriers, not barrier batches or templates.
@@ -829,6 +848,9 @@ public:
     bool GetTransientLifetime(RGHandle handle, uint32_t& outFirst, uint32_t& outLast) const;
 
 private:
+    bool RecordParallelInternal(IRHIParallelCommandPool& pool, uint32_t workerCount,
+        const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch, std::string& outError,
+        RHISoftwareRecorder* software, RHISoftwareBatchDesc* softwareDesc, RHISoftwareBatch* softwareBatch);
     void RequireQueueIdle() const;
     std::weak_ptr<const void> m_queueLease;
     bool m_queueExecutionAttempted{false};
@@ -908,7 +930,8 @@ private:
         std::vector<uint16_t> poisonBuffers;
         std::vector<std::pair<uint16_t, RHIRenderTargetBinding>> aliasClears;
         uint32_t repeatCount{1};
-        std::vector<RepeatedPhase> phases;
+        std::vector<RepeatedPhase> phaseStorage;
+        std::span<RepeatedPhase> phases;
         bool repeated{false};
         RepeatedExecuteCallback repeatedExecute;
         std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
@@ -953,7 +976,7 @@ private:
     Resource& AppendResource();
     // Pass처럼 완료된 기록 사이에 메타데이터 컨테이너를 유지한다.
     // 활성 구간만 현재 핸들·상태·버전 선언을 포함한다.
-    std::vector<Resource> m_resourceStorage;
+    ce::render_vector<Resource> m_resourceStorage;
     std::span<Resource> m_resources;
     // Declaration-local indices. Reset removes every entry, and generation bits
     // remain part of the key. Duplicate imports keep the original first match.
@@ -966,14 +989,14 @@ private:
     bool m_poison{false};
     // Active declarations are a prefix of retained metadata. Reset releases all
     // callbacks/handles while keeping the empty containers and their capacities.
-    std::vector<Pass> m_passStorage;
+    ce::render_vector<Pass> m_passStorage;
     std::span<Pass> m_passes;
     std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
     bool m_executeOrderOverridden{false}; // Queue specialization owns a mutable copy only when it reorders.
     std::shared_ptr<const std::string> m_timingSignature;
     // Byte offset of each pass's culled field inside m_timingSignature.
-    std::vector<size_t> m_signatureCulledOffsets;
+    ce::render_vector<size_t> m_signatureCulledOffsets;
     void BuildTimingSignature();
     void PatchTimingSignatureReachability();
     GpuPassTimingIdentity TimingIdentity(uint16_t passIndex) const

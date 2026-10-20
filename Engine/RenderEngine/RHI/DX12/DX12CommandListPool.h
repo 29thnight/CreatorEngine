@@ -7,6 +7,7 @@
 
 class DX12DeviceResources;
 class DX12Encoder;
+struct DX12RecordingResources;
 
 // [프레임][기록 구간]별 command allocator/list 소유자. 실행 스레드는 공용
 // job_scheduler가 소유한다. 구간 번호는 물리 워커 번호와 독립적이다.
@@ -14,14 +15,13 @@ class DX12Encoder;
 // 각 구간에 연속 패스를 배정하고 구간 순서로 제출하여 그래프 순서를 보존한다.
 class DX12CommandListPool : public IRHIParallelCommandPool
 {
-public:
+  public:
     static constexpr uint32_t kMaxWorkers = IRHIParallelCommandPool::kMaxWorkers;
 
     explicit DX12CommandListPool(job_scheduler& scheduler = ce::get_job_scheduler());
     ~DX12CommandListPool() override;
 
-    bool Initialize(DX12DeviceResources& resources, uint32_t workerCount, uint32_t frameCount,
-        std::string& outError);
+    bool Initialize(DX12DeviceResources& resources, uint32_t workerCount, uint32_t frameCount, std::string& outError);
     void Shutdown();
 
     bool IsInitialized() const override { return !m_slots.empty(); }
@@ -31,6 +31,9 @@ public:
     /// 프레임 구간을 바꾼다. 이 시점에는 그 구간의 GPU 작업이 끝나 있어야 한다
     /// (DX12DeviceResources::BeginFrame의 펜스 대기가 그것을 보장한다).
     void BeginFrame(uint32_t frameIndex) override;
+
+    bool CreateTranslationPool(std::shared_ptr<DX12CommandListPool>& result, std::string& outError);
+    bool GetTranslationRecording(uint64_t& uploadRecordingId, uint64_t& descriptorVersion) const override;
 
     bool Prepare(std::string& outError) override;
     bool OpenWorker(uint32_t worker, std::string& outError) override;
@@ -50,15 +53,15 @@ public:
 
     ID3D12GraphicsCommandList* Get(uint32_t worker) const;
 
-
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Slot
     {
-        ComPtr<ID3D12CommandAllocator>    allocator;
+        ComPtr<ID3D12CommandAllocator> allocator;
         ComPtr<ID3D12GraphicsCommandList> list;
-        bool opened{ false };
+        bool opened{false};
     };
 
     // [프레임][기록 구간]. OpenWorker에서 해당 allocator/list를 Reset한다.
@@ -68,17 +71,18 @@ private:
     uint64_t GetCurrentRecordingId() const override;
     void RejectPreparedCommands(uint64_t recordingId, RHICompletionPoint completion) override;
     void AcceptPreparedCommands(RHICompletionPoint completion, const RHISubmissionTicket& ticket) override;
-    bool PrepareRecordedCommands(uint32_t frameSlot,
-        RHICompletionPoint& outCompletion, std::string& outError) override;
-    bool SubmitRecordedCommands(uint32_t frameSlot,
-        std::span<const uint32_t> workerOrder, RHICompletionPoint completion,
-        std::string& outError) override;
+    bool PrepareRecordedCommands(uint32_t frameSlot, RHICompletionPoint& outCompletion, std::string& outError) override;
+    bool SubmitRecordedCommands(uint32_t frameSlot, std::span<const uint32_t> workerOrder,
+                                RHICompletionPoint completion, std::string& outError) override;
 
     ComPtr<ID3D12Device> m_device;
-    DX12DeviceResources* m_resources{ nullptr };
+    DX12DeviceResources* m_resources{nullptr};
+    std::shared_ptr<const DX12RecordingResources> m_recordingResources;
     std::vector<std::unique_ptr<DX12Encoder>> m_encoders;
-    uint32_t m_workerCount{ 0 };
-    uint32_t m_frameCount{ 0 };
-    uint32_t m_frameIndex{ 0 };
+    // A cached fork can be reused only when retirement has released every
+    // external owner. Otherwise the new recording receives a different fork.
+    std::vector<std::shared_ptr<DX12CommandListPool>> m_translationPools;
+    uint32_t m_workerCount{0};
+    uint32_t m_frameCount{0};
+    uint32_t m_frameIndex{0};
 };
-

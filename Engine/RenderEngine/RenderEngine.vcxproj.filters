@@ -564,6 +564,21 @@
     <ClCompile Include="RHI\RHIShaderSource.cpp">
       <Filter>RHI\Core</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\RHISoftwareCommandList.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHISoftwareEncoder.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHISoftwareBatch.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHISoftwareRecorder.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\RHICommandTranslator.cpp">
+      <Filter>RHI\Core</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\RHISubmissionThread.cpp">
       <Filter>RHI\Core</Filter>
     </ClCompile>
@@ -1134,6 +1149,33 @@
     <ClInclude Include="RHI\RHIDeviceMemoryBudgetCoordinator.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHISoftwareCommandTypes.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHISoftwareCommandList.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHISoftwareEncoder.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHISoftwareBatch.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHISoftwareRecorder.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\IRHICommandTranslator.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12CommandTranslator.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12SoftwareCommandValidator.h">
+      <Filter>RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanCommandTranslator.h">
+      <Filter>RHI\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\RHIEncoder.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
@@ -1593,6 +1635,9 @@
     <ClInclude Include="MaterialGraphPreparationTasks.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialGraphPacketPlan.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
     <ClInclude Include="MaterialGraphPacketWork.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
@@ -1701,5 +1746,17 @@
     <ClInclude Include="RHI\RHIValidationLedger.h">
       <Filter>RHI</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RenderAllocator.h" />
+    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c"><Filter>ThirdParty\mimalloc</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="ThirdParty"><UniqueIdentifier>{c42eab0b-07d5-4dac-98d0-e8c612580101}</UniqueIdentifier></Filter>
+    <Filter Include="ThirdParty\mimalloc"><UniqueIdentifier>{c42eab0b-07d5-4dac-98d0-e8c612580102}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RenderArena.h" />
+    <ClCompile Include="RenderArena.cpp" />
   </ItemGroup>
 </Project>

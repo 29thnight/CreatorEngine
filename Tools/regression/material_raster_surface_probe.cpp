@@ -1766,6 +1766,108 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
     }
 }
 
+void VerifyRepeatedPhaseViews(RecordingChangeDevice& device)
+{
+    using Usage = EnhancedRenderGraph::RGPassUsage;
+    using Phase = EnhancedRenderGraph::RepeatedPhaseView;
+    EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
+    RGHandle previous;
+    std::string error;
+    unsigned frames{};
+    for (const unsigned count : {4u, 1u, 3u, 4u, 0u, 4u})
+    {
+        graph.Reset();
+        Check(device.BeginFrame(error), "Repeated phase view begin");
+        RGTextureDesc description;
+        description.width = description.height = 8;
+        description.format = RHIFormat::R32Float;
+        description.allowUnorderedAccess = true;
+        description.name = "Probe.RepeatedPhase.Target";
+        const auto target = graph.Write(graph.CreateTexture(description));
+        Check(!previous.IsValid() || target.epoch != previous.epoch,
+              "Repeated phase storage does not preserve a previous graph epoch");
+        previous = target;
+        std::array<Usage, 1> outer{{{target, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
+        std::array<std::string, 4> names;
+        std::array<std::array<Usage, 1>, 4> phaseUses;
+        std::array<Phase, 4> phases;
+        std::vector<std::pair<uint32_t, uint32_t>> calls;
+        if (count)
+        {
+            for (unsigned index = 0; index < count; ++index)
+            {
+                names[index] = "Phase" + std::to_string(index);
+                phaseUses[index][0] = {target, RHIResourceState::UnorderedAccess,
+                                       index ? RGAccessMode::ReadWrite : RGAccessMode::Write};
+                phases[index] = {names[index], phaseUses[index]};
+            }
+            Check(graph
+                      .AddRepeatedPassView(
+                          "Probe.RepeatedPhase", outer, std::span{phases}.first(count), 2,
+                          [&](const auto&, uint32_t iteration, uint32_t phase)
+                          { calls.emplace_back(iteration, phase); }, true)
+                      .IsValid(),
+                  "Repeated phase view declaration");
+            // Every borrowed name/span is overwritten before compilation.
+            outer[0] = {};
+            for (unsigned index = 0; index < count; ++index)
+            {
+                names[index] = "Overwritten";
+                phaseUses[index][0] = {};
+                phases[index] = {};
+            }
+        }
+        else
+        {
+            graph.AddPass(
+                "Probe.NormalAfterRepeated", std::span<const Usage>{outer},
+                [&](const auto&) { calls.emplace_back(0, 0); }, true);
+        }
+        Check(graph.Compile(error), "Repeated phase view compile " + error);
+        EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+        Check(graph.CaptureDiagnosticSnapshot(snapshot) && snapshot.passes.size() == 1 &&
+                  snapshot.passes[0].phases.size() == count,
+              "Repeated phase active prefix shrinks and normal passes expose no stale phases");
+        for (unsigned index = 0; index < count; ++index)
+        {
+            Check(snapshot.passes[0].phases[index].name == "Phase" + std::to_string(index) &&
+                      snapshot.passes[0].phases[index].usages.size() == 1,
+                  "Repeated phase declaration owns names and usages after scratch mutation");
+        }
+        Check(graph.Execute(error) && device.EndFrame(error) &&
+                  GetRHISubmissionThread().DrainSubmissions(&device, error),
+              "Repeated phase view submission " + error);
+        device.WaitForGpu();
+        Check(GetRHISubmissionThread().Drain(&device, error), "Repeated phase view retirement " + error);
+        Check(calls.size() == (count ? count * 2u : 1u), "Repeated phase callback count");
+        if (count)
+        {
+            for (unsigned index = 0; index < calls.size(); ++index)
+            {
+                Check(calls[index] == std::pair<uint32_t, uint32_t>{index / count, index % count},
+                      "Repeated phase order and iteration survive storage reuse");
+            }
+        }
+        ++frames;
+    }
+    graph.Reset();
+    Check(device.BeginFrame(error), "Repeated phase stale view begin");
+    RGTextureDesc description;
+    description.width = description.height = 8;
+    description.format = RHIFormat::R32Float;
+    description.allowUnorderedAccess = true;
+    description.name = "Probe.RepeatedPhase.Stale";
+    const auto target = graph.Write(graph.CreateTexture(description));
+    const std::array<Usage, 1> outer{{{target, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
+    const std::array<Usage, 1> stale{{{previous, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
+    const std::array<Phase, 1> phases{{{"Stale", stale}}};
+    graph.AddRepeatedPassView("Probe.StalePhase", outer, phases, 1, [](const auto&, uint32_t, uint32_t) {}, true);
+    Check(!graph.Compile(error), "Repeated phase cached capacity never accepts a previous graph epoch");
+    device.AbortFrame();
+    graph.Reset();
+    std::cout << "REPEATED_PHASE_VIEW_OK frames=" << frames << " staleRejected=1\n";
+}
+
 void VerifySceneReadNormalization(RecordingChangeDevice& device)
 {
     using Usage = EnhancedRenderGraph::RGPassUsage;
@@ -3378,12 +3480,13 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(device.MapReadback(tileArguments,argumentImage,error), "Material indirect argument map");
             const auto& packetPlan=*materialWork->packetWork;
             uint32_t nextSlice{};
-            for(uint32_t bucket=0; bucket<materialWork->commandCount; ++bucket) {
-                const auto count=static_cast<uint32_t>(expectedBuckets[bucket].size());
-                const auto& bucketPlan=packetPlan.buckets.at(bucket);
-                Check(bucketPlan.first==nextSlice && bucketPlan.count>0 &&
-                    uint64_t(bucketPlan.count)*packetPlan.values.sliceCapacity>=count,
-                    "Fixed material slices cover every visible packet in bucket order");
+            for (uint32_t bucket = 0; bucket < materialWork->commandCount; ++bucket)
+            {
+                const auto count = static_cast<uint32_t>(expectedBuckets[bucket].size());
+                const auto& bucketPlan = packetPlan.plan->buckets.at(bucket);
+                Check(bucketPlan.first == nextSlice && bucketPlan.count > 0 &&
+                          uint64_t(bucketPlan.count) * packetPlan.values.sliceCapacity >= count,
+                      "Fixed material slices cover every visible packet in bucket order");
                 for(uint32_t slice=0; slice<bucketPlan.count; ++slice) {
                     const auto& plan=packetPlan.slices.at(bucketPlan.first+slice);
                     const auto begin=uint64_t(slice)*packetPlan.values.sliceCapacity;
@@ -4455,6 +4558,8 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     }
     if (mode == "--scene-only" || mode == "--scene-full-only")
     {
+        VerifyRepeatedPhaseViews(device);
+        VerifySceneReadNormalization(device);
         if (mode != "--scene-full-only")
         {
             RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 4);
@@ -4946,6 +5051,57 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
 }
 } // namespace
 
+namespace
+{
+    void PacketPlanChecks()
+    {
+        using namespace material_graph;
+        PacketDispatchPlanCache cache;
+        std::string error;
+        const std::array<uint32_t, 3> capacities{0, 65, 700};
+        const auto first = cache.Acquire(600, 8, 64, capacities, error);
+        Check(bool(first), "Packet plan construction failed");
+        Check(first->scratchWords == 7 && first->argumentWords == 39 && first->levels.size() == 1,
+              "Packet plan scan/slice dimensions changed");
+        Check(first->values[0] == std::array<uint32_t, 4>{0, 1, 0, 0} &&
+                  first->values[1] == std::array<uint32_t, 4>{1, 2, 65, 0} &&
+                  first->values[2] == std::array<uint32_t, 4>{3, 10, 600, 0},
+              "Packet plan zero/clamped bucket ranges changed");
+        Check(first->selectors.back() == std::array<uint32_t, 4>{2, 8, 576, 0}, "Packet plan slice selector changed");
+        Check(cache.Acquire(600, 8, 64, capacities, error) == first && cache.Hits() == 1,
+              "Identical packet shape did not reuse its immutable plan");
+        auto changed = capacities;
+        changed[1] = 66;
+        Check(cache.Acquire(600, 8, 64, changed, error) != first &&
+                  cache.Acquire(601, 8, 64, capacities, error) != first &&
+                  cache.Acquire(600, 9, 64, capacities, error) != first &&
+                  cache.Acquire(600, 8, 63, capacities, error) != first,
+              "Packet shape/capability change reused an incompatible plan");
+        Check(cache.Acquire(600, 8, 64, capacities, error, false) != first, "Uncached control reused a cached plan");
+        Check(!cache.Acquire(0, 8, 64, capacities, error) && !cache.Acquire(600, 0, 64, capacities, error) &&
+                  !cache.Acquire(600, 8, 0, capacities, error),
+              "Invalid packet plan accepted");
+        std::vector<uint32_t> many(65537, 1);
+        const auto large = cache.Acquire(1, 1, 1, many, error);
+        Check(large && large->levels.size() == 3 && large->levels[1].count == 257 && large->levels[2].count == 2 &&
+                  large->argumentWords == 65537 * 3,
+              "Multilevel scan plan changed");
+        Check(cache.Bytes() <= PacketDispatchPlanCache::ByteLimit, "Oversized plan bypassed cache bound");
+        for (uint32_t index = 1; index <= 80; ++index)
+        {
+            Check(bool(cache.Acquire(index, 8, 64, capacities, error)), "Packet plan eviction failed");
+        }
+        Check(cache.Bytes() <= PacketDispatchPlanCache::ByteLimit &&
+                  first->selectors.back() == std::array<uint32_t, 4>{2, 8, 576, 0},
+              "Plan eviction invalidated a retained frame owner");
+        const auto rebuilt = cache.Acquire(600, 8, 64, capacities, error);
+        Check(rebuilt != first && rebuilt->values == first->values && rebuilt->selectors == first->selectors,
+              "Evicted packet plan rebuilt with different content");
+        std::cout << "LX_PACKET_PLAN_OK hits=" << cache.Hits() << " builds=" << cache.Builds()
+                  << " bytes=" << cache.Bytes() << " multilevel=3 retained=1 invalidation=4\n";
+    }
+} // namespace
+
 int main(int argc, char** argv)
 {
 #ifdef _DEBUG
@@ -4955,16 +5111,23 @@ int main(int argc, char** argv)
     _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 #endif
     std::cout << std::unitbuf;
-    SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* exception) -> LONG {
-        std::cerr << "Native exception code=" << std::hex << exception->ExceptionRecord->ExceptionCode
-                  << " address=" << exception->ExceptionRecord->ExceptionAddress << std::dec << '\n';
-        char message[] = "Unhandled native exception";
-        ReportAssertion(0, message, nullptr);
-        return EXCEPTION_EXECUTE_HANDLER;
-    });
+    SetUnhandledExceptionFilter(
+        [](EXCEPTION_POINTERS* exception) -> LONG
+        {
+            std::cerr << "Native exception code=" << std::hex << exception->ExceptionRecord->ExceptionCode
+                      << " address=" << exception->ExceptionRecord->ExceptionAddress << std::dec << '\n';
+            char message[] = "Unhandled native exception";
+            ReportAssertion(0, message, nullptr);
+            return EXCEPTION_EXECUTE_HANDLER;
+        });
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
     try
     {
+        PacketPlanChecks();
+        if (argc == 3 && std::string_view(argv[2]) == "--packet-plan-only")
+        {
+            return 0;
+        }
         if (argc == 3 && std::string_view(argv[2]) == "--export-cook-fixtures")
         {
             const auto root = std::filesystem::absolute(argv[1]);

@@ -393,11 +393,11 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
     m_graph = &graph;
     m_graphEpoch = graph.ResourceEpoch();
     m_depth = depth;
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
-    std::vector<EnhancedRenderGraph::RepeatedPhase> phases;
-    uses.reserve(m_levelCount + 1u);
-    uses.push_back({depth, RHIResourceState::ShaderResource, RGAccessMode::Read});
-    phases.reserve(m_levelCount);
+    using Usage = EnhancedRenderGraph::RGPassUsage;
+    std::array<Usage, kMaximumLevels + 1u> uses;
+    std::array<std::array<Usage, 2>, kMaximumLevels> phaseUses;
+    std::array<EnhancedRenderGraph::RepeatedPhaseView, kMaximumLevels> phases;
+    uses[0] = {depth, RHIResourceState::ShaderResource, RGAccessMode::Read};
     m_levels.reserve(m_levelCount);
     auto source = depth;
     for (std::uint32_t level = 0; level < m_levelCount; ++level)
@@ -412,18 +412,19 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
         }
         const auto target = graph.Write(resource);
         m_levels.push_back(target);
-        uses.push_back({target, RHIResourceState::UnorderedAccess, RGAccessMode::Write});
-        auto& phase = phases.emplace_back();
-        phase.name = description.name;
-        phase.usages.reserve(2);
-        phase.usages.push_back({source, RHIResourceState::ShaderResource, RGAccessMode::Read});
-        phase.usages.push_back({target, RHIResourceState::UnorderedAccess, RGAccessMode::Write});
+        uses[level + 1u] = {target, RHIResourceState::UnorderedAccess, RGAccessMode::Write};
+        phaseUses[level] = {{{source, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                             {target, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
+        phases[level] = {description.name, phaseUses[level]};
         source = target;
     }
     // Mips are a serial dependency chain. Keep their resource versions and
     // per-phase transitions explicit without allocating a complete Pass per mip.
-    const auto buildPass = graph.AddRepeatedPass(m_declarationLayout->buildName, std::move(uses), std::move(phases), 1,
-        [owner, depth](const auto& execution, std::uint32_t, std::uint32_t level) {
+    const auto buildPass = graph.AddRepeatedPassView(
+        m_declarationLayout->buildName, std::span{uses}.first(m_levelCount + 1u), std::span{phases}.first(m_levelCount),
+        1,
+        [owner, depth](const auto& execution, std::uint32_t, std::uint32_t level)
+        {
             const auto divisor = 1u << level;
             const auto phaseWidth = (owner->m_view.width + divisor - 1u) / divisor;
             const auto phaseHeight = (owner->m_view.height + divisor - 1u) / divisor;
@@ -462,7 +463,8 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
             {
                 owner->m_history->recorded.store(true);
             }
-        }, bool(m_history), m_levelCount);
+        },
+        bool(m_history), m_levelCount);
     graph.DeclareComputeCompatible(buildPass);
     graph.DeclareRecordingIndependent(buildPass);
 }

@@ -7,25 +7,23 @@
 
 static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(D3D12_DRAW_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==
-    offsetof(D3D12_DRAW_ARGUMENTS, VertexCountPerInstance));
-static_assert(offsetof(RHIDrawIndirectArguments, instanceCount) ==
-    offsetof(D3D12_DRAW_ARGUMENTS, InstanceCount));
-static_assert(offsetof(RHIDrawIndirectArguments, firstVertex) ==
-    offsetof(D3D12_DRAW_ARGUMENTS, StartVertexLocation));
+              offsetof(D3D12_DRAW_ARGUMENTS, VertexCountPerInstance));
+static_assert(offsetof(RHIDrawIndirectArguments, instanceCount) == offsetof(D3D12_DRAW_ARGUMENTS, InstanceCount));
+static_assert(offsetof(RHIDrawIndirectArguments, firstVertex) == offsetof(D3D12_DRAW_ARGUMENTS, StartVertexLocation));
 static_assert(offsetof(RHIDrawIndirectArguments, firstInstance) ==
-    offsetof(D3D12_DRAW_ARGUMENTS, StartInstanceLocation));
+              offsetof(D3D12_DRAW_ARGUMENTS, StartInstanceLocation));
 
 static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(D3D12_DRAW_INDEXED_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
-    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, IndexCountPerInstance));
+              offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, IndexCountPerInstance));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
-    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount));
+              offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
-    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartIndexLocation));
+              offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartIndexLocation));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
-    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, BaseVertexLocation));
+              offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, BaseVertexLocation));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
-    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartInstanceLocation));
+              offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartInstanceLocation));
 
 namespace
 {
@@ -34,22 +32,27 @@ namespace
     {
         switch (topology)
         {
-        case RHIPrimitiveTopology::TriangleStrip: return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
-        case RHIPrimitiveTopology::LineList:      return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
-        case RHIPrimitiveTopology::PointList:     return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
-        default:                                  return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        case RHIPrimitiveTopology::TriangleStrip:
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+        case RHIPrimitiveTopology::LineList:
+            return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+        case RHIPrimitiveTopology::PointList:
+            return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+        default:
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         }
     }
-}
+} // namespace
 
 void DX12Encoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 {
-    if (nullptr == m_commandList) return;
+    if (nullptr == m_commandList)
+    {
+        return;
+    }
 
-    const D3D12_VIEWPORT viewport{ 0.f, 0.f,
-        static_cast<float>(width), static_cast<float>(height), 0.f, 1.f };
-    const D3D12_RECT scissor{ 0, 0,
-        static_cast<LONG>(width), static_cast<LONG>(height) };
+    const D3D12_VIEWPORT viewport{0.f, 0.f, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f};
+    const D3D12_RECT scissor{0, 0, static_cast<LONG>(width), static_cast<LONG>(height)};
 
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissor);
@@ -63,13 +66,13 @@ bool DX12Encoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
     }
     const double right = static_cast<double>(x) + width;
     const double bottom = static_cast<double>(y) + height;
-    if (x < D3D12_VIEWPORT_BOUNDS_MIN || y < D3D12_VIEWPORT_BOUNDS_MIN ||
-        right > D3D12_VIEWPORT_BOUNDS_MAX || bottom > D3D12_VIEWPORT_BOUNDS_MAX)
+    if (x < D3D12_VIEWPORT_BOUNDS_MIN || y < D3D12_VIEWPORT_BOUNDS_MIN || right > D3D12_VIEWPORT_BOUNDS_MAX ||
+        bottom > D3D12_VIEWPORT_BOUNDS_MAX)
     {
         return false;
     }
 
-    const D3D12_VIEWPORT viewport{ x, y, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f };
+    const D3D12_VIEWPORT viewport{x, y, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f};
     m_commandList->RSSetViewports(1, &viewport);
     return true;
 }
@@ -82,8 +85,8 @@ bool DX12Encoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t he
     {
         return false;
     }
-    const D3D12_RECT scissor{ static_cast<LONG>(x), static_cast<LONG>(y),
-        static_cast<LONG>(x + width), static_cast<LONG>(y + height) };
+    const D3D12_RECT scissor{static_cast<LONG>(x), static_cast<LONG>(y), static_cast<LONG>(x + width),
+                             static_cast<LONG>(y + height)};
     m_commandList->RSSetScissorRects(1, &scissor);
     return true;
 }
@@ -91,7 +94,10 @@ bool DX12Encoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t he
 void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
 {
     m_boundPipeline = {};
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
 
     // ★ 핸들이 짝을 푼다(A-1). 예전에는 호출부가 둘을 따로 넘겼고, 그래서
     //   "파이프라인 P 를 레이아웃 L' 로 걸었다"가 표현 가능했다 — 표가 짝을
@@ -125,9 +131,13 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline
     if (nullptr != entry.signature && entry.signature != m_boundRootSignature[slot])
     {
         if (RHIBindPoint::Compute == bindPoint)
+        {
             m_commandList->SetComputeRootSignature(entry.signature);
+        }
         else
+        {
             m_commandList->SetGraphicsRootSignature(entry.signature);
+        }
 
         m_boundRootSignature[slot] = entry.signature;
     }
@@ -138,19 +148,25 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline
 
 void DX12Encoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
 {
-    if (nullptr == m_commandList) return;
+    if (nullptr == m_commandList)
+    {
+        return;
+    }
     m_commandList->IASetPrimitiveTopology(EncToD3D12Topology(topology));
 }
 
-void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
-    const RHIBindingTable& table)
+void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot, const RHIBindingTable& table)
 {
-    if (nullptr == m_commandList || nullptr == m_resources || !table.IsValid() ||
-        0 == table.version || !m_resources->IsDescriptorVersionCurrent(table.version))
+    if (nullptr == m_commandList || nullptr == m_resources || !table.IsValid() || 0 == table.version ||
+        (m_recordingResources ? table.version != m_recordingResources->descriptors.version
+                              : !m_resources->IsDescriptorVersionCurrent(table.version)))
     {
         // 만료된 descriptor 버전으로 그리면 GPU가 읽는 중인 자리를 덮는다.
         // 막는 것이 옳지만, 막았다는 사실은 남겨야 한다.
-        if (nullptr != m_commandList) NoteDropped("SetBindings(expired version)");
+        if (nullptr != m_commandList)
+        {
+            NoteDropped("SetBindings(expired version)");
+        }
         return;
     }
 
@@ -159,31 +175,44 @@ void DX12Encoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
     EnsureDescriptorHeaps();
 
     if (RHIBindPoint::Compute == bindPoint)
+    {
         m_commandList->SetComputeRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
+    }
     else
+    {
         m_commandList->SetGraphicsRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
+    }
 }
 
-void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
-    const RHISamplerTable& table)
+void DX12Encoder::SetSamplers(RHIBindPoint bindPoint, uint32_t slot, const RHISamplerTable& table)
 {
     if (nullptr == m_commandList || !table.IsValid())
     {
-        if (nullptr != m_commandList) NoteDropped("SetSamplers(invalid table)");
+        if (nullptr != m_commandList)
+        {
+            NoteDropped("SetSamplers(invalid table)");
+        }
         return;
     }
 
     EnsureDescriptorHeaps();
 
     if (RHIBindPoint::Compute == bindPoint)
+    {
         m_commandList->SetComputeRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
+    }
     else
+    {
         m_commandList->SetGraphicsRootDescriptorTable(slot, DX12ToGpuHandle(table.backend));
+    }
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS DX12Encoder::ResolveSlice(const RHIBufferSlice& slice) const
 {
-    if (nullptr == m_resources || !slice.IsValid()) return 0;
+    if (nullptr == m_resources || !slice.IsValid())
+    {
+        return 0;
+    }
 
     // ★ 표가 등록 시점에 물어 둔 주소를 쓴다 (A-4). 예전에는 여기서
     //   `Resolve(...)->GetGPUVirtualAddress()` 를 불렀는데, 그것이 D3D12
@@ -191,55 +220,83 @@ D3D12_GPU_VIRTUAL_ADDRESS DX12Encoder::ResolveSlice(const RHIBufferSlice& slice)
     //   되면서 `dx12.encoderbench` 실물 경로에 드로우당 +67~81ns 로 나왔다.
     //   주소는 리소스 수명 동안 안 바뀌므로 물어볼 자리는 등록 시점이다.
     const D3D12_GPU_VIRTUAL_ADDRESS base = m_resources->ResolveGpuAddress(slice.buffer);
-    if (0 == base) return 0;
+    if (0 == base)
+    {
+        return 0;
+    }
     return base + slice.offset;
 }
 
-void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-    const RHIBufferSlice& slice)
+void DX12Encoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
     if (nullptr == m_commandList || 0 == address)
     {
-        if (nullptr != m_commandList) NoteDropped("SetConstantBuffer(null address)");
+        if (nullptr != m_commandList)
+        {
+            NoteDropped("SetConstantBuffer(null address)");
+        }
         return;
     }
 
     if (RHIBindPoint::Compute == bindPoint)
+    {
         m_commandList->SetComputeRootConstantBufferView(slot, address);
+    }
     else
+    {
         m_commandList->SetGraphicsRootConstantBufferView(slot, address);
+    }
 }
 
-void DX12Encoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
-    const RHIBufferSlice& slice)
+void DX12Encoder::SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice)
 {
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
     if (nullptr == m_commandList || 0 == address)
     {
-        if (nullptr != m_commandList) NoteDropped("SetRootBuffer(null address)");
+        if (nullptr != m_commandList)
+        {
+            NoteDropped("SetRootBuffer(null address)");
+        }
         return;
     }
 
     if (RHIBindPoint::Compute == bindPoint)
+    {
         m_commandList->SetComputeRootShaderResourceView(slot, address);
+    }
     else
+    {
         m_commandList->SetGraphicsRootShaderResourceView(slot, address);
+    }
 }
 
 bool DX12Encoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice)
 {
     const auto address = ResolveSlice(slice);
-    if (!m_commandList || !address || !m_resources || !slice.size || slice.offset % 4 != 0) return false;
+    if (!m_commandList || !address || !m_resources || !slice.size || slice.offset % 4 != 0)
+    {
+        return false;
+    }
     auto* resource = m_resources->Resolve(slice.buffer);
-    if (!resource) return false;
+    if (!resource)
+    {
+        return false;
+    }
     const auto desc = resource->GetDesc();
-    if (!(desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) ||
-        slice.offset >= desc.Width || slice.size > desc.Width - slice.offset) return false;
+    if (!(desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) || slice.offset >= desc.Width ||
+        slice.size > desc.Width - slice.offset)
+    {
+        return false;
+    }
     if (bindPoint == RHIBindPoint::Compute)
+    {
         m_commandList->SetComputeRootUnorderedAccessView(slot, address);
+    }
     else
+    {
         m_commandList->SetGraphicsRootUnorderedAccessView(slot, address);
+    }
     return true;
 }
 
@@ -248,7 +305,10 @@ void DX12Encoder::SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride)
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
     if (nullptr == m_commandList || 0 == address)
     {
-        if (nullptr != m_commandList) NoteDropped("SetVertexBuffer(null address)");
+        if (nullptr != m_commandList)
+        {
+            NoteDropped("SetVertexBuffer(null address)");
+        }
         return;
     }
 
@@ -264,7 +324,10 @@ void DX12Encoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format)
     const D3D12_GPU_VIRTUAL_ADDRESS address = ResolveSlice(slice);
     if (nullptr == m_commandList || 0 == address)
     {
-        if (nullptr != m_commandList) NoteDropped("SetIndexBuffer(null address)");
+        if (nullptr != m_commandList)
+        {
+            NoteDropped("SetIndexBuffer(null address)");
+        }
         return;
     }
 
@@ -277,13 +340,19 @@ void DX12Encoder::SetIndexBuffer(const RHIBufferSlice& slice, RHIFormat format)
 
 void DX12Encoder::SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view)
 {
-    if (nullptr == m_commandList) return;
+    if (nullptr == m_commandList)
+    {
+        return;
+    }
     m_commandList->IASetVertexBuffers(0, 1, &view);
 }
 
 void DX12Encoder::SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view)
 {
-    if (nullptr == m_commandList) return;
+    if (nullptr == m_commandList)
+    {
+        return;
+    }
     m_commandList->IASetIndexBuffer(&view);
 }
 
@@ -294,12 +363,10 @@ bool DX12Encoder::IsPipelineBound(RHIBindPoint point, bool mesh) const
         return false;
     }
     const auto entry = m_resources->Resolve(m_boundPipeline);
-    return entry.IsValid() && entry.computePipeline == (point == RHIBindPoint::Compute) &&
-        entry.meshPipeline == mesh;
+    return entry.IsValid() && entry.computePipeline == (point == RHIBindPoint::Compute) && entry.meshPipeline == mesh;
 }
 
-void DX12Encoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
-    uint32_t firstVertex, uint32_t firstInstance)
+void DX12Encoder::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
 {
     if (nullptr == m_commandList || 0 == vertexCount || 0 == instanceCount)
     {
@@ -313,8 +380,8 @@ void DX12Encoder::Draw(uint32_t vertexCount, uint32_t instanceCount,
     m_commandList->DrawInstanced(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void DX12Encoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
-    uint32_t firstIndex, int32_t baseVertex, uint32_t firstInstance)
+void DX12Encoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t baseVertex,
+                              uint32_t firstInstance)
 {
     if (nullptr == m_commandList || 0 == indexCount || 0 == instanceCount)
     {
@@ -325,8 +392,7 @@ void DX12Encoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         NoteDropped("DrawIndexed(pipeline kind)");
         return;
     }
-    m_commandList->DrawIndexedInstanced(indexCount, instanceCount, firstIndex,
-        baseVertex, firstInstance);
+    m_commandList->DrawIndexedInstanced(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
 }
 
 bool DX12Encoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
@@ -338,8 +404,8 @@ bool DX12Encoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
     }
     ID3D12CommandSignature* const signature = m_resources->GetDrawIndirectSignature();
     const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
-    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments ||
-        byteOffset > entry.bytes || sizeof(RHIDrawIndirectArguments) > entry.bytes - byteOffset)
+    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        sizeof(RHIDrawIndirectArguments) > entry.bytes - byteOffset)
     {
         return false;
     }
@@ -356,8 +422,8 @@ bool DX12Encoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOf
     }
     ID3D12CommandSignature* const signature = m_resources->GetDrawIndexedIndirectSignature();
     const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
-    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments ||
-        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
+        sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
     {
         return false;
     }
@@ -369,11 +435,11 @@ bool DX12Encoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOf
 
 static_assert(sizeof(RHIDispatchMeshIndirectArguments) == sizeof(D3D12_DISPATCH_MESH_ARGUMENTS));
 static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountX) ==
-    offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountX));
+              offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountX));
 static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountY) ==
-    offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountY));
+              offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountY));
 static_assert(offsetof(RHIDispatchMeshIndirectArguments, groupCountZ) ==
-    offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountZ));
+              offsetof(D3D12_DISPATCH_MESH_ARGUMENTS, ThreadGroupCountZ));
 
 bool DX12Encoder::DispatchMesh(uint32_t x, uint32_t y, uint32_t z)
 {
@@ -405,47 +471,64 @@ bool DX12Encoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteO
 }
 
 bool DX12Encoder::DispatchMeshIndirectBatch(RHIBufferHandle arguments, uint64_t byteOffset, uint32_t count,
-    std::span<const uint32_t> roots)
+                                            std::span<const uint32_t> roots)
 {
-    if (!m_meshCommandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, true) ||
-        !count || roots.empty() || roots.size() > 16 || byteOffset % 4) return false;
+    if (!m_meshCommandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, true) || !count ||
+        roots.empty() || roots.size() > 16 || byteOffset % 4)
+    {
+        return false;
+    }
     const auto entry = m_resources->DescribeBuffer(arguments);
     const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + 12;
     if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
-        uint64_t(stride) * count > entry.bytes - byteOffset) return false;
+        uint64_t(stride) * count > entry.bytes - byteOffset)
+    {
+        return false;
+    }
     auto* signature = m_resources->GetMaterialBatchSignature(m_boundRootSignature[0], roots, false);
-    if (!signature) return false;
+    if (!signature)
+    {
+        return false;
+    }
     m_meshCommandList->ExecuteIndirect(signature, count, entry.resource, byteOffset, nullptr, 0);
     return true;
 }
 
 bool DX12Encoder::DrawIndexedIndirectBatch(RHIBufferHandle arguments, uint64_t byteOffset, uint32_t count,
-    std::span<const uint32_t> roots)
+                                           std::span<const uint32_t> roots)
 {
-    if (!m_commandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, false) ||
-        !count || roots.empty() || roots.size() > 16 || byteOffset % 4) return false;
+    if (!m_commandList || !m_resources || !IsPipelineBound(RHIBindPoint::Graphics, false) || !count || roots.empty() ||
+        roots.size() > 16 || byteOffset % 4)
+    {
+        return false;
+    }
     const auto entry = m_resources->DescribeBuffer(arguments);
     const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + 36;
     if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
-        uint64_t(stride) * count > entry.bytes - byteOffset) return false;
+        uint64_t(stride) * count > entry.bytes - byteOffset)
+    {
+        return false;
+    }
     auto* signature = m_resources->GetMaterialBatchSignature(m_boundRootSignature[0], roots, true);
-    if (!signature) return false;
+    if (!signature)
+    {
+        return false;
+    }
     m_commandList->ExecuteIndirect(signature, count, entry.resource, byteOffset, nullptr, 0);
     return true;
 }
 
 static_assert(sizeof(RHIDispatchIndirectArguments) == sizeof(D3D12_DISPATCH_ARGUMENTS));
 static_assert(offsetof(RHIDispatchIndirectArguments, groupCountX) ==
-    offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountX));
+              offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountX));
 static_assert(offsetof(RHIDispatchIndirectArguments, groupCountY) ==
-    offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountY));
+              offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountY));
 static_assert(offsetof(RHIDispatchIndirectArguments, groupCountZ) ==
-    offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountZ));
+              offsetof(D3D12_DISPATCH_ARGUMENTS, ThreadGroupCountZ));
 
 bool DX12Encoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
 {
-    if (!m_commandList || !m_resources || byteOffset % 4 != 0 ||
-        !IsPipelineBound(RHIBindPoint::Compute))
+    if (!m_commandList || !m_resources || byteOffset % 4 != 0 || !IsPipelineBound(RHIBindPoint::Compute))
     {
         return false;
     }
@@ -485,16 +568,34 @@ void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)
 // RHIRenderTargetBinding에 핸들 대신 인덱스를 담은 이유가 그것이다).
 void DX12Encoder::EnsureDescriptorHeaps()
 {
-    if (m_heapsBound) return;
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (m_heapsBound)
+    {
+        return;
+    }
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
 
-    m_resources->BindDescriptorHeaps(m_commandList, true);
+    if (m_recordingResources)
+    {
+        ID3D12DescriptorHeap* heaps[] = {m_recordingResources->descriptors.heap.Get(),
+                                         m_recordingResources->samplers.Get()};
+        m_commandList->SetDescriptorHeaps(2, heaps);
+    }
+    else
+    {
+        m_resources->BindDescriptorHeaps(m_commandList, true);
+    }
     m_heapsBound = true;
 }
 
 bool DX12Encoder::BeginRasterWithoutAttachments(uint32_t width, uint32_t height)
 {
-    if (!m_commandList || !width || !height) return false;
+    if (!m_commandList || !width || !height)
+    {
+        return false;
+    }
     m_commandList->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
     SetViewportAndScissor(width, height);
     return true;
@@ -502,26 +603,80 @@ bool DX12Encoder::BeginRasterWithoutAttachments(uint32_t width, uint32_t height)
 
 void DX12Encoder::BindRenderTargets(const RHIRenderTargetBinding& binding)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
+    if (m_recordingResources)
+    {
+        if (!binding.IsValid())
+        {
+            return;
+        }
+        D3D12_CPU_DESCRIPTOR_HANDLE depth{};
+        D3D12_CPU_DESCRIPTOR_HANDLE color{};
+        if (binding.HasDepth())
+        {
+            depth = m_recordingResources->depthTargets.CpuAt(DX12DsvIndexOf(binding.backend));
+        }
+        if (binding.HasColor())
+        {
+            color = m_recordingResources->renderTargets.CpuAt(DX12RtvIndexOf(binding.backend));
+        }
+        m_commandList->OMSetRenderTargets(binding.colorCount, binding.HasColor() ? &color : nullptr, TRUE,
+                                          binding.HasDepth() ? &depth : nullptr);
+        return;
+    }
     m_resources->BindRenderTargets(m_commandList, binding);
 }
 
-void DX12Encoder::ClearRenderTargets(const RHIRenderTargetBinding& binding,
-    const float rgba[4])
+void DX12Encoder::ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4])
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
+    if (m_recordingResources)
+    {
+        if (!rgba)
+        {
+            return;
+        }
+        for (uint32_t index = 0; index < binding.colorCount; ++index)
+        {
+            m_commandList->ClearRenderTargetView(
+                m_recordingResources->renderTargets.CpuAt(DX12RtvIndexOf(binding.backend) + index), rgba, 0, nullptr);
+        }
+        return;
+    }
     m_resources->ClearRenderTargets(m_commandList, binding, rgba);
 }
 
 void DX12Encoder::ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
+    if (m_recordingResources)
+    {
+        if (binding.HasDepth())
+        {
+            m_commandList->ClearDepthStencilView(
+                m_recordingResources->depthTargets.CpuAt(DX12DsvIndexOf(binding.backend)), D3D12_CLEAR_FLAG_DEPTH,
+                depth, 0, 0, nullptr);
+        }
+        return;
+    }
     m_resources->ClearDepthTarget(m_commandList, binding, depth);
 }
 
 void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
-    if (nullptr == m_commandList || nullptr == m_resources || batch.IsEmpty()) return;
+    if (nullptr == m_commandList || nullptr == m_resources || batch.IsEmpty())
+    {
+        return;
+    }
 
     auto& barriers = m_barrierScratch;
     barriers.clear();
@@ -572,13 +727,17 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     for (const RHITransition& transition : batch.textureTransitions)
     {
         ID3D12Resource* const resource = m_resources->Resolve(transition.texture);
-        if (nullptr == resource) continue;
+        if (nullptr == resource)
+        {
+            continue;
+        }
 
-        const D3D12_RESOURCE_STATES before =
-            stateForQueue(transition.before);
-        const D3D12_RESOURCE_STATES after =
-            stateForQueue(transition.after);
-        if (before == after) continue;
+        const D3D12_RESOURCE_STATES before = stateForQueue(transition.before);
+        const D3D12_RESOURCE_STATES after = stateForQueue(transition.after);
+        if (before == after)
+        {
+            continue;
+        }
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -592,13 +751,17 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
     {
         ID3D12Resource* const resource = m_resources->Resolve(transition.buffer);
-        if (nullptr == resource) continue;
+        if (nullptr == resource)
+        {
+            continue;
+        }
 
-        const D3D12_RESOURCE_STATES before =
-            stateForQueue(transition.before);
-        const D3D12_RESOURCE_STATES after =
-            stateForQueue(transition.after);
-        if (before == after) continue;
+        const D3D12_RESOURCE_STATES before = stateForQueue(transition.before);
+        const D3D12_RESOURCE_STATES after = stateForQueue(transition.after);
+        if (before == after)
+        {
+            continue;
+        }
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -612,7 +775,10 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     for (RHITextureHandle handle : batch.uavTextures)
     {
         ID3D12Resource* resource = m_resources->Resolve(handle);
-        if (nullptr == resource) continue;
+        if (nullptr == resource)
+        {
+            continue;
+        }
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
         barrier.UAV.pResource = resource;
@@ -622,7 +788,10 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     for (RHIBufferHandle handle : batch.uavBuffers)
     {
         ID3D12Resource* resource = m_resources->Resolve(handle);
-        if (nullptr == resource) continue;
+        if (nullptr == resource)
+        {
+            continue;
+        }
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
         barrier.UAV.pResource = resource;
@@ -630,7 +799,9 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     }
 
     if (!barriers.empty())
+    {
         m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    }
 }
 
 void DX12Encoder::UavBarrier(std::span<const RHITextureHandle> textures)
@@ -649,20 +820,35 @@ void DX12Encoder::UavBarrierBuffers(std::span<const RHIBufferHandle> buffers)
 
 void DX12Encoder::CopyResource(RHITextureHandle destination, RHITextureHandle source)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
 
     ID3D12Resource* dst = m_resources->Resolve(destination);
     ID3D12Resource* src = m_resources->Resolve(source);
-    if (nullptr == dst || nullptr == src) return;
+    if (nullptr == dst || nullptr == src)
+    {
+        return;
+    }
     m_commandList->CopyResource(dst, src);
 }
 
 void DX12Encoder::ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4])
 {
-    if (nullptr == m_commandList || nullptr == rgba || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == rgba || nullptr == m_resources)
+    {
+        return;
+    }
 
     // 짝 맞추기는 디바이스 서비스에 한 벌만 둔다 — 그래프 밖(PrepareFrame)에도
     // 호출부가 있어서 그쪽이 본체다. 여기는 통로다.
+    if (m_recordingResources)
+    {
+        EnsureDescriptorHeaps();
+        m_resources->ClearRecordedUnorderedAccess(*m_commandList, *m_recordingResources, view, rgba);
+        return;
+    }
     m_resources->ClearUnorderedAccess(m_commandList, view, rgba);
 }
 
@@ -672,14 +858,19 @@ void DX12Encoder::ClearUnorderedAccess(const RHIBindingDesc& view, const float r
 // 서비스에는 readback/source handle만 보이고, native command list/resource는
 // 이 backend 구현 안에서만 해소한다(R6-b).
 
-void DX12Encoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
-    uint32_t slice, uint32_t sourceSubresource)
+void DX12Encoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle source, uint32_t slice,
+                                 uint32_t sourceSubresource)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
     ID3D12Resource* const sourceResource = m_resources->Resolve(source);
     ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
-    if (nullptr == sourceResource || nullptr == readbackResource ||
-        !readback.IsValid() || slice >= readback.sliceCount) return;
+    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid() || slice >= readback.sliceCount)
+    {
+        return;
+    }
 
     D3D12_TEXTURE_COPY_LOCATION src{};
     src.pResource = sourceResource;
@@ -699,13 +890,18 @@ void DX12Encoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle s
     m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
-void DX12Encoder::CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
-    uint32_t sourceSubresource)
+void DX12Encoder::CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source, uint32_t sourceSubresource)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
     ID3D12Resource* const sourceResource = m_resources->Resolve(source);
     ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
-    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid()) return;
+    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid())
+    {
+        return;
+    }
 
     D3D12_TEXTURE_COPY_LOCATION src{};
     src.pResource = sourceResource;
@@ -725,14 +921,19 @@ void DX12Encoder::CopyVolumeToReadback(const RHIReadback& readback, RHITextureHa
     m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
-void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
-    uint32_t slice, uint32_t sourceSubresource)
+void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source, uint32_t slice,
+                                        uint32_t sourceSubresource)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
     ID3D12Resource* const sourceResource = m_resources->Resolve(source);
     ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
-    if (nullptr == sourceResource || nullptr == readbackResource ||
-        !readback.IsValid() || slice >= readback.sliceCount) return;
+    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid() || slice >= readback.sliceCount)
+    {
+        return;
+    }
 
     D3D12_TEXTURE_COPY_LOCATION src{};
     src.pResource = sourceResource;
@@ -759,40 +960,63 @@ void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureH
 
 bool DX12Encoder::CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source)
 {
-    if (!m_commandList || !m_resources || !source.size || destination.size != source.size) return false;
+    if (!m_commandList || !m_resources || !source.size || destination.size != source.size)
+    {
+        return false;
+    }
     auto* src = m_resources->Resolve(source.buffer);
     auto* dst = m_resources->Resolve(destination.buffer);
-    if (!src || !dst || src == dst) return false;
+    if (!src || !dst || src == dst)
+    {
+        return false;
+    }
     const auto srcBytes = src->GetDesc().Width, dstBytes = dst->GetDesc().Width;
-    if (source.offset > srcBytes || source.size > srcBytes - source.offset ||
-        destination.offset > dstBytes || destination.size > dstBytes - destination.offset) return false;
+    if (source.offset > srcBytes || source.size > srcBytes - source.offset || destination.offset > dstBytes ||
+        destination.size > dstBytes - destination.offset)
+    {
+        return false;
+    }
     m_commandList->CopyBufferRegion(dst, destination.offset, src, source.offset, source.size);
     return true;
 }
 
-void DX12Encoder::CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
-    uint64_t sourceOffset, uint64_t bytes)
+void DX12Encoder::CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source, uint64_t sourceOffset,
+                                       uint64_t bytes)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
     ID3D12Resource* const sourceResource = m_resources->Resolve(source);
     ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
-    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid()) return;
+    if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid())
+    {
+        return;
+    }
 
     const uint64_t copyBytes = (0 == bytes) ? readback.sliceBytes : bytes;
-    if (0 == copyBytes || copyBytes > readback.sliceBytes) return;
+    if (0 == copyBytes || copyBytes > readback.sliceBytes)
+    {
+        return;
+    }
 
-    m_commandList->CopyBufferRegion(readbackResource, 0,
-        sourceResource, sourceOffset, copyBytes);
+    m_commandList->CopyBufferRegion(readbackResource, 0, sourceResource, sourceOffset, copyBytes);
 }
 
-void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source,
-    uint32_t destinationSubresource, uint32_t sourceSubresource)
+void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source, uint32_t destinationSubresource,
+                              uint32_t sourceSubresource)
 {
-    if (nullptr == m_commandList || nullptr == m_resources) return;
+    if (nullptr == m_commandList || nullptr == m_resources)
+    {
+        return;
+    }
 
     ID3D12Resource* const dstResource = m_resources->Resolve(destination);
     ID3D12Resource* const srcResource = m_resources->Resolve(source);
-    if (nullptr == dstResource || nullptr == srcResource) return;
+    if (nullptr == dstResource || nullptr == srcResource)
+    {
+        return;
+    }
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
     dst.pResource = dstResource;
@@ -807,12 +1031,22 @@ void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle sou
     m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 }
 
-void DX12Encoder::ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
-    const float rgba[4], const RHIRect& rect)
+void DX12Encoder::ClearRenderTargetRect(const RHIRenderTargetBinding& binding, const float rgba[4], const RHIRect& rect)
 {
-    if (nullptr == m_commandList || nullptr == m_resources || nullptr == rgba) return;
+    if (nullptr == m_commandList || nullptr == m_resources || nullptr == rgba)
+    {
+        return;
+    }
 
-    const D3D12_RECT native{ rect.left, rect.top, rect.right, rect.bottom };
+    const D3D12_RECT native{rect.left, rect.top, rect.right, rect.bottom};
+    if (m_recordingResources)
+    {
+        for (uint32_t index = 0; index < binding.colorCount; ++index)
+        {
+            m_commandList->ClearRenderTargetView(
+                m_recordingResources->renderTargets.CpuAt(DX12RtvIndexOf(binding.backend) + index), rgba, 1, &native);
+        }
+        return;
+    }
     m_resources->ClearRenderTargetsRect(m_commandList, binding, rgba, &native);
 }
-

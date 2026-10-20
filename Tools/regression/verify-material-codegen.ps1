@@ -22,7 +22,7 @@ $sources = @('Tools/regression/material_codegen_probe.cpp', 'Lattice/Core/LXGrap
     'Lattice/Material/LXMaterialOperators.cpp', 'Lattice/Material/LXMaterialCompiler.cpp')
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '
 $compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++latest ' +
-    '/permissive- /utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /MD ' +
+    '/permissive- /utf-8 /DCE_CONTRACT_STANDALONE /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /MD ' +
     '/I"' + (Join-Path $repo 'ThirdParty/Slang/include') + '" /I"' + (Join-Path $repo 'Engine/RenderEngine/RHI') +
     '" /I"' + (Join-Path $dependencies 'include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe + '" ' +
     $quoted + ' /link /LIBPATH:"' + (Join-Path $dependencies 'lib') + '" ryml.lib c4core.lib d3d12.lib dxgi.lib'

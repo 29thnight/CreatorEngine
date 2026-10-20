@@ -1,10 +1,11 @@
 #pragma once
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
-#include <d3d12.h>   // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
+#include <d3d12.h> // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
 #include "../RHIEncoder.h"
 
 class DX12DeviceResources;
+struct DX12RecordingResources;
 
 // RHIEncoder의 DX12 구현 (PHASE 3-1 재정의, R3).
 //
@@ -31,9 +32,17 @@ class DX12DeviceResources;
 //   갈려 어긋난다.
 class DX12Encoder final : public RHIEncoder
 {
-public:
-    DX12Encoder(ID3D12GraphicsCommandList* commandList, DX12DeviceResources* resources)
-        : m_resources(resources) { ResetState(commandList); }
+  public:
+    DX12Encoder(ID3D12GraphicsCommandList* commandList, DX12DeviceResources* resources) : m_resources(resources)
+    {
+        ResetState(commandList);
+    }
+
+    void SetRecordingResources(std::shared_ptr<const DX12RecordingResources> recording)
+    {
+        m_recordingResources = std::move(recording);
+        m_heapsBound = false;
+    }
 
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
     bool SetViewport(float x, float y, uint32_t width, uint32_t height) override;
@@ -41,14 +50,10 @@ public:
     void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) override;
     void SetPrimitiveTopology(RHIPrimitiveTopology topology) override;
 
-    void SetBindings(RHIBindPoint bindPoint, uint32_t slot,
-        const RHIBindingTable& table) override;
-    void SetSamplers(RHIBindPoint bindPoint, uint32_t slot,
-        const RHISamplerTable& table) override;
-    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        const RHIBufferSlice& slice) override;
-    void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot,
-        const RHIBufferSlice& slice) override;
+    void SetBindings(RHIBindPoint bindPoint, uint32_t slot, const RHIBindingTable& table) override;
+    void SetSamplers(RHIBindPoint bindPoint, uint32_t slot, const RHISamplerTable& table) override;
+    void SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice) override;
+    void SetRootBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice) override;
 
     bool SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot, const RHIBufferSlice& slice) override;
 
@@ -62,36 +67,34 @@ public:
     void SetVertexBuffer(const D3D12_VERTEX_BUFFER_VIEW& view);
     void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view);
 
-private:
+  private:
     uint64_t m_computeDispatches{};
     std::vector<D3D12_RESOURCE_BARRIER> m_barrierScratch;
     /// 슬라이스를 GPU 주소로 푼다. 링은 리소스가 하나라 표 조회가 배열
     /// 인덱싱 한 번이다 — Allocate 의 175ns 에 비하면 묻힌다(encoderbench 로 잰다).
     D3D12_GPU_VIRTUAL_ADDRESS ResolveSlice(const RHIBufferSlice& slice) const;
-public:
 
-    void Draw(uint32_t vertexCount, uint32_t instanceCount,
-        uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
-    void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
-        uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+  public:
+    void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex = 0,
+              uint32_t firstInstance = 0) override;
+    void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex = 0, int32_t baseVertex = 0,
+                     uint32_t firstInstance = 0) override;
     bool DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     bool DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
 
     bool DispatchMesh(uint32_t x, uint32_t y, uint32_t z) override;
     bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     bool DispatchMeshIndirectBatch(RHIBufferHandle arguments, uint64_t byteOffset, uint32_t count,
-        std::span<const uint32_t> roots) override;
+                                   std::span<const uint32_t> roots) override;
 
-    bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,
-        std::span<const uint32_t>) override;
+    bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t, std::span<const uint32_t>) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
     bool DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     uint64_t GetComputeDispatchCount() const override { return m_computeDispatches; }
 
     bool BeginRasterWithoutAttachments(uint32_t width, uint32_t height) override;
     void BindRenderTargets(const RHIRenderTargetBinding& binding) override;
-    void ClearRenderTargets(const RHIRenderTargetBinding& binding,
-        const float rgba[4]) override;
+    void ClearRenderTargets(const RHIRenderTargetBinding& binding, const float rgba[4]) override;
     void ClearDepthTarget(const RHIRenderTargetBinding& binding, float depth) override;
 
     void ResourceBarriers(const RHIBarrierBatch& barriers) override;
@@ -101,19 +104,19 @@ public:
     void CopyResource(RHITextureHandle destination, RHITextureHandle source) override;
     void ClearUnorderedAccess(const RHIBindingDesc& view, const float rgba[4]) override;
 
-    void CopyToReadback(const RHIReadback& readback, RHITextureHandle source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
+    void CopyToReadback(const RHIReadback& readback, RHITextureHandle source, uint32_t slice = 0,
+                        uint32_t sourceSubresource = 0) override;
     void CopyVolumeToReadback(const RHIReadback& readback, RHITextureHandle source,
-        uint32_t sourceSubresource = 0) override;
-    void CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source,
-        uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
-    void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
-        uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
+                              uint32_t sourceSubresource = 0) override;
+    void CopyPartialToReadback(const RHIReadback& readback, RHITextureHandle source, uint32_t slice = 0,
+                               uint32_t sourceSubresource = 0) override;
+    void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source, uint64_t sourceOffset = 0,
+                              uint64_t bytes = 0) override;
     bool CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source) override;
-    void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
-        uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) override;
-    void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,
-        const float rgba[4], const RHIRect& rect) override;
+    void CopyTexture(RHITextureHandle destination, RHITextureHandle source, uint32_t destinationSubresource = 0,
+                     uint32_t sourceSubresource = 0) override;
+    void ClearRenderTargetRect(const RHIRenderTargetBinding& binding, const float rgba[4],
+                               const RHIRect& rect) override;
 
     /// 상태 기억을 비우고 리스트를 다시 건다 (G-2a).
     ///
@@ -155,9 +158,13 @@ public:
     ///   `GetUnimplementedCount()`와 같은 자리다.
     uint32_t GetDroppedCount() const { return m_dropped; }
     const char* GetLastDropped() const { return m_lastDropped; }
-    void ClearDropped() { m_dropped = 0; m_lastDropped = nullptr; }
+    void ClearDropped()
+    {
+        m_dropped = 0;
+        m_lastDropped = nullptr;
+    }
 
-private:
+  private:
     /// 버린 명령을 센다. 이름은 리터럴이라 수명 걱정이 없다.
     void NoteDropped(const char* name)
     {
@@ -178,17 +185,17 @@ private:
     void EnsureDescriptorHeaps();
     bool IsPipelineBound(RHIBindPoint point, bool mesh = false) const;
 
-    ID3D12GraphicsCommandList* m_commandList{ nullptr };
-    DX12DeviceResources*       m_resources{ nullptr };
+    ID3D12GraphicsCommandList* m_commandList{nullptr};
+    DX12DeviceResources* m_resources{nullptr};
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_meshCommandList;
     RHIPipelineHandle m_boundPipeline;
 
     /// [0] = Graphics, [1] = Compute. 둘은 DX12에서 완전히 별개 상태다.
-    ID3D12RootSignature*       m_boundRootSignature[2]{ nullptr, nullptr };
+    ID3D12RootSignature* m_boundRootSignature[2]{nullptr, nullptr};
 
-    bool                       m_heapsBound{ false };
+    std::shared_ptr<const DX12RecordingResources> m_recordingResources;
+    bool m_heapsBound{false};
 
-    uint32_t                   m_dropped{ 0 };
-    const char*                m_lastDropped{ nullptr };
+    uint32_t m_dropped{0};
+    const char* m_lastDropped{nullptr};
 };
-

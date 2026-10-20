@@ -273,7 +273,7 @@ public:
     //   그래프의 서비스를 생성자 인자로 만든 것과 같은 수다.
 
     // Explicit UAV-only raster scope. Unsupported backends fail, never retain old attachments.
-    virtual bool BeginRasterWithoutAttachments(uint32_t width, uint32_t height) { return false; }
+    virtual bool BeginRasterWithoutAttachments(uint32_t, uint32_t) { return false; }
     virtual void BindRenderTargets(const RHIRenderTargetBinding& binding) = 0;
     virtual void ClearRenderTargets(const RHIRenderTargetBinding& binding,
         const float rgba[4]) = 0;

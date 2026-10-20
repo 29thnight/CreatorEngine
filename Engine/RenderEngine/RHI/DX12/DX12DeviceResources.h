@@ -18,6 +18,23 @@
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include "../RHISubmissionThread.h"
 
+// Captured after recording writers join. Copies CPU descriptors and pins the
+// shader-visible page/upload segments independently of the active recording.
+struct DX12RecordingResources
+{
+    uint64_t uploadRecordingId{};
+    DX12DescriptorRecycler::RecordingLease descriptors;
+    DX12TargetViewHeap::Snapshot renderTargets;
+    DX12TargetViewHeap::Snapshot depthTargets;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> samplers;
+    std::shared_ptr<const void> uploads;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> clearDescriptors;
+    uint32_t descriptorCount{};
+    uint32_t descriptorIncrement{};
+    uint32_t clearCapacity{};
+    mutable uint32_t clearUsed{}; // Exclusively owned by serial translation.
+};
+
 /// A-3. 즉시 인코더가 이 타입이다. 헤더를 물지 않는 것은 방향 때문이다 —
 /// 인코더가 이 클래스를 알아야지 그 반대가 아니다.
 class DX12Encoder;
@@ -47,18 +64,16 @@ class DX12MemorySamplingSession;
 // 쪼갤 근거가 생기면(예: 서비스만 가짜로 바꿔 패스를 검증할 때) 그때 나눈다.
 class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices, public IRHICommandQueueFactory
 {
-public:
+  public:
     RHIQueueCapabilities QueryQueueCapabilities() const override;
-    bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue,
-        std::string& error) override;
+    bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue, std::string& error) override;
     bool SupportsTransientAliasing() const override { return true; }
-    bool DescribeTransientAllocation(const RHITransientResourceDesc& desc,
-        RHITransientAllocationInfo& info, std::string& error) const override;
-    bool CreateTransientHeap(const RHITransientAllocationInfo& info,
-        std::shared_ptr<RHITransientHeap>& heap, std::string& error) override;
-    bool CreatePlacedTransient(const RHITransientResourceDesc& desc,
-        RHITransientHeap& heap, RHITextureHandle& texture, RHIBufferHandle& buffer,
-        std::string& error) override;
+    bool DescribeTransientAllocation(const RHITransientResourceDesc& desc, RHITransientAllocationInfo& info,
+                                     std::string& error) const override;
+    bool CreateTransientHeap(const RHITransientAllocationInfo& info, std::shared_ptr<RHITransientHeap>& heap,
+                             std::string& error) override;
+    bool CreatePlacedTransient(const RHITransientResourceDesc& desc, RHITransientHeap& heap, RHITextureHandle& texture,
+                               RHIBufferHandle& buffer, std::string& error) override;
     /// 정의는 둘 다 .cpp 에 있다 — 즉시 인코더를 불완전 타입으로 들기
     /// 때문이다(A-3).
     ///
@@ -75,10 +90,14 @@ public:
     // 시험 전용 장치 제거 주입. 해당 종류 장치의 다음 BeginFrame 이
     // ID3D12Device5::RemoveDevice 를 불러 실제 제거 경로를 태운다.
     // 씬은 스왑체인이 없는 장치, 호스트는 스왑체인을 붙인 장치다.
-    enum class TestDeviceRemovalTarget : uint32_t { Scene = 1u << 0, Host = 1u << 1 };
+    enum class TestDeviceRemovalTarget : uint32_t
+    {
+        Scene = 1u << 0,
+        Host = 1u << 1
+    };
     static void RequestTestDeviceRemoval(TestDeviceRemovalTarget target);
-    bool EnqueueQueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue,
-        ID3D12Fence* fence, uint64_t value, std::string& error)
+    bool EnqueueQueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue, ID3D12Fence* fence, uint64_t value,
+                              std::string& error)
     {
         return m_queueService && m_queueService->EnqueueTestGate(queue, fence, value, error);
     }
@@ -87,7 +106,7 @@ public:
     // 렌더 타깃의 최적화 클리어 값. 생성 힌트와 실제 클리어가 일치해야 검증
     // 레이어가 조용하다 — 힌트를 안 주는 쪽도, 다른 값으로 지우는 쪽도 경고를 쌓는다
     // (둘 다 실측). 그래서 클리어 색은 여기 상수 하나로 고정한다.
-    static constexpr float kClearColor[4] = { 0.1f, 0.1f, 0.15f, 1.f };
+    static constexpr float kClearColor[4] = {0.1f, 0.1f, 0.15f, 1.f};
 
     // 실패 사유를 문자열로 돌려준다 — 브링업 단계의 실패는 전부 진단 가능해야 한다.
     //
@@ -104,8 +123,8 @@ public:
     /// 자가 검증은 256x256처럼 화면과 무관한 크기로 디바이스를 세우고, 그것이
     /// 창을 따라가면 검증이 창 크기에 좌우된다. DX11 Texture의 기본값을
     /// '따라가지 않음'으로 둔 것과 같은 이유다.
-    bool Initialize(uint32_t width, uint32_t height, std::string& outError,
-        LUID matchAdapterLuid = LUID{ 0, 0 }, bool followScreenSize = false);
+    bool Initialize(uint32_t width, uint32_t height, std::string& outError, LUID matchAdapterLuid = LUID{0, 0},
+                    bool followScreenSize = false);
     void Shutdown() override;
 
     /// 창 크기가 바뀌었을 때 크기에 딸린 리소스를 다시 만든다.
@@ -134,8 +153,7 @@ public:
     /// 업로드 링은 그 슬롯을 되감아 온전한 구간으로 다시 시작한다.
     void AbortFrame() override;
 
-public:
-
+  public:
     /// 프레임 중간에 지금까지 기록한 것을 제출하고 리스트를 다시 연다.
     ///
     /// 병렬 기록에 필요하다. 업로드(PrepareFrame)는 이 리스트에 기록되는데,
@@ -156,19 +174,15 @@ public:
     bool ShutdownQueueService(std::string& outError);
     /// 이미 닫힌 backend command list 묶음을 제출하고 같은 queue fence로
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
-    bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
-        std::string& outError);
+    bool PrepareParallelSubmission(RHICompletionPoint& outCompletion, std::string& outError);
     void AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket);
     void RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion);
-    bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
-        RHICompletionPoint completion, std::string& outError);
+    bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists, RHICompletionPoint completion,
+                            std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
     void WaitForGpu() override;
     bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
-    const RHILifecycleResult& GetLastLifecycleResult() const
-    {
-        return m_lastLifecycleResult;
-    }
+    const RHILifecycleResult& GetLastLifecycleResult() const { return m_lastLifecycleResult; }
 
     /// 큐 admission이 확인된 마지막 완료 예약. CPU 제출 성공은 ticket이,
     /// GPU 완료는 GetCompletedFenceValue가 따로 증명한다. 거절된 예약은 제외한다.
@@ -197,8 +211,7 @@ public:
     //
     // 백버퍼 상태 전이(PRESENT ↔ RENDER_TARGET)는 호출부 책임이다 —
     // 프레임 구조(어디서 그리고 어디서 제출하는가)를 여기가 모른다.
-    bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
-        std::string& outError) override;
+    bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height, std::string& outError) override;
     bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError) override;
     // 직렬 표시 소유자가 EndFrame 뒤에 호출한다. 리사이즈는 프레임 사이에
     // 처리하며, 호출자는 종료·파괴 전에 그 소유자를 join해야 한다.
@@ -245,28 +258,31 @@ public:
     std::shared_ptr<DlssTemporalAdapter> GetTemporalDlssSession() const;
     TemporalResult GetTemporalBootstrapResult() const { return m_temporalBootstrapResult; }
     bool HasTemporalSharedDevice() const { return static_cast<bool>(m_temporalDevice); }
-    ID3D12Device* GetDevice() const {  return m_device.Get(); }
+    ID3D12Device* GetDevice() const { return m_device.Get(); }
     bool EncodeIndirectBuffer(const RHIBufferSlice& slice, uint64_t& payload) const override
     {
         const auto entry = DescribeBuffer(slice.buffer);
-        if (!entry.IsValid() || slice.offset >= entry.bytes || slice.size > entry.bytes - slice.offset) return false;
+        if (!entry.IsValid() || slice.offset >= entry.bytes || slice.size > entry.bytes - slice.offset)
+        {
+            return false;
+        }
         payload = entry.resource->GetGPUVirtualAddress() + slice.offset;
         return payload != 0;
     }
     bool EncodeIndirectIndexBuffer(const RHIBufferSlice& slice, RHIFormat format,
-        std::array<uint32_t, 4>& payload) const override
+                                   std::array<uint32_t, 4>& payload) const override
     {
         uint64_t address{};
-        if (format != RHIFormat::R32Uint || !slice.size || slice.size > UINT32_MAX ||
-            slice.size % 4 || !EncodeIndirectBuffer(slice, address) || address % 4) return false;
+        if (format != RHIFormat::R32Uint || !slice.size || slice.size > UINT32_MAX || slice.size % 4 ||
+            !EncodeIndirectBuffer(slice, address) || address % 4)
+        {
+            return false;
+        }
         payload = {uint32_t(address), uint32_t(address >> 32), uint32_t(slice.size), uint32_t(DXGI_FORMAT_R32_UINT)};
         return true;
     }
     IDXGIAdapter1* GetAdapter() const { return m_adapter.Get(); }
-    RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator()
-    {
-        return m_persistentMemoryBudget;
-    }
+    RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator() { return m_persistentMemoryBudget; }
     const RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator() const
     {
         return m_persistentMemoryBudget;
@@ -278,7 +294,7 @@ public:
 
     // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).
     ID3D12CommandQueue* GetCommandQueue() const { return m_queue.Get(); }
-    ID3D12GraphicsCommandList* GetCommandList() const {  return m_commandList.Get(); }
+    ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList.Get(); }
     ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }
     /// 프레임 리드백. 오프스크린 결과를 픽셀로 꺼내 보는 자가 검증이 쓴다.
@@ -298,12 +314,11 @@ public:
     ///   않는다. 그것이 성능 계약이다(호출당 ~175ns 원자 연산).
     using IRenderDeviceServices::AllocateUpload;
 
-    bool ReserveUploadBatch(std::span<const RHIUploadRequest> requests,
-        std::span<RHIBufferSlice> outSlices, std::string& outError) override
+    bool ReserveUploadBatch(std::span<const RHIUploadRequest> requests, std::span<RHIBufferSlice> outSlices,
+                            std::string& outError) override
     {
         RHIBufferSlice slice{};
-        return m_uploadAllocator.ReserveBatch(
-            m_currentRecordingId, requests, outSlices, outError);
+        return m_uploadAllocator.ReserveBatch(m_currentRecordingId, requests, outSlices, outError);
     }
 
     RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override
@@ -318,46 +333,38 @@ public:
 
     RHIBufferSlice UploadConstants(const void* data, size_t bytes) override
     {
-        const RHIBufferSlice slice = AllocateUpload(
-            RHIUploadRequest{ bytes, RHIUploadUsage::ConstantBuffer, 1 });
-        if (slice.IsValid() && nullptr != data) std::memcpy(slice.cpuAddress, data, bytes);
+        const RHIBufferSlice slice = AllocateUpload(RHIUploadRequest{bytes, RHIUploadUsage::ConstantBuffer, 1});
+        if (slice.IsValid() && nullptr != data)
+        {
+            std::memcpy(slice.cpuAddress, data, bytes);
+        }
         return slice;
     }
 
     RHIUploadStats GetUploadStats() const { return m_uploadAllocator.GetStats(); }
-    uint64_t GetCurrentUploadRecordingId() const override
-    {
-        return m_currentRecordingId;
-    }
-    void RegisterUploadTransactionListener(
-        IRHIUploadTransactionListener* listener) override;
-    void UnregisterUploadTransactionListener(
-        IRHIUploadTransactionListener* listener) override;
+    uint64_t GetCurrentUploadRecordingId() const override { return m_currentRecordingId; }
+    void RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override;
+    void UnregisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override;
     uint64_t GetUploadUsedBytes() const { return m_uploadAllocator.GetRecordingUsedBytes(); }
-    uint64_t GetRegularUploadSegmentBytes() const
-    {
-        return m_uploadAllocator.GetRegularSegmentBytes();
-    }
+    uint64_t GetRegularUploadSegmentBytes() const { return m_uploadAllocator.GetRegularSegmentBytes(); }
     DX12UploadSegmentAllocator& GetUploadAllocator() { return m_uploadAllocator; }
     const DX12UploadSegmentAllocator& GetUploadAllocator() const { return m_uploadAllocator; }
 
     // recording 버전별 shader-visible page. 제출 완료 전 page를 되감지 않는
     // 규칙은 submission coordinator가 직접 배선한다.
     DX12DescriptorRecycler& GetDescriptorRecycler() { return m_descriptorRecycler; }
-    const DX12DescriptorRecycler& GetDescriptorRecycler() const
-    {
-        return m_descriptorRecycler;
-    }
-    bool IsDescriptorVersionCurrent(uint64_t token) const
-    {
-        return m_descriptorRecycler.IsCurrentVersion(token);
-    }
+    const DX12DescriptorRecycler& GetDescriptorRecycler() const { return m_descriptorRecycler; }
+    void ClearRecordedUnorderedAccess(ID3D12GraphicsCommandList& commandList, const DX12RecordingResources& recording,
+                                      const RHIBindingDesc& view, const float rgba[4]);
+    bool CaptureRecordingResources(std::shared_ptr<const DX12RecordingResources>& result, std::string& outError,
+                                   const DX12RecordingResources* retiredResources = nullptr);
+    bool IsDescriptorVersionCurrent(uint64_t token) const { return m_descriptorRecycler.IsCurrentVersion(token); }
 
     // 샘플러 힙은 프레임과 무관하다(설정이 바뀌지 않는다) — 되감지 않는다.
     //
     // ★ 인터페이스에서 빠졌다(A-4). 아래 CreateSamplers 가 그 자리를 덮고,
     //   힙 자체를 꺼내는 것은 백엔드 내부(인코더의 힙 바인딩·진단)만 한다.
-    DX12SamplerHeap& GetSamplerHeap() {  return m_samplerHeap; }
+    DX12SamplerHeap& GetSamplerHeap() { return m_samplerHeap; }
 
     /// 샘플러 N개를 연속 테이블로 (A-4).
     ///
@@ -366,11 +373,13 @@ public:
     ///   Initialize 에서 한 번씩 부르므로 힙 상한(2048)을 아끼는 값이 있다.
     RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc> descs) override
     {
-        if (descs.empty()) return RHISamplerTable{};
-        const auto handle = (1 == descs.size())
-            ? m_samplerHeap.GetOrCreate(descs[0])
-            : m_samplerHeap.CreateRange(descs);
-        return RHISamplerTable{ handle.ptr };
+        if (descs.empty())
+        {
+            return RHISamplerTable{};
+        }
+        const auto handle =
+            (1 == descs.size()) ? m_samplerHeap.GetOrCreate(descs[0]) : m_samplerHeap.CreateRange(descs);
+        return RHISamplerTable{handle.ptr};
     }
 
     /// 지금 열린 커맨드 리스트에 붙은 인코더 (A-3). BeginFrame 이 다시 만든다.
@@ -383,39 +392,32 @@ public:
     // ── 바인딩(R2) — 구현은 .cpp에 ──
     RHIBindingTable CreateBindings(std::span<const RHIBindingDesc> descs) override;
     /// PBR-W0 — recycler 가 이미 들고 있던 값을 중립 어휘로 내보낸다.
-    uint64_t GetDescriptorVersionToken() const override
-    {
-        return m_descriptorRecycler.GetCurrentVersionToken();
-    }
+    uint64_t GetDescriptorVersionToken() const override { return m_descriptorRecycler.GetCurrentVersionToken(); }
     /// 인터페이스에서 빠졌다(R4-1b) — 인코더와, 그래프 밖에서 원시 경로를
     /// 쓰는 두 자리(인코더 벤치·SSGI 자가 검증)만 부른다.
-    void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
-        bool withSamplers = false);
+    void BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList, bool withSamplers = false);
     const DX12SamplerHeap& GetSamplerHeap() const { return m_samplerHeap; }
 
     // ── 렌더 타깃(R2b) — 구현은 .cpp에 ──
     RHIRenderTargetBinding CreateRenderTargets(std::span<const RHITextureHandle> colors,
-        const RHIDepthTargetDesc* depth = nullptr) override;
+                                               const RHIDepthTargetDesc* depth = nullptr) override;
     RHIRenderTargetBinding CreateRenderTargets(std::span<const RHIColorTargetDesc> colors,
-        const RHIDepthTargetDesc* depth = nullptr) override;
+                                               const RHIDepthTargetDesc* depth = nullptr) override;
     /// 거는 셋은 인터페이스에서 빠졌다(R4-1) — DX12Encoder만 부른다.
     /// 구현이 여기 남은 것은 뷰 힙이 여기 있기 때문이고, 인덱스에서 핸들을
     /// 얻는 산술을 두 곳에 두지 않으려는 것이다.
-    void BindRenderTargets(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding);
-    void ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding, const float rgba[4]);
+    void BindRenderTargets(ID3D12GraphicsCommandList* commandList, const RHIRenderTargetBinding& binding);
+    void ClearRenderTargets(ID3D12GraphicsCommandList* commandList, const RHIRenderTargetBinding& binding,
+                            const float rgba[4]);
     /// rect가 널이면 전체를 지운다 — 위 함수가 이것의 얇은 별칭이다.
-    void ClearRenderTargetsRect(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding, const float rgba[4], const D3D12_RECT* rect);
-    void ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
-        const RHIRenderTargetBinding& binding, float depth);
+    void ClearRenderTargetsRect(ID3D12GraphicsCommandList* commandList, const RHIRenderTargetBinding& binding,
+                                const float rgba[4], const D3D12_RECT* rect);
+    void ClearDepthTarget(ID3D12GraphicsCommandList* commandList, const RHIRenderTargetBinding& binding, float depth);
 
     /// 인터페이스에서 빠졌다(A-3) — DX12Encoder 만 부른다. 구현이 여기 남은
     /// 것은 셰이더 가시·비가시 디스크립터를 짝지어야 하고 두 힙이 여기 있기
     /// 때문이다(거는 셋을 R4-1 에서 내린 것과 같은 경계: 커맨드를 적는가).
-    void ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
-        const RHIBindingDesc& view, const float rgba[4]);
+    void ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList, const RHIBindingDesc& view, const float rgba[4]);
 
     /// ClearUnorderedAccessViewFloat이 요구하는 비셰이더 가시 UAV 디스크립터.
     /// 인코더가 그 짝을 맞추는 데 쓴다 — 호출부는 이것을 몰라도 된다.
@@ -471,44 +473,23 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
-    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
-    {
-        return m_resourceTable.DescribeBuffer(handle);
-    }
+    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const { return m_resourceTable.DescribeBuffer(handle); }
 
     RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
     {
         const bool available = nullptr != m_drawIndexedIndirectSignature.Get();
-        return { available, available || nullptr != m_drawIndirectSignature.Get(),
-            nullptr != m_drawIndirectSignature.Get() };
+        return {available, available || nullptr != m_drawIndirectSignature.Get(),
+                nullptr != m_drawIndirectSignature.Get()};
     }
     RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
     bool IsAtomicMin64Buffer(RHIBufferHandle buffer) const override;
-    RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override
-    {
-        return m_meshShaderCapabilities;
-    }
-    RHIShaderArrayCapabilities GetShaderArrayCapabilities() const override
-    {
-        return m_shaderArrayCapabilities;
-    }
-    ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const
-    {
-        return m_dispatchMeshIndirectSignature.Get();
-    }
-    ID3D12CommandSignature* GetDispatchIndirectSignature() const
-    {
-        return m_dispatchIndirectSignature.Get();
-    }
+    RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override { return m_meshShaderCapabilities; }
+    RHIShaderArrayCapabilities GetShaderArrayCapabilities() const override { return m_shaderArrayCapabilities; }
+    ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const { return m_dispatchMeshIndirectSignature.Get(); }
+    ID3D12CommandSignature* GetDispatchIndirectSignature() const { return m_dispatchIndirectSignature.Get(); }
     ID3D12CommandSignature* GetMaterialBatchSignature(ID3D12RootSignature*, std::span<const uint32_t>, bool indexed);
-    ID3D12CommandSignature* GetDrawIndirectSignature() const
-    {
-        return m_drawIndirectSignature.Get();
-    }
-    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const
-    {
-        return m_drawIndexedIndirectSignature.Get();
-    }
+    ID3D12CommandSignature* GetDrawIndirectSignature() const { return m_drawIndirectSignature.Get(); }
+    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const { return m_drawIndexedIndirectSignature.Get(); }
 
     /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
@@ -526,58 +507,49 @@ public:
     // ★ 만드는 쪽과 표가 갈린 것은 V2 의 `RegisterExternalTexture` 와 같은
     //   모양이다 — 캐시가 만들어 오래 들고, 표는 소비처에 핸들을 주려고 든다.
     //   그 주석이 "이쪽은 과도기가 아니다"라고 적어 둔 부류다.
-    RHIPipelineHandle RegisterPipeline(ID3D12PipelineState* pipeline,
-        ID3D12RootSignature* signature, bool meshPipeline = false, bool computePipeline = false)
+    RHIPipelineHandle RegisterPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature,
+                                       bool meshPipeline = false, bool computePipeline = false)
     {
         return m_resourceTable.AddPipeline(pipeline, signature, meshPipeline, computePipeline);
     }
-    RHIPipelineLayoutHandle RegisterPipelineLayout(ID3D12RootSignature* signature,
-        uint64_t stableHash, bool allowInputAssembler = true)
+    RHIPipelineLayoutHandle RegisterPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash,
+                                                   bool allowInputAssembler = true)
     {
         return m_resourceTable.AddPipelineLayout(signature, stableHash, allowInputAssembler);
     }
 
-    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
-    {
-        return m_resourceTable.Resolve(handle);
-    }
-    DX12PipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const
-    {
-        return m_resourceTable.Resolve(handle);
-    }
-    void ReleasePipeline(RHIPipelineHandle handle)
-    {
-        m_resourceTable.Release(handle);
-    }
+    DX12PipelineEntry Resolve(RHIPipelineHandle handle) const { return m_resourceTable.Resolve(handle); }
+    DX12PipelineLayoutEntry Resolve(RHIPipelineLayoutHandle handle) const { return m_resourceTable.Resolve(handle); }
+    void ReleasePipeline(RHIPipelineHandle handle) { m_resourceTable.Release(handle); }
 
     // ── 패스 소유 리소스(R2c) — 구현은 .cpp에 ──
-    bool CreateBuffer(const RHIBufferDesc& desc,
-        RHIBufferHandle& outHandle, std::string& outError) override;
+    bool CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandle& outHandle, std::string& outError) override;
     uint64_t SparseBufferTileBytes() const override;
-    bool StreamingMemoryPressure() const override { return m_persistentMemoryBudget.GetMemoryPressureInfo().memoryPressure; }
+    bool StreamingMemoryPressure() const override
+    {
+        return m_persistentMemoryBudget.GetMemoryPressureInfo().memoryPressure;
+    }
     bool IsSparseBuffer(RHIBufferHandle buffer) const { return m_resourceTable.ResolveSparseHeap(buffer) != nullptr; }
-    bool CreateSparseBuffer(const RHISparseBufferDesc& desc,
-        RHIBufferHandle& outHandle, std::string& outError) override;
-    bool UpdateSparseBufferMappings(RHIBufferHandle buffer,
-        std::span<const RHISparseTileMapping> mappings, std::string& outError) override;
-    bool CreateTexture(const RHITextureDesc& desc,
-        RHITextureHandle& outHandle, std::string& outError) override;
+    bool CreateSparseBuffer(const RHISparseBufferDesc& desc, RHIBufferHandle& outHandle,
+                            std::string& outError) override;
+    bool UpdateSparseBufferMappings(RHIBufferHandle buffer, std::span<const RHISparseTileMapping> mappings,
+                                    std::string& outError) override;
+    bool CreateTexture(const RHITextureDesc& desc, RHITextureHandle& outHandle, std::string& outError) override;
 
     // ── 리드백(R2c-b) — 구현은 .cpp에 ──
-    bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format,
-        uint32_t sliceCount, RHIReadback& outReadback, std::string& outError) override;
-    bool MapReadback(const RHIReadback& readback,
-        RHIReadbackImage& outImage, std::string& outError) override;
+    bool CreateReadback(uint32_t width, uint32_t height, RHIFormat format, uint32_t sliceCount,
+                        RHIReadback& outReadback, std::string& outError) override;
+    bool MapReadback(const RHIReadback& readback, RHIReadbackImage& outImage, std::string& outError) override;
     void ReleaseReadback(RHIReadback& readback) override
     {
         m_resourceTable.Release(readback.buffer);
         readback = RHIReadback{};
     }
-    bool CreateBufferReadback(uint64_t bytes,
-        RHIReadback& outReadback, std::string& outError) override;
+    bool CreateBufferReadback(uint64_t bytes, RHIReadback& outReadback, std::string& outError) override;
 
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
     void RefreshUploadBudget();
@@ -595,19 +567,19 @@ private:
 
     TemporalResult m_temporalBootstrapResult;
     std::shared_ptr<TemporalDeviceDX12> m_temporalDevice;
-    ComPtr<IDXGIFactory6>              m_factory;
-    ComPtr<IDXGIAdapter1>              m_adapter;
+    ComPtr<IDXGIFactory6> m_factory;
+    ComPtr<IDXGIAdapter1> m_adapter;
     std::unique_ptr<DX12MemorySamplingSession> m_memorySampling;
-    ComPtr<ID3D12Device>               m_device;
+    ComPtr<ID3D12Device> m_device;
     std::unique_ptr<DX12QueueService> m_queueService;
     bool m_queueFrameActive{false};
     bool m_queueFrameJoined{false};
     void DrainAbortedQueueFrame();
     bool FlushCommandListImpl(bool preserveRecording, std::string& outError);
-    ComPtr<ID3D12CommandSignature>     m_drawIndirectSignature;
-    ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
-    ComPtr<ID3D12CommandSignature>     m_dispatchMeshIndirectSignature;
-    ComPtr<ID3D12CommandSignature>     m_dispatchIndirectSignature;
+    ComPtr<ID3D12CommandSignature> m_drawIndirectSignature;
+    ComPtr<ID3D12CommandSignature> m_drawIndexedIndirectSignature;
+    ComPtr<ID3D12CommandSignature> m_dispatchMeshIndirectSignature;
+    ComPtr<ID3D12CommandSignature> m_dispatchIndirectSignature;
     // Ascending unique root slots have an exact allocation-free representation:
     // native root identity, occupied slots, CBV slots, indexed/mesh command kind.
     using MaterialBatchSignatureKey = std::tuple<uintptr_t, uint64_t, uint64_t, bool>;
@@ -620,78 +592,76 @@ private:
     uint64_t m_meshBatchSignatureGeneration{NextMaterialBatchSignatureGeneration()};
     std::mutex m_meshBatchSignatureMutex;
     std::map<MaterialBatchSignatureKey, MaterialBatchSignature> m_meshBatchSignatures;
-    RHIAtomicCapabilities             m_atomicCapabilities;
-    RHIMeshShaderCapabilities          m_meshShaderCapabilities;
-    RHIShaderArrayCapabilities         m_shaderArrayCapabilities;
+    RHIAtomicCapabilities m_atomicCapabilities;
+    RHIMeshShaderCapabilities m_meshShaderCapabilities;
+    RHIShaderArrayCapabilities m_shaderArrayCapabilities;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.
-    ComPtr<ID3D12InfoQueue>            m_infoQueue;
-    ComPtr<ID3D12CommandQueue>         m_queue;
+    ComPtr<ID3D12InfoQueue> m_infoQueue;
+    ComPtr<ID3D12CommandQueue> m_queue;
     std::array<ComPtr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
-    std::array<uint64_t, kFrameCount>  m_frameFenceValues{};
+    std::array<uint64_t, kFrameCount> m_frameFenceValues{};
     std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
-    std::array<std::vector<ComPtr<ID3D12GraphicsCommandList>>, kFrameCount>
-        m_retiredCommandLists;
-    ComPtr<ID3D12GraphicsCommandList>  m_commandList;
+    std::array<std::vector<ComPtr<ID3D12GraphicsCommandList>>, kFrameCount> m_retiredCommandLists;
+    ComPtr<ID3D12GraphicsCommandList> m_commandList;
 
     /// 지금 열린 리스트에 붙은 인코더 (A-3). 리스트를 Reset 할 때마다 다시
     /// 만든다 — 인코더가 기억하는 디스크립터 힙 바인딩이 Reset 으로 풀리므로,
     /// 들고 있으면 '걸었다고 기억하는데 안 걸린' 상태가 된다.
-    std::unique_ptr<DX12Encoder>       m_immediateEncoder;
+    std::unique_ptr<DX12Encoder> m_immediateEncoder;
 
-    ComPtr<ID3D12Fence>                m_fence;
-    HANDLE                             m_fenceEvent{ nullptr };
-    uint64_t                           m_nextFenceValue{ 1 };
-    uint64_t                           m_lastAdmittedFenceValue{ 0 };
-    uint32_t                           m_frameIndex{ 0 };
-    bool                               m_submissionClient{ false };
-    RHILifecycleResult                 m_lastLifecycleResult{};
+    ComPtr<ID3D12Fence> m_fence;
+    HANDLE m_fenceEvent{nullptr};
+    uint64_t m_nextFenceValue{1};
+    uint64_t m_lastAdmittedFenceValue{0};
+    uint32_t m_frameIndex{0};
+    bool m_submissionClient{false};
+    RHILifecycleResult m_lastLifecycleResult{};
 
-    ComPtr<ID3D12DescriptorHeap>       m_rtvHeap;
-    D3D12_CPU_DESCRIPTOR_HANDLE        m_rtvHandle{};
-    ComPtr<ID3D12Resource>             m_renderTarget;
-    RHIReadback                        m_frameReadback;
+    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_rtvHandle{};
+    ComPtr<ID3D12Resource> m_renderTarget;
+    RHIReadback m_frameReadback;
 
     // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
-    ComPtr<IDXGISwapChain3>            m_swapChain;
-    UINT                             m_swapChainFlags{ 0 };
-    HANDLE                           m_frameLatencyWaitableObject{ nullptr };
-    bool                             m_frameLatencyReady{ false };
+    ComPtr<IDXGISwapChain3> m_swapChain;
+    UINT m_swapChainFlags{0};
+    HANDLE m_frameLatencyWaitableObject{nullptr};
+    bool m_frameLatencyReady{false};
     // allocator·백버퍼 링과 별개로 미완료 호스트 프레임은 하나만 허용한다.
-    RHISubmissionTicket              m_hostSubmissionTicket;
-    uint64_t                         m_hostFenceValue{ 0 };
+    RHISubmissionTicket m_hostSubmissionTicket;
+    uint64_t m_hostFenceValue{0};
     std::array<ComPtr<ID3D12Resource>, kFrameCount> m_backBuffers;
-    ComPtr<ID3D12DescriptorHeap>       m_backBufferRtvHeap;
-    uint32_t                           m_backBufferRtvSize{ 0 };
+    ComPtr<ID3D12DescriptorHeap> m_backBufferRtvHeap;
+    uint32_t m_backBufferRtvSize{0};
 
-    DX12UploadSegmentAllocator         m_uploadAllocator;
-    bool                               m_uploadMemoryPressure{ false };
-    RHIDeviceMemoryBudgetCoordinator   m_persistentMemoryBudget;
-    uint64_t                           m_nextRecordingId{ 1 };
-    uint64_t                           m_currentRecordingId{ 0 };
+    DX12UploadSegmentAllocator m_uploadAllocator;
+    bool m_uploadMemoryPressure{false};
+    RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
+    uint64_t m_nextRecordingId{1};
+    uint64_t m_currentRecordingId{0};
     std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
-    DX12DescriptorRecycler             m_descriptorRecycler;
-    DX12SamplerHeap                    m_samplerHeap;
+    DX12DescriptorRecycler m_descriptorRecycler;
+    DX12SamplerHeap m_samplerHeap;
 
     // 복사 원본은 CPU 전용 힙이어야 한다. 초기화 뒤 worker가 읽기만 하며,
     // recording 합류 뒤 종료/재초기화할 때만 해제한다. 준비 실패 시 count=0으로
     // 기존 뷰 생성 경로를 유지하고 프레임마다 다시 할당하지 않는다.
-    ComPtr<ID3D12DescriptorHeap>        m_nullTextureDescriptorHeap;
-    D3D12_CPU_DESCRIPTOR_HANDLE        m_nullTextureDescriptor{};
-    uint32_t                          m_nullTextureDescriptorCount{ 0 };
+    ComPtr<ID3D12DescriptorHeap> m_nullTextureDescriptorHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_nullTextureDescriptor{};
+    uint32_t m_nullTextureDescriptorCount{0};
 
     // 패스가 매 프레임 다시 만드는 RTV/DSV(R2b). 링과 달리 프레임 구간으로
     // 나누지 않는다 — 이 디스크립터는 기록 시점에 소비된다(DX12DescriptorHeaps.h).
-    DX12TargetViewHeap                 m_rtvViewHeap;
-    DX12TargetViewHeap                 m_dsvViewHeap;
+    DX12TargetViewHeap m_rtvViewHeap;
+    DX12TargetViewHeap m_dsvViewHeap;
 
     // ClearUnorderedAccessViewFloat 전용 비가시 UAV 힙(R3).
-    DX12TargetViewHeap                 m_clearViewHeap;
+    DX12TargetViewHeap m_clearViewHeap;
 
-    uint32_t m_width{ 0 };
-    uint32_t m_height{ 0 };
+    uint32_t m_width{0};
+    uint32_t m_height{0};
 
-    ScreenResizeBus::Handle m_resizeSubscription{ ScreenResizeBus::kInvalidHandle };
+    ScreenResizeBus::Handle m_resizeSubscription{ScreenResizeBus::kInvalidHandle};
 };
-

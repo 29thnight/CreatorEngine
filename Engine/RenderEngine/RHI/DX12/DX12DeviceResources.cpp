@@ -5,12 +5,12 @@
 #include "../Temporal/TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include "../RHIRecordedBatch.h"
-#include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
+#include "DX12Encoder.h" // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <stdint.h>
 #include <stdio.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
 
-#include <dxgidebug.h>   // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
+#include <dxgidebug.h> // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
 #include "../RHIValidationLedger.h"
 
 #pragma comment(lib, "d3d12.lib")
@@ -21,9 +21,8 @@
 // Each device stream is retained separately; process usage must not be summed.
 class DX12MemorySamplingSession
 {
-public:
-    DX12MemorySamplingSession(IDXGIAdapter1* adapter, const char* path)
-        : m_file(path, std::ios::app)
+  public:
+    DX12MemorySamplingSession(IDXGIAdapter1* adapter, const char* path) : m_file(path, std::ios::app)
     {
         if (!m_file || FAILED(adapter->QueryInterface(IID_PPV_ARGS(&m_adapter))))
         {
@@ -32,17 +31,18 @@ public:
         static std::atomic<uint64_t> next{1};
         m_stream = next.fetch_add(1);
         Record("start");
-        m_worker = std::jthread([this](std::stop_token stop)
-        {
-            while (!stop.stop_requested())
+        m_worker = std::jthread(
+            [this](std::stop_token stop)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                if (!stop.stop_requested())
+                while (!stop.stop_requested())
                 {
-                    Record("sample");
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    if (!stop.stop_requested())
+                    {
+                        Record("sample");
+                    }
                 }
-            }
-        });
+            });
     }
     ~DX12MemorySamplingSession()
     {
@@ -53,24 +53,23 @@ public:
         }
         Record("end");
     }
-private:
+
+  private:
     void Record(const char* kind)
     {
         DXGI_QUERY_VIDEO_MEMORY_INFO info{};
-        const HRESULT hr = m_adapter->QueryVideoMemoryInfo(0,
-            DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
-        const auto utcMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - m_began).count();
+        const HRESULT hr = m_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+        const auto utcMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count();
+        const auto elapsedMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_began).count();
         static std::mutex writerMutex;
         std::lock_guard lock(writerMutex);
-        m_file << "{\"stream\":" << m_stream << ",\"kind\":\"" << kind
-            << "\",\"utcMs\":" << utcMs << ",\"elapsedMs\":" << elapsedMs
-            << ",\"valid\":" << (SUCCEEDED(hr) ? "true" : "false")
-            << ",\"hresult\":" << static_cast<int64_t>(hr)
-            << ",\"usedBytes\":" << info.CurrentUsage
-            << ",\"budgetBytes\":" << info.Budget << "}\n";
+        m_file << "{\"stream\":" << m_stream << ",\"kind\":\"" << kind << "\",\"utcMs\":" << utcMs
+               << ",\"elapsedMs\":" << elapsedMs << ",\"valid\":" << (SUCCEEDED(hr) ? "true" : "false")
+               << ",\"hresult\":" << static_cast<int64_t>(hr) << ",\"usedBytes\":" << info.CurrentUsage
+               << ",\"budgetBytes\":" << info.Budget << "}\n";
         m_file.flush();
     }
     Microsoft::WRL::ComPtr<IDXGIAdapter3> m_adapter;
@@ -92,22 +91,34 @@ namespace
     std::string ReadEnvironment(const char* name)
     {
         const DWORD length = GetEnvironmentVariableA(name, nullptr, 0);
-        if (0 == length) return {};
+        if (0 == length)
+        {
+            return {};
+        }
 
         std::string value(length, '\0');
         GetEnvironmentVariableA(name, value.data(), length);
         value.resize(length - 1);
         std::transform(value.begin(), value.end(), value.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return value;
     }
 
     bool ReadEnvironmentFlag(const char* name, bool fallback)
     {
         const std::string value = ReadEnvironment(name);
-        if (value.empty()) return fallback;
-        if (value == "1" || value == "true" || value == "on" || value == "yes") return true;
-        if (value == "0" || value == "false" || value == "off" || value == "no") return false;
+        if (value.empty())
+        {
+            return fallback;
+        }
+        if (value == "1" || value == "true" || value == "on" || value == "yes")
+        {
+            return true;
+        }
+        if (value == "0" || value == "false" || value == "off" || value == "no")
+        {
+            return false;
+        }
         return fallback;
     }
 
@@ -119,9 +130,18 @@ namespace
         constexpr ValidationMode fallback = ValidationMode::Off;
 #endif
         const std::string value = ReadEnvironment("CREATOR_DX12_VALIDATION");
-        if (value.empty()) return fallback;
-        if (value == "off" || value == "0" || value == "false") return ValidationMode::Off;
-        if (value == "gpu" || value == "full" || value == "2") return ValidationMode::Gpu;
+        if (value.empty())
+        {
+            return fallback;
+        }
+        if (value == "off" || value == "0" || value == "false")
+        {
+            return ValidationMode::Off;
+        }
+        if (value == "gpu" || value == "full" || value == "2")
+        {
+            return ValidationMode::Gpu;
+        }
         if (value == "basic" || value == "standard" || value == "1" || value == "true")
         {
             return ValidationMode::Basic;
@@ -131,9 +151,15 @@ namespace
 
     std::string WideToUtf8(const wchar_t* value)
     {
-        if (nullptr == value || L'\0' == *value) return {};
+        if (nullptr == value || L'\0' == *value)
+        {
+            return {};
+        }
         const int bytes = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
-        if (bytes <= 1) return {};
+        if (bytes <= 1)
+        {
+            return {};
+        }
         std::string result(static_cast<size_t>(bytes), '\0');
         WideCharToMultiByte(CP_UTF8, 0, value, -1, result.data(), bytes, nullptr, nullptr);
         result.resize(static_cast<size_t>(bytes - 1));
@@ -142,7 +168,10 @@ namespace
 
     std::string DebugName(const char* narrow, const wchar_t* wide)
     {
-        if (nullptr != narrow && '\0' != *narrow) return narrow;
+        if (nullptr != narrow && '\0' != *narrow)
+        {
+            return narrow;
+        }
         const std::string converted = WideToUtf8(wide);
         return converted.empty() ? "<unnamed>" : converted;
     }
@@ -154,35 +183,35 @@ namespace
         return oss.str();
     }
 
-    uint64_t DX12UploadSoftBudget(const RHIUploadMemoryBudget& budget,
-        uint64_t currentSegmentBytes)
+    uint64_t DX12UploadSoftBudget(const RHIUploadMemoryBudget& budget, uint64_t currentSegmentBytes)
     {
         constexpr uint64_t MiB = 1024ull * 1024ull;
         constexpr uint64_t kMinimum = 64ull * MiB;
         constexpr uint64_t kMaximum = 512ull * MiB;
         constexpr uint64_t kFallback = 256ull * MiB;
-        if (!budget.IsValid()) return kFallback;
+        if (!budget.IsValid())
+        {
+            return kFallback;
+        }
 
-        const uint64_t headroom = budget.budgetBytes > budget.usageBytes
-            ? budget.budgetBytes - budget.usageBytes : 0;
+        const uint64_t headroom = budget.budgetBytes > budget.usageBytes ? budget.budgetBytes - budget.usageBytes : 0;
         const uint64_t candidate = currentSegmentBytes + headroom / 8;
         return (std::min)(kMaximum, (std::max)(kMinimum, candidate));
     }
 
-    bool DX12UploadMemoryPressure(const RHIUploadMemoryBudget& budget,
-        bool wasPressured)
+    bool DX12UploadMemoryPressure(const RHIUploadMemoryBudget& budget, bool wasPressured)
     {
-        if (!budget.IsValid()) return false;
+        if (!budget.IsValid())
+        {
+            return false;
+        }
         const uint64_t releaseThreshold = budget.budgetBytes - budget.budgetBytes / 5;
         const uint64_t enterThreshold = budget.budgetBytes - budget.budgetBytes / 10;
-        return wasPressured
-            ? budget.usageBytes > releaseThreshold
-            : budget.usageBytes >= enterThreshold;
+        return wasPressured ? budget.usageBytes > releaseThreshold : budget.usageBytes >= enterThreshold;
     }
-}
+} // namespace
 
-bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t height,
-    std::string& outError)
+bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t height, std::string& outError)
 {
     m_width = width;
     m_height = height;
@@ -202,11 +231,19 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
 
     D3D12_CLEAR_VALUE clearValue{};
     clearValue.Format = rtDesc.Format;
-    for (int i = 0; i < 4; ++i) clearValue.Color[i] = kClearColor[i];
+    for (int i = 0; i < 4; ++i)
+    {
+        clearValue.Color[i] = kClearColor[i];
+    }
 
     HRESULT hr = m_device->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &rtDesc,
-        D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue, IID_PPV_ARGS(&m_renderTarget));
-    if (FAILED(hr)) { outError = "렌더 타깃 생성 실패 " + HrToString(hr); return false; }
+                                                   D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue,
+                                                   IID_PPV_ARGS(&m_renderTarget));
+    if (FAILED(hr))
+    {
+        outError = "렌더 타깃 생성 실패 " + HrToString(hr);
+        return false;
+    }
 
     m_rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
     m_device->CreateRenderTargetView(m_renderTarget.Get(), nullptr, m_rtvHandle);
@@ -216,8 +253,7 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
     // 손으로 만들던 것을 자기 인터페이스로 돌렸다. 행 간격 계산과 힙 설명이
     // 여기서 사라지고, 쓰는 쪽(자가 검증 셋)도 GetRowPitch로 산술을 하지
     // 않는다 — 리드백이 스스로 안다.
-    if (!CreateReadback(width, height, RHIFormat::RGBA8Unorm, 1,
-        m_frameReadback, outError))
+    if (!CreateReadback(width, height, RHIFormat::RGBA8Unorm, 1, m_frameReadback, outError))
     {
         return false;
     }
@@ -232,13 +268,21 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
         outError = "초기화되지 않은 디바이스에 리사이즈를 걸었다";
         return false;
     }
-    if (0 == width || 0 == height) return true;
-    if (width == m_width && height == m_height) return true;
+    if (0 == width || 0 == height)
+    {
+        return true;
+    }
+    if (width == m_width && height == m_height)
+    {
+        return true;
+    }
 
     // GPU가 옛 타깃을 읽는 중일 수 있다. 놓기 전에 비운다 — DX11 쪽은 스왑체인
     // 제약 때문에 뷰를 먼저 놓아야 했지만, 여기서는 이유가 다르다(수명).
     if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError))
+    {
         return false;
+    }
 
     m_renderTarget.Reset();
     ReleaseReadback(m_frameReadback);
@@ -247,8 +291,8 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
     return CreateSizeDependentResources(width, height, outError);
 }
 
-bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::string& outError,
-    LUID matchAdapterLuid, bool followScreenSize)
+bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::string& outError, LUID matchAdapterLuid,
+                                     bool followScreenSize)
 {
     m_nullTextureDescriptorHeap.Reset();
     m_nullTextureDescriptor = {};
@@ -313,10 +357,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
 
     std::printf("[DX12 검증] DebugLayer=%s GPUValidation=%s DRED=%s BreakOnError=%s\n",
-        debugLayerEnabled ? "on" : "off",
-        gpuValidationEnabled ? "on" : "off",
-        dredEnabled ? "on" : "off",
-        breakOnError ? "on" : "off");
+                debugLayerEnabled ? "on" : "off", gpuValidationEnabled ? "on" : "off", dredEnabled ? "on" : "off",
+                breakOnError ? "on" : "off");
 
     const UINT factoryFlags = debugLayerEnabled ? DXGI_CREATE_FACTORY_DEBUG : 0;
     TemporalResult temporalBootstrap;
@@ -331,42 +373,57 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
     else
     {
-    hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&m_factory));
-    if (FAILED(hr)) { outError = "DXGI 팩토리 생성 실패 " + HrToString(hr); return false; }
-
-    // 어댑터 선택.
-    //
-    // LUID를 받았으면 그 어댑터를 찾는다 — 공유 텍스처는 같은 물리 어댑터에서만
-    // 성립하므로, DX11과 짝을 맞추는 것이 성능 정책보다 우선이다.
-    // 받지 않았으면(독립 자가 검증 등) 고성능 우선.
-    if (0 != matchAdapterLuid.LowPart || 0 != matchAdapterLuid.HighPart)
-    {
-        hr = m_factory->EnumAdapterByLuid(matchAdapterLuid, IID_PPV_ARGS(&m_adapter));
+        hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&m_factory));
         if (FAILED(hr))
         {
-            outError = "지정 LUID의 어댑터를 찾지 못했다 " + HrToString(hr);
+            outError = "DXGI 팩토리 생성 실패 " + HrToString(hr);
             return false;
         }
-    }
-    else
-    {
-        hr = m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-            IID_PPV_ARGS(&m_adapter));
-        if (FAILED(hr)) { outError = "어댑터 열거 실패 " + HrToString(hr); return false; }
-    }
 
-    hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
-    if (FAILED(hr)) { outError = "D3D12 디바이스 생성 실패 " + HrToString(hr); return false; }
-        if (temporalBootstrap.status != TemporalStatus::NotQueried)
-            TemporalRuntimeControl::Get().PublishDiagnostic([&](auto& snapshot)
+        // 어댑터 선택.
+        //
+        // LUID를 받았으면 그 어댑터를 찾는다 — 공유 텍스처는 같은 물리 어댑터에서만
+        // 성립하므로, DX11과 짝을 맞추는 것이 성능 정책보다 우선이다.
+        // 받지 않았으면(독립 자가 검증 등) 고성능 우선.
+        if (0 != matchAdapterLuid.LowPart || 0 != matchAdapterLuid.HighPart)
+        {
+            hr = m_factory->EnumAdapterByLuid(matchAdapterLuid, IID_PPV_ARGS(&m_adapter));
+            if (FAILED(hr))
             {
-                snapshot.lastUpscaleResult = temporalBootstrap;
-                snapshot.diagnostic = "Streamline pre-device initialization failed; native device remains usable";
-            });
+                outError = "지정 LUID의 어댑터를 찾지 못했다 " + HrToString(hr);
+                return false;
+            }
+        }
+        else
+        {
+            hr = m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+                                                       IID_PPV_ARGS(&m_adapter));
+            if (FAILED(hr))
+            {
+                outError = "어댑터 열거 실패 " + HrToString(hr);
+                return false;
+            }
+        }
+
+        hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
+        if (FAILED(hr))
+        {
+            outError = "D3D12 디바이스 생성 실패 " + HrToString(hr);
+            return false;
+        }
+        if (temporalBootstrap.status != TemporalStatus::NotQueried)
+        {
+            TemporalRuntimeControl::Get().PublishDiagnostic(
+                [&](auto& snapshot)
+                {
+                    snapshot.lastUpscaleResult = temporalBootstrap;
+                    snapshot.diagnostic = "Streamline pre-device initialization failed; native device remains usable";
+                });
+        }
     }
     char samplingPath[32768]{};
-    const DWORD samplingLength = GetEnvironmentVariableA("CREATOR_GPU_MEMORY_SAMPLES",
-        samplingPath, static_cast<DWORD>(sizeof(samplingPath)));
+    const DWORD samplingLength =
+        GetEnvironmentVariableA("CREATOR_GPU_MEMORY_SAMPLES", samplingPath, static_cast<DWORD>(sizeof(samplingPath)));
     if (samplingLength > 0 && samplingLength < sizeof(samplingPath))
     {
         try
@@ -400,7 +457,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
                 m_infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
             }
 
-            D3D12_MESSAGE_ID denied[] = { D3D12_MESSAGE_ID_LOADPIPELINE_NAMENOTFOUND };
+            D3D12_MESSAGE_ID denied[] = {D3D12_MESSAGE_ID_LOADPIPELINE_NAMENOTFOUND};
             D3D12_INFO_QUEUE_FILTER filter{};
             filter.DenyList.NumIDs = _countof(denied);
             filter.DenyList.pIDList = denied;
@@ -410,9 +467,9 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     // 장부는 **실물**을 받아 적는다. 환경 변수가 basic 이라고 적혀 있어도 큐를
     // 얻지 못했으면 읽을 것이 없고, 그 실행의 "오류 0" 은 아무것도 뜻하지 않는다.
-    ::rhi::validation::declare_layer(nullptr != m_infoQueue,
-        ValidationMode::Gpu == validationMode ? "gpu" :
-        ValidationMode::Basic == validationMode ? "basic" : "off");
+    ::rhi::validation::declare_layer(nullptr != m_infoQueue, ValidationMode::Gpu == validationMode     ? "gpu"
+                                                             : ValidationMode::Basic == validationMode ? "basic"
+                                                                                                       : "off");
 
     // 바인딩은 기존 그래픽 경로가 유지하므로 루트 시그니처 없는 단건 draw만 굽는다.
     // 준비 실패는 capability=false로 남겨 CPU 경로를 유지한다.
@@ -422,13 +479,12 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     indirectSignature.ByteStride = sizeof(RHIDrawIndexedIndirectArguments);
     indirectSignature.NumArgumentDescs = 1;
     indirectSignature.pArgumentDescs = &indexedArgument;
-    const HRESULT indirectResult = m_device->CreateCommandSignature(
-        &indirectSignature, nullptr, IID_PPV_ARGS(&m_drawIndexedIndirectSignature));
+    const HRESULT indirectResult =
+        m_device->CreateCommandSignature(&indirectSignature, nullptr, IID_PPV_ARGS(&m_drawIndexedIndirectSignature));
     if (FAILED(indirectResult))
     {
         m_drawIndexedIndirectSignature.Reset();
-        OutputDebugStringA(("[DX12] Indexed indirect unavailable: " +
-            HrToString(indirectResult) + "\n").c_str());
+        OutputDebugStringA(("[DX12] Indexed indirect unavailable: " + HrToString(indirectResult) + "\n").c_str());
     }
 
     D3D12_INDIRECT_ARGUMENT_DESC drawArgument{};
@@ -437,21 +493,20 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     drawSignature.ByteStride = sizeof(RHIDrawIndirectArguments);
     drawSignature.NumArgumentDescs = 1;
     drawSignature.pArgumentDescs = &drawArgument;
-    const HRESULT drawIndirectResult = m_device->CreateCommandSignature(
-        &drawSignature, nullptr, IID_PPV_ARGS(&m_drawIndirectSignature));
+    const HRESULT drawIndirectResult =
+        m_device->CreateCommandSignature(&drawSignature, nullptr, IID_PPV_ARGS(&m_drawIndirectSignature));
     if (FAILED(drawIndirectResult))
     {
         m_drawIndirectSignature.Reset();
-        OutputDebugStringA(("[DX12] Nonindexed indirect unavailable: " +
-            HrToString(drawIndirectResult) + "\n").c_str());
+        OutputDebugStringA(
+            ("[DX12] Nonindexed indirect unavailable: " + HrToString(drawIndirectResult) + "\n").c_str());
     }
 
     D3D12_INDIRECT_ARGUMENT_DESC dispatchArgument{};
     dispatchArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
-    const D3D12_COMMAND_SIGNATURE_DESC dispatchSignature{
-        sizeof(RHIDispatchIndirectArguments), 1, &dispatchArgument, 0};
-    const HRESULT dispatchIndirectResult = m_device->CreateCommandSignature(
-        &dispatchSignature, nullptr, IID_PPV_ARGS(&m_dispatchIndirectSignature));
+    const D3D12_COMMAND_SIGNATURE_DESC dispatchSignature{sizeof(RHIDispatchIndirectArguments), 1, &dispatchArgument, 0};
+    const HRESULT dispatchIndirectResult =
+        m_device->CreateCommandSignature(&dispatchSignature, nullptr, IID_PPV_ARGS(&m_dispatchIndirectSignature));
     if (FAILED(dispatchIndirectResult))
     {
         outError = "DX12 compute indirect signature creation failed: " + HrToString(dispatchIndirectResult);
@@ -461,62 +516,73 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
-    if (FAILED(hr)) { outError = "커맨드 큐 생성 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr))
+    {
+        outError = "커맨드 큐 생성 실패 " + HrToString(hr);
+        return false;
+    }
 
     for (uint32_t i = 0; i < kFrameCount; ++i)
     {
-        hr = m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
-            IID_PPV_ARGS(&m_allocators[i]));
-        if (FAILED(hr)) { outError = "커맨드 얼로케이터 생성 실패 " + HrToString(hr); return false; }
+        hr = m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
+        if (FAILED(hr))
+        {
+            outError = "커맨드 얼로케이터 생성 실패 " + HrToString(hr);
+            return false;
+        }
     }
 
-    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-        m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
-    if (FAILED(hr)) { outError = "커맨드 리스트 생성 실패 " + HrToString(hr); return false; }
+    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr,
+                                     IID_PPV_ARGS(&m_commandList));
+    if (FAILED(hr))
+    {
+        outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
+        return false;
+    }
     // Mesh support is optional. Feature level alone is not sufficient: require
     // shader model, hardware tier and the interfaces used by pipeline/dispatch.
     m_atomicCapabilities = {};
     m_shaderArrayCapabilities = {};
     D3D12_FEATURE_DATA_D3D12_OPTIONS bindingOptions{};
-    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS,
-        &bindingOptions, sizeof(bindingOptions))))
+    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &bindingOptions, sizeof(bindingOptions))))
     {
         const bool fullHeap = bindingOptions.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_2;
         m_shaderArrayCapabilities.sampledImageNonUniformIndexing = true;
         m_shaderArrayCapabilities.storageBufferNonUniformIndexing = true;
         m_shaderArrayCapabilities.partiallyBoundSrvArrays = fullHeap;
-        m_shaderArrayCapabilities.maxSampledImages = fullHeap ?
-            D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1 : D3D12_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT;
+        m_shaderArrayCapabilities.maxSampledImages = fullHeap ? D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_1
+                                                              : D3D12_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT;
         m_shaderArrayCapabilities.maxStorageBuffers = m_shaderArrayCapabilities.maxSampledImages;
-        m_shaderArrayCapabilities.maxSamplers = fullHeap ?
-            D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE : D3D12_COMMONSHADER_SAMPLER_SLOT_COUNT;
+        m_shaderArrayCapabilities.maxSamplers =
+            fullHeap ? D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE : D3D12_COMMONSHADER_SAMPLER_SLOT_COUNT;
     }
     D3D12_FEATURE_DATA_SHADER_MODEL atomicModel{D3D_SHADER_MODEL_6_6};
     D3D12_FEATURE_DATA_D3D12_OPTIONS1 integerOptions{};
     if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &atomicModel, sizeof(atomicModel))) &&
         atomicModel.HighestShaderModel >= D3D_SHADER_MODEL_6_6 &&
-        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &integerOptions, sizeof(integerOptions))) &&
+        SUCCEEDED(
+            m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &integerOptions, sizeof(integerOptions))) &&
         integerOptions.Int64ShaderOps)
     {
         m_atomicCapabilities.bufferInt64Min = true;
         D3D12_FEATURE_DATA_D3D12_OPTIONS9 atomicOptions{};
         D3D12_FEATURE_DATA_FORMAT_SUPPORT format{DXGI_FORMAT_R32G32_UINT};
         m_atomicCapabilities.typedInt64Min =
-            SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS9, &atomicOptions, sizeof(atomicOptions))) &&
+            SUCCEEDED(
+                m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS9, &atomicOptions, sizeof(atomicOptions))) &&
             atomicOptions.AtomicInt64OnTypedResourceSupported &&
             SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &format, sizeof(format))) &&
             (format.Support1 & D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW) != 0;
     }
     D3D12_FEATURE_DATA_D3D12_OPTIONS7 meshOptions{};
-    D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{ D3D_SHADER_MODEL_6_5 };
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{D3D_SHADER_MODEL_6_5};
     ComPtr<ID3D12Device2> meshDevice;
     ComPtr<ID3D12GraphicsCommandList6> meshCommands;
-    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7,
-            &meshOptions, sizeof(meshOptions))) &&
+    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &meshOptions, sizeof(meshOptions))) &&
         meshOptions.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1 &&
-        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL,
-            &shaderModel, sizeof(shaderModel))) && shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5 &&
-        SUCCEEDED(m_device.As(&meshDevice)) && SUCCEEDED(m_commandList.As(&meshCommands)))
+        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel))) &&
+        shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5 && SUCCEEDED(m_device.As(&meshDevice)) &&
+        SUCCEEDED(m_commandList.As(&meshCommands)))
     {
         // Core mesh shader limits; optional increased-dispatch extensions are
         // intentionally not required by the first mesh-only route.
@@ -538,27 +604,42 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         meshSignature.ByteStride = sizeof(RHIDispatchMeshIndirectArguments);
         meshSignature.NumArgumentDescs = 1;
         meshSignature.pArgumentDescs = &meshArgument;
-        m_meshShaderCapabilities.meshIndirect = SUCCEEDED(m_device->CreateCommandSignature(
-            &meshSignature, nullptr, IID_PPV_ARGS(&m_dispatchMeshIndirectSignature)));
+        m_meshShaderCapabilities.meshIndirect = SUCCEEDED(
+            m_device->CreateCommandSignature(&meshSignature, nullptr, IID_PPV_ARGS(&m_dispatchMeshIndirectSignature)));
     }
     m_commandList->Close(); // BeginFrame이 여는 것이 규약 — 생성 직후는 닫아 둔다
     m_immediateEncoder.reset();
 
     hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
-    if (FAILED(hr)) { outError = "펜스 생성 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr))
+    {
+        outError = "펜스 생성 실패 " + HrToString(hr);
+        return false;
+    }
 
     m_fenceEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (nullptr == m_fenceEvent) { outError = "펜스 이벤트 생성 실패"; return false; }
+    if (nullptr == m_fenceEvent)
+    {
+        outError = "펜스 이벤트 생성 실패";
+        return false;
+    }
 
     // ── 오프스크린 렌더 타깃 ──
     D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtvHeapDesc.NumDescriptors = 1;
     hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
-    if (FAILED(hr)) { outError = "RTV 힙 생성 실패 " + HrToString(hr); return false; }
+    if (FAILED(hr))
+    {
+        outError = "RTV 힙 생성 실패 " + HrToString(hr);
+        return false;
+    }
 
     // 크기에 딸린 것은 한 곳에 모은다 — 리사이즈가 같은 코드를 다시 탄다.
-    if (!CreateSizeDependentResources(width, height, outError)) return false;
+    if (!CreateSizeDependentResources(width, height, outError))
+    {
+        return false;
+    }
 
     // 완료점 기반 transient upload segment pool. 대형 요청은 첫 요청에서
     // 즉시 전용 세그먼트를 만들며 다음 프레임 성장을 기다리지 않는다.
@@ -571,8 +652,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     uploadPolicy.standbyRegularSegments = kStandbyRegularSegments;
     uploadPolicy.largeCacheBudgetBytes = 64ull * 1024 * 1024;
     uploadPolicy.softBudgetBytes = DX12UploadSoftBudget(QueryUploadMemoryBudget(), 0);
-    if (!m_uploadAllocator.Initialize(m_device.Get(), m_resourceTable,
-        uploadPolicy, outError))
+    if (!m_uploadAllocator.Initialize(m_device.Get(), m_resourceTable, uploadPolicy, outError))
     {
         return false;
     }
@@ -583,8 +663,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // tables of up to 4096 mesh bins, alongside transform/material descriptors.
     // These tables must coexist in one immutable shader-visible heap version.
     constexpr uint32_t kDescriptorsPerPage = 131072;
-    if (!m_descriptorRecycler.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        kDescriptorsPerPage, kFrameCount, outError))
+    if (!m_descriptorRecycler.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kDescriptorsPerPage,
+                                         kFrameCount, outError))
     {
         return false;
     }
@@ -602,13 +682,11 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 정확한 값은 peakFrameDescriptors가 알려 준다 — 추정하지 말고 재서 줄인다.
     constexpr uint32_t kRtvCapacity = 512;
     constexpr uint32_t kDsvCapacity = 256;
-    if (!m_rtvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-        kRtvCapacity, outError))
+    if (!m_rtvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kRtvCapacity, outError))
     {
         return false;
     }
-    if (!m_dsvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
-        kDsvCapacity, outError))
+    if (!m_dsvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, kDsvCapacity, outError))
     {
         return false;
     }
@@ -617,8 +695,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 지금은 포그 볼륨 셋뿐이라 작게 잡는다 — 그 셋이 자기 힙을 들고 있던
     // 것을 이리로 합쳤다(R3-2).
     constexpr uint32_t kClearViewCapacity = 64;
-    if (!m_clearViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-        kClearViewCapacity, outError))
+    if (!m_clearViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kClearViewCapacity,
+                                    outError))
     {
         return false;
     }
@@ -643,7 +721,10 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
 
     RefreshPersistentMemoryBudget();
-    if (!GetRHISubmissionThread().AcquireClient(this, outError)) return false;
+    if (!GetRHISubmissionThread().AcquireClient(this, outError))
+    {
+        return false;
+    }
     m_submissionClient = true;
     m_queueService = std::make_unique<DX12QueueService>(m_device.Get());
     return true;
@@ -654,8 +735,7 @@ RHIQueueCapabilities DX12DeviceResources::QueryQueueCapabilities() const
     return m_queueService ? m_queueService->QueryQueueCapabilities() : RHIQueueCapabilities{};
 }
 
-bool DX12DeviceResources::CreateQueue(RHIQueueKind kind,
-    std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+bool DX12DeviceResources::CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
 {
     if (!m_queueService)
     {
@@ -680,11 +760,9 @@ void DX12DeviceResources::Shutdown()
     if (m_device && m_submissionClient)
     {
         std::string lifecycleError;
-        const RHISubmissionOwnerStats owner =
-            GetRHISubmissionThread().GetOwnerStats(this);
-        const RHILifecycleCommand command = owner.faulted
-            ? RHILifecycleCommand::UnrecoverableDeviceError
-            : RHILifecycleCommand::BackendShutdown;
+        const RHISubmissionOwnerStats owner = GetRHISubmissionThread().GetOwnerStats(this);
+        const RHILifecycleCommand command =
+            owner.faulted ? RHILifecycleCommand::UnrecoverableDeviceError : RHILifecycleCommand::BackendShutdown;
         bool drained = DrainForLifecycle(command, lifecycleError);
         if (!drained && GetRHISubmissionThread().GetOwnerStats(this).faulted)
         {
@@ -692,10 +770,11 @@ void DX12DeviceResources::Shutdown()
         }
         if (!drained)
         {
-            OutputDebugStringA(("[DX12] Fatal: forced destruction without verified GPU idle or device loss: " +
-                lifecycleError + "\n").c_str());
+            OutputDebugStringA(
+                ("[DX12] Fatal: forced destruction without verified GPU idle or device loss: " + lifecycleError + "\n")
+                    .c_str());
             std::fprintf(stderr, "Fatal DX12 teardown invariant: GPU idle/device loss unproven: %s\n",
-                lifecycleError.c_str());
+                         lifecycleError.c_str());
             std::fflush(stderr);
             std::terminate();
         }
@@ -717,7 +796,10 @@ void DX12DeviceResources::Shutdown()
     m_currentRecordingId = 0;
 
     // 스왑체인은 백버퍼 참조를 먼저 놓아야 곱게 죽는다(GPU 완주는 위에서 확인).
-    for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
+    for (auto& backBuffer : m_backBuffers)
+    {
+        backBuffer.Reset();
+    }
     m_backBufferRtvHeap.Reset();
     m_swapChain.Reset();
     if (nullptr != m_frameLatencyWaitableObject)
@@ -750,7 +832,10 @@ void DX12DeviceResources::Shutdown()
     m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
     m_shaderArrayCapabilities = {};
-    for (auto& lists : m_retiredCommandLists) lists.clear();
+    for (auto& lists : m_retiredCommandLists)
+    {
+        lists.clear();
+    }
     m_immediateEncoder.reset();
 
     if (m_fenceEvent)
@@ -792,23 +877,28 @@ DX12DeviceResources::~DX12DeviceResources()
 {
     // 성공 초기화 뒤 호출부가 명시 Shutdown을 놓쳐도 process-wide RHI client와
     // owner 작업이 남지 않게 한다. 정상 명시 해체 뒤에는 flag가 false라 no-op이다.
-    if (m_submissionClient) Shutdown();
+    if (m_submissionClient)
+    {
+        Shutdown();
+    }
 }
 
-void DX12DeviceResources::RegisterUploadTransactionListener(
-    IRHIUploadTransactionListener* listener)
+void DX12DeviceResources::RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener)
 {
-    if (nullptr == listener) return;
-    if (m_uploadTransactionListeners.end() == std::find(
-        m_uploadTransactionListeners.begin(), m_uploadTransactionListeners.end(), listener))
+    if (nullptr == listener)
+    {
+        return;
+    }
+    if (m_uploadTransactionListeners.end() ==
+        std::find(m_uploadTransactionListeners.begin(), m_uploadTransactionListeners.end(), listener))
+    {
         m_uploadTransactionListeners.push_back(listener);
+    }
 }
 
-void DX12DeviceResources::UnregisterUploadTransactionListener(
-    IRHIUploadTransactionListener* listener)
+void DX12DeviceResources::UnregisterUploadTransactionListener(IRHIUploadTransactionListener* listener)
 {
-    const auto found = std::remove(m_uploadTransactionListeners.begin(),
-        m_uploadTransactionListeners.end(), listener);
+    const auto found = std::remove(m_uploadTransactionListeners.begin(), m_uploadTransactionListeners.end(), listener);
     m_uploadTransactionListeners.erase(found, m_uploadTransactionListeners.end());
 }
 
@@ -830,15 +920,21 @@ RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
     //   커맨드 리스트 포인터도 여기서 다시 받는다. `ID3D12GraphicsCommandList::
     //   Reset()` 은 같은 객체를 재사용하므로 포인터는 안 바뀌지만, 그 사실에
     //   기대지 않는다.
-    if (nullptr == m_immediateEncoder) ResetImmediateEncoder();
-    else m_immediateEncoder->ResetState(m_commandList.Get());
+    if (nullptr == m_immediateEncoder)
+    {
+        ResetImmediateEncoder();
+    }
+    else
+    {
+        m_immediateEncoder->ResetState(m_commandList.Get());
+    }
     return *m_immediateEncoder;
 }
 
 #if !CE_SHIPPING
 namespace
 {
-    std::atomic<uint32_t> g_testDeviceRemovalRequests{ 0 };
+    std::atomic<uint32_t> g_testDeviceRemovalRequests{0};
 }
 
 void DX12DeviceResources::RequestTestDeviceRemoval(TestDeviceRemovalTarget target)
@@ -856,20 +952,25 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     }
     GetRHISubmissionThread().CollectCompletedLifetimes(this);
 #if !CE_SHIPPING
-    const uint32_t removalBit = static_cast<uint32_t>(
-        HasSwapChain() ? TestDeviceRemovalTarget::Host : TestDeviceRemovalTarget::Scene);
+    const uint32_t removalBit =
+        static_cast<uint32_t>(HasSwapChain() ? TestDeviceRemovalTarget::Host : TestDeviceRemovalTarget::Scene);
     if (0 != (g_testDeviceRemovalRequests.fetch_and(~removalBit) & removalBit))
     {
         Microsoft::WRL::ComPtr<ID3D12Device5> device5;
         const bool removed = SUCCEEDED(m_device.As(&device5));
-        if (removed) device5->RemoveDevice();
-        std::printf("[test.device-removal] target=%s removed=%d\n",
-            HasSwapChain() ? "host" : "scene", removed ? 1 : 0);
+        if (removed)
+        {
+            device5->RemoveDevice();
+        }
+        std::printf("[test.device-removal] target=%s removed=%d\n", HasSwapChain() ? "host" : "scene", removed ? 1 : 0);
         std::fflush(stdout);
     }
 #endif
     RHISubmissionThread& submission = GetRHISubmissionThread();
-    if (submission.ConsumeFailure(this, outError)) return false;
+    if (submission.ConsumeFailure(this, outError))
+    {
+        return false;
+    }
     if (m_frameSubmissionTickets[m_frameIndex].IsValid() &&
         !submission.Wait(m_frameSubmissionTickets[m_frameIndex], outError))
     {
@@ -900,8 +1001,8 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
             }
             if (WAIT_OBJECT_0 != result)
             {
-                outError = "DX12 frame latency wait failed " +
-                    std::to_string(WAIT_FAILED == result ? GetLastError() : result);
+                outError =
+                    "DX12 frame latency wait failed " + std::to_string(WAIT_FAILED == result ? GetLastError() : result);
                 return false;
             }
             // 기록을 취소하면 실제 Present까지 이 허용 상태를 유지한다.
@@ -915,7 +1016,12 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     auto& allocator = m_allocators[m_frameIndex];
 
     HRESULT hr = allocator->Reset();
-    if (FAILED(hr)) { outError = "얼로케이터 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    if (FAILED(hr))
+    {
+        outError = "얼로케이터 Reset 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
 
     bool created = false;
     if (!m_commandList)
@@ -928,8 +1034,8 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
         }
         else
         {
-            hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-                allocator.Get(), nullptr, IID_PPV_ARGS(&m_commandList));
+            hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr,
+                                             IID_PPV_ARGS(&m_commandList));
             if (FAILED(hr))
             {
                 outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
@@ -942,7 +1048,12 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     if (!created)
     {
         hr = m_commandList->Reset(allocator.Get(), nullptr);
-        if (FAILED(hr)) { outError = "커맨드 리스트 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+        if (FAILED(hr))
+        {
+            outError = "커맨드 리스트 Reset 실패 " + HrToString(hr);
+            AppendDeviceRemovedReport(hr, outError);
+            return false;
+        }
     }
     ResetImmediateEncoder();
 
@@ -959,7 +1070,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     }
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    m_descriptorRecycler.Collect(RHICompletionPoint{completed});
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
     {
         return false;
@@ -995,24 +1106,30 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
         return false;
     }
     HRESULT hr = m_commandList->Close();
-    if (FAILED(hr)) { outError = "중간 제출 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    if (FAILED(hr))
+    {
+        outError = "중간 제출 Close 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
 
     const uint64_t fenceValue = m_nextFenceValue++;
     const uint64_t recordingId = m_currentRecordingId;
-    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue, preserveRecording]
-    {
-        if (!preserveRecording)
+    RHIRecordingAdmissionGuard admission(
+        [this, recordingId, fenceValue, preserveRecording]
         {
-            RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
-        }
-    });
+            if (!preserveRecording)
+            {
+                RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{fenceValue});
+            }
+        });
     if (!preserveRecording)
     {
-        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
-        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+        m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
+        m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         {
-            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+            listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
         }
         m_currentRecordingId = 0;
     }
@@ -1024,34 +1141,35 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
     m_immediateEncoder.reset();
 
     RHISubmissionTicket ticket;
-    if (!GetRHISubmissionThread().Enqueue(this, "DX12 immediate flush",
-        [owner = this, queue = m_queue, fence = m_fence, submittedList, fenceValue](
-            std::string& error)
-        {
-            if (!GetRHISubmissionThread().IsCurrentThread())
+    if (!GetRHISubmissionThread().Enqueue(
+            this, "DX12 immediate flush",
+            [owner = this, queue = m_queue, fence = m_fence, submittedList, fenceValue](std::string& error)
             {
-                error = "DX12 ExecuteCommandLists가 RHI thread 밖에서 호출됐다";
-                return false;
-            }
-            ID3D12CommandList* lists[] = { submittedList.Get() };
-            {
-                // Immediate work has no proven frame/query token association.
-                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
-                queue->ExecuteCommandLists(1, lists);
-            }
-            const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
-            if (FAILED(signalResult))
-            {
-                error = "DX12 중간 제출 Signal 실패 " + HrToString(signalResult);
-                if (DXGI_ERROR_DEVICE_REMOVED == signalResult ||
-                    DXGI_ERROR_DEVICE_RESET == signalResult ||
-                    DXGI_ERROR_DEVICE_HUNG == signalResult ||
-                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == signalResult)
-                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
-                return false;
-            }
-            return true;
-        }, ticket, outError))
+                if (!GetRHISubmissionThread().IsCurrentThread())
+                {
+                    error = "DX12 ExecuteCommandLists가 RHI thread 밖에서 호출됐다";
+                    return false;
+                }
+                ID3D12CommandList* lists[] = {submittedList.Get()};
+                {
+                    // Immediate work has no proven frame/query token association.
+                    const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                    queue->ExecuteCommandLists(1, lists);
+                }
+                const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
+                if (FAILED(signalResult))
+                {
+                    error = "DX12 중간 제출 Signal 실패 " + HrToString(signalResult);
+                    if (DXGI_ERROR_DEVICE_REMOVED == signalResult || DXGI_ERROR_DEVICE_RESET == signalResult ||
+                        DXGI_ERROR_DEVICE_HUNG == signalResult || DXGI_ERROR_DRIVER_INTERNAL_ERROR == signalResult)
+                    {
+                        GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                    }
+                    return false;
+                }
+                return true;
+            },
+            ticket, outError))
     {
         return false;
     }
@@ -1074,9 +1192,14 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
 
     // 같은 allocator는 되감지 않고 새 command-list 객체만 연다. 이전 객체는
     // RHI thread가 아직 Execute하지 않았을 수 있어 여기서 Reset할 수 없다.
-    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-        m_allocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
-    if (FAILED(hr)) { outError = "중간 제출 후 command list 생성 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[m_frameIndex].Get(), nullptr,
+                                     IID_PPV_ARGS(&m_commandList));
+    if (FAILED(hr))
+    {
+        outError = "중간 제출 후 command list 생성 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
     ResetImmediateEncoder();
 
     if (!preserveRecording)
@@ -1093,8 +1216,7 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
     return true;
 }
 
-bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue,
-    std::string& outError)
+bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue, std::string& outError)
 {
     if (!m_queueService)
     {
@@ -1104,8 +1226,7 @@ bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQue
     return m_queueService->GetPrimaryGraphicsQueue(m_queue.Get(), queue, outError);
 }
 
-bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics,
-    std::string& outError)
+bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError)
 {
     if (!m_queueService || !graphics || m_queueFrameActive || m_currentRecordingId == 0 ||
         graphics->GetIdentity().kind != RHIQueueKind::Graphics)
@@ -1120,10 +1241,12 @@ bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue
         const bool deviceLost = FAILED(m_device->GetDeviceRemovedReason());
         if (deviceLost)
         {
-            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, "Queue frame prefix failed after device removal.");
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(this,
+                                                                  "Queue frame prefix failed after device removal.");
         }
-        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError :
-            RHILifecycleCommand::OfflineReadbackCapture, drainError))
+        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError
+                                          : RHILifecycleCommand::OfflineReadbackCapture,
+                               drainError))
         {
             std::terminate();
         }
@@ -1177,8 +1300,9 @@ void DX12DeviceResources::DrainAbortedQueueFrame()
         {
             GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, "Queue frame aborted after device removal.");
         }
-        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError :
-            RHILifecycleCommand::OfflineReadbackCapture, error))
+        if (!DrainForLifecycle(deviceLost ? RHILifecycleCommand::UnrecoverableDeviceError
+                                          : RHILifecycleCommand::OfflineReadbackCapture,
+                               error))
         {
             std::terminate();
         }
@@ -1203,8 +1327,7 @@ bool DX12DeviceResources::ShutdownQueueService(std::string& outError)
     return !m_queueService || m_queueService->Shutdown(outError);
 }
 
-bool DX12DeviceResources::PrepareParallelSubmission(
-    RHICompletionPoint& outCompletion, std::string& outError)
+bool DX12DeviceResources::PrepareParallelSubmission(RHICompletionPoint& outCompletion, std::string& outError)
 {
     if (!m_queue || !m_fence || m_queueFrameActive)
     {
@@ -1213,13 +1336,13 @@ bool DX12DeviceResources::PrepareParallelSubmission(
     }
 
     const uint64_t fenceValue = m_nextFenceValue++;
-    outCompletion = RHICompletionPoint{ fenceValue };
-    m_uploadAllocator.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    m_descriptorRecycler.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    outCompletion = RHICompletionPoint{fenceValue};
+    m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
+    m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    {
+        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
+    }
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
@@ -1233,11 +1356,11 @@ bool DX12DeviceResources::PrepareParallelSubmission(
 
 void DX12DeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
 {
-    if (const auto batch = ticket.GetRecordedBatch())
+    if (const auto identity = ticket.GetIdentity(); identity.recordingId != 0)
     {
         for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         {
-            listener->OnUploadAccepted(batch->GetRecordingId(), completion);
+            listener->OnUploadAccepted(identity.recordingId, completion);
         }
     }
     m_frameFenceValues[m_frameIndex] = completion.value;
@@ -1260,9 +1383,8 @@ void DX12DeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHI
     }
 }
 
-bool DX12DeviceResources::SubmitCommandLists(
-    std::span<ID3D12CommandList* const> lists, RHICompletionPoint completion,
-    std::string& outError)
+bool DX12DeviceResources::SubmitCommandLists(std::span<ID3D12CommandList* const> lists, RHICompletionPoint completion,
+                                             std::string& outError)
 {
     if (!m_queue || !m_fence || !completion.IsValid())
     {
@@ -1277,7 +1399,7 @@ bool DX12DeviceResources::SubmitCommandLists(
     if (!lists.empty())
     {
         const ce::dx_capture::submission_scope capture(m_queue.Get(), static_cast<std::uint32_t>(lists.size()),
-            ce::dx_capture::current_submission_context());
+                                                       ce::dx_capture::current_submission_context());
         m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
     }
     HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
@@ -1294,8 +1416,7 @@ bool DX12DeviceResources::SubmitCommandLists(
     if (FAILED(hr))
     {
         outError = "DX12 외부 리스트 제출 Signal/장치 상태 실패 " + HrToString(hr);
-        if (DXGI_ERROR_DEVICE_REMOVED == hr || DXGI_ERROR_DEVICE_RESET == hr ||
-            DXGI_ERROR_DEVICE_HUNG == hr ||
+        if (DXGI_ERROR_DEVICE_REMOVED == hr || DXGI_ERROR_DEVICE_RESET == hr || DXGI_ERROR_DEVICE_HUNG == hr ||
             DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
         {
             GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
@@ -1310,11 +1431,16 @@ void DX12DeviceResources::AbortFrame()
     DrainAbortedQueueFrame();
     // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
-    if (m_commandList) m_commandList->Close();
+    if (m_commandList)
+    {
+        m_commandList->Close();
+    }
     m_uploadAllocator.AbortRecording(m_currentRecordingId);
     m_descriptorRecycler.AbortRecording(m_currentRecordingId);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
         listener->OnUploadAborted(m_currentRecordingId);
+    }
     m_currentRecordingId = 0;
 }
 
@@ -1332,20 +1458,23 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
         return false;
     }
     HRESULT hr = m_commandList->Close();
-    if (FAILED(hr)) { outError = "커맨드 리스트 Close 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+    if (FAILED(hr))
+    {
+        outError = "커맨드 리스트 Close 실패 " + HrToString(hr);
+        AppendDeviceRemovedReport(hr, outError);
+        return false;
+    }
 
     const uint64_t fenceValue = m_nextFenceValue++;
     const uint64_t recordingId = m_currentRecordingId;
-    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
-    {
-        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
-    });
-    m_uploadAllocator.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    m_descriptorRecycler.OnSubmitted(
-        m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    RHIRecordingAdmissionGuard admission(
+        [this, recordingId, fenceValue] { RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{fenceValue}); });
+    m_uploadAllocator.OnSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
+    m_descriptorRecycler.OnSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{ fenceValue });
+    {
+        listener->OnUploadSubmitted(m_currentRecordingId, RHICompletionPoint{fenceValue});
+    }
     m_currentRecordingId = 0;
 
     const uint32_t frameSlot = m_frameIndex;
@@ -1355,34 +1484,35 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     m_immediateEncoder.reset();
 
     RHISubmissionTicket ticket;
-    if (!GetRHISubmissionThread().Enqueue(this, "DX12 EndFrame",
-        [owner = this, queue = m_queue, fence = m_fence, submittedList, fenceValue](
-            std::string& error)
-        {
-            if (!GetRHISubmissionThread().IsCurrentThread())
+    if (!GetRHISubmissionThread().Enqueue(
+            this, "DX12 EndFrame",
+            [owner = this, queue = m_queue, fence = m_fence, submittedList, fenceValue](std::string& error)
             {
-                error = "DX12 EndFrame queue 호출이 RHI thread 밖에서 실행됐다";
-                return false;
-            }
-            ID3D12CommandList* lists[] = { submittedList.Get() };
-            {
-                // Immediate tails must not inherit another recorded batch's IDs.
-                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
-                queue->ExecuteCommandLists(1, lists);
-            }
-            const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
-            if (FAILED(signalResult))
-            {
-                error = "DX12 EndFrame Signal 실패 " + HrToString(signalResult);
-                if (DXGI_ERROR_DEVICE_REMOVED == signalResult ||
-                    DXGI_ERROR_DEVICE_RESET == signalResult ||
-                    DXGI_ERROR_DEVICE_HUNG == signalResult ||
-                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == signalResult)
-                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
-                return false;
-            }
-            return true;
-        }, ticket, outError))
+                if (!GetRHISubmissionThread().IsCurrentThread())
+                {
+                    error = "DX12 EndFrame queue 호출이 RHI thread 밖에서 실행됐다";
+                    return false;
+                }
+                ID3D12CommandList* lists[] = {submittedList.Get()};
+                {
+                    // Immediate tails must not inherit another recorded batch's IDs.
+                    const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                    queue->ExecuteCommandLists(1, lists);
+                }
+                const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
+                if (FAILED(signalResult))
+                {
+                    error = "DX12 EndFrame Signal 실패 " + HrToString(signalResult);
+                    if (DXGI_ERROR_DEVICE_REMOVED == signalResult || DXGI_ERROR_DEVICE_RESET == signalResult ||
+                        DXGI_ERROR_DEVICE_HUNG == signalResult || DXGI_ERROR_DRIVER_INTERNAL_ERROR == signalResult)
+                    {
+                        GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
+                    }
+                    return false;
+                }
+                return true;
+            },
+            ticket, outError))
     {
         return false;
     }
@@ -1443,15 +1573,13 @@ bool DX12DeviceResources::WaitForFenceValue(uint64_t value, std::string& outErro
 void DX12DeviceResources::WaitForGpu()
 {
     std::string error;
-    if (!DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error) &&
-        !error.empty())
+    if (!DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error) && !error.empty())
     {
         OutputDebugStringA(("[DX12] offline GPU drain 실패: " + error + "\n").c_str());
     }
 }
 
-bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
-    std::string& outError)
+bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command, std::string& outError)
 {
     const auto releaseCompletedTickets = [this]
     {
@@ -1461,7 +1589,10 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
         m_frameFenceValues = {};
         m_hostFenceValue = 0;
     };
-    if (!m_queue || !m_fence || !m_submissionClient) return true;
+    if (!m_queue || !m_fence || !m_submissionClient)
+    {
+        return true;
+    }
 
     RHISubmissionThread& submission = GetRHISubmissionThread();
     const RHISubmissionOwnerStats before = submission.GetOwnerStats(this);
@@ -1479,11 +1610,8 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
     //   축소를 섞어도 똑같이 세 번째에서 죽었다 — 크기 방향과 무관했다.
     //
     //   실측: 지름길을 끊자 확대·축소 일곱 번이 모두 살았다.
-    if (before.IsIdle() &&
-        ((before.lastCommand == command &&
-            (RHILifecycleCommand::BackendShutdown == command)) ||
-         (before.faulted && RHILifecycleCommand::UnrecoverableDeviceError ==
-            before.lastCommand)))
+    if (before.IsIdle() && ((before.lastCommand == command && (RHILifecycleCommand::BackendShutdown == command)) ||
+                            (before.faulted && RHILifecycleCommand::UnrecoverableDeviceError == before.lastCommand)))
     {
         m_lastLifecycleResult = {};
         m_lastLifecycleResult.command = before.lastCommand;
@@ -1504,45 +1632,46 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
     }
 
     const uint64_t fenceValue = m_nextFenceValue++;
-    if (!submission.ExecuteLifecycleDrain(this, command,
-        [owner = this, queue = m_queue, fence = m_fence, fenceValue](std::string& taskError)
-        {
-            if (!GetRHISubmissionThread().IsCurrentThread())
+    if (!submission.ExecuteLifecycleDrain(
+            this, command,
+            [owner = this, queue = m_queue, fence = m_fence, fenceValue](std::string& taskError)
             {
-                taskError = "DX12 lifecycle drain이 RHI thread 밖에서 호출됐다";
-                return false;
-            }
-            const HRESULT result = queue->Signal(fence.Get(), fenceValue);
-            if (FAILED(result))
-            {
-                taskError = "DX12 lifecycle Signal 실패 " + HrToString(result);
-                if (DXGI_ERROR_DEVICE_REMOVED == result ||
-                    DXGI_ERROR_DEVICE_RESET == result ||
-                    DXGI_ERROR_DEVICE_HUNG == result ||
-                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == result)
+                if (!GetRHISubmissionThread().IsCurrentThread())
                 {
-                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(
-                        owner, taskError);
+                    taskError = "DX12 lifecycle drain이 RHI thread 밖에서 호출됐다";
+                    return false;
                 }
-                return false;
-            }
-            return owner->WaitForFenceValue(fenceValue, taskError);
-        }, m_lastLifecycleResult, outError)) return false;
+                const HRESULT result = queue->Signal(fence.Get(), fenceValue);
+                if (FAILED(result))
+                {
+                    taskError = "DX12 lifecycle Signal 실패 " + HrToString(result);
+                    if (DXGI_ERROR_DEVICE_REMOVED == result || DXGI_ERROR_DEVICE_RESET == result ||
+                        DXGI_ERROR_DEVICE_HUNG == result || DXGI_ERROR_DRIVER_INTERNAL_ERROR == result)
+                    {
+                        GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, taskError);
+                    }
+                    return false;
+                }
+                return owner->WaitForFenceValue(fenceValue, taskError);
+            },
+            m_lastLifecycleResult, outError))
+    {
+        return false;
+    }
 
     const uint64_t completed = GetCompletedFenceValue();
-    m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    m_descriptorRecycler.Collect(RHICompletionPoint{completed});
     m_lastAdmittedFenceValue = fenceValue;
     releaseCompletedTickets();
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
         listener->OnUploadCompleted(completed);
+    }
     std::printf("[RHI lifecycle][DX12] %s generation %llu->%llu"
-        " pending task/batch/retirement %u/%u/%u\n",
-        ToString(command),
-        static_cast<unsigned long long>(m_lastLifecycleResult.previousGeneration),
-        static_cast<unsigned long long>(m_lastLifecycleResult.generation),
-        m_lastLifecycleResult.pendingTasks,
-        m_lastLifecycleResult.pendingBatches,
-        m_lastLifecycleResult.pendingRetirements);
+                " pending task/batch/retirement %u/%u/%u\n",
+                ToString(command), static_cast<unsigned long long>(m_lastLifecycleResult.previousGeneration),
+                static_cast<unsigned long long>(m_lastLifecycleResult.generation), m_lastLifecycleResult.pendingTasks,
+                m_lastLifecycleResult.pendingBatches, m_lastLifecycleResult.pendingRetirements);
     return m_lastLifecycleResult.IsClean();
 }
 
@@ -1556,7 +1685,10 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
 uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
 {
     outMessages.clear();
-    if (nullptr == m_infoQueue) return 0;
+    if (nullptr == m_infoQueue)
+    {
+        return 0;
+    }
 
     ID3D12InfoQueue* infoQueue = m_infoQueue.Get();
     const uint64_t count = infoQueue->GetNumStoredMessages();
@@ -1568,17 +1700,33 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
         infoQueue->GetMessage(i, nullptr, &length);
         std::string storage(length, '\0');
         auto* message = reinterpret_cast<D3D12_MESSAGE*>(storage.data());
-        if (FAILED(infoQueue->GetMessage(i, message, &length))) continue;
+        if (FAILED(infoQueue->GetMessage(i, message, &length)))
+        {
+            continue;
+        }
 
         const char* severity = "INFO";
         bool isProblem = false;
         switch (message->Severity)
         {
-        case D3D12_MESSAGE_SEVERITY_CORRUPTION: severity = "CORRUPTION"; isProblem = true; break;
-        case D3D12_MESSAGE_SEVERITY_ERROR:      severity = "ERROR";      isProblem = true; break;
-        case D3D12_MESSAGE_SEVERITY_WARNING:    severity = "WARNING";    isProblem = true; break;
-        case D3D12_MESSAGE_SEVERITY_INFO:       severity = "INFO";       break;
-        case D3D12_MESSAGE_SEVERITY_MESSAGE:    severity = "MESSAGE";    break;
+        case D3D12_MESSAGE_SEVERITY_CORRUPTION:
+            severity = "CORRUPTION";
+            isProblem = true;
+            break;
+        case D3D12_MESSAGE_SEVERITY_ERROR:
+            severity = "ERROR";
+            isProblem = true;
+            break;
+        case D3D12_MESSAGE_SEVERITY_WARNING:
+            severity = "WARNING";
+            isProblem = true;
+            break;
+        case D3D12_MESSAGE_SEVERITY_INFO:
+            severity = "INFO";
+            break;
+        case D3D12_MESSAGE_SEVERITY_MESSAGE:
+            severity = "MESSAGE";
+            break;
         }
 
         // ExecuteIndirect root arguments are legal, but GBV cannot precisely
@@ -1591,7 +1739,10 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
             severity = "VALIDATION-COVERAGE";
             std::fprintf(stderr, "DX12_GBV_COVERAGE_LIMIT id=%u %s\n", unsigned(message->ID), message->pDescription);
         }
-        if (isProblem) ++problems;
+        if (isProblem)
+        {
+            ++problems;
+        }
 
         outMessages += "[";
         outMessages += severity;
@@ -1645,7 +1796,7 @@ namespace
         }
         return std::string(description.substr(begin, end - begin));
     }
-}
+} // namespace
 
 void SetDiagnosticsDeviceResources(IRHIDeviceResources* resources)
 {
@@ -1660,27 +1811,35 @@ IRHIDeviceResources* GetDiagnosticsDeviceResources()
 RHIUploadMemoryBudget DX12DeviceResources::QueryUploadMemoryBudget() const
 {
     RHIUploadMemoryBudget result{};
-    if (!m_adapter || !m_device) return result;
+    if (!m_adapter || !m_device)
+    {
+        return result;
+    }
 
     Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
-    if (FAILED(m_adapter.As(&adapter3))) return result;
+    if (FAILED(m_adapter.As(&adapter3)))
+    {
+        return result;
+    }
 
     D3D12_FEATURE_DATA_ARCHITECTURE1 architecture{};
     architecture.NodeIndex = 0;
-    const bool uma = SUCCEEDED(m_device->CheckFeatureSupport(
-        D3D12_FEATURE_ARCHITECTURE1, &architecture, sizeof(architecture))) &&
+    const bool uma =
+        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE1, &architecture, sizeof(architecture))) &&
         architecture.UMA;
 
     DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
-    const DXGI_MEMORY_SEGMENT_GROUP preferred = uma
-        ? DXGI_MEMORY_SEGMENT_GROUP_LOCAL : DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL;
+    const DXGI_MEMORY_SEGMENT_GROUP preferred =
+        uma ? DXGI_MEMORY_SEGMENT_GROUP_LOCAL : DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL;
     HRESULT queried = adapter3->QueryVideoMemoryInfo(0, preferred, &memory);
     if (FAILED(queried) || 0 == memory.Budget)
     {
-        queried = adapter3->QueryVideoMemoryInfo(0,
-            DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory);
+        queried = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory);
     }
-    if (FAILED(queried) || 0 == memory.Budget) return result;
+    if (FAILED(queried) || 0 == memory.Budget)
+    {
+        return result;
+    }
 
     result.usageBytes = memory.CurrentUsage;
     result.budgetBytes = memory.Budget;
@@ -1691,10 +1850,8 @@ void DX12DeviceResources::RefreshUploadBudget()
 {
     const RHIUploadMemoryBudget budget = QueryUploadMemoryBudget();
     const uint64_t currentBytes = m_uploadAllocator.GetStats().segmentBytes;
-    m_uploadMemoryPressure = DX12UploadMemoryPressure(budget,
-        m_uploadMemoryPressure);
-    m_uploadAllocator.UpdateBudget(DX12UploadSoftBudget(budget, currentBytes),
-        m_uploadMemoryPressure);
+    m_uploadMemoryPressure = DX12UploadMemoryPressure(budget, m_uploadMemoryPressure);
+    m_uploadAllocator.UpdateBudget(DX12UploadSoftBudget(budget, currentBytes), m_uploadMemoryPressure);
 }
 
 void DX12DeviceResources::RefreshPersistentMemoryBudget()
@@ -1706,16 +1863,15 @@ void DX12DeviceResources::RefreshPersistentMemoryBudget()
         if (SUCCEEDED(m_adapter.As(&adapter3)))
         {
             DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
-            if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0,
-                DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory)) && 0 != memory.Budget)
+            if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory)) &&
+                0 != memory.Budget)
             {
                 budget.usageBytes = memory.CurrentUsage;
                 budget.budgetBytes = memory.Budget;
             }
         }
     }
-    m_persistentMemoryBudget.UpdateBudget(
-        kRHIDeviceLocalMemoryBudgetDomain, budget);
+    m_persistentMemoryBudget.UpdateBudget(kRHIDeviceLocalMemoryBudgetDomain, budget);
 }
 
 RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
@@ -1768,7 +1924,7 @@ RHIGpuObjectCensus DX12DeviceResources::CaptureLiveObjectCensus(bool allowDevice
     Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
     if (FAILED(m_device.As(&debugDevice)) || FAILED(m_device.As(&infoQueue)))
     {
-        return census;  // 디버그 레이어가 꺼져 있다 — VRAM만 유효
+        return census; // 디버그 레이어가 꺼져 있다 — VRAM만 유효
     }
 
     // ReportLiveDeviceObjects는 살아있는 객체 하나당 메시지 한 건을 InfoQueue에
@@ -1803,8 +1959,7 @@ RHIGpuObjectCensus DX12DeviceResources::CaptureLiveObjectCensus(bool allowDevice
             --descriptionLength;
         }
 
-        const std::string type = ExtractLiveObjectType(
-            std::string_view(message->pDescription, descriptionLength));
+        const std::string type = ExtractLiveObjectType(std::string_view(message->pDescription, descriptionLength));
         if (type.empty())
         {
             continue;
@@ -1846,22 +2001,28 @@ void DX12DeviceResources::ReportLiveObjectsToDebugOutput()
 #endif
 }
 
-void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult,
-    std::string& outError) const
+void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const
 {
-    if (!m_device) return;
+    if (!m_device)
+    {
+        return;
+    }
 
     HRESULT reason = m_device->GetDeviceRemovedReason();
     const bool operationIndicatesRemoval =
-        DXGI_ERROR_DEVICE_REMOVED == operationResult ||
-        DXGI_ERROR_DEVICE_RESET == operationResult ||
-        DXGI_ERROR_DEVICE_HUNG == operationResult ||
-        DXGI_ERROR_DRIVER_INTERNAL_ERROR == operationResult;
+        DXGI_ERROR_DEVICE_REMOVED == operationResult || DXGI_ERROR_DEVICE_RESET == operationResult ||
+        DXGI_ERROR_DEVICE_HUNG == operationResult || DXGI_ERROR_DRIVER_INTERNAL_ERROR == operationResult;
 
     // GetDeviceRemovedReason은 살아 있는 장치에서 S_OK다. 일반 API 실패마다 DRED
     // 빈 보고서를 붙이면 최초 오류가 묻히므로 장치 제거일 때만 확장한다.
-    if (SUCCEEDED(reason) && !operationIndicatesRemoval) return;
-    if (SUCCEEDED(reason)) reason = operationResult;
+    if (SUCCEEDED(reason) && !operationIndicatesRemoval)
+    {
+        return;
+    }
+    if (SUCCEEDED(reason))
+    {
+        reason = operationResult;
+    }
 
     std::ostringstream report;
     report << "\n[DRED] deviceRemovedReason=" << HrToString(reason);
@@ -1879,15 +2040,12 @@ void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult,
     {
         uint32_t nodeCount = 0;
         for (const D3D12_AUTO_BREADCRUMB_NODE1* node = breadcrumbs.pHeadAutoBreadcrumbNode;
-            nullptr != node && nodeCount < 64; node = node->pNext, ++nodeCount)
+             nullptr != node && nodeCount < 64; node = node->pNext, ++nodeCount)
         {
-            const UINT completed = (nullptr != node->pLastBreadcrumbValue)
-                ? *node->pLastBreadcrumbValue : 0;
-            report << "\n[DRED] queue="
-                << DebugName(node->pCommandQueueDebugNameA, node->pCommandQueueDebugNameW)
-                << " commandList="
-                << DebugName(node->pCommandListDebugNameA, node->pCommandListDebugNameW)
-                << " completed=" << completed << '/' << node->BreadcrumbCount;
+            const UINT completed = (nullptr != node->pLastBreadcrumbValue) ? *node->pLastBreadcrumbValue : 0;
+            report << "\n[DRED] queue=" << DebugName(node->pCommandQueueDebugNameA, node->pCommandQueueDebugNameW)
+                   << " commandList=" << DebugName(node->pCommandListDebugNameA, node->pCommandListDebugNameW)
+                   << " completed=" << completed << '/' << node->BreadcrumbCount;
 
             if (nullptr != node->pCommandHistory && completed < node->BreadcrumbCount)
             {
@@ -1911,27 +2069,30 @@ void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult,
                 report << " context=" << WideToUtf8(lastContext->pContextString);
             }
         }
-        if (nodeCount == 64) report << "\n[DRED] breadcrumb list truncated at 64 nodes";
+        if (nodeCount == 64)
+        {
+            report << "\n[DRED] breadcrumb list truncated at 64 nodes";
+        }
     }
 
     D3D12_DRED_PAGE_FAULT_OUTPUT1 pageFault{};
-    if (SUCCEEDED(dred->GetPageFaultAllocationOutput1(&pageFault)) &&
-        0 != pageFault.PageFaultVA)
+    if (SUCCEEDED(dred->GetPageFaultAllocationOutput1(&pageFault)) && 0 != pageFault.PageFaultVA)
     {
         report << "\n[DRED] pageFaultVA=0x" << std::hex << pageFault.PageFaultVA << std::dec;
 
-        const auto appendAllocations = [&report](const char* label,
-            const D3D12_DRED_ALLOCATION_NODE1* head)
+        const auto appendAllocations = [&report](const char* label, const D3D12_DRED_ALLOCATION_NODE1* head)
         {
             uint32_t count = 0;
-            for (const D3D12_DRED_ALLOCATION_NODE1* node = head;
-                nullptr != node && count < 32; node = node->pNext, ++count)
+            for (const D3D12_DRED_ALLOCATION_NODE1* node = head; nullptr != node && count < 32;
+                 node = node->pNext, ++count)
             {
-                report << "\n[DRED] " << label << " name="
-                    << DebugName(node->ObjectNameA, node->ObjectNameW)
-                    << " type=" << static_cast<unsigned>(node->AllocationType);
+                report << "\n[DRED] " << label << " name=" << DebugName(node->ObjectNameA, node->ObjectNameW)
+                       << " type=" << static_cast<unsigned>(node->AllocationType);
             }
-            if (count == 32) report << "\n[DRED] " << label << " list truncated at 32 nodes";
+            if (count == 32)
+            {
+                report << "\n[DRED] " << label << " list truncated at 32 nodes";
+            }
         };
 
         appendAllocations("existing", pageFault.pHeadExistingAllocationNode);
@@ -1941,8 +2102,7 @@ void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult,
     outError += report.str();
 }
 
-bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
-    std::string& outError)
+bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height, std::string& outError)
 {
     // 인터페이스(IRHIDeviceResources)가 플랫폼 핸들을 void*로 받는다 —
     // 그 헤더가 Windows.h를 끌어오지 않기 위해서다. Win32에서는 HWND다.
@@ -1977,15 +2137,15 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     ComPtr<IDXGIFactory5> tearingFactory;
     BOOL allowTearing = FALSE;
     const bool supportsTearing = SUCCEEDED(m_factory.As(&tearingFactory)) &&
-        SUCCEEDED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
-            &allowTearing, sizeof(allowTearing))) && allowTearing;
-    m_swapChainFlags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT |
-        (supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
+                                 SUCCEEDED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+                                                                               &allowTearing, sizeof(allowTearing))) &&
+                                 allowTearing;
+    m_swapChainFlags =
+        DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | (supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
     desc.Flags = m_swapChainFlags;
 
     ComPtr<IDXGISwapChain1> swapChain1;
-    HRESULT hr = m_factory->CreateSwapChainForHwnd(m_queue.Get(), hwnd, &desc,
-        nullptr, nullptr, &swapChain1);
+    HRESULT hr = m_factory->CreateSwapChainForHwnd(m_queue.Get(), hwnd, &desc, nullptr, nullptr, &swapChain1);
     if (FAILED(hr))
     {
         outError = "CreateSwapChainForHwnd 실패 " + HrToString(hr);
@@ -2017,14 +2177,12 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
     heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     heapDesc.NumDescriptors = kFrameCount;
-    if (FAILED(m_device->CreateDescriptorHeap(&heapDesc,
-        IID_PPV_ARGS(&m_backBufferRtvHeap))))
+    if (FAILED(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_backBufferRtvHeap))))
     {
         outError = "백버퍼 RTV 힙 생성 실패";
         return false;
     }
-    m_backBufferRtvSize = m_device->GetDescriptorHandleIncrementSize(
-        D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+    m_backBufferRtvSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     for (uint32_t i = 0; i < kFrameCount; ++i)
     {
@@ -2033,14 +2191,12 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
             outError = "백버퍼 " + std::to_string(i) + " 획득 실패";
             return false;
         }
-        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr,
-            GetBackBufferRtv(i));
+        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
     }
     return true;
 }
 
-bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
-    std::string& outError)
+bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError)
 {
     if (!m_swapChain)
     {
@@ -2051,11 +2207,16 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
     // ResizeBuffers는 백버퍼 참조가 전부 풀린 상태를 요구한다 — GPU 완주
     // 대기 후 RTV만 남기고 놓는다.
     if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError))
+    {
         return false;
-    for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
+    }
+    for (auto& backBuffer : m_backBuffers)
+    {
+        backBuffer.Reset();
+    }
 
-    const HRESULT hr = m_swapChain->ResizeBuffers(kFrameCount, width, height,
-        DXGI_FORMAT_R8G8B8A8_UNORM, m_swapChainFlags);
+    const HRESULT hr =
+        m_swapChain->ResizeBuffers(kFrameCount, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, m_swapChainFlags);
     if (FAILED(hr))
     {
         outError = "ResizeBuffers 실패 " + HrToString(hr);
@@ -2069,8 +2230,7 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
             outError = "리사이즈 후 백버퍼 획득 실패";
             return false;
         }
-        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr,
-            GetBackBufferRtv(i));
+        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
     }
     return true;
 }
@@ -2108,8 +2268,8 @@ bool DX12DeviceResources::Present(std::string& outError, HRESULT* nativeResult)
     ce::profile_scope present{ce::marker<"DXGIPresent">()};
     BOOL fullscreen = FALSE;
     const bool windowed = SUCCEEDED(m_swapChain->GetFullscreenState(&fullscreen, nullptr)) && !fullscreen;
-    const UINT flags = windowed && (m_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
-        ? DXGI_PRESENT_ALLOW_TEARING : 0;
+    const UINT flags =
+        windowed && (m_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) ? DXGI_PRESENT_ALLOW_TEARING : 0;
     const HRESULT result = m_swapChain->Present(0, flags);
     if (nativeResult)
     {
@@ -2138,8 +2298,7 @@ uint32_t DX12DeviceResources::GetBackBufferIndex() const
 
 D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::GetBackBufferRtv(uint32_t index) const
 {
-    D3D12_CPU_DESCRIPTOR_HANDLE handle =
-        m_backBufferRtvHeap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = m_backBufferRtvHeap->GetCPUDescriptorHandleForHeapStart();
     handle.ptr += static_cast<SIZE_T>(index) * m_backBufferRtvSize;
     return handle;
 }
@@ -2160,50 +2319,74 @@ namespace
     // ★ 깊이 → 셰이더 읽기 포맷 대응표를 DX12Format.h 로 옮겼다(V1).
     //   표가 둘이면 언젠가 갈리고, Vulkan 백엔드에서 이 함수가 항등에 가까워지는 것이
     //   그 자리의 뜻이다.
-    DXGI_FORMAT DepthToColorFormat(DXGI_FORMAT format) { return DepthToShaderReadDXGI(format); }
+    DXGI_FORMAT DepthToColorFormat(DXGI_FORMAT format)
+    {
+        return DepthToShaderReadDXGI(format);
+    }
 
     /// UNKNOWN이면 리소스가 아는 포맷을 쓴다. SRV 설명을 명시하는 경로에서는
     /// UNKNOWN이 그대로 유효한 값이 아니라서, 여기서 반드시 채워야 한다.
     DXGI_FORMAT ResolveSrvFormat(const RHIBindingDesc& desc, ID3D12Resource* resource)
     {
         // 널 디스크립터는 물어볼 리소스가 없다 — 적어 준 포맷을 그대로 쓴다.
-        if (nullptr == resource) return ToDXGI(desc.format);
+        if (nullptr == resource)
+        {
+            return ToDXGI(desc.format);
+        }
 
         const DXGI_FORMAT resourceFormat = resource->GetDesc().Format;
 
-        if (desc.depthAsColor)  return DepthToColorFormat(resourceFormat);
-        if (RHIFormat::Unknown == desc.format) return resourceFormat;
+        if (desc.depthAsColor)
+        {
+            return DepthToColorFormat(resourceFormat);
+        }
+        if (RHIFormat::Unknown == desc.format)
+        {
+            return resourceFormat;
+        }
         return ToDXGI(desc.format);
     }
-}
+} // namespace
 D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
 {
     switch (state)
     {
-    case RHIResourceState::RenderTarget:    return D3D12_RESOURCE_STATE_RENDER_TARGET;
-    case RHIResourceState::DepthWrite:      return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    case RHIResourceState::DepthRead:       return D3D12_RESOURCE_STATE_DEPTH_READ;
-    case RHIResourceState::ShaderResource:  return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
+    case RHIResourceState::RenderTarget:
+        return D3D12_RESOURCE_STATE_RENDER_TARGET;
+    case RHIResourceState::DepthWrite:
+        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    case RHIResourceState::DepthRead:
+        return D3D12_RESOURCE_STATE_DEPTH_READ;
+    case RHIResourceState::ShaderResource:
+        return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
     case RHIResourceState::PixelShaderResource:
         return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     case RHIResourceState::DepthReadShaderResource:
         return D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
-    case RHIResourceState::UnorderedAccess: return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    case RHIResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
-    case RHIResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;
-    case RHIResourceState::IndexBuffer:     return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    case RHIResourceState::UnorderedAccess:
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    case RHIResourceState::CopySource:
+        return D3D12_RESOURCE_STATE_COPY_SOURCE;
+    case RHIResourceState::CopyDest:
+        return D3D12_RESOURCE_STATE_COPY_DEST;
+    case RHIResourceState::IndexBuffer:
+        return D3D12_RESOURCE_STATE_INDEX_BUFFER;
     case RHIResourceState::IndirectArgument:
         return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
     case RHIResourceState::VertexAndShaderResource:
         return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
     case RHIResourceState::Common:
-    default:                                return D3D12_RESOURCE_STATE_COMMON;
+    default:
+        return D3D12_RESOURCE_STATE_COMMON;
     }
 }
 
 void DX12DeviceResources::TransitionResources(std::span<const RHITransition> transitions)
 {
-    if (nullptr == m_commandList.Get() || transitions.empty()) return;
+    if (nullptr == m_commandList.Get() || transitions.empty())
+    {
+        return;
+    }
 
     // 한 번에 모아 넣는다 — 배리어를 흩뿌리면 GPU가 그때마다 파이프라인을 비운다.
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
@@ -2212,11 +2395,17 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
     for (const RHITransition& transition : transitions)
     {
         ID3D12Resource* const resource = Resolve(transition.texture);
-        if (nullptr == resource) continue;
+        if (nullptr == resource)
+        {
+            continue;
+        }
 
         const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
         const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
-        if (before == after) continue;   // 같은 상태로의 전이는 검증 레이어가 거절한다
+        if (before == after)
+        {
+            continue; // 같은 상태로의 전이는 검증 레이어가 거절한다
+        }
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -2227,25 +2416,36 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
         barriers.push_back(barrier);
     }
 
-    if (barriers.empty()) return;
+    if (barriers.empty())
+    {
+        return;
+    }
     m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
 }
 
-void DX12DeviceResources::TransitionBuffers(
-    std::span<const RHIBufferTransition> transitions)
+void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition> transitions)
 {
-    if (nullptr == m_commandList.Get() || transitions.empty()) return;
+    if (nullptr == m_commandList.Get() || transitions.empty())
+    {
+        return;
+    }
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
     barriers.reserve(transitions.size());
     for (const RHIBufferTransition& transition : transitions)
     {
         ID3D12Resource* const resource = Resolve(transition.buffer);
-        if (nullptr == resource) continue;
+        if (nullptr == resource)
+        {
+            continue;
+        }
 
         const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
         const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
-        if (before == after) continue;
+        if (before == after)
+        {
+            continue;
+        }
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -2257,14 +2457,19 @@ void DX12DeviceResources::TransitionBuffers(
     }
 
     if (!barriers.empty())
+    {
         m_commandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    }
 }
 
 ID3D12Resource* DX12DeviceResources::ResolveBinding(const RHIBindingDesc& desc) const
 {
     // ★ 어느 칸을 보는지는 dim이 정한다(V2-b). 버퍼 UAV만 bufferResource를
     //   쓰고 나머지는 텍스처 칸이다 — 두 칸을 나눠 둔 이유가 이 분기다.
-    if (RHIBindingDesc::Dim::Buffer == desc.dim) return Resolve(desc.bufferResource);
+    if (RHIBindingDesc::Dim::Buffer == desc.dim)
+    {
+        return Resolve(desc.bufferResource);
+    }
     return Resolve(desc.resource);
 }
 
@@ -2284,8 +2489,7 @@ void DX12DeviceResources::InitializeNullTextureDescriptors()
     }
 
     const auto source = heap->GetCPUDescriptorHandleForHeapStart();
-    const uint32_t increment = m_device->GetDescriptorHandleIncrementSize(
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    const uint32_t increment = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     D3D12_SHADER_RESOURCE_VIEW_DESC description{};
     description.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     description.Format = ToDXGI(RHIFormat::RGBA8Unorm);
@@ -2300,8 +2504,7 @@ void DX12DeviceResources::InitializeNullTextureDescriptors()
     {
         auto destination = source;
         destination.ptr += static_cast<SIZE_T>(initialized) * increment;
-        m_device->CopyDescriptorsSimple(initialized, destination, source,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        m_device->CopyDescriptorsSimple(initialized, destination, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     m_nullTextureDescriptorHeap = std::move(heap);
@@ -2311,7 +2514,10 @@ void DX12DeviceResources::InitializeNullTextureDescriptors()
 
 RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDesc> descs)
 {
-    if (descs.empty()) return {};
+    if (descs.empty())
+    {
+        return {};
+    }
 
     // 리소스가 하나라도 비면 테이블을 만들지 않는다.
     //
@@ -2323,33 +2529,40 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     //   디스크립터가 깔린다(안 거는 것과 다르다).
     for (const RHIBindingDesc& desc : descs)
     {
-        if (nullptr == ResolveBinding(desc) && !desc.allowNull) return {};
+        if (nullptr == ResolveBinding(desc) && !desc.allowNull)
+        {
+            return {};
+        }
         if (desc.kind == RHIBindingDesc::Kind::ShaderResource && desc.dim == RHIBindingDesc::Dim::Buffer)
         {
             const auto stride = desc.structureByteStride ? desc.structureByteStride : 4u;
             auto* buffer = ResolveBinding(desc);
-            if (!desc.numElements || (desc.structureByteStride &&
-                (desc.structureByteStride % 4 || desc.structureByteStride > 2048)) ||
+            if (!desc.numElements ||
+                (desc.structureByteStride && (desc.structureByteStride % 4 || desc.structureByteStride > 2048)) ||
                 (buffer && (buffer->GetDesc().Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
-                    (uint64_t(desc.firstElement) + desc.numElements) * stride > buffer->GetDesc().Width))) return {};
+                            (uint64_t(desc.firstElement) + desc.numElements) * stride > buffer->GetDesc().Width)))
+            {
+                return {};
+            }
         }
     }
 
     const auto range = m_descriptorRecycler.Allocate(static_cast<uint32_t>(descs.size()));
-    if (!range.IsValid()) return {};
+    if (!range.IsValid())
+    {
+        return {};
+    }
 
     ID3D12Device* device = m_device.Get();
     const auto isCanonicalNull = [](const RHIBindingDesc& desc)
     {
         // null padding의 정확한 기본 설명만 합친다. 자원이 해제된 경우에도
         // 0이 아닌 핸들이나 다른 차원/포맷/밉은 기존 native 뷰 생성 경로를 따른다.
-        return desc.kind == RHIBindingDesc::Kind::ShaderResource &&
-            desc.dim == RHIBindingDesc::Dim::Texture2D &&
-            desc.resource == RHITextureHandle{} && desc.bufferResource == RHIBufferHandle{} &&
-            desc.format == RHIFormat::RGBA8Unorm && !desc.depthAsColor && desc.allowNull &&
-            desc.mostDetailedMip == 0 && desc.mipLevels == 1 && desc.firstSlice == 0 &&
-            desc.sliceCount == 1 && desc.firstElement == 0 && desc.numElements == 0 &&
-            desc.structureByteStride == 0;
+        return desc.kind == RHIBindingDesc::Kind::ShaderResource && desc.dim == RHIBindingDesc::Dim::Texture2D &&
+               desc.resource == RHITextureHandle{} && desc.bufferResource == RHIBufferHandle{} &&
+               desc.format == RHIFormat::RGBA8Unorm && !desc.depthAsColor && desc.allowNull &&
+               desc.mostDetailedMip == 0 && desc.mipLevels == 1 && desc.firstSlice == 0 && desc.sliceCount == 1 &&
+               desc.firstElement == 0 && desc.numElements == 0 && desc.structureByteStride == 0;
     };
     for (uint32_t i = 0; i < descs.size(); ++i)
     {
@@ -2359,14 +2572,14 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
         {
             uint32_t count = 1;
             while (count < m_nullTextureDescriptorCount && count < descs.size() - i &&
-                isCanonicalNull(descs[static_cast<size_t>(i) + count]))
+                   isCanonicalNull(descs[static_cast<size_t>(i) + count]))
             {
                 ++count;
             }
             // 원본은 worker 전체가 공유하는 불변 CPU 힙이고, 목적지는 이 호출이
             // 새로 예약한 범위다. 제출된 shader-visible page를 원본으로 읽지 않는다.
             device->CopyDescriptorsSimple(count, handle, m_nullTextureDescriptor,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                                          D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             i += count - 1;
             continue;
         }
@@ -2450,31 +2663,133 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     return table;
 }
 
-void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList,
-    bool withSamplers)
+bool DX12DeviceResources::CaptureRecordingResources(std::shared_ptr<const DX12RecordingResources>& result,
+                                                    std::string& outError,
+                                                    const DX12RecordingResources* retiredResources)
 {
-    if (nullptr == commandList) return;
+    if (result || !m_device || !m_currentRecordingId)
+    {
+        outError = "Recording resource capture requires an active recording and empty output.";
+        return false;
+    }
+    auto recording = std::make_shared<DX12RecordingResources>();
+    recording->uploadRecordingId = m_currentRecordingId;
+    recording->descriptors = m_descriptorRecycler.PinRecording(m_descriptorRecycler.GetCurrentVersionToken());
+    recording->uploads = m_uploadAllocator.PinRecording(m_currentRecordingId);
+    recording->samplers = m_samplerHeap.GetHeap();
+    if (!recording->descriptors.IsValid() || !recording->uploads ||
+        !m_rtvViewHeap.Capture(*m_device.Get(), recording->renderTargets, outError,
+                               retiredResources ? retiredResources->renderTargets.heap.Get() : nullptr) ||
+        !m_dsvViewHeap.Capture(*m_device.Get(), recording->depthTargets, outError,
+                               retiredResources ? retiredResources->depthTargets.heap.Get() : nullptr))
+    {
+        if (outError.empty())
+        {
+            outError = "Recording upload or descriptor lease could not be acquired.";
+        }
+        return false;
+    }
+    recording->descriptorCount = m_descriptorRecycler.GetRecordingUsed();
+    recording->descriptorIncrement = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    const auto remaining = m_descriptorRecycler.GetDescriptorsPerPage() - recording->descriptorCount;
+    recording->clearCapacity = (std::min)(remaining, 512u);
+    if (recording->clearCapacity)
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC desc{};
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        desc.NumDescriptors = recording->clearCapacity;
+        if (retiredResources && retiredResources->clearDescriptors &&
+            retiredResources->clearDescriptors->GetDesc().NumDescriptors >= recording->clearCapacity)
+        {
+            recording->clearDescriptors = retiredResources->clearDescriptors;
+        }
+        else
+        {
+            const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&recording->clearDescriptors));
+            if (FAILED(hr))
+            {
+                outError = "Frozen clear descriptor heap creation failed " + HrToString(hr);
+                return false;
+            }
+        }
+    }
+    result = std::move(recording);
+    return true;
+}
+
+void DX12DeviceResources::ClearRecordedUnorderedAccess(ID3D12GraphicsCommandList& commandList,
+                                                       const DX12RecordingResources& recording,
+                                                       const RHIBindingDesc& desc, const float rgba[4])
+{
+    auto* resource = ResolveBinding(desc);
+    if (!resource || !rgba || recording.clearUsed >= recording.clearCapacity)
+    {
+        throw std::runtime_error("Frozen UAV clear has no resource, color, or descriptor capacity.");
+    }
+    const auto index = recording.clearUsed++;
+    auto cpu = recording.clearDescriptors->GetCPUDescriptorHandleForHeapStart();
+    cpu.ptr += static_cast<SIZE_T>(index) * recording.descriptorIncrement;
+    auto shaderCpu = recording.descriptors.heap->GetCPUDescriptorHandleForHeapStart();
+    auto shaderGpu = recording.descriptors.heap->GetGPUDescriptorHandleForHeapStart();
+    const auto offset = static_cast<uint64_t>(recording.descriptorCount + index) * recording.descriptorIncrement;
+    shaderCpu.ptr += static_cast<SIZE_T>(offset);
+    shaderGpu.ptr += offset;
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav{};
+    uav.Format = ToDXGI(desc.format);
+    switch (desc.dim)
+    {
+    case RHIBindingDesc::Dim::Texture3D:
+        uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+        uav.Texture3D.WSize = desc.sliceCount;
+        break;
+    case RHIBindingDesc::Dim::Buffer:
+        uav.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uav.Buffer.FirstElement = desc.firstElement;
+        uav.Buffer.NumElements = desc.numElements;
+        uav.Buffer.StructureByteStride = desc.structureByteStride;
+        break;
+    default:
+        uav.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+        uav.Texture2D.MipSlice = desc.mostDetailedMip;
+        break;
+    }
+
+    m_device->CreateUnorderedAccessView(resource, nullptr, &uav, cpu);
+    m_device->CopyDescriptorsSimple(1, shaderCpu, cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    commandList.ClearUnorderedAccessViewFloat(shaderGpu, cpu, resource, rgba, 0, nullptr);
+}
+
+void DX12DeviceResources::BindDescriptorHeaps(ID3D12GraphicsCommandList* commandList, bool withSamplers)
+{
+    if (nullptr == commandList)
+    {
+        return;
+    }
 
     if (withSamplers)
     {
-        ID3D12DescriptorHeap* heaps[] = {
-            m_descriptorRecycler.GetHeap(), m_samplerHeap.GetHeap() };
+        ID3D12DescriptorHeap* heaps[] = {m_descriptorRecycler.GetHeap(), m_samplerHeap.GetHeap()};
         commandList->SetDescriptorHeaps(2, heaps);
         return;
     }
 
-    ID3D12DescriptorHeap* heaps[] = { m_descriptorRecycler.GetHeap() };
+    ID3D12DescriptorHeap* heaps[] = {m_descriptorRecycler.GetHeap()};
     commandList->SetDescriptorHeaps(1, heaps);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
-    const RHIBindingDesc& desc)
+D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(const RHIBindingDesc& desc)
 {
     ID3D12Resource* const resource = ResolveBinding(desc);
-    if (nullptr == m_device || nullptr == resource) return {};
+    if (nullptr == m_device || nullptr == resource)
+    {
+        return {};
+    }
 
     const uint32_t index = m_clearViewHeap.Allocate(1);
-    if (DX12TargetViewHeap::kInvalidIndex == index) return {};
+    if (DX12TargetViewHeap::kInvalidIndex == index)
+    {
+        return {};
+    }
 
     const D3D12_CPU_DESCRIPTOR_HANDLE handle = m_clearViewHeap.CpuAt(index);
 
@@ -2504,34 +2819,47 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(
 
 // ── 렌더 타깃 (R2b) ──
 
-RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
-    std::span<const RHITextureHandle> colors, const RHIDepthTargetDesc* depth)
+RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(std::span<const RHITextureHandle> colors,
+                                                                const RHIDepthTargetDesc* depth)
 {
-    if (colors.size() > 8) return {};
+    if (colors.size() > 8)
+    {
+        return {};
+    }
     RHIColorTargetDesc descriptions[8]{};
     for (uint32_t i = 0; i < colors.size(); ++i)
+    {
         descriptions[i] = RHIColorTargetDesc::Texture(colors[i]);
-    return CreateRenderTargets(
-        std::span<const RHIColorTargetDesc>{ descriptions, colors.size() }, depth);
+    }
+    return CreateRenderTargets(std::span<const RHIColorTargetDesc>{descriptions, colors.size()}, depth);
 }
 
-RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
-    std::span<const RHIColorTargetDesc> colors, const RHIDepthTargetDesc* depth)
+RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(std::span<const RHIColorTargetDesc> colors,
+                                                                const RHIDepthTargetDesc* depth)
 {
     const bool wantsDepth = (nullptr != depth && depth->resource.IsValid());
-    if (colors.empty() && !wantsDepth) return {};
+    if (colors.empty() && !wantsDepth)
+    {
+        return {};
+    }
 
     // CreateBindings와 같은 계약 — 하나라도 널이면 통째로 거절한다.
     // 부분적으로 만들어 주면 호출부가 '몇 개가 만들어졌는가'를 다시 세야 하고,
     // 그 셈이 틀리면 OMSetRenderTargets가 초기화되지 않은 칸을 묶는다.
     for (const RHIColorTargetDesc& color : colors)
     {
-        if (nullptr == Resolve(color.resource)) return {};
+        if (nullptr == Resolve(color.resource))
+        {
+            return {};
+        }
     }
 
     // 깊이는 포맷을 반드시 받는다. UNKNOWN으로 DSV를 만들면 리소스가
     // TYPELESS일 때 조용히 실패하고, 화면에는 '깊이가 안 걸린다'로만 나온다.
-    if (wantsDepth && RHIFormat::Unknown == depth->format) return {};
+    if (wantsDepth && RHIFormat::Unknown == depth->format)
+    {
+        return {};
+    }
 
     RHIRenderTargetBinding binding{};
     // 5b. 두 인덱스를 모아 마지막에 한 값으로 접는다 — 계약이 인덱스를
@@ -2543,24 +2871,24 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
     if (!colors.empty())
     {
         const uint32_t index = m_rtvViewHeap.Allocate(static_cast<uint32_t>(colors.size()));
-        if (DX12TargetViewHeap::kInvalidIndex == index) return {};
+        if (DX12TargetViewHeap::kInvalidIndex == index)
+        {
+            return {};
+        }
 
         for (uint32_t i = 0; i < colors.size(); ++i)
         {
             const RHIColorTargetDesc& color = colors[i];
             ID3D12Resource* const resource = Resolve(color.resource);
-            const bool defaultView = RHIFormat::Unknown == color.format &&
-                0 == color.mipSlice && 0 == color.sliceCount;
+            const bool defaultView = RHIFormat::Unknown == color.format && 0 == color.mipSlice && 0 == color.sliceCount;
             if (defaultView)
             {
-                device->CreateRenderTargetView(resource, nullptr,
-                    m_rtvViewHeap.CpuAt(index + i));
+                device->CreateRenderTargetView(resource, nullptr, m_rtvViewHeap.CpuAt(index + i));
                 continue;
             }
 
             D3D12_RENDER_TARGET_VIEW_DESC rtv{};
-            rtv.Format = (RHIFormat::Unknown != color.format)
-                ? ToDXGI(color.format) : resource->GetDesc().Format;
+            rtv.Format = (RHIFormat::Unknown != color.format) ? ToDXGI(color.format) : resource->GetDesc().Format;
             if (0 == color.sliceCount)
             {
                 rtv.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
@@ -2573,8 +2901,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
                 rtv.Texture2DArray.FirstArraySlice = color.firstSlice;
                 rtv.Texture2DArray.ArraySize = color.sliceCount;
             }
-            device->CreateRenderTargetView(resource, &rtv,
-                m_rtvViewHeap.CpuAt(index + i));
+            device->CreateRenderTargetView(resource, &rtv, m_rtvViewHeap.CpuAt(index + i));
         }
 
         rtvIndex = index;
@@ -2584,7 +2911,10 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
     if (wantsDepth)
     {
         const uint32_t index = m_dsvViewHeap.Allocate(1);
-        if (DX12TargetViewHeap::kInvalidIndex == index) return {};
+        if (DX12TargetViewHeap::kInvalidIndex == index)
+        {
+            return {};
+        }
 
         D3D12_DEPTH_STENCIL_VIEW_DESC dsv{};
         dsv.Format = ToDXGI(depth->format);
@@ -2611,13 +2941,19 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(
 }
 
 void DX12DeviceResources::BindRenderTargets(ID3D12GraphicsCommandList* commandList,
-    const RHIRenderTargetBinding& binding)
+                                            const RHIRenderTargetBinding& binding)
 {
-    if (nullptr == commandList || !binding.IsValid()) return;
+    if (nullptr == commandList || !binding.IsValid())
+    {
+        return;
+    }
 
     D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
     const bool hasDepth = binding.HasDepth();
-    if (hasDepth) dsv = m_dsvViewHeap.CpuAt(DX12DsvIndexOf(binding.backend));
+    if (hasDepth)
+    {
+        dsv = m_dsvViewHeap.CpuAt(DX12DsvIndexOf(binding.backend));
+    }
 
     if (!binding.HasColor())
     {
@@ -2632,54 +2968,69 @@ void DX12DeviceResources::BindRenderTargets(ID3D12GraphicsCommandList* commandLi
 }
 
 void DX12DeviceResources::ClearRenderTargets(ID3D12GraphicsCommandList* commandList,
-    const RHIRenderTargetBinding& binding, const float rgba[4])
+                                             const RHIRenderTargetBinding& binding, const float rgba[4])
 {
     ClearRenderTargetsRect(commandList, binding, rgba, nullptr);
 }
 
 void DX12DeviceResources::ClearRenderTargetsRect(ID3D12GraphicsCommandList* commandList,
-    const RHIRenderTargetBinding& binding, const float rgba[4], const D3D12_RECT* rect)
+                                                 const RHIRenderTargetBinding& binding, const float rgba[4],
+                                                 const D3D12_RECT* rect)
 {
-    if (nullptr == commandList || nullptr == rgba || !binding.HasColor()) return;
+    if (nullptr == commandList || nullptr == rgba || !binding.HasColor())
+    {
+        return;
+    }
 
     for (uint32_t i = 0; i < binding.colorCount; ++i)
     {
-        commandList->ClearRenderTargetView(
-            m_rtvViewHeap.CpuAt(DX12RtvIndexOf(binding.backend) + i),
-            rgba, (nullptr != rect) ? 1u : 0u, rect);
+        commandList->ClearRenderTargetView(m_rtvViewHeap.CpuAt(DX12RtvIndexOf(binding.backend) + i), rgba,
+                                           (nullptr != rect) ? 1u : 0u, rect);
     }
 }
 
 void DX12DeviceResources::ClearDepthTarget(ID3D12GraphicsCommandList* commandList,
-    const RHIRenderTargetBinding& binding, float depth)
+                                           const RHIRenderTargetBinding& binding, float depth)
 {
-    if (nullptr == commandList || !binding.HasDepth()) return;
+    if (nullptr == commandList || !binding.HasDepth())
+    {
+        return;
+    }
 
-    commandList->ClearDepthStencilView(m_dsvViewHeap.CpuAt(DX12DsvIndexOf(binding.backend)),
-        D3D12_CLEAR_FLAG_DEPTH, depth, 0, 0, nullptr);
+    commandList->ClearDepthStencilView(m_dsvViewHeap.CpuAt(DX12DsvIndexOf(binding.backend)), D3D12_CLEAR_FLAG_DEPTH,
+                                       depth, 0, 0, nullptr);
 }
 
-void DX12DeviceResources::ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList,
-    const RHIBindingDesc& view, const float rgba[4])
+void DX12DeviceResources::ClearUnorderedAccess(ID3D12GraphicsCommandList* commandList, const RHIBindingDesc& view,
+                                               const float rgba[4])
 {
     ID3D12Resource* const viewResource = ResolveBinding(view);
-    if (nullptr == commandList || nullptr == rgba || nullptr == viewResource) return;
+    if (nullptr == commandList || nullptr == rgba || nullptr == viewResource)
+    {
+        return;
+    }
 
     // ★ 같은 UAV를 두 벌 만든다. DX12가 셰이더 가시 GPU 핸들과 비가시 CPU
     //   핸들을 짝으로 요구하기 때문이고, 호출부가 그것을 알 이유가 없다.
     //   VolumetricFog가 이것 하나 때문에 비가시 힙을 따로 들고 같은 뷰를
     //   두 번 만들고 있었다.
-    const RHIBindingTable shaderVisible = CreateBindings({ &view, 1 });
-    if (!shaderVisible.IsValid()) return;
+    const RHIBindingTable shaderVisible = CreateBindings({&view, 1});
+    if (!shaderVisible.IsValid())
+    {
+        return;
+    }
 
     const D3D12_CPU_DESCRIPTOR_HANDLE cpuOnly = CreateClearDescriptor(view);
-    if (0 == cpuOnly.ptr) return;
+    if (0 == cpuOnly.ptr)
+    {
+        return;
+    }
 
     // 셰이더 가시 힙이 걸려 있어야 GPU 핸들이 뜻을 갖는다.
     BindDescriptorHeaps(commandList);
 
-    commandList->ClearUnorderedAccessViewFloat(DX12ToGpuHandle(shaderVisible.backend), cpuOnly,
-        viewResource, rgba, 0, nullptr);
+    commandList->ClearUnorderedAccessViewFloat(DX12ToGpuHandle(shaderVisible.backend), cpuOnly, viewResource, rgba, 0,
+                                               nullptr);
 }
 
 // ── 패스 소유 리소스 (R2c) ──
@@ -2689,26 +3040,39 @@ namespace
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
     void DevResApplyDebugName(ID3D12Resource* resource, const wchar_t* name)
     {
-        if (nullptr != resource && nullptr != name) resource->SetName(name);
+        if (nullptr != resource && nullptr != name)
+        {
+            resource->SetName(name);
+        }
     }
-}
+} // namespace
 
 bool DX12DeviceResources::IsAtomicMin64Buffer(RHIBufferHandle buffer) const
 {
     auto* resource = m_resourceTable.Resolve(buffer);
-    if (!m_atomicCapabilities.bufferInt64Min || !resource) return false;
+    if (!m_atomicCapabilities.bufferInt64Min || !resource)
+    {
+        return false;
+    }
     const auto desc = resource->GetDesc();
     return desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER && desc.Width != 0 && desc.Width % 8 == 0 &&
-        (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
+           (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
 }
 
-bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
-    RHIBufferHandle& outHandle, std::string& outError)
+bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandle& outHandle, std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"DX12CreateBuffer">()};
     outHandle = {};
-    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
-    if (0 == desc.bytes)     { outError = "버퍼 크기가 0이다"; return false; }
+    if (nullptr == m_device)
+    {
+        outError = "디바이스가 없다";
+        return false;
+    }
+    if (0 == desc.bytes)
+    {
+        outError = "버퍼 크기가 0이다";
+        return false;
+    }
     if (RHIResourceState::IndirectArgument == desc.initialState && !desc.allowIndirectArguments)
     {
         outError = "IndirectArgument 상태에는 allowIndirectArguments가 필요하다";
@@ -2730,13 +3094,12 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     resourceDesc.MipLevels = 1;
     resourceDesc.SampleDesc.Count = 1;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resourceDesc.Flags = desc.allowUnorderedAccess
-        ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
-        : D3D12_RESOURCE_FLAG_NONE;
+    resourceDesc.Flags =
+        desc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &resourceDesc, ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(&resource));
+    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &resourceDesc,
+                                                         ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "버퍼 생성 실패 " + HrToString(hr);
@@ -2759,12 +3122,15 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
 uint64_t DX12DeviceResources::SparseBufferTileBytes() const
 {
     D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
-    return m_device && SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))) &&
-        options.TiledResourcesTier != D3D12_TILED_RESOURCES_TIER_NOT_SUPPORTED ? RHISparseTileBytes : 0;
+    return m_device &&
+                   SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))) &&
+                   options.TiledResourcesTier != D3D12_TILED_RESOURCES_TIER_NOT_SUPPORTED
+               ? RHISparseTileBytes
+               : 0;
 }
 
-bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc,
-    RHIBufferHandle& outHandle, std::string& outError)
+bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc, RHIBufferHandle& outHandle,
+                                             std::string& outError)
 {
     outHandle = {};
     if (!m_device || !m_queue || !desc.virtualBytes || !desc.physicalTileCapacity ||
@@ -2788,10 +3154,11 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc,
     resourceDesc.MipLevels = 1;
     resourceDesc.SampleDesc.Count = 1;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    resourceDesc.Flags = desc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+    resourceDesc.Flags =
+        desc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-    HRESULT hr = m_device->CreateReservedResource(&resourceDesc, D3D12_RESOURCE_STATE_COMMON,
-        nullptr, IID_PPV_ARGS(&resource));
+    HRESULT hr =
+        m_device->CreateReservedResource(&resourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "Reserved buffer creation failed " + HrToString(hr);
@@ -2802,7 +3169,8 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc,
     {
         auto* sharedHeap = m_resourceTable.ResolveSparseHeap(desc.physicalPoolOwner);
         auto lease = m_resourceTable.ResolveBufferLifetime(desc.physicalPoolOwner);
-        if (!sharedHeap || !lease || sharedHeap->GetDesc().SizeInBytes / RHISparseTileBytes != desc.physicalTileCapacity)
+        if (!sharedHeap || !lease ||
+            sharedHeap->GetDesc().SizeInBytes / RHISparseTileBytes != desc.physicalTileCapacity)
         {
             outError = "Sparse shared pool owner or capacity is invalid";
             return false;
@@ -2829,16 +3197,21 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc,
         RHIDeviceMemoryBudgetOwner owner;
         RHIDeviceMemoryGrowthTicket ticket;
         explicit SparseBudgetLease(RHIDeviceMemoryBudgetCoordinator& value)
-            : coordinator(value), owner(value.RegisterOwner()) {}
+            : coordinator(value), owner(value.RegisterOwner())
+        {
+        }
         ~SparseBudgetLease()
         {
-            if (ticket.IsValid()) coordinator.CancelGrowth(ticket);
+            if (ticket.IsValid())
+            {
+                coordinator.CancelGrowth(ticket);
+            }
             coordinator.UnregisterOwner(owner);
         }
     };
     auto budget = std::make_shared<SparseBudgetLease>(m_persistentMemoryBudget);
-    budget->ticket = m_persistentMemoryBudget.TryReserveGrowth(budget->owner,
-        kRHIDeviceLocalMemoryBudgetDomain, heapDesc.SizeInBytes);
+    budget->ticket = m_persistentMemoryBudget.TryReserveGrowth(budget->owner, kRHIDeviceLocalMemoryBudgetDomain,
+                                                               heapDesc.SizeInBytes);
     if (!budget->ticket.IsValid())
     {
         outError = "Sparse physical heap exceeds the shared device VRAM growth budget";
@@ -2868,7 +3241,8 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc,
 }
 
 bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
-    std::span<const RHISparseTileMapping> mappings, std::string& outError)
+                                                     std::span<const RHISparseTileMapping> mappings,
+                                                     std::string& outError)
 {
     auto resource = Resolve(buffer);
     auto heap = m_resourceTable.ResolveSparseHeap(buffer);
@@ -2931,27 +3305,40 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
         return false;
     }
     RHISubmissionTicket ticket;
-    if (!GetRHISubmissionThread().Enqueue(this, "DX12 sparse mappings",
-        [this, retainedResource, retainedHeap, coordinates = std::move(coordinates), regions = std::move(regions),
-         flags = std::move(flags), offsets = std::move(offsets), counts = std::move(counts), lifetime](std::string& error)
-        {
-            m_queue->UpdateTileMappings(retainedResource.Get(), static_cast<UINT>(coordinates.size()),
-                coordinates.data(), regions.data(), retainedHeap.Get(), static_cast<UINT>(flags.size()),
-                flags.data(), offsets.data(), counts.data(), D3D12_TILE_MAPPING_FLAG_NONE);
-            auto result = m_queue->Signal(lifetime->fence.Get(), 1);
-            if (SUCCEEDED(result)) result = m_device->GetDeviceRemovedReason();
-            if (FAILED(result))
+    if (!GetRHISubmissionThread().Enqueue(
+            this, "DX12 sparse mappings",
+            [this, retainedResource, retainedHeap, coordinates = std::move(coordinates), regions = std::move(regions),
+             flags = std::move(flags), offsets = std::move(offsets), counts = std::move(counts),
+             lifetime](std::string& error)
             {
-                error = "Sparse mapping device failure " + HrToString(result);
-                GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, error);
-                return false;
-            }
-            error.clear();
-            return true;
-        }, ticket, outError, RHICompletionPoint{1}, [lifetime] {
-            const auto value = lifetime->fence->GetCompletedValue();
-            return value == UINT64_MAX ? uint64_t(0) : value;
-        }, lifetime)) return false;
+                m_queue->UpdateTileMappings(retainedResource.Get(), static_cast<UINT>(coordinates.size()),
+                                            coordinates.data(), regions.data(), retainedHeap.Get(),
+                                            static_cast<UINT>(flags.size()), flags.data(), offsets.data(),
+                                            counts.data(), D3D12_TILE_MAPPING_FLAG_NONE);
+                auto result = m_queue->Signal(lifetime->fence.Get(), 1);
+                if (SUCCEEDED(result))
+                {
+                    result = m_device->GetDeviceRemovedReason();
+                }
+                if (FAILED(result))
+                {
+                    error = "Sparse mapping device failure " + HrToString(result);
+                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, error);
+                    return false;
+                }
+                error.clear();
+                return true;
+            },
+            ticket, outError, RHICompletionPoint{1},
+            [lifetime]
+            {
+                const auto value = lifetime->fence->GetCompletedValue();
+                return value == UINT64_MAX ? uint64_t(0) : value;
+            },
+            lifetime))
+    {
+        return false;
+    }
     return GetRHISubmissionThread().Wait(ticket, outError);
 }
 
@@ -2974,13 +3361,14 @@ namespace
             result.Width = desc.bufferDesc.bytes;
             result.Height = result.DepthOrArraySize = result.MipLevels = 1;
             result.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            result.Flags = desc.bufferDesc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+            result.Flags = desc.bufferDesc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
+                                                                : D3D12_RESOURCE_FLAG_NONE;
         }
         else
         {
             const auto& texture = desc.textureDesc;
-            result.Dimension = texture.dim == RHITextureDesc::Dim::Texture3D
-                ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            result.Dimension = texture.dim == RHITextureDesc::Dim::Texture3D ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
+                                                                             : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
             result.Width = texture.width;
             result.Height = texture.height;
             result.DepthOrArraySize = static_cast<UINT16>(texture.depthOrArraySize);
@@ -3006,24 +3394,29 @@ namespace
     {
         switch (heapClass)
         {
-        case 1: return D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
-        case 2: return D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
-        case 3: return D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
-        default: return D3D12_HEAP_FLAG_NONE;
+        case 1:
+            return D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+        case 2:
+            return D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+        case 3:
+            return D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+        default:
+            return D3D12_HEAP_FLAG_NONE;
         }
     }
-}
+} // namespace
 
 bool DX12DeviceResources::DescribeTransientAllocation(const RHITransientResourceDesc& desc,
-    RHITransientAllocationInfo& info, std::string& error) const
+                                                      RHITransientAllocationInfo& info, std::string& error) const
 {
     info = {};
-    if (!m_device || (desc.buffer ? desc.bufferDesc.bytes == 0 :
-        desc.textureDesc.width == 0 || desc.textureDesc.height == 0 ||
-        desc.textureDesc.depthOrArraySize == 0 || desc.textureDesc.depthOrArraySize > UINT16_MAX ||
-        desc.textureDesc.mipLevels == 0 || desc.textureDesc.mipLevels > UINT16_MAX ||
-        desc.textureDesc.format == RHIFormat::Unknown ||
-        (desc.textureDesc.allowRenderTarget && desc.textureDesc.allowDepthStencil)))
+    if (!m_device ||
+        (desc.buffer
+             ? desc.bufferDesc.bytes == 0
+             : desc.textureDesc.width == 0 || desc.textureDesc.height == 0 || desc.textureDesc.depthOrArraySize == 0 ||
+                   desc.textureDesc.depthOrArraySize > UINT16_MAX || desc.textureDesc.mipLevels == 0 ||
+                   desc.textureDesc.mipLevels > UINT16_MAX || desc.textureDesc.format == RHIFormat::Unknown ||
+                   (desc.textureDesc.allowRenderTarget && desc.textureDesc.allowDepthStencil)))
     {
         error = "Invalid transient allocation description";
         return false;
@@ -3038,13 +3431,13 @@ bool DX12DeviceResources::DescribeTransientAllocation(const RHITransientResource
     info.bytes = nativeInfo.SizeInBytes;
     info.alignment = nativeInfo.Alignment;
     // Homogeneous heaps also work on resource heap tier 1 hardware.
-    info.heapClass = desc.buffer ? 1 :
-        (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil ? 3 : 2);
+    info.heapClass =
+        desc.buffer ? 1 : (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil ? 3 : 2);
     return true;
 }
 
 bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& info,
-    std::shared_ptr<RHITransientHeap>& heap, std::string& error)
+                                              std::shared_ptr<RHITransientHeap>& heap, std::string& error)
 {
     heap.reset();
     if (!m_device || !info.bytes || info.alignment != D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
@@ -3072,8 +3465,8 @@ bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& 
     return true;
 }
 
-bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& desc,
-    RHITransientHeap& heap, RHITextureHandle& texture, RHIBufferHandle& buffer, std::string& error)
+bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& desc, RHITransientHeap& heap,
+                                                RHITextureHandle& texture, RHIBufferHandle& buffer, std::string& error)
 {
     texture = {};
     buffer = {};
@@ -3103,8 +3496,9 @@ bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& 
     }
     const bool hasClear = !desc.buffer && (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil);
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-    const auto hr = m_device->CreatePlacedResource(nativeHeap->native.Get(), 0, &nativeDesc,
-        D3D12_RESOURCE_STATE_COMMON, hasClear ? &clear : nullptr, IID_PPV_ARGS(&resource));
+    const auto hr =
+        m_device->CreatePlacedResource(nativeHeap->native.Get(), 0, &nativeDesc, D3D12_RESOURCE_STATE_COMMON,
+                                       hasClear ? &clear : nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         error = "Placed transient creation failed " + HrToString(hr);
@@ -3133,7 +3527,10 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
     RHITextureInfo info{};
 
     ID3D12Resource* const native = m_resourceTable.Resolve(handle);
-    if (nullptr == native) return info;
+    if (nullptr == native)
+    {
+        return info;
+    }
 
     const D3D12_RESOURCE_DESC desc = native->GetDesc();
     info.width = static_cast<uint32_t>(desc.Width);
@@ -3142,15 +3539,18 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
     info.mipLevels = desc.MipLevels;
     info.format = FromDXGI(desc.Format);
     info.retainsExplicitStateOnGraphicsQueue = desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER &&
-        (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) == 0;
+                                               (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) == 0;
     return info;
 }
 
-bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
-    RHITextureHandle& outHandle, std::string& outError)
+bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc, RHITextureHandle& outHandle, std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"DX12CreateTexture">()};
-    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
+    if (nullptr == m_device)
+    {
+        outError = "디바이스가 없다";
+        return false;
+    }
     if (0 == desc.width || 0 == desc.height)
     {
         outError = "텍스처 크기가 0이다";
@@ -3166,9 +3566,8 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     heap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
     D3D12_RESOURCE_DESC resourceDesc{};
-    resourceDesc.Dimension = (RHITextureDesc::Dim::Texture3D == desc.dim)
-        ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
-        : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resourceDesc.Dimension = (RHITextureDesc::Dim::Texture3D == desc.dim) ? D3D12_RESOURCE_DIMENSION_TEXTURE3D
+                                                                          : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     resourceDesc.Width = desc.width;
     resourceDesc.Height = desc.height;
     resourceDesc.DepthOrArraySize = static_cast<UINT16>(desc.depthOrArraySize);
@@ -3177,9 +3576,18 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     resourceDesc.SampleDesc.Count = 1;
 
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-    if (desc.allowUnorderedAccess) resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-    if (desc.allowRenderTarget)    resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    if (desc.allowDepthStencil)    resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+    if (desc.allowUnorderedAccess)
+    {
+        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    }
+    if (desc.allowRenderTarget)
+    {
+        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    }
+    if (desc.allowDepthStencil)
+    {
+        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+    }
 
     // ★ 클리어 힌트는 타깃일 때만 넘긴다 (G-1). 타깃이 아닌 리소스에 주면
     //   생성이 E_INVALIDARG 로 실패하고, 타깃인데 안 주면 검증 레이어가
@@ -3192,14 +3600,17 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     }
     else
     {
-        for (int i = 0; i < 4; ++i) clearValue.Color[i] = desc.clearColor[i];
+        for (int i = 0; i < 4; ++i)
+        {
+            clearValue.Color[i] = desc.clearColor[i];
+        }
     }
     const bool wantsClearValue = desc.allowRenderTarget || desc.allowDepthStencil;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &resourceDesc, ToD3D12(desc.initialState),
-        wantsClearValue ? &clearValue : nullptr, IID_PPV_ARGS(&resource));
+    const HRESULT hr =
+        m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &resourceDesc, ToD3D12(desc.initialState),
+                                          wantsClearValue ? &clearValue : nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr))
     {
         outError = "텍스처 생성 실패 " + HrToString(hr);
@@ -3220,10 +3631,14 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
 //   언젠가 갈리고, 갈린 결과는 '행 간격이 어긋나 그림이 비스듬해진다'로만
 //   드러나 원인이 멀다. 모르는 포맷에 0을 주고 호출부가 거절하는 규약은 그대로다.
 
-bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
-    RHIFormat format, uint32_t sliceCount, RHIReadback& outReadback, std::string& outError)
+bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIFormat format, uint32_t sliceCount,
+                                         RHIReadback& outReadback, std::string& outError)
 {
-    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
+    if (nullptr == m_device)
+    {
+        outError = "디바이스가 없다";
+        return false;
+    }
     if (0 == width || 0 == height || 0 == sliceCount)
     {
         outError = "리드백 크기가 0이다";
@@ -3240,8 +3655,7 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
     // ★ 행 간격 정렬을 여기서 한 번만 한다. 검사 열여덟 곳이 각자 상수로
     //   들고 있던 계산이고, 하나만 어긋나도 읽은 그림이 한 행씩 밀린다.
     const uint32_t rowPitch =
-        (width * bytesPerPixel + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
-        & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
+        (width * bytesPerPixel + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u) & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
 
     const size_t sliceBytes = static_cast<size_t>(rowPitch) * height;
 
@@ -3258,8 +3672,8 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
-    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
+    const HRESULT hr = m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
     if (FAILED(hr))
     {
         outError = "리드백 버퍼 생성 실패 " + HrToString(hr);
@@ -3284,11 +3698,18 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height,
     return true;
 }
 
-bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
-    RHIReadback& outReadback, std::string& outError)
+bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes, RHIReadback& outReadback, std::string& outError)
 {
-    if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
-    if (0 == bytes) { outError = "리드백 크기가 0이다"; return false; }
+    if (nullptr == m_device)
+    {
+        outError = "디바이스가 없다";
+        return false;
+    }
+    if (0 == bytes)
+    {
+        outError = "리드백 크기가 0이다";
+        return false;
+    }
 
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -3303,8 +3724,8 @@ bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
-    const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-        &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
+    const HRESULT hr = m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
     if (FAILED(hr))
     {
         outError = "버퍼 리드백 생성 실패 " + HrToString(hr);
@@ -3332,19 +3753,26 @@ bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes,
     return true;
 }
 
-bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
-    RHIReadbackImage& outImage, std::string& outError)
+bool DX12DeviceResources::MapReadback(const RHIReadback& readback, RHIReadbackImage& outImage, std::string& outError)
 {
-    if (!readback.IsValid()) { outError = "리드백이 비어 있다"; return false; }
+    if (!readback.IsValid())
+    {
+        outError = "리드백이 비어 있다";
+        return false;
+    }
 
     const size_t totalBytes = readback.sliceBytes * readback.sliceCount;
 
     // 읽을 범위를 정확히 준다. 0,0을 주면 드라이버가 '아무것도 안 읽는다'로
     // 보고 최적화할 수 있다.
-    const D3D12_RANGE range{ 0, totalBytes };
+    const D3D12_RANGE range{0, totalBytes};
     void* mapped = nullptr;
     ID3D12Resource* const native = m_resourceTable.Resolve(readback.buffer);
-    if (nullptr == native) { outError = "리드백 버퍼가 이미 놓였다"; return false; }
+    if (nullptr == native)
+    {
+        outError = "리드백 버퍼가 이미 놓였다";
+        return false;
+    }
 
     const HRESULT hr = native->Map(0, &range, &mapped);
     if (FAILED(hr) || nullptr == mapped)
@@ -3353,12 +3781,11 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
         return false;
     }
 
-    outImage.data.assign(static_cast<const uint8_t*>(mapped),
-        static_cast<const uint8_t*>(mapped) + totalBytes);
+    outImage.data.assign(static_cast<const uint8_t*>(mapped), static_cast<const uint8_t*>(mapped) + totalBytes);
 
     // ★ 쓰지 않았으므로 빈 범위를 준다. 여기에 전체 범위를 주면 드라이버가
     //   CPU가 쓴 것으로 보고 되돌려 쓸 수 있다.
-    const D3D12_RANGE written{ 0, 0 };
+    const D3D12_RANGE written{0, 0};
     native->Unmap(0, &written);
 
     outImage.width = readback.width;
@@ -3370,7 +3797,6 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback,
     return true;
 }
 
-
 std::shared_ptr<DlssTemporalAdapter> DX12DeviceResources::GetTemporalDlssSession() const
 {
     return m_temporalDevice ? m_temporalDevice->session : nullptr;
@@ -3378,15 +3804,24 @@ std::shared_ptr<DlssTemporalAdapter> DX12DeviceResources::GetTemporalDlssSession
 
 bool DX12DeviceResources::DetachSwapChain(std::string& outError)
 {
-    if (!m_swapChain) return true;
+    if (!m_swapChain)
+    {
+        return true;
+    }
     if (!DrainForLifecycle(RHILifecycleCommand::SwapChainResize, outError) ||
         GetLastLifecycleResult().command == RHILifecycleCommand::UnrecoverableDeviceError ||
         !GetLastLifecycleResult().IsClean() || !m_device || FAILED(m_device->GetDeviceRemovedReason()))
     {
-        if (outError.empty()) outError = "Swapchain detach requires verified GPU retirement on a live device";
+        if (outError.empty())
+        {
+            outError = "Swapchain detach requires verified GPU retirement on a live device";
+        }
         return false;
     }
-    for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
+    for (auto& backBuffer : m_backBuffers)
+    {
+        backBuffer.Reset();
+    }
     m_backBufferRtvHeap.Reset();
     m_swapChain.Reset();
     if (m_frameLatencyWaitableObject)
@@ -3406,8 +3841,8 @@ uint64_t DX12DeviceResources::NextMaterialBatchSignatureGeneration()
     return next.fetch_add(1, std::memory_order_relaxed);
 }
 
-ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(
-    ID3D12RootSignature* rootSignature, std::span<const uint32_t> roots, bool indexed)
+ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(ID3D12RootSignature* rootSignature,
+                                                                       std::span<const uint32_t> roots, bool indexed)
 {
     uint64_t slots{}, cbvs{};
     for (const auto root : roots)
@@ -3456,15 +3891,15 @@ ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(
         {
             auto& argument = descriptions[count++];
             argument.Type = (root & 0x80000000u) ? D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT_BUFFER_VIEW
-                                                : D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
+                                                 : D3D12_INDIRECT_ARGUMENT_TYPE_SHADER_RESOURCE_VIEW;
             argument.ConstantBufferView.RootParameterIndex = root & 0x7fffffffu;
         }
         if (indexed)
         {
             descriptions[count++].Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
         }
-        descriptions[count++].Type = indexed ? D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED
-                                             : D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
+        descriptions[count++].Type =
+            indexed ? D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED : D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
         const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + (indexed ? 36 : 12);
         const D3D12_COMMAND_SIGNATURE_DESC desc{stride, count, descriptions.data(), 0};
         MaterialBatchSignature value;

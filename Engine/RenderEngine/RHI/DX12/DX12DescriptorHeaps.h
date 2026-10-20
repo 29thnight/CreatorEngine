@@ -43,7 +43,6 @@ inline uint32_t DX12DsvIndexOf(uint64_t backend)
     return static_cast<uint32_t>(backend >> 32);
 }
 
-
 // 디스크립터 힙 관리 (PHASE 3-4).
 //
 // DX11에서는 SRV·샘플러를 슬롯에 그냥 꽂았다. DX12는 디스크립터를 힙에 만들어 두고
@@ -65,7 +64,7 @@ inline uint32_t DX12DsvIndexOf(uint64_t backend)
 
 class DX12DescriptorRecycler
 {
-public:
+  public:
     // 힙에서 잘라낸 연속 구간.
     //
     // 디스크립터 테이블은 연속이어야 하므로 낱개가 아니라 구간 단위로 준다.
@@ -75,9 +74,9 @@ public:
     {
         D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
         D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-        uint32_t count{ 0 };
-        uint32_t incrementSize{ 0 };
-        uint64_t version{ 0 };
+        uint32_t count{0};
+        uint32_t incrementSize{0};
+        uint64_t version{0};
 
         bool IsValid() const { return 0 != count; }
 
@@ -90,12 +89,22 @@ public:
         }
     };
 
+    struct RecordingLease
+    {
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
+        std::shared_ptr<const void> reuseLease;
+        uint64_t version{};
+        bool IsValid() const { return heap && reuseLease && version != 0; }
+    };
+
+    RecordingLease PinRecording(uint64_t version);
+
     struct Stats
     {
-        uint64_t allocations{ 0 };
-        uint64_t descriptors{ 0 };
-        uint64_t overflows{ 0 };        // 구간이 모자라 거절한 횟수 — 0이 아니면 크기를 늘려야 한다
-        uint32_t peakRecordingDescriptors{ 0 };
+        uint64_t allocations{0};
+        uint64_t descriptors{0};
+        uint64_t overflows{0}; // 구간이 모자라 거절한 횟수 — 0이 아니면 크기를 늘려야 한다
+        uint32_t peakRecordingDescriptors{0};
         RHIDescriptorVersionStats versions{};
     };
 
@@ -103,14 +112,14 @@ public:
     // 돌면 여러 스레드가 같은 recording page에서 잘라 간다.
     struct AtomicStats
     {
-        std::atomic<uint64_t> allocations{ 0 };
-        std::atomic<uint64_t> descriptors{ 0 };
-        std::atomic<uint64_t> overflows{ 0 };
-        std::atomic<uint32_t> peakRecordingDescriptors{ 0 };
+        std::atomic<uint64_t> allocations{0};
+        std::atomic<uint64_t> descriptors{0};
+        std::atomic<uint64_t> overflows{0};
+        std::atomic<uint32_t> peakRecordingDescriptors{0};
     };
 
-    bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-        uint32_t descriptorsPerPage, uint32_t initialVersions, std::string& outError);
+    bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t descriptorsPerPage,
+                    uint32_t initialVersions, std::string& outError);
     void Shutdown();
 
     bool IsInitialized() const { return nullptr != m_device.Get(); }
@@ -126,16 +135,12 @@ public:
     // 엉뚱한 텍스처가 보이는 식으로만 드러난다.
     Allocation Allocate(uint32_t count);
 
-    ID3D12DescriptorHeap* GetHeap() const
-    {
-        return (nullptr != m_activePage) ? m_activePage->heap.Get() : nullptr;
-    }
+    ID3D12DescriptorHeap* GetHeap() const { return (nullptr != m_activePage) ? m_activePage->heap.Get() : nullptr; }
     uint32_t GetDescriptorsPerPage() const { return m_descriptorsPerPage; }
     uint32_t GetInitialVersionCount() const { return m_initialVersions; }
     uint32_t GetRecordingUsed() const
     {
-        return (nullptr != m_activePage)
-            ? m_activePage->cursor.load(std::memory_order_relaxed) : 0;
+        return (nullptr != m_activePage) ? m_activePage->cursor.load(std::memory_order_relaxed) : 0;
     }
     uint64_t GetCurrentVersionToken() const { return m_activeVersion.ToToken(); }
     bool IsCurrentVersion(uint64_t token) const
@@ -149,32 +154,33 @@ public:
         stats.allocations = m_stats.allocations.load(std::memory_order_relaxed);
         stats.descriptors = m_stats.descriptors.load(std::memory_order_relaxed);
         stats.overflows = m_stats.overflows.load(std::memory_order_relaxed);
-        stats.peakRecordingDescriptors =
-            m_stats.peakRecordingDescriptors.load(std::memory_order_relaxed);
+        stats.peakRecordingDescriptors = m_stats.peakRecordingDescriptors.load(std::memory_order_relaxed);
         stats.versions = m_versions.GetStats();
         return stats;
     }
 
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Page
     {
         ComPtr<ID3D12DescriptorHeap> heap;
         D3D12_CPU_DESCRIPTOR_HANDLE cpuBase{};
         D3D12_GPU_DESCRIPTOR_HANDLE gpuBase{};
-        std::atomic<uint32_t> cursor{ 0 };
+        std::atomic<uint32_t> cursor{0};
+        bool sealed{};
     };
 
     ComPtr<ID3D12Device> m_device;
-    D3D12_DESCRIPTOR_HEAP_TYPE m_type{ D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV };
+    D3D12_DESCRIPTOR_HEAP_TYPE m_type{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV};
     std::vector<std::unique_ptr<Page>> m_pages;
     RHIDescriptorVersionPolicy m_versions;
     RHIDescriptorVersionHandle m_activeVersion{};
-    Page* m_activePage{ nullptr };
-    uint32_t m_incrementSize{ 0 };
-    uint32_t m_descriptorsPerPage{ 0 };
-    uint32_t m_initialVersions{ 0 };
+    Page* m_activePage{nullptr};
+    uint32_t m_incrementSize{0};
+    uint32_t m_descriptorsPerPage{0};
+    uint32_t m_initialVersions{0};
 
     AtomicStats m_stats;
 
@@ -208,21 +214,40 @@ private:
 // 프레임에 기록된 것은 다 기록됐다"가 성립하는 유일하게 자연스러운 지점이다.
 class DX12TargetViewHeap
 {
-public:
+  public:
     static constexpr uint32_t kInvalidIndex = 0xFFFFFFFFu;
+
+    struct Snapshot
+    {
+        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
+        D3D12_CPU_DESCRIPTOR_HANDLE cpuBase{};
+        uint32_t count{};
+        uint32_t incrementSize{};
+        D3D12_CPU_DESCRIPTOR_HANDLE CpuAt(uint32_t index) const
+        {
+            if (!heap || index >= count)
+            {
+                throw std::out_of_range("Frozen target descriptor index is outside its recording.");
+            }
+            auto handle = cpuBase;
+            handle.ptr += static_cast<SIZE_T>(index) * incrementSize;
+            return handle;
+        }
+    };
+    bool Capture(ID3D12Device& device, Snapshot& result, std::string& outError,
+                 ID3D12DescriptorHeap* reusableHeap = nullptr) const;
 
     struct Stats
     {
-        uint64_t allocations{ 0 };
-        uint64_t descriptors{ 0 };
-        uint64_t overflows{ 0 };        // 0이 아니면 용량을 늘려야 한다
-        uint32_t peakFrameDescriptors{ 0 };
+        uint64_t allocations{0};
+        uint64_t descriptors{0};
+        uint64_t overflows{0}; // 0이 아니면 용량을 늘려야 한다
+        uint32_t peakFrameDescriptors{0};
     };
 
     /// type은 RTV 또는 DSV만 받는다. 셰이더 가시 플래그는 붙이지 않는다 —
     /// 두 타입은 애초에 셰이더 가시 힙을 만들 수 없다.
-    bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-        uint32_t capacity, std::string& outError);
+    bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity, std::string& outError);
     void Shutdown();
 
     bool IsInitialized() const { return nullptr != m_heap.Get(); }
@@ -245,22 +270,23 @@ public:
 
     uint32_t GetCapacity() const { return m_capacity; }
     uint32_t GetFrameUsed() const { return m_cursor.load(std::memory_order_relaxed); }
-    Stats    GetStats() const;
+    Stats GetStats() const;
 
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     ComPtr<ID3D12DescriptorHeap> m_heap;
-    D3D12_CPU_DESCRIPTOR_HANDLE  m_cpuBase{};
-    uint32_t m_incrementSize{ 0 };
-    uint32_t m_capacity{ 0 };
+    D3D12_CPU_DESCRIPTOR_HANDLE m_cpuBase{};
+    uint32_t m_incrementSize{0};
+    uint32_t m_capacity{0};
 
-    std::atomic<uint32_t> m_cursor{ 0 };
+    std::atomic<uint32_t> m_cursor{0};
 
-    std::atomic<uint64_t> m_allocations{ 0 };
-    std::atomic<uint64_t> m_descriptors{ 0 };
-    std::atomic<uint64_t> m_overflows{ 0 };
-    std::atomic<uint32_t> m_peakFrameDescriptors{ 0 };
+    std::atomic<uint64_t> m_allocations{0};
+    std::atomic<uint64_t> m_descriptors{0};
+    std::atomic<uint64_t> m_overflows{0};
+    std::atomic<uint32_t> m_peakFrameDescriptors{0};
 };
 
 // 샘플러 힙 + 중복 제거 캐시.
@@ -270,12 +296,12 @@ private:
 // 이유도 같다 — 같은 것을 여러 벌 만들면 상한(2048)에 먼저 부딪힌다.
 class DX12SamplerHeap
 {
-public:
+  public:
     struct Stats
     {
-        uint32_t hits{ 0 };
-        uint32_t creates{ 0 };
-        uint32_t overflows{ 0 };   // 힙이 꽉 참 — 상한이 2048이라 실제로 닿을 수 있다
+        uint32_t hits{0};
+        uint32_t creates{0};
+        uint32_t overflows{0}; // 힙이 꽉 참 — 상한이 2048이라 실제로 닿을 수 있다
     };
 
     bool Initialize(ID3D12Device* device, uint32_t capacity, std::string& outError);
@@ -300,19 +326,20 @@ public:
     static uint64_t ComputeHash(const RHISamplerDesc& desc);
 
     ID3D12DescriptorHeap* GetHeap() const { return m_heap.Get(); }
-    Stats  GetStats() const;
+    Stats GetStats() const;
     size_t GetCachedCount() const;
 
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    ComPtr<ID3D12Device>         m_device;
+    ComPtr<ID3D12Device> m_device;
     ComPtr<ID3D12DescriptorHeap> m_heap;
-    D3D12_CPU_DESCRIPTOR_HANDLE  m_cpuBase{};
-    D3D12_GPU_DESCRIPTOR_HANDLE  m_gpuBase{};
-    uint32_t m_incrementSize{ 0 };
-    uint32_t m_capacity{ 0 };
-    uint32_t m_used{ 0 };
+    D3D12_CPU_DESCRIPTOR_HANDLE m_cpuBase{};
+    D3D12_GPU_DESCRIPTOR_HANDLE m_gpuBase{};
+    uint32_t m_incrementSize{0};
+    uint32_t m_capacity{0};
+    uint32_t m_used{0};
 
     mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, D3D12_GPU_DESCRIPTOR_HANDLE> m_cache;
@@ -320,4 +347,3 @@ private:
     std::map<std::vector<uint64_t>, D3D12_GPU_DESCRIPTOR_HANDLE> m_rangeCache;
     Stats m_stats;
 };
-

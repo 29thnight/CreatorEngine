@@ -1,3 +1,4 @@
+#include "../../RHI/RHISoftwareBatch.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include <stdint.h>
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -7085,6 +7086,8 @@ namespace
                 : ce::dx_capture::submission_context{ sourceFrameId, 0, view.key.viewId, false };
 #endif
             RHIRecordedBatch batch;
+            RHISoftwareBatch softwareBatch;
+            const bool softwareRecording = dx12.UsesSoftwareRecording();
             RHISubmissionTicket batchTicket;
             double ownedRecordingMilliseconds = 0.0;
             LiveStopwatch recordWatch;
@@ -7100,7 +7103,9 @@ namespace
                         return false;
                     }
                 }
-                else if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc, batch, outError))
+                else if (!(softwareRecording
+                    ? dx12.RecordSoftwareGraph(graph, 4, batchDesc, softwareBatch, outError)
+                    : graph.RecordParallel(dx12.CommandPool(), 4, batchDesc, batch, outError)))
                 {
                     return false;
                 }
@@ -7134,11 +7139,13 @@ namespace
                 {
                     if (view.displayTarget==EnhancedLiveDisplayTarget::Game && temporalSink)
                         temporalSink->MarkTemporalLatency(view.temporal.frame.realFrameId,RHITemporalLatencyMarker::RenderSubmitStart);
-                    if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket, outError))
+                    if (!(softwareRecording
+                        ? dx12.EnqueueSoftwareBatch(std::move(softwareBatch), batchTicket, outError)
+                        : dx12.EnqueueRecordedBatch(std::move(batch), batchTicket, outError)))
                     {
                         return false;
                     }
-                    const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                    const auto graphCompletion = batchTicket.GetIdentity().completion;
                     if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId, graphCompletion, outError, batchTicket))
                     {
                         return false;

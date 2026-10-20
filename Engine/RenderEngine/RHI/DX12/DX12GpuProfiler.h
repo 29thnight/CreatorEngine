@@ -20,13 +20,13 @@
 // 상대 변화(DX11 대비, 최적화 전후)를 보는 도구다.
 class DX12GpuProfiler : public IRHIGpuProfiler
 {
-public:
+  public:
     /// 표시용으로 이름끼리 묶은 것. 원본은 PassSlice 에 남아 있다.
     struct PassTiming
     {
         std::string name;
-        double      milliseconds{ 0.0 };
-        double      spanMilliseconds{ 0.0 };
+        double milliseconds{0.0};
+        double spanMilliseconds{0.0};
     };
 
     /// 조각 하나의 raw 구간. 분할 패스는 조각마다 구간을 찍으므로 한 패스가
@@ -38,8 +38,8 @@ public:
     struct PassSlice
     {
         std::string name;
-        uint64_t    beginTicks{ 0 };
-        uint64_t    endTicks{ 0 };
+        uint64_t beginTicks{0};
+        uint64_t endTicks{0};
         GpuPassTimingIdentity identity;
     };
 
@@ -50,22 +50,22 @@ public:
     /// 수 있다. 표본이 없으면 통합 축을 끄고 큐 상대시간만 남긴다(§12).
     struct ClockCalibration
     {
-        uint64_t gpuTicks{ 0 };
-        uint64_t cpuTicks{ 0 };            // QPC 원시 값
-        uint64_t gpuTicksPerSecond{ 0 };
-        uint64_t cpuTicksPerSecond{ 0 };
-        uint64_t sampleCount{ 0 };         // 몇 번 다시 떴는가
-        uint64_t lastSampleCpuTick{ 0 };
+        uint64_t gpuTicks{0};
+        uint64_t cpuTicks{0}; // QPC 원시 값
+        uint64_t gpuTicksPerSecond{0};
+        uint64_t cpuTicksPerSecond{0};
+        uint64_t sampleCount{0}; // 몇 번 다시 떴는가
+        uint64_t lastSampleCpuTick{0};
 
         // 새 표본이 **직전 표본으로 예측한 값**에서 얼마나 벗어났는가(CPU 틱).
         // 두 시계가 같은 속도로 가면 0 에 붙고, 벌어지면 이 수가 자란다.
         //
         // ★ 여기에는 임계값을 걸지 않는다. 고른 수가 곧 거짓말의 여유가 되기
         //   때문이다 — 정렬 판정은 "제출과 수집 사이" 라는 인과가 맡는다.
-        int64_t  lastDriftTicks{ 0 };
-        int64_t  maxAbsoluteDriftTicks{ 0 };
+        int64_t lastDriftTicks{0};
+        int64_t maxAbsoluteDriftTicks{0};
 
-        bool     valid{ false };
+        bool valid{false};
     };
 
     /// 제출 하나의 수집 결과.
@@ -75,14 +75,14 @@ public:
     ///   조각마다의 것이다. 세을 더하면 서로 다른 수가 나오고, 그것이 정상이다.
     struct FrameTimings
     {
-        GpuFrameToken          token{};
-        std::vector<PassSlice> slices;             // 기록 순서 그대로
-        uint64_t queueBeginTicks{ 0 };
-        uint64_t queueEndTicks{ 0 };
-        uint64_t busyTicks{ 0 };
-        uint64_t ticksPerSecond{ 0 };
+        GpuFrameToken token{};
+        std::vector<PassSlice> slices; // 기록 순서 그대로
+        uint64_t queueBeginTicks{0};
+        uint64_t queueEndTicks{0};
+        uint64_t busyTicks{0};
+        uint64_t ticksPerSecond{0};
         // 예약했지만 질의 힙 용량을 넘어 측정하지 못한 패스 수.
-        uint32_t overflowedPasses{ 0 };
+        uint32_t overflowedPasses{0};
 
         // 끝이 시작보다 **앞선** 조각. 큰 음수가 되므로 뺀다 — 다만 **숨기지
         // 않고 센다.** 예전에는 조용히 0 으로 바꿔 합계에 섞여 들어갔다.
@@ -90,20 +90,20 @@ public:
         // ★ 길이가 0 인 것은 여기 들어오지 않는다. 둘을 `end <= begin` 으로 한데
         //   묶었더니, 그릴 것이 없어 일찍 빠져나간 패스(선이 없는 GizmoLine)가
         //   결함으로 세졌다. 두 timestamp 가 같은 틱에 찍히는 것은 정상이다.
-        uint32_t droppedSlices{ 0 };
+        uint32_t droppedSlices{0};
 
         // 버린 조각의 end - begin. 부호가 있어야 "얼마나 뒤집혔는가" 를 물을 수 있다.
-        int64_t droppedSliceDeltaTicks{ 0 };
+        int64_t droppedSliceDeltaTicks{0};
 
         // 길이가 정확히 0 인 조각. **버리지 않는다** — 그 패스는 실제로 돌았고
         // 비용이 timestamp 분해능 아래일 뿐이다. 세는 것은 정보지 판정이 아니다.
-        uint32_t zeroLengthSlices{ 0 };
+        uint32_t zeroLengthSlices{0};
 
         // queue span 을 CPU(QPC) 축으로 옮긴 것. cpuAligned 가 거짓이면 표본이
         // 없다는 뜻이고, 그때 이 둘은 0 이며 큐 상대시간만 유효하다.
-        uint64_t queueBeginCpuTicks{ 0 };
-        uint64_t queueEndCpuTicks{ 0 };
-        bool     cpuAligned{ false };
+        uint64_t queueBeginCpuTicks{0};
+        uint64_t queueEndCpuTicks{0};
+        bool cpuAligned{false};
 
         // 버린 조각 중 **첫 번째의 이름.** 수만 세면 "한 개 버렸다" 까지만 알고
         // 어느 패스가 짝을 잃었는지는 모른다 — 고칠 수 없는 수는 계수기가 아니라
@@ -111,8 +111,8 @@ public:
         std::string droppedSliceName;
     };
 
-    bool Initialize(ID3D12Device* device, ID3D12CommandQueue* queue,
-        uint32_t maxPassesPerFrame, uint32_t frameCount, std::string& outError);
+    bool Initialize(ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t maxPassesPerFrame, uint32_t frameCount,
+                    std::string& outError);
     void Shutdown();
 
     bool IsInitialized() const { return nullptr != m_queryHeap.Get(); }
@@ -125,19 +125,19 @@ public:
     ///
     /// ★ 슬롯의 기록(이름·질의 인덱스·사용 표시)만 되감는다. 다른 슬롯은
     ///   건드리지 않는다 — 그것이 인플라이트 제출의 기록을 지키는 유일한 방법이다.
-    GpuFrameToken BeginFrame(uint64_t engineFrameId, uint64_t submissionId,
-        uint64_t renderViewId, uint64_t captureGeneration = 0);
+    GpuFrameToken BeginFrame(uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId,
+                             uint64_t captureGeneration = 0);
 
     /// 패스 시작. 돌려준 슬롯을 EndPass에 그대로 넘긴다.
     /// 슬롯이 모자라면 kInvalidSlot을 돌려주고, 그 패스는 측정에서 빠진다.
     uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
-        const GpuPassTimingIdentity& identity = {}) override;
-    void     EndPass(RHIEncoder& encoder, uint32_t slot) override;
+                       const GpuPassTimingIdentity& identity = {}) override;
+    void EndPass(RHIEncoder& encoder, uint32_t slot) override;
 
     // DX12 전용 benchmark와 Resolve 경로가 native list를 직접 계측할 때 쓴다.
     uint32_t BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name,
-        const GpuPassTimingIdentity& identity = {});
-    void     EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot);
+                       const GpuPassTimingIdentity& identity = {});
+    void EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot);
 
     /// 제출을 닫기 전에 부른다. 그 표가 가리키는 슬롯의 질의만 리드백으로 옮긴다.
     void ResolveFrame(ID3D12GraphicsCommandList* commandList, const GpuFrameToken& token);
@@ -148,8 +148,7 @@ public:
     ///   다른 제출이 그 슬롯을 다시 열었으면 기록은 이미 남의 것이므로, 그때는
     ///   수치를 내지 않고 **실패한다.** 예전에는 그 자리에서 그럴듯한 숫자가 나왔고
     ///   어느 프레임 것인지는 어디에도 적혀 있지 않았다.
-    bool Collect(const GpuFrameToken& token, FrameTimings& outTimings,
-        std::string& outError);
+    bool Collect(const GpuFrameToken& token, FrameTimings& outTimings, std::string& outError);
 
     /// raw 조각을 이름으로 묶어 표시용으로 만든다. 원본은 그대로 둔다.
     ///
@@ -187,35 +186,35 @@ public:
     /// 마지막으로 수집한 것의 합계.
     double GetLastTotalMilliseconds() const { return m_lastTotalMs; }
 
-private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+  private:
+    uint32_t ReservePass(const std::string& name, const GpuPassTimingIdentity& identity);
+    template<typename T>
+    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct PassRecord
     {
         std::string name;
         GpuPassTimingIdentity identity;
-        uint32_t    beginQuery{ 0 };
-        uint32_t    endQuery{ 0 };
-        bool        used{ false };
+        uint32_t beginQuery{0};
+        uint32_t endQuery{0};
+        bool used{false};
     };
 
     // Collect()가 프레임마다 쓰는 병합 스크래치. 멤버로 둬서 용량을 유지한다 —
     // 지역 변수였을 때 프레임마다 벡터 하나 + 엔트리마다 std::string 하나를
     // 새로 할당했고, 그것이 할당 귀속 상위에 잡혔다(ContainerLibraryDesign C0).
     //
-    // 키는 입력 FrameTimings::slices[i].name을 빌린다. 다음 Collect()가 그
-    // 문자열을 바꾸기 전에 MergeSlices()의 scope guard가 모든 view를 지운다.
-    // 컨테이너 용량만 재사용하며, 반환 뒤에 빌린 키를 남기지 않는다.
+    // Flat buckets contain scratch indices only. Borrowed names are cleared
+    // before MergeSlices returns, while bucket and span storage retain capacity.
     struct MergedSpan
     {
-        uint64_t begin{ 0 };
-        uint64_t end{ 0 };
-        uint32_t slices{ 0 };
-        uint64_t duration{ 0 };
+        uint64_t begin{0};
+        uint64_t end{0};
+        uint32_t slices{0};
+        uint64_t duration{0};
     };
     std::vector<std::pair<std::string_view, MergedSpan>> m_mergeScratch;
-    // 이름 -> m_mergeScratch 위치. 조각이 수백 개라 선형 탐색이 제곱으로 커졌다.
-    std::unordered_map<std::string_view, std::size_t> m_mergeIndex;
+    std::vector<size_t> m_mergeBuckets;
 
     // busy 계산용 스크래치. 조각을 정렬해 훑어야 하는데 원본 순서를 깨면
     // 안 되므로 사본을 둔다.
@@ -224,18 +223,18 @@ private:
     // 큐를 붙잡아 둔다. 표본을 다시 뜨려면 필요하고, 주파수만 받아 두고
     // 놓아 버리면 그 뒤로는 두 시계를 맞출 수단이 없다.
     ComPtr<ID3D12CommandQueue> m_queue;
-    ClockCalibration           m_calibration;
-    std::string                m_calibrationError;
+    ClockCalibration m_calibration;
+    std::string m_calibrationError;
 
     ComPtr<ID3D12QueryHeap> m_queryHeap;
-    ComPtr<ID3D12Resource>  m_readback;
+    ComPtr<ID3D12Resource> m_readback;
 
-    uint32_t m_maxPassesPerFrame{ 0 };
-    uint32_t m_frameCount{ 0 };
+    uint32_t m_maxPassesPerFrame{0};
+    uint32_t m_frameCount{0};
 
     // 지금 **기록 중인** 슬롯. 기록은 한 번에 한 제출뿐이므로 하나면 충분하다 —
     // 읽는 쪽은 이것을 보지 않고 표의 ringSlot 을 본다.
-    uint32_t m_recordingSlot{ 0 };
+    uint32_t m_recordingSlot{0};
     // 슬롯 카운터는 원자적이다.
     //
     // 병렬 기록에서는 여러 워커가 동시에 BeginPass를 부른다. 단순 증가면
@@ -246,7 +245,7 @@ private:
     // 리스트가 같은 힙에 써도 된다. 워커마다 힙을 나눌 필요는 없었다.
 
     // 틱을 밀리초로 바꾸는 값. 큐마다 다를 수 있어 초기화 때 받아 둔다.
-    uint64_t m_ticksPerSecond{ 0 };
+    uint64_t m_ticksPerSecond{0};
 
     // 레코드는 미리 크기를 잡고 인덱스로 접근한다. push_back은 재할당을
     // 일으켜 병렬에서 성립하지 않는다.
@@ -267,7 +266,6 @@ private:
     // 슬롯마다의 사용 패스 수와 표. atomic 은 복사도 이동도 안 되므로
     // vector 가 아니라 고정 배열로 둔다.
     std::unique_ptr<std::atomic<uint32_t>[]> m_slotUsedPasses;
-    std::vector<GpuFrameToken>               m_slotTokens;
-    double m_lastTotalMs{ 0.0 };
+    std::vector<GpuFrameToken> m_slotTokens;
+    double m_lastTotalMs{0.0};
 };
-

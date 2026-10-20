@@ -1,3 +1,4 @@
+#include "../RHISoftwareEncoder.h"
 #include "DX12GpuProfiler.h"
 #include "DX12Encoder.h"
 
@@ -12,10 +13,10 @@ namespace
         oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
         return oss.str();
     }
-}
+} // namespace
 
-bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue,
-    uint32_t maxPassesPerFrame, uint32_t frameCount, std::string& outError)
+bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t maxPassesPerFrame,
+                                 uint32_t frameCount, std::string& outError)
 {
     if (nullptr == device || nullptr == queue || 0 == maxPassesPerFrame || 0 == frameCount)
     {
@@ -56,7 +57,7 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
     }
     m_slotTokens.assign(frameCount, GpuFrameToken{});
 
-    const uint32_t queriesPerFrame = maxPassesPerFrame * 2;   // 패스마다 시작·끝
+    const uint32_t queriesPerFrame = maxPassesPerFrame * 2; // 패스마다 시작·끝
     const uint32_t totalQueries = queriesPerFrame * frameCount;
 
     D3D12_QUERY_HEAP_DESC heapDesc{};
@@ -82,8 +83,8 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
     desc.SampleDesc.Count = 1;
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    hr = device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_readback));
+    hr = device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON,
+                                         nullptr, IID_PPV_ARGS(&m_readback));
     if (FAILED(hr))
     {
         outError = "질의 리드백 버퍼 생성 실패 " + ProfilerHrToString(hr);
@@ -166,15 +167,20 @@ bool DX12GpuProfiler::SampleClockCalibration(std::string& outError)
 
 void DX12GpuProfiler::RefreshClockCalibrationIfStale()
 {
-    if (!m_queue || 0 == m_calibration.cpuTicksPerSecond) return;
+    if (!m_queue || 0 == m_calibration.cpuTicksPerSecond)
+    {
+        return;
+    }
 
     LARGE_INTEGER nowTick{};
     QueryPerformanceCounter(&nowTick);
-    const int64_t elapsed =
-        nowTick.QuadPart - static_cast<int64_t>(m_calibration.lastSampleCpuTick);
-    const int64_t interval = static_cast<int64_t>(
-        static_cast<double>(m_calibration.cpuTicksPerSecond) * kCalibrationIntervalSeconds);
-    if (elapsed < interval) return;
+    const int64_t elapsed = nowTick.QuadPart - static_cast<int64_t>(m_calibration.lastSampleCpuTick);
+    const int64_t interval =
+        static_cast<int64_t>(static_cast<double>(m_calibration.cpuTicksPerSecond) * kCalibrationIntervalSeconds);
+    if (elapsed < interval)
+    {
+        return;
+    }
 
     m_calibrationError.clear();
     SampleClockCalibration(m_calibrationError);
@@ -182,10 +188,12 @@ void DX12GpuProfiler::RefreshClockCalibrationIfStale()
 
 uint64_t DX12GpuProfiler::GpuTickToCpuTick(uint64_t gpuTick) const
 {
-    if (!m_calibration.valid || 0 == m_calibration.gpuTicksPerSecond) return 0;
+    if (!m_calibration.valid || 0 == m_calibration.gpuTicksPerSecond)
+    {
+        return 0;
+    }
 
-    const int64_t gpuDelta =
-        static_cast<int64_t>(gpuTick) - static_cast<int64_t>(m_calibration.gpuTicks);
+    const int64_t gpuDelta = static_cast<int64_t>(gpuTick) - static_cast<int64_t>(m_calibration.gpuTicks);
     const int64_t gpuFrequency = static_cast<int64_t>(m_calibration.gpuTicksPerSecond);
     const int64_t cpuFrequency = static_cast<int64_t>(m_calibration.cpuTicksPerSecond);
 
@@ -197,8 +205,8 @@ uint64_t DX12GpuProfiler::GpuTickToCpuTick(uint64_t gpuTick) const
     return static_cast<uint64_t>(static_cast<int64_t>(m_calibration.cpuTicks) + cpuDelta);
 }
 
-GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
-    uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration)
+GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId,
+                                          uint64_t captureGeneration)
 {
     GpuFrameToken token;
     token.engineFrameId = engineFrameId;
@@ -241,32 +249,99 @@ GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
 
 GpuFrameToken DX12GpuProfiler::SlotToken(uint32_t ringSlot) const
 {
-    if (ringSlot >= m_slotTokens.size()) return GpuFrameToken{};
+    if (ringSlot >= m_slotTokens.size())
+    {
+        return GpuFrameToken{};
+    }
     return m_slotTokens[ringSlot];
 }
 
-uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name,
-    const GpuPassTimingIdentity& identity)
+namespace
 {
-    auto* const dx12Encoder = dynamic_cast<DX12Encoder*>(&encoder);
-    return (nullptr != dx12Encoder)
-        ? BeginPass(dx12Encoder->GetCommandList(), name, identity) : kInvalidSlot;
+    struct DX12SoftwareTimestamp
+    {
+        ID3D12QueryHeap* heap;
+        uint32_t query;
+    };
+
+    bool ReplayDX12SoftwareTimestamp(RHIEncoder& encoder, const void* data)
+    {
+        const auto& timestamp = *static_cast<const DX12SoftwareTimestamp*>(data);
+        auto* native = dynamic_cast<DX12Encoder*>(&encoder);
+        if (!native || !native->GetCommandList() || !timestamp.heap)
+        {
+            return false;
+        }
+        native->GetCommandList()->EndQuery(timestamp.heap, D3D12_QUERY_TYPE_TIMESTAMP, timestamp.query);
+        return true;
+    }
+} // namespace
+
+uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name, const GpuPassTimingIdentity& identity)
+{
+    if (auto* software = dynamic_cast<RHISoftwareEncoder*>(&encoder))
+    {
+        const auto slot = ReservePass(name, identity);
+        if (slot != kInvalidSlot &&
+            !software->RecordGpuQuery(
+                RHISoftwareCommandType::BeginGpuPass,
+                DX12SoftwareTimestamp{m_queryHeap.Get(), m_records[RecordIndex(m_recordingSlot, slot)].beginQuery},
+                &ReplayDX12SoftwareTimestamp))
+        {
+            throw std::runtime_error("Software GPU begin timestamp could not be recorded.");
+        }
+        return slot;
+    }
+    auto* native = dynamic_cast<DX12Encoder*>(&encoder);
+    return native ? BeginPass(native->GetCommandList(), name, identity) : kInvalidSlot;
 }
 
 void DX12GpuProfiler::EndPass(RHIEncoder& encoder, uint32_t slot)
 {
-    auto* const dx12Encoder = dynamic_cast<DX12Encoder*>(&encoder);
-    if (nullptr != dx12Encoder) EndPass(dx12Encoder->GetCommandList(), slot);
+    if (auto* software = dynamic_cast<RHISoftwareEncoder*>(&encoder))
+    {
+        if (slot != kInvalidSlot && slot < m_maxPassesPerFrame &&
+            !software->RecordGpuQuery(
+                RHISoftwareCommandType::EndGpuPass,
+                DX12SoftwareTimestamp{m_queryHeap.Get(), m_records[RecordIndex(m_recordingSlot, slot)].endQuery},
+                &ReplayDX12SoftwareTimestamp))
+        {
+            throw std::runtime_error("Software GPU end timestamp could not be recorded.");
+        }
+        return;
+    }
+    auto* native = dynamic_cast<DX12Encoder*>(&encoder);
+    if (native)
+    {
+        EndPass(native->GetCommandList(), slot);
+    }
 }
 
 uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name,
-    const GpuPassTimingIdentity& identity)
+                                    const GpuPassTimingIdentity& identity)
 {
-    if (!m_queryHeap || nullptr == commandList) return kInvalidSlot;
+    if (!m_queryHeap || nullptr == commandList)
+    {
+        return kInvalidSlot;
+    }
 
+    const auto slot = ReservePass(name, identity);
+    if (slot != kInvalidSlot)
+    {
+        commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+                              m_records[RecordIndex(m_recordingSlot, slot)].beginQuery);
+    }
+    return slot;
+}
+
+uint32_t DX12GpuProfiler::ReservePass(const std::string& name, const GpuPassTimingIdentity& identity)
+{
+    if (!m_queryHeap)
+    {
+        return kInvalidSlot;
+    }
     // 슬롯을 원자적으로 예약한다. 병렬 기록에서는 여러 워커가 동시에 들어온다.
-    const uint32_t slot =
-        m_slotUsedPasses[m_recordingSlot].fetch_add(1, std::memory_order_relaxed);
+    const uint32_t slot = m_slotUsedPasses[m_recordingSlot].fetch_add(1, std::memory_order_relaxed);
     if (slot >= m_maxPassesPerFrame)
     {
         // 넘친 만큼 되돌리지 않는다. 되돌리면 다른 워커가 그 사이에 받은
@@ -283,39 +358,47 @@ uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, cons
     record.endQuery = base + 1;
     record.used = true;
 
-    commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, base);
     return slot;
 }
 
 void DX12GpuProfiler::EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot)
 {
-    if (!m_queryHeap || nullptr == commandList || kInvalidSlot == slot) return;
-    if (slot >= m_maxPassesPerFrame) return;
+    if (!m_queryHeap || nullptr == commandList || kInvalidSlot == slot)
+    {
+        return;
+    }
+    if (slot >= m_maxPassesPerFrame)
+    {
+        return;
+    }
 
     commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
-        m_records[RecordIndex(m_recordingSlot, slot)].endQuery);
+                          m_records[RecordIndex(m_recordingSlot, slot)].endQuery);
 }
 
-void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList,
-    const GpuFrameToken& token)
+void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList, const GpuFrameToken& token)
 {
-    if (!token.IsValid() || token.ringSlot >= m_frameCount) return;
+    if (!token.IsValid() || token.ringSlot >= m_frameCount)
+    {
+        return;
+    }
 
-    const uint32_t used = (std::min)(
-        m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed),
-        m_maxPassesPerFrame);
-    if (!m_queryHeap || nullptr == commandList || 0 == used) return;
+    const uint32_t used =
+        (std::min)(m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed), m_maxPassesPerFrame);
+    if (!m_queryHeap || nullptr == commandList || 0 == used)
+    {
+        return;
+    }
 
     // 이 제출 구간만 옮긴다. 전부 옮기면 다른 제출이 쓰는 중인 영역까지 건드린다.
     const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const uint32_t count = used * 2;
 
-    commandList->ResolveQueryData(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
-        base, count, m_readback.Get(), static_cast<uint64_t>(base) * sizeof(uint64_t));
+    commandList->ResolveQueryData(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, base, count, m_readback.Get(),
+                                  static_cast<uint64_t>(base) * sizeof(uint64_t));
 }
 
-bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
-    FrameTimings& outTimings, std::string& outError)
+bool DX12GpuProfiler::Collect(const GpuFrameToken& token, FrameTimings& outTimings, std::string& outError)
 {
     auto fail = [&outTimings](std::string& error, std::string text) -> bool
     {
@@ -349,10 +432,9 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     if (held.submissionId != token.submissionId ||
         (token.captureGeneration != 0 && held.captureGeneration != token.captureGeneration))
     {
-        return fail(outError, "GPU 수집 표가 낡았다 — 슬롯 " +
-            std::to_string(token.ringSlot) + " 은 제출 " +
-            std::to_string(held.submissionId) + " 의 것이고 물은 것은 " +
-            std::to_string(token.submissionId) + " 이다");
+        return fail(outError, "GPU 수집 표가 낡았다 — 슬롯 " + std::to_string(token.ringSlot) + " 은 제출 " +
+                                  std::to_string(held.submissionId) + " 의 것이고 물은 것은 " +
+                                  std::to_string(token.submissionId) + " 이다");
     }
 
     // The caller may have transferred/reset capture admission. Origin belongs
@@ -362,10 +444,8 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     outTimings.queueBeginTicks = 0;
     outTimings.queueEndTicks = 0;
     outTimings.busyTicks = 0;
-    const uint32_t reservedPasses =
-        m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed);
-    outTimings.overflowedPasses = reservedPasses > m_maxPassesPerFrame
-        ? reservedPasses - m_maxPassesPerFrame : 0;
+    const uint32_t reservedPasses = m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed);
+    outTimings.overflowedPasses = reservedPasses > m_maxPassesPerFrame ? reservedPasses - m_maxPassesPerFrame : 0;
     outTimings.droppedSlices = 0;
     outTimings.droppedSliceName.clear();
     outTimings.droppedSliceDeltaTicks = 0;
@@ -374,7 +454,11 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     outTimings.queueEndCpuTicks = 0;
     outTimings.cpuAligned = false;
 
-    if (!m_readback || m_records.empty()) { outTimings.slices.clear(); return true; }
+    if (!m_readback || m_records.empty())
+    {
+        outTimings.slices.clear();
+        return true;
+    }
 
     const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const size_t offset = static_cast<size_t>(base) * sizeof(uint64_t);
@@ -382,7 +466,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     const size_t bytes = static_cast<size_t>(used) * 2 * sizeof(uint64_t);
 
     void* mapped = nullptr;
-    D3D12_RANGE range{ offset, offset + bytes };
+    D3D12_RANGE range{offset, offset + bytes};
     const HRESULT hr = m_readback->Map(0, &range, &mapped);
     if (FAILED(hr))
     {
@@ -390,7 +474,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     }
 
     const auto* timestamps = static_cast<const uint64_t*>(mapped);
-    const D3D12_RANGE emptyRange{ 0, 0 };
+    const D3D12_RANGE emptyRange{0, 0};
 
     // ★ 읽은 기록이 **그 슬롯의 것**인지 질의 인덱스로 검산한다.
     //
@@ -406,18 +490,24 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     // 크기를 먼저 맞춘다. 정상 상태에서는 패스 구성이 안 바뀜므로 같은 수가
     // 나오고, 그러면 resize 가 아무것도 하지 않아 문자열 버퍼가 그대로 살아있다.
     size_t sliceCount = 0;
-    if (outTimings.slices.size() < used) outTimings.slices.resize(used);
+    if (outTimings.slices.size() < used)
+    {
+        outTimings.slices.resize(used);
+    }
 
     for (uint32_t i = 0; i < used; ++i)
     {
         const PassRecord& record = m_records[RecordIndex(token.ringSlot, i)];
-        if (!record.used) continue;
+        if (!record.used)
+        {
+            continue;
+        }
 
         if (record.beginQuery < slotQueryBegin || record.endQuery >= slotQueryEnd)
         {
             m_readback->Unmap(0, &emptyRange);
-            return fail(outError, "GPU 수집 기록이 슬롯 " +
-                std::to_string(token.ringSlot) + " 의 질의 구간 밖을 가리킨다");
+            return fail(outError,
+                        "GPU 수집 기록이 슬롯 " + std::to_string(token.ringSlot) + " 의 질의 구간 밖을 가리킨다");
         }
 
         const uint64_t begin = timestamps[record.beginQuery];
@@ -431,8 +521,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
             if (0 == outTimings.droppedSlices)
             {
                 outTimings.droppedSliceName.assign(record.name);
-                outTimings.droppedSliceDeltaTicks =
-                    static_cast<int64_t>(end) - static_cast<int64_t>(begin);
+                outTimings.droppedSliceDeltaTicks = static_cast<int64_t>(end) - static_cast<int64_t>(begin);
             }
             ++outTimings.droppedSlices;
             continue;
@@ -440,7 +529,10 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
 
         // 길이 0 은 버리지 않는다. 그 패스는 그릴 것이 없어 일찍 빠져나갔을
         // 뿐이고, 없었던 것처럼 지우면 타임라인에서 그 패스가 통째로 사라진다.
-        if (end == begin) ++outTimings.zeroLengthSlices;
+        if (end == begin)
+        {
+            ++outTimings.zeroLengthSlices;
+        }
 
         PassSlice& slice = outTimings.slices[sliceCount++];
         slice.name.assign(record.name);
@@ -452,7 +544,10 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     outTimings.slices.resize(sliceCount);
     m_readback->Unmap(0, &emptyRange);
 
-    if (0 == sliceCount) return true;
+    if (0 == sliceCount)
+    {
+        return true;
+    }
 
     // queue span 과 busy 를 가른다(§3.4).
     //
@@ -465,7 +560,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     m_busyScratch.reserve(sliceCount);
     uint64_t queueBegin = outTimings.slices[0].beginTicks;
     uint64_t queueEnd = outTimings.slices[0].endTicks;
-    for (const PassSlice& slice : outTimings.slices)
+    for (const PassSlice& slice : std::span(outTimings.slices.data(), outTimings.slices.size()))
     {
         queueBegin = (std::min)(queueBegin, slice.beginTicks);
         queueEnd = (std::max)(queueEnd, slice.endTicks);
@@ -474,7 +569,8 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     outTimings.queueBeginTicks = queueBegin;
     outTimings.queueEndTicks = queueEnd;
 
-    std::sort(m_busyScratch.begin(), m_busyScratch.end());
+    auto busySpans = std::span(m_busyScratch.data(), m_busyScratch.size());
+    std::sort(busySpans.begin(), busySpans.end());
     uint64_t busy = 0;
     uint64_t runBegin = m_busyScratch[0].first;
     uint64_t runEnd = m_busyScratch[0].second;
@@ -504,54 +600,72 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     return true;
 }
 
-void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
-    std::vector<PassTiming>& outTimings)
+void DX12GpuProfiler::MergeSlices(const FrameTimings& timings, std::vector<PassTiming>& outTimings)
 {
     m_lastTotalMs = 0.0;
 
-    // 스크래치는 멤버다(선언부 주석) — clear 는 용량을 지우지 않는다.
-    m_mergeScratch.clear();
-    m_mergeIndex.clear();
-    // Collect may overwrite/reallocate slice names before the next merge. A
-    // borrowed hash key must remain immutable even during unordered_map::clear:
-    // MSVC's sparse clear hashes keys again to locate their original buckets.
-    // Release every view before returning, including output allocation failures.
-    // The containers retain their capacity; no frame owns these borrowed names.
+    // Reuse flat, index-only buckets. No per-frame hash nodes or Debug STL
+    // iterators are constructed, and no borrowed name survives this call.
+    const size_t required = timings.slices.size();
+    if (required > (std::numeric_limits<size_t>::max)() / 4)
+    {
+        throw std::length_error("GPU timing merge exceeds bucket capacity.");
+    }
+    size_t bucketCount = 1;
+    while (bucketCount < required * 2)
+    {
+        bucketCount *= 2;
+    }
+    if (m_mergeBuckets.size() < bucketCount)
+    {
+        m_mergeBuckets.resize(bucketCount);
+    }
+    std::fill_n(m_mergeBuckets.data(), bucketCount, size_t{});
+    if (m_mergeScratch.size() < required)
+    {
+        m_mergeScratch.resize(required);
+    }
+    size_t mergedCount{};
     struct BorrowedNamesScope
     {
-        decltype(m_mergeIndex)& index;
         decltype(m_mergeScratch)& scratch;
+        size_t& count;
         ~BorrowedNamesScope()
         {
-            index.clear();
-            scratch.clear();
+            for (size_t index = 0; index < count; ++index)
+            {
+                scratch[index].first = {};
+            }
         }
-    } borrowedNames{m_mergeIndex, m_mergeScratch};
-    for (const PassSlice& slice : timings.slices)
+    } borrowedNames{m_mergeScratch, mergedCount};
+    for (const PassSlice& slice : std::span(timings.slices.data(), timings.slices.size()))
     {
-        // 키는 slice.name 을 가리키는 view 다 — 사본을 만들지 않는다.
-        const auto [index, inserted] = m_mergeIndex.try_emplace(std::string_view{ slice.name }, m_mergeScratch.size());
-        if (inserted)
+        const std::string_view name{slice.name};
+        size_t bucket = std::hash<std::string_view>{}(name) & (bucketCount - 1);
+        while (m_mergeBuckets[bucket] && m_mergeScratch[m_mergeBuckets[bucket] - 1].first != name)
         {
-            m_mergeScratch.emplace_back(std::string_view{ slice.name },
-                MergedSpan{ slice.beginTicks, slice.endTicks, 1, slice.endTicks - slice.beginTicks });
+            bucket = (bucket + 1) & (bucketCount - 1);
+        }
+        if (!m_mergeBuckets[bucket])
+        {
+            m_mergeScratch[mergedCount] = {name,
+                                           {slice.beginTicks, slice.endTicks, 1, slice.endTicks - slice.beginTicks}};
+            m_mergeBuckets[bucket] = ++mergedCount;
             continue;
         }
-
-        const auto found = m_mergeScratch.begin() + static_cast<std::ptrdiff_t>(index->second);
-        found->second.begin = (std::min)(found->second.begin, slice.beginTicks);
-        found->second.end = (std::max)(found->second.end, slice.endTicks);
-        ++found->second.slices;
-        found->second.duration += slice.endTicks - slice.beginTicks;
+        auto& merged = m_mergeScratch[m_mergeBuckets[bucket] - 1].second;
+        merged.begin = (std::min)(merged.begin, slice.beginTicks);
+        merged.end = (std::max)(merged.end, slice.endTicks);
+        ++merged.slices;
+        merged.duration += slice.endTicks - slice.beginTicks;
     }
 
     // clear + push_back 이 아니라 resize + 제자리 대입이다. 문자열이 이미 들고
     // 있는 버퍼를 재사용해야 프레임마다 새로 할당하지 않는다.
-    outTimings.resize(m_mergeScratch.size());
-    const double toMs = (timings.ticksPerSecond > 0)
-        ? (1000.0 / static_cast<double>(timings.ticksPerSecond)) : 0.0;
+    outTimings.resize(mergedCount);
+    const double toMs = (timings.ticksPerSecond > 0) ? (1000.0 / static_cast<double>(timings.ticksPerSecond)) : 0.0;
 
-    for (size_t i = 0; i < m_mergeScratch.size(); ++i)
+    for (size_t i = 0; i < mergedCount; ++i)
     {
         const auto& entry = m_mergeScratch[i];
         PassTiming& timing = outTimings[i];
@@ -562,13 +676,16 @@ void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
             // std::to_string 은 할당한다 — 스택 버퍼에 찍어 붙인다.
             char suffix[24]{};
             const int len = std::snprintf(suffix, sizeof(suffix), "(x%u)", entry.second.slices);
-            if (len > 0) { timing.name.append(suffix, static_cast<size_t>(len)); }
+            if (len > 0)
+            {
+                timing.name.append(suffix, static_cast<size_t>(len));
+            }
         }
 
         timing.spanMilliseconds = (entry.second.end > entry.second.begin)
-            ? static_cast<double>(entry.second.end - entry.second.begin) * toMs : 0.0;
+                                      ? static_cast<double>(entry.second.end - entry.second.begin) * toMs
+                                      : 0.0;
         timing.milliseconds = static_cast<double>(entry.second.duration) * toMs;
         m_lastTotalMs += timing.milliseconds;
     }
 }
-

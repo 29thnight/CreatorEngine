@@ -27,13 +27,12 @@ namespace
         }
         return hash;
     }
-}
+} // namespace
 
 // ── DX12DescriptorRecycler ──
 
-bool DX12DescriptorRecycler::Initialize(ID3D12Device* device,
-    D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t descriptorsPerPage,
-    uint32_t initialVersions, std::string& outError)
+bool DX12DescriptorRecycler::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                        uint32_t descriptorsPerPage, uint32_t initialVersions, std::string& outError)
 {
     if (nullptr == device || 0 == descriptorsPerPage || 0 == initialVersions)
     {
@@ -76,9 +75,18 @@ bool DX12DescriptorRecycler::Initialize(ID3D12Device* device,
 
 bool DX12DescriptorRecycler::EnsurePage(uint32_t slot, std::string& outError)
 {
-    if (!m_device || 0 == m_descriptorsPerPage) return false;
-    if (slot >= m_pages.size()) m_pages.resize(static_cast<size_t>(slot) + 1);
-    if (m_pages[slot]) return true;
+    if (!m_device || 0 == m_descriptorsPerPage)
+    {
+        return false;
+    }
+    if (slot >= m_pages.size())
+    {
+        m_pages.resize(static_cast<size_t>(slot) + 1);
+    }
+    if (m_pages[slot])
+    {
+        return true;
+    }
 
     D3D12_DESCRIPTOR_HEAP_DESC desc{};
     desc.Type = m_type;
@@ -86,8 +94,7 @@ bool DX12DescriptorRecycler::EnsurePage(uint32_t slot, std::string& outError)
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
     auto page = std::make_unique<Page>();
-    const HRESULT hr = m_device->CreateDescriptorHeap(
-        &desc, IID_PPV_ARGS(&page->heap));
+    const HRESULT hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&page->heap));
     if (FAILED(hr))
     {
         outError = "디스크립터 page 생성 실패 " + DescHeapHrToString(hr);
@@ -101,6 +108,25 @@ bool DX12DescriptorRecycler::EnsurePage(uint32_t slot, std::string& outError)
     page->heap->SetName(name.c_str());
     m_pages[slot] = std::move(page);
     return true;
+}
+
+DX12DescriptorRecycler::RecordingLease DX12DescriptorRecycler::PinRecording(uint64_t version)
+{
+    RecordingLease result;
+    if (!m_activePage || m_activePage->sealed || version != m_activeVersion.ToToken())
+    {
+        return {};
+    }
+    const auto handle = RHIDescriptorVersionHandle::FromToken(version);
+    result.reuseLease = m_versions.PinRecording(handle);
+    if (!result.reuseLease || handle.slot >= m_pages.size() || !m_pages[handle.slot])
+    {
+        return {};
+    }
+    result.heap = m_pages[handle.slot]->heap;
+    result.version = version;
+    m_activePage->sealed = true;
+    return result;
 }
 
 void DX12DescriptorRecycler::Shutdown()
@@ -120,11 +146,9 @@ void DX12DescriptorRecycler::Collect(RHICompletionPoint completed)
     m_versions.Collect(completed);
 }
 
-bool DX12DescriptorRecycler::BeginRecording(uint64_t recordingId,
-    std::string& outError)
+bool DX12DescriptorRecycler::BeginRecording(uint64_t recordingId, std::string& outError)
 {
-    const RHIDescriptorVersionAcquire acquired =
-        m_versions.BeginRecording(recordingId);
+    const RHIDescriptorVersionAcquire acquired = m_versions.BeginRecording(recordingId);
     if (!acquired.IsValid())
     {
         outError = "디스크립터 recording version 획득 실패";
@@ -133,8 +157,7 @@ bool DX12DescriptorRecycler::BeginRecording(uint64_t recordingId,
 
     // policy의 같은 recordingId 재호출은 멱등이다. 이미 활성화된 page를
     // 되감으면 앞서 작성한 descriptor를 제자리에서 덮게 되므로 그대로 둔다.
-    if (nullptr != m_activePage &&
-        m_activeVersion.slot == acquired.handle.slot &&
+    if (nullptr != m_activePage && m_activeVersion.slot == acquired.handle.slot &&
         m_activeVersion.generation == acquired.handle.generation)
     {
         return true;
@@ -148,13 +171,16 @@ bool DX12DescriptorRecycler::BeginRecording(uint64_t recordingId,
     m_activeVersion = acquired.handle;
     m_activePage = m_pages[acquired.handle.slot].get();
     m_activePage->cursor.store(0, std::memory_order_relaxed);
+    m_activePage->sealed = false;
     return true;
 }
 
-void DX12DescriptorRecycler::OnSubmitted(uint64_t recordingId,
-    RHICompletionPoint completion)
+void DX12DescriptorRecycler::OnSubmitted(uint64_t recordingId, RHICompletionPoint completion)
 {
-    if (!m_versions.OnSubmitted(recordingId, completion)) return;
+    if (!m_versions.OnSubmitted(recordingId, completion))
+    {
+        return;
+    }
     m_activePage = nullptr;
     m_activeVersion = {};
 }
@@ -166,7 +192,10 @@ void DX12DescriptorRecycler::RejectSubmission(uint64_t recordingId, RHICompletio
 
 void DX12DescriptorRecycler::AbortRecording(uint64_t recordingId)
 {
-    if (!m_versions.AbortRecording(recordingId)) return;
+    if (!m_versions.AbortRecording(recordingId))
+    {
+        return;
+    }
     m_activePage = nullptr;
     m_activeVersion = {};
 }
@@ -175,8 +204,7 @@ void DX12DescriptorRecycler::RecordPeak(uint32_t used)
 {
     uint32_t peak = m_stats.peakRecordingDescriptors.load(std::memory_order_relaxed);
     while (used > peak &&
-        !m_stats.peakRecordingDescriptors.compare_exchange_weak(
-            peak, used, std::memory_order_relaxed))
+           !m_stats.peakRecordingDescriptors.compare_exchange_weak(peak, used, std::memory_order_relaxed))
     {
     }
 }
@@ -185,8 +213,10 @@ DX12DescriptorRecycler::Allocation DX12DescriptorRecycler::Allocate(uint32_t cou
 {
     Allocation allocation{};
     Page* const page = m_activePage;
-    if (nullptr == page || !m_versions.IsCurrent(m_activeVersion) || 0 == count)
+    if (nullptr == page || page->sealed || !m_versions.IsCurrent(m_activeVersion) || 0 == count)
+    {
         return allocation;
+    }
 
     // page 하나를 worker들이 공유하므로 cursor 예약은 원자적이다.
     uint32_t current = page->cursor.load(std::memory_order_relaxed);
@@ -194,15 +224,13 @@ DX12DescriptorRecycler::Allocation DX12DescriptorRecycler::Allocate(uint32_t cou
 
     do
     {
-        if (count > m_descriptorsPerPage ||
-            current > m_descriptorsPerPage - count)
+        if (count > m_descriptorsPerPage || current > m_descriptorsPerPage - count)
         {
             m_stats.overflows.fetch_add(1, std::memory_order_relaxed);
             return allocation;
         }
         next = current + count;
-    } while (!page->cursor.compare_exchange_weak(
-        current, next, std::memory_order_relaxed));
+    } while (!page->cursor.compare_exchange_weak(current, next, std::memory_order_relaxed));
 
     allocation.cpu = page->cpuBase;
     allocation.cpu.ptr += static_cast<SIZE_T>(current) * m_incrementSize;
@@ -223,8 +251,8 @@ DX12DescriptorRecycler::Allocation DX12DescriptorRecycler::Allocate(uint32_t cou
 
 // ── DX12TargetViewHeap ──
 
-bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-    uint32_t capacity, std::string& outError)
+bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity,
+                                    std::string& outError)
 {
     if (nullptr == device || 0 == capacity)
     {
@@ -241,8 +269,7 @@ bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_
     //
     // 셰이더 가시 CBV/SRV/UAV는 DX12DescriptorRecycler 몫이다 — 그쪽은
     // GPU가 드로우 동안 읽으므로 프레임 구간과 펜스가 필요하다.
-    if (type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV &&
-        type != D3D12_DESCRIPTOR_HEAP_TYPE_DSV &&
+    if (type != D3D12_DESCRIPTOR_HEAP_TYPE_RTV && type != D3D12_DESCRIPTOR_HEAP_TYPE_DSV &&
         type != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
     {
         outError = "타깃 뷰 힙은 RTV/DSV/비가시 UAV 전용이다";
@@ -282,17 +309,55 @@ void DX12TargetViewHeap::BeginFrame()
     // 직전 프레임 사용량을 남긴다 — 용량을 정하는 유일한 근거다.
     const uint32_t used = m_cursor.load(std::memory_order_relaxed);
     uint32_t peak = m_peakFrameDescriptors.load(std::memory_order_relaxed);
-    while (used > peak &&
-        !m_peakFrameDescriptors.compare_exchange_weak(peak, used, std::memory_order_relaxed))
+    while (used > peak && !m_peakFrameDescriptors.compare_exchange_weak(peak, used, std::memory_order_relaxed))
     {
     }
 
     m_cursor.store(0, std::memory_order_relaxed);
 }
 
+bool DX12TargetViewHeap::Capture(ID3D12Device& device, Snapshot& result, std::string& outError,
+                                 ID3D12DescriptorHeap* reusableHeap) const
+{
+    if (result.heap || !m_heap)
+    {
+        outError = "Target descriptor snapshot requires an empty output and initialized source.";
+        return false;
+    }
+    Snapshot snapshot;
+    snapshot.count = GetFrameUsed();
+    snapshot.incrementSize = m_incrementSize;
+    if (snapshot.count != 0)
+    {
+        auto desc = m_heap->GetDesc();
+        desc.NumDescriptors = snapshot.count;
+        if (reusableHeap && reusableHeap->GetDesc().Type == desc.Type && reusableHeap->GetDesc().Flags == desc.Flags &&
+            reusableHeap->GetDesc().NumDescriptors >= snapshot.count)
+        {
+            snapshot.heap = reusableHeap;
+        }
+        else
+        {
+            const HRESULT hr = device.CreateDescriptorHeap(&desc, IID_PPV_ARGS(&snapshot.heap));
+            if (FAILED(hr))
+            {
+                outError = "Target descriptor snapshot creation failed " + DescHeapHrToString(hr);
+                return false;
+            }
+        }
+        snapshot.cpuBase = snapshot.heap->GetCPUDescriptorHandleForHeapStart();
+        device.CopyDescriptorsSimple(snapshot.count, snapshot.cpuBase, m_cpuBase, desc.Type);
+    }
+    result = std::move(snapshot);
+    return true;
+}
+
 uint32_t DX12TargetViewHeap::Allocate(uint32_t count)
 {
-    if (!m_heap || 0 == count) return kInvalidIndex;
+    if (!m_heap || 0 == count)
+    {
+        return kInvalidIndex;
+    }
 
     uint32_t current = m_cursor.load(std::memory_order_relaxed);
     uint32_t next = 0;
@@ -341,7 +406,10 @@ bool DX12SamplerHeap::Initialize(ID3D12Device* device, uint32_t capacity, std::s
 
     // 하드웨어 상한이 2048이다. 넘겨서 만들면 생성 자체가 실패하므로 여기서 자른다.
     constexpr uint32_t kMaxSamplers = D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE;
-    if (capacity > kMaxSamplers) capacity = kMaxSamplers;
+    if (capacity > kMaxSamplers)
+    {
+        capacity = kMaxSamplers;
+    }
 
     D3D12_DESCRIPTOR_HEAP_DESC desc{};
     desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
@@ -382,7 +450,10 @@ void DX12SamplerHeap::Shutdown()
 D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::GetOrCreate(const RHISamplerDesc& desc)
 {
     D3D12_GPU_DESCRIPTOR_HANDLE handle{};
-    if (!m_heap) return handle;
+    if (!m_heap)
+    {
+        return handle;
+    }
 
     const uint64_t hash = ComputeHash(desc);
 
@@ -420,13 +491,19 @@ D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::GetOrCreate(const RHISamplerDesc& d
 D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::CreateRange(std::span<const RHISamplerDesc> descs)
 {
     D3D12_GPU_DESCRIPTOR_HANDLE handle{};
-    if (!m_heap || descs.empty()) return handle;
+    if (!m_heap || descs.empty())
+    {
+        return handle;
+    }
 
     const uint32_t count = static_cast<uint32_t>(descs.size());
 
     std::vector<uint64_t> key;
     key.reserve(count);
-    for (const auto& desc : descs) key.push_back(ComputeHash(desc));
+    for (const auto& desc : descs)
+    {
+        key.push_back(ComputeHash(desc));
+    }
 
     std::lock_guard<std::mutex> guard(m_mutex);
 
@@ -472,4 +549,3 @@ size_t DX12SamplerHeap::GetCachedCount() const
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_cache.size();
 }
-

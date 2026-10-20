@@ -23,6 +23,7 @@
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\RHIQueueContractTests.h" />
+    <ClInclude Include="RHI\DX12\Tests\RHISoftwareNativeTests.h" />
     <ClInclude Include="RHI\DX12\Tests\RHIQueueNativeTests.h" />
     <ClInclude Include="RHI\DX12\Tests\RHIQueueOwnershipTests.h" />
     <ClInclude Include="RHI\DX12\Tests\RenderQueueScheduleRg8Tests.h" />

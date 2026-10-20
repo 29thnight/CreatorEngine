@@ -26,6 +26,16 @@ class IRHIParallelCommandPool
     virtual bool IsInitialized() const = 0;
     virtual uint32_t GetWorkerCount() const = 0;
 
+    // A frozen pool owns batch-specific targets and resource leases. Its identity
+    // remains valid after submission admission advances the producer recording.
+    virtual bool GetTranslationRecording(uint64_t& uploadRecordingId, uint64_t& descriptorVersion) const
+    {
+        uploadRecordingId = 0;
+        descriptorVersion = 0;
+        return false;
+    }
+
+
     /// 이 frame slot의 GPU 사용이 끝난 뒤 호출한다.
     virtual void BeginFrame(uint32_t frameIndex) = 0;
 

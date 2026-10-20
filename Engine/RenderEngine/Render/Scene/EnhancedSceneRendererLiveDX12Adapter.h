@@ -18,6 +18,8 @@ class IRenderPipelineCache;
 class IRenderRootSignatureCache;
 class IRenderTextureCache;
 class RHIRecordedBatch;
+class RHISoftwareBatch;
+struct RHIRecordedBatchDesc;
 class RHISubmissionTicket;
 class EnhancedRenderGraph;
 struct RHIVideoMemoryInfo;
@@ -76,6 +78,10 @@ public:
     uint64_t GetBackendGeneration() const;
     bool EnqueueRecordedBatch(RHIRecordedBatch&& batch,
         RHISubmissionTicket& outTicket, std::string& outError);
+    bool UsesSoftwareRecording() const;
+    bool RecordSoftwareGraph(EnhancedRenderGraph& graph, uint32_t workerCount,
+        const RHIRecordedBatchDesc& desc, RHISoftwareBatch& outBatch, std::string& outError);
+    bool EnqueueSoftwareBatch(RHISoftwareBatch&& batch, RHISubmissionTicket& outTicket, std::string& outError);
     void WaitForGpu();
     bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
     bool HasDeviceLossProof() const;

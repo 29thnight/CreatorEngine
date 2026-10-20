@@ -1,3 +1,6 @@
+#include "DX12SoftwareCommandValidator.h"
+#include "DX12CommandTranslator.h"
+#include "../RHISoftwareRecorder.h"
 #include "../../Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h"
 
 #include "../../GpuDiagnostics.h"
@@ -802,6 +805,58 @@ bool EnhancedSceneRendererLiveDX12Adapter::EnqueueRecordedBatch(
     Impl& impl = *m_impl;
     return GetRHISubmissionThread().EnqueueRecordedBatch(&impl.resources,
         impl.resources, std::move(batch), outTicket, outError);
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::UsesSoftwareRecording() const
+{
+    static const bool enabled = []
+    {
+        char* value{};
+        size_t length{};
+        const bool available = _dupenv_s(&value, &length, "CREATOR_RHI_SOFTWARE_COMMANDS") == 0;
+        const bool result = available && value && std::strcmp(value, "1") == 0;
+        std::free(value);
+        return result;
+    }();
+    return !UsesOwnedQueueExecution() && enabled;
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::RecordSoftwareGraph(EnhancedRenderGraph& graph, uint32_t workerCount,
+    const RHIRecordedBatchDesc& desc, RHISoftwareBatch& outBatch, std::string& outError)
+{
+    auto& impl = *m_impl;
+    std::shared_ptr<IRHICommandQueue> primary;
+    if (!impl.resources.GetPrimaryGraphicsQueue(primary, outError))
+    {
+        return false;
+    }
+    DX12SoftwareCommandValidator validator(impl.resources);
+    RHISoftwareRecorder recorder(validator);
+    RHISoftwareBatchDesc software;
+    software.frameId = desc.frameId;
+    software.backendGeneration = desc.backendGeneration;
+    software.displayToken = desc.displayToken;
+    software.queue = primary->GetIdentity();
+    software.lifetimeToken = desc.lifetimeToken;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+    software.captureContext = desc.captureContext;
+    software.renderViewId = desc.captureContext.render_view_id;
+#endif
+    return graph.RecordSoftware(impl.commandPool, workerCount, recorder, software, outBatch, outError);
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::EnqueueSoftwareBatch(RHISoftwareBatch&& batch,
+    RHISubmissionTicket& outTicket, std::string& outError)
+{
+    auto& impl = *m_impl;
+    std::shared_ptr<DX12CommandListPool> frozen;
+    if (!impl.commandPool.CreateTranslationPool(frozen, outError))
+    {
+        return false;
+    }
+    auto translator = std::make_shared<DX12CommandTranslator>(*frozen, impl.resources, batch.GetDesc().queue);
+    return GetRHISubmissionThread().EnqueueSoftwareBatch(&impl.resources, impl.resources, frozen,
+        std::move(translator), std::move(batch), outTicket, outError);
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::WaitForGpu()
@@ -1794,4 +1849,3 @@ std::string EnhancedSceneRendererLiveDX12Adapter::FormatTargetHeapStatus() const
         static_cast<unsigned long long>(dsvStats.overflows));
     return line;
 }
-

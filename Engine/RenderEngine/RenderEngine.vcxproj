@@ -250,6 +250,11 @@
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
     <ClCompile Include="RHI\DX12\DX12QueueService.cpp" />
+    <ClCompile Include="RHI\RHISoftwareCommandList.cpp" />
+    <ClCompile Include="RHI\RHISoftwareEncoder.cpp" />
+    <ClCompile Include="RHI\RHISoftwareBatch.cpp" />
+    <ClCompile Include="RHI\RHISoftwareRecorder.cpp" />
+    <ClCompile Include="RHI\RHICommandTranslator.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
@@ -777,6 +782,7 @@
     <ClInclude Include="MeshTransformDeclarationPlan.h" />
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />
+    <ClInclude Include="MaterialGraphPacketPlan.h" />
     <ClInclude Include="MaterialGraphPacketWork.h" />
     <ClInclude Include="MaterialGraphBindingDiagnostics.h" />
     <ClInclude Include="MaterialGraphPreparationTasks.h" />
@@ -928,6 +934,15 @@
     <ClInclude Include="Render\Temporal\TemporalReconstruction.h" />
     <ClInclude Include="Render\Temporal\ITemporalUpscaler.h" />
     <ClInclude Include="Render\Temporal\ITemporalFrameGenerator.h" />
+    <ClInclude Include="RHI\RHISoftwareCommandTypes.h" />
+    <ClInclude Include="RHI\RHISoftwareCommandList.h" />
+    <ClInclude Include="RHI\RHISoftwareEncoder.h" />
+    <ClInclude Include="RHI\RHISoftwareBatch.h" />
+    <ClInclude Include="RHI\RHISoftwareRecorder.h" />
+    <ClInclude Include="RHI\IRHICommandTranslator.h" />
+    <ClInclude Include="RHI\DX12\DX12CommandTranslator.h" />
+    <ClInclude Include="RHI\DX12\DX12SoftwareCommandValidator.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanCommandTranslator.h" />
     <ClInclude Include="RHI\RHIEncoder.h" />
     <ClInclude Include="RHI\IRHIGpuProfiler.h" />
     <ClInclude Include="RHI\RHIParallelCommandPool.h" />
@@ -1015,5 +1030,24 @@
     <ClInclude Include="RHI\DX12\DX12Format.h" />
     <ClInclude Include="RHI\DX12\DX12PipelineLayoutTranslate.h" />
     <ClInclude Include="RHI\DX12\DX12ResourceTable.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RenderAllocator.h" />
+    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <CompileAs>CompileAsC</CompileAs>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <PreprocessorDefinitions>MI_STATIC_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\ThirdParty\mimalloc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <Optimization>MaxSpeed</Optimization>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="RenderArena.h" />
+    <ClCompile Include="RenderArena.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
   </ItemGroup>
 </Project>

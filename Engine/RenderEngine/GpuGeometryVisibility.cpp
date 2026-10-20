@@ -156,6 +156,7 @@ struct GpuGeometryVisibility::BufferPool
         std::mutex m_mutex;
         std::array<std::vector<EnhancedRenderGraph::RGPassUsage>, 5> m_uses;
         std::vector<size_t> m_normalize;
+        std::vector<const material_graph::MeshSurfaceBatch*> m_geometrySeen;
     };
     struct UploadScratch
     {
@@ -1518,6 +1519,8 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     auto& countUses = scratch.m_uses[2];
     auto& finalizeUses = scratch.m_uses[3];
     auto& scatterUses = scratch.m_uses[4];
+    scratch.m_geometrySeen.clear();
+    scratch.m_geometrySeen.reserve(pendingBins);
     resetUses.reserve(pendingBins + ownerCount * 2u + 1u);
     cullUses.reserve(pendingBins * 2u + ownerCount * (3u + GpuGeometryOcclusion::kMaximumLevels) + 1u);
     finalizeUses.reserve(ownerCount * 2u);
@@ -1549,6 +1552,12 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         advance(*frame, cullUses, false);
         for (const auto& geometry : frame->m_meshletGeometries)
         {
+            const auto seen = std::span{scratch.m_geometrySeen};
+            if (std::ranges::find(seen, geometry.get()) != seen.end())
+            {
+                continue;
+            }
+            scratch.m_geometrySeen.push_back(geometry.get());
             const auto topology = geometry->GraphMeshlets(graph);
             resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
             if (geometry->UsesDirectClusters() && geometry->IsObjectSpace() &&

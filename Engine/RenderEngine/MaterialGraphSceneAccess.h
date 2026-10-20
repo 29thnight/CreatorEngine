@@ -44,10 +44,14 @@ namespace material_graph
         {
             size_t operator()(const RGHandle& handle) const noexcept
             {
-                const uint64_t slot = uint64_t(handle.index) | (uint64_t(handle.version) << 16) |
-                    (uint64_t(handle.kind) << 32);
-                return std::hash<uint64_t>{}(slot) ^ (std::hash<uint64_t>{}(handle.epoch) +
-                    size_t{0x9e3779b9u} + (size_t(slot) << 6) + (size_t(slot) >> 2));
+                uint64_t slot =
+                    uint64_t(handle.index) | (uint64_t(handle.version) << 16) | (uint64_t(handle.kind) << 32);
+                // These are integer fields, not byte strings. Full identity is
+                // still checked after a collision, including kind and epoch.
+                slot ^= handle.epoch + uint64_t{0x9e3779b97f4a7c15ull} + (slot << 6) + (slot >> 2);
+                slot ^= slot >> 33;
+                slot *= uint64_t{0xff51afd7ed558ccdull};
+                return size_t(slot ^ (slot >> 33));
             }
         };
         struct SameHandle

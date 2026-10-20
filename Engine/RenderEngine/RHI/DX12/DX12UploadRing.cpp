@@ -1,6 +1,5 @@
 #include "DX12UploadRing.h"
 
-
 #include "DX12ResourceTable.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -18,17 +17,17 @@ namespace
     {
         alignment = (std::max)(alignment, 1ull);
         if (value > (std::numeric_limits<uint64_t>::max)() - (alignment - 1))
+        {
             return (std::numeric_limits<uint64_t>::max)();
+        }
         return ((value + alignment - 1) / alignment) * alignment;
     }
-}
+} // namespace
 
-bool DX12UploadSegmentAllocator::Initialize(ID3D12Device* device,
-    DX12ResourceTable& table, const RHIUploadSegmentPolicy& policy,
-    std::string& outError)
+bool DX12UploadSegmentAllocator::Initialize(ID3D12Device* device, DX12ResourceTable& table,
+                                            const RHIUploadSegmentPolicy& policy, std::string& outError)
 {
-    if (nullptr == device || 0 == policy.regularSegmentBytes ||
-        0 == policy.largeThreshold)
+    if (nullptr == device || 0 == policy.regularSegmentBytes || 0 == policy.largeThreshold)
     {
         outError = "DX12 업로드 세그먼트 인자가 잘못됐다";
         return false;
@@ -36,8 +35,7 @@ bool DX12UploadSegmentAllocator::Initialize(ID3D12Device* device,
 
     m_device = device;
     m_table = &table;
-    m_regularSegmentBytes = UploadSegmentsAlignUp(
-        policy.regularSegmentBytes, kTexturePlacementAlignment);
+    m_regularSegmentBytes = UploadSegmentsAlignUp(policy.regularSegmentBytes, kTexturePlacementAlignment);
     m_largeThreshold = (std::min)(policy.largeThreshold, m_regularSegmentBytes);
     m_standbyRegularSegments = policy.standbyRegularSegments;
     m_trimDelayCollects = policy.trimDelayCollects;
@@ -57,8 +55,8 @@ bool DX12UploadSegmentAllocator::Initialize(ID3D12Device* device,
     return true;
 }
 
-DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(
-    uint64_t bytes, bool large, std::string& outError)
+DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(uint64_t bytes, bool large,
+                                                                               std::string& outError)
 {
     bytes = UploadSegmentsAlignUp(bytes, kTexturePlacementAlignment);
 
@@ -76,8 +74,8 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     auto segment = std::make_unique<Segment>();
-    HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&segment->buffer));
+    HRESULT hr = m_device->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&segment->buffer));
     if (FAILED(hr))
     {
         outError = "DX12 업로드 세그먼트 생성 실패 " + UploadSegmentsHrToString(hr);
@@ -107,15 +105,16 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(
     }
 
     wchar_t name[80]{};
-    std::swprintf(name, std::size(name), L"DX12UploadSegment.%s.%zu",
-        large ? L"Large" : L"Regular", m_segments.size());
+    std::swprintf(name, std::size(name), L"DX12UploadSegment.%s.%zu", large ? L"Large" : L"Regular", m_segments.size());
     segment->buffer->SetName(name);
 
     Segment* result = segment.get();
     m_segments.push_back(std::move(segment));
     m_slowPathCreates.fetch_add(1, std::memory_order_relaxed);
     if (std::this_thread::get_id() != m_ownerThread)
+    {
         m_workerSegmentCreates.fetch_add(1, std::memory_order_relaxed);
+    }
     return result;
 }
 
@@ -125,8 +124,14 @@ void DX12UploadSegmentAllocator::Shutdown()
     std::lock_guard lock(m_mutex);
     for (const auto& segment : m_segments)
     {
-        if (m_table && segment->handle.IsValid()) m_table->Release(segment->handle);
-        if (segment->buffer && segment->mapped) segment->buffer->Unmap(0, nullptr);
+        if (m_table && segment->handle.IsValid())
+        {
+            m_table->Release(segment->handle);
+        }
+        if (segment->buffer && segment->mapped)
+        {
+            segment->buffer->Unmap(0, nullptr);
+        }
     }
     m_segments.clear();
     m_device = nullptr;
@@ -163,8 +168,7 @@ void DX12UploadSegmentAllocator::Shutdown()
     m_budgetOvercommits.store(0, std::memory_order_release);
 }
 
-uint64_t DX12UploadSegmentAllocator::RequiredAlignment(
-    const RHIUploadRequest& request) const
+uint64_t DX12UploadSegmentAllocator::RequiredAlignment(const RHIUploadRequest& request) const
 {
     uint64_t required = 1;
     switch (request.usage)
@@ -189,15 +193,21 @@ uint64_t DX12UploadSegmentAllocator::RequiredAlignment(
     return (std::max)(required, (std::max)(request.minimumAlignment, 1ull));
 }
 
-bool DX12UploadSegmentAllocator::TryPack(uint64_t start, uint64_t capacity,
-    std::span<const RHIUploadRequest> requests, uint64_t& outEnd) const
+bool DX12UploadSegmentAllocator::TryPack(uint64_t start, uint64_t capacity, std::span<const RHIUploadRequest> requests,
+                                         uint64_t& outEnd) const
 {
     uint64_t cursor = start;
     for (const RHIUploadRequest& request : requests)
     {
-        if (0 == request.bytes) return false;
+        if (0 == request.bytes)
+        {
+            return false;
+        }
         cursor = UploadSegmentsAlignUp(cursor, RequiredAlignment(request));
-        if (cursor > capacity || request.bytes > capacity - cursor) return false;
+        if (cursor > capacity || request.bytes > capacity - cursor)
+        {
+            return false;
+        }
         cursor += request.bytes;
     }
     outEnd = cursor;
@@ -207,21 +217,27 @@ bool DX12UploadSegmentAllocator::TryPack(uint64_t start, uint64_t capacity,
 void DX12UploadSegmentAllocator::UpdatePeakRecordingBytes(uint64_t value)
 {
     uint64_t peak = m_peakRecordingBytes.load(std::memory_order_relaxed);
-    while (peak < value && !m_peakRecordingBytes.compare_exchange_weak(
-        peak, value, std::memory_order_relaxed, std::memory_order_relaxed)) {}
+    while (peak < value && !m_peakRecordingBytes.compare_exchange_weak(peak, value, std::memory_order_relaxed,
+                                                                       std::memory_order_relaxed))
+    {
+    }
 }
 
-bool DX12UploadSegmentAllocator::TryReserveAtomic(Segment& segment,
-    std::span<const RHIUploadRequest> requests,
-    std::span<RHIBufferSlice> outSlices, bool fastPath)
+bool DX12UploadSegmentAllocator::TryReserveAtomic(Segment& segment, std::span<const RHIUploadRequest> requests,
+                                                  std::span<RHIBufferSlice> outSlices, bool fastPath)
 {
     uint64_t expected = segment.cursor.load(std::memory_order_relaxed);
     uint64_t end = 0;
     for (;;)
     {
-        if (!TryPack(expected, segment.capacity, requests, end)) return false;
-        if (segment.cursor.compare_exchange_weak(expected, end,
-            std::memory_order_acq_rel, std::memory_order_relaxed)) break;
+        if (!TryPack(expected, segment.capacity, requests, end))
+        {
+            return false;
+        }
+        if (segment.cursor.compare_exchange_weak(expected, end, std::memory_order_acq_rel, std::memory_order_relaxed))
+        {
+            break;
+        }
         m_casRetries.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -239,28 +255,29 @@ bool DX12UploadSegmentAllocator::TryReserveAtomic(Segment& segment,
     }
 
     const uint64_t used = end - expected;
-    const uint64_t recordingBytes = m_recordingBytes.fetch_add(
-        used, std::memory_order_relaxed) + used;
+    const uint64_t recordingBytes = m_recordingBytes.fetch_add(used, std::memory_order_relaxed) + used;
     UpdatePeakRecordingBytes(recordingBytes);
     m_allocations.fetch_add(requests.size(), std::memory_order_relaxed);
     m_bytesAllocated.fetch_add(requestedBytes, std::memory_order_relaxed);
-    (fastPath ? m_fastPathReservations : m_slowPathReservations)
-        .fetch_add(1, std::memory_order_relaxed);
+    (fastPath ? m_fastPathReservations : m_slowPathReservations).fetch_add(1, std::memory_order_relaxed);
     return true;
 }
 
-DX12UploadSegmentAllocator::Segment*
-DX12UploadSegmentAllocator::FindAvailableSegmentLocked(bool large,
-    uint64_t minimumBytes)
+DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::FindAvailableSegmentLocked(bool large,
+                                                                                            uint64_t minimumBytes)
 {
     Segment* best = nullptr;
     for (const auto& candidate : m_segments)
     {
-        if (candidate->large != large ||
-            candidate->state != RHIUploadSegmentState::Available ||
-            candidate->capacity < minimumBytes) continue;
+        if (candidate->large != large || candidate->state != RHIUploadSegmentState::Available ||
+            !candidate->translationLease.expired() || candidate->capacity < minimumBytes)
+        {
+            continue;
+        }
         if (nullptr == best || candidate->capacity < best->capacity)
+        {
             best = candidate.get();
+        }
     }
     return best;
 }
@@ -268,45 +285,62 @@ DX12UploadSegmentAllocator::FindAvailableSegmentLocked(bool large,
 uint64_t DX12UploadSegmentAllocator::SegmentBytesLocked() const
 {
     uint64_t bytes = 0;
-    for (const auto& segment : m_segments) bytes += segment->capacity;
+    for (const auto& segment : m_segments)
+    {
+        bytes += segment->capacity;
+    }
     return bytes;
 }
 
 void DX12UploadSegmentAllocator::ReleaseSegmentLocked(Segment& segment)
 {
-    if (m_table && segment.handle.IsValid()) m_table->Release(segment.handle);
+    if (m_table && segment.handle.IsValid())
+    {
+        m_table->Release(segment.handle);
+    }
     segment.handle = {};
-    if (segment.buffer && segment.mapped) segment.buffer->Unmap(0, nullptr);
+    if (segment.buffer && segment.mapped)
+    {
+        segment.buffer->Unmap(0, nullptr);
+    }
     segment.mapped = nullptr;
     segment.buffer.Reset();
 }
 
-void DX12UploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure,
-    uint64_t bytesNeeded)
+void DX12UploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure, uint64_t bytesNeeded)
 {
     uint64_t totalBytes = SegmentBytesLocked();
     uint32_t availableRegular = 0;
     uint64_t availableLargeBytes = 0;
     for (const auto& segment : m_segments)
     {
-        if (segment->state != RHIUploadSegmentState::Available) continue;
-        if (segment->large) availableLargeBytes += segment->capacity;
-        else ++availableRegular;
+        if (segment->state != RHIUploadSegmentState::Available || !segment->translationLease.expired())
+        {
+            continue;
+        }
+        if (segment->large)
+        {
+            availableLargeBytes += segment->capacity;
+        }
+        else
+        {
+            ++availableRegular;
+        }
     }
 
     const uint32_t keepRegular = memoryPressure ? 0 : m_standbyRegularSegments;
-    const uint64_t keepLarge = memoryPressure ? 0 :
-        m_largeCacheBudgetBytes.load(std::memory_order_relaxed);
+    const uint64_t keepLarge = memoryPressure ? 0 : m_largeCacheBudgetBytes.load(std::memory_order_relaxed);
     const uint64_t softBudget = m_softBudgetBytes.load(std::memory_order_relaxed);
 
     for (;;)
     {
-        const bool budgetExcess = 0 != softBudget &&
-            (bytesNeeded > softBudget || totalBytes > softBudget - bytesNeeded);
+        const bool budgetExcess =
+            0 != softBudget && (bytesNeeded > softBudget || totalBytes > softBudget - bytesNeeded);
         const bool immediate = memoryPressure || budgetExcess;
-        const auto eligible = [&](const Segment& segment) {
+        const auto eligible = [&](const Segment& segment)
+        {
             return immediate || 0 == m_trimDelayCollects ||
-                (m_collectEpoch >= segment.lastCollectedEpoch &&
+                   (m_collectEpoch >= segment.lastCollectedEpoch &&
                     m_collectEpoch - segment.lastCollectedEpoch >= m_trimDelayCollects);
         };
         auto candidate = m_segments.end();
@@ -315,19 +349,22 @@ void DX12UploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure,
         {
             for (auto it = m_segments.begin(); it != m_segments.end(); ++it)
             {
-                if ((*it)->state != RHIUploadSegmentState::Available ||
+                if ((*it)->state != RHIUploadSegmentState::Available || !(*it)->translationLease.expired() ||
                     !(*it)->large || !eligible(**it))
+                {
                     continue;
+                }
                 if (candidate == m_segments.end() || (*it)->capacity > (*candidate)->capacity)
+                {
                     candidate = it;
+                }
             }
         }
-        if (candidate == m_segments.end() &&
-            (availableRegular > keepRegular || budgetExcess))
+        if (candidate == m_segments.end() && (availableRegular > keepRegular || budgetExcess))
         {
             for (auto it = m_segments.begin(); it != m_segments.end(); ++it)
             {
-                if ((*it)->state == RHIUploadSegmentState::Available &&
+                if ((*it)->state == RHIUploadSegmentState::Available && (*it)->translationLease.expired() &&
                     !(*it)->large && eligible(**it))
                 {
                     candidate = it;
@@ -335,15 +372,24 @@ void DX12UploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure,
                 }
             }
         }
-        if (candidate == m_segments.end()) break;
+        if (candidate == m_segments.end())
+        {
+            break;
+        }
 
         const uint64_t releasedBytes = (*candidate)->capacity;
         const bool releasedLarge = (*candidate)->large;
         ReleaseSegmentLocked(**candidate);
         m_segments.erase(candidate);
         totalBytes -= releasedBytes;
-        if (releasedLarge) availableLargeBytes -= releasedBytes;
-        else --availableRegular;
+        if (releasedLarge)
+        {
+            availableLargeBytes -= releasedBytes;
+        }
+        else
+        {
+            --availableRegular;
+        }
         m_trimmedSegments.fetch_add(1, std::memory_order_relaxed);
         m_trimmedBytes.fetch_add(releasedBytes, std::memory_order_relaxed);
     }
@@ -354,30 +400,35 @@ void DX12UploadSegmentAllocator::EnsureBudgetForCreateLocked(uint64_t bytesNeede
     const uint64_t softBudget = m_softBudgetBytes.load(std::memory_order_relaxed);
     const uint64_t totalBytes = SegmentBytesLocked();
     const bool memoryPressure = m_memoryPressure.load(std::memory_order_relaxed);
-    const bool budgetExcess = 0 != softBudget &&
-        (bytesNeeded > softBudget || totalBytes > softBudget - bytesNeeded);
-    if (!memoryPressure && !budgetExcess) return;
+    const bool budgetExcess = 0 != softBudget && (bytesNeeded > softBudget || totalBytes > softBudget - bytesNeeded);
+    if (!memoryPressure && !budgetExcess)
+    {
+        return;
+    }
 
     m_budgetPressureEvents.fetch_add(1, std::memory_order_relaxed);
     m_budgetRetries.fetch_add(1, std::memory_order_relaxed);
     TrimAvailableLocked(memoryPressure, bytesNeeded);
 
     const uint64_t afterTrim = SegmentBytesLocked();
-    if (0 != softBudget &&
-        (bytesNeeded > softBudget || afterTrim > softBudget - bytesNeeded))
+    if (0 != softBudget && (bytesNeeded > softBudget || afterTrim > softBudget - bytesNeeded))
+    {
         m_budgetOvercommits.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
-void DX12UploadSegmentAllocator::UpdateBudget(uint64_t softBudgetBytes,
-    bool memoryPressure)
+void DX12UploadSegmentAllocator::UpdateBudget(uint64_t softBudgetBytes, bool memoryPressure)
 {
-    if (m_budgetOverrideForTesting.load(std::memory_order_acquire)) return;
+    if (m_budgetOverrideForTesting.load(std::memory_order_acquire))
+    {
+        return;
+    }
     m_softBudgetBytes.store(softBudgetBytes, std::memory_order_release);
     m_memoryPressure.store(memoryPressure, std::memory_order_release);
 }
 
-void DX12UploadSegmentAllocator::SetBudgetForTesting(uint64_t softBudgetBytes,
-    uint64_t largeCacheBudgetBytes, bool memoryPressure)
+void DX12UploadSegmentAllocator::SetBudgetForTesting(uint64_t softBudgetBytes, uint64_t largeCacheBudgetBytes,
+                                                     bool memoryPressure)
 {
     m_budgetOverrideForTesting.store(true, std::memory_order_release);
     m_softBudgetBytes.store(softBudgetBytes, std::memory_order_release);
@@ -387,8 +438,7 @@ void DX12UploadSegmentAllocator::SetBudgetForTesting(uint64_t softBudgetBytes,
 
 void DX12UploadSegmentAllocator::ClearBudgetOverrideForTesting()
 {
-    m_largeCacheBudgetBytes.store(m_defaultLargeCacheBudgetBytes,
-        std::memory_order_release);
+    m_largeCacheBudgetBytes.store(m_defaultLargeCacheBudgetBytes, std::memory_order_release);
     m_memoryPressure.store(false, std::memory_order_release);
     m_budgetOverrideForTesting.store(false, std::memory_order_release);
 }
@@ -399,13 +449,14 @@ void DX12UploadSegmentAllocator::Collect(uint64_t completedValue)
     ++m_collectEpoch;
     for (const auto& segment : m_segments)
     {
-        if (segment->state == RHIUploadSegmentState::Pending &&
-            segment->completionValue <= completedValue)
+        if (segment->state == RHIUploadSegmentState::Pending && segment->completionValue <= completedValue)
         {
             const uint64_t lag = completedValue - segment->completionValue;
             uint64_t previous = m_reclaimLag.load(std::memory_order_relaxed);
-            while (previous < lag && !m_reclaimLag.compare_exchange_weak(
-                previous, lag, std::memory_order_relaxed, std::memory_order_relaxed)) {}
+            while (previous < lag && !m_reclaimLag.compare_exchange_weak(previous, lag, std::memory_order_relaxed,
+                                                                         std::memory_order_relaxed))
+            {
+            }
             segment->state = RHIUploadSegmentState::Available;
             segment->cursor.store(0, std::memory_order_relaxed);
             segment->recordingId = 0;
@@ -415,7 +466,9 @@ void DX12UploadSegmentAllocator::Collect(uint64_t completedValue)
     }
     const bool memoryPressure = m_memoryPressure.load(std::memory_order_relaxed);
     if (memoryPressure)
+    {
         m_budgetPressureEvents.fetch_add(1, std::memory_order_relaxed);
+    }
     TrimAvailableLocked(memoryPressure, 0);
 }
 
@@ -423,20 +476,21 @@ void DX12UploadSegmentAllocator::BeginRecording(uint64_t recordingId)
 {
     std::lock_guard lock(m_mutex);
     m_fastRegular.store(nullptr, std::memory_order_release);
+    m_sealedRecordingId.store(0, std::memory_order_release);
     m_currentRecordingId.store(recordingId, std::memory_order_release);
     m_recordingBytes.store(0, std::memory_order_release);
 }
 
-bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
-    std::span<const RHIUploadRequest> requests,
-    std::span<RHIBufferSlice> outSlices, std::string& outError)
+bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId, std::span<const RHIUploadRequest> requests,
+                                              std::span<RHIBufferSlice> outSlices, std::string& outError)
 {
     if (requests.empty() || requests.size() != outSlices.size() || 0 == recordingId)
     {
         outError = "DX12 업로드 배치의 요청/출력 또는 recording id가 잘못됐다";
         return false;
     }
-    if (recordingId != m_currentRecordingId.load(std::memory_order_acquire))
+    if (recordingId != m_currentRecordingId.load(std::memory_order_acquire) ||
+        recordingId == m_sealedRecordingId.load(std::memory_order_acquire))
     {
         outError = "DX12 업로드 배치가 현재 recording과 일치하지 않는다";
         return false;
@@ -455,7 +509,9 @@ bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
     {
         Segment* const active = m_fastRegular.load(std::memory_order_acquire);
         if (nullptr != active && TryReserveAtomic(*active, requests, outSlices, true))
+        {
             return true;
+        }
     }
 
     std::lock_guard lock(m_mutex);
@@ -470,16 +526,23 @@ bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
     {
         Segment* const active = m_fastRegular.load(std::memory_order_acquire);
         if (nullptr != active && TryReserveAtomic(*active, requests, outSlices, false))
+        {
             return true;
+        }
     }
     else
     {
         for (const auto& candidate : m_segments)
         {
-            if (!candidate->large ||
-                candidate->state != RHIUploadSegmentState::Active ||
-                candidate->recordingId != recordingId) continue;
-            if (TryReserveAtomic(*candidate, requests, outSlices, false)) return true;
+            if (!candidate->large || candidate->state != RHIUploadSegmentState::Active ||
+                candidate->recordingId != recordingId)
+            {
+                continue;
+            }
+            if (TryReserveAtomic(*candidate, requests, outSlices, false))
+            {
+                return true;
+            }
         }
     }
 
@@ -490,9 +553,7 @@ bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
     }
     else
     {
-        const uint64_t bytes = large
-            ? UploadSegmentsAlignUp(minimumPacked, 4ull * 1024 * 1024)
-            : m_regularSegmentBytes;
+        const uint64_t bytes = large ? UploadSegmentsAlignUp(minimumPacked, 4ull * 1024 * 1024) : m_regularSegmentBytes;
         EnsureBudgetForCreateLocked(bytes);
         segment = CreateSegment(bytes, large, outError);
         if (nullptr == segment)
@@ -515,29 +576,66 @@ bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
         return false;
     }
 
-    if (!large) m_fastRegular.store(segment, std::memory_order_release);
+    if (!large)
+    {
+        m_fastRegular.store(segment, std::memory_order_release);
+    }
     return true;
 }
 
-void DX12UploadSegmentAllocator::OnSubmitted(uint64_t recordingId,
-    RHICompletionPoint completion)
+std::shared_ptr<const void> DX12UploadSegmentAllocator::PinRecording(uint64_t recordingId)
+{
+    std::lock_guard lock(m_mutex);
+    if (!recordingId || recordingId != m_currentRecordingId.load(std::memory_order_acquire) ||
+        recordingId == m_sealedRecordingId.load(std::memory_order_acquire))
+    {
+        return {};
+    }
+    m_sealedRecordingId.store(recordingId, std::memory_order_release);
+    struct Lease
+    {
+        std::vector<std::shared_ptr<const void>> segments;
+        std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> resources;
+    };
+    auto result = std::make_shared<Lease>();
+    for (const auto& segment : m_segments)
+    {
+        if (segment->recordingId != recordingId || segment->state != RHIUploadSegmentState::Active)
+        {
+            continue;
+        }
+        auto lease = segment->translationLease.lock();
+        if (!lease)
+        {
+            lease = std::make_shared<const uint64_t>(recordingId);
+            segment->translationLease = lease;
+        }
+        result->segments.push_back(std::move(lease));
+        result->resources.push_back(segment->buffer);
+    }
+    return result;
+}
+
+void DX12UploadSegmentAllocator::OnSubmitted(uint64_t recordingId, RHICompletionPoint completion)
 {
     m_fastRegular.store(nullptr, std::memory_order_release);
     std::lock_guard lock(m_mutex);
     for (const auto& segment : m_segments)
     {
-        if (segment->state != RHIUploadSegmentState::Active ||
-            segment->recordingId != recordingId) continue;
+        if (segment->state != RHIUploadSegmentState::Active || segment->recordingId != recordingId)
+        {
+            continue;
+        }
 
-        m_tailWasteBytes.fetch_add(segment->capacity -
-            segment->cursor.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        m_tailWasteBytes.fetch_add(segment->capacity - segment->cursor.load(std::memory_order_relaxed),
+                                   std::memory_order_relaxed);
         segment->completionValue = completion.value;
-        segment->state = completion.IsValid()
-            ? RHIUploadSegmentState::Pending
-            : RHIUploadSegmentState::Quarantined;
+        segment->state = completion.IsValid() ? RHIUploadSegmentState::Pending : RHIUploadSegmentState::Quarantined;
     }
     if (recordingId == m_currentRecordingId.load(std::memory_order_relaxed))
+    {
         m_currentRecordingId.store(0, std::memory_order_release);
+    }
 }
 
 void DX12UploadSegmentAllocator::RejectSubmission(uint64_t recordingId, RHICompletionPoint completion)
@@ -563,8 +661,7 @@ void DX12UploadSegmentAllocator::AbortRecording(uint64_t recordingId)
     std::lock_guard lock(m_mutex);
     for (const auto& segment : m_segments)
     {
-        if (segment->state == RHIUploadSegmentState::Active &&
-            segment->recordingId == recordingId)
+        if (segment->state == RHIUploadSegmentState::Active && segment->recordingId == recordingId)
         {
             segment->state = RHIUploadSegmentState::Available;
             segment->cursor.store(0, std::memory_order_relaxed);
@@ -621,15 +718,21 @@ RHIUploadStats DX12UploadSegmentAllocator::GetStats() const
         switch (segment->state)
         {
         case RHIUploadSegmentState::Active:
-            ++stats.activeSegments; stats.activeBytes += segment->capacity; break;
+            ++stats.activeSegments;
+            stats.activeBytes += segment->capacity;
+            break;
         case RHIUploadSegmentState::Pending:
-            ++stats.pendingSegments; stats.pendingBytes += segment->capacity;
-            if (0 == stats.oldestPendingValue ||
-                segment->completionValue < stats.oldestPendingValue)
+            ++stats.pendingSegments;
+            stats.pendingBytes += segment->capacity;
+            if (0 == stats.oldestPendingValue || segment->completionValue < stats.oldestPendingValue)
+            {
                 stats.oldestPendingValue = segment->completionValue;
+            }
             break;
         case RHIUploadSegmentState::Available:
-            ++stats.availableSegments; stats.availableBytes += segment->capacity; break;
+            ++stats.availableSegments;
+            stats.availableBytes += segment->capacity;
+            break;
         default:
             break;
         }
@@ -637,21 +740,25 @@ RHIUploadStats DX12UploadSegmentAllocator::GetStats() const
     return stats;
 }
 
-DX12UploadSegmentAllocator::Allocation DX12UploadSegmentAllocator::Allocate(
-    uint64_t bytes, uint64_t alignment)
+DX12UploadSegmentAllocator::Allocation DX12UploadSegmentAllocator::Allocate(uint64_t bytes, uint64_t alignment)
 {
-    const RHIUploadRequest request{ bytes, RHIUploadUsage::Raw, alignment };
+    const RHIUploadRequest request{bytes, RHIUploadUsage::Raw, alignment};
     RHIBufferSlice slice{};
     std::string error;
     if (!ReserveBatch(m_currentRecordingId.load(std::memory_order_acquire),
-        std::span<const RHIUploadRequest>(&request, 1),
-        std::span<RHIBufferSlice>(&slice, 1), error)) return {};
+                      std::span<const RHIUploadRequest>(&request, 1), std::span<RHIBufferSlice>(&slice, 1), error))
+    {
+        return {};
+    }
 
     std::lock_guard lock(m_mutex);
     for (size_t i = 0; i < m_segments.size(); ++i)
     {
         const auto& segment = m_segments[i];
-        if (segment->handle.id != slice.buffer.id) continue;
+        if (segment->handle.id != slice.buffer.id)
+        {
+            continue;
+        }
         Allocation result{};
         result.cpuAddress = slice.cpuAddress;
         result.gpuAddress = segment->buffer->GetGPUVirtualAddress() + slice.offset;
@@ -668,4 +775,3 @@ uint64_t DX12UploadSegmentAllocator::GetRecordingUsedBytes() const
 {
     return m_recordingBytes.load(std::memory_order_acquire);
 }
-

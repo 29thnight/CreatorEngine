@@ -5,6 +5,17 @@
 
 class IRHIDeviceResources;
 class RHIRecordedBatch;
+class RHITranslatedBatch;
+class RHISoftwareBatch;
+class IRHICommandTranslator;
+class IRHIParallelCommandPool;
+
+struct RHISubmissionIdentity
+{
+    uint64_t frameId{};
+    uint64_t recordingId{};
+    RHICompletionPoint completion;
+};
 
 /// producer의 예약을 큐 admission까지 지킨다. 예외도 never-admitted 거절이며,
 /// Accept 뒤에는 native 실패가 나더라도 rollback하지 않는다.
@@ -118,6 +129,7 @@ public:
 
     bool IsValid() const { return nullptr != m_state; }
     uint64_t GetSequence() const;
+    RHISubmissionIdentity GetIdentity() const;
     /// CPU 제출 결과의 acquire 경계다. GPU 완료와 자원 재사용은 별도 fence가 보장한다.
     bool IsComplete() const;
     /// 예약된 식별 정보는 enqueue 뒤 읽을 수 있다. 제출 중 바뀌는 상태는 완료 뒤 읽는다.
@@ -197,6 +209,14 @@ public:
         IRHIDeviceResources& completionSource, RHIRecordedBatch&& batch,
         RHISubmissionTicket& outTicket, std::string& outError);
 
+    bool EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources& completionSource,
+        std::shared_ptr<IRHIParallelCommandPool> pool, std::shared_ptr<IRHICommandTranslator> translator,
+        RHISoftwareBatch&& batch, RHISubmissionTicket& outTicket, std::string& outError);
+
+    bool EnqueueTranslatedBatch(const void* owner,
+        IRHIDeviceResources& completionSource, RHITranslatedBatch&& batch,
+        RHISubmissionTicket& outTicket, std::string& outError);
+
 private:
     enum class EntryKind : uint8_t;
     bool EnqueueInternal(const void* owner, const char* label, Work work,
@@ -206,7 +226,8 @@ private:
         std::shared_ptr<const void> lifetimeToken,
         EntryKind kind, bool allowTransition,
         uint64_t expectedGeneration = 0,
-        std::shared_ptr<RHIRecordedBatch> recordedBatch = {});
+        std::shared_ptr<RHIRecordedBatch> recordedBatch = {},
+        RHISubmissionIdentity identity = {});
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;

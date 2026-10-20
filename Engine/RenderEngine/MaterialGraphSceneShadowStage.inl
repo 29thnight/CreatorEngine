@@ -46,31 +46,54 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     {
         return depth;
     }
+    frame->CheckCurrent(&graph);
     commands->Declare(graph, commands);
     depth = graph.Modify(depth);
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses{{depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}};
+    // Declaration does not run callbacks or yield. Reuse only CPU scratch; the
+    // graph copies the final usages before another cascade can change it.
+    thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    if (!uses.empty())
+    {
+        uses.clear();
+    }
+    uses.push_back({depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite});
     commands->visibility->AddVisibleIdsRead(graph, uses);
     commands->AddRead(graph, uses, commands->GraphOutput(graph));
     frame->sceneData->AddRead(graph, uses);
-    uses.push_back({frame->raster->geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-    for (const auto& draw : frame->shadowDraws)
+    const auto readSetIndex = staticCasters ? 0u : 1u;
+    auto& sharedReads = frame->m_shadowReadSets[readSetIndex];
+    if (!frame->m_shadowReadSetsReady[readSetIndex])
     {
-        if (!draw.shadowEnabled || draw.staticShadow != staticCasters)
+        sharedReads.push_back(
+            {frame->raster->geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+        for (const auto& draw : std::span{frame->shadowDraws})
         {
-            continue;
+            if (!draw.shadowEnabled || draw.staticShadow != staticCasters)
+            {
+                continue;
+            }
+            sharedReads.push_back(
+                {draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            sharedReads.push_back(
+                {draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
+            for (const auto& texture : std::span{draw.bindings->resources.textures})
+            {
+                sharedReads.push_back({graph.FindImportedTexture(texture.resource),
+                                       RHIResourceState::PixelShaderResource, RGAccessMode::Read});
+            }
         }
-        uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-        uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-        for (const auto& texture : draw.bindings->resources.textures)
-        {
-            uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource,
-                            RGAccessMode::Read});
-        }
+        NormalizeSceneReads(graph, sharedReads);
+        frame->m_shadowReadSetsReady[readSetIndex] = true;
+    }
+    uses.reserve(uses.size() + sharedReads.size());
+    for (const auto& usage : std::span{sharedReads})
+    {
+        uses.push_back(usage);
     }
     NormalizeSceneReads(graph, uses);
     const auto statisticsSlot = cascade * 2 + (staticCasters ? 0 : 1);
     const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
-    const auto pass = graph.AddSplitPass(name, std::move(uses),
+    const auto pass = graph.AddSplitPass(name, uses,
         [frame, commands, depth, cascade, slice, count, statisticsSlot](const auto& execution,
                                                             uint32_t recordSlice, uint32_t sliceCount) {
         frame->CheckCurrent(execution.graph);
@@ -188,7 +211,7 @@ SceneShadowResources SceneHost::ShadowCacheStage::Declare(const own::shared_owne
     return outputs;
 }
 
-SceneShadowResources SceneHost::ShadowFirstCullStage::Declare(const own::shared_owner<const FrameInput>& frame,
+SceneShadowResources SceneHost::ShadowFirstCullStage::Declare(const own::shared_owner<const Frame>& frame,
                                                               EnhancedRenderGraph& graph, RGHandle geometry,
                                                               RGHandle cameraOccluderDepth) const
 {

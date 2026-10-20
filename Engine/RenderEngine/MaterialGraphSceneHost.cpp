@@ -6,6 +6,7 @@
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphWork.h"
 #include "MaterialGraphPreparationTasks.h"
+#include "RenderArena.h"
 
 #include "PathFinder.h"
 #include "../EngineDiagnostics/ProfileScope.h"
@@ -169,14 +170,15 @@ namespace material_graph
             };
 
           private:
-            std::vector<std::pair<std::size_t, std::size_t>>& m_ranges;
-            std::vector<Chunk>& m_chunks;
-            std::vector<SceneHost::ForwardDraw>& m_blended;
+            ce::render_arena_vector<std::pair<std::size_t, std::size_t>>& m_ranges;
+            ce::render_arena_vector<Chunk>& m_chunks;
+            ce::render_arena_vector<SceneHost::ForwardDraw>& m_blended;
             job_handle m_work;
 
           public:
-            SceneCpuPreparation(std::vector<std::pair<std::size_t, std::size_t>>& ranges, std::vector<Chunk>& chunks,
-                                std::vector<SceneHost::ForwardDraw>& blended)
+            SceneCpuPreparation(ce::render_arena_vector<std::pair<std::size_t, std::size_t>>& ranges,
+                                ce::render_arena_vector<Chunk>& chunks,
+                                ce::render_arena_vector<SceneHost::ForwardDraw>& blended)
                 : m_ranges(ranges), m_chunks(chunks), m_blended(blended)
             {
             }
@@ -395,8 +397,8 @@ namespace material_graph
             }
         };
 
-        bool ReserveSceneIndirectCommands(std::size_t count, std::vector<std::uint32_t>& words,
-                                          std::vector<std::array<std::uint32_t, 4>>& records, std::string& error)
+        template<typename Words, typename Records>
+        bool ReserveSceneIndirectCommands(std::size_t count, Words& words, Records& records, std::string& error)
         {
             constexpr auto wordsPerCommand = SceneIndirectRootLayout::kCapacity * 2;
             if (count > words.max_size() / wordsPerCommand || count > records.max_size())
@@ -457,8 +459,20 @@ namespace material_graph
 
     struct SceneHost::PreparationScratch
     {
-        std::vector<SceneCpuPreparation::Chunk> m_chunks;
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> m_cameraGeometry, m_blendedGeometry;
+        ce::RenderArenaPool m_pool;
+        struct Work
+        {
+            // The lease precedes all containers: destruction destroys their
+            // objects/proxies before the last lease resets retained raw blocks.
+            ce::RenderArenaLease m_storage;
+            ce::render_arena_vector<SceneCpuPreparation::Chunk> m_chunks;
+            ce::render_arena_vector<std::shared_ptr<const MeshSurfaceBatch>> m_cameraGeometry, m_blendedGeometry;
+            explicit Work(const ce::RenderArenaPool& pool)
+                : m_storage(pool.Acquire()), m_chunks(&m_storage->Resource(0)),
+                  m_cameraGeometry(&m_storage->Resource(1)), m_blendedGeometry(&m_storage->Resource(1))
+            {
+            }
+        };
     };
 
     struct SceneHost::Program
@@ -555,6 +569,12 @@ namespace material_graph
     // Only recording identity and execution observations mutate in this shared input.
     struct SceneHost::FrameInput
     {
+        static ce::RenderArenaLease AcquireStorage()
+        {
+            static ce::RenderArenaPool pool;
+            return pool.Acquire();
+        }
+        ce::RenderArenaLease m_cpuStorage{AcquireStorage()};
         struct Draw
         {
             own::shared_owner<const Program> program;
@@ -586,10 +606,14 @@ namespace material_graph
         std::uint64_t recording{}, descriptors{};
         own::shared_owner<const SceneViewInput> input;
         // Occluder: first culling list -> HZB source depth. Final: recovered union -> surface.
-        std::vector<Draw> draws;
-        std::vector<Draw> shadowDraws;
-        std::vector<std::pair<size_t, size_t>> inputRanges;
-        std::vector<ForwardDraw> blendedOrder;
+        ce::render_arena_vector<Draw> draws{&m_cpuStorage->Resource(0)};
+        ce::render_arena_vector<Draw> shadowDraws{&m_cpuStorage->Resource(1)};
+        // Static/dynamic caster reads are invariant across this sealed frame's
+        // cascades. CheckCurrent rejects reuse with another graph or epoch.
+        mutable std::array<std::vector<EnhancedRenderGraph::RGPassUsage>, 2> m_shadowReadSets;
+        mutable std::array<bool, 2> m_shadowReadSetsReady{};
+        ce::render_arena_vector<std::pair<size_t, size_t>> inputRanges{&m_cpuStorage->Resource(2)};
+        ce::render_arena_vector<ForwardDraw> blendedOrder{&m_cpuStorage->Resource(2)};
         std::span<const Draw> DrawsFor(std::optional<size_t> inputIndex) const
         {
             if (!inputIndex)
@@ -1799,17 +1823,8 @@ namespace material_graph
         struct PreparationScope final
         {
             std::atomic_flag& m_preparing;
-            std::unique_ptr<PreparationScratch>& m_scratch;
-            ~PreparationScope()
-            {
-                if (m_scratch)
-                {
-                    m_scratch->m_cameraGeometry.clear();
-                    m_scratch->m_blendedGeometry.clear();
-                }
-                m_preparing.clear(std::memory_order_release);
-            }
-        } preparationScope{m_preparing, m_preparationScratch};
+            ~PreparationScope() { m_preparing.clear(std::memory_order_release); }
+        } preparationScope{m_preparing};
         // 작업 소유자보다 먼저 생성해 도움 실행 중 재진입과 동시 스크래치 재사용을 막는다.
         ce::profile_scope profile{ce::marker<"MaterialGraphScenePrepare">()};
         // Keep sequential phases balanced on every early return as well as success.
@@ -1866,13 +1881,13 @@ namespace material_graph
         {
             m_preparationScratch = std::make_unique<PreparationScratch>();
         }
+        PreparationScratch::Work scratch(m_preparationScratch->m_pool);
         auto candidate = own::make_shared<Frame>();
         candidate->device = device_;
         candidate->recording = device_->GetCurrentUploadRecordingId();
         candidate->descriptors = device_->GetDescriptorVersionToken();
         candidate->input = std::move(input);
-        SceneCpuPreparation cpuPreparation(candidate->inputRanges, m_preparationScratch->m_chunks,
-                                           candidate->blendedOrder);
+        SceneCpuPreparation cpuPreparation(candidate->inputRanges, scratch.m_chunks, candidate->blendedOrder);
         cpuPreparation.Start(scheduler_, candidate->input);
         candidate->environment = environment;
         const auto emptyVisibility = RHIBindingDesc::Srv2D({}, RHIFormat::RG32Uint).OrNull();
@@ -2093,7 +2108,8 @@ namespace material_graph
         {
             return Fail(error, "METEOR caster snapshot exceeds the frame geometry address contract.");
         }
-        std::vector<own::shared_owner<const Program>> drawPrograms(candidate->input->Draws().size());
+        ce::render_arena_vector<own::shared_owner<const Program>> drawPrograms(candidate->input->Draws().size(),
+                                                                               &scratch.m_storage->Resource(2));
         struct DrawPreparation
         {
             own::shared_owner<const RenderBindings> bindings;
@@ -2102,7 +2118,7 @@ namespace material_graph
             bool shadowEnabled{};
             std::array<RHIBufferSlice, 3> shadowConstants;
         };
-        std::vector<DrawPreparation> preparedDraws(drawPrograms.size());
+        ce::render_arena_vector<DrawPreparation> preparedDraws(drawPrograms.size(), &scratch.m_storage->Resource(2));
         for (const auto& draw : candidate->input->Draws())
         {
             const auto index = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
@@ -2205,8 +2221,9 @@ namespace material_graph
         {
             return false;
         }
-        std::vector<std::uint32_t> shadowChunkIndices(preparedChunks);
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> shadowMeshletGeometry;
+        ce::render_arena_vector<std::uint32_t> shadowChunkIndices(preparedChunks, &scratch.m_storage->Resource(3));
+        ce::render_arena_vector<std::shared_ptr<const MeshSurfaceBatch>> shadowMeshletGeometry{
+            &scratch.m_storage->Resource(3)};
         for (const auto& draw : candidate->input->Draws())
         {
             const auto inputIndex = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
@@ -2633,8 +2650,8 @@ namespace material_graph
         // 기하 소유자 목록은 여기서 봉인된다. 가시성 작업은 뒤에서 채울 Draw/장면 레코드를 읽지 않는다.
         // 카메라 목록 작업 소유자는 빌린 입력보다 뒤에 두어 Draw 업로드 실패에도 먼저 배출한다.
         nextPreparationPhase(ce::marker<"MaterialSceneCameraPrepare">());
-        auto& cameraGeometry = m_preparationScratch->m_cameraGeometry;
-        auto& blendedGeometry = m_preparationScratch->m_blendedGeometry;
+        auto& cameraGeometry = scratch.m_cameraGeometry;
+        auto& blendedGeometry = scratch.m_blendedGeometry;
         cameraGeometry.clear();
         blendedGeometry.clear();
         cameraGeometry.reserve(preparedChunks);
@@ -2800,7 +2817,7 @@ namespace material_graph
                 item.geometry = candidate->draws[outputIndex].geometry;
                 item.previousGeometry = candidate->draws[outputIndex].previousGeometry;
                 item.cameraMeshletBin = candidate->draws[outputIndex].cameraMeshletBin;
-                const auto& cpuChunk = m_preparationScratch->m_chunks[outputIndex];
+                const auto& cpuChunk = scratch.m_chunks[outputIndex];
                 constants.geometryIdentity = cpuChunk.identity;
                 if (geometryTable->records.size() >= UINT32_MAX || item.geometry->MeshletCount() > (UINT32_MAX >> 7))
                 {
@@ -2958,14 +2975,15 @@ namespace material_graph
             // insufficient to merge programs with different pass semantics.
             using BucketKey = std::tuple<std::string_view, bool, uint32_t>;
             using PacketGroups = std::vector<std::vector<std::size_t>>;
-            std::map<BucketKey, std::vector<std::size_t>> groups;
+            ce::render_arena_map<BucketKey, ce::render_arena_vector<std::size_t>> groups{
+                &scratch.m_storage->Resource(2)};
             const auto snapshotGroups = [&]() -> std::shared_ptr<const PacketGroups>
             {
                 auto selected = std::make_shared<PacketGroups>();
                 selected->reserve(groups.size());
                 for (const auto& entry : groups)
                 {
-                    selected->push_back(entry.second);
+                    selected->emplace_back(entry.second.begin(), entry.second.end());
                 }
                 return selected;
             };
@@ -3043,7 +3061,8 @@ namespace material_graph
                 batch->visibility = cascade ? shadowList
                                     : depth ? candidate->firstCullStage.cameraDepthMeshlets
                                             : candidate->finalCullStage.cameraMeshlets;
-                std::vector<IndirectMaterialBatch::PacketDraw> records;
+                auto packetStorage = m_preparationScratch->m_pool.Acquire();
+                ce::render_arena_vector<IndirectMaterialBatch::PacketDraw> records{&packetStorage->Resource(0)};
                 size_t count{};
                 for (const auto& indices : std::span(packetGroups))
                 {
@@ -3261,8 +3280,8 @@ namespace material_graph
             replay->device = device_;
             replay->pool = bufferPool_;
             replay->pipeline = indirectCommands_.GetGeneration();
-            std::vector<uint32_t> replayWords;
-            std::vector<std::array<uint32_t, 4>> replayRecords;
+            ce::render_arena_vector<uint32_t> replayWords{&scratch.m_storage->Resource(2)};
+            ce::render_arena_vector<std::array<uint32_t, 4>> replayRecords{&scratch.m_storage->Resource(2)};
             const auto replayCount = static_cast<std::size_t>(std::ranges::count_if(
                 candidate->draws, [](const auto& draw) { return draw.program->hasSurface && draw.blended; }));
             if (!ReserveSceneIndirectCommands(replayCount, replayWords, replayRecords, error))
@@ -3365,8 +3384,8 @@ namespace material_graph
         indexed->pool = bufferPool_;
         indexed->pipeline = indirectCommands_.GetGeneration();
         indexed->visibility = candidate->finalCullStage.blendedMeshlets;
-        std::vector<uint32_t> indexedWords;
-        std::vector<std::array<uint32_t, 4>> indexedRecords;
+        ce::render_arena_vector<uint32_t> indexedWords{&scratch.m_storage->Resource(2)};
+        ce::render_arena_vector<std::array<uint32_t, 4>> indexedRecords{&scratch.m_storage->Resource(2)};
         std::uint32_t indexedOutputBytes{};
         for (const auto [first, count] : candidate->inputRanges)
         {
@@ -4291,9 +4310,9 @@ namespace material_graph
         bool pending = false;
         if (ticket.IsValid())
         {
-            const auto* batch = ticket.GetRecordedBatch();
-            if (!batch || batch->GetFrameId() != frameId || batch->GetRecordingId() != frame_->recording ||
-                batch->GetCompletionPoint().value != completion.value)
+            const auto identity = ticket.GetIdentity();
+            if (identity.frameId != frameId || identity.recordingId != frame_->recording ||
+                identity.completion.value != completion.value)
             {
                 return Fail(error, "METEOR Scene publication ticket must identify its exact recorded graph batch.");
             }

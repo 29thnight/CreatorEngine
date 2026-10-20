@@ -4,6 +4,7 @@
 #include "IRHIDeviceResources.h"
 #include "RHIParallelCommandPool.h"
 #include "RHIRecordedBatch.h"
+#include "IRHICommandTranslator.h"
 
 #include <stdio.h>
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -57,6 +58,7 @@ struct RHISubmissionTicket::State
     bool success{ false };
     std::string error;
     std::shared_ptr<RHIRecordedBatch> recordedBatch;
+    RHISubmissionIdentity identity;
 
     void PublishCompletion(bool completedSuccessfully, std::string completionError)
     {
@@ -363,6 +365,11 @@ uint64_t RHISubmissionTicket::GetSequence() const
     return m_state ? m_state->sequence : 0;
 }
 
+RHISubmissionIdentity RHISubmissionTicket::GetIdentity() const
+{
+    return m_state ? m_state->identity : RHISubmissionIdentity{};
+}
+
 bool RHISubmissionTicket::IsComplete() const
 {
     return m_state && m_state->ready.load(std::memory_order_acquire);
@@ -553,7 +560,7 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
     RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
     std::shared_ptr<const void> lifetimeToken, EntryKind kind,
     bool allowTransition, uint64_t expectedGeneration,
-    std::shared_ptr<RHIRecordedBatch> recordedBatch)
+    std::shared_ptr<RHIRecordedBatch> recordedBatch, RHISubmissionIdentity identity)
 {
     if (nullptr == owner || !work)
     {
@@ -630,6 +637,10 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
     const uint64_t sequence = impl.nextSequence;
     state->sequence = sequence;
     // worker가 즉시 완료해도 release 게시 뒤 ticket의 결과 포인터를 바꾸지 않는다.
+    state->identity = recordedBatch
+        ? RHISubmissionIdentity{recordedBatch->GetFrameId(), recordedBatch->GetRecordingId(),
+                                recordedBatch->GetCompletionPoint()}
+        : identity;
     state->recordedBatch = std::move(recordedBatch);
     impl.queue.push_back(Impl::Entry{
         sequence, ownerState.generation, owner, kind,
@@ -1083,6 +1094,96 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
     admission.Accept();
     pool->AcceptPreparedRecordedBatch(*queuedBatch, outTicket);
     return true;
+}
+
+bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources& completionSource,
+    std::shared_ptr<IRHIParallelCommandPool> pool, std::shared_ptr<IRHICommandTranslator> translator,
+    RHISoftwareBatch&& batch, RHISubmissionTicket& outTicket, std::string& outError)
+{
+    if (IsCurrentThread() || !pool || !translator || !batch.IsValid())
+    {
+        outError = "Software submission requires a producer, sealed batch, frozen pool and translator.";
+        return false;
+    }
+    CollectCompletedLifetimes(owner);
+    const uint64_t generation = GetOwnerGeneration(owner);
+    uint64_t recordingId{};
+    uint64_t descriptorVersion{};
+    if (!generation || generation != batch.GetDesc().backendGeneration ||
+        !pool->GetTranslationRecording(recordingId, descriptorVersion) ||
+        recordingId != batch.GetDesc().uploadRecordingId || descriptorVersion != batch.GetDesc().descriptorVersion)
+    {
+        outError = "Software submission resource recording or owner generation does not match.";
+        return false;
+    }
+    RHICompletionPoint completion;
+    RHIRecordingAdmissionGuard admission([&]
+    {
+        if (completion.IsValid())
+        {
+            pool->RejectPreparedCommands(recordingId, completion);
+        }
+    });
+    if (!pool->PrepareRecordedCommands(pool->GetCurrentFrameSlot(), completion, outError) || !completion.IsValid())
+    {
+        return false;
+    }
+    const RHISubmissionIdentity identity{batch.GetDesc().frameId, recordingId, completion};
+    struct Lifetime
+    {
+        std::shared_ptr<IRHIParallelCommandPool> pool;
+        std::shared_ptr<IRHICommandTranslator> translator;
+        std::shared_ptr<const void> resources;
+    };
+    auto lifetime = std::make_shared<Lifetime>(Lifetime{pool, translator, batch.GetDesc().lifetimeToken});
+    auto software = std::make_shared<RHISoftwareBatch>(std::move(batch));
+    ce::cpu_span_context cpuContext{};
+#if !CE_SHIPPING
+    cpuContext = ce::current_cpu_context;
+#endif
+    if (!EnqueueInternal(owner, "software batch translate and submit",
+        [pool, translator, software, identity, cpuContext](std::string& error)
+        {
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+            const ce::dx_capture::submission_context_scope context(software->GetDesc().captureContext);
+#endif
+            const ce::profile_context_scope recordingContext(cpuContext);
+            RHITranslatedBatch translated;
+            RHICommandFailure failure;
+            {
+                ce::profile_scope translate{ce::marker<"RHISoftwareTranslate">()};
+                if (!translator->Translate(std::move(*software), {}, translated, failure))
+                {
+                    error = failure.message;
+                    return false;
+                }
+            }
+            auto& native = translated.m_native;
+            native.m_recordingId = identity.recordingId;
+            native.m_completion = identity.completion;
+            native.m_admitted = true;
+            return pool->SubmitRecordedBatch(native, error);
+        }, outTicket, outError, completion,
+        [&completionSource] { return completionSource.GetCompletedFenceValue(); },
+        std::move(lifetime), EntryKind::RecordedBatch, false, generation, {}, identity))
+    {
+        return false;
+    }
+    admission.Accept();
+    pool->AcceptPreparedCommands(completion, outTicket);
+    return true;
+}
+
+bool RHISubmissionThread::EnqueueTranslatedBatch(const void* owner,
+    IRHIDeviceResources& completionSource, RHITranslatedBatch&& batch,
+    RHISubmissionTicket& outTicket, std::string& outError)
+{
+    if (batch.GetKind() != RHITranslatedBatchKind::ParallelPool)
+    {
+        outError = "Translated submission requires a native parallel-pool batch.";
+        return false;
+    }
+    return EnqueueRecordedBatch(owner, completionSource, std::move(batch.m_native), outTicket, outError);
 }
 
 RHISubmissionThread& GetRHISubmissionThread()

@@ -334,7 +334,7 @@ namespace material_graph
                         const auto& page = m_sceneData->pages.at(m_sceneData->recordPages.at(draw.geometryRecord));
                         encoder.SetBindings(RHIBindPoint::Compute, 3, page.vertexTable);
                         encoder.SetBindings(RHIBindPoint::Compute, 4, page.topologyTable);
-                        const auto range = m_material->packetWork->buckets.at(bucketIndex);
+                        const auto range = m_material->packetWork->plan->buckets.at(bucketIndex);
                         for (std::uint32_t index = range.first; index < range.first + range.count; ++index)
                         {
                             const auto& slice = m_material->packetWork->slices[index];
