@@ -764,6 +764,58 @@ namespace editor::profiler_view
                 }
             }
 
+            const ce::profile_rhi_context* rhi = nullptr;
+            for (const auto& frame : capture->frames())
+            {
+                const bool ownsEvent =
+                    ce::has_flag(hoveredSpan->flags, ce::event_flags::gpu_span)
+                        ? frame.engine_frame == hoveredSpan->frame
+                        : hoveredSpan->tick_end > frame.tick_begin && hoveredSpan->tick_end <= frame.tick_end;
+                if (ownsEvent)
+                {
+                    rhi = frame.rhi_context_for(*hoveredSpan);
+                    break;
+                }
+            }
+            ImGui::Separator();
+            if (rhi)
+            {
+                ImGui::Text(
+                    "RHI recording %llu / frame %llu / view %llu", static_cast<unsigned long long>(rhi->recording_id),
+                    static_cast<unsigned long long>(rhi->frame_id), static_cast<unsigned long long>(rhi->view_id));
+                if (rhi->source_engine_frame_available)
+                {
+                    ImGui::Text("Source engine frame %llu", static_cast<unsigned long long>(rhi->source_engine_frame));
+                }
+                else
+                {
+                    ImGui::TextDisabled("Source engine frame: unknown (not recorded)");
+                }
+                if (rhi->device_incarnation != 0 && rhi->queue_id != 0)
+                {
+                    ImGui::Text("Device %llu / queue %u / kind %u / backend generation %llu",
+                                static_cast<unsigned long long>(rhi->device_incarnation), rhi->queue_id,
+                                static_cast<unsigned>(rhi->queue_kind),
+                                static_cast<unsigned long long>(rhi->backend_generation));
+                }
+                else
+                {
+                    ImGui::TextDisabled("RHI queue identity: unknown");
+                }
+                if (rhi->target_index == UINT32_MAX)
+                {
+                    ImGui::TextUnformatted("RHI target: aggregate / unknown");
+                }
+                else
+                {
+                    ImGui::Text("RHI target %u", rhi->target_index);
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("RHI identity: unknown (not recorded or ambiguous)");
+            }
+
             if (truncatedBegin)
             {
                 ImGui::TextDisabled("Truncated start: the scope began before recording observed it.");
