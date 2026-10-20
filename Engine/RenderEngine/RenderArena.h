@@ -2,6 +2,7 @@
 #include "RenderAllocator.h"
 #include <array>
 #include <algorithm>
+#include <cstring>
 #include <span>
 #include <stdexcept>
 #include <map>
@@ -144,15 +145,23 @@ namespace ce
         T* emplace(Args&&... args)
         {
             static_assert(std::is_nothrow_destructible_v<T>);
-            auto* record = static_cast<destructor_record*>(
-                resource_.allocate(sizeof(destructor_record), alignof(destructor_record)));
-            auto* memory = static_cast<T*>(resource_.allocate(sizeof(T), alignof(T)));
-            // A throwing constructor never publishes a destructor record.
-            auto* value = std::construct_at(memory, std::forward<Args>(args)...);
-            std::construct_at(record, destructor_record{head_, value, [](void* object) noexcept
-                                                        { std::destroy_at(static_cast<T*>(object)); }});
-            head_ = record;
-            return value;
+            if constexpr (std::is_trivially_destructible_v<T>)
+            {
+                auto* memory = static_cast<T*>(resource_.allocate(sizeof(T), alignof(T)));
+                return std::construct_at(memory, std::forward<Args>(args)...);
+            }
+            else
+            {
+                auto* record = static_cast<destructor_record*>(
+                    resource_.allocate(sizeof(destructor_record), alignof(destructor_record)));
+                auto* memory = static_cast<T*>(resource_.allocate(sizeof(T), alignof(T)));
+                // A throwing constructor never publishes a destructor record.
+                auto* value = std::construct_at(memory, std::forward<Args>(args)...);
+                std::construct_at(record, destructor_record{head_, value, [](void* object) noexcept
+                                                            { std::destroy_at(static_cast<T*>(object)); }});
+                head_ = record;
+                return value;
+            }
         }
 
         template<class T>
@@ -162,41 +171,51 @@ namespace ce
             {
                 return {};
             }
-            struct array_owner
-            {
-                T* data;
-                size_t size{};
-                ~array_owner()
-                {
-                    while (size)
-                    {
-                        std::destroy_at(data + --size);
-                    }
-                }
-            };
             if (values.size() > (std::numeric_limits<size_t>::max)() / sizeof(T))
             {
                 throw std::bad_array_new_length();
             }
             auto* data = static_cast<T*>(resource_.allocate(values.size_bytes(), alignof(T)));
-            auto* owner = emplace<array_owner>(data);
-            try
+            // 단순 선언 값은 파괴할 소유자가 없다. 원소별 생성/파괴 목록 없이
+            // 한 번 복사하고, 주소는 이 arena를 reset할 때까지 유지한다.
+            if constexpr (std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>)
             {
-                for (const auto& value : values)
-                {
-                    std::construct_at(data + owner->size, value);
-                    ++owner->size;
-                }
+                std::memcpy(data, values.data(), values.size_bytes());
+                return {data, values.size()};
             }
-            catch (...)
+            else
             {
-                while (owner->size)
+                struct array_owner
                 {
-                    std::destroy_at(data + --owner->size);
+                    T* data;
+                    size_t size{};
+                    ~array_owner()
+                    {
+                        while (size)
+                        {
+                            std::destroy_at(data + --size);
+                        }
+                    }
+                };
+                auto* owner = emplace<array_owner>(data);
+                try
+                {
+                    for (const auto& value : values)
+                    {
+                        std::construct_at(data + owner->size, value);
+                        ++owner->size;
+                    }
                 }
-                throw;
+                catch (...)
+                {
+                    while (owner->size)
+                    {
+                        std::destroy_at(data + --owner->size);
+                    }
+                    throw;
+                }
+                return {data, owner->size};
             }
-            return {data, owner->size};
         }
 
         void reset() noexcept

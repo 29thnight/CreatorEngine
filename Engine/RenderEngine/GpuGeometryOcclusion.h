@@ -71,7 +71,8 @@ class GpuGeometryOcclusion final
         mutable const EnhancedRenderGraph* m_graph{};
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_depth;
-        mutable std::vector<RGHandle> m_levels;
+        mutable std::array<RGHandle, kMaximumLevels> m_levels{};
+        mutable std::uint32_t m_declaredLevels{};
         std::shared_ptr<History> m_history;
         bool m_historyReader{};
         std::string m_name{"Geometry.Occlusion"};

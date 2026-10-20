@@ -324,46 +324,168 @@ void EnhancedRenderGraph::DispatchDeclarationPackets(bool finish)
     {
         return;
     }
+    constexpr size_t kMaximumJobs = 8;
+    constexpr size_t kMaximumRanges = kMaximumJobs * 2;
+    // 고정 항목 비용 + 복사 byte의 추정 점수다. 실제 풀을 사용한 CPU
+    // fixture에서 작은 복사는 제출 비용이 더 커 보수적으로 묶는다.
+    constexpr size_t kMinimumCostPerJob = 512 * 1024;
+    constexpr size_t kMinimumParallelCost = 8 * 1024 * 1024;
+    const auto packets = std::span{m_declarationPackets}.subspan(work.nextPacket);
+    const DeclarationPacket combined{packets.front().firstResource, packets.back().endResource,
+                                     packets.front().firstPass, packets.back().endPass};
+    const size_t resources = combined.endResource - combined.firstResource;
+    const size_t units = resources + combined.endPass - combined.firstPass;
+    const auto addCost = [](size_t left, size_t right) { return left + (std::min)(right, SIZE_MAX - left); };
+    const auto costAt = [&](size_t unit)
+    {
+        size_t cost{};
+        if (unit < resources)
+        {
+            const size_t index = combined.firstResource + unit;
+            const auto& resource = m_resources.data()[index];
+            const auto& declaration = m_resourceDeclarations.data()[index];
+            if (resource.name.data() != declaration.name.data() || resource.name.size() != declaration.name.size())
+            {
+                cost = addCost(64, declaration.name.size());
+            }
+            if (!resource.imported)
+            {
+                const auto& name = resource.IsBuffer() ? resource.bufferDesc.name : resource.desc.name;
+                if (name != declaration.descriptorName)
+                {
+                    cost = addCost(cost, addCost(64, declaration.descriptorName.size()));
+                }
+            }
+        }
+        else
+        {
+            const size_t index = combined.firstPass + unit - resources;
+            const auto& pass = m_passes.data()[index];
+            const auto& declaration = m_passDeclarations.data()[index];
+            if (pass.name.data() != declaration.name.data() || pass.name.size() != declaration.name.size())
+            {
+                cost = addCost(64, declaration.name.size());
+            }
+            for (const auto& phase : declaration.phases)
+            {
+                cost = addCost(cost, addCost(64, addCost(phase.name.size(), phase.usages.size_bytes())));
+            }
+        }
+        return cost;
+    };
+    size_t totalCost{}, usefulUnits{};
+    for (size_t unit = 0; unit < units; ++unit)
+    {
+        const size_t cost = costAt(unit);
+        totalCost = addCost(totalCost, cost);
+        usefulUnits += cost != 0;
+    }
+    // 재사용한 이름만 남은 묶음은 실행할 일이 없다. 작은 복사는 제출/합류와
+    // 원자적 claim 비용보다 싸므로 arena batch조차 만들지 않고 직접 처리한다.
+    if (!totalCost)
+    {
+        work.nextPacket += count;
+        return;
+    }
+    auto& scheduler = ce::get_job_scheduler();
+    size_t jobs =
+        totalCost >= kMinimumParallelCost && !thread_pool::is_worker_thread() && scheduler.is_running()
+            ? (std::min)({kMaximumJobs, scheduler.worker_count(), usefulUnits, totalCost / kMinimumCostPerJob})
+            : size_t{1};
+    if (jobs < 2)
+    {
+        m_declarationPacketJobs = (std::max)(m_declarationPacketJobs, uint32_t{1});
+        MaterializeDeclarationPacket(combined, m_resources.data(), m_resourceDeclarations.data(), m_passes.data(),
+                                     m_passDeclarations.data());
+        work.nextPacket += count;
+        return;
+    }
     struct BuildBatch
     {
-        std::span<const DeclarationPacket> packets;
+        struct Range
+        {
+            DeclarationPacket packet;
+            size_t cost{};
+        };
+        std::array<Range, kMaximumRanges> ranges;
         Resource* resources;
         ResourceDeclaration* resourceDeclarations;
         Pass* passes;
         PassDeclaration* passDeclarations;
-        size_t jobs;
+        ce::cpu_span_context cpuContext{};
+        size_t rangeCount{};
+        alignas(64) std::atomic<size_t> nextRange{};
     };
-    auto& scheduler = ce::get_job_scheduler();
-    const size_t jobs = count >= 8 && !thread_pool::is_worker_thread() && scheduler.is_running()
-                            ? (std::min)({size_t{4}, ce::get_thread_pool().size(), count})
-                            : size_t{1};
-    m_declarationPacketJobs = (std::max)(m_declarationPacketJobs, static_cast<uint32_t>(jobs));
+    static_assert(std::is_trivially_destructible_v<BuildBatch>);
     if (work.pendingCount == work.pending.size())
     {
         JoinDeclarationPackets();
     }
-    auto* batch = static_cast<BuildBatch*>(m_packetArena.allocate(sizeof(BuildBatch), alignof(BuildBatch)));
-    std::construct_at(
-        batch, BuildBatch{CopyPacketValues<DeclarationPacket>(std::span{m_declarationPackets}.subspan(work.nextPacket)),
-                          m_resources.data(), m_resourceDeclarations.data(), m_passes.data(), m_passDeclarations.data(),
-                          jobs});
-    const auto build = [batch](size_t job)
+    auto* batch =
+        std::construct_at(static_cast<BuildBatch*>(m_packetArena.allocate(sizeof(BuildBatch), alignof(BuildBatch))));
+    batch->resources = m_resources.data();
+    batch->resourceDeclarations = m_resourceDeclarations.data();
+    batch->passes = m_passes.data();
+    batch->passDeclarations = m_passDeclarations.data();
+#if !CE_SHIPPING
+    batch->cpuContext = ce::current_cpu_context;
+#endif
+    const size_t rangeLimit = (std::min)(jobs * 2, usefulUnits);
+    size_t first{}, cost{}, remainingCost = totalCost;
+    const auto appendRange = [&](size_t end)
     {
-        for (size_t index = job; index < batch->packets.size(); index += batch->jobs)
+        auto& range = batch->ranges[batch->rangeCount++];
+        range.packet = {combined.firstResource + (std::min)(first, resources),
+                        combined.firstResource + (std::min)(end, resources),
+                        combined.firstPass + (first > resources ? first - resources : 0),
+                        combined.firstPass + (end > resources ? end - resources : 0)};
+        range.cost = cost;
+        remainingCost -= (std::min)(remainingCost, cost);
+        first = end;
+        cost = 0;
+    };
+    for (size_t unit = 0; unit < units; ++unit)
+    {
+        cost = addCost(cost, costAt(unit));
+        const size_t remainingRanges = rangeLimit - batch->rangeCount;
+        const size_t target = remainingCost / remainingRanges + (remainingCost % remainingRanges != 0);
+        if (cost && remainingRanges > 1 && cost >= target)
         {
-            MaterializeDeclarationPacket(batch->packets[index], batch->resources, batch->resourceDeclarations,
+            appendRange(unit + 1);
+        }
+    }
+    if (cost)
+    {
+        appendRange(units);
+    }
+    // 한 pass의 phaseStorage는 한 작업만 쓴다. 큰 범위를 먼저 내고 최대
+    // 16개의 고정 저장 범위를 끝낸 워커가 다음 범위를 가져가 tail을 줄인다.
+    for (size_t index = 1; index < batch->rangeCount; ++index)
+    {
+        const auto range = batch->ranges[index];
+        size_t destination = index;
+        while (destination && batch->ranges[destination - 1].cost < range.cost)
+        {
+            batch->ranges[destination] = batch->ranges[destination - 1];
+            --destination;
+        }
+        batch->ranges[destination] = range;
+    }
+    jobs = (std::min)(jobs, batch->rangeCount);
+    m_declarationPacketJobs = (std::max)(m_declarationPacketJobs, static_cast<uint32_t>(jobs));
+    const auto build = [batch](size_t)
+    {
+        ce::profile_context_scope context{batch->cpuContext};
+        for (size_t index = batch->nextRange.fetch_add(1, std::memory_order_relaxed); index < batch->rangeCount;
+             index = batch->nextRange.fetch_add(1, std::memory_order_relaxed))
+        {
+            MaterializeDeclarationPacket(batch->ranges[index].packet, batch->resources, batch->resourceDeclarations,
                                          batch->passes, batch->passDeclarations);
         }
     };
-    if (jobs > 1)
-    {
-        ce::profile_scope profile{ce::marker<"RenderGraphDeclarePacketDispatch">()};
-        work.pending[work.pendingCount++] = scheduler.submit_indexed(jobs, build);
-    }
-    else
-    {
-        build(0);
-    }
+    ce::profile_scope profile{ce::marker<"RenderGraphDeclarePacketDispatch">()};
+    work.pending[work.pendingCount] = scheduler.submit_indexed(jobs, build);
+    ++work.pendingCount;
     work.nextPacket += count;
 }
 
@@ -412,7 +534,7 @@ void EnhancedRenderGraph::ClearResourceMetadata(Resource& resource)
     resource.lastUse = 0;
     resource.aliasGroup = resource.aliasMember = UINT32_MAX;
     resource.allocationBytes = 0;
-    ClearNonempty(resource.versions);
+    resource.versions = {};
 }
 
 std::string_view EnhancedRenderGraph::CopyPacketName(std::string_view value)
@@ -491,12 +613,23 @@ void EnhancedRenderGraph::SetDeclarationResourceName(uint16_t index, std::string
 
 void EnhancedRenderGraph::AppendDeclarationVersion(uint16_t index, Resource::Version value)
 {
-    m_resources[index].versions.push_back(value);
+    auto& resource = m_resources[index];
+    const auto version = resource.versions.size();
+    if (version == resource.versionStorage.size())
+    {
+        resource.versionStorage.push_back(value);
+    }
+    else
+    {
+        // atomicMin64까지 덮어 이전 프레임의 버전 속성을 남기지 않는다.
+        resource.versionStorage.data()[version] = value;
+    }
+    resource.versions = std::span{resource.versionStorage}.first(version + 1);
 }
 
 void EnhancedRenderGraph::SetDeclarationUsages(uint16_t index, std::span<const RGPassUsage> usages)
 {
-    CopyPassUsages(m_passes[index].usages, usages);
+    m_passes[index].usages = m_declarationData.copy(usages);
 }
 
 void EnhancedRenderGraph::MaterializeDeclarationPacket(const DeclarationPacket& packet, Resource* resources,
@@ -599,8 +732,8 @@ void EnhancedRenderGraph::Reset()
     m_queueDiagnostics = {};
     m_measurementDomain = RGMeasurementDomain::Normal;
     m_queueExecutionMode = 0;
-    // 현재 native 자원을 해제한 뒤 활성 상태를 비우고 이름·저장 공간은 재사용한다. 버전 vector의 수명을 유지해
-    // 다음 선언에서 checked-iterator proxy까지 다시 생성하는 비용을 피한다.
+    // 현재 native 자원을 해제한 뒤 활성 상태만 비우고 이름·버전 저장 공간은
+    // 재사용한다. 같은 크기의 다음 선언은 vector 크기를 바꾸지 않고 덮어쓴다.
     for (auto& resource : m_resources)
     {
         ClearResourceMetadata(resource);
@@ -1016,7 +1149,7 @@ RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
     const auto version = static_cast<uint16_t>(r.versions.size());
     // Keep fork declarations for Compile to reject, rather than silently
     // choosing whichever writer happened to call this API first.
-    r.versions.push_back({previous.version, modify});
+    AppendDeclarationVersion(previous.index, {previous.version, modify});
     return VersionHandle(previous.index, version);
 }
 
@@ -1104,9 +1237,8 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     pass.splitExecute = {};
     pass.repeatedExecute = {};
     // Names stay owned while inactive and can be reused without a journal copy.
-    // Keep the payload size as well as capacity: equal-shaped declarations
-    // overwrite raw slots without orphaning Debug iterators on every frame.
-    std::fill_n(pass.usages.data(), pass.usages.size(), RGPassUsage{});
+    // 선언 값은 graph arena가 소유한다. 원소를 초기화하지 않고 활성 뷰만 비운다.
+    pass.usages = {};
     ClearNonempty(pass.transitions);
     ClearNonempty(pass.bufferTransitions);
     ClearNonempty(pass.uavBarriers);
@@ -1184,7 +1316,8 @@ RGPassId EnhancedRenderGraph::AddPass(std::string_view name, std::vector<RGPassU
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages = std::move(usages);
+    SetDeclarationUsages(id.index, usages);
+    usages.clear();
     pass.execute = std::move(execute);
     return id;
 }
@@ -1315,7 +1448,8 @@ RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, std::vector<RG
         return {};
     }
     auto& pass = m_passes[id.index];
-    pass.usages = std::move(usages);
+    SetDeclarationUsages(id.index, usages);
+    usages.clear();
     pass.splitExecute = std::move(execute);
     pass.maxSlices = (std::max)(1u, maxSlices);
     pass.recordCost = recordCost;
@@ -3527,7 +3661,7 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
         declaration.imported = resource.imported;
         declaration.bufferKind = resource.bufferKind;
         declaration.firstImport = resource.firstImport;
-        declaration.versions = resource.versions;
+        declaration.versions.assign(resource.versions.begin(), resource.versions.end());
         declaration.used = resource.used;
         declaration.firstUse = resource.firstUse;
         declaration.lastUse = resource.lastUse;
