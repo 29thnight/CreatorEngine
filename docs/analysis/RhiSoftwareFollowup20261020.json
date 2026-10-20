@@ -1,0 +1,526 @@
+{
+  "baseCommit": "0e9aeccf362b826418a378db3024c147b27eaae6",
+  "configuration": "Debug",
+  "softwareRhi": true,
+  "workers": 8,
+  "views": 2,
+  "width": 1186,
+  "height": 514,
+  "profileSeconds": 15,
+  "etw": false,
+  "order": [
+    1,
+    2,
+    4,
+    5
+  ],
+  "runs": {
+    "before": {
+      "profileSha256": "ef5257b3f80383ac8a707fddc08fad9285bffd32c73e47bebc15ee27ab396069",
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "invalidProvenanceSamples": 0,
+      "gpuEvents": 99755,
+      "matchedGpuEvents": 99755,
+      "nativeRealPerformanceGateEligible": true,
+      "views": [
+        {
+          "frameKind": 1,
+          "viewId": 2,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 355,
+          "cpuRenderSubmitMs": {
+            "mean": 14.258920281690141,
+            "p50": 14.1255,
+            "p95": 17.0926,
+            "max": 20.4204
+          },
+          "cpuSamples": 355,
+          "gpuPassMs": {
+            "mean": 0.04617348870199615,
+            "p50": 0.0051,
+            "p95": 0.128,
+            "max": 1.7991
+          },
+          "gpuPassSamples": 49345
+        },
+        {
+          "frameKind": 1,
+          "viewId": 1,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 355,
+          "cpuRenderSubmitMs": {
+            "mean": 14.260310704225352,
+            "p50": 14.1158,
+            "p95": 17.4152,
+            "max": 21.6017
+          },
+          "cpuSamples": 355,
+          "gpuPassMs": {
+            "mean": 0.04451128545923428,
+            "p50": 0.0051,
+            "p95": 0.1259,
+            "max": 1.8247
+          },
+          "gpuPassSamples": 50410
+        }
+      ],
+      "markers": {
+        "RenderCommandRecord": {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 4.181373045822102,
+          "mean": 2.1666053072625697,
+          "p50": 2.0797499999999998,
+          "p95": 2.6752,
+          "max": 3.2808
+        },
+        "RenderCommandRecord.DispatchJoin": {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DispatchJoin",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 3.7665948787061994,
+          "mean": 1.9516853351955308,
+          "p50": 1.86835,
+          "p95": 2.4144,
+          "max": 3.048
+        },
+        "RenderCommandRecord.DependencyGraph": {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DependencyGraph",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 3.7607959568733156,
+          "mean": 1.9486805865921788,
+          "p50": 1.86545,
+          "p95": 2.4116,
+          "max": 3.045
+        },
+        "RHISoftwareTranslate": {
+          "thread": "[RHIThread]",
+          "name": "RHISoftwareTranslate",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 3.681492722371968,
+          "mean": 1.9075891061452515,
+          "p50": 1.8169499999999998,
+          "p95": 2.5664,
+          "max": 3.3616
+        },
+        "MaterialSceneInputSeal": {
+          "thread": "[RenderThread]",
+          "name": "MaterialSceneInputSeal",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 1.75446576819407,
+          "mean": 0.9090877094972067,
+          "p50": 0.897,
+          "p95": 1.2566,
+          "max": 1.6772
+        },
+        "RenderGraphDeclare": {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclare",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 10.487728301886794,
+          "mean": 5.4342837988826815,
+          "p50": 5.20735,
+          "p95": 6.7412,
+          "max": 9.1978
+        },
+        "RenderGraphCompile": {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphCompile",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 1.602145013477089,
+          "mean": 0.8301617318435754,
+          "p50": 0.7888,
+          "p95": 1.0697,
+          "max": 1.8203
+        },
+        "RenderGraphReset": {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphReset",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 716,
+          "perEngineFrame": 1.6392148247978435,
+          "mean": 0.8493696927374301,
+          "p50": 0.9914499999999999,
+          "p95": 1.4568,
+          "max": 2.1451
+        }
+      },
+      "recordingOff": {
+        "completedViews": 826,
+        "seconds": 15.1337926,
+        "completedViewsPerSecond": 54.579841407368036
+      }
+    },
+    "after": {
+      "profileSha256": "5b60970ef91ba410e1296d80cba26ee96e151bd6e6890471db03f0c7e0db78a8",
+      "complete": true,
+      "unacked": 0,
+      "droppedEvents": 0,
+      "invalidProvenanceSamples": 0,
+      "gpuEvents": 104251,
+      "matchedGpuEvents": 104251,
+      "nativeRealPerformanceGateEligible": true,
+      "views": [
+        {
+          "frameKind": 1,
+          "viewId": 2,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 371,
+          "cpuRenderSubmitMs": {
+            "mean": 13.700584636118599,
+            "p50": 13.6965,
+            "p95": 15.9204,
+            "max": 22.3724
+          },
+          "cpuSamples": 371,
+          "gpuPassMs": {
+            "mean": 0.0453781787507999,
+            "p50": 0.0051,
+            "p95": 0.128,
+            "max": 1.9077
+          },
+          "gpuPassSamples": 51569
+        },
+        {
+          "frameKind": 1,
+          "viewId": 1,
+          "sceneEpoch": 3,
+          "renderWidth": 1186,
+          "renderHeight": 514,
+          "displayWidth": 1186,
+          "displayHeight": 514,
+          "upscaler": 0,
+          "frameGenerator": 0,
+          "resolutionState": 1,
+          "spatialMode": 0,
+          "deepDvcApplied": 0,
+          "realFrameCount": 371,
+          "cpuRenderSubmitMs": {
+            "mean": 13.606335849056604,
+            "p50": 13.6376,
+            "p95": 15.5113,
+            "max": 19.1467
+          },
+          "cpuSamples": 371,
+          "gpuPassMs": {
+            "mean": 0.04365692646444706,
+            "p50": 0.0051,
+            "p95": 0.1239,
+            "max": 1.7142
+          },
+          "gpuPassSamples": 52682
+        }
+      ],
+      "markers": {
+        "RenderCommandRecord": {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 3.793806266318538,
+          "mean": 1.9425505347593583,
+          "p50": 1.87275,
+          "p95": 2.3493,
+          "max": 2.6654
+        },
+        "RenderCommandRecord.DispatchJoin": {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DispatchJoin",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 3.4513874673629243,
+          "mean": 1.7672211229946524,
+          "p50": 1.7015500000000001,
+          "p95": 2.1546,
+          "max": 2.5014
+        },
+        "RenderCommandRecord.DependencyGraph": {
+          "thread": "[RenderThread]",
+          "name": "RenderCommandRecord.DependencyGraph",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 3.4457903394255873,
+          "mean": 1.7643552139037433,
+          "p50": 1.69865,
+          "p95": 2.1513,
+          "max": 2.4988
+        },
+        "RHISoftwareTranslate": {
+          "thread": "[RHIThread]",
+          "name": "RHISoftwareTranslate",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 3.3494843342036553,
+          "mean": 1.715043449197861,
+          "p50": 1.6467,
+          "p95": 2.2419,
+          "max": 3.0017
+        },
+        "MaterialSceneInputSeal": {
+          "thread": "[RenderThread]",
+          "name": "MaterialSceneInputSeal",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 1.7661036553524803,
+          "mean": 0.9043017379679145,
+          "p50": 0.89355,
+          "p95": 1.2269,
+          "max": 1.7086
+        },
+        "RenderGraphDeclare": {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphDeclare",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 10.321085117493473,
+          "mean": 5.284726737967914,
+          "p50": 5.091749999999999,
+          "p95": 6.2767,
+          "max": 8.7622
+        },
+        "RenderGraphCompile": {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphCompile",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 1.613770496083551,
+          "mean": 0.8263022727272727,
+          "p50": 0.79075,
+          "p95": 1.0452,
+          "max": 1.6821
+        },
+        "RenderGraphReset": {
+          "thread": "[RenderThread]",
+          "name": "RenderGraphReset",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 748,
+          "perEngineFrame": 1.5997292428198433,
+          "mean": 0.8191127005347594,
+          "p50": 0.9894,
+          "p95": 1.2954,
+          "max": 2.0376
+        }
+      },
+      "recordingOff": {
+        "completedViews": 846,
+        "seconds": 15.1441901,
+        "completedViewsPerSecond": 55.863007160746086
+      }
+    }
+  },
+  "validation": {
+    "jobGraph": {
+      "Debug": 23312,
+      "Release": 23312,
+      "mutationGate": true
+    },
+    "softwareCommands": true,
+    "sceneInput": {
+      "checks": 302,
+      "failuresRejected": 24
+    },
+    "native": {
+      "translationPoolReuse": true,
+      "passed": true,
+      "uploadRollover": true,
+      "nativeClearBarrierReadback": true,
+      "gpuMergeReuse": true,
+      "asynchronousTranslation": true,
+      "creatorRobotSoftwarePath": false,
+      "frozenTargets": true,
+      "fullRenderGraph": true,
+      "normalExit": true,
+      "validation": "gpu",
+      "arenaRetirement": true
+    },
+    "replay": {
+      "before-replay.log": {
+        "inputsExact": true,
+        "sourceDrawOrderSame": true,
+        "attachments": {
+          "depth": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "baseColor": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "normal": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "metalRough": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "emissive": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "sceneHdr": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          }
+        },
+        "passed": true
+      },
+      "after-replay.log": {
+        "inputsExact": true,
+        "sourceDrawOrderSame": true,
+        "attachments": {
+          "depth": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "baseColor": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "normal": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "metalRough": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "emissive": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "sceneHdr": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          }
+        },
+        "passed": true
+      },
+      "after-reload-replay.log": {
+        "inputsExact": true,
+        "sourceDrawOrderSame": true,
+        "attachments": {
+          "depth": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "baseColor": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "normal": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "metalRough": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "emissive": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          },
+          "sceneHdr": {
+            "different": 0,
+            "over1e4": 0,
+            "maxAbs": 0.0
+          }
+        },
+        "passed": true
+      }
+    },
+    "unrelatedTrackedPathsPreserved": 10
+  },
+  "target": {
+    "fps": 120,
+    "cpuBudgetMs": 8.333333333333334,
+    "achieved": false
+  }
+}

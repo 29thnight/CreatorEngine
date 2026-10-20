@@ -142,7 +142,11 @@ void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline
         m_boundRootSignature[slot] = entry.signature;
     }
 
-    m_commandList->SetPipelineState(entry.pipeline);
+    if (entry.pipeline != m_nativePipeline)
+    {
+        m_commandList->SetPipelineState(entry.pipeline);
+        m_nativePipeline = entry.pipeline;
+    }
     m_boundPipeline = pipeline;
 }
 

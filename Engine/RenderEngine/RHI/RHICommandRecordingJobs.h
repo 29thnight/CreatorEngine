@@ -56,14 +56,24 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
     {
         // 전체 의존 관계를 한 번에 수락한다. 후속 작업은 enki 의존성으로 이어져
         // 준비될 때마다 별도 dispatcher handoff를 다시 만들지 않는다.
-        std::vector<job_graph_node> nodes;
-        nodes.reserve(graph.nodes.size());
-        for (const auto& node : graph.nodes)
+        // Retain conversion storage; the native executor copies or reuses its
+        // own topology before submit_graph returns. Owner-side joins exclude
+        // recursive recording on this thread.
+        static thread_local std::vector<job_graph_node> storage;
+        if (storage.size() < graph.nodes.size())
         {
-            nodes.push_back(job_graph_node{node.dependencies});
+            storage.resize(graph.nodes.size());
         }
-        auto handle = scheduler.submit_graph(nodes, [&job](size_t node) { job(static_cast<uint32_t>(node)); },
-                                              options.diagnostics);
+        auto nodes = std::span(storage.data(), graph.nodes.size());
+        for (size_t index = 0; index < nodes.size(); ++index)
+        {
+            if (nodes[index].dependencies != graph.nodes[index].dependencies)
+            {
+                nodes[index].dependencies = graph.nodes[index].dependencies;
+            }
+        }
+        auto handle = scheduler.submit_graph(
+            nodes, [&job](size_t node) { job(static_cast<uint32_t>(node)); }, options.diagnostics);
         if (options.waitBeginNanoseconds)
         {
             *options.waitBeginNanoseconds = job_timestamp_ns();
@@ -71,14 +81,22 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
         handle.wait();
         return;
     }
-    std::vector<job_handle> handles;
+    struct fallback_storage
+    {
+        std::vector<job_handle> handles;
+        std::vector<job_handle> dependencies;
+    };
+    static thread_local fallback_storage storage;
+    auto& handles = storage.handles;
+    auto& dependencies = storage.dependencies;
+    handles.clear();
     handles.reserve(graph.nodes.size());
     std::exception_ptr failure;
     try
     {
         for (uint32_t node = 0; node < graph.nodes.size(); ++node)
         {
-            std::vector<job_handle> dependencies;
+            dependencies.clear();
             dependencies.reserve(graph.nodes[node].dependencies.size());
             for (const auto dependency : graph.nodes[node].dependencies)
             {
@@ -112,6 +130,10 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
             {
             }
         }
+        dependencies.clear();
+        handles.clear();
         std::rethrow_exception(failure);
     }
+    dependencies.clear();
+    handles.clear();
 }

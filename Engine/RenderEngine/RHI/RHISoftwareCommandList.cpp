@@ -125,6 +125,19 @@ void RHISoftwareCommandList::Clear() noexcept
     }
 }
 
+void RHISoftwareCommandList::Reset(uint64_t commandBytes, uint64_t payloadBytes,
+                                   const std::shared_ptr<RHISoftwareRecordingBudget>& budget)
+{
+    Clear();
+    m_budget = budget;
+    m_maxCommandBytes = commandBytes;
+    m_maxPayloadBytes = payloadBytes;
+    m_stats = {};
+    m_error = {};
+    m_sealed = false;
+    m_consumed = false;
+}
+
 void RHISoftwareCommandList::Fail(const char* message)
 {
     if (m_error.empty())

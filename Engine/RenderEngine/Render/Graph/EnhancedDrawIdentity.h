@@ -23,43 +23,50 @@
 
 namespace enhanced_draw
 {
-    [[nodiscard]] inline std::size_t GeometryKey(
-        const EnhancedDrawItem& draw) noexcept
+    [[nodiscard]] inline std::size_t GeometryKey(const EnhancedDrawItem& draw) noexcept
     {
-        if (0 != draw.geometryKey) return draw.geometryKey;
+        if (0 != draw.geometryKey)
+        {
+            return draw.geometryKey;
+        }
         // MBC7 — typed 뷰가 첫 축이다(자산 신원 {ModelId, MeshId, generation}).
         if (draw.modelMeshView.handle.IsValid())
         {
             return HashModelMeshHandle(draw.modelMeshView.handle);
         }
-        return nullptr != draw.mesh
-            ? static_cast<std::size_t>(draw.mesh->m_hashingMesh.m_ID_Data)
-            : std::size_t{ 0 };
+        return nullptr != draw.mesh ? static_cast<std::size_t>(draw.mesh->m_hashingMesh.m_ID_Data) : std::size_t{0};
     }
 
     // geometryKey is a compact sorting/batching token, never proof of identity.
     // Fail the candidate before any hash-keyed pass table can alias two meshes.
-    [[nodiscard]] inline bool ValidateGeometryIdentities(
-        std::span<const EnhancedDrawItem> draws, std::string& error)
+    [[nodiscard]] inline bool ValidateGeometryIdentities(std::span<const EnhancedDrawItem> draws, std::string& error)
     {
-        std::map<std::size_t, const EnhancedDrawItem*> identities;
+        struct Identity
+        {
+            size_t key{};
+            assets::ModelMeshHandle mesh;
+        };
+        // Only copied identity values persist; no draw pointer escapes validation.
+        static thread_local std::vector<Identity> storage;
+        storage.resize(draws.size());
+        size_t count{};
         for (const auto& draw : draws)
         {
             const auto key = GeometryKey(draw);
-            if (key == 0u)
+            if (key)
             {
-                continue;
+                storage[count++] = {key, draw.modelMeshView.handle};
             }
-            const auto [position, inserted] = identities.emplace(key, &draw);
-            if (inserted)
-            {
-                continue;
-            }
-            const auto& previous = *position->second;
-            const bool typed = draw.modelMeshView.handle.IsValid();
-            const bool previousTyped = previous.modelMeshView.handle.IsValid();
-            if (typed != previousTyped || (typed
-                && draw.modelMeshView.handle != previous.modelMeshView.handle))
+        }
+        auto identities = std::span(storage.data(), count);
+        std::sort(identities.begin(), identities.end(),
+                  [](const Identity& left, const Identity& right) { return left.key < right.key; });
+        for (size_t index = 1; index < identities.size(); ++index)
+        {
+            const auto& current = identities[index];
+            const auto& previous = identities[index - 1];
+            if (current.key == previous.key && (current.mesh.IsValid() != previous.mesh.IsValid() ||
+                                                (current.mesh.IsValid() && current.mesh != previous.mesh)))
             {
                 error = "Geometry batching hash collides with a different complete mesh identity.";
                 return false;
@@ -68,11 +75,12 @@ namespace enhanced_draw
         return true;
     }
 
-    [[nodiscard]] inline float BoundRadius(
-        const EnhancedDrawItem& draw) noexcept
+    [[nodiscard]] inline float BoundRadius(const EnhancedDrawItem& draw) noexcept
     {
-        if (draw.boundRadius > 0.f) return draw.boundRadius;
-        return nullptr != draw.mesh
-            ? draw.mesh->GetBoundingSphere().radius : 0.f;
+        if (draw.boundRadius > 0.f)
+        {
+            return draw.boundRadius;
+        }
+        return nullptr != draw.mesh ? draw.mesh->GetBoundingSphere().radius : 0.f;
     }
-}
+} // namespace enhanced_draw

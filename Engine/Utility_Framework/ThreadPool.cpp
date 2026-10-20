@@ -355,22 +355,61 @@ struct thread_pool::state
             }
         }
 
-        ~graph_work()
+        bool matches(std::span<const job_graph_node> descriptions) const
         {
-            if (!admitted_)
+            if (nodes_.size() != descriptions.size())
             {
-                return;
+                return false;
             }
-            // 모든 native 콜백 순회가 돌아온 뒤 공유 사용자 캡처를 먼저 해제한다.
+            for (size_t index = 0; index < descriptions.size(); ++index)
+            {
+                if (nodes_[index]->prerequisites_ != descriptions[index].dependencies)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void prepare(std::function<void(std::size_t)> execute, std::function<void(std::exception_ptr)> complete,
+                     std::shared_ptr<job_graph_diagnostics> diagnostics)
+        {
+            execute_ = std::move(execute);
+            complete_ = std::move(complete);
+            diagnostics_ = std::move(diagnostics);
+            if (diagnostics_)
+            {
+                diagnostics_->native_storage_reused = true;
+            }
+            references_.store(2, std::memory_order_relaxed);
+            for (auto& task : std::span(nodes_.data(), nodes_.size()))
+            {
+                task->failed_.store(false, std::memory_order_relaxed);
+                if (diagnostics_)
+                {
+                    diagnostics_->nodes[task->index_].registered_ns = job_timestamp_ns();
+                }
+            }
+        }
+
+        // Called only after the last enki callback traversal has returned.
+        // No member may be accessed after recycling publishes this object.
+        void retire() noexcept
+        {
+            auto& owner = owner_;
             execute_ = {};
             if (diagnostics_)
             {
                 diagnostics_->completed_ns = job_timestamp_ns();
             }
+            diagnostics_.reset();
             auto complete = std::move(complete_);
-            complete(failure_);
+            auto failure = std::exchange(failure_, {});
+            admitted_ = false;
+            owner.recycle_graph(this);
+            complete(failure);
             complete = {};
-            owner_.finish();
+            owner.finish();
         }
 
         void remember_failure(std::exception_ptr error)
@@ -389,7 +428,7 @@ struct thread_pool::state
             // 마지막 감소는 이전 모든 콜백의 쓰기를 획득한다. publish_end도 최종 handle보다 앞선다.
             if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
             {
-                delete this;
+                retire();
             }
         }
     };
@@ -400,6 +439,51 @@ struct thread_pool::state
         using enki::IPinnedTask::IPinnedTask;
         void Execute() override {}
     };
+
+    static_assert(std::atomic<graph_work*>::is_always_lock_free);
+    std::array<std::atomic<graph_work*>, 8> completed_graphs_{};
+
+    void recycle_graph(graph_work* graph) noexcept
+    {
+        if (graph->nodes_.size() <= 4096 && graph->dependencies_.size() <= 16384)
+        {
+            for (auto& slot : completed_graphs_)
+            {
+                graph_work* empty{};
+                if (slot.compare_exchange_strong(empty, graph, std::memory_order_release, std::memory_order_relaxed))
+                {
+                    return;
+                }
+            }
+        }
+        delete graph;
+    }
+
+    std::unique_ptr<graph_work> acquire_graph(std::span<const job_graph_node> nodes)
+    {
+        for (auto& slot : completed_graphs_)
+        {
+            if (!slot.load(std::memory_order_relaxed))
+            {
+                continue;
+            }
+            auto* graph = slot.exchange(nullptr, std::memory_order_acquire);
+            if (!graph)
+            {
+                continue;
+            }
+            if (graph->matches(nodes))
+            {
+                return std::unique_ptr<graph_work>(graph);
+            }
+            graph_work* empty{};
+            if (!slot.compare_exchange_strong(empty, graph, std::memory_order_release, std::memory_order_relaxed))
+            {
+                delete graph;
+            }
+        }
+        return {};
+    }
 
     enki::TaskScheduler scheduler_;
     std::mutex submit_mutex_, done_mutex_, assist_mutex_;
@@ -467,7 +551,14 @@ struct thread_pool::state
             throw std::runtime_error("thread_pool dispatcher registration failed");
         }
     }
-    ~state() { stop_dispatcher(); }
+    ~state()
+    {
+        stop_dispatcher();
+        for (auto& slot : completed_graphs_)
+        {
+            delete slot.load(std::memory_order_relaxed);
+        }
+    }
     // Called after the last handoff has drained; the wake task is the final
     // pinned task the dispatcher runs before it deregisters.
     void stop_dispatcher() noexcept
@@ -507,8 +598,16 @@ struct thread_pool::state
                         std::function<void(std::exception_ptr)> complete,
                         std::shared_ptr<job_graph_diagnostics> diagnostics)
     {
-        auto graph =
-            std::make_unique<graph_work>(*this, nodes, std::move(execute), std::move(complete), std::move(diagnostics));
+        auto graph = acquire_graph(nodes);
+        if (graph)
+        {
+            graph->prepare(std::move(execute), std::move(complete), std::move(diagnostics));
+        }
+        else
+        {
+            graph = std::make_unique<graph_work>(*this, nodes, std::move(execute), std::move(complete),
+                                                 std::move(diagnostics));
+        }
         graph_work* submitted = nullptr;
         {
             std::lock_guard lock(submit_mutex_);

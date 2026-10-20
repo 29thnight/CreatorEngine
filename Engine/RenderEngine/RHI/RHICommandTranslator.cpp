@@ -32,7 +32,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
         outFailure.message = "Upload or descriptor recording changed before serial translation.";
         return false;
     }
-    for (const auto target : std::span(input.m_targetOrder.data(), input.m_targetOrder.size()))
+    for (const auto target : std::span(input.m_storage->targetOrder.data(), input.m_storage->targetOrder.size()))
     {
         if (target >= m_pool.GetWorkerCount())
         {
@@ -58,7 +58,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
     };
     try
     {
-        for (const auto target : std::span(input.m_targetOrder.data(), input.m_targetOrder.size()))
+        for (const auto target : std::span(input.m_storage->targetOrder.data(), input.m_storage->targetOrder.size()))
         {
             outFailure.targetIndex = target;
             nativeOpened = true;
@@ -69,11 +69,11 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
                 return false;
             }
             uint64_t targetCommands{};
-            for (const auto& segment :
-                 std::span(input.m_targets[target].segments.data(), input.m_targets[target].segments.size()))
+            for (const auto& segment : std::span(input.m_storage->targets[target].segments.data(),
+                                                 input.m_storage->targets[target].activeSegments))
             {
                 RHICommandTranslationStats segmentStats;
-                auto& encoder = m_pool.AcquireEncoder(target);
+                auto& encoder = m_pool.AcquireTranslationEncoder(target);
                 if (!segment->Replay(encoder, segmentStats, segmentFailure))
                 {
                     outFailure.commandIndex = targetCommands + segmentFailure.commandIndex;
@@ -109,7 +109,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
         nativeDesc.captureContext = input.m_desc.captureContext;
 #endif
-        if (!m_pool.FinalizeRecordedBatch(input.m_targetOrder, nativeDesc, translated.m_native, error))
+        if (!m_pool.FinalizeRecordedBatch(input.m_storage->targetOrder, nativeDesc, translated.m_native, error))
         {
             outFailure.message = error;
             closeFailedRecording();

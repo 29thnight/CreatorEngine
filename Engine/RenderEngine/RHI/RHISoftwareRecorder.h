@@ -18,14 +18,15 @@ class RHISoftwareRecorder final
     bool FinishRecording(std::span<const uint32_t> targetOrder, const RHISoftwareBatchDesc& desc,
                          RHISoftwareBatch& outBatch, std::string& outError);
     void CancelRecording();
-    bool HasRecorded(uint32_t target) const { return target < m_targets.size() && !m_targets[target].segments.empty(); }
+    bool HasRecorded(uint32_t target) const
+    {
+        return m_storage && target < m_storage->targets.size() && m_storage->targets[target].activeSegments != 0;
+    }
     RHICommandRecordingStats GetRecordingStats() const;
 
   private:
     const IRHISoftwareCommandValidator& m_validator;
-    ce::render_vector<std::shared_ptr<RHISoftwareRecordingBudget>> m_budgets;
+    std::shared_ptr<RHISoftwareRecordingStorage> m_storage;
     RHISoftwareRecordingDesc m_desc;
-    ce::render_vector<RHISoftwareBatch::Target> m_targets;
-    ce::render_vector<ce::render_unique_ptr<RHISoftwareEncoder>> m_encoders;
     bool m_active{};
 };

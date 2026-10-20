@@ -2,7 +2,9 @@
 
 작성일: 2026-10-19. 상태: 단계별 구현 진행 중. 기준: CreatorEngine `2935f29452698d08f4c0cf720c255ae383c3ca3f` 및 작업 트리, 로컬 UE 5.6.1 소스. 본문은 전체 구현 계약이며 현재 추가된 범위는 아래 진행 기록으로 구분한다.
 
-이번 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 [기록·번역 재사용 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 [비동기 제품 배선 검증](../../Artifacts/rhi-async-20261019/index.html)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계다.
+최신 후속(권장 1→2→4→5)은 작업 그래프·입력·segment 객체·네이티브 상태를 재사용한다. 이번 동일 조건 비교에서 Game CPU 중앙값 14.1255→13.6965ms, 기록 평균 2.1666→1.9426ms, 번역 평균 1.9076→1.7150ms다. 120 FPS 예산은 미달이다. [후속 계측·검증](../analysis/RhiSoftwareFollowup20261020.md).
+
+이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 [기록·번역 재사용 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 [비동기 제품 배선 검증](../../Artifacts/rhi-async-20261019/index.html)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계다.
 
 ### 2026-10-19 구현 API와 수명
 
@@ -25,6 +27,14 @@
 - 소프트웨어 명령 헤더는 payload 포인터를 바이트 오프셋으로 바꿔 32→24바이트, Draw 기록은 48→40바이트가 됐다. `arenaBlocks`/`allocatedBytes`는 활성 저장소를, `arenaCacheHits`는 새 backing 할당 없이 활성화한 retained block 수를 센다.
 - `DX12GpuProfiler::MergeSlices`는 재사용하는 연속 해시 버킷과 인덱스로 이름을 묶는다. 매 프레임 해시 노드를 할당·삭제하지 않는다. 합산 시간·span·첫 등장 순서·분할 suffix와 호출 종료 전 borrowed name 해제는 유지한다.
 - 측정·검증과 120 FPS 예산 비교는 [최적화 실행 기록](../analysis/RhiSoftwareArenaOptimization20261020.md)에 기록한다.
+
+### 2026-10-20 작업 그래프·입력·기록 객체·네이티브 상태 재사용
+
+- `RHIRunCommandRecordingTaskGraph`는 thread-local 변환 배열과 dependency 배열 용량을 유지한다. native scheduler는 노드 수와 모든 predecessor 목록이 같은 완료 그래프를 재사용한다. 최대 8개, 그래프당 4096노드·16384 dependency를 보관하며 acquire exchange/release CAS로 독점 소유권을 전달한다. 마지막 enki callback 참조 해제 뒤 사용자 캡처·실패 상태를 비우고 풀에 게시한 다음 완료를 통지한다. scheduler 접수·종료 mutex는 유지한다.
+- `SceneViewInput::Seal`은 temporal identity와 이전 draw lookup을 정렬한 thread-local 연속 배열로 처리한다. 정확한 object/incarnation/instance/mesh 조합, 중복 거절, 이전 view 일치, topology/pose 확인 계약을 유지한다. 함수 종료 시 이전 draw 포인터를 모두 비운다. geometry hash 충돌 검사도 복사한 신원 배열을 정렬하며 draw 포인터를 보관하지 않는다.
+- `RHISoftwareRecordingStorage`는 target별 segment 목록·budget·encoder와 target 순서의 용량을 보관한다. 전역 풀은 최대 8개·객체 및 배열 용량 합계 16MiB이며 원자적 슬롯으로 반환한다. 명령 backing 블록은 기존 `RenderArenaPool` 한도를 별도로 따른다. 활성 segment prefix만 밀봉·집계·번역한다. recorder에서 batch로 저장소 소유권을 이동하고 마지막 CPU 번역·취소 소비 뒤 초기화하여 반환한다. 재사용 encoder는 현재 recorder의 validator를 다시 연결한다.
+- `AcquireTranslationEncoder`는 frozen software 번역 풀에서 첫 segment의 native 상태를 초기화하고 이후 segment는 논리적 pipeline 바인딩만 비운다. 알려진 root signature·descriptor heaps·PSO 캐시를 유지해 같은 native 설정의 반복 호출을 생략한다. 일반 native callback 및 native command-list reset은 전체 캐시를 초기화한다. 각 패스의 Draw/Dispatch는 해당 패스의 유효 pipeline 바인딩을 여전히 요구한다.
+- [후속 실행 결과](../analysis/RhiSoftwareFollowup20261020.md).
 
 ### 2026-10-20 Draw·RDG 수명별 아레나
 

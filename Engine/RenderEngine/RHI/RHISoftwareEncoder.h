@@ -259,13 +259,25 @@ class RHISoftwareEncoder final : public RHIEncoder
 {
   public:
     RHISoftwareEncoder(RHISoftwareCommandList& list, const IRHISoftwareCommandValidator& validator)
-        : m_list(&list), m_validator(validator)
+        : m_list(&list), m_validator(&validator)
     {
     }
 
     void Reset(RHISoftwareCommandList& list)
     {
         m_list = &list;
+        m_state = {};
+    }
+
+    void Reset(RHISoftwareCommandList& list, const IRHISoftwareCommandValidator& validator)
+    {
+        m_validator = &validator;
+        Reset(list);
+    }
+    void ReleaseRecording() noexcept
+    {
+        m_list = nullptr;
+        m_validator = nullptr;
         m_state = {};
     }
 
@@ -331,6 +343,6 @@ class RHISoftwareEncoder final : public RHIEncoder
 
   private:
     RHISoftwareCommandList* m_list;
-    const IRHISoftwareCommandValidator& m_validator;
+    const IRHISoftwareCommandValidator* m_validator;
     RHISoftwareEncoderState m_state;
 };

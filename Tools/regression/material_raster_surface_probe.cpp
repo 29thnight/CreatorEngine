@@ -1105,6 +1105,39 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     const bool sealed = SealScene(view, {&draw, 1}, {}, accepted, error);
     Check(sealed, "Scene input seal " + error);
     {
+        std::array historyDraws{draw, draw};
+        historyDraws[0].temporalObjectId = 101;
+        historyDraws[1].temporalObjectId = 202;
+        historyDraws[1].worldMatrix.m[3][0] = 2;
+        own::shared_owner<const SceneViewInput> history;
+        Check(SealScene(view, historyDraws, {}, history, error), "Temporal sorted history " + error);
+        auto nextView = view;
+        ++nextView.frameId;
+        nextView.temporalFrame.reset = false;
+        std::swap(historyDraws[0], historyDraws[1]);
+        historyDraws[0].worldMatrix.m[3][0] = 4;
+        own::shared_owner<const SceneViewInput> current;
+        Check(SealScene(nextView, historyDraws, {}, current, error, &*history) &&
+                  current->Draws()[0].temporalHistoryValid && current->Draws()[1].temporalHistoryValid &&
+                  current->Draws()[0].previousGeometry->Source()->World().m[3][0] == 2 &&
+                  current->Draws()[1].previousGeometry->Source()->World().m[3][0] == 0,
+              "Reordered temporal draws preserve exact previous poses " + error);
+        historyDraws[1].temporalObjectId = historyDraws[0].temporalObjectId;
+        current.reset();
+        Check(!SealScene(nextView, historyDraws, {}, current, error, &*history) &&
+                  error == "Scene view contains duplicate temporal object/instance/mesh identities.",
+              "Sorted temporal duplicate rejection");
+        historyDraws[1].temporalInstanceId = 1;
+        Check(SealScene(nextView, historyDraws, {}, current, error, &*history) &&
+                  !current->Draws()[1].temporalHistoryValid,
+              "Different instance identity cannot inherit history " + error);
+        current.reset();
+        nextView.temporalFrame.reset = true;
+        Check(SealScene(nextView, historyDraws, {}, current, error, &*history) &&
+                  !current->Draws()[0].temporalHistoryValid,
+              "Explicit temporal reset excludes cached previous entries " + error);
+    }
+    {
         // The producer, queued source, sealed view, and render binding each
         // hand off actual ownership. A weak lookup is never the durable anchor.
         auto independent = own::make_shared<const Instance>(*instances[0]);
@@ -4319,6 +4352,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     }
     RecordingChangeDevice device;
     RunSceneInputFailures(instances);
+    if (mode == "--scene-input-only")
+    {
+        std::cout << "LX_SCENE_INPUT_OK checks=" << checks << " failures=" << sceneInputFailures << '\n';
+        return;
+    }
     Check(device.Initialize(64, 64, error), "Native device " + error);
 #ifdef LX_PROBE_VULKAN
     ProbePipelines pipelines;
@@ -5146,6 +5184,7 @@ int main(int argc, char** argv)
                     std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" ||
                     std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" ||
                     std::string_view(argv[2]) == "--scene-full-only" ||
+                    std::string_view(argv[2]) == "--scene-input-only" ||
                     std::string_view(argv[2]) == "--layer-shape-only" ||
                     std::string_view(argv[2]) == "--layer-bucket-only" ||
                     std::string_view(argv[2]) == "--temporal-bucket-only" ||

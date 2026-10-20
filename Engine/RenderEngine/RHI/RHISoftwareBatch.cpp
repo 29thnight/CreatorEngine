@@ -16,8 +16,7 @@ RHISoftwareBatch& RHISoftwareBatch::operator=(RHISoftwareBatch&& other) noexcept
 
 void RHISoftwareBatch::MoveFrom(RHISoftwareBatch&& other) noexcept
 {
-    m_targets = std::move(other.m_targets);
-    m_targetOrder = std::move(other.m_targetOrder);
+    m_storage = std::move(other.m_storage);
     m_desc = std::move(other.m_desc);
     m_recordingId = std::exchange(other.m_recordingId, 0);
     m_state = std::exchange(other.m_state, RHISoftwareBatchState::Empty);

@@ -113,24 +113,25 @@ namespace
         bool failed = false;
         try
         {
-            RHIRunCommandRecordingTaskGraph(scheduler, graph,
-                                            [&](uint32_t node)
-                                            {
-                                                if (graph.nodes[node].target == 0)
-                                                {
-                                                    ++calls;
-                                                    if (graph.nodes[node].wave == 0)
-                                                    {
-                                                        throw std::runtime_error("recording task failure");
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    std::this_thread::sleep_for(std::chrono::milliseconds(3));
-                                                    ++calls;
-                                                }
-                                            },
-                                            options);
+            RHIRunCommandRecordingTaskGraph(
+                scheduler, graph,
+                [&](uint32_t node)
+                {
+                    if (graph.nodes[node].target == 0)
+                    {
+                        ++calls;
+                        if (graph.nodes[node].wave == 0)
+                        {
+                            throw std::runtime_error("recording task failure");
+                        }
+                    }
+                    else
+                    {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(3));
+                        ++calls;
+                    }
+                },
+                options);
         }
         catch (const std::runtime_error& error)
         {
@@ -219,30 +220,27 @@ namespace
         constexpr auto kSameTarget = static_cast<uint8_t>(RHIRecordingDependencyReason::SameTarget);
         constexpr auto kCpuProducer = static_cast<uint8_t>(RHIRecordingDependencyReason::CpuProducer);
         RHIRecordingTaskTopology topology;
-        auto graph = Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1},
-                           {{false, {}}, {false, {}}, {false, {0}}}, &topology);
-        const auto withoutTopology = Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1},
-                                           {{false, {}}, {false, {}}, {false, {0}}});
+        auto graph =
+            Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1}, {{false, {}}, {false, {}}, {false, {0}}}, &topology);
+        const auto withoutTopology =
+            Build({0, 1, 0}, {0, 0, 1}, {0, 1, 2}, {1, 20, 1}, {{false, {}}, {false, {}}, {false, {0}}});
         RequireSameExecutionGraph(graph, withoutTopology);
         RequireCompleteTopology(graph, topology);
         const auto& combined = topology.nodes[2].dependencies;
-        Require(combined.size() == 1 && combined[0].node == 0 &&
-                    combined[0].reasons == (kSameTarget | kCpuProducer),
+        Require(combined.size() == 1 && combined[0].node == 0 && combined[0].reasons == (kSameTarget | kCpuProducer),
                 "one execution edge lost or duplicated its overlapping dependency reasons");
 
-        graph = Build({0, 1, 1}, {0, 0, 1}, {0, 1, 2}, {},
-                      {{false, {}}, {true, {0}}, {false, {1}}}, &topology);
+        graph = Build({0, 1, 1}, {0, 0, 1}, {0, 1, 2}, {}, {{false, {}}, {true, {0}}, {false, {1}}}, &topology);
         RequireCompleteTopology(graph, topology);
         Require(topology.nodes.size() == 3, "independent pass topology changed its expected node count");
         const auto& bridged = topology.nodes[2].dependencies;
-        Require(topology.nodes[1].dependencies.empty() && bridged.size() == 2 &&
-                    bridged[0].node == 0 && bridged[0].reasons == kCpuProducer && bridged[1].node == 1 &&
+        Require(topology.nodes[1].dependencies.empty() && bridged.size() == 2 && bridged[0].node == 0 &&
+                    bridged[0].reasons == kCpuProducer && bridged[1].node == 1 &&
                     bridged[1].reasons == (kSameTarget | kCpuProducer),
                 "independent pass topology lost its inherited CPU frontier or blocked its own callback");
 
         // 입력 unit 순서와 target으로 정렬한 node 순서는 다르며, 같은 묶음의 두 unit도 각각 남아야 한다.
-        graph = Build({1, 0, 2, 2}, {0, 0, 1, 1}, {0, 0, 1, 1}, {5, 7, 11, 13},
-                      {{false, {}}, {false, {0}}}, &topology);
+        graph = Build({1, 0, 2, 2}, {0, 0, 1, 1}, {0, 0, 1, 1}, {5, 7, 11, 13}, {{false, {}}, {false, {0}}}, &topology);
         RequireCompleteTopology(graph, topology);
         Require(topology.nodes.size() == 3, "split producer topology changed its expected node count");
         Require(topology.unitNodes == std::vector<uint32_t>({1, 0, 2, 2}) &&
@@ -253,8 +251,8 @@ namespace
         Require(graph.nodes[0].work == 7 && graph.nodes[1].work == 5 && graph.nodes[2].work == 24,
                 "topology capture changed coalesced work estimates");
         const auto& split = topology.nodes[2].dependencies;
-        Require(split.size() == 2 && split[0].node == 0 && split[1].node == 1 &&
-                    split[0].reasons == kCpuProducer && split[1].reasons == kCpuProducer,
+        Require(split.size() == 2 && split[0].node == 0 && split[1].node == 1 && split[0].reasons == kCpuProducer &&
+                    split[1].reasons == kCpuProducer,
                 "split producer topology omitted a slice or invented a same-target reason");
 
         graph = Build({0, 0}, {0, 0}, {0, 1}, {}, {{false, {}}, {false, {0}}}, &topology);
@@ -263,10 +261,10 @@ namespace
                     topology.nodes[0].units == std::vector<uint32_t>({0, 1}),
                 "coalesced passes created a self dependency or lost a recording unit");
         const auto previous = graph;
-        Require(!RHIBuildRecordingTaskGraph(std::array{0u, 0u}, std::array{0u, 1u}, std::array{0u, 1u}, {},
-                                            std::array{RHIRecordingPassDependencies{},
-                                                       RHIRecordingPassDependencies{false, {2}}},
-                                            1, graph, &topology),
+        Require(!RHIBuildRecordingTaskGraph(
+                    std::array{0u, 0u}, std::array{0u, 1u}, std::array{0u, 1u}, {},
+                    std::array{RHIRecordingPassDependencies{}, RHIRecordingPassDependencies{false, {2}}}, 1, graph,
+                    &topology),
                 "invalid producer accepted after building partial topology");
         RequireUnavailableTopology(topology, false);
         RequireSameExecutionGraph(graph, previous);
@@ -295,13 +293,13 @@ namespace
         targets.push_back(kMaximumEntries);
         waves.push_back(0);
         unitPasses.push_back(0);
-        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries + 1,
-                                           graph, &topology),
-                "diagnostic entry cap rejected valid execution work");
+        Require(
+            RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries + 1, graph, &topology),
+            "diagnostic entry cap rejected valid execution work");
         RequireUnavailableTopology(topology, true);
-        Require(RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries + 1,
-                                           withoutTopology),
-                "entry-cap comparison graph was rejected");
+        Require(
+            RHIBuildRecordingTaskGraph(targets, waves, unitPasses, {}, passes, kMaximumEntries + 1, withoutTopology),
+            "entry-cap comparison graph was rejected");
         RequireSameExecutionGraph(graph, withoutTopology);
 
         // node가 한 개로 합쳐져도 원래 unit의 수가 상한을 넘으면 역매핑 일부를 공개하면 안 된다.
@@ -609,10 +607,54 @@ namespace
 
         auto successCapture = std::make_shared<uint32_t>(7);
         std::weak_ptr<uint32_t> successRetained = successCapture;
-        auto success = scheduler.submit_graph(
-            std::array{job_graph_node{}}, [capture = std::move(successCapture)](size_t) { (void)capture; });
+        auto success = scheduler.submit_graph(std::array{job_graph_node{}},
+                                              [capture = std::move(successCapture)](size_t) { (void)capture; });
         success.wait();
         Require(successRetained.expired(), "successful native graph retained shared callback captures");
+    }
+
+    void VerifyNativeStorageReuse(job_scheduler& scheduler)
+    {
+        std::array<job_graph_node, 4> nodes;
+        nodes[1].dependencies = {0};
+        nodes[2].dependencies = {1};
+        auto diagnostics = std::make_shared<job_graph_diagnostics>();
+        for (size_t iteration = 0; iteration < 128; ++iteration)
+        {
+            std::array<std::atomic<uint32_t>, 4> calls{};
+            auto capture = std::make_shared<size_t>(iteration);
+            std::weak_ptr<size_t> weak = capture;
+            const bool fail = iteration % 4 == 0;
+            auto handle = scheduler.submit_graph(
+                nodes,
+                [&, capture = std::move(capture)](size_t node)
+                {
+                    ++calls[node];
+                    if (node == 0 && fail)
+                    {
+                        throw std::runtime_error("reused root failure");
+                    }
+                    Require(*capture == iteration, "Reused native graph read an earlier capture.");
+                },
+                diagnostics);
+            bool failed{};
+            try
+            {
+                handle.wait();
+            }
+            catch (const std::runtime_error& error)
+            {
+                failed = std::string_view(error.what()) == "reused root failure";
+            }
+            Require(failed == fail && calls[0] == 1 && calls[1] == (fail ? 0u : 1u) && calls[2] == (fail ? 0u : 1u) &&
+                        calls[3] == 1,
+                    "Native storage reuse kept a failure bit or changed dependency execution.");
+            Require(weak.expired(), "Native storage cache retained a completed callback.");
+            if (iteration)
+            {
+                Require(diagnostics->native_storage_reused, "Identical native graph allocated its storage again.");
+            }
+        }
     }
 
     void VerifyCompletionWait(job_scheduler& scheduler)
@@ -703,40 +745,39 @@ namespace
         std::promise<void> rootEntered;
         auto entered = rootEntered.get_future();
         std::atomic<uint32_t> calls{0};
-        auto handle = scheduler.submit_graph(
-            nodes,
-            [&](size_t node)
-            {
-                if (node == 0)
-                {
-                    rootEntered.set_value();
-                    release.Wait();
-                }
-                ++calls;
-            });
+        auto handle = scheduler.submit_graph(nodes,
+                                             [&](size_t node)
+                                             {
+                                                 if (node == 0)
+                                                 {
+                                                     rootEntered.set_value();
+                                                     release.Wait();
+                                                 }
+                                                 ++calls;
+                                             });
         const bool rootStarted = entered.wait_for(std::chrono::seconds(2)) == std::future_status::ready;
-        auto observer = std::async(
-            std::launch::async,
-            [&]
-            {
-                GateRelease releaseOnExit{release};
-                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-                while (scheduler.is_running() && std::chrono::steady_clock::now() < deadline)
-                {
-                    std::this_thread::yield();
-                }
-                const bool admissionClosed = !scheduler.is_running();
-                bool rejected = false;
-                try
-                {
-                    scheduler.submit_graph(std::array{job_graph_node{}}, [&](size_t) { ++calls; });
-                }
-                catch (const std::runtime_error&)
-                {
-                    rejected = true;
-                }
-                return std::pair{admissionClosed, rejected};
-            });
+        auto observer =
+            std::async(std::launch::async,
+                       [&]
+                       {
+                           GateRelease releaseOnExit{release};
+                           const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+                           while (scheduler.is_running() && std::chrono::steady_clock::now() < deadline)
+                           {
+                               std::this_thread::yield();
+                           }
+                           const bool admissionClosed = !scheduler.is_running();
+                           bool rejected = false;
+                           try
+                           {
+                               scheduler.submit_graph(std::array{job_graph_node{}}, [&](size_t) { ++calls; });
+                           }
+                           catch (const std::runtime_error&)
+                           {
+                               rejected = true;
+                           }
+                           return std::pair{admissionClosed, rejected};
+                       });
         GateRelease cleanup{release};
         // enki 수명 API는 start와 같은 소유자에서 호출하고 관찰자만 별도 스레드로 둔다.
         scheduler.shutdown();
@@ -793,6 +834,7 @@ int main()
             VerifyNativeSubmission(scheduler);
             VerifyNativeValidation(scheduler);
             VerifyNativeFailureAndLifetime(scheduler);
+            VerifyNativeStorageReuse(scheduler);
             VerifyCompletionWait(scheduler);
             VerifyNativeShutdown(pool, scheduler);
 #else

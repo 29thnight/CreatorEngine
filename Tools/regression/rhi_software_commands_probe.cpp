@@ -528,6 +528,27 @@ int main()
                     "Arena move lost a command or returned its block early.");
             Require(!firstList.Replay(movedNative, movedStats, movedFailure), "Moved arena retained replay ownership.");
         }
+        {
+            Require(recorder.BeginRecording(recordingDesc, error), "Reusable storage warmup failed.");
+            auto* retainedEncoder = &recorder.AcquireEncoder(0);
+            retainedEncoder->Draw(1, 1, 0, 0);
+            recorder.AcquireEncoder(0).Draw(2, 1, 0, 0);
+            recorder.AcquireEncoder(0).Draw(3, 1, 0, 0);
+            recorder.CancelRecording();
+            Require(recorder.BeginRecording(recordingDesc, error), "Reusable storage restart failed.");
+            auto* nextEncoder = &recorder.AcquireEncoder(0);
+            Require(nextEncoder == retainedEncoder, "Completed frame allocated another software encoder.");
+            nextEncoder->Draw(4, 1, 0, 0);
+            Require(recorder.GetRecordingStats().commandCount == 1,
+                    "Inactive retained segments leaked commands into the next frame.");
+            recorder.CancelRecording();
+            ProbeValidator rejecting;
+            RHISoftwareRecorder differentValidator(rejecting);
+            Require(differentValidator.BeginRecording(recordingDesc, error), "Validator rebinding begin failed.");
+            Require(!differentValidator.AcquireEncoder(0).SetScissor(0, 0, 1, 1),
+                    "Recycled encoder retained its previous recorder validator.");
+            differentValidator.CancelRecording();
+        }
         recordingDesc.maxCommandBytes = 1;
         recordingDesc.targetCount = 2;
         Require(!recorder.BeginRecording(recordingDesc, error), "Budget smaller than target count accepted.");

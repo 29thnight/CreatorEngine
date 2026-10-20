@@ -202,6 +202,28 @@ RHIEncoder& DX12CommandListPool::AcquireEncoder(uint32_t worker)
     return *encoder;
 }
 
+RHIEncoder& DX12CommandListPool::AcquireTranslationEncoder(uint32_t worker)
+{
+    if (!m_recordingResources)
+    {
+        return AcquireEncoder(worker);
+    }
+    if (worker >= m_workerCount || m_slots.empty() || !m_slots[m_frameIndex][worker].opened)
+    {
+        throw std::out_of_range("Translation encoder requires an open frozen target.");
+    }
+    auto& slot = m_slots[m_frameIndex][worker];
+    if (!slot.translationBegun)
+    {
+        auto& encoder = AcquireEncoder(worker);
+        slot.translationBegun = true;
+        return encoder;
+    }
+    auto& encoder = *m_encoders[worker];
+    encoder.ResetSoftwareSegment();
+    return encoder;
+}
+
 ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::string& outError)
 {
     if (m_slots.empty() || worker >= m_workerCount)
@@ -230,6 +252,7 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::strin
         return nullptr;
     }
 
+    slot.translationBegun = false;
     slot.opened = true;
     return slot.list.Get();
 }

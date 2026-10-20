@@ -38,6 +38,7 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     bool Prepare(std::string& outError) override;
     bool OpenWorker(uint32_t worker, std::string& outError) override;
     RHIEncoder& AcquireEncoder(uint32_t worker) override;
+    RHIEncoder& AcquireTranslationEncoder(uint32_t worker) override;
 
     /// 워커의 리스트를 열어 돌려준다. 이미 열려 있으면 그대로 준다.
     /// 실패하면 nullptr — 호출부는 그 패스를 건너뛰지 말고 알려야 한다.
@@ -62,6 +63,7 @@ class DX12CommandListPool : public IRHIParallelCommandPool
         ComPtr<ID3D12CommandAllocator> allocator;
         ComPtr<ID3D12GraphicsCommandList> list;
         bool opened{false};
+        bool translationBegun{false};
     };
 
     // [프레임][기록 구간]. OpenWorker에서 해당 allocator/list를 Reset한다.

@@ -37,6 +37,7 @@ struct job_graph_diagnostics
     uint64_t completed_ns{};
     uint32_t dispatcher_handoffs{};
     uint32_t native_task_count{};
+    bool native_storage_reused{};
 };
 
 uint64_t job_timestamp_ns() noexcept;

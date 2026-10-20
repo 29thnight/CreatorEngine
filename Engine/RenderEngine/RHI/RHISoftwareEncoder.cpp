@@ -18,7 +18,7 @@ bool RHISoftwareEncoder::SetViewport(float x, float y, uint32_t width, uint32_t 
 {
     RHISoftwareSetViewportArguments payload{x, y, width, height};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::SetViewport, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::SetViewport, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -36,7 +36,7 @@ bool RHISoftwareEncoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint
 {
     RHISoftwareSetScissorArguments payload{x, y, width, height};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::SetScissor, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::SetScissor, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -145,7 +145,7 @@ bool RHISoftwareEncoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t
 {
     RHISoftwareSetRootUnorderedBufferArguments payload{bindPoint, slot, value};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::SetRootUnorderedBuffer, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::SetRootUnorderedBuffer, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -225,7 +225,7 @@ bool RHISoftwareEncoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOf
 {
     RHISoftwareDrawIndirectArguments payload{arguments, byteOffset};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DrawIndirect, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DrawIndirect, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -243,7 +243,7 @@ bool RHISoftwareEncoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t
 {
     RHISoftwareDrawIndexedIndirectArguments payload{arguments, byteOffset};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DrawIndexedIndirect, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DrawIndexedIndirect, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -261,7 +261,7 @@ bool RHISoftwareEncoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t by
 {
     RHISoftwareDispatchIndirectArguments payload{arguments, byteOffset};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DispatchIndirect, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DispatchIndirect, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -283,7 +283,7 @@ bool RHISoftwareEncoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_
 {
     RHISoftwareDispatchMeshIndirectArguments payload{arguments, byteOffset};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DispatchMeshIndirect, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DispatchMeshIndirect, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -302,7 +302,7 @@ bool RHISoftwareEncoder::DispatchMeshIndirectBatch(RHIBufferHandle arguments, ui
 {
     RHISoftwareDispatchMeshIndirectBatchArguments payload{arguments, byteOffset, count, roots};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DispatchMeshIndirectBatch, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DispatchMeshIndirectBatch, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -322,7 +322,7 @@ bool RHISoftwareEncoder::DrawIndexedIndirectBatch(RHIBufferHandle arguments, uin
 {
     RHISoftwareDrawIndexedIndirectBatchArguments payload{arguments, byteOffset, count, roots};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DrawIndexedIndirectBatch, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DrawIndexedIndirectBatch, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -358,7 +358,7 @@ bool RHISoftwareEncoder::DispatchMesh(uint32_t x, uint32_t y, uint32_t z)
 {
     RHISoftwareDispatchMeshArguments payload{x, y, z};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::DispatchMesh, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::DispatchMesh, &payload, sizeof(payload), m_state))
     {
         return false;
     }
@@ -375,8 +375,8 @@ bool RHISoftwareEncoder::DispatchMesh(uint32_t x, uint32_t y, uint32_t z)
 bool RHISoftwareEncoder::BeginRasterWithoutAttachments(uint32_t width, uint32_t height)
 {
     RHISoftwareBeginRasterWithoutAttachmentsArguments payload{width, height};
-    if (!m_list->CanWrite() || !m_validator.Validate(RHISoftwareCommandType::BeginRasterWithoutAttachments, &payload,
-                                                     sizeof(payload), m_state))
+    if (!m_list->CanWrite() || !m_validator->Validate(RHISoftwareCommandType::BeginRasterWithoutAttachments, &payload,
+                                                      sizeof(payload), m_state))
     {
         return false;
     }
@@ -585,7 +585,7 @@ bool RHISoftwareEncoder::CopyBuffer(const RHIBufferSlice& destination, const RHI
 {
     RHISoftwareCopyBufferArguments payload{destination, source};
     if (!m_list->CanWrite() ||
-        !m_validator.Validate(RHISoftwareCommandType::CopyBuffer, &payload, sizeof(payload), m_state))
+        !m_validator->Validate(RHISoftwareCommandType::CopyBuffer, &payload, sizeof(payload), m_state))
     {
         return false;
     }

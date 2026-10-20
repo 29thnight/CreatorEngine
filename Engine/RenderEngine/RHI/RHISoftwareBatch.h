@@ -6,6 +6,21 @@
 class RHISoftwareRecorder;
 class RHICommandTranslator;
 
+struct RHISoftwareRecordingStorage
+{
+    struct Target
+    {
+        ce::render_vector<ce::render_unique_ptr<RHISoftwareCommandList>> segments;
+        size_t activeSegments{};
+    };
+    ce::render_vector<Target> targets;
+    ce::render_vector<uint32_t> targetOrder;
+    ce::render_vector<std::shared_ptr<RHISoftwareRecordingBudget>> budgets;
+    ce::render_vector<ce::render_unique_ptr<RHISoftwareEncoder>> encoders;
+    void Reset() noexcept;
+    size_t RetainedBytes() const noexcept;
+};
+
 struct RHISoftwareBatchDesc
 {
     uint64_t frameId{};
@@ -37,7 +52,7 @@ class RHISoftwareBatch final
     RHISoftwareBatchState GetState() const { return m_state; }
     const RHISoftwareBatchDesc& GetDesc() const { return m_desc; }
     uint64_t GetRecordingId() const { return m_recordingId; }
-    uint32_t GetTargetCount() const { return static_cast<uint32_t>(m_targetOrder.size()); }
+    uint32_t GetTargetCount() const { return m_storage ? static_cast<uint32_t>(m_storage->targetOrder.size()) : 0; }
     const RHICommandRecordingStats& GetRecordingStats() const { return m_stats; }
 
   private:
@@ -45,13 +60,7 @@ class RHISoftwareBatch final
     friend class RHICommandTranslator;
     void MoveFrom(RHISoftwareBatch&& other) noexcept;
 
-    struct Target
-    {
-        ce::render_vector<ce::render_unique_ptr<RHISoftwareCommandList>> segments;
-    };
-
-    ce::render_vector<Target> m_targets;
-    ce::render_vector<uint32_t> m_targetOrder;
+    std::shared_ptr<RHISoftwareRecordingStorage> m_storage;
     RHISoftwareBatchDesc m_desc;
     uint64_t m_recordingId{};
     RHISoftwareBatchState m_state{RHISoftwareBatchState::Empty};

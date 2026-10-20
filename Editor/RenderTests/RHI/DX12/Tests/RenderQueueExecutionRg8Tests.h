@@ -1,6 +1,7 @@
 #pragma once
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/DX12DeviceResources.h"
+#include "RHI/DX12/DX12Encoder.h"
 #include "RHI/DX12/DX12QueueRecorder.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -1067,7 +1068,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const auto view = RHIBindingDesc::UavBuffer(graph->ResolveBufferHandle(output), 64, 4);
             bindings = device.CreateBindings(std::span<const RHIBindingDesc>{&view, 1});
             require(bindings.IsValid(), "Frame descriptor allocation failed.");
-            auto& prefixEncoder = device.GetImmediateEncoder();
+            auto& prefixEncoder = static_cast<DX12Encoder&>(device.GetImmediateEncoder());
             RHIBufferTransition prefixTransition{storage->prefixBuffer, RHIResourceState::Common, RHIResourceState::UnorderedAccess};
             RHIBarrierBatch prefixBarriers{};
             prefixBarriers.bufferTransitions = {&prefixTransition, 1};
@@ -1078,6 +1079,14 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             require(prefixBindings.IsValid(), "Prefix descriptor allocation failed.");
             prefixEncoder.SetBindings(RHIBindPoint::Compute, 0, prefixBindings);
             prefixEncoder.Dispatch(1, 1, 1);
+            const auto recordedDispatches = prefixEncoder.GetComputeDispatchCount();
+            prefixEncoder.ResetSoftwareSegment();
+            prefixEncoder.Dispatch(1, 1, 1);
+            require(prefixEncoder.GetComputeDispatchCount() == recordedDispatches &&
+                        prefixEncoder.GetDroppedCount() == 1,
+                    "Software segment reset inherited a previous pass logical pipeline.");
+            prefixEncoder.ClearDropped();
+            prefixEncoder.SetPipeline(RHIBindPoint::Compute, producerPipeline);
             prefixTransition = {storage->prefixBuffer, RHIResourceState::UnorderedAccess, RHIResourceState::Common};
             prefixEncoder.ResourceBarriers(prefixBarriers);
             const auto recording = device.GetCurrentUploadRecordingId();

@@ -70,6 +70,9 @@ class RHISoftwareCommandList final
 
   private:
     friend class RHISoftwareEncoder;
+    friend struct RHISoftwareRecordingStorage;
+    friend class RHISoftwareRecorder;
+    void Reset(uint64_t commandBytes, uint64_t payloadBytes, const std::shared_ptr<RHISoftwareRecordingBudget>& budget);
 
     struct Command
     {

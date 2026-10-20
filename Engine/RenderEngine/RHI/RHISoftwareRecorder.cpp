@@ -1,7 +1,118 @@
 #include "RHISoftwareRecorder.h"
 
+void RHISoftwareRecordingStorage::Reset() noexcept
+{
+    for (auto& target : std::span(targets.data(), targets.size()))
+    {
+        for (auto& list : std::span(target.segments.data(), target.segments.size()))
+        {
+            list->Clear();
+            list->m_stats = {};
+            list->m_error = {};
+            list->m_sealed = false;
+            list->m_consumed = true;
+        }
+        target.activeSegments = 0;
+    }
+    for (auto& budget : std::span(budgets.data(), budgets.size()))
+    {
+        if (budget)
+        {
+            budget->arena.Clear();
+        }
+    }
+    for (auto& encoder : std::span(encoders.data(), encoders.size()))
+    {
+        if (encoder)
+        {
+            encoder->ReleaseRecording();
+        }
+    }
+    targetOrder.clear();
+}
+
+size_t RHISoftwareRecordingStorage::RetainedBytes() const noexcept
+{
+    size_t bytes =
+        targets.capacity() * sizeof(Target) + targetOrder.capacity() * sizeof(uint32_t) +
+        budgets.capacity() *
+            (sizeof(std::shared_ptr<RHISoftwareRecordingBudget>) + sizeof(RHISoftwareRecordingBudget)) +
+        encoders.capacity() * (sizeof(ce::render_unique_ptr<RHISoftwareEncoder>) + sizeof(RHISoftwareEncoder));
+    for (const auto& target : std::span(targets.data(), targets.size()))
+    {
+        bytes += target.segments.capacity() * sizeof(ce::render_unique_ptr<RHISoftwareCommandList>) +
+                 target.segments.size() * sizeof(RHISoftwareCommandList);
+    }
+    return bytes;
+}
+
 namespace
 {
+    struct SoftwareStoragePool
+    {
+        static constexpr size_t MaxBytes = 16 * 1024 * 1024;
+        static_assert(std::atomic<RHISoftwareRecordingStorage*>::is_always_lock_free);
+        static_assert(std::atomic<size_t>::is_always_lock_free);
+        std::array<std::atomic<RHISoftwareRecordingStorage*>, 8> free{};
+        std::atomic<size_t> bytes{};
+        ~SoftwareStoragePool()
+        {
+            for (auto& slot : free)
+            {
+                ce::render_delete<RHISoftwareRecordingStorage>{}(slot.load(std::memory_order_relaxed));
+            }
+        }
+        void Release(RHISoftwareRecordingStorage* storage) noexcept
+        {
+            storage->Reset();
+            const auto retained = storage->RetainedBytes();
+            auto used = bytes.load(std::memory_order_relaxed);
+            while (retained <= MaxBytes && used <= MaxBytes - retained)
+            {
+                if (bytes.compare_exchange_weak(used, used + retained, std::memory_order_relaxed))
+                {
+                    for (auto& slot : free)
+                    {
+                        RHISoftwareRecordingStorage* empty{};
+                        if (slot.compare_exchange_strong(empty, storage, std::memory_order_release,
+                                                         std::memory_order_relaxed))
+                        {
+                            return;
+                        }
+                    }
+                    bytes.fetch_sub(retained, std::memory_order_relaxed);
+                    break;
+                }
+            }
+            ce::render_delete<RHISoftwareRecordingStorage>{}(storage);
+        }
+    };
+
+    std::shared_ptr<RHISoftwareRecordingStorage> AcquireSoftwareStorage()
+    {
+        static const auto pool = ce::make_render_shared<SoftwareStoragePool>();
+        RHISoftwareRecordingStorage* storage{};
+        for (auto& slot : pool->free)
+        {
+            if (!slot.load(std::memory_order_relaxed))
+            {
+                continue;
+            }
+            storage = slot.exchange(nullptr, std::memory_order_acquire);
+            if (storage)
+            {
+                pool->bytes.fetch_sub(storage->RetainedBytes(), std::memory_order_relaxed);
+                break;
+            }
+        }
+        if (!storage)
+        {
+            storage = ce::make_render_unique<RHISoftwareRecordingStorage>().release();
+        }
+        return std::shared_ptr<RHISoftwareRecordingStorage>(
+            storage, [state = pool](auto* value) { state->Release(value); }, ce::render_allocator<std::byte>{});
+    }
+
     std::atomic<uint64_t> g_softwareRecordingId{1};
 
     void AddSoftwareRecordingStats(RHICommandRecordingStats& total, const RHICommandRecordingStats& next)
@@ -26,20 +137,21 @@ bool RHISoftwareRecorder::BeginRecording(const RHISoftwareRecordingDesc& desc, s
             "Software recording requires an inactive session, identified queue, 1..8 targets and positive budgets.";
         return false;
     }
-    m_targets.clear();
-    m_encoders.clear();
-    m_targets.resize(desc.targetCount);
-    m_encoders.resize(desc.targetCount);
-    m_budgets.clear();
-    m_budgets.reserve(desc.targetCount);
+    m_storage = AcquireSoftwareStorage();
+    m_storage->targets.resize(desc.targetCount);
+    m_storage->encoders.resize(desc.targetCount);
+    m_storage->budgets.resize(desc.targetCount);
     for (uint32_t target = 0; target < desc.targetCount; ++target)
     {
-        auto budget = ce::make_render_shared<RHISoftwareRecordingBudget>();
+        auto& budget = m_storage->budgets[target];
+        if (!budget)
+        {
+            budget = ce::make_render_shared<RHISoftwareRecordingBudget>();
+        }
         budget->maxCommandBytes =
             desc.maxCommandBytes / desc.targetCount + (target < desc.maxCommandBytes % desc.targetCount ? 1 : 0);
         budget->maxPayloadBytes =
             desc.maxPayloadBytes / desc.targetCount + (target < desc.maxPayloadBytes % desc.targetCount ? 1 : 0);
-        m_budgets.push_back(std::move(budget));
     }
     m_desc = desc;
     m_active = true;
@@ -48,41 +160,53 @@ bool RHISoftwareRecorder::BeginRecording(const RHISoftwareRecordingDesc& desc, s
 
 RHIEncoder& RHISoftwareRecorder::AcquireEncoder(uint32_t target)
 {
-    if (!m_active || target >= m_targets.size())
+    if (!m_active || target >= m_storage->targets.size())
     {
         throw std::out_of_range("Software encoder target is outside the active session.");
     }
-    auto& segments = m_targets[target].segments;
-    if (!segments.empty())
+    auto& slot = m_storage->targets[target];
+    auto& segments = slot.segments;
+    if (slot.activeSegments)
     {
-        // Seal clears this on success. Keep the diagnostic string's Debug STL
-        // proxy across passes instead of allocating/orphaning one per pass.
         thread_local std::string error;
-        if (!segments.back()->Seal(error))
+        if (!segments[slot.activeSegments - 1]->Seal(error))
         {
             throw std::runtime_error(error);
         }
     }
-    auto list = ce::make_render_unique<RHISoftwareCommandList>(m_desc.maxCommandBytes, m_desc.maxPayloadBytes,
-                                                               m_budgets[target]);
-    if (!m_encoders[target])
+    const auto index = slot.activeSegments;
+    if (index == segments.size())
     {
-        m_encoders[target] = ce::make_render_unique<RHISoftwareEncoder>(*list, m_validator);
+        segments.push_back(ce::make_render_unique<RHISoftwareCommandList>(
+            m_desc.maxCommandBytes, m_desc.maxPayloadBytes, m_storage->budgets[target]));
     }
     else
     {
-        m_encoders[target]->Reset(*list);
+        segments[index]->Reset(m_desc.maxCommandBytes, m_desc.maxPayloadBytes, m_storage->budgets[target]);
     }
-    segments.push_back(std::move(list));
-    return *m_encoders[target];
+    auto& encoder = m_storage->encoders[target];
+    if (!encoder)
+    {
+        encoder = ce::make_render_unique<RHISoftwareEncoder>(*segments[index], m_validator);
+    }
+    else
+    {
+        encoder->Reset(*segments[index], m_validator);
+    }
+    ++slot.activeSegments;
+    return *encoder;
 }
 
 RHICommandRecordingStats RHISoftwareRecorder::GetRecordingStats() const
 {
     RHICommandRecordingStats total;
-    for (const auto& target : std::span(m_targets.data(), m_targets.size()))
+    if (!m_storage)
     {
-        for (const auto& segment : std::span(target.segments.data(), target.segments.size()))
+        return total;
+    }
+    for (const auto& target : std::span(m_storage->targets.data(), m_storage->targets.size()))
+    {
+        for (const auto& segment : std::span(target.segments.data(), target.activeSegments))
         {
             AddSoftwareRecordingStats(total, segment->GetRecordingStats());
         }
@@ -103,16 +227,17 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
     std::bitset<8> seen;
     for (const uint32_t target : targetOrder)
     {
-        if (target >= m_targets.size() || seen.test(target) || m_targets[target].segments.empty())
+        if (target >= m_storage->targets.size() || seen.test(target) || m_storage->targets[target].activeSegments == 0)
         {
             outError = "Software target order has an invalid, duplicate or unopened target.";
             return false;
         }
         seen.set(target);
     }
-    for (size_t target = 0; target < m_targets.size(); ++target)
+    for (size_t target = 0; target < m_storage->targets.size(); ++target)
     {
-        for (const auto& segment : std::span(m_targets[target].segments.data(), m_targets[target].segments.size()))
+        for (const auto& segment :
+             std::span(m_storage->targets[target].segments.data(), m_storage->targets[target].activeSegments))
         {
             if (segment->GetCommandCount() && !seen.test(target))
             {
@@ -127,9 +252,9 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
         outError = "Software recording exceeded its aggregate byte budget.";
         return false;
     }
-    for (auto& target : std::span(m_targets.data(), m_targets.size()))
+    for (auto& target : std::span(m_storage->targets.data(), m_storage->targets.size()))
     {
-        for (auto& segment : std::span(target.segments.data(), target.segments.size()))
+        for (auto& segment : std::span(target.segments.data(), target.activeSegments))
         {
             if ((!segment->IsSealed() && !segment->Seal(outError)) || !segment->GetError().empty())
             {
@@ -142,14 +267,12 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
         }
     }
     RHISoftwareBatch batch;
-    batch.m_targetOrder.assign(targetOrder.begin(), targetOrder.end());
+    m_storage->targetOrder.assign(targetOrder.begin(), targetOrder.end());
     batch.m_desc = desc;
     batch.m_stats = stats;
     batch.m_recordingId = g_softwareRecordingId.fetch_add(1, std::memory_order_relaxed);
-    batch.m_targets = std::move(m_targets);
+    batch.m_storage = std::move(m_storage);
     batch.m_state = RHISoftwareBatchState::Sealed;
-    m_encoders.clear();
-    m_budgets.clear();
     m_active = false;
     outBatch = std::move(batch);
     return true;
@@ -157,8 +280,6 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
 
 void RHISoftwareRecorder::CancelRecording()
 {
-    m_encoders.clear();
-    m_targets.clear();
-    m_budgets.clear();
+    m_storage.reset();
     m_active = false;
 }

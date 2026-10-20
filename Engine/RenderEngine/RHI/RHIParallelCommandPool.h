@@ -35,7 +35,6 @@ class IRHIParallelCommandPool
         return false;
     }
 
-
     /// 이 frame slot의 GPU 사용이 끝난 뒤 호출한다.
     virtual void BeginFrame(uint32_t frameIndex) = 0;
 
@@ -48,6 +47,10 @@ class IRHIParallelCommandPool
 
     /// 열린 worker target에 새 pass 상태로 기록할 encoder를 돌려준다.
     virtual RHIEncoder& AcquireEncoder(uint32_t worker) = 0;
+
+    // Software replay has no untracked native pass callbacks. Backends may
+    // retain known native state while starting an empty logical pass.
+    virtual RHIEncoder& AcquireTranslationEncoder(uint32_t worker) { return AcquireEncoder(worker); }
 
     /// 열린 target을 모두 닫는다. Vulkan은 열린 dynamic rendering도 여기서 닫는다.
     virtual bool CloseAll(std::string& outError) = 0;
