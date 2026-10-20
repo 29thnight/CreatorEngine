@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/WorkerBalance20261020.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026-10-20 워커 분배 기준선과 병목 분석</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#결론과-범위">결론과 범위</a></li><li><a href="#1-캡처와-소스-신원">1. 캡처와 소스 신원</a></li><li><a href="#2-시간-축과-표본-선택">2. 시간 축과 표본 선택</a></li><li><a href="#3-공용-워커와-소유자-스레드">3. 공용 워커와 소유자 스레드</a></li><li><a href="#4-cpu-단계별-병목">4. CPU 단계별 병목</a></li><li><a href="#5-기록-대상별-분배">5. 기록 대상별 분배</a></li><li><a href="#6-gpu와-계측-영향">6. GPU와 계측 영향</a></li><li><a href="#7-변경과-수용-조건">7. 변경과 수용 조건</a></li><li><a href="#8-구현과-검증-요약">8. 구현과 검증 요약</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="WorkerBalance20261020.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>2026-10-20 워커 분배 기준선과 병목 분석</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 9개의 분량 막대">
+<a class="map-row" href="#결론과-범위"><span class="ve-label">§00</span><span class="map-name">결론과 범위</span><span class="map-bar"><i style="width:26.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-캡처와-소스-신원"><span class="ve-label">§1</span><span class="map-name">캡처와 소스 신원</span><span class="map-bar"><i style="width:44.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-시간-축과-표본-선택"><span class="ve-label">§2</span><span class="map-name">시간 축과 표본 선택</span><span class="map-bar"><i style="width:27%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-공용-워커와-소유자-스레드"><span class="ve-label">§3</span><span class="map-name">공용 워커와 소유자 스레드</span><span class="map-bar"><i style="width:35.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-cpu-단계별-병목"><span class="ve-label">§4</span><span class="map-name">CPU 단계별 병목</span><span class="map-bar"><i style="width:57.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-기록-대상별-분배"><span class="ve-label">§5</span><span class="map-name">기록 대상별 분배</span><span class="map-bar"><i style="width:28.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-gpu와-계측-영향"><span class="ve-label">§6</span><span class="map-name">GPU와 계측 영향</span><span class="map-bar"><i style="width:19.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-변경과-수용-조건"><span class="ve-label">§7</span><span class="map-name">변경과 수용 조건</span><span class="map-bar"><i style="width:56%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-구현과-검증-요약"><span class="ve-label">§8</span><span class="map-name">구현과 검증 요약</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 9개 가운데 「8. 구현과 검증 요약」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-결론과-범위">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="결론과-범위">결론과 범위</h2></div>
+<div class="prose"><p>최신 저장 계측은 <strong>워커 풀 전체의 장기 편중보다 렌더 소유자 스레드의 직렬 작업 집중과 명령 기록 대상별 작업량 차이</strong>를 보여 준다. ETW ON 구간에서 공용 워커 8개의 평균 Running 비율은 각각 7.15–8.02%이고 최대/최소 비율은 1.121배다. 같은 구간의 RenderThread는 81.28% Running이다. <code>RenderGraphDeclare</code>는 평균 5.097 ms 중 5.035 ms가 Running이므로, 이 단계의 대부분을 워커 대기 시간으로 해석할 수 없다.</p>
+<p>명령 기록에는 별도의 개선 후보가 있다. 현재 캡처는 8개 공용 워커를 사용하지만 네이티브 command target은 4개다. <code>RenderCommandRecord.Worker1</code>이라는 <strong>기록 대상 1</strong>은 그래프당 두 작업의 합이 평균 1.723 ms이며, 그중 OS Running이 1.671 ms다. 이것은 <code>[Worker 1]</code>이라는 물리 작업 스레드 번호가 아니다. 다른 기록 대상과 비용 차이가 있지만, 의존 관계와 같은 대상의 순서를 유지한 채 분배해야 한다.</p>
+<p>이 문서는 <strong>변경 전 저장 계측을 재분석한 기준선</strong>이다. 변경 후 Windows 호스트 실행, 실제 GPU 출력 검증 및 엔진 프레임 성능 재측정은 이 분석 환경에서 수행하지 않았다. 작업 분배 변경이 실제 프레임 시간을 줄였다는 주장은 하지 않는다. 정본 수치는 <a href="WorkerBalance20261020.json">WorkerBalance20261020.json</a>에 있으며, 대용량 원본을 복제하지 않고 기존 계측 파일을 참조한다.</p>
+<p>참고 방법론은 사용자가 제시한 <a href="https://github.com/usamahz/cpu-performance-engineering">cpu-performance-engineering</a>의 공식 README다. 전용 MCP는 이번 세션의 호출 가능한 도구로 노출되지 않아 README의 측정·동시성·allocator 관점을 적용했다. 이 작업에서는 저장 실측과 코드 정적 근거를 구분하고, 누적 작업 합과 의존 관계의 critical path를 따로 평가하며, 분배 장치에는 고정 크기 또는 소유자가 재사용하는 저장소를 사용한다. 외부 코드를 복제한 구현이 아니며, 실제 변경 후 측정 전에는 speedup을 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-캡처와-소스-신원">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-캡처와-소스-신원">1. 캡처와 소스 신원</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>확인한 값</th></tr></thead>
+<tbody><tr><td>계측 파일 게시 커밋</td><td><code>7ebcd2b1a2a181e88e4c2fe1c8952242242ab536</code></td></tr>
+<tr><td>캡처가 기록한 코드 HEAD</td><td><code>4eeba98f2c9ad5907debfa4eaa10b2f004afb149</code> — owned declaration packet 병렬화 이후</td></tr>
+<tr><td>구성·장면</td><td>Debug, CreatorRobot, Play mode, CreatorEditor, 엔티티 62개</td></tr>
+<tr><td>렌더 뷰</td><td>Scene <code>viewId=1</code>, Game <code>viewId=2</code>, 각각 1186×514</td></tr>
+<tr><td>실행 자원</td><td>공용 워커 8개, 논리 CPU 8개, 프로세스 affinity <code>0xff</code></td></tr>
+<tr><td>OS가 보고한 코어 ID</td><td><code>0, 2, 4, 6</code> — 논리 CPU 두 개씩 연결</td></tr>
+<tr><td>백엔드</td><td>네이티브 DX12 앞의 software command recording/translation wrapper 사용</td></tr>
+<tr><td>GPU validation</td><td>off</td></tr>
+<tr><td>구간</td><td>baseline 및 ETW, 각각 엔진 계측 ON/OFF 약 15초</td></tr>
+<tr><td>ETW ON 범위</td><td>1364.921–16377.786 ms, 15,012.865 ms</td></tr>
+<tr><td>ETW OFF 범위</td><td>26462.896–41476.539 ms, 15,013.643 ms</td></tr></tbody></table></div>
+<p><code>softwareRhi=true</code>는 CPU에서 GPU를 에뮬레이션했다는 뜻이 아니다. 엔진의 소프트웨어 명령 스트림을 CPU에서 기록하고 네이티브 명령으로 번역하는 경로다. <code>RHISoftwareTranslate</code>를 GPU 패스 시간과 혼합하지 않는다.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/measurement.json">measurement.json</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/identity.json">identity.json</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/worker-count.json">worker-count.json</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/worker-start-scheduler.json">worker-start-scheduler.json</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/baseline-play-before.json">baseline-play-before.json</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/ranges.json">ranges.json</a>. <code>viewId</code>의 의미는 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h">EnhancedSceneRenderer.h</a>의 안정된 Editor/Game view ID 계약을 따른다.</p>
+<h3 id="소스-신원의-한계">소스 신원의 한계</h3>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/source-identity.json">source-identity.json</a>은 캡처 전부터 존재한 Editor 프로젝트·GUI·문서 변경 등 dirty 목록을 함께 기록한다. <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/source-verification.json">source-verification.json</a>의 <code>sourceUnchanged=true</code>는 <strong>캡처 도중 소스가 변하지 않았다는 뜻</strong>이며, 전체 작업 트리가 깨끗한 HEAD였다는 보증이 아니다.</p>
+<p>기록된 582개 파일 SHA256을 변경 중인 작업 트리가 아닌 고정된 <code>4eeba98</code> Git blob과 대조했다. 98개는 원문 바이트가 일치하고 445개는 LF를 CRLF로 변환했을 때 일치한다. 나머지 39개는 일률적인 줄바꿈·BOM 변환으로 일치하지 않아 동등성을 확정하지 않았다. 혼합 줄바꿈일 수도 있고 다른 바이트 차이일 수도 있으며, SHA만으로 둘을 구분하지 않는다. 목록과 핵심 경로의 hash는 정본 JSON의 <code>integrity.source_identity</code>에 보존했다. <code>EnhancedRenderGraph.cpp</code>, <code>EnhancedSceneRenderer.cpp</code>, <code>MaterialGraphSceneHost.cpp</code>, <code>GpuGeometryVisibility.cpp</code>, <code>RHICommandTranslator.cpp</code>, <code>RHISubmissionThread.cpp</code> 등 분석 경로는 원문 또는 CRLF 변환 hash로 연결된다.</p>
+<p>저장소 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/verification.json">verification.json</a>은 원본 381개 파일의 hash 일치와 캡처 round trip 일치를 보고한다. 이번 독립 분석에서는 필요한 43개 파일을 내려받아 manifest의 byte 수와 SHA256을 다시 확인했으며 불일치는 0개였다. 이번 분석이 381개 전체를 다시 검증했다고 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-시간-축과-표본-선택">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-시간-축과-표본-선택">2. 시간 축과 표본 선택</h2></div>
+<div class="prose"><ul>
+<li><strong>baseline 전체 summary</strong>는 ETW를 켜지 않은 엔진 계측 캡처다. 프레임 경계 402개, 완전한 <code>RenderGraphDeclare</code>/<code>MaterialGraphScenePrepare</code>/<code>RenderCommandRecord</code> scope는 각각 794개다. CPU 렌더 제출 신원이 완전한 표본은 뷰별 396개다.</li>
+<li><strong>ETW 전체 summary</strong>는 프레임 경계 376개이고, CPU 렌더 제출 표본은 뷰별 349개다. 아래 OS 상태 분석은 전체 summary와 구분하여 <strong>ON 구간에 완전히 포함된 scope</strong>만 사용한다. 경계 partial flags의 하위 두 비트가 설정된 scope는 제외한다.</li>
+<li>ETW ON의 완전한 <code>RenderCommandRecord</code>는 678개이며, Scene/Game 각각 339개로 실제 렌더 측정 구간에 일대일 대응한다. 작업 scope 4407개 모두 부모 기록 구간에 속한다. <code>MaterialGraphScenePrepare</code>는 경계 위치 차이로 679개다.</li>
+<li>p50은 median, p95/p99는 정렬한 실제 표본의 <code>min(n-1, floor(n*p))</code> 인덱스다. 서로 다른 자식 scope의 p95를 더하지 않는다.</li>
+<li>ETW의 Running은 OS가 CPU에 올린 시간으로 유용한 작업량과 동일하지 않다. Ready는 실행 가능하지만 스케줄되지 않은 시간이고, Waiting 자체는 특정 mutex·fence의 대기 원인을 알려 주지 않는다.</li>
+<li>여러 워커의 시간 합은 <strong>core-ms</strong> 또는 겹치는 scope의 합이다. 이를 wall time, 프레임 시간, 화면에 표시된 FPS로 바꾸어 쓰지 않는다.</li>
+</ul>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/baseline/summary.json">baseline summary</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/etw/summary.json">ETW summary</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/etw/timeline-metadata.json">ETW timeline metadata</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/scope-metrics.json">scope-metrics.json</a>이 근거다. 원본 scope와 OS 상태를 다시 교차하여 주요 네 단계의 count·mean·Running/Ready/Waiting 평균이 저장된 scope-metrics와 반올림 오차 범위에서 같음을 확인했다. ETW lost buffers/events는 모두 0이고, 캡처의 partial scope는 14개다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-공용-워커와-소유자-스레드">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-공용-워커와-소유자-스레드">3. 공용 워커와 소유자 스레드</h2></div>
+<div class="prose"><p>ETW ON 구간의 전체 OS 상태다. 이 표는 scope의 중첩 합이 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>스레드</th><th style="text-align:right">TID</th><th style="text-align:right">Running ms</th><th style="text-align:right">Running %</th><th style="text-align:right">Ready %</th><th style="text-align:right">Waiting %</th></tr></thead>
+<tbody><tr><td>Worker 1</td><td class="num" style="text-align:right">41212</td><td class="num" style="text-align:right">1157.188</td><td class="num" style="text-align:right">7.708</td><td class="num" style="text-align:right">1.976</td><td class="num" style="text-align:right">90.316</td></tr>
+<tr><td>Worker 2</td><td class="num" style="text-align:right">34792</td><td class="num" style="text-align:right">1106.196</td><td class="num" style="text-align:right">7.368</td><td class="num" style="text-align:right">2.304</td><td class="num" style="text-align:right">90.327</td></tr>
+<tr><td>Worker 3</td><td class="num" style="text-align:right">11764</td><td class="num" style="text-align:right">1079.478</td><td class="num" style="text-align:right">7.190</td><td class="num" style="text-align:right">2.300</td><td class="num" style="text-align:right">90.510</td></tr>
+<tr><td>Worker 4</td><td class="num" style="text-align:right">41704</td><td class="num" style="text-align:right">1203.606</td><td class="num" style="text-align:right">8.017</td><td class="num" style="text-align:right">1.982</td><td class="num" style="text-align:right">90.001</td></tr>
+<tr><td>Worker 5</td><td class="num" style="text-align:right">41928</td><td class="num" style="text-align:right">1184.620</td><td class="num" style="text-align:right">7.891</td><td class="num" style="text-align:right">1.965</td><td class="num" style="text-align:right">90.144</td></tr>
+<tr><td>Worker 6</td><td class="num" style="text-align:right">25748</td><td class="num" style="text-align:right">1083.018</td><td class="num" style="text-align:right">7.214</td><td class="num" style="text-align:right">2.321</td><td class="num" style="text-align:right">90.465</td></tr>
+<tr><td>Worker 7</td><td class="num" style="text-align:right">16056</td><td class="num" style="text-align:right">1073.741</td><td class="num" style="text-align:right">7.152</td><td class="num" style="text-align:right">2.282</td><td class="num" style="text-align:right">90.566</td></tr>
+<tr><td>Worker 8</td><td class="num" style="text-align:right">32968</td><td class="num" style="text-align:right">1200.635</td><td class="num" style="text-align:right">7.997</td><td class="num" style="text-align:right">1.998</td><td class="num" style="text-align:right">90.005</td></tr>
+<tr><td>RenderThread</td><td class="num" style="text-align:right">28068</td><td class="num" style="text-align:right">12202.699</td><td class="num" style="text-align:right">81.282</td><td class="num" style="text-align:right">0.922</td><td class="num" style="text-align:right">17.796</td></tr>
+<tr><td>RHIThread</td><td class="num" style="text-align:right">29888</td><td class="num" style="text-align:right">800.315</td><td class="num" style="text-align:right">5.331</td><td class="num" style="text-align:right">0.592</td><td class="num" style="text-align:right">94.077</td></tr>
+<tr><td>PresentationThread</td><td class="num" style="text-align:right">37368</td><td class="num" style="text-align:right">4083.657</td><td class="num" style="text-align:right">27.201</td><td class="num" style="text-align:right">0.369</td><td class="num" style="text-align:right">72.429</td></tr>
+<tr><td>GameThread</td><td class="num" style="text-align:right">35984</td><td class="num" style="text-align:right">1319.856</td><td class="num" style="text-align:right">8.791</td><td class="num" style="text-align:right">0.357</td><td class="num" style="text-align:right">90.851</td></tr></tbody></table></div>
+<p>공용 워커의 Running 합은 9088.482 core-ms다. 이를 15,012.865 ms로 나누면 <strong>평균 0.605개 워커가 동시에 CPU에서 실행</strong>된 셈이다. 8개 풀의 평균 사용률은 7.567%이며, 60.5%의 전체 머신 사용률이라는 뜻이 아니다. 워커 Running의 변동계수는 4.65%다.</p>
+<p>엔진 계측 OFF·ETW ON 구간에서도 공용 워커 Running은 7.85–8.58%, 최대/최소 1.093배이고 RenderThread Running은 74.02%다. 계측 ON 한 구간만의 현상으로 단정하지 않으면서도, 실제 작업 비용의 정량 비교는 동일한 측정 모드에서 해야 한다.</p>
+<p>원본은 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/etw/thread-41212.json">Worker 1 thread</a>를 포함한 <code>json/etw/thread-&lt;TID&gt;.json</code>의 <code>states</code>다. 스레드 이름과 TID 대응은 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/etw/metadata.json">ETW metadata</a>에 있고, 전체 숫자는 정본 JSON의 <code>etw_thread_windows</code>에 있다.</p>
+<h3 id="렌더-단계가-진행되는-동안의-동시-실행">렌더 단계가 진행되는 동안의 동시 실행</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>소유자 단계</th><th style="text-align:right">완전한 scope 수</th><th style="text-align:right">해당 구간에서 CPU에 올라간 공용 워커 수의 평균</th><th style="text-align:right">8개 풀 기준 Running %</th></tr></thead>
+<tbody><tr><td>ScenePrepare</td><td class="num" style="text-align:right">679</td><td class="num" style="text-align:right">1.376</td><td class="num" style="text-align:right">17.20</td></tr>
+<tr><td>Declare</td><td class="num" style="text-align:right">678</td><td class="num" style="text-align:right">0.225</td><td class="num" style="text-align:right">2.81</td></tr>
+<tr><td>Compile</td><td class="num" style="text-align:right">678</td><td class="num" style="text-align:right">0.002</td><td class="num" style="text-align:right">0.03</td></tr>
+<tr><td>Record</td><td class="num" style="text-align:right">678</td><td class="num" style="text-align:right">2.201</td><td class="num" style="text-align:right">27.51</td></tr></tbody></table></div>
+<p>이 표는 <strong>시간상 동시성</strong>이다. 같은 구간에서 실행되는 이전 제출의 RHI 번역 등도 포함될 수 있으므로, 해당 단계가 그 워커 작업을 직접 소유한다고 해석하지 않는다. 기록 job scope 내부의 Running만 합한 값은 그래프당 평균 3.932 core-ms이며, 아래 Record wall 2.238 ms와 별개의 값이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-cpu-단계별-병목">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-cpu-단계별-병목">4. CPU 단계별 병목</h2></div>
+<div class="prose"><h3 id="etw-없는-baseline-전체-scope">ETW 없는 baseline 전체 scope</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>단계</th><th style="text-align:right">scope 수</th><th style="text-align:right">평균 ms</th><th style="text-align:right">p95 ms</th></tr></thead>
+<tbody><tr><td>RenderThreadFrame</td><td class="num" style="text-align:right">401</td><td class="num" style="text-align:right">28.9159</td><td class="num" style="text-align:right">32.1104</td></tr>
+<tr><td>RenderView</td><td class="num" style="text-align:right">794</td><td class="num" style="text-align:right">12.7257</td><td class="num" style="text-align:right">14.7164</td></tr>
+<tr><td>RenderGraphDeclare</td><td class="num" style="text-align:right">794</td><td class="num" style="text-align:right">4.4058</td><td class="num" style="text-align:right">5.1819</td></tr>
+<tr><td>MaterialGraphScenePrepare</td><td class="num" style="text-align:right">794</td><td class="num" style="text-align:right">2.7748</td><td class="num" style="text-align:right">3.3690</td></tr>
+<tr><td>RenderCommandRecord</td><td class="num" style="text-align:right">794</td><td class="num" style="text-align:right">1.8888</td><td class="num" style="text-align:right">2.2795</td></tr>
+<tr><td>RHISoftwareTranslate</td><td class="num" style="text-align:right">794</td><td class="num" style="text-align:right">1.0639</td><td class="num" style="text-align:right">1.2274</td></tr>
+<tr><td>RenderGraphCompile</td><td class="num" style="text-align:right">794</td><td class="num" style="text-align:right">0.7963</td><td class="num" style="text-align:right">1.1069</td></tr>
+<tr><td>RenderGpuCollect</td><td class="num" style="text-align:right">1599</td><td class="num" style="text-align:right">1.3648</td><td class="num" style="text-align:right">3.3272</td></tr></tbody></table></div>
+<p>부모·자식 또는 다른 스레드에서 겹치는 단계가 섞여 있으므로 열을 합쳐 프레임 시간을 만들지 않는다. <code>RenderGpuCollect</code>는 뷰마다 정확히 한 번 호출되는 scope도 아니다. 별도 CPU 제출 신원 표본의 평균은 Game 12.6548 ms, Scene 12.7123 ms이고 각각 396개다.</p>
+<h3 id="etw-on에서-확인한-소유자-실행대기">ETW ON에서 확인한 소유자 실행·대기</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>단계</th><th style="text-align:right">wall 평균 ms</th><th style="text-align:right">Running ms</th><th style="text-align:right">Ready ms</th><th style="text-align:right">Waiting ms</th></tr></thead>
+<tbody><tr><td>Declare</td><td class="num" style="text-align:right">5.0969</td><td class="num" style="text-align:right">5.0355</td><td class="num" style="text-align:right">0.0229</td><td class="num" style="text-align:right">0.0386</td></tr>
+<tr><td>ScenePrepare</td><td class="num" style="text-align:right">3.3817</td><td class="num" style="text-align:right">3.0607</td><td class="num" style="text-align:right">0.1024</td><td class="num" style="text-align:right">0.2184</td></tr>
+<tr><td>Record</td><td class="num" style="text-align:right">2.2384</td><td class="num" style="text-align:right">0.3012</td><td class="num" style="text-align:right">0.0137</td><td class="num" style="text-align:right">1.9236</td></tr>
+<tr><td>RHI Translate</td><td class="num" style="text-align:right">1.2165</td><td class="num" style="text-align:right">0.2943</td><td class="num" style="text-align:right">0.0168</td><td class="num" style="text-align:right">0.9055</td></tr>
+<tr><td>Compile</td><td class="num" style="text-align:right">0.8705</td><td class="num" style="text-align:right">0.8694</td><td class="num" style="text-align:right">0.0008</td><td class="num" style="text-align:right">0.0002</td></tr>
+<tr><td>GPU Collect</td><td class="num" style="text-align:right">1.5092</td><td class="num" style="text-align:right">1.4977</td><td class="num" style="text-align:right">0.0064</td><td class="num" style="text-align:right">0.0050</td></tr></tbody></table></div>
+<p>Declare의 wall 중 Running은 98.79%다. 반대로 Record와 RHI Translate 소유자는 대부분 워커 완료를 기다리는 구조이며, 작업 단위 재분배 후보가 된다. GPU Collect는 이름과 달리 이 표본에서 대부분 CPU Running이므로, 비싼 시간을 모두 GPU fence 대기로 설명하면 잘못이다. 구체적인 collect 내부 원인은 별도 조사 대상이다.</p>
+<h3 id="declare의-비싼-노드">Declare의 비싼 노드</h3>
+<p><code>RenderDeclare.&lt;node&gt;</code>라는 실제 이름별 scope가 있어 순서로 노드 번호를 추측할 필요가 없다. 아래는 baseline 794회씩의 평균이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>노드</th><th style="text-align:right">평균 ms</th></tr></thead>
+<tbody><tr><td>METEOR.Scene.Cull.First</td><td class="num" style="text-align:right">0.5866</td></tr>
+<tr><td>METEOR.Shadow.Cull.Final</td><td class="num" style="text-align:right">0.4196</td></tr>
+<tr><td>METEOR.Shadow.Occluder</td><td class="num" style="text-align:right">0.3601</td></tr>
+<tr><td>SSGI</td><td class="num" style="text-align:right">0.3283</td></tr>
+<tr><td>METEOR.Shadow.Raster</td><td class="num" style="text-align:right">0.3179</td></tr>
+<tr><td>METEOR.Shadow.History</td><td class="num" style="text-align:right">0.2855</td></tr>
+<tr><td>METEOR.Scene.Visibility</td><td class="num" style="text-align:right">0.2418</td></tr>
+<tr><td>METEOR.Scene.Occluder</td><td class="num" style="text-align:right">0.2360</td></tr>
+<tr><td>METEOR.Scene.Geometry</td><td class="num" style="text-align:right">0.2041</td></tr>
+<tr><td>METEOR.Scene.Cull.Final</td><td class="num" style="text-align:right">0.1817</td></tr></tbody></table></div>
+<p><code>RenderGraphDeclareNodeBody</code>가 이 범위 안에 중첩되므로 두 종류의 scope를 더하지 않는다. 기존 병렬 packet build는 공용 워커 8개에서 총 약 108 ms/794 Declare, 즉 뷰당 약 0.136 ms의 <strong>작업 합</strong>에 불과하며, 호출당 평균 6.3–7.0 µs다. Packet dispatch는 뷰당 평균 2.5회×0.0276 ms, join은 0.0654 ms다. 이 작은 경로를 모든 Declare의 대리 지표로 사용하지 않는다.</p>
+<h3 id="sceneprepare의-남은-비용">ScenePrepare의 남은 비용</h3>
+<p>baseline의 <code>MaterialSceneIndirectCommandsPrepare</code>는 평균 0.8248 ms이고 내부 <code>MaterialSceneIndirectPrepare</code>는 0.8103 ms다. <code>MaterialScenePacketJoin</code>은 0.3988 ms, <code>SurfaceStagesPrepare</code> 0.2547 ms, <code>TilePacketPrepare</code> 0.1682 ms다. <code>MaterialMeshGpuPrepare</code>는 뷰당 8회이며 합계 평균 약 0.5033 ms다. 값은 중첩 관계가 있어 단순 합산 대상이 아니다.</p>
+<p>PacketTask는 뷰당 4개, 합계 평균 1.2923 ms의 병렬 작업량이며, 내부 PacketPrepare는 뷰당 8회다. PlanUpload와 OutputBindings는 각각 뷰당 9회이고 두 종류의 scope 합은 약 0.1267 ms다. 따라서 이 두 작은 마커만 없애서 PacketPrepare의 전체 작업량이 사라진다고 볼 수 없다. ETW PacketJoin 평균 0.4995 ms 중 Running 0.3150 ms는 owner assist가 포함되는 구현과 일치하며, join wall 전체를 수동적인 대기로 계산하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-기록-대상별-분배">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-기록-대상별-분배">5. 기록 대상별 분배</h2></div>
+<div class="prose"><p>시간 구간 포함 관계로 ETW ON의 678개 Record를 렌더 측정과 연결했다. Scene 339개는 모두 6개의 job scope, Game 339개는 모두 7개의 job scope였다. 같은 target이 의존 단계마다 다시 실행되므로 target 수와 job 수는 다르다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>command target</th><th style="text-align:right">Scene job 수/graph</th><th style="text-align:right">Scene job wall 합 평균 ms</th><th style="text-align:right">Game job 수/graph</th><th style="text-align:right">Game job wall 합 평균 ms</th></tr></thead>
+<tbody><tr><td class="num">0</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0.9300</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">1.0022</td></tr>
+<tr><td class="num">1</td><td class="num" style="text-align:right">2</td><td class="num" style="text-align:right">1.6760</td><td class="num" style="text-align:right">2</td><td class="num" style="text-align:right">1.7692</td></tr>
+<tr><td class="num">2</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0.3876</td><td class="num" style="text-align:right">2</td><td class="num" style="text-align:right">1.0446</td></tr>
+<tr><td class="num">3</td><td class="num" style="text-align:right">2</td><td class="num" style="text-align:right">1.3374</td><td class="num" style="text-align:right">2</td><td class="num" style="text-align:right">1.2100</td></tr></tbody></table></div>
+<p>Scene은 target 합 최대/최소가 약 4.32배, Game은 약 1.77배다. 이 비율은 서로 다른 의존 job 수를 가진 target의 합을 비교한 것이며, 그 비율만큼 빨라질 수 있다는 예측이 아니다. 두 뷰 전체에서 target 1의 wall 합 1.7226 ms 중 실제 Running은 1.6710 ms다. 해당 편중은 OS 대기만으로 생긴 것이 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>기록 단계 관측</th><th style="text-align:right">평균 ms/graph</th><th>해석</th></tr></thead>
+<tbody><tr><td>owner Record wall</td><td class="num" style="text-align:right">2.2384</td><td>실제 기록 API 구간</td></tr>
+<tr><td>모든 record job wall 합</td><td class="num" style="text-align:right">4.6784</td><td>병렬 구간이 겹치는 합; wall 아님</td></tr>
+<tr><td>record job 시간 구간의 합집합</td><td class="num" style="text-align:right">1.7914</td><td>하나 이상 job scope가 열려 있는 시간</td></tr>
+<tr><td>Record 시작→첫 job 시작</td><td class="num" style="text-align:right">0.2557</td><td>사전 준비와 dispatch 포함</td></tr>
+<tr><td>마지막 job 종료→Record 끝</td><td class="num" style="text-align:right">0.1339</td><td>join 후 처리·finalization 포함</td></tr>
+<tr><td>첫 job→마지막 job 사이 모두 비어 있는 간격</td><td class="num" style="text-align:right">0.0574</td><td>의존 전환 등의 구간; 원인은 별도 확인</td></tr></tbody></table></div>
+<p>관측한 모든 그래프의 마지막 job은 target 3의 두 번째 짧은 job이었다. 따라서 target 1이 가장 비싸다는 사실만으로 전체 DAG의 마지막 노드나 임계 경로를 확정할 수 없다. 캡처에는 개별 record unit의 CPU callback timing과 실제 진단 topology payload가 없고, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/recording-task-graph.json">recording-task-graph.json</a>은 기본 모드만 기록한다. GPU pass 비용을 CPU 기록 비용으로 대신하여 가상의 최적 분배 성능을 계산하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-gpu와-계측-영향">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-gpu와-계측-영향">6. GPU와 계측 영향</h2></div>
+<div class="prose"><p>baseline은 각 뷰 396개 렌더의 GPU pass 표본을 갖는다. 같은 뷰에서 pass별 시간을 합하고 렌더 수로 나눈 평균은 Scene 5.9646 ms, Game 6.1244 ms다. 이 값은 <strong>기록된 GPU pass 시간 합</strong>이며, 보정된 queue busy 합집합·GPU 전체 프레임 span 또는 p95가 아니다.</p>
+<p><code>Shared.First.Cull</code>, <code>Shared.ShadowRecovery.Cull</code>, <code>CameraMeshlet.Recovery.Cull</code> 세 종류의 합은 Scene 평균 2.5240 ms, Game 2.5395 ms로, 각 뷰의 측정 pass 합 중 42.32%, 41.46%다. CPU command target 분배는 이 GPU shader 자체의 수행량을 줄이는 변경과 구분한다.</p>
+<p>완료한 real view render 수를 창 길이로 나눈 관측률은 다음과 같다. <strong>Scene/Game 합계 뷰 처리율이며 표시 FPS가 아니다.</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>모드</th><th style="text-align:right">완료 뷰 수</th><th style="text-align:right">초</th><th style="text-align:right">뷰/초</th></tr></thead>
+<tbody><tr><td>baseline, 엔진 계측 ON</td><td class="num" style="text-align:right">778</td><td class="num" style="text-align:right">15.1597</td><td class="num" style="text-align:right">51.3201</td></tr>
+<tr><td>baseline, 엔진 계측 OFF</td><td class="num" style="text-align:right">904</td><td class="num" style="text-align:right">15.1354</td><td class="num" style="text-align:right">59.7277</td></tr>
+<tr><td>ETW, 엔진 계측 ON</td><td class="num" style="text-align:right">686</td><td class="num" style="text-align:right">15.1889</td><td class="num" style="text-align:right">45.1646</td></tr>
+<tr><td>ETW, 엔진 계측 OFF</td><td class="num" style="text-align:right">828</td><td class="num" style="text-align:right">15.1671</td><td class="num" style="text-align:right">54.5918</td></tr></tbody></table></div>
+<p>서로 다른 창의 계측 부담과 실행 조건이 섞여 있으므로, 이 차이를 단일 요인의 인과 효과나 변경 후 개선율로 제시하지 않는다. <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/measurement-windows.json">measurement-windows.json</a>과 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Artifacts/current-state-20261020/json/conditions/baseline-environment.json">environment</a>의 관측 한계도 유지한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-변경과-수용-조건">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-변경과-수용-조건">7. 변경과 수용 조건</h2></div>
+<div class="prose"><h3 id="변경의-적용-범위">변경의 적용 범위</h3>
+<p>이 기준선은 다음 작업의 근거다. 명령 target 상한을 실제 가용 워커 범위에 맞추되 기존 최대 8개의 계약을 지키고, contiguous partition의 최대 추정 비용을 줄이는 후보를 기존 CPU dependency·wave 수용 조건으로 평가한다. RHI 번역에서는 긴 target을 먼저 배정하고, 먼저 끝난 작업자가 아직 시작하지 않은 target을 맡을 수 있게 한다. ScenePrepare에는 독립 packet 작업의 분리와 재사용 scratch를 구현했다. <strong>반복 상수 업로드 배칭은 이번 PR에서 수행하지 않았다.</strong></p>
+<h3 id="command-target-용량과-소유권의-정적-검토">command target 용량과 소유권의 정적 검토</h3>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/Utility_Framework/WorkPartition.h">WorkPartition.h</a>의 새 분할 함수는 caller가 제공한 span과 scalar만 사용한다. 비용 합의 정수 overflow를 결과 기록 전에 거부하며, 기존 명령 순서를 보존하는 연속·비어 있지 않은 구간을 만든다. <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp">EnhancedRenderGraph.cpp</a>의 <code>consider</code>가 기존 CPU dependency와 wave 수, 추정 critical work 조건으로 후보를 평가한다. 최대 target 추정 비용의 최소화만으로 후보를 무조건 채택하지 않는다.</p>
+<p>command target 수와 raster slice 수는 다른 값이다. <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/MaterialGraphSceneHost.cpp">MaterialGraphSceneHost.cpp</a>의 <code>RasterRecordingSlices</code>는 최대 4개를 반환하며, <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl">MaterialGraphSceneShadowStage.inl</a>을 포함한 두 raster split caller가 이 값을 전달한다. 그래프는 <code>min(pass.maxSlices, poolWorkers)</code>를 적용하므로 command target을 8개로 늘려도 <code>recordedGeometryRoutes[4]</code>와 <code>shadowRecordingStats[6][4]</code>의 slice 인덱스는 0–3이다. DX12·Vulkan command pool의 slot/encoder는 초기화된 worker 수만큼 준비되고, DX12 제출 배열과 공통 target 검증의 최대 용량은 기존 <code>kMaxWorkers=8</code>이다.</p>
+<p>정상 Editor·Player 부팅에서는 <a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RuntimeHost/EngineBootstrap.h">EngineBootstrap.h</a>의 <code>InitializeRuntime</code>이 scheduler를 시작한 뒤 <code>Run</code>이 app을 생성·초기화한다. 이후 렌더 스레드의 첫 pipeline build에서 live command pool이 초기화된다. 따라서 정상 부팅에서 scheduler가 아직 시작되지 않아 command pool이 1개 fallback으로 고정되는 순서는 확인되지 않았다.</p>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/efa60231f06601245bb3807b9bee68bade7aa8fd/Engine/RenderEngine/RHI/RHICommandTranslator.cpp">RHICommandTranslator.cpp</a>는 고정 용량을 넘는 target count를 결과 배열 접근 전에 거부한다. 고정 크기 claim queue는 각 target을 한 작업자에게만 배정하고, 그 작업자가 해당 target의 모든 segment를 번역한다. 모든 작업을 join한 뒤 실패 선택과 최종 제출은 원래 target 순서를 사용한다. 이 정적 검토는 native driver의 병렬 실행 검증을 대신하지 않는다.</p>
+<h3 id="변경-후-실행에서-확인할-조건">변경 후 실행에서 확인할 조건</h3>
+<p><strong>추정 비용의 균형은 실제 비용의 균형을 보장하지 않는다.</strong> 변경 후에는 같은 코드 구성·장면·뷰·worker 수의 Windows 실행에서 다음을 확인해야 한다.</p>
+<ol>
+<li>원래 GPU command 제출 순서, CPU dependency, target의 단독 기록 소유권과 실패 시 전체 drain을 유지한다.</li>
+<li>1·4·8 worker와 빈 target·부분 사용 target·큰 비용·정수 overflow 경계를 검증한다. command target 최대 8개와 raster slice 최대 4개의 독립된 용량 계약을 유지한다.</li>
+<li>같은 방식으로 Record/Translate/ScenePrepare의 wall·p95, target별 실제 CPU 비용과 생성된 DAG의 critical path를 측정한다. 현재 없는 per-unit timing을 사용할 경우 그 진단 비용을 별도 구분한다.</li>
+<li>엔진 계측 OFF의 정상 실행 관측과 GPU validation을 켠 정확성 실행을 분리한다. CPU-only 회귀 통과를 실제 DX12/Vulkan 실행 통과로 표기하지 않는다.</li>
+</ol>
+<p>이 문서의 렌더링 시간·사용률은 전부 변경 전 저장 계측이다. 다음 절의 CPU 회귀 검증은 코드 계약을 확인하며 Windows native 실행 완료나 성능 개선을 뜻하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-구현과-검증-요약">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-구현과-검증-요약">8. 구현과 검증 요약</h2></div>
+<div class="prose"><h3 id="구현">구현</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>변경</th><th>적용 내용과 유지하는 계약</th></tr></thead>
+<tbody><tr><td>live command pool 용량</td><td>기존 고정 4개 대신 초기화 시 가용 공용 워커 수를 1–8로 제한한다. Record는 초기화된 pool의 worker 수를 사용하고 RHI translation job 상한도 최대 8개까지 허용한다. raster split 최대 4개의 계약은 별도로 유지한다.</td></tr>
+<tr><td>contiguous partition</td><td>새 minimax 함수가 연속 구간의 최대 추정 비용을 최소화한 후보를 만든다. 기존 DAG critical-work·wave 검사가 수락 여부를 결정한다. 함수 자체에는 heap 할당이 없다.</td></tr>
+<tr><td>declared-writer 조회</td><td><code>HasDeclaredWriter</code>의 <code>const auto usages = pass.usages</code> 값 복사를 제거하고 기존 usages를 span으로 읽는다. 매 pass의 usage container 복사·할당을 줄이며 조회 조건은 유지한다.</td></tr>
+<tr><td>RHI translation 분배</td><td>active segment의 command count를 추정 비용으로 사용하여 긴 target부터 안정적으로 정렬한다. 고정 크기 atomic claim queue에서 다음 target을 가져오되 target 내부 segment의 순서와 단독 소유, 원래 순서의 오류·제출 처리를 유지한다.</td></tr>
+<tr><td>ScenePrepare packet</td><td>camera 최대 2개와 shadow 최대 9개의 독립 descriptor를 두 phase의 indexed batch로 처리한다. 각 batch의 작업자가 다음 descriptor를 claim하며, owner가 보유한 고정 11개 <code>render_vector&lt;PacketDraw&gt;</code>의 용량을 다시 사용한다. vector 슬롯은 worker 번호 대신 논리 packet ID에 연결한다. 기존 retained arena의 immutable group span과 작업별 결과·오류 슬롯은 전체 drain까지 살아 있다.</td></tr></tbody></table></div>
+<p>작업 분배용 지역 저장소는 bounded array·span·scalar다. RHI translation의 새 queue는 이 검증 환경에서 128 bytes이고 cost array는 64 bytes다. 이것은 해당 구조의 크기이며 함수 전체 stack 크기나 native RHI 전체의 무할당을 보장하는 값은 아니다. ScenePrepare의 packet record vector는 owner 상태에 보관하고, 참조를 빌려 <code>resize</code>·덮어쓰기를 수행한다. packet마다 지역 vector와 그 Debug proxy를 다시 만드는 방식은 피한다. record는 <code>UploadPackets</code>에서 복사되므로 재사용 vector의 주소를 완료된 frame에 게시하지 않는다.</p>
+<h3 id="cpu-회귀-검증과-한계">CPU 회귀 검증과 한계</h3>
+<p>세부 실행 결과와 실제 검증 입력의 SHA256은 <a href="WorkerBalance20261020Validation.json">WorkerBalance20261020Validation.json</a>에 모은다. normal·sanitizer·실제 scheduler 검증을 구분하며, 아래의 native scheduler는 엔진 <code>JobScheduler</code>·<code>ThreadPool</code>·enkiTS CPU 경로를 뜻한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검증</th><th>확인한 범위</th></tr></thead>
+<tbody><tr><td>partition oracle</td><td>유효 입력 669,936개 case를 normal 및 ASan/UBSan에서 통과했다. 이 중 669,928개는 가능한 cut을 모두 비교하고, 4096개 원소를 가진 8개 case는 분배·단조성을 검증한다. 별도로 잘못된 입력 4개를 거부하며 결과를 보존하는지 확인한다. helper의 추가 동적 할당은 0이다. 0비용, 0·1·최대 target, 잘못된 크기와 합 overflow를 포함한다.</td></tr>
+<tr><td>recording DAG</td><td>실제 scheduler에서 물리 worker 1·4·8, command target 8, legacy/native 정책의 24,485개 검증을 normal 및 ASan/UBSan에서 통과했다. unrelated previous-wave 완료를 강제로 기다리게 하는 mutant는 거부됐다.</td></tr>
+<tr><td>translation</td><td>exact production <code>Translate</code> body를 CPU RHI fixture 경계에서 실행했다. job 1·2·4·8, 실제 scheduler worker 1·4·8, target·segment 단독 소유, active-only·포화 비용, 원래 오류/제출 순서, 지연 참여자와 실패 drain을 검증했다. queue 10,000회 반복에서 일반·aligned allocation counter가 모두 0이었다. normal 및 실제 scheduler ASan/UBSan 실행을 통과했다.</td></tr>
+<tr><td>ScenePrepare packet</td><td>exact Host packet admission/build/join과 <code>UploadPackets</code>, RenderArena 및 실제 scheduler를 실행한 308,808개 검증을 normal·ASan/UBSan에서 각각 통과했다. worker 1·2·4·8, 기록 bytes·출력 소유권·오류 순서·drain을 확인했다. 전역 pool을 시작하지 않고 주입한 scheduler만 4·8 worker로 실행한 경우도 검증한다. 작업 수 계산은 해당 scheduler가 소유한 pool의 worker 수를 조회한다.</td></tr></tbody></table></div>
+<p>ScenePrepare의 warm allocation 비교는 <strong>해당 packet CPU fixture에서 관측한 할당 요청</strong>이다. worker 4·8, draw 97·4096, static cache hit/miss의 8개 조건에서 각각 16회 warmup 후 17개 표본을 수집했다. cache hit의 median은 preparation당 133→64회, cache miss는 172→85회였다. 변경 후 모든 표본은 각각 64·85회다. 집계는 일반·aligned <code>new</code>와 arena upstream service의 할당 요청을 포함하며, RHI upload와 기존 GPU packet plan은 fixture이고 mimalloc은 malloc shim으로 대체했다. 또한 작은 admission-count adapter가 실제 preparation helper로 전달한다. 이 결과를 전체 <code>MaterialGraphScenePrepare</code>의 무할당, Windows 할당 횟수 또는 프레임 시간 개선으로 해석하지 않는다.</p>
+<p>ASan/UBSan 실행에서는 sandbox의 <code>/proc</code> 접근 제약으로 LeakSanitizer를 비활성화했다(<code>detect_leaks=0</code>). 따라서 이 결과를 leak 검사 통과라고 쓰지 않는다. 강제 지연·admission 실패 fixture 일부는 join되는 <code>std::thread</code>를 사용하며, 전체 결과를 실제 native RHI·driver 검증으로 확장하지 않는다.</p>
+<p>이 Linux 환경의 include-boundary gate는 <strong>FAIL이며 기존 실패가 그대로 남아 있다.</strong> 변경 전 HEAD <code>7ebcd2b</code>의 Git blob을 별도 임시 트리에 복원하고 현재와 같은 sparse-checkout footprint에서 같은 검사기·allowlist로 실행한 결과, 양쪽 모두 상향 간선 27개·물리 경계 69개로 stdout까지 동일했다. 이번 수정으로 추가된 위반은 0개다. 전체 HEAD scanner 입력에는 현재 sparse checkout에 없는 <code>ThirdParty/DxTimingCaptureLibrary/lib/DxTimingCaptureLibrary.lib.vcxproj</code>가 하나 더 있어 물리 경계 70개가 된다. 이 footprint 차이를 수정에 의한 위반 감소로 보고하지 않는다. 검사기나 allowlist를 변경해 통과시키지 않았다.</p>
+<p>Linux CPU 검증으로 확인한 범위는 분배·순서·수명·실패 처리와 제한된 할당 계약이다. <strong>Windows 빌드, DX12/Vulkan native GPU 실행, GPU 출력 동일성, 변경 후 CPU/GPU 시간 및 표시 FPS는 아직 검증하지 않았다.</strong> 최종 수용에는 7절의 동일 조건 재측정이 필요하다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="WorkerBalance20261020.md"><code>docs/analysis/WorkerBalance20261020.md</code></a> · 마지막 커밋 2026-10-20 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

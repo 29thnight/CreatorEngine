@@ -64,7 +64,7 @@ for (const doc of data.documents) {
     if (/^[a-z]+:/i.test(target)) return match;
     const destination = path.resolve(path.dirname(doc.path), target+'.md');
     const rendered = destination.replace(/\.md$/,'.html');
-    if (fs.existsSync(rendered) || data.documents.some(d=>path.resolve(d.path)===destination)) return `href="${target}.html${fragment}"`;
+    if (fs.existsSync(rendered) || (destination.startsWith(path.resolve('docs')+path.sep) && fs.existsSync(destination)) || data.documents.some(d=>path.resolve(d.path)===destination)) return `href="${target}.html${fragment}"`;
     const repositoryPath = path.relative(root,destination).replaceAll('\\','/');
     return `href="https://github.com/29thnight/CreatorEngine/blob/${data.master}/${repositoryPath}${fragment}"`;
   });

@@ -50,7 +50,11 @@ class Page(HTMLParser):
         for key in ('href','src'):
             if key in attrs: self.links.append(attrs[key])
 
-check(git('rev-parse','master').decode().strip()==sha,'master changed during review')
+current_master=git('rev-parse','master').decode().strip()
+if '--allow-descendant-master' in sys.argv:
+    check(subprocess.run(['git','merge-base','--is-ancestor',sha,current_master],cwd=ROOT).returncode==0,'Audited snapshot is not an ancestor of current master')
+else:
+    check(current_master==sha,'master changed during review')
 dashboard='docs/RefactoringPlanDashboard.html'
 check(digest(dashboard)==manifest['dashboardSha256'],'dashboard changed during full documentation review')
 subprocess.run(['node','Tools/docs/collect-document-links.mjs'],cwd=ROOT,check=True)
@@ -140,7 +144,7 @@ if '--visual' in sys.argv:
 
 original=ROOT/'Build/full-docs-inherited-links.json'
 legacy=json.loads(original.read_text(encoding='utf-8')) if original.exists() else []
-report={'master':sha,'status':'PASS' if not problems else 'FAIL','updatedMarkdownDocuments':len(manifest['documents'])+len(plans['documents']), 'standaloneReports':len(manifest['standalone']), 'apiPages':len(api['pages']),'apiMembers':member_count,'documentationFilesInspected':len(all_links),'localLinksInspected':inspected,'brokenLinks':bad,'originalReportedMissingLinks':len(legacy),'sourceFilesVerified':len(sources),'sourceCitationsVerified':citations,'visualPagesVerified':visual_count,'dashboardPreserved':digest(dashboard)==manifest['dashboardSha256'],'problems':problems}
+report={'master':sha,'currentMaster':current_master,'allowDescendantMaster':'--allow-descendant-master' in sys.argv,'status':'PASS' if not problems else 'FAIL','updatedMarkdownDocuments':len(manifest['documents'])+len(plans['documents']), 'standaloneReports':len(manifest['standalone']), 'apiPages':len(api['pages']),'apiMembers':member_count,'documentationFilesInspected':len(all_links),'localLinksInspected':inspected,'brokenLinks':bad,'originalReportedMissingLinks':len(legacy),'sourceFilesVerified':len(sources),'sourceCitationsVerified':citations,'visualPagesVerified':visual_count,'dashboardPreserved':digest(dashboard)==manifest['dashboardSha256'],'problems':problems}
 (ROOT/'Build/full-docs-verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print(json.dumps({k:v for k,v in report.items() if k not in ('brokenLinks','problems')},ensure_ascii=False))
 for item in problems[:40]: print(item)
