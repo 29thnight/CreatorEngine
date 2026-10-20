@@ -147,6 +147,9 @@
     <ClInclude Include="JobGraph.h">
       <Filter>Core.Thread</Filter>
     </ClInclude>
+    <ClInclude Include="WorkPartition.h">
+      <Filter>Core.Thread</Filter>
+    </ClInclude>
     <ClInclude Include="WindowsCoreWindow.h">
       <Filter>WindowsApplication\CoreWindow</Filter>
     </ClInclude>

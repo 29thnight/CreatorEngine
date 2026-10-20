@@ -1,0 +1,682 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-10-20T13:42:33.983032+00:00",
+  "baseline_commit": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+  "measured_code_head": "4eeba98f2c9ad5907debfa4eaa10b2f004afb149",
+  "scope": "CPU correctness and bounded allocation contracts. No post-change Windows/native GPU/frame timing.",
+  "environment": {
+    "system": "Linux",
+    "machine": "x86_64",
+    "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+    "enkiTS_commit": "0289cf6ffce86697e1f46cb4eeca1c946bffec71",
+    "formatter": "clang-format 22.1.3 with repository configuration, changed ranges only"
+  },
+  "source_coherence": {
+    "report_count": 11,
+    "input_hash_comparisons": 101,
+    "unique_sources": 26,
+    "mismatches": 0
+  },
+  "production_source_sha256": {
+    "Engine/RenderEngine/MaterialGraphPreparationTasks.h": "cfa7e96533d9e42821ef2bf30b2481c06512ab89adae74ef31bbaf2791b52dd9",
+    "Engine/RenderEngine/MaterialGraphSceneHost.cpp": "d0038ed77960ebebb32b7aa7a5ba76921643f685634b8148fd28842074f57ac7",
+    "Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp": "20097d52a99a30eff1ecadd0738a7b5af691c21305da4c1b5622c9228c9034e0",
+    "Engine/RenderEngine/RHI/RHICommandTranslator.cpp": "a5eb70fe3239623b5cf7c3704085e475e29df8b75ee075b9b8f044dc08420153",
+    "Engine/RenderEngine/RHI/RHISubmissionThread.cpp": "1f5f1c050c8f03dcefa895b82afd373b4d3828ffabab010d1f92e4622dadb45d",
+    "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h": "16c3b98360a5a8622336f978215d6c146d4205f4397b90ae978c7c1ebf826dc6",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "3da5b8483df9a9f5480d0bc29ba183c2e4d6f8eab6d75777af5aef53d3821721",
+    "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": "8001dddf38ecd843df4bac33c9f1fe6fb5f015ef0651c0bd7de70cea5d60d6f6",
+    "Engine/RenderEngine/RenderEngine.vcxproj": "8a78f17d5bb4a231cfafd8f9312eb97126233a8f02d499f93e4a14452c13efeb",
+    "Engine/RenderEngine/RenderEngine.vcxproj.filters": "69cfe3abd273b2d1bc887684565f297df2879db95bf67f6fa131f4c94bc32305",
+    "Engine/Utility_Framework/JobScheduler.cpp": "f972c1c3f7b3753ab376d6fb4ebf6be2f0f7b34c7c25acc6ca708efad27fc2e2",
+    "Engine/Utility_Framework/JobScheduler.h": "22382a44d69ab02bb1a4e3373af1fd5a24799d3a93660ada6576a4a6b2e70c7a",
+    "Engine/Utility_Framework/Utility_Framework.vcxproj": "1fafa22d5dfdb77e147781dd81a1bec15bf16a92ac3522b460ed9bab46f37754",
+    "Engine/Utility_Framework/Utility_Framework.vcxproj.filters": "6ade5df77aa72f554071ab5e9740f9ada9cadd3ef70cf2a0af2bacea1170fbc9",
+    "Engine/Utility_Framework/WorkPartition.h": "72fde3dfdb11f89b9dd1ae50783a20989dbe920c40eede4406da60a090689822"
+  },
+  "validated_input_sha256": {
+    "Engine/RenderEngine/MaterialGraphIndirectBatch.h": "e0b2a808edd09a6e8d32307618d5aa626e9f385229e34f03fb35aeb7d898c95d",
+    "Engine/RenderEngine/MaterialGraphPreparationTasks.h": "cfa7e96533d9e42821ef2bf30b2481c06512ab89adae74ef31bbaf2791b52dd9",
+    "Engine/RenderEngine/MaterialGraphSceneHost.cpp": "d0038ed77960ebebb32b7aa7a5ba76921643f685634b8148fd28842074f57ac7",
+    "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h": "459de735e4b2027de6caff8d956198bd92873f4d0947d9951628bfaa278e1ed1",
+    "Engine/RenderEngine/RHI/RHICommandTranslator.cpp": "a5eb70fe3239623b5cf7c3704085e475e29df8b75ee075b9b8f044dc08420153",
+    "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h": "7f6ea7cc8c1bab9d906e06aae3d2c03dafb94756054a697ba610af80141637e9",
+    "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h": "16c3b98360a5a8622336f978215d6c146d4205f4397b90ae978c7c1ebf826dc6",
+    "Engine/RenderEngine/RenderAllocator.h": "3eed71244cea313c115b44abea65e22e5ca43b89fe8826f089a691daa9ede631",
+    "Engine/RenderEngine/RenderArena.cpp": "a4efb38e96d31d350486fc08c3a4d3e6d35a3df38f561b57cfe290ad40853b33",
+    "Engine/RenderEngine/RenderArena.h": "bd7b8d5a104fc672352dbafaec3a810b46b74d87899e5fc5eb3de23259f39409",
+    "Engine/Utility_Framework/JobGraph.h": "6f36d49d401ca096b1db8e9ea93c933d153857660b0a8b7b6cbab269e56600e0",
+    "Engine/Utility_Framework/JobScheduler.cpp": "f972c1c3f7b3753ab376d6fb4ebf6be2f0f7b34c7c25acc6ca708efad27fc2e2",
+    "Engine/Utility_Framework/JobScheduler.h": "22382a44d69ab02bb1a4e3373af1fd5a24799d3a93660ada6576a4a6b2e70c7a",
+    "Engine/Utility_Framework/StandardLibrary.h": "103811f4e6208c3ef680acb559d51ed394af5a879f469ba6282fd2e66dc5fd5a",
+    "Engine/Utility_Framework/ThreadPool.cpp": "6cc3d9e0acc9c42b4a03dcbe3a1079b9a163833f75cd19e5b0591269c2df5a5b",
+    "Engine/Utility_Framework/ThreadPool.h": "e412cc9b6ee695c98bab3b6370928bdf61dc92a9905b5ddd06354e532b7628f1",
+    "Engine/Utility_Framework/WorkPartition.h": "72fde3dfdb11f89b9dd1ae50783a20989dbe920c40eede4406da60a090689822",
+    "Tools/regression/recording_task_graph_probe.cpp": "0055c2cde6634c991e29f427d3c6ffa6a417e569ffac18a501ac22c0aec4897a",
+    "Tools/regression/scene_packet_preparation_cpu_probe.cpp": "0c971f33017c5646c405bf59a3c112dc1ca40e035ead722e3d6861f6cfa8d61d",
+    "Tools/regression/scene_preparation_tasks_cpu_probe.cpp": "c358bccaada07b062330f5e244db101288fc6dbb9c8407c05af2b569b1a126cb",
+    "Tools/regression/translation_work_queue_probe.cpp": "17b781c32cb6a1d783d4042f8d123f86f980375d0aead71b5eb4a98a5341811c",
+    "Tools/regression/verify-scene-packet-preparation.py": "3c2967e5f512b028773bcb0a5851aa39138b91840d370c74b46209bd92ac8961",
+    "Tools/regression/verify-translation-work-queue.py": "92e022e9bd91a5a7557ea63e99a42c7a4cf91032445dc1e57b009af5688884d5",
+    "Tools/regression/work_partition_probe.cpp": "6cf3958126db07b13856e1bc2a4cce1e56db7de47406ef35fb981583b2580371",
+    "dependency/enkiTS/src/TaskScheduler.cpp": "84a886ace6ced064ec87764ed7c38df2084c0283e9540f91e109a3ff0f37112f",
+    "dependency/enkiTS/src/TaskScheduler.h": "b73962988486762da85bb837c7b1d38650696327ac4d89c7d9c7905a3374c22d"
+  },
+  "tests": [
+    {
+      "name": "work-partition-normal",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-work-partition.py",
+      "source_keys": [
+        "Engine/Utility_Framework/WorkPartition.h",
+        "Engine/Utility_Framework/StandardLibrary.h",
+        "Tools/regression/work_partition_probe.cpp"
+      ],
+      "raw_report_sha256": "d253387fce8b9f7ea1c98ed3a59c18f9bcd630f525d863466b970ca173b8fa4a",
+      "scope": "allocation-free CPU partition oracle; no frame benchmark",
+      "sanitized": false,
+      "asan_options": "",
+      "output": [
+        "WORK_PARTITION_OK cases=669936 oracle_cases=669928 stress_cases=8 invalid_cases=4 allocations=0 oracle=all-cuts scope=CPU-partition-only"
+      ]
+    },
+    {
+      "name": "work-partition-sanitized",
+      "status": "PASS",
+      "command": "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 python Tools/regression/verify-work-partition.py --sanitize",
+      "source_keys": [
+        "Engine/Utility_Framework/WorkPartition.h",
+        "Engine/Utility_Framework/StandardLibrary.h",
+        "Tools/regression/work_partition_probe.cpp"
+      ],
+      "raw_report_sha256": "13ae3ccaad09286299c93054cdcc1f79ba2a0fe38515ca62d5721127a36ef537",
+      "scope": "allocation-free CPU partition oracle; no frame benchmark",
+      "sanitized": true,
+      "asan_options": "detect_leaks=0:halt_on_error=1",
+      "output": [
+        "WORK_PARTITION_OK cases=669936 oracle_cases=669928 stress_cases=8 invalid_cases=4 allocations=0 oracle=all-cuts scope=CPU-partition-only"
+      ]
+    },
+    {
+      "name": "recording-task-graph-normal",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-recording-task-graph.py --enkits <enkiTS>",
+      "source_keys": [
+        "Tools/regression/recording_task_graph_probe.cpp",
+        "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
+        "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "dependency/enkiTS/src/TaskScheduler.h",
+        "dependency/enkiTS/src/TaskScheduler.cpp"
+      ],
+      "raw_report_sha256": "fe17f14810ad5b5021e6bbd5aef7c4bce5d0fb62dcd0735d612528a1b448465c",
+      "scope": "CPU recording DAG correctness only; no GPU/frame benchmark",
+      "sanitized": false,
+      "asan_options": "",
+      "rows": [
+        {
+          "mutant": false,
+          "passed": true,
+          "stdout": "RECORDING_TASK_GRAPH_OK checks=24485 workers=1,4,8 targets=8 policies=legacy,native wait=cv lifetime=callback,observer shutdown=drain topology=bounded",
+          "stderr": ""
+        },
+        {
+          "mutant": true,
+          "passed": true,
+          "stdout": "",
+          "stderr": "RECORDING_TASK_GRAPH_FAIL consumer waited for unrelated work in the previous wave"
+        }
+      ]
+    },
+    {
+      "name": "recording-task-graph-sanitized",
+      "status": "PASS",
+      "command": "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 python Tools/regression/verify-recording-task-graph.py --enkits <enkiTS> --sanitize",
+      "source_keys": [
+        "Tools/regression/recording_task_graph_probe.cpp",
+        "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
+        "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "dependency/enkiTS/src/TaskScheduler.h",
+        "dependency/enkiTS/src/TaskScheduler.cpp"
+      ],
+      "raw_report_sha256": "6659b7ddb52b8503c31bf197a5b0e99ab0171871f341f505a82c2d28a052c2bc",
+      "scope": "CPU recording DAG correctness only; no GPU/frame benchmark",
+      "sanitized": true,
+      "asan_options": "detect_leaks=0:halt_on_error=1",
+      "rows": [
+        {
+          "mutant": false,
+          "passed": true,
+          "stdout": "RECORDING_TASK_GRAPH_OK checks=24485 workers=1,4,8 targets=8 policies=legacy,native wait=cv lifetime=callback,observer shutdown=drain topology=bounded",
+          "stderr": ""
+        },
+        {
+          "mutant": true,
+          "passed": true,
+          "stdout": "",
+          "stderr": "RECORDING_TASK_GRAPH_FAIL consumer waited for unrelated work in the previous wave"
+        }
+      ]
+    },
+    {
+      "name": "translation-work-queue-normal",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-translation-work-queue.py",
+      "source_keys": [
+        "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+        "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
+        "Tools/regression/translation_work_queue_probe.cpp",
+        "Tools/regression/verify-translation-work-queue.py",
+        "Engine/Utility_Framework/StandardLibrary.h"
+      ],
+      "raw_report_sha256": "74f7b3fd47d818becc8628be933f7040a167da6e1c265c8ebdbe47be3593146a",
+      "boundary": "exact-production-function; fixed CPU RHI fixture; no native/GPU/frame timing",
+      "sanitized": false,
+      "native_scheduler": false,
+      "production_body_sha256": "61c094853de78466c507400fc06165315545811cdab6dd7be478c6b8624ef61b",
+      "output": [
+        "PASS fixed queue: 0..8 targets, stable ties, zero/full costs, exhaustion, capacity, 10000 repetitions with zero dynamic allocations; bytes=128",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "BOUNDARY native RHI, driver cost, enkiTS scheduling and engine frame speed are not measured"
+      ]
+    },
+    {
+      "name": "translation-work-queue-native",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-translation-work-queue.py --enkits <enkiTS>",
+      "source_keys": [
+        "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+        "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
+        "Tools/regression/translation_work_queue_probe.cpp",
+        "Tools/regression/verify-translation-work-queue.py",
+        "Engine/Utility_Framework/StandardLibrary.h",
+        "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
+        "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/JobGraph.h",
+        "dependency/enkiTS/src/TaskScheduler.cpp",
+        "dependency/enkiTS/src/TaskScheduler.h"
+      ],
+      "raw_report_sha256": "84fe67048be46695112cdb7fc8d268dbaa9ca3a92397bd95189dc98e674228ff",
+      "boundary": "exact-production-function; fixed CPU RHI fixture; no native/GPU/frame timing",
+      "sanitized": false,
+      "native_scheduler": true,
+      "production_body_sha256": "61c094853de78466c507400fc06165315545811cdab6dd7be478c6b8624ef61b",
+      "output": [
+        "PASS fixed queue: 0..8 targets, stable ties, zero/full costs, exhaustion, capacity, 10000 repetitions with zero dynamic allocations; bytes=128",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "PASS actual RHIRunCommandRecordingJobs + JobScheduler + ThreadPool, enkiTS workers=1",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "PASS actual RHIRunCommandRecordingJobs + JobScheduler + ThreadPool, enkiTS workers=4",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "PASS actual RHIRunCommandRecordingJobs + JobScheduler + ThreadPool, enkiTS workers=8",
+        "BOUNDARY native RHI, driver cost and engine frame speed are not measured; forced delay/admission fixtures use joined std::threads"
+      ]
+    },
+    {
+      "name": "translation-work-queue-sanitized",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-translation-work-queue.py --enkits <enkiTS> --sanitize",
+      "source_keys": [
+        "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+        "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
+        "Tools/regression/translation_work_queue_probe.cpp",
+        "Tools/regression/verify-translation-work-queue.py",
+        "Engine/Utility_Framework/StandardLibrary.h",
+        "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
+        "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/JobGraph.h",
+        "dependency/enkiTS/src/TaskScheduler.cpp",
+        "dependency/enkiTS/src/TaskScheduler.h"
+      ],
+      "raw_report_sha256": "f3460bf20c9a1d8c2a637e5003e6db7728ea993c1f055af16cf259120ab1af7c",
+      "boundary": "exact-production-function; fixed CPU RHI fixture; no native/GPU/frame timing",
+      "sanitized": true,
+      "native_scheduler": true,
+      "production_body_sha256": "61c094853de78466c507400fc06165315545811cdab6dd7be478c6b8624ef61b",
+      "output": [
+        "PASS fixed queue: 0..8 targets, stable ties, zero/full costs, exhaustion, capacity, 10000 repetitions with zero dynamic allocations; bytes=128",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "PASS actual RHIRunCommandRecordingJobs + JobScheduler + ThreadPool, enkiTS workers=1",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "PASS actual RHIRunCommandRecordingJobs + JobScheduler + ThreadPool, enkiTS workers=4",
+        "PASS exact Translate body: 1/2/4/8 jobs, exactly-once segments, exclusive target owner, original open/finalize/error order, active-only/saturated costs, serial fallback, delayed participant, replay/admission failure drain",
+        "PASS actual RHIRunCommandRecordingJobs + JobScheduler + ThreadPool, enkiTS workers=8",
+        "BOUNDARY native RHI, driver cost and engine frame speed are not measured; forced delay/admission fixtures use joined std::threads"
+      ]
+    },
+    {
+      "name": "packets-final",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-scene-packet-preparation.py --enkits <enkiTS>",
+      "source_keys": [
+        "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+        "Engine/RenderEngine/MaterialGraphPreparationTasks.h",
+        "Engine/RenderEngine/MaterialGraphIndirectBatch.h",
+        "Engine/RenderEngine/RenderArena.cpp",
+        "Engine/RenderEngine/RenderArena.h",
+        "Engine/RenderEngine/RenderAllocator.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "Tools/regression/scene_packet_preparation_cpu_probe.cpp",
+        "Tools/regression/verify-scene-packet-preparation.py",
+        "dependency/enkiTS/src/TaskScheduler.cpp",
+        "dependency/enkiTS/src/TaskScheduler.h"
+      ],
+      "raw_report_sha256": "14bab1699d4e96336af7d1372fb3bedabb3c6c1bc4edb0ab6cde3f646c14adef",
+      "scope": "Verify exact Scene packet admission/build/join bodies with the real scheduler.\n\nThe RHI upload boundary and pre-existing GPU packet-plan preparation are fixtures.\nProduction RenderArena uses a malloc shim in place of unavailable mimalloc; a\nfixed admission-count adapter forwards directly to the actual preparation helper.\nThis tests CPU ownership, byte identity, ordering and allocations; it is not a native\nEditor, GPU, or end-to-end frame-time measurement. No dependencies are downloaded.\n",
+      "sanitizer": "none",
+      "baseline_ref": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+      "baseline_sha256": {
+        "Engine/RenderEngine/MaterialGraphSceneHost.cpp": "bf74281398dada9625dab6f6c47e72174de329d99bf77bf36c3361caecb0fa0e",
+        "Engine/RenderEngine/MaterialGraphPreparationTasks.h": "83b8306fa152281b348d20456c6df9958adedf8b0ddaddb5645210f7c9582652"
+      },
+      "rows": [
+        {
+          "kind": "contracts",
+          "checks": 308808,
+          "passed": true
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 97,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 172,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 97,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 135,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 4096,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 174,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 4096,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 97,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 173,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 97,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 4096,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 174,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 4096,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "injected-scheduler",
+          "workers": 4,
+          "globalWorkers": 0,
+          "cameraParticipants": 2,
+          "shadowParticipants": 4,
+          "passed": true
+        },
+        {
+          "kind": "injected-scheduler",
+          "workers": 8,
+          "globalWorkers": 0,
+          "cameraParticipants": 2,
+          "shadowParticipants": 6,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "packets-asan-final",
+      "status": "PASS",
+      "command": "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 python Tools/regression/verify-scene-packet-preparation.py --enkits <enkiTS> --sanitize address",
+      "source_keys": [
+        "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+        "Engine/RenderEngine/MaterialGraphPreparationTasks.h",
+        "Engine/RenderEngine/MaterialGraphIndirectBatch.h",
+        "Engine/RenderEngine/RenderArena.cpp",
+        "Engine/RenderEngine/RenderArena.h",
+        "Engine/RenderEngine/RenderAllocator.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "Tools/regression/scene_packet_preparation_cpu_probe.cpp",
+        "Tools/regression/verify-scene-packet-preparation.py",
+        "dependency/enkiTS/src/TaskScheduler.cpp",
+        "dependency/enkiTS/src/TaskScheduler.h"
+      ],
+      "raw_report_sha256": "8d5d10d8e0d18cbe98534c952f0bd54150b9dcd70acc4948904dcaec5f82f562",
+      "scope": "Verify exact Scene packet admission/build/join bodies with the real scheduler.\n\nThe RHI upload boundary and pre-existing GPU packet-plan preparation are fixtures.\nProduction RenderArena uses a malloc shim in place of unavailable mimalloc; a\nfixed admission-count adapter forwards directly to the actual preparation helper.\nThis tests CPU ownership, byte identity, ordering and allocations; it is not a native\nEditor, GPU, or end-to-end frame-time measurement. No dependencies are downloaded.\n",
+      "sanitizer": "address",
+      "baseline_ref": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+      "baseline_sha256": {
+        "Engine/RenderEngine/MaterialGraphSceneHost.cpp": "bf74281398dada9625dab6f6c47e72174de329d99bf77bf36c3361caecb0fa0e",
+        "Engine/RenderEngine/MaterialGraphPreparationTasks.h": "83b8306fa152281b348d20456c6df9958adedf8b0ddaddb5645210f7c9582652"
+      },
+      "rows": [
+        {
+          "kind": "contracts",
+          "checks": 308808,
+          "passed": true
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 97,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 172,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 97,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 4096,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 172,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 4,
+          "draws": 4096,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 97,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 172,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 97,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 4096,
+          "staticCacheHit": false,
+          "beforeMin": 172,
+          "beforeMedian": 172,
+          "beforeMax": 172,
+          "afterMin": 85,
+          "afterMedian": 85,
+          "afterMax": 85,
+          "samples": 17
+        },
+        {
+          "kind": "warm-allocations",
+          "workers": 8,
+          "draws": 4096,
+          "staticCacheHit": true,
+          "beforeMin": 133,
+          "beforeMedian": 133,
+          "beforeMax": 133,
+          "afterMin": 64,
+          "afterMedian": 64,
+          "afterMax": 64,
+          "samples": 17
+        },
+        {
+          "kind": "injected-scheduler",
+          "workers": 4,
+          "globalWorkers": 0,
+          "cameraParticipants": 2,
+          "shadowParticipants": 4,
+          "passed": true
+        },
+        {
+          "kind": "injected-scheduler",
+          "workers": 8,
+          "globalWorkers": 0,
+          "cameraParticipants": 2,
+          "shadowParticipants": 6,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "preparation-helper-final",
+      "status": "PASS",
+      "command": "python Tools/regression/verify-scene-preparation-tasks.py --enkits <enkiTS>",
+      "source_keys": [
+        "Engine/RenderEngine/MaterialGraphPreparationTasks.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "Tools/regression/scene_preparation_tasks_cpu_probe.cpp",
+        "dependency/enkiTS/src/TaskScheduler.cpp",
+        "dependency/enkiTS/src/TaskScheduler.h"
+      ],
+      "raw_report_sha256": "2c198fa654837e21133c5c53a5ac57138026261b18541830cfcc9a3aad913eac",
+      "sanitized": false,
+      "baseline_ref": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+      "baseline_sha256": "83b8306fa152281b348d20456c6df9958adedf8b0ddaddb5645210f7c9582652",
+      "rows": [
+        {
+          "kind": "contracts",
+          "passed": true
+        }
+      ],
+      "scope": "CPU helper contracts only; --benchmark was not requested. Baseline metadata is the runner input identity."
+    },
+    {
+      "name": "preparation-helper-asan-final",
+      "status": "PASS",
+      "command": "ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 python Tools/regression/verify-scene-preparation-tasks.py --enkits <enkiTS> --sanitize",
+      "source_keys": [
+        "Engine/RenderEngine/MaterialGraphPreparationTasks.h",
+        "Engine/Utility_Framework/JobScheduler.cpp",
+        "Engine/Utility_Framework/ThreadPool.cpp",
+        "Engine/Utility_Framework/JobScheduler.h",
+        "Engine/Utility_Framework/ThreadPool.h",
+        "Tools/regression/scene_preparation_tasks_cpu_probe.cpp",
+        "dependency/enkiTS/src/TaskScheduler.cpp",
+        "dependency/enkiTS/src/TaskScheduler.h"
+      ],
+      "raw_report_sha256": "ea69248454498aaa12aefebda4aea83020c054c7f188d569d11744cd2a7325bb",
+      "sanitized": true,
+      "baseline_ref": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+      "baseline_sha256": "83b8306fa152281b348d20456c6df9958adedf8b0ddaddb5645210f7c9582652",
+      "rows": [
+        {
+          "kind": "contracts",
+          "passed": true
+        }
+      ],
+      "scope": "CPU helper contracts only; --benchmark was not requested. Baseline metadata is the runner input identity."
+    }
+  ],
+  "include_boundary": {
+    "status": "FAIL (pre-existing, unchanged)",
+    "command": "python scripts/check_include_boundary.py",
+    "baseline_and_current_exit_code": 1,
+    "upward_edges": 27,
+    "physical_boundary_count": 69,
+    "matched_footprint_stdout_sha256": "9955a04f95e53baf1f631328f9f46e4ce17f1f06046ed499caa16fa360fe5b76",
+    "baseline_stdout_sha256": "9955a04f95e53baf1f631328f9f46e4ce17f1f06046ed499caa16fa360fe5b76",
+    "equality": {
+      "exit_code": true,
+      "new_upward_edges": true,
+      "stale_upward_allowlist": true,
+      "physical_excess": true,
+      "physical_stale": true,
+      "physical_observed_total": true,
+      "stdout_sha256": true,
+      "stderr": true
+    },
+    "new_failures_relative_to_baseline": [],
+    "full_head_physical_boundary_count": 70,
+    "footprint_difference": [
+      "ThirdParty/DxTimingCaptureLibrary/lib/DxTimingCaptureLibrary.lib.vcxproj"
+    ],
+    "scanner_and_allowlist_sha256": {
+      "scripts/check_include_boundary.py": {
+        "baseline": "b73ed6c91d5b720b2fc7e093de3b115a04ee23093d2f1114e00650d0d7dad127",
+        "current": "b73ed6c91d5b720b2fc7e093de3b115a04ee23093d2f1114e00650d0d7dad127"
+      },
+      "scripts/include_boundary_allowlist.txt": {
+        "baseline": "df41276e35a3eaa8bd9eddf4687ebc723195c478065f9c450a1cc6bcade5a4f9",
+        "current": "df41276e35a3eaa8bd9eddf4687ebc723195c478065f9c450a1cc6bcade5a4f9"
+      },
+      "scripts/layer_boundary_allowlist.txt": {
+        "baseline": "15e1e2d2e6541f82112a39889eeff385c4f84a092edc5d02e25e8e991f953372",
+        "current": "15e1e2d2e6541f82112a39889eeff385c4f84a092edc5d02e25e8e991f953372"
+      }
+    },
+    "comparison_report_sha256": "9169e9ad8b26765d8709dceb5094292bc69a9132b117be101ca49334ca1e459b"
+  },
+  "diff_check": "PASS",
+  "limits": [
+    "CPU probes use CE_CONTRACT_STANDALONE and CE_SHIPPING. MSVC import-std/Debug checked-iterator execution is untested.",
+    "RHI/native encoders, GPU packet-plan preparation and allocator service boundaries are fixtures where documented by each runner.",
+    "LeakSanitizer could not inspect /proc tasks in this environment. AddressSanitizer/UBSan ran with detect_leaks=0; leak freedom is not claimed.",
+    "Scene packet allocation samples count operator new and the mimalloc service shim. They are not total Editor/frame allocations or timings.",
+    "The partitioner is exact for contiguous estimated target load; DAG acceptance is heuristic and actual CPU critical-path optimality is not proven.",
+    "Target counts and command counts are scheduling limits/proxies, not proof of equal physical worker execution time."
+  ],
+  "not_run": [
+    "Windows x64 MSVC Debug/Release and non-unity engine builds",
+    "PowerShell Tools/regression/verify-rhi-software-native.ps1 -OutputDirectory <fresh-directory>",
+    "PowerShell Tools/regression/verify-material-scene-packet.ps1",
+    "Native DX12/Vulkan output, validation, driver threading and live CreatorRobot render paths",
+    "Post-change same-condition CPU/GPU frame-time, p95 and presented FPS measurements"
+  ]
+}

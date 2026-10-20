@@ -1,0 +1,2801 @@
+{
+  "schema": "CreatorEngine worker balance baseline v1",
+  "capture_artifact_commit": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+  "captured_code_head": "4eeba98f2c9ad5907debfa4eaa10b2f004afb149",
+  "source_paths_root": "Artifacts/current-state-20261020/",
+  "conditions": {
+    "configuration": "Debug",
+    "scene": "CreatorRobot",
+    "playMode": true,
+    "workerCount": 8,
+    "softwareRhi": true,
+    "profilerBindingDetail": false,
+    "secondsPerWindow": 15
+  },
+  "conditions_notes": {
+    "softwareRhi": "CPU software command recording/translation wrapper feeding native DX12; not CPU GPU emulation",
+    "render_views": {
+      "1": "Scene/editor camera",
+      "2": "Game camera"
+    },
+    "extent": [
+      1186,
+      514
+    ],
+    "editor_process": "CreatorEditor",
+    "logical_processors": 8,
+    "reported_core_ids": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "affinity_mask": 255,
+    "validation": "off",
+    "native_after_change_execution": false,
+    "post_change_performance_measurement": false,
+    "native_after_change_execution_scope": "Windows Editor/Player with a native DX12/Vulkan device. CPU fixtures do execute native C++ and enkiTS.",
+    "post_change_performance_measurement_scope": "End-to-end renderer/frame CPU/GPU timing. Warm CPU-fixture allocation request counts are recorded separately in WorkerBalance20261020Validation.json."
+  },
+  "integrity": {
+    "repository_verification_report": {
+      "passed": true,
+      "filesVerified": 381,
+      "hashMismatches": 0,
+      "captureRoundTripEqual": true,
+      "etwLosses": {
+        "Buffers": 0,
+        "Events": 0
+      },
+      "sourceUnchanged": true
+    },
+    "independent_local_download_check": {
+      "files": 43,
+      "mismatches": [],
+      "manifest_sha256": "95663230ad22b302a4e51fdeee236c5ffafbeb87dd4288657044b5239de5e9e8"
+    },
+    "source_identity": {
+      "listed_files": 582,
+      "hash_match_counts": {
+        "uniform_lf_to_crlf": 445,
+        "unresolved": 39,
+        "exact": 98
+      },
+      "unresolved_paths": [
+        "Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedGizmoLineTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedGizmoSceneTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedGridTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedIBLTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedSSAOTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedSSRTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedSSSTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedSkyBoxTest.cpp",
+        "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedVolumetricFogTest.cpp",
+        "Engine/RenderEngine/AssetMetaRegistry.h",
+        "Engine/RenderEngine/EnhancedGizmoLineCollector.cpp",
+        "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h",
+        "Engine/RenderEngine/Experiment/Import/FbxImporter.cpp",
+        "Engine/RenderEngine/Experiment/MaterialAuthoringCodec.cpp",
+        "Engine/RenderEngine/Interfaces/FoliageType.h",
+        "Engine/RenderEngine/Interfaces/LightProperty.h",
+        "Engine/RenderEngine/Interfaces/RenderPassSettings.h",
+        "Engine/RenderEngine/LXMaterialRuntime.cpp",
+        "Engine/RenderEngine/LightRenderProxy.h",
+        "Engine/RenderEngine/Material.cpp",
+        "Engine/RenderEngine/Material.h",
+        "Engine/RenderEngine/MaterialGraphRasterSurface.h",
+        "Engine/RenderEngine/ProxyCommandQueue.h",
+        "Engine/RenderEngine/RHI/DX12/DX12PSOManager.h",
+        "Engine/RenderEngine/RHI/DX12/DX12RootSignatureCache.h",
+        "Engine/RenderEngine/RHI/RHIGraphicsPipelineRequest.h",
+        "Engine/RenderEngine/RHI/RHIResourceState.h",
+        "Engine/RenderEngine/RHI/ScreenSizedResource.h",
+        "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp",
+        "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.h",
+        "Engine/RenderEngine/Render/Core/EnhancedLightPacking.h",
+        "Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSRPass.h",
+        "Engine/RenderEngine/Render/Passes/Lighting/EnhancedSkyBoxPass.h",
+        "Engine/RenderEngine/Render/Passes/Lighting/EnhancedVolumetricFogPass.cpp",
+        "Engine/RenderEngine/Render/Passes/Lighting/EnhancedVolumetricFogPass.h",
+        "Engine/RenderEngine/SpriteSheet.h",
+        "Engine/RenderEngine/TerrainMaterial.cpp",
+        "Engine/RenderEngine/UIRenderProxy.cpp"
+      ],
+      "key_paths": {
+        "Engine/RenderEngine/GpuGeometryVisibility.cpp": {
+          "captured_sha256": "8736705e8b3466068bccb744c75a8d8cbec7c8a493cafba8c2d68c4049c5c4b7",
+          "git_blob_sha256": "71441af5898f52885d589b88468cd4d82e249f3e3358cc453045c37ae8999ea6",
+          "match": "uniform_lf_to_crlf"
+        },
+        "Engine/RenderEngine/MaterialGraphSceneHost.cpp": {
+          "captured_sha256": "3f82469e28c59000e15bda35162ba81782c1df992ffb30cb08ddb3ac6d2d67ca",
+          "git_blob_sha256": "bf74281398dada9625dab6f6c47e72174de329d99bf77bf36c3361caecb0fa0e",
+          "match": "uniform_lf_to_crlf"
+        },
+        "Engine/RenderEngine/RHI/RHICommandTranslator.cpp": {
+          "captured_sha256": "fdf798aa50fe378617dafd69f06836b190b77e16870dc4e5b243101980911194",
+          "git_blob_sha256": "1589387a48b39dc5f58d07942337702aea7710c94e303b58ce55a3c463f2db67",
+          "match": "uniform_lf_to_crlf"
+        },
+        "Engine/RenderEngine/RHI/RHISubmissionThread.cpp": {
+          "captured_sha256": "1f35ff6211ae4c51bfcdb5d49c489259757260b2687154ee576b7089a8833f86",
+          "git_blob_sha256": "5eb8e94e873c9a0cc0760ce00363f77d0596b19ab9bbc4f8a25a1767d48447ef",
+          "match": "uniform_lf_to_crlf"
+        },
+        "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": {
+          "captured_sha256": "8d47dcb9ed710c7b3a6158ae0da66d53a4b26ecbee26bcb0e8aaee2e003f7b12",
+          "git_blob_sha256": "8d47dcb9ed710c7b3a6158ae0da66d53a4b26ecbee26bcb0e8aaee2e003f7b12",
+          "match": "exact"
+        },
+        "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": {
+          "captured_sha256": "61b4e3528f2d02c1253b524312e8482859c6c2f5001e5ac2e7e5157088646ea6",
+          "git_blob_sha256": "704ecce0969d65985dcb959372b7e8cb2a38cbbc2588dec6e33160cbd4d67563",
+          "match": "uniform_lf_to_crlf"
+        }
+      },
+      "preexisting_dirty_entries": [
+        " M Editor/Editor.vcxproj",
+        " M Editor/EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp",
+        " M Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp",
+        " M Editor/EngineGUIWindow/MemoryProfilerSnapshot.cpp",
+        " M Editor/EngineGUIWindow/ReflectionTypedDraw.h",
+        " M Engine/SceneRuntime/SceneRuntime.vcxproj",
+        " M Tools/profiling-validation/README.md",
+        " M docs/analysis/LiveRenderWiring20261012.html",
+        " M docs/analysis/ReEngineMeshletComparison20261011.html",
+        " M docs/analysis/ReEngineMeshletGraphFeasibility20261011.html",
+        "?? CreatorEditor_20261017_193921_36168.txt",
+        "?? Dynamic_CPP/Saved/Editor/Cache/",
+        "?? Dynamic_CPP/Saved/Editor/Dump/",
+        "?? Dynamic_CPP/Saved/Editor/Editor/Workspaces/active.workspace.rejected",
+        "?? Tools/profiling-validation/attach-gpu-timeline.py",
+        "?? Tools/profiling-validation/gpu-timeline.html",
+        "?? Tools/profiling-validation/gpu-timeline.js",
+        "?? Tools/profiling-validation/lossless-profile-bundle.py",
+        "?? Tools/profiling-validation/test_gpu_timeline.py"
+      ],
+      "note": "sourceUnchanged verifies no changes during capture; it does not prove the capture was a pristine checkout. Exact and uniform-CRLF hashes are compared against immutable 4eeba98 Git blobs; unresolved files may have mixed line endings or other byte differences and are not claimed equivalent."
+    }
+  },
+  "admission": {
+    "summary_cohort": "All complete-scope summary samples. baseline and ETW differ; never combine denominators.",
+    "etw_window": 15012.865,
+    "etw_scope": "positive duration, flags&3==0, fully contained in ON",
+    "quantile": "median; nearest observed sorted[min(n-1,floor(n*p))] for p95/p99, as repository scopes.py",
+    "etw_scope_state_recheck": "RenderGraphDeclare/MaterialGraphScenePrepare/RenderCommandRecord/RHISoftwareTranslate raw ON scopes reproduce published count/mean/state means within floating point rounding.",
+    "losses": {
+      "Buffers": 0,
+      "Events": 0
+    },
+    "partial_scope_count": 14,
+    "excluded_boundary_events": {
+      "baseline": 5,
+      "etw": 14
+    },
+    "measurement_axis": "completed real view renders and CPU scopes, not displayed FPS"
+  },
+  "rates": {
+    "baseline-live": {
+      "seconds": 15.1597393,
+      "completedViews": 778,
+      "completedViewsPerSecond": 51.32014374416056,
+      "axis": "completed real view renders, not displayed FPS"
+    },
+    "baseline-off-live": {
+      "seconds": 15.1353681,
+      "completedViews": 904,
+      "completedViewsPerSecond": 59.72765208135242,
+      "axis": "completed real view renders, not displayed FPS"
+    },
+    "etw-live": {
+      "seconds": 15.1888842,
+      "completedViews": 686,
+      "completedViewsPerSecond": 45.164607944012104,
+      "axis": "completed real view renders, not displayed FPS"
+    },
+    "etw-off-live": {
+      "seconds": 15.1671106,
+      "completedViews": 828,
+      "completedViewsPerSecond": 54.591808673169425,
+      "axis": "completed real view renders, not displayed FPS"
+    }
+  },
+  "cpu_submit_groups": {
+    "baseline": [
+      {
+        "frameKind": 1,
+        "viewId": 2,
+        "sceneEpoch": 3,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "displayWidth": 1186,
+        "displayHeight": 514,
+        "upscaler": 0,
+        "frameGenerator": 0,
+        "resolutionState": 1,
+        "spatialMode": 0,
+        "deepDvcApplied": 0,
+        "realFrameCount": 396,
+        "cpuRenderSubmitMs": {
+          "mean": 12.654800757575758,
+          "p50": 12.684249999999999,
+          "p95": 14.6763,
+          "max": 18.1871
+        },
+        "cpuSamples": 396,
+        "gpuPassMs": {
+          "mean": 0.044060638761717896,
+          "p50": 0.0041,
+          "p95": 0.128,
+          "max": 1.5278
+        },
+        "gpuPassSamples": 55044
+      },
+      {
+        "frameKind": 1,
+        "viewId": 1,
+        "sceneEpoch": 3,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "displayWidth": 1186,
+        "displayHeight": 514,
+        "upscaler": 0,
+        "frameGenerator": 0,
+        "resolutionState": 1,
+        "spatialMode": 0,
+        "deepDvcApplied": 0,
+        "realFrameCount": 396,
+        "cpuRenderSubmitMs": {
+          "mean": 12.712292424242424,
+          "p50": 12.774149999999999,
+          "p95": 14.656,
+          "max": 17.0699
+        },
+        "cpuSamples": 396,
+        "gpuPassMs": {
+          "mean": 0.04200410798122066,
+          "p50": 0.0041,
+          "p95": 0.127,
+          "max": 1.5237
+        },
+        "gpuPassSamples": 56232
+      }
+    ],
+    "etw": [
+      {
+        "frameKind": 1,
+        "viewId": 2,
+        "sceneEpoch": 3,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "displayWidth": 1186,
+        "displayHeight": 514,
+        "upscaler": 0,
+        "frameGenerator": 0,
+        "resolutionState": 1,
+        "spatialMode": 0,
+        "deepDvcApplied": 0,
+        "realFrameCount": 349,
+        "cpuRenderSubmitMs": {
+          "mean": 14.79816418338109,
+          "p50": 14.6886,
+          "p95": 18.0246,
+          "max": 22.429
+        },
+        "cpuSamples": 349,
+        "gpuPassMs": {
+          "mean": 0.043359652449959804,
+          "p50": 0.0051,
+          "p95": 0.1219,
+          "max": 1.9589
+        },
+        "gpuPassSamples": 48511
+      },
+      {
+        "frameKind": 1,
+        "viewId": 1,
+        "sceneEpoch": 3,
+        "renderWidth": 1186,
+        "renderHeight": 514,
+        "displayWidth": 1186,
+        "displayHeight": 514,
+        "upscaler": 0,
+        "frameGenerator": 0,
+        "resolutionState": 1,
+        "spatialMode": 0,
+        "deepDvcApplied": 0,
+        "realFrameCount": 349,
+        "cpuRenderSubmitMs": {
+          "mean": 14.983529226361032,
+          "p50": 14.7955,
+          "p95": 18.2149,
+          "max": 22.9027
+        },
+        "cpuSamples": 349,
+        "gpuPassMs": {
+          "mean": 0.04153040679607732,
+          "p50": 0.0051,
+          "p95": 0.1249,
+          "max": 1.9538
+        },
+        "gpuPassSamples": 49558
+      }
+    ]
+  },
+  "etw_thread_windows": {
+    "on": {
+      "begin_ms": 1364.921,
+      "end_ms": 16377.786,
+      "duration_ms": 15012.865,
+      "threads": [
+        {
+          "tid": 35984,
+          "name": "[GameThread]",
+          "state_ms": {
+            "Unknown": 0.0,
+            "Running": 1319.8560000000027,
+            "Ready": 53.65200000000045,
+            "Waiting": 13639.356999999975
+          },
+          "state_percent": {
+            "Unknown": 0.0,
+            "Running": 8.791499823651266,
+            "Ready": 0.3573734926677916,
+            "Waiting": 90.85112668368079
+          }
+        },
+        {
+          "tid": 10036,
+          "name": "[Physics 1 Worker 0]",
+          "state_ms": {
+            "Unknown": 0.021999999999998465,
+            "Running": 724.4900000000015,
+            "Ready": 187.92599999999632,
+            "Waiting": 14100.427000000345
+          },
+          "state_percent": {
+            "Unknown": 0.00014654098334993665,
+            "Running": 4.825794410327419,
+            "Ready": 1.2517664016827987,
+            "Waiting": 93.92229264700873
+          }
+        },
+        {
+          "tid": 4416,
+          "name": "[Physics 1 Worker 1]",
+          "state_ms": {
+            "Unknown": 0.045000000000001705,
+            "Running": 712.4429999999976,
+            "Ready": 212.88999999999874,
+            "Waiting": 14087.487000000281
+          },
+          "state_percent": {
+            "Unknown": 0.00029974292048853905,
+            "Running": 4.74554990003572,
+            "Ready": 1.4180504520622728,
+            "Waiting": 93.83609990498337
+          }
+        },
+        {
+          "tid": 41836,
+          "name": "[Physics 1 Worker 2]",
+          "state_ms": {
+            "Unknown": 0.06300000000000949,
+            "Running": 705.0240000000013,
+            "Ready": 216.23599999999894,
+            "Waiting": 14091.542000000334
+          },
+          "state_percent": {
+            "Unknown": 0.00041964008868400197,
+            "Running": 4.696132283877869,
+            "Ready": 1.4403380034390434,
+            "Waiting": 93.86311007259664
+          }
+        },
+        {
+          "tid": 27432,
+          "name": "[Physics 1 Worker 3]",
+          "state_ms": {
+            "Unknown": 0.031999999999996476,
+            "Running": 722.7009999999966,
+            "Ready": 187.72899999999652,
+            "Waiting": 14102.403000000342
+          },
+          "state_percent": {
+            "Unknown": 0.00021315052123626287,
+            "Running": 4.81387796399952,
+            "Ready": 1.2504541937864393,
+            "Waiting": 93.93545469169504
+          }
+        },
+        {
+          "tid": 37368,
+          "name": "[PresentationThread]",
+          "state_ms": {
+            "Unknown": 0.0470000000000006,
+            "Running": 4083.656999999994,
+            "Ready": 55.456000000000785,
+            "Waiting": 10873.705000000022
+          },
+          "state_percent": {
+            "Unknown": 0.0003130648280657996,
+            "Running": 27.2010505656315,
+            "Ready": 0.36938985330248947,
+            "Waiting": 72.42924651623805
+          }
+        },
+        {
+          "tid": 29888,
+          "name": "[RHIThread]",
+          "state_ms": {
+            "Unknown": 0.0,
+            "Running": 800.3150000000007,
+            "Ready": 88.90700000000132,
+            "Waiting": 14123.643000000005
+          },
+          "state_percent": {
+            "Unknown": 0.0,
+            "Running": 5.330861231350584,
+            "Ready": 0.5922054184860872,
+            "Waiting": 94.07693335016337
+          }
+        },
+        {
+          "tid": 28068,
+          "name": "[RenderThread]",
+          "state_ms": {
+            "Unknown": 0.14599999999999813,
+            "Running": 12202.699000000035,
+            "Ready": 138.36000000000146,
+            "Waiting": 2671.660000000019
+          },
+          "state_percent": {
+            "Unknown": 0.000972499253140544,
+            "Running": 81.28161413560991,
+            "Ready": 0.9216095661954028,
+            "Waiting": 17.795803798941904
+          }
+        },
+        {
+          "tid": 41212,
+          "name": "[Worker 1]",
+          "state_ms": {
+            "Unknown": 0.012000000000000455,
+            "Running": 1157.1880000000065,
+            "Ready": 296.6239999999934,
+            "Waiting": 13559.041000000045
+          },
+          "state_percent": {
+            "Unknown": 7.993144546361041e-05,
+            "Running": 7.7079757927617845,
+            "Ready": 1.9757987565997122,
+            "Waiting": 90.31614551919334
+          }
+        },
+        {
+          "tid": 34792,
+          "name": "[Worker 2]",
+          "state_ms": {
+            "Unknown": 0.021999999999999353,
+            "Running": 1106.1960000000076,
+            "Ready": 345.93499999999466,
+            "Waiting": 13560.711999999963
+          },
+          "state_percent": {
+            "Unknown": 0.00014654098334994256,
+            "Running": 7.36832043717177,
+            "Ready": 2.3042570488710497,
+            "Waiting": 90.3272759729736
+          }
+        },
+        {
+          "tid": 11764,
+          "name": "[Worker 3]",
+          "state_ms": {
+            "Unknown": 0.004999999999999893,
+            "Running": 1079.4780000000103,
+            "Ready": 345.2409999999944,
+            "Waiting": 13588.141000000018
+          },
+          "state_percent": {
+            "Unknown": 3.330476894316903e-05,
+            "Running": 7.190353073847066,
+            "Ready": 2.2996343469417355,
+            "Waiting": 90.5099792744424
+          }
+        },
+        {
+          "tid": 41704,
+          "name": "[Worker 4]",
+          "state_ms": {
+            "Unknown": 0.020000000000000462,
+            "Running": 1203.606000000002,
+            "Ready": 297.49399999999406,
+            "Waiting": 13511.744999999977
+          },
+          "state_percent": {
+            "Unknown": 0.00013321907577268203,
+            "Running": 8.017163945722565,
+            "Ready": 1.9815937863958282,
+            "Waiting": 90.00110904880566
+          }
+        },
+        {
+          "tid": 41928,
+          "name": "[Worker 5]",
+          "state_ms": {
+            "Unknown": 0.02999999999999936,
+            "Running": 1184.6200000000042,
+            "Ready": 294.96899999999425,
+            "Waiting": 13533.246000000003
+          },
+          "state_percent": {
+            "Unknown": 0.00019982861365901419,
+            "Running": 7.890699077091576,
+            "Ready": 1.9647748780795289,
+            "Waiting": 90.14432621621525
+          }
+        },
+        {
+          "tid": 25748,
+          "name": "[Worker 6]",
+          "state_ms": {
+            "Unknown": 0.01899999999999924,
+            "Running": 1083.0180000000096,
+            "Ready": 348.5119999999945,
+            "Waiting": 13581.31599999999
+          },
+          "state_percent": {
+            "Unknown": 0.00012655812198403995,
+            "Running": 7.213932850258826,
+            "Ready": 2.321422326784358,
+            "Waiting": 90.4645182648348
+          }
+        },
+        {
+          "tid": 16056,
+          "name": "[Worker 7]",
+          "state_ms": {
+            "Unknown": 0.008000000000000007,
+            "Running": 1073.741000000015,
+            "Ready": 342.53699999999634,
+            "Waiting": 13596.579000000012
+          },
+          "state_percent": {
+            "Unknown": 5.328763030907163e-05,
+            "Running": 7.152139181961704,
+            "Ready": 2.2816231278972823,
+            "Waiting": 90.56618440251087
+          }
+        },
+        {
+          "tid": 32968,
+          "name": "[Worker 8]",
+          "state_ms": {
+            "Unknown": 0.019999999999999574,
+            "Running": 1200.634999999997,
+            "Ready": 299.9359999999926,
+            "Waiting": 13512.274
+          },
+          "state_percent": {
+            "Unknown": 0.00013321907577267612,
+            "Running": 7.997374252016502,
+            "Ready": 1.9978598355476627,
+            "Waiting": 90.00463269336
+          }
+        }
+      ],
+      "worker_aggregate": {
+        "running_core_ms": 9088.482000000053,
+        "average_active_worker_count": 0.605379586108318,
+        "pool_average_running_percent": 7.567244826353975,
+        "max_min_running_ratio": 1.1209462989678007,
+        "running_cv": 0.04650206582195457
+      }
+    },
+    "off": {
+      "begin_ms": 26462.896,
+      "end_ms": 41476.539,
+      "duration_ms": 15013.642999999996,
+      "threads": [
+        {
+          "tid": 35984,
+          "name": "[GameThread]",
+          "state_ms": {
+            "Unknown": 0.015999999999998238,
+            "Running": 1299.7309999999861,
+            "Ready": 43.39400000000009,
+            "Waiting": 13670.502000000008
+          },
+          "state_percent": {
+            "Unknown": 0.00010656973793767603,
+            "Running": 8.65699950371796,
+            "Ready": 0.289030450504252,
+            "Waiting": 91.05386347603982
+          }
+        },
+        {
+          "tid": 10036,
+          "name": "[Physics 1 Worker 0]",
+          "state_ms": {
+            "Unknown": 0.026000000000003354,
+            "Running": 663.6829999999729,
+            "Ready": 196.9339999999529,
+            "Waiting": 14152.9999999984
+          },
+          "state_percent": {
+            "Unknown": 0.00017317582414876496,
+            "Running": 4.420532711480972,
+            "Ready": 1.311700298188474,
+            "Waiting": 94.26759381449527
+          }
+        },
+        {
+          "tid": 4416,
+          "name": "[Physics 1 Worker 1]",
+          "state_ms": {
+            "Unknown": 0.028999999999996362,
+            "Running": 667.051999999969,
+            "Ready": 198.2219999999548,
+            "Waiting": 14148.339999998727
+          },
+          "state_percent": {
+            "Unknown": 0.00019315765001203485,
+            "Running": 4.442972301925449,
+            "Ready": 1.3202791620924703,
+            "Waiting": 94.2365553783231
+          }
+        },
+        {
+          "tid": 41836,
+          "name": "[Physics 1 Worker 2]",
+          "state_ms": {
+            "Unknown": 0.06199999999999761,
+            "Running": 661.0159999999689,
+            "Ready": 199.37999999995503,
+            "Waiting": 14153.184999998834
+          },
+          "state_percent": {
+            "Unknown": 0.0004129577345085242,
+            "Running": 4.402768868288456,
+            "Ready": 1.327992146875712,
+            "Waiting": 94.26882602709307
+          }
+        },
+        {
+          "tid": 27432,
+          "name": "[Physics 1 Worker 3]",
+          "state_ms": {
+            "Unknown": 0.010000000000005116,
+            "Running": 662.3539999999739,
+            "Ready": 195.99299999995839,
+            "Waiting": 14155.285999998752
+          },
+          "state_percent": {
+            "Unknown": 6.660608621108893e-05,
+            "Running": 4.411680762623529,
+            "Ready": 1.3054326654760502,
+            "Waiting": 94.28281996580547
+          }
+        },
+        {
+          "tid": 37368,
+          "name": "[PresentationThread]",
+          "state_ms": {
+            "Unknown": 0.06600000000000605,
+            "Running": 4561.651000000016,
+            "Ready": 58.001999999999086,
+            "Waiting": 10393.92399999998
+          },
+          "state_percent": {
+            "Unknown": 0.0004396001689930024,
+            "Running": 30.383371977074567,
+            "Ready": 0.3863286212413543,
+            "Waiting": 69.22985980151508
+          }
+        },
+        {
+          "tid": 29888,
+          "name": "[RHIThread]",
+          "state_ms": {
+            "Unknown": 0.005000000000000782,
+            "Running": 865.802000000004,
+            "Ready": 98.78299999998862,
+            "Waiting": 14049.053000000189
+          },
+          "state_percent": {
+            "Unknown": 3.3303043105532635e-05,
+            "Running": 5.766768265370398,
+            "Ready": 0.6579549014185874,
+            "Waiting": 93.57524353016915
+          }
+        },
+        {
+          "tid": 28068,
+          "name": "[RenderThread]",
+          "state_ms": {
+            "Unknown": 0.06899999999999906,
+            "Running": 11113.299999999894,
+            "Ready": 118.31199999998651,
+            "Waiting": 3781.9620000000605
+          },
+          "state_percent": {
+            "Unknown": 0.00045958199485627226,
+            "Running": 74.02134178893088,
+            "Ready": 0.7880299271801423,
+            "Waiting": 25.190168701893747
+          }
+        },
+        {
+          "tid": 41212,
+          "name": "[Worker 1]",
+          "state_ms": {
+            "Unknown": 0.0,
+            "Running": 1240.3039999998493,
+            "Ready": 342.1279999999763,
+            "Waiting": 13431.211000000065
+          },
+          "state_percent": {
+            "Unknown": 0.0,
+            "Running": 8.261179515190614,
+            "Ready": 2.27878070632142,
+            "Waiting": 89.46003977848726
+          }
+        },
+        {
+          "tid": 34792,
+          "name": "[Worker 2]",
+          "state_ms": {
+            "Unknown": 0.006000000000000227,
+            "Running": 1225.2189999999,
+            "Ready": 365.7279999999839,
+            "Waiting": 13422.689999999977
+          },
+          "state_percent": {
+            "Unknown": 3.996365172663443e-05,
+            "Running": 8.160704234141576,
+            "Ready": 2.4359710697795602,
+            "Waiting": 89.40328473242623
+          }
+        },
+        {
+          "tid": 11764,
+          "name": "[Worker 3]",
+          "state_ms": {
+            "Unknown": 0.017999999999999794,
+            "Running": 1206.7990000001719,
+            "Ready": 367.1469999999754,
+            "Waiting": 13439.679000000011
+          },
+          "state_percent": {
+            "Unknown": 0.00011989095517989737,
+            "Running": 8.038015823342624,
+            "Ready": 2.445422473412852,
+            "Waiting": 89.51644181229042
+          }
+        },
+        {
+          "tid": 41704,
+          "name": "[Worker 4]",
+          "state_ms": {
+            "Unknown": 0.0,
+            "Running": 1276.4899999998665,
+            "Ready": 339.2769999999842,
+            "Waiting": 13397.87599999984
+          },
+          "state_percent": {
+            "Unknown": 0.0,
+            "Running": 8.502200298754053,
+            "Ready": 2.2597913111427004,
+            "Waiting": 89.23800839010121
+          }
+        },
+        {
+          "tid": 41928,
+          "name": "[Worker 5]",
+          "state_ms": {
+            "Unknown": 0.013999999999999346,
+            "Running": 1197.5039999998721,
+            "Ready": 340.06999999997845,
+            "Waiting": 13476.054999999928
+          },
+          "state_percent": {
+            "Unknown": 9.324852069547244e-05,
+            "Running": 7.976105466207452,
+            "Ready": 2.265073173779199,
+            "Waiting": 89.75872811149121
+          }
+        },
+        {
+          "tid": 25748,
+          "name": "[Worker 6]",
+          "state_ms": {
+            "Unknown": 0.03300000000000036,
+            "Running": 1203.8219999999008,
+            "Ready": 368.97799999997164,
+            "Waiting": 13440.809999999914
+          },
+          "state_percent": {
+            "Unknown": 0.00021980008449648344,
+            "Running": 8.018187191475786,
+            "Ready": 2.457618047798071,
+            "Waiting": 89.52397496064025
+          }
+        },
+        {
+          "tid": 16056,
+          "name": "[Worker 7]",
+          "state_ms": {
+            "Unknown": 0.006000000000000227,
+            "Running": 1178.9179999998746,
+            "Ready": 365.94299999998134,
+            "Waiting": 13468.776000000078
+          },
+          "state_percent": {
+            "Unknown": 3.996365172663443e-05,
+            "Running": 7.852311394375602,
+            "Ready": 2.4374031006330803,
+            "Waiting": 89.71024554133918
+          }
+        },
+        {
+          "tid": 32968,
+          "name": "[Worker 8]",
+          "state_ms": {
+            "Unknown": 0.024999999999999467,
+            "Running": 1288.3649999998559,
+            "Ready": 340.41699999997473,
+            "Waiting": 13384.835999999981
+          },
+          "state_percent": {
+            "Unknown": 0.00016651521552763358,
+            "Running": 8.581295026129608,
+            "Ready": 2.2673844049706977,
+            "Waiting": 89.15115405368294
+          }
+        }
+      ],
+      "worker_aggregate": {
+        "running_core_ms": 9817.42099999929,
+        "average_active_worker_count": 0.6538999894961731,
+        "pool_average_running_percent": 8.173749868702163,
+        "max_min_running_ratio": 1.0928368215601025,
+        "running_cv": 0.029552715295835037
+      }
+    }
+  },
+  "etw_worker_activity_during_owner_stages": {
+    "MaterialGraphScenePrepare": {
+      "count": 679,
+      "owner_scope_wall_sum": 2296.1425,
+      "worker_running_core_ms": 3158.944000000043,
+      "average_running_workers": 1.3757613040131627,
+      "worker_pool_running_percent": 17.197016300164535
+    },
+    "RenderGraphDeclare": {
+      "count": 678,
+      "owner_scope_wall_sum": 3455.6917,
+      "worker_running_core_ms": 775.8412999999994,
+      "average_running_workers": 0.2245111449033487,
+      "worker_pool_running_percent": 2.8063893112918588
+    },
+    "RenderGraphCompile": {
+      "count": 678,
+      "owner_scope_wall_sum": 590.1761,
+      "worker_running_core_ms": 1.3898000000048967,
+      "average_running_workers": 0.002354890345449259,
+      "worker_pool_running_percent": 0.02943612931811574
+    },
+    "RenderCommandRecord": {
+      "count": 678,
+      "owner_scope_wall_sum": 1517.6598,
+      "worker_running_core_ms": 3339.8900999999914,
+      "average_running_workers": 2.200684303557353,
+      "worker_pool_running_percent": 27.508553794466913
+    }
+  },
+  "etw_owner_scope_metrics": {
+    "RenderThreadFrame": {
+      "wall": {
+        "count": 359,
+        "mean": 32.306496657381615,
+        "p50": 33.2957,
+        "p95": 40.3514,
+        "p99": 42.701,
+        "max": 51.5082
+      },
+      "meanStateMs": {
+        "Running": 27.827468802228584,
+        "Ready": 0.33628412256309115,
+        "Waiting": 4.142342618384457,
+        "Unknown": 0.00040111420612244875
+      }
+    },
+    "RenderView": {
+      "wall": {
+        "count": 678,
+        "mean": 14.905512389380531,
+        "p50": 14.766649999999998,
+        "p95": 18.1441,
+        "p99": 20.0208,
+        "max": 22.9606
+      },
+      "meanStateMs": {
+        "Running": 12.564489380531045,
+        "Ready": 0.15595663716838795,
+        "Waiting": 2.1848952802359993,
+        "Unknown": 0.00017109144542468892
+      }
+    },
+    "RenderGpuCollect": {
+      "wall": {
+        "count": 1400,
+        "mean": 1.5092318571428571,
+        "p50": 0.1727,
+        "p95": 4.068,
+        "p99": 4.9357,
+        "max": 5.9931
+      },
+      "meanStateMs": {
+        "Running": 1.4977469999999737,
+        "Ready": 0.0064419285714471435,
+        "Waiting": 0.005041500000051786,
+        "Unknown": 1.4285714288624668e-06
+      }
+    },
+    "MaterialGraphScenePrepare": {
+      "wall": {
+        "count": 679,
+        "mean": 3.3816531664212075,
+        "p50": 3.3561,
+        "p95": 4.2577,
+        "p99": 4.8017,
+        "max": 5.2066
+      },
+      "meanStateMs": {
+        "Running": 3.060704123711356,
+        "Ready": 0.10243313696619781,
+        "Waiting": 0.21844226804122982,
+        "Unknown": 7.363770250261031e-05
+      }
+    },
+    "RenderGraphDeclare": {
+      "wall": {
+        "count": 678,
+        "mean": 5.096890412979351,
+        "p50": 4.8969000000000005,
+        "p95": 6.5304,
+        "p99": 7.3247,
+        "max": 9.7313
+      },
+      "meanStateMs": {
+        "Running": 5.035453244837743,
+        "Ready": 0.02285752212395312,
+        "Waiting": 0.03855162241889872,
+        "Unknown": 2.8023598820402406e-05
+      }
+    },
+    "RenderGraphCompile": {
+      "wall": {
+        "count": 678,
+        "mean": 0.8704662241887906,
+        "p50": 0.7961,
+        "p95": 1.2881,
+        "p99": 1.4197,
+        "max": 1.9699
+      },
+      "meanStateMs": {
+        "Running": 0.8694308259586885,
+        "Ready": 0.0008230088495595235,
+        "Waiting": 0.00021238938053131685,
+        "Unknown": 0.0
+      }
+    },
+    "RenderCommandRecord": {
+      "wall": {
+        "count": 678,
+        "mean": 2.2384362831858406,
+        "p50": 2.14425,
+        "p95": 2.801,
+        "p99": 3.1052,
+        "max": 3.3156
+      },
+      "meanStateMs": {
+        "Running": 0.30121150442481515,
+        "Ready": 0.013659882006010513,
+        "Waiting": 1.9235648967551433,
+        "Unknown": 0.0
+      }
+    },
+    "RHISoftwareTranslate": {
+      "wall": {
+        "count": 678,
+        "mean": 1.216538053097345,
+        "p50": 1.2005499999999998,
+        "p95": 1.4811,
+        "p99": 1.6326,
+        "max": 1.8894
+      },
+      "meanStateMs": {
+        "Running": 0.2943064896755548,
+        "Ready": 0.016761061946847032,
+        "Waiting": 0.9054705014749197,
+        "Unknown": 0.0
+      }
+    },
+    "RenderSubmit": {
+      "wall": {
+        "count": 678,
+        "mean": 0.39984100294985253,
+        "p50": 0.3833,
+        "p95": 0.5211,
+        "p99": 0.6265,
+        "max": 0.7436
+      },
+      "meanStateMs": {
+        "Running": 0.3994796460177131,
+        "Ready": 0.00028318584070931676,
+        "Waiting": 6.784660767136576e-05,
+        "Unknown": 1.0324483775902426e-05
+      }
+    }
+  },
+  "baseline_owner_scope_metrics": [
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderThreadFrame",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 401,
+      "perEngineFrame": 28.843923880597018,
+      "mean": 28.915853865336658,
+      "p50": 28.7579,
+      "p95": 32.1104,
+      "max": 36.7294
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderView",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 25.134750248756216,
+      "mean": 12.725654408060453,
+      "p50": 12.7393,
+      "p95": 14.7164,
+      "max": 18.2437
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderGraphDeclare",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 8.701923880597015,
+      "mean": 4.405759949622166,
+      "p50": 4.288,
+      "p95": 5.1819,
+      "max": 6.5758
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "MaterialGraphScenePrepare",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 5.480519402985075,
+      "mean": 2.7747717884130982,
+      "p50": 2.7348,
+      "p95": 3.369,
+      "max": 4.2217
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderGpuCollect",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 1599,
+      "perEngineFrame": 5.428558706467662,
+      "mean": 1.3647783614759224,
+      "p50": 0.2125,
+      "p95": 3.3272,
+      "max": 5.2956
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderCommandRecord",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 3.7306940298507465,
+      "mean": 1.8888400503778338,
+      "p50": 1.8252,
+      "p95": 2.2795,
+      "max": 2.9393
+    },
+    {
+      "thread": "[RHIThread]",
+      "name": "RHISoftwareTranslate",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 2.101247014925373,
+      "mean": 1.0638555415617128,
+      "p50": 1.06055,
+      "p95": 1.2274,
+      "max": 1.4862
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderGraphCompile",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 1.5728644278606967,
+      "mean": 0.7963369017632241,
+      "p50": 0.7536,
+      "p95": 1.1069,
+      "max": 1.5553
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderGraphDeclarePacketDispatch",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 1985,
+      "perEngineFrame": 0.1363445273631841,
+      "mean": 0.027612342569269522,
+      "p50": 0.026,
+      "p95": 0.0382,
+      "max": 0.0974
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderGraphDeclarePacketJoin",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.12907611940298508,
+      "mean": 0.06535088161209068,
+      "p50": 0.07595,
+      "p95": 0.1202,
+      "max": 0.2345
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderGraphDeclarePacketMerge",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.004389800995024875,
+      "mean": 0.002222544080604534,
+      "p50": 0.0022,
+      "p95": 0.0036,
+      "max": 0.0046
+    }
+  ],
+  "baseline_declare_named_nodes": [
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Cull.First",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 1.158694776119403,
+      "mean": 0.5866439546599497,
+      "p50": 0.5574,
+      "p95": 0.7508,
+      "max": 1.1299
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Shadow.Cull.Final",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.8288248756218904,
+      "mean": 0.4196317380352645,
+      "p50": 0.3997,
+      "p95": 0.5398,
+      "max": 0.7107
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Shadow.Occluder",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.7112723880597016,
+      "mean": 0.36011523929471034,
+      "p50": 0.3403,
+      "p95": 0.4865,
+      "max": 0.7267
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.SSGI",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.6483771144278607,
+      "mean": 0.3282715365239295,
+      "p50": 0.3088,
+      "p95": 0.451,
+      "max": 0.6216
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Shadow.Raster",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.6278761194029852,
+      "mean": 0.3178919395465995,
+      "p50": 0.30415000000000003,
+      "p95": 0.3942,
+      "max": 0.5916
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Shadow.History",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.5638584577114428,
+      "mean": 0.2854799748110831,
+      "p50": 0.26825,
+      "p95": 0.3807,
+      "max": 0.5104
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Visibility",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.4775587064676617,
+      "mean": 0.2417866498740554,
+      "p50": 0.2261,
+      "p95": 0.3423,
+      "max": 0.488
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Occluder",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.4660430348258707,
+      "mean": 0.23595629722921915,
+      "p50": 0.22285,
+      "p95": 0.3265,
+      "max": 0.6494
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Geometry",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.4031462686567164,
+      "mean": 0.20411183879093198,
+      "p50": 0.194,
+      "p95": 0.2761,
+      "max": 0.6472
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Cull.Final",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.35895223880597016,
+      "mean": 0.18173652392947104,
+      "p50": 0.1716,
+      "p95": 0.2477,
+      "max": 0.3876
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.PostChain",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.3337726368159204,
+      "mean": 0.168988161209068,
+      "p50": 0.16,
+      "p95": 0.2402,
+      "max": 0.3952
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Color",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.29468830845771143,
+      "mean": 0.14919987405541563,
+      "p50": 0.1427,
+      "p95": 0.2031,
+      "max": 0.5133
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.Temporal.Inputs",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.26888955223880595,
+      "mean": 0.13613803526448362,
+      "p50": 0.1283,
+      "p95": 0.193,
+      "max": 0.3291
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.SurfaceResolve",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.2023671641791045,
+      "mean": 0.10245793450881611,
+      "p50": 0.0944,
+      "p95": 0.151,
+      "max": 0.456
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.MaterialWork",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.16648482587064678,
+      "mean": 0.08429080604534005,
+      "p50": 0.078,
+      "p95": 0.1209,
+      "max": 0.2363
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.History",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.14262960199004976,
+      "mean": 0.07221297229219144,
+      "p50": 0.0664,
+      "p95": 0.1052,
+      "max": 0.214
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Shadow.StaticCache",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.07673880597014926,
+      "mean": 0.03885264483627204,
+      "p50": 0.0356,
+      "p95": 0.0498,
+      "max": 0.2417
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Shadow.Cull.First",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.0662136815920398,
+      "mean": 0.03352380352644836,
+      "p50": 0.029949999999999997,
+      "p95": 0.0437,
+      "max": 0.2361
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.Temporal.DisplayInputs",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.06166666666666666,
+      "mean": 0.031221662468513853,
+      "p50": 0.0295,
+      "p95": 0.0438,
+      "max": 0.1684
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.SSAO",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.0576679104477612,
+      "mean": 0.029197103274559193,
+      "p50": 0.0272,
+      "p95": 0.0397,
+      "max": 0.1521
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Blended",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.05229129353233831,
+      "mean": 0.02647493702770781,
+      "p50": 0.0246,
+      "p95": 0.0356,
+      "max": 0.1232
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.SkyBox",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.05037810945273632,
+      "mean": 0.025506297229219144,
+      "p50": 0.021,
+      "p95": 0.0537,
+      "max": 0.1492
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.LayerWork",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.04603233830845771,
+      "mean": 0.023306045340050378,
+      "p50": 0.0213,
+      "p95": 0.0337,
+      "max": 0.1154
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.GizmoIcon",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.030970398009950252,
+      "mean": 0.01568022670025189,
+      "p50": 0.0156,
+      "p95": 0.0296,
+      "max": 0.0647
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Decal",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.028001243781094524,
+      "mean": 0.014176952141057934,
+      "p50": 0.0133,
+      "p95": 0.021,
+      "max": 0.0289
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.live_present",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.027434328358208956,
+      "mean": 0.01388992443324937,
+      "p50": 0.0132,
+      "p95": 0.0203,
+      "max": 0.11
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.Grid",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.025119651741293533,
+      "mean": 0.01271801007556675,
+      "p50": 0.0196,
+      "p95": 0.0229,
+      "max": 0.0572
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.Temporal.SpriteMotion",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.023890298507462684,
+      "mean": 0.0120955919395466,
+      "p50": 0.0113,
+      "p95": 0.0179,
+      "max": 0.0644
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.Volume",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.02187363184079602,
+      "mean": 0.01107455919395466,
+      "p50": 0.0105,
+      "p95": 0.0159,
+      "max": 0.0185
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.SSR",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.019632089552238805,
+      "mean": 0.009939672544080605,
+      "p50": 0.0087,
+      "p95": 0.0158,
+      "max": 0.0419
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.Temporal.Upscale",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.019441542288557215,
+      "mean": 0.009843198992443325,
+      "p50": 0.0092,
+      "p95": 0.014,
+      "max": 0.1363
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.GizmoLine",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.017764925373134326,
+      "mean": 0.00899433249370277,
+      "p50": 0.0133,
+      "p95": 0.0154,
+      "max": 0.1875
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.SSS",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.01400597014925373,
+      "mean": 0.007091183879093199,
+      "p50": 0.0067,
+      "p95": 0.0102,
+      "max": 0.0263
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.Sprite",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.012539800995024877,
+      "mean": 0.006348866498740554,
+      "p50": 0.006,
+      "p95": 0.0092,
+      "max": 0.0162
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.SpatialPost",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.0111318407960199,
+      "mean": 0.005636020151133501,
+      "p50": 0.0053,
+      "p95": 0.0082,
+      "max": 0.0203
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.METEOR.Scene.LightTiles",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.009941044776119403,
+      "mean": 0.005033123425692695,
+      "p50": 0.0047,
+      "p95": 0.0073,
+      "max": 0.0173
+    },
+    {
+      "thread": "[RenderThread]",
+      "name": "RenderDeclare.UI",
+      "gpu": false,
+      "view": 0,
+      "file": "",
+      "calls": 794,
+      "perEngineFrame": 0.0066746268656716415,
+      "mean": 0.003379345088161209,
+      "p50": 0.0032,
+      "p95": 0.0049,
+      "max": 0.0116
+    }
+  ],
+  "baseline_prepare_selected": [
+    {
+      "name": "MaterialSceneCasterSnapshot",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 546.9288,
+      "mean_ms": 0.6888272040302267,
+      "inclusive_scope_sum_per_prepare_ms": 0.6888272040302267,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.8375712812960235,
+          "p50": 0.8029,
+          "p95": 1.1489,
+          "p99": 1.3559,
+          "max": 1.5339
+        },
+        "meanStateMs": {
+          "Running": 0.8239702503681942,
+          "Ready": 0.00876597938144259,
+          "Waiting": 0.004814432989699771,
+          "Unknown": 2.0618556699873633e-05
+        }
+      }
+    },
+    {
+      "name": "MaterialMeshGpuPrepare",
+      "calls": 6352,
+      "inclusive_scope_sum_ms": 399.6206,
+      "mean_ms": 0.0629125629722922,
+      "inclusive_scope_sum_per_prepare_ms": 0.5033005037783376,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 5432,
+          "mean": 0.07383606406480117,
+          "p50": 0.0587,
+          "p95": 0.1586,
+          "p99": 0.2354,
+          "max": 0.499
+        },
+        "meanStateMs": {
+          "Running": 0.07240988586155456,
+          "Ready": 0.0009692562592046893,
+          "Waiting": 0.00045434462444877743,
+          "Unknown": 2.577319587484204e-06
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneIndirectCommandsPrepare",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 654.9052,
+      "mean_ms": 0.8248176322418137,
+      "inclusive_scope_sum_per_prepare_ms": 0.8248176322418137,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 1.0215759941089837,
+          "p50": 0.9931,
+          "p95": 1.3525,
+          "p99": 1.633,
+          "max": 2.0064
+        },
+        "meanStateMs": {
+          "Running": 0.8244830633284621,
+          "Ready": 0.04522842415317146,
+          "Waiting": 0.15183210603828298,
+          "Unknown": 3.2400589101523586e-05
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneIndirectPrepare",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 643.3611999999999,
+      "mean_ms": 0.8102785894206548,
+      "inclusive_scope_sum_per_prepare_ms": 0.8102785894206548,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 1.0050503681885126,
+          "p50": 0.9788,
+          "p95": 1.331,
+          "p99": 1.6128,
+          "max": 1.9884
+        },
+        "meanStateMs": {
+          "Running": 0.808026215022119,
+          "Ready": 0.04515964653903455,
+          "Waiting": 0.15183210603828298,
+          "Unknown": 3.2400589101523586e-05
+        }
+      }
+    },
+    {
+      "name": "MaterialScenePacketJoin",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 316.64910000000003,
+      "mean_ms": 0.3988023929471033,
+      "inclusive_scope_sum_per_prepare_ms": 0.3988023929471033,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.49946715758468335,
+          "p50": 0.4727,
+          "p95": 0.7176,
+          "p99": 0.958,
+          "max": 1.3868
+        },
+        "meanStateMs": {
+          "Running": 0.31502503681885435,
+          "Ready": 0.03602385861560548,
+          "Waiting": 0.14840648011780397,
+          "Unknown": 1.1782032400980224e-05
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneSurfaceStagesPrepare",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 202.22600000000003,
+      "mean_ms": 0.2546926952141058,
+      "inclusive_scope_sum_per_prepare_ms": 0.2546926952141058,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.3006379970544919,
+          "p50": 0.291,
+          "p95": 0.4316,
+          "p99": 0.5992,
+          "max": 1.4269
+        },
+        "meanStateMs": {
+          "Running": 0.29224138438880376,
+          "Ready": 0.004156553755523223,
+          "Waiting": 0.004240058910172914,
+          "Unknown": 0.0
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneTilePacketPrepare",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 133.5763,
+      "mean_ms": 0.16823211586901762,
+      "inclusive_scope_sum_per_prepare_ms": 0.16823211586901762,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.19741546391752576,
+          "p50": 0.1824,
+          "p95": 0.306,
+          "p99": 0.4113,
+          "max": 0.8883
+        },
+        "meanStateMs": {
+          "Running": 0.1909830633284389,
+          "Ready": 0.004947864506641793,
+          "Waiting": 0.0014742268041293691,
+          "Unknown": 1.0309278349936817e-05
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneFinalizePrepare",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 122.54629999999999,
+      "mean_ms": 0.1543404282115869,
+      "inclusive_scope_sum_per_prepare_ms": 0.1543404282115869,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.17275463917525774,
+          "p50": 0.1534,
+          "p95": 0.2419,
+          "p99": 0.373,
+          "max": 0.5888
+        },
+        "meanStateMs": {
+          "Running": 0.17242916053018287,
+          "Ready": 0.00020618556700811256,
+          "Waiting": 0.00011929307805615754,
+          "Unknown": 0.0
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneDrawsPrepare",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 105.1079,
+      "mean_ms": 0.13237770780856423,
+      "inclusive_scope_sum_per_prepare_ms": 0.13237770780856423,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.16078703976435935,
+          "p50": 0.1292,
+          "p95": 0.3426,
+          "p99": 0.4666,
+          "max": 0.7404
+        },
+        "meanStateMs": {
+          "Running": 0.14540515463916753,
+          "Ready": 0.012789837997078111,
+          "Waiting": 0.00257290132547741,
+          "Unknown": 1.9145802650839416e-05
+        }
+      }
+    },
+    {
+      "name": "MaterialSceneCameraJoin",
+      "calls": 794,
+      "inclusive_scope_sum_ms": 84.8111,
+      "mean_ms": 0.10681498740554156,
+      "inclusive_scope_sum_per_prepare_ms": 0.10681498740554156,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 679,
+          "mean": 0.17298468335787923,
+          "p50": 0.1747,
+          "p95": 0.3403,
+          "p99": 0.4955,
+          "max": 0.7145
+        },
+        "meanStateMs": {
+          "Running": 0.10069072164947102,
+          "Ready": 0.02101369661267767,
+          "Waiting": 0.05128026509571578,
+          "Unknown": 0.0
+        }
+      }
+    },
+    {
+      "name": "MaterialScenePacketTask",
+      "calls": 3176,
+      "inclusive_scope_sum_ms": 1026.0632,
+      "mean_ms": 0.323067758186398,
+      "inclusive_scope_sum_per_prepare_ms": 1.292271032745592,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 2716,
+          "mean": 0.3695941089837997,
+          "p50": 0.3509,
+          "p95": 0.5628,
+          "p99": 0.7075,
+          "max": 1.3128
+        },
+        "meanStateMs": {
+          "Running": 0.3469360824742428,
+          "Ready": 0.009945213549329278,
+          "Waiting": 0.012705817378511943,
+          "Unknown": 6.995581737600639e-06
+        }
+      }
+    },
+    {
+      "name": "MaterialScenePacketPrepare",
+      "calls": 6352,
+      "inclusive_scope_sum_ms": 991.6926,
+      "mean_ms": 0.1561228904282116,
+      "inclusive_scope_sum_per_prepare_ms": 1.2489831234256927,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 5432,
+          "mean": 0.17827409793814433,
+          "p50": 0.164,
+          "p95": 0.3071,
+          "p99": 0.427,
+          "max": 0.8864
+        },
+        "meanStateMs": {
+          "Running": 0.16769957658321435,
+          "Ready": 0.00479819587628454,
+          "Waiting": 0.005772827687783038,
+          "Unknown": 3.4977908688003196e-06
+        }
+      }
+    },
+    {
+      "name": "MaterialScenePacketPlanUpload",
+      "calls": 7146,
+      "inclusive_scope_sum_ms": 26.9545,
+      "mean_ms": 0.0037719703330534563,
+      "inclusive_scope_sum_per_prepare_ms": 0.033947732997481106,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 6111,
+          "mean": 0.004594796269023073,
+          "p50": 0.0039,
+          "p95": 0.0057,
+          "p99": 0.0129,
+          "max": 0.5522
+        },
+        "meanStateMs": {
+          "Running": 0.004172459499234241,
+          "Ready": 7.754868270458003e-05,
+          "Waiting": 0.0003447880870580583,
+          "Unknown": 0.0
+        }
+      }
+    },
+    {
+      "name": "MaterialScenePacketOutputBindings",
+      "calls": 7146,
+      "inclusive_scope_sum_ms": 73.6446,
+      "mean_ms": 0.010305709487825356,
+      "inclusive_scope_sum_per_prepare_ms": 0.09275138539042821,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 6111,
+          "mean": 0.011578285059728358,
+          "p50": 0.0108,
+          "p95": 0.017,
+          "p99": 0.0322,
+          "max": 0.2646
+        },
+        "meanStateMs": {
+          "Running": 0.011525822287665625,
+          "Ready": 5.215185730653946e-05,
+          "Waiting": 3.109147440868396e-07,
+          "Unknown": 0.0
+        }
+      }
+    },
+    {
+      "name": "SceneBufferPoolAcquire",
+      "calls": 13498,
+      "inclusive_scope_sum_ms": 280.25329999999997,
+      "mean_ms": 0.020762579641428358,
+      "inclusive_scope_sum_per_prepare_ms": 0.3529638539042821,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 11543,
+          "mean": 0.02553380403707875,
+          "p50": 0.016,
+          "p95": 0.0824,
+          "p99": 0.1352,
+          "max": 0.3787
+        },
+        "meanStateMs": {
+          "Running": 0.022868266481856653,
+          "Ready": 0.0015330156804962275,
+          "Waiting": 0.0011325218747268453,
+          "Unknown": 0.0
+        }
+      }
+    },
+    {
+      "name": "SceneBufferPoolAcquireLock",
+      "calls": 13498,
+      "inclusive_scope_sum_ms": 64.7864,
+      "mean_ms": 0.004799703659801452,
+      "inclusive_scope_sum_per_prepare_ms": 0.08159496221662468,
+      "warning": "nested or parallel scopes; sums are not additive wall duration",
+      "etw_on": {
+        "wall": {
+          "count": 11543,
+          "mean": 0.006506800658407693,
+          "p50": 0.001,
+          "p95": 0.0495,
+          "p99": 0.102,
+          "max": 0.3487
+        },
+        "meanStateMs": {
+          "Running": 0.00419486268725337,
+          "Ready": 0.0013308238759393459,
+          "Waiting": 0.0009811140951231996,
+          "Unknown": 0.0
+        }
+      }
+    }
+  ],
+  "etw_record_graph_mapping": {
+    "owner_scopes": 678,
+    "matched_graphs": 678,
+    "mapped_to_view": 678,
+    "job_scope_count": 4407,
+    "matched_job_count": 4407,
+    "unit_timing_available": false,
+    "wave_mapping_available": false,
+    "warning": "No per-pass CPU unit timing or declared topology payload captured. Do not infer CPU costs from GPU timing; do not assume a target is one job or one physical worker; no ideal repartition speedup predicted."
+  },
+  "etw_record_graphs": {
+    "all": {
+      "count": 678,
+      "job_count_distribution": {
+        "7": 339,
+        "6": 339
+      },
+      "targets": {
+        "0": {
+          "sum_per_graph": {
+            "count": 678,
+            "sum": 655.017,
+            "mean": 0.9661017699115045,
+            "p50": 0.95095,
+            "p95": 1.1893,
+            "p99": 1.2932,
+            "max": 1.5136
+          },
+          "count_per_graph": {
+            "1": 678
+          }
+        },
+        "1": {
+          "sum_per_graph": {
+            "count": 678,
+            "sum": 1167.8938,
+            "mean": 1.7225572271386431,
+            "p50": 1.6518000000000002,
+            "p95": 2.1794,
+            "p99": 2.391,
+            "max": 2.6634
+          },
+          "count_per_graph": {
+            "2": 678
+          }
+        },
+        "2": {
+          "sum_per_graph": {
+            "count": 678,
+            "sum": 485.486,
+            "mean": 0.7160560471976402,
+            "p50": 0.7538,
+            "p95": 1.2185000000000001,
+            "p99": 1.377,
+            "max": 1.6195
+          },
+          "count_per_graph": {
+            "2": 339,
+            "1": 339
+          }
+        },
+        "3": {
+          "sum_per_graph": {
+            "count": 678,
+            "sum": 863.5579,
+            "mean": 1.2736842182890855,
+            "p50": 1.2390500000000002,
+            "p95": 1.6278,
+            "p99": 1.7705,
+            "max": 1.9423
+          },
+          "count_per_graph": {
+            "2": 678
+          }
+        }
+      },
+      "metrics": {
+        "wall": {
+          "count": 678,
+          "sum": 1517.6598,
+          "mean": 2.2384362831858406,
+          "p50": 2.14425,
+          "p95": 2.801,
+          "p99": 3.1052,
+          "max": 3.3156
+        },
+        "job_wall_sum": {
+          "count": 678,
+          "sum": 3171.9547,
+          "mean": 4.678399262536873,
+          "p50": 4.6396999999999995,
+          "p95": 5.8937,
+          "p99": 6.3318,
+          "max": 7.4098
+        },
+        "job_scope_union": {
+          "count": 678,
+          "sum": 1214.5545999999943,
+          "mean": 1.7913784660766876,
+          "p50": 1.714499999999589,
+          "p95": 2.2356999999997242,
+          "p99": 2.462599999998929,
+          "max": 2.7149999999983265
+        },
+        "job_running_core_ms": {
+          "count": 678,
+          "sum": 2665.9514000000318,
+          "mean": 3.932081710914501,
+          "p50": 3.848000000000596,
+          "p95": 4.8129000000028554,
+          "p99": 5.265800000001036,
+          "max": 5.458699999999567
+        },
+        "job_ready_core_ms": {
+          "count": 678,
+          "sum": 35.1072999999969,
+          "mean": 0.05178067846607212,
+          "p50": 0.047000000000011255,
+          "p95": 0.08399999999994634,
+          "p99": 0.15200000000000102,
+          "max": 0.30999999999994543
+        },
+        "job_waiting_core_ms": {
+          "count": 678,
+          "sum": 470.8910000000385,
+          "mean": 0.6945294985251306,
+          "p50": 0.709500000000844,
+          "p95": 1.2070000000003347,
+          "p99": 1.3920000000016444,
+          "max": 2.1599999999998545
+        },
+        "observed_parallelism_during_record": {
+          "count": 678,
+          "sum": 1418.4213986051425,
+          "mean": 2.0920669595946055,
+          "p50": 2.0699277038297312,
+          "p95": 2.3697743179011193,
+          "p99": 2.4641164360607077,
+          "max": 2.704837625093944
+        },
+        "begin_to_first_job": {
+          "count": 678,
+          "sum": 173.3771000000129,
+          "mean": 0.2557184365781901,
+          "p50": 0.24610000000052423,
+          "p95": 0.33399999999983265,
+          "p99": 0.3838999999989028,
+          "max": 0.530699999999797
+        },
+        "last_job_to_end": {
+          "count": 678,
+          "sum": 90.80819999999562,
+          "mean": 0.13393539823008205,
+          "p50": 0.12610000000017862,
+          "p95": 0.18620000000009895,
+          "p99": 0.27009999999791034,
+          "max": 0.3426999999992404
+        },
+        "uncovered_inside_job_span": {
+          "count": 678,
+          "sum": 38.919899999997824,
+          "mean": 0.05740398230088175,
+          "p50": 0.04900000000088767,
+          "p95": 0.11459999999897263,
+          "p99": 0.1378999999997177,
+          "max": 0.1653999999998632
+        }
+      }
+    },
+    "view1": {
+      "count": 339,
+      "job_count_distribution": {
+        "6": 339
+      },
+      "targets": {
+        "0": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 315.285,
+            "mean": 0.9300442477876107,
+            "p50": 0.8998,
+            "p95": 1.1688,
+            "p99": 1.2758,
+            "max": 1.2938
+          },
+          "count_per_graph": {
+            "1": 339
+          }
+        },
+        "1": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 568.1515,
+            "mean": 1.675963126843658,
+            "p50": 1.5664,
+            "p95": 2.1262,
+            "p99": 2.4529,
+            "max": 2.6287000000000003
+          },
+          "count_per_graph": {
+            "2": 339
+          }
+        },
+        "2": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 131.3827,
+            "mean": 0.38755958702064897,
+            "p50": 0.355,
+            "p95": 0.5121,
+            "p99": 0.5716,
+            "max": 0.7049
+          },
+          "count_per_graph": {
+            "1": 339
+          }
+        },
+        "3": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 453.3839,
+            "mean": 1.337415634218289,
+            "p50": 1.2666,
+            "p95": 1.6937,
+            "p99": 1.8546,
+            "max": 1.9423
+          },
+          "count_per_graph": {
+            "2": 339
+          }
+        }
+      },
+      "metrics": {
+        "wall": {
+          "count": 339,
+          "sum": 746.1229,
+          "mean": 2.200952507374631,
+          "p50": 2.0896,
+          "p95": 2.817,
+          "p99": 3.1238,
+          "max": 3.2582
+        },
+        "job_wall_sum": {
+          "count": 339,
+          "sum": 1468.2031,
+          "mean": 4.330982595870206,
+          "p50": 4.1774,
+          "p95": 5.4478,
+          "p99": 5.9578,
+          "max": 6.339799999999999
+        },
+        "job_scope_union": {
+          "count": 339,
+          "sum": 597.3142000000137,
+          "mean": 1.7619887905605123,
+          "p50": 1.6558999999997468,
+          "p95": 2.2327000000004773,
+          "p99": 2.4979999999995925,
+          "max": 2.7149999999983265
+        },
+        "job_running_core_ms": {
+          "count": 339,
+          "sum": 1308.413300000007,
+          "mean": 3.859626253687336,
+          "p50": 3.684900000001221,
+          "p95": 4.768199999998387,
+          "p99": 5.315800000001218,
+          "max": 5.458699999999567
+        },
+        "job_ready_core_ms": {
+          "count": 339,
+          "sum": 15.132799999999676,
+          "mean": 0.044639528023597864,
+          "p50": 0.04100000000001103,
+          "p95": 0.07499999999998863,
+          "p99": 0.09800000000001319,
+          "max": 0.30999999999994543
+        },
+        "job_waiting_core_ms": {
+          "count": 339,
+          "sum": 144.65700000003062,
+          "mean": 0.42671681415938234,
+          "p50": 0.4119999999998072,
+          "p95": 0.7100000000009459,
+          "p99": 0.8569999999999709,
+          "max": 0.9699999999993452
+        },
+        "observed_parallelism_during_record": {
+          "count": 339,
+          "sum": 668.4485135745296,
+          "mean": 1.9718245238186713,
+          "p50": 1.9742406444034235,
+          "p95": 2.1012815015959223,
+          "p99": 2.2232820976491863,
+          "max": 2.2999588815789473
+        },
+        "begin_to_first_job": {
+          "count": 339,
+          "sum": 85.26860000001466,
+          "mean": 0.25152979351036775,
+          "p50": 0.24029999999947904,
+          "p95": 0.32780000000002474,
+          "p99": 0.3874000000000706,
+          "max": 0.530699999999797
+        },
+        "last_job_to_end": {
+          "count": 339,
+          "sum": 44.50119999998651,
+          "mean": 0.13127197640114016,
+          "p50": 0.12370000000009895,
+          "p95": 0.1845999999986816,
+          "p99": 0.23769999999967695,
+          "max": 0.28119999999989886
+        },
+        "uncovered_inside_job_span": {
+          "count": 339,
+          "sum": 19.038899999985688,
+          "mean": 0.05616194690261265,
+          "p50": 0.04829999999992651,
+          "p95": 0.12239999999928841,
+          "p99": 0.1378999999997177,
+          "max": 0.1653999999998632
+        }
+      }
+    },
+    "view2": {
+      "count": 339,
+      "job_count_distribution": {
+        "7": 339
+      },
+      "targets": {
+        "0": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 339.73199999999997,
+            "mean": 1.002159292035398,
+            "p50": 0.9862,
+            "p95": 1.2019,
+            "p99": 1.3283,
+            "max": 1.5136
+          },
+          "count_per_graph": {
+            "1": 339
+          }
+        },
+        "1": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 599.7423,
+            "mean": 1.7691513274336284,
+            "p50": 1.6968999999999999,
+            "p95": 2.2048,
+            "p99": 2.3752999999999997,
+            "max": 2.6634
+          },
+          "count_per_graph": {
+            "2": 339
+          }
+        },
+        "2": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 354.1033,
+            "mean": 1.0445525073746313,
+            "p50": 1.0217,
+            "p95": 1.2641,
+            "p99": 1.4475,
+            "max": 1.6195
+          },
+          "count_per_graph": {
+            "2": 339
+          }
+        },
+        "3": {
+          "sum_per_graph": {
+            "count": 339,
+            "sum": 410.174,
+            "mean": 1.209952802359882,
+            "p50": 1.1883000000000001,
+            "p95": 1.4687,
+            "p99": 1.6836,
+            "max": 1.7564
+          },
+          "count_per_graph": {
+            "2": 339
+          }
+        }
+      },
+      "metrics": {
+        "wall": {
+          "count": 339,
+          "sum": 771.5369000000001,
+          "mean": 2.2759200589970505,
+          "p50": 2.184,
+          "p95": 2.8003,
+          "p99": 2.9485,
+          "max": 3.3156
+        },
+        "job_wall_sum": {
+          "count": 339,
+          "sum": 1703.7516,
+          "mean": 5.02581592920354,
+          "p50": 4.9446,
+          "p95": 6.0356,
+          "p99": 6.6777999999999995,
+          "max": 7.4098
+        },
+        "job_scope_union": {
+          "count": 339,
+          "sum": 617.2403999999806,
+          "mean": 1.8207681415928632,
+          "p50": 1.7487999999993917,
+          "p95": 2.2471999999979744,
+          "p99": 2.40520000000015,
+          "max": 2.6847000000016124
+        },
+        "job_running_core_ms": {
+          "count": 339,
+          "sum": 1357.5381000000248,
+          "mean": 4.004537168141666,
+          "p50": 3.974400000002447,
+          "p95": 4.833900000001904,
+          "p99": 5.19659999999908,
+          "max": 5.40310000000386
+        },
+        "job_ready_core_ms": {
+          "count": 339,
+          "sum": 19.974499999997217,
+          "mean": 0.058921828908546366,
+          "p50": 0.0549999999999784,
+          "p95": 0.09000000000000341,
+          "p99": 0.15500000000002956,
+          "max": 0.24189999999940426
+        },
+        "job_waiting_core_ms": {
+          "count": 339,
+          "sum": 326.2340000000079,
+          "mean": 0.9623421828908787,
+          "p50": 0.9459999999999127,
+          "p95": 1.29300000000012,
+          "p99": 1.4459999999999127,
+          "max": 2.1599999999998545
+        },
+        "observed_parallelism_during_record": {
+          "count": 339,
+          "sum": 749.9728850306128,
+          "mean": 2.2123093953705393,
+          "p50": 2.197993216506501,
+          "p95": 2.4151908324651954,
+          "p99": 2.4764419356307186,
+          "max": 2.704837625093944
+        },
+        "begin_to_first_job": {
+          "count": 339,
+          "sum": 88.10849999999823,
+          "mean": 0.25990707964601245,
+          "p50": 0.25160000000141736,
+          "p95": 0.33690000000024156,
+          "p99": 0.37920000000030996,
+          "max": 0.4477000000006228
+        },
+        "last_job_to_end": {
+          "count": 339,
+          "sum": 46.30700000000911,
+          "mean": 0.13659882005902393,
+          "p50": 0.12880000000041036,
+          "p95": 0.1889999999993961,
+          "p99": 0.2725000000000364,
+          "max": 0.3426999999992404
+        },
+        "uncovered_inside_job_span": {
+          "count": 339,
+          "sum": 19.881000000012136,
+          "mean": 0.05864601769915084,
+          "p50": 0.05019999999967695,
+          "p95": 0.10909999999967113,
+          "p99": 0.13370000000031723,
+          "max": 0.14469999999982974
+        }
+      }
+    }
+  },
+  "etw_record_target_os_states": {
+    "RenderCommandRecord.Worker3": {
+      "scope_calls": 1356,
+      "state_core_ms": {
+        "Unknown": 0.0,
+        "Running": 655.0899000000002,
+        "Ready": 17.163000000000075,
+        "Waiting": 191.30500000003258
+      },
+      "graph_count": 678
+    },
+    "RenderCommandRecord.Worker0": {
+      "scope_calls": 678,
+      "state_core_ms": {
+        "Unknown": 0.0,
+        "Running": 490.28499999998587,
+        "Ready": 10.433999999999298,
+        "Waiting": 154.29800000000068
+      },
+      "graph_count": 678
+    },
+    "RenderCommandRecord.Worker2": {
+      "scope_calls": 1017,
+      "state_core_ms": {
+        "Unknown": 0.0,
+        "Running": 387.61420000002533,
+        "Ready": 5.170799999997605,
+        "Waiting": 92.70100000001298
+      },
+      "graph_count": 678
+    },
+    "RenderCommandRecord.Worker1": {
+      "scope_calls": 1356,
+      "state_core_ms": {
+        "Unknown": 0.004999999999999893,
+        "Running": 1132.9623000000204,
+        "Ready": 2.3394999999999158,
+        "Waiting": 32.58699999999226
+      },
+      "graph_count": 678
+    }
+  },
+  "gpu_pass_sum_cohort": {
+    "1": {
+      "view_render_count": 396,
+      "pass_samples": 56232,
+      "mean_pass_sum_per_view_ms": 5.964583333333333,
+      "top_passes": [
+        {
+          "name": "METEOR.Shared.ShadowRecovery.Cull",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 1.014460101010101,
+          "fraction_of_measured_pass_sum": 0.1700806316747637
+        },
+        {
+          "name": "METEOR.Shared.First.Cull",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 1.0104689393939392,
+          "fraction_of_measured_pass_sum": 0.16941148826723398
+        },
+        {
+          "name": "METEOR.CameraMeshlet.Recovery.Cull",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.49906843434343423,
+          "fraction_of_measured_pass_sum": 0.0836719694323606
+        },
+        {
+          "name": "METEOR.Scene.Color",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.27177171717171716,
+          "fraction_of_measured_pass_sum": 0.045564241789180664
+        },
+        {
+          "name": "METEOR.Scene.Material.Resolve",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.18749520202020198,
+          "fraction_of_measured_pass_sum": 0.03143475269636638
+        },
+        {
+          "name": "Geometry.Occlusion.Build",
+          "pass_samples": 792,
+          "sum_per_view_render_ms": 0.13532651515151514,
+          "fraction_of_measured_pass_sum": 0.022688343441399677
+        },
+        {
+          "name": "METEOR.Shadow.Occlusion.C1.Build",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.13448055555555552,
+          "fraction_of_measured_pass_sum": 0.0225465129817208
+        },
+        {
+          "name": "METEOR.Shadow.Occlusion.C0.Build",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.12799949494949495,
+          "fraction_of_measured_pass_sum": 0.02145992231077806
+        }
+      ],
+      "combined_p95_available": false
+    },
+    "2": {
+      "view_render_count": 396,
+      "pass_samples": 55044,
+      "mean_pass_sum_per_view_ms": 6.124428787878788,
+      "top_passes": [
+        {
+          "name": "METEOR.Shared.ShadowRecovery.Cull",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 1.0265300505050508,
+          "fraction_of_measured_pass_sum": 0.16761237432243736
+        },
+        {
+          "name": "METEOR.Shared.First.Cull",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 1.0159454545454545,
+          "fraction_of_measured_pass_sum": 0.16588411584704374
+        },
+        {
+          "name": "METEOR.CameraMeshlet.Recovery.Cull",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.49701262626262616,
+          "fraction_of_measured_pass_sum": 0.08115248678314174
+        },
+        {
+          "name": "METEOR.Scene.Color",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.35695454545454547,
+          "fraction_of_measured_pass_sum": 0.05828372862478456
+        },
+        {
+          "name": "METEOR.Scene.Material.Resolve",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.19607727272727277,
+          "fraction_of_measured_pass_sum": 0.03201560170237275
+        },
+        {
+          "name": "Geometry.Occlusion.Build",
+          "pass_samples": 792,
+          "sum_per_view_render_ms": 0.15131414141414137,
+          "fraction_of_measured_pass_sum": 0.024706653739466438
+        },
+        {
+          "name": "METEOR.Shadow.Occlusion.C1.Build",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.13299318181818176,
+          "fraction_of_measured_pass_sum": 0.021715197682010166
+        },
+        {
+          "name": "METEOR.Shadow.Occlusion.C0.Build",
+          "pass_samples": 396,
+          "sum_per_view_render_ms": 0.1280108585858586,
+          "fraction_of_measured_pass_sum": 0.02090168128645929
+        }
+      ],
+      "combined_p95_available": false
+    }
+  },
+  "limitations": [
+    "No post-change benchmark; no Windows host build/native GPU execution in the implementation environment.",
+    "OS Running includes scheduler/instrumentation work; Waiting does not identify a specific mutex or fence.",
+    "Record target indices are command targets, not stable physical Worker thread indices.",
+    "Record target/job wall sums overlap; do not add them to obtain critical path. No per-unit callback timing or actual recorded topology payload is available.",
+    "GPU figures sum measured pass durations in a homogeneous per-view cohort. They are not calibrated queue busy-union or GPU frame-span p95.",
+    "Baseline and ETW are separate capture windows with distinct instrumentation/background conditions. Rate differences are observations, not isolated causal estimates of profiler overhead."
+  ],
+  "implementation_static_review": {
+    "scope": "Independent static review of the working implementation; not a native driver or performance test.",
+    "concrete_defects_found": [],
+    "command_target_capacity": 8,
+    "raster_slice_capacity": 4,
+    "contracts": [
+      {
+        "paths": [
+          "Engine/Utility_Framework/WorkPartition.h",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp"
+        ],
+        "finding": "Span/scalar-only contiguous minimax candidate; rejects sum overflow before writing; existing consider() retains CPU dependency, wave and critical-work admission."
+      },
+      {
+        "paths": [
+          "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+          "Engine/RenderEngine/MaterialGraphSceneShadowStage.inl",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp"
+        ],
+        "finding": "Both raster split callers use RasterRecordingSlices<=4; Graph clamps to min(pass.maxSlices,poolWorkers). Increasing command targets to8 does not enlarge the slice index beyond0..3."
+      },
+      {
+        "paths": [
+          "Engine/RenderEngine/RHI/RHIParallelCommandPool.h",
+          "Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp",
+          "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp"
+        ],
+        "finding": "Common max targets=8; backend slots/encoders follow initialized worker count; DX12 submission array has8 slots and translation forks inherit worker count."
+      },
+      {
+        "paths": [
+          "Engine/RuntimeHost/EngineBootstrap.h",
+          "Engine/Utility_Framework/JobScheduler.cpp",
+          "Engine/Utility_Framework/ThreadPool.cpp",
+          "Editor/EngineEntry/EditorMain.cpp",
+          "Player/PlayerMain.cpp",
+          "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp"
+        ],
+        "finding": "Normal Editor/Player bootstrap synchronously starts scheduler before app construction/Initialize and before renderer live pipeline initialization; no startup fallback1 sticking path found."
+      },
+      {
+        "paths": [
+          "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
+          "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h"
+        ],
+        "finding": "Target-count guard precedes fixed results access. Stable read-only cost order with atomic unique claims preserves target/segment exclusive ownership; joined results/error selection/final submission retain original target order."
+      }
+    ]
+  },
+  "implementation_validation_file": "WorkerBalance20261020Validation.json",
+  "include_boundary_validation": {
+    "baseline_commit": "7ebcd2b1a2a181e88e4c2fe1c8952242242ab536",
+    "gate_status": "FAIL (pre-existing, unchanged)",
+    "current": {
+      "new_upward_edges": 27,
+      "physical_excess_keys": 69,
+      "exit_code": 1
+    },
+    "baseline_same_checkout_footprint": {
+      "new_upward_edges": 27,
+      "physical_excess_keys": 69,
+      "exit_code": 1
+    },
+    "baseline_full_head": {
+      "new_upward_edges": 27,
+      "physical_excess_keys": 70,
+      "exit_code": 1
+    },
+    "same_footprint_exact_stdout_equal": true,
+    "new_failures_relative_to_baseline": 0,
+    "sparse_checkout_absent_baseline_inputs": [
+      "ThirdParty/DxTimingCaptureLibrary/lib/DxTimingCaptureLibrary.lib.vcxproj"
+    ],
+    "scanner_and_allowlists_unchanged": true,
+    "snapshot_inputs": {
+      "baseline": 1370,
+      "current": 1371,
+      "added": [
+        "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
+        "Engine/Utility_Framework/WorkPartition.h"
+      ],
+      "removed": [
+        "ThirdParty/DxTimingCaptureLibrary/lib/DxTimingCaptureLibrary.lib.vcxproj"
+      ]
+    },
+    "input_inventory_sha256": "b31deac5213e49dcca11c1a3cdcbd8c4204a0f4cbe152e5e61438b2f313839da",
+    "comparison_report_sha256": "9169e9ad8b26765d8709dceb5094292bc69a9132b117be101ca49334ca1e459b",
+    "note": "The checker still fails. The full-tree HEAD extra failure is an absent ThirdParty project in the sparse checkout, not a change made by this PR. No allowlist or scanner edits.",
+    "platform": "Linux",
+    "final_current_only_recheck": true,
+    "current_files_changed_after_snapshot": []
+  },
+  "methodology": {
+    "reference": "https://github.com/usamahz/cpu-performance-engineering",
+    "dedicated_mcp_available_in_session": false,
+    "use": "Official README measurement/concurrency/allocator methodology; no external code copied. Distinguish measurements from static evidence, cumulative work from dependency critical path; reuse fixed/owned storage; no speedup claim before renderer remeasurement."
+  }
+}

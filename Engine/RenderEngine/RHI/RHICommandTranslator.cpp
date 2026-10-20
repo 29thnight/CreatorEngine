@@ -1,6 +1,7 @@
 #include "IRHICommandTranslator.h"
 #include "IRenderDeviceServices.h"
 #include "RHIParallelCommandPool.h"
+#include "RHITranslationWorkQueue.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 
 bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHICommandTranslationOptions& options,
@@ -12,6 +13,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
     outFailure.recordingId = input.GetRecordingId();
     outFailure.backendGeneration = input.GetDesc().backendGeneration;
     if (!input.IsValid() || outBatch.IsValid() || !m_pool.IsInitialized() ||
+        input.GetTargetCount() > IRHIParallelCommandPool::kMaxWorkers ||
         (options.mode != RHICommandTranslationMode::Serial && options.mode != RHICommandTranslationMode::Parallel) ||
         options.maxTranslationJobs == 0 || options.maxTranslationJobs > IRHIParallelCommandPool::kMaxWorkers ||
         (options.mode == RHICommandTranslationMode::Serial && options.maxTranslationJobs != 1) ||
@@ -81,6 +83,21 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
         jobs = static_cast<uint32_t>((std::max)(
             uint64_t{1}, (std::min)({uint64_t(options.maxTranslationJobs), uint64_t(order.size()), budget})));
     }
+    std::array<uint64_t, IRHIParallelCommandPool::kMaxWorkers> targetCosts{};
+    if (jobs > 1)
+    {
+        for (size_t index = 0; index < order.size(); ++index)
+        {
+            const auto& target = input.m_storage->targets[order[index]];
+            for (const auto& segment : std::span(target.segments.data(), target.activeSegments))
+            {
+                const auto commands = segment->GetCommandCount();
+                targetCosts[index] += (std::min)(commands, UINT64_MAX - targetCosts[index]);
+            }
+        }
+    }
+    translation_work_queue<IRHIParallelCommandPool::kMaxWorkers> pendingTargets(
+        std::span(targetCosts.data(), jobs > 1 ? order.size() : 0));
     input.m_state = RHISoftwareBatchState::Translating;
     RHITranslatedBatch translated;
     translated.m_stats.translationJobCount = jobs;
@@ -109,46 +126,60 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
             destination.nativeComputeDispatches += source.nativeComputeDispatches;
         }
     };
+    const auto replayTarget = [&](size_t index)
+    {
+        const auto target = order[index];
+        auto& result = results[index];
+        try
+        {
+            result.succeeded = true;
+            for (const auto& segment : std::span(input.m_storage->targets[target].segments.data(),
+                                                 input.m_storage->targets[target].activeSegments))
+            {
+                RHICommandTranslationStats stats;
+                auto& encoder = m_pool.AcquireTranslationEncoder(target);
+                if (!segment->Replay(encoder, stats, result.failure))
+                {
+                    result.failure.commandIndex += result.stats.commandCount;
+                    result.succeeded = false;
+                    break;
+                }
+                accumulate(result.stats, stats);
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            result.succeeded = false;
+            result.failure.message = exception.what();
+        }
+        catch (...)
+        {
+            result.succeeded = false;
+            result.failure.message = "Unknown native target translation exception.";
+        }
+    };
 #if !CE_SHIPPING
     const auto cpuContext = ce::current_cpu_context;
 #endif
-    const auto replayTargets = [&](uint32_t job)
+    const auto replayTargets = [&](uint32_t)
     {
 #if !CE_SHIPPING
         const ce::profile_context_scope context(cpuContext);
 #endif
         ce::profile_scope replay{ce::marker<"RHISoftwareTranslate.Targets">()};
-        for (size_t index = job; index < order.size(); index += jobs)
+        if (jobs == 1)
         {
-            const auto target = order[index];
-            auto& result = results[index];
-            try
+            for (size_t index = 0; index < order.size(); ++index)
             {
-                result.succeeded = true;
-                for (const auto& segment : std::span(input.m_storage->targets[target].segments.data(),
-                                                     input.m_storage->targets[target].activeSegments))
-                {
-                    RHICommandTranslationStats stats;
-                    auto& encoder = m_pool.AcquireTranslationEncoder(target);
-                    if (!segment->Replay(encoder, stats, result.failure))
-                    {
-                        result.failure.commandIndex += result.stats.commandCount;
-                        result.succeeded = false;
-                        break;
-                    }
-                    accumulate(result.stats, stats);
-                }
+                replayTarget(index);
             }
-            catch (const std::exception& exception)
-            {
-                result.succeeded = false;
-                result.failure.message = exception.what();
-            }
-            catch (...)
-            {
-                result.succeeded = false;
-                result.failure.message = "Unknown native target translation exception.";
-            }
+            return;
+        }
+        // 짧은 target을 끝낸 작업자가 남은 target을 맡는다. target 내부 segment와
+        // 결과 슬롯은 끝까지 같은 작업자가 소유하고 제출·오류 보고는 원래 순서를 따른다.
+        for (auto index = pendingTargets.claim(); index < order.size(); index = pendingTargets.claim())
+        {
+            replayTarget(index);
         }
     };
     try

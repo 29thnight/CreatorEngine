@@ -2,6 +2,7 @@
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
 #include "../../../Utility_Framework/JobScheduler.h"
+#include "../../../Utility_Framework/WorkPartition.h"
 #include "../../RenderArena.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -1031,8 +1032,7 @@ bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, std::string_view 
         {
             continue;
         }
-        const auto usages = pass.usages;
-        for (const auto& use : usages)
+        for (const auto& use : std::span{pass.usages})
         {
             if (use.handle.index == resource.index && use.handle.kind == resource.kind &&
                 use.handle.epoch == resource.epoch &&
@@ -5181,6 +5181,13 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     }
                 };
                 consider(candidate);
+                // Equal prefix quotas can leave one costly unit on the wrong side
+                // of a boundary. Try the exact contiguous minimax partition too;
+                // the existing CPU dependency/wave check still decides acceptance.
+                if (ce::partition_contiguous_work(costs, workers, candidate))
+                {
+                    consider(candidate);
+                }
                 // Bounded cold-plan search. Boundaries remain contiguous/nonempty;
                 // every trial retains the same CPU dependencies and GPU list order.
                 if (cacheEligible && unitCount <= 512)
