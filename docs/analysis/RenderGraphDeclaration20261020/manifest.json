@@ -1,0 +1,31 @@
+{
+  "etw": false,
+  "views": 2,
+  "files": [
+    {
+      "bytes": 1726642,
+      "sha256": "320c40b21b2322797f00dd6d8bfd733f1535eb7a77489bb964083f7ce03c516e",
+      "file": "before.summary.json"
+    },
+    {
+      "bytes": 1731648,
+      "sha256": "34276a646f951fbf1331e335b1fcdaab7c158b862717edfb813e55fbbd425b7e",
+      "file": "after.summary.json"
+    },
+    {
+      "bytes": 105105,
+      "sha256": "7dbe13f3f68081c20785735c85a5b2ed4fe7341d4fdce4f977107d6240f454cb",
+      "file": "gpu-metrics.json"
+    }
+  ],
+  "implementationCommit": "5c4109ed3f4fa50db52e24d9b5ab64133e61da7d",
+  "baselineCommit": "475dbae93a07d2a382f69978bfba7b464c348c1f",
+  "workers": 8,
+  "profileSeconds": 15,
+  "schemaVersion": 1,
+  "configuration": "Debug",
+  "resolution": [
+    1186,
+    514
+  ]
+}
