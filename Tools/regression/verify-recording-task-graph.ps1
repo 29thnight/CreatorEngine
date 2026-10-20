@@ -43,7 +43,7 @@ foreach ($mutant in @($false, $true))
     }
     else
     {
-        $expected = 'RECORDING_TASK_GRAPH_OK checks=\d+ workers=1,4 policies=legacy,native ' +
+        $expected = 'RECORDING_TASK_GRAPH_OK checks=\d+ workers=1,4,8 targets=8 policies=legacy,native ' +
             'wait=cv lifetime=callback,observer shutdown=drain topology=bounded'
         if ($process.ExitCode -ne 0 -or $stdout -notmatch $expected)
         {

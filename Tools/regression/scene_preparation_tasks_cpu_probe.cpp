@@ -201,6 +201,49 @@ namespace
                     "empty inline failure message changed");
         }
         {
+            ScenePreparationTasks tasks(scheduler, false);
+            std::array<unsigned, 7> outputs{};
+            const auto owner = std::this_thread::get_id();
+            require(tasks.AddIndexed(
+                        kMarker, outputs.size(),
+                        [&](std::size_t index, std::string&)
+                        {
+                            require(owner == std::this_thread::get_id(), "inline indexed callback changed threads");
+                            outputs[index] = static_cast<unsigned>(index + 1);
+                            return true;
+                        },
+                        error),
+                    "inline indexed admission failed");
+            for (std::size_t index = 0; index < outputs.size(); ++index)
+            {
+                require(outputs[index] == index + 1, "inline indexed callback skipped or repeated an index");
+            }
+            require(tasks.AddIndexed(
+                        kMarker, 0, [](std::size_t, std::string&) -> bool { throw 1; }, error) &&
+                        tasks.Join(error),
+                    "empty indexed batch executed or failed");
+        }
+        {
+            std::array<std::atomic<unsigned>, 97> outputs{};
+            ScenePreparationTasks tasks(scheduler, true);
+            require(tasks.AddIndexed(
+                        kMarker, outputs.size(),
+                        [&](std::size_t index, std::string& failure)
+                        {
+                            failure = std::to_string(index);
+                            ++outputs[index];
+                            require(failure == std::to_string(index), "indexed callbacks shared failure storage");
+                            return true;
+                        },
+                        error),
+                    "parallel indexed admission failed");
+            require(tasks.Join(error), "parallel indexed join failed");
+            for (const auto& output : outputs)
+            {
+                require(output == 1, "parallel indexed callback skipped or repeated an index");
+            }
+        }
+        {
             std::atomic<unsigned> completed{};
             ScenePreparationTasks tasks(scheduler, true);
             for (unsigned index = 0; index < 16; ++index)

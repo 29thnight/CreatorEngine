@@ -460,6 +460,9 @@ namespace material_graph
     struct SceneHost::PreparationScratch
     {
         ce::RenderArenaPool m_pool;
+        // camera 2개와 shadow 최대 9개의 writer가 각자 한 vector를 재사용한다.
+        // packet 입력은 UploadPackets 안에서 복사되고 이 저장소를 frame에 게시하지 않는다.
+        std::array<ce::render_vector<IndirectMaterialBatch::PacketDraw>, 11> m_packetRecords;
         struct Work
         {
             // The lease precedes all containers: destruction destroys their
@@ -2974,18 +2977,31 @@ namespace material_graph
             // bucket. A hash, material pointer or equal GBuffer bytecode alone is
             // insufficient to merge programs with different pass semantics.
             using BucketKey = std::tuple<std::string_view, bool, uint32_t>;
-            using PacketGroups = std::vector<std::vector<std::size_t>>;
+            using PacketGroups = std::span<const std::span<const std::size_t>>;
             ce::render_arena_map<BucketKey, ce::render_arena_vector<std::size_t>> groups{
                 &scratch.m_storage->Resource(2)};
-            const auto snapshotGroups = [&]() -> std::shared_ptr<const PacketGroups>
+            const auto snapshotGroups = [&]() -> PacketGroups
             {
-                auto selected = std::make_shared<PacketGroups>();
-                selected->reserve(groups.size());
+                std::size_t count{};
                 for (const auto& entry : groups)
                 {
-                    selected->emplace_back(entry.second.begin(), entry.second.end());
+                    count += entry.second.size();
                 }
-                return selected;
+                auto& arena = scratch.m_storage->Resource(2);
+                auto* indices =
+                    static_cast<std::size_t*>(arena.allocate(count * sizeof(std::size_t), alignof(std::size_t)));
+                using Group = std::span<const std::size_t>;
+                auto* selected = static_cast<Group*>(arena.allocate(groups.size() * sizeof(Group), alignof(Group)));
+                std::size_t offset{}, index{};
+                for (const auto& entry : groups)
+                {
+                    std::uninitialized_copy(entry.second.begin(), entry.second.end(), indices + offset);
+                    std::construct_at(selected + index++, indices + offset, entry.second.size());
+                    offset += entry.second.size();
+                }
+                // owner만 arena를 늘리고 worker는 게시된 불변 span만 읽는다.
+                // 모든 packet 작업이 끝난 뒤 scratch lease가 block을 되감는다.
+                return {selected, groups.size()};
             };
             const auto bucketKey = [&](const Frame::Draw& draw)
             {
@@ -3039,7 +3055,8 @@ namespace material_graph
             {
                 return false;
             }
-            const auto prepare = [&](const PacketGroups& packetGroups, bool depth,
+            const auto prepare = [&](const PacketGroups& packetGroups,
+                                     ce::render_vector<IndirectMaterialBatch::PacketDraw>& records, bool depth,
                                      std::shared_ptr<const IndirectMaterialBatch>& result, std::string& taskError,
                                      std::optional<unsigned> cascade = {},
                                      std::shared_ptr<const GpuGeometryVisibility::Frame> shadowList = {},
@@ -3061,8 +3078,6 @@ namespace material_graph
                 batch->visibility = cascade ? shadowList
                                     : depth ? candidate->firstCullStage.cameraDepthMeshlets
                                             : candidate->finalCullStage.cameraMeshlets;
-                auto packetStorage = m_preparationScratch->m_pool.Acquire();
-                ce::render_arena_vector<IndirectMaterialBatch::PacketDraw> records{&packetStorage->Resource(0)};
                 size_t count{};
                 for (const auto& indices : std::span(packetGroups))
                 {
@@ -3100,32 +3115,108 @@ namespace material_graph
                 result = std::move(batch);
                 return true;
             };
-            ScenePreparationTasks packetPreparation(scheduler_, parallelPreparation);
-            const auto enqueuePacket = [&](std::shared_ptr<const PacketGroups> selected, bool depth,
-                                           std::shared_ptr<const IndirectMaterialBatch>& result,
-                                           std::optional<unsigned> cascade = {},
-                                           std::shared_ptr<const GpuGeometryVisibility::Frame> shadowList = {},
-                                           const char* shadowPhase = "Final")
+            struct PacketTask
             {
-                return packetPreparation.Add(
-                    ce::marker<"MaterialScenePacketTask">(),
-                    [&, selected = std::move(selected), depth, output = &result, cascade,
-                     shadowList = std::move(shadowList), shadowPhase](std::string& taskError)
-                    { return prepare(*selected, depth, *output, taskError, cascade, shadowList, shadowPhase); },
+                PacketGroups m_groups;
+                bool m_depth{};
+                std::shared_ptr<const IndirectMaterialBatch>* m_output{};
+                std::optional<unsigned> m_cascade;
+                std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibility;
+                const char* m_phase{"Final"};
+                std::size_t m_storageIndex{};
+                std::string m_error;
+                std::exception_ptr m_failure;
+                bool m_succeeded{};
+                ce::render_vector<IndirectMaterialBatch::PacketDraw>* m_records{};
+            };
+            std::array<PacketTask, 2> cameraTasks;
+            std::array<PacketTask, 9> shadowTasks;
+            std::size_t cameraTaskCount{}, shadowTaskCount{};
+            std::atomic<std::size_t> nextCameraTask{}, nextShadowTask{};
+            const auto packetErrors = [&](std::span<const PacketTask> tasks)
+            {
+                for (const auto& task : tasks)
+                {
+                    if (task.m_failure)
+                    {
+                        try
+                        {
+                            std::rethrow_exception(task.m_failure);
+                        }
+                        catch (const std::exception& failure)
+                        {
+                            error = failure.what();
+                        }
+                        catch (...)
+                        {
+                            if (!parallelPreparation)
+                            {
+                                throw;
+                            }
+                            error = "Unknown scene preparation task failure.";
+                        }
+                        return false;
+                    }
+                    if (!task.m_succeeded)
+                    {
+                        error = task.m_error.empty() ? "Scene preparation task failed." : task.m_error;
+                        return false;
+                    }
+                }
+                return true;
+            };
+            // guard는 descriptor, error, claim cursor보다 늦게 선언해야 조기 반환도 모두 drain한다.
+            ScenePreparationTasks packetPreparation(scheduler_, parallelPreparation);
+            const auto submitPacketTasks = [&](std::span<PacketTask> tasks, std::atomic<std::size_t>& next)
+            {
+                for (auto& task : tasks)
+                {
+                    task.m_records = &m_preparationScratch->m_packetRecords[task.m_storageIndex];
+                }
+                const auto workers = parallelPreparation
+                                         ? std::min(tasks.size(), std::max(std::size_t{1}, scheduler_.worker_count()))
+                                         : std::size_t{1};
+                const auto admitted = packetPreparation.AddIndexed(
+                    ce::marker<"MaterialScenePacketTask">(), workers,
+                    [&, tasks, next = &next](std::size_t, std::string&)
+                    {
+                        for (;;)
+                        {
+                            const auto index = next->fetch_add(1, std::memory_order_relaxed);
+                            if (index >= tasks.size())
+                            {
+                                break;
+                            }
+                            auto& task = tasks[index];
+                            try
+                            {
+                                task.m_succeeded =
+                                    prepare(task.m_groups, *task.m_records, task.m_depth, *task.m_output, task.m_error,
+                                            task.m_cascade, task.m_visibility, task.m_phase);
+                            }
+                            catch (...)
+                            {
+                                task.m_failure = std::current_exception();
+                            }
+                            if (!parallelPreparation && (!task.m_succeeded || task.m_failure))
+                            {
+                                break;
+                            }
+                        }
+                        return true;
+                    },
                     error);
+                // inline 실패는 다음 owner 단계 전에 보고하고 병렬 작업만 마지막 합류까지 모은다.
+                return admitted && (parallelPreparation || packetErrors(tasks));
             };
             if (!groups.empty())
             {
                 const auto cameraGroups = snapshotGroups();
-                if (!packetPreparation.Add(
-                        ce::marker<"MaterialScenePacketTask">(),
-                        [&, cameraGroups](std::string& taskError)
-                        {
-                            return prepare(*cameraGroups, false, candidate->visibilityStage.materialCommands,
-                                           taskError) &&
-                                   prepare(*cameraGroups, true, candidate->occluderStage.depthCommands, taskError);
-                        },
-                        error))
+                cameraTasks[cameraTaskCount++] = {
+                    cameraGroups, false, &candidate->visibilityStage.materialCommands, {}, {}, "Final", 0};
+                cameraTasks[cameraTaskCount++] = {cameraGroups, true, &candidate->occluderStage.depthCommands, {}, {},
+                                                  "Final",      1};
+                if (!submitPacketTasks(std::span(cameraTasks).first(cameraTaskCount), nextCameraTask))
                 {
                     return false;
                 }
@@ -3246,31 +3337,39 @@ namespace material_graph
                 {
                     if (staticCasters)
                     {
-                        if (!candidate->shadowCacheStage.hit &&
-                            !enqueuePacket(shadowGroups, false, candidate->shadowCacheStage.commands[cascade], cascade,
-                                           candidate->shadowCacheStage.meshlets[cascade], "Static"))
+                        if (!candidate->shadowCacheStage.hit)
                         {
-                            return false;
+                            shadowTasks[shadowTaskCount++] = {shadowGroups,
+                                                              false,
+                                                              &candidate->shadowCacheStage.commands[cascade],
+                                                              cascade,
+                                                              candidate->shadowCacheStage.meshlets[cascade],
+                                                              "Static",
+                                                              2 + cascade};
                         }
                     }
-                    else if (!packetPreparation.Add(
-                                 ce::marker<"MaterialScenePacketTask">(),
-                                 [&, shadowGroups, cascade](std::string& taskError)
-                                 {
-                                     return prepare(*shadowGroups, false,
-                                                    candidate->shadowOccluderStage.commands[cascade], taskError,
-                                                    cascade, candidate->shadowFirstCullStage.meshlets[cascade],
-                                                    "First") &&
-                                            prepare(*shadowGroups, false,
-                                                    candidate->shadowRasterStage.shadowCommands[cascade], taskError,
-                                                    cascade, candidate->shadowFinalCullStage.meshlets[cascade],
-                                                    "Final");
-                                 },
-                                 error))
+                    else
                     {
-                        return false;
+                        shadowTasks[shadowTaskCount++] = {shadowGroups,
+                                                          false,
+                                                          &candidate->shadowOccluderStage.commands[cascade],
+                                                          cascade,
+                                                          candidate->shadowFirstCullStage.meshlets[cascade],
+                                                          "First",
+                                                          5 + cascade * 2};
+                        shadowTasks[shadowTaskCount++] = {shadowGroups,
+                                                          false,
+                                                          &candidate->shadowRasterStage.shadowCommands[cascade],
+                                                          cascade,
+                                                          candidate->shadowFinalCullStage.meshlets[cascade],
+                                                          "Final",
+                                                          6 + cascade * 2};
                     }
                 }
+            }
+            if (shadowTaskCount && !submitPacketTasks(std::span(shadowTasks).first(shadowTaskCount), nextShadowTask))
+            {
+                return false;
             }
             // Only transmitting/blended surfaces replay geometry. Opaque Temporal
             // consumes final visibility and the existing GPU material tile packets.
@@ -3357,7 +3456,8 @@ namespace material_graph
             }
             {
                 ce::profile_scope packetJoin{ce::marker<"MaterialScenePacketJoin">()};
-                if (!packetPreparation.Join(error))
+                if (!packetPreparation.Join(error) || !packetErrors(std::span(cameraTasks).first(cameraTaskCount)) ||
+                    !packetErrors(std::span(shadowTasks).first(shadowTaskCount)))
                 {
                     return false;
                 }

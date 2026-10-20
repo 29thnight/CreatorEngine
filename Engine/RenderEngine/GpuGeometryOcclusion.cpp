@@ -313,16 +313,23 @@ bool GpuGeometryOcclusion::PrepareHistory(const EnhancedFrameContext& context, c
 std::shared_ptr<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadHistory(
     const EnhancedFrameContext& context, const math::matrix4x4& projection, const std::shared_ptr<History>& history)
 {
-    if (!history || !history->recorded.load() || !history->completion || history->device != context.resources ||
+    if (!history || !history->recorded.load() || !history->completion || history->textures.empty() ||
+        history->textures.size() > kMaximumLevels || history->device != context.resources ||
         history->source.width != context.width || history->source.height != context.height ||
         history->source.sceneEpoch != context.sceneEpoch || history->source.frameId >= context.frameId)
+    {
         throw std::runtime_error("History HZB does not match the current device, extent, scene or frame order.");
+    }
     auto pyramid = std::make_shared<Pyramid>();
     pyramid->m_view = CaptureView(context, projection);
     pyramid->m_levelCount = static_cast<std::uint32_t>(history->textures.size());
     pyramid->m_history = history;
     pyramid->m_historyReader = true;
-    pyramid->m_name = history->name;
+    // The same immutable name is used by every imported mip. Prepare it once
+    // with the reader instead of constructing a temporary string per import.
+    pyramid->m_name.reserve(history->name.size() + sizeof(".PreviousHZB") - 1);
+    pyramid->m_name.assign(history->name);
+    pyramid->m_name.append(".PreviousHZB");
     pyramid->m_self = pyramid;
     return pyramid;
 }
@@ -330,9 +337,11 @@ std::shared_ptr<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadH
 void GpuGeometryOcclusion::Pyramid::ImportHistory(EnhancedRenderGraph& graph) const
 {
     CheckCurrent();
-    if (!m_historyReader || !m_history || graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned ||
-        &graph.DeviceServices() != m_view.device)
+    if (!m_historyReader || !m_history || m_history->textures.size() != m_levelCount || m_levelCount > kMaximumLevels ||
+        graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned || &graph.DeviceServices() != m_view.device)
+    {
         throw std::runtime_error("History HZB import requires its recording-local RG2 reader.");
+    }
     if (m_graph)
     {
         CheckCurrent(&graph);
@@ -342,9 +351,9 @@ void GpuGeometryOcclusion::Pyramid::ImportHistory(EnhancedRenderGraph& graph) co
     m_graphEpoch = graph.ResourceEpoch();
     for (auto texture : m_history->textures)
     {
-        auto handle = graph.ImportTexture(texture, RHIResourceState::ShaderResource, m_history->name + ".PreviousHZB");
+        auto handle = graph.ImportTexture(texture, RHIResourceState::ShaderResource, m_name);
         graph.RequireImportedFinalState(handle, RHIResourceState::ShaderResource);
-        m_levels.push_back(handle);
+        m_levels[m_declaredLevels++] = handle;
     }
 }
 
@@ -398,7 +407,6 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
     std::array<std::array<Usage, 2>, kMaximumLevels> phaseUses;
     std::array<EnhancedRenderGraph::RepeatedPhaseView, kMaximumLevels> phases;
     uses[0] = {depth, RHIResourceState::ShaderResource, RGAccessMode::Read};
-    m_levels.reserve(m_levelCount);
     auto source = depth;
     for (std::uint32_t level = 0; level < m_levelCount; ++level)
     {
@@ -411,7 +419,7 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
             graph.RequireImportedFinalState(resource, RHIResourceState::ShaderResource);
         }
         const auto target = graph.Write(resource);
-        m_levels.push_back(target);
+        m_levels[m_declaredLevels++] = target;
         uses[level + 1u] = {target, RHIResourceState::UnorderedAccess, RGAccessMode::Write};
         phaseUses[level] = {{{source, RHIResourceState::ShaderResource, RGAccessMode::Read},
                              {target, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
@@ -473,11 +481,11 @@ void GpuGeometryOcclusion::Pyramid::AddReadUsages(EnhancedRenderGraph& graph,
                                                   std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const
 {
     CheckCurrent(&graph);
-    if (m_levels.size() != m_levelCount)
+    if (m_declaredLevels != m_levelCount)
     {
         throw std::runtime_error("Current-depth pyramid is not completely declared.");
     }
-    for (const auto level : m_levels)
+    for (const auto level : std::span{m_levels}.first(m_declaredLevels))
     {
         const auto duplicate = std::find_if(
             std::span{usages}.begin(), std::span{usages}.end(), [&](const auto& usage) { return SameOcclusionHandle(level, usage.handle); });
@@ -496,14 +504,14 @@ std::array<RHIBindingDesc, GpuGeometryOcclusion::kMaximumLevels> GpuGeometryOccl
     const EnhancedRenderGraph::ExecuteContext& execution) const
 {
     CheckCurrent(execution.graph);
-    if (m_levels.size() != m_levelCount || m_levels.empty())
+    if (m_declaredLevels != m_levelCount || !m_declaredLevels)
     {
         throw std::runtime_error("Current-depth pyramid binding requires a complete declaration.");
     }
     std::array<RHIBindingDesc, kMaximumLevels> inputs;
     for (std::size_t index = 0; index < inputs.size(); ++index)
     {
-        const auto levelIndex = (std::min)(index, m_levels.size() - 1u);
+        const auto levelIndex = (std::min)(index, static_cast<size_t>(m_declaredLevels - 1u));
         inputs[index] = RHIBindingDesc::Srv2D(execution.ResolveHandle(m_levels[levelIndex]), RHIFormat::R32Float);
     }
     return inputs;

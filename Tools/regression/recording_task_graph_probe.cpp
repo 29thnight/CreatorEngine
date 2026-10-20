@@ -378,10 +378,21 @@ namespace
 
     void VerifyTargetSerialization(job_scheduler& scheduler, const RHIRecordingExecutionOptions& options)
     {
-        const auto graph = Build({0, 1, 0, 1, 0, 1}, {0, 0, 1, 1, 2, 2}, {0, 1, 2, 3, 4, 5}, {},
-                                 std::vector<RHIRecordingPassDependencies>(6));
-        std::array<std::atomic<uint32_t>, 2> active{};
-        std::array<std::atomic<uint32_t>, 2> nextWave{};
+        constexpr uint32_t kTargets = 8;
+        constexpr uint32_t kWaves = 3;
+        std::array<uint32_t, kTargets * kWaves> targets{}, waves{}, units{};
+        std::array<RHIRecordingPassDependencies, kTargets * kWaves> passes{};
+        for (uint32_t unit = 0; unit < targets.size(); ++unit)
+        {
+            targets[unit] = unit % kTargets;
+            waves[unit] = unit / kTargets;
+            units[unit] = unit;
+        }
+        RHIRecordingTaskGraph graph;
+        Require(RHIBuildRecordingTaskGraph(targets, waves, units, {}, passes, kTargets, graph),
+                "maximum-target graph build failed");
+        std::array<std::atomic<uint32_t>, kTargets> active{};
+        std::array<std::atomic<uint32_t>, kTargets> nextWave{};
         RHIRunCommandRecordingTaskGraph(
             scheduler, graph,
             [&](uint32_t node)
@@ -399,8 +410,11 @@ namespace
                 Require(expectedWave == task.wave, "recording target sequence changed");
             },
             options);
-        Require(active[0] == 0 && active[1] == 0 && nextWave[0] == 3 && nextWave[1] == 3,
-                "target serialization omitted work or retained an active callback");
+        for (uint32_t target = 0; target < kTargets; ++target)
+        {
+            Require(active[target] == 0 && nextWave[target] == kWaves,
+                    "target serialization omitted work or retained an active callback");
+        }
     }
 
     void VerifySplitProducerExecution(job_scheduler& scheduler, const RHIRecordingExecutionOptions& options)
@@ -813,7 +827,7 @@ int main()
             stopped = true;
         }
         Require(stopped, "stopped scheduler accepted recording work");
-        for (const auto workers : {1u, 4u})
+        for (const auto workers : {1u, 4u, 8u})
         {
             scheduler.start(workers);
             for (const bool batchSubmit : {false, true})
@@ -825,7 +839,7 @@ int main()
                 VerifyTargetSerialization(scheduler, options);
                 VerifySplitProducerExecution(scheduler, options);
 #endif
-                if (workers == 4)
+                if (workers > 1)
                 {
                     VerifyNoGlobalBarrier(scheduler, options);
                 }
@@ -842,7 +856,7 @@ int main()
 #endif
         }
         std::cout << "RECORDING_TASK_GRAPH_OK checks=" << g_checks.load()
-                  << " workers=1,4 policies=legacy,native wait=cv lifetime=callback,observer"
+                  << " workers=1,4,8 targets=8 policies=legacy,native wait=cv lifetime=callback,observer"
                   << " shutdown=drain topology=bounded\n";
         return 0;
     }

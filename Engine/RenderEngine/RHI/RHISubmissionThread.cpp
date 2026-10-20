@@ -1156,7 +1156,8 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
                 if (pool->SupportsParallelTranslation())
                 {
                     options.mode = RHICommandTranslationMode::Parallel;
-                    options.maxTranslationJobs = (std::min)(4u, pool->GetWorkerCount());
+                    options.maxTranslationJobs =
+                        (std::min)(IRHIParallelCommandPool::kMaxWorkers, pool->GetWorkerCount());
                     options.minCommandsPerJob = 256;
                 }
                 if (!translator->Translate(std::move(*software), options, translated, failure))
