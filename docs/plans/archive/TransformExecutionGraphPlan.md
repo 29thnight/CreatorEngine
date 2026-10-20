@@ -1,43 +1,44 @@
 # (통합됨) Sparse Compiled Transform Execution Graph 제안
 
-> **보관 · 통합됨 (정리: 2026-09-06).** 2026-08-25 TransformUpdatePlan으로 통합된 제안과 절 매핑.
-> [보관 색인](README.md) · [활성 계획과 대시보드](../../RefactoringPlanDashboard.html#doc-index)
+> 2026-10-20 정리 · master `27de3f5a02aadde7456aab680db3184c36ee735e` · 종료/승계 문서
 
-**이 문서의 내용은 2026-08-25에 [`TransformUpdatePlan.md`](TransformUpdatePlan.md)로
-통합됐다.** 여기서 유지하지 않는다.
+판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
 
-`TransformUpdatePlan.md`가 PHASE 8.75의 단일 정본이며, 이 제안이 담고 있던 것은
-다음 자리로 갔다.
+[전체 문서 대조·충돌 판정](../MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/archive/TransformExecutionGraphPlan.md)
 
-| 원래 절 | 통합 후 |
-|---|---|
-| §0 판정 요약 | §0 판정 요약 — 권장 구조와 복잡도 표 |
-| §1 측정·구조 전제 교정 | **§3** 측정·구조 전제 교정 (§3.1~§3.7). 소스 확인 표시와 §3.8·§3.9 신규 실측 추가 |
-| §2 목표와 비목표 | §5 |
-| §3 목표 소유 구조 | §6 (다이어그램 재작성) |
-| §4 쓰기 계약 | §7 |
-| §5 resolve 알고리즘 | §8 (프레임 플로우·SyncDerivedState·sparse resolve 다이어그램 신설) |
-| §6 render publication | §9 |
-| §7 데이터 표현 | §10 |
-| §8 계층 mutation 계약 | §11 |
-| §9 실행 슬라이스 X0~X9 | §12 (의존 다이어그램 신설, X0에 topology 변경 빈도 추가) |
-| §10 성능·회귀 매트릭스 | §13 (스폰/파괴 시나리오 추가) |
-| §11 위험과 롤백 경계 | §14 |
-| §12 기존 계획과의 관계 | **부록 A** — 폐기된 T0~T5와 판정 |
-| §13 최종 권고 | §12 슬라이스 의존 다이어그램이 대체 |
+## 남은 작업과 완료 판정
 
-통합 과정에서 더해진 것:
+**단일 소유 계획:** [NativeObjectMemoryPolicyPlan](../NativeObjectMemoryPolicyPlan.md). 이 문서는 이전 진입 링크를 보존하는 인계 문서다.
 
-- **§3.8 X1 비용 실측** — `Transform` 한정 TRS 직접 쓰기 **12곳, 전부 에디터**
-  (`InspectorWindow.cpp` 9 · `ImGuiDrawHelperRectTransformComponent.cpp` 3).
-  느슨한 상한 104건은 대부분 다른 타입이다. X1은 대공사가 아니다.
-- **§3.9 topology 변경 빈도 (미측정, X0-④ 신설)** — §8.5가 허용하는 "topology 변경 시
-  O(N) 전체 compile"의 재개 조건이 *reparent*로만 잡혀 있었는데, **엔티티 생성·파괴도
-  topology 변경**이다. 매 프레임 스폰하는 씬이면 O(N)/frame이 되어 지금보다 나빠질 수
-  있다. X0에서 재고, 크면 incremental compile이 X9 선택지가 아니라 X4의 전제가 된다.
-- **§6.3 소유자 명시** — WorldSpace Canvas처럼 두 projection에 모두 들어가는 Entity의
-  `worldMatrix` 소유자는 Spatial graph 하나다.
-- **§8.4 동등 비교의 한계 명시** — `nextWorld != worldMatrix[i]`는 64B float 완전 일치라
-  FP 지터에 무력하고, range 순회 자체를 줄이지 않고 write·publish만 줄인다.
-- **X5 완료 기준 단서** — skeleton 시나리오는 X7(bulk upload) 이후에 다시 잰다.
-  X5 시점의 나쁜 수치를 설계 실패로 오독하지 않기 위해서다.
+- 이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.
+
+## 적용할 구조와 경계
+
+`SceneManager → GC roots → Scene → Entity → Component; handle invalidation and lifecycle cleanup precede collection`
+
+위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.
+
+## master 소스 근거
+
+모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.
+
+- [Engine/SceneRuntime/SceneManager.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L33) — `gc::domain m_gcDomain;`
+- [Engine/SceneRuntime/Scene.h:276](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L276) — `class [[reflgen::reflect]] Scene : public gc::managed`
+- [Engine/SceneRuntime/Entity.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L21) — `class [[reflgen::reflect]] Entity : public Object, public gc::managed`
+- [Engine/SceneRuntime/Component.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L14) — `class [[reflgen::reflect]] Component : public meta::identity<Component, Object>, public gc::managed`
+- [Engine/SceneRuntime/SceneGC.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneGC.h#L5) — `#include "../../ThirdParty/GCCE/include/gc/gc.hpp"`
+- [Engine/SceneRuntime/DetachedEntityTransfer.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/DetachedEntityTransfer.h#L12) — `gc::root_ref<Entity> entity{};`
+- [Engine/SceneRuntime/SceneManager.cpp:304](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L304) — `gc::domain& SceneManager::ManagedDomain()`
+- [Editor/RenderTests/Tasks/SceneGCSelfTest.cpp:161](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/Tasks/SceneGCSelfTest.cpp#L161) — `void gc_trace(gc::tracer& tracer) const override`
+- [Tools/regression/verify-scene-gc.ps1:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-gc.ps1#L18) — `'Editor/RenderTests/Tasks/SceneGCSelfTest.cpp',`
+
+## 검증 경계
+
+이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.
+
+<details><summary>이전 절 링크 호환</summary>
+
+이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.
+
+
+</details>

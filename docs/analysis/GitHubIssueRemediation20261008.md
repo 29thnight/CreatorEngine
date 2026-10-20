@@ -1,5 +1,52 @@
 # GitHub issue remediation — 2026-10-08
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.
+- 과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang#L8) — `struct WireInstance`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang#L20) — `struct VSIn`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang#L27) — `struct VSOut`
+- [Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp#L90) — `bool DX12Test::RunWireFrameTest(std::string& outLog)`
+- [Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp:150](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp#L150) — `draws[0].worldMatrix = math::matrix4x4::identity();`
+- [Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp:152](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp#L152) — `draws[1].worldMatrix = math::translation_matrix(math::vector3{ 3.f, 0.f, 0.f });`
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [ScriptCore/MeshRenderer.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13) — `public sealed class MeshRenderer : NativeComponent`
+- [ScriptCore/MeshRenderer.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15) — `public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);`
+- [ScriptCore/MeshRenderer.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24) — `public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);`
+- [Engine/SceneRuntime/Terrain.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L16) — `class [[reflgen::reflect]] TerrainComponent : public meta::identity<TerrainComponent, Component>`
+- [Engine/SceneRuntime/Terrain.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L20) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Terrain.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L22) — `Component::gc_trace(tracer);`
+- [Engine/SceneRuntime/BlackBoard.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L8) — `class Entity;`
+- [Engine/SceneRuntime/BlackBoard.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L9) — `class Transform;`
+- [Engine/SceneRuntime/BlackBoard.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L10) — `class MenuBarWindow;`
+- [Engine/SceneRuntime/MeshRenderer.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19) — `class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>`
+- [Engine/SceneRuntime/MeshRenderer.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/MeshRenderer.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25) — `Component::gc_trace(tracer);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Base: `9c1c2aeae0e85cc3a2caacea142aee1e706cf88f`. Scope: audit all 33 open issues against current consumers and canonical plans, then fix valid issues sequentially. Existing unrelated dirty changes are preserved. Issue closure requires validation evidence. The original implementation task excluded GitHub status changes; the explicit 2026-10-09 closure request and its results are recorded below.
 
 Backend implementation remains neutral. PHASE 4.9 owns cross-backend runtime/pixel acceptance; this does not block scoped DX12 fixes. RG6 acceptance is not a performance-improvement claim. Material recovery preserves authored sources and does not restore native fallback.
@@ -132,3 +179,5 @@ The remaining 19 are OPEN: #133, #136, #137, #138, #139, #145, #146, #147, #148,
 Every closure comment explicitly distinguishes local verified changes from remote publication: latest fixes and evidence updates include uncommitted/unpushed work based on `329fad205f6560fc4462354b9287d64a68049c8a`. No commit or push was performed by the closure operation. Earlier statements of no GitHub changes describe their respective historical steps, not this final state.
 
 Evidence: `Build/Verification/IssueClosureCandidates20261009/closures.jsonl` retains comment URLs; `github-final-state.json` retains the independently fetched final issue states and timestamps.
+
+</details>

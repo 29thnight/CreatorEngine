@@ -1,5 +1,52 @@
 # 닫힌·완료 계획 Commandlet 은퇴 — 2026-09-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-cli-service.ps1:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-service.ps1#L23) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-cli-service.ps1:184](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-service.ps1#L184) — `$sw = [Diagnostics.Stopwatch]::StartNew()`
+- [Tools/regression/verify-cli-service.ps1:295](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-service.ps1#L295) — `$me  = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:193](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L193) — `stream.handle = ::GetStdHandle(stream.id);`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:195](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L195) — `const DWORD type = ::GetFileType(stream.handle);`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:203](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L203) — `if (nullptr == ::GetConsoleWindow())`
+- [Tools/regression/verify-mbc-cutover-freeze.ps1:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-mbc-cutover-freeze.ps1#L27) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-mbc-cutover-freeze.ps1:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-mbc-cutover-freeze.ps1#L38) — `$relative = [IO.Path]::GetRelativePath($repoRoot, $fullPath)`
+- [Tools/regression/verify-mbc-cutover-freeze.ps1:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-mbc-cutover-freeze.ps1#L46) — `$body = [IO.File]::ReadAllText($path)`
+- [Tools/regression/verify-cli-registry-golden.ps1:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-registry-golden.ps1#L34) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-cli-registry-golden.ps1:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-registry-golden.ps1#L35) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-cli-registry-golden.ps1:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-registry-golden.ps1#L79) — `foreach ($line in [IO.File]::ReadAllLines($Path)) {`
+- [Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp#L95) — `cls.hInstance = ::GetModuleHandleW(nullptr);`
+- [Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp:118](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp#L118) — `bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& modelPath, const std::string& texturePath, std::string& outLog)`
+- [Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp:122](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/Vulkan/VulkanSelfTest.cpp#L122) — `if (!RenderTest::RunShaderReflectionSelfTest(texturePath, outLog)) return false;`
+- [Tools/regression/verify-editor-command-surface.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L11) — `if ([string]::IsNullOrWhiteSpace($MaterialScene) -ne [string]::IsNullOrWhiteSpace($MaterialTarget)) { throw 'Provide both MaterialScene and MaterialTarget for the optional real-material Undo leg.' }`
+- [Tools/regression/verify-editor-command-surface.ps1:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L88) — `Assert ($proc.WaitForExit(180000)) 'Commandlet scenario must terminate without quit'`
+- [Tools/regression/verify-editor-command-surface.ps1:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L113) — `Assert ($results[-1].command -eq 'quit' -and $results[-1].status -eq 'succeeded') `
+- [Editor/EngineEntry/Commandlets/EditorCommandlets.cpp:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commandlets/EditorCommandlets.cpp#L26) — `CommandData data = CommandData::Object();`
+- [Editor/EngineEntry/Commandlets/EditorCommandlets.cpp:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commandlets/EditorCommandlets.cpp#L27) — `CommandData names = CommandData::Array();`
+- [Editor/EngineEntry/Commandlets/EditorCommandlets.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commandlets/EditorCommandlets.cpp#L28) — `for (const auto& entry : entries) names.Append(CommandData::String(entry.name));`
+- [Tools/regression/verify-player-cooked-scene-baseline.ps1:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-cooked-scene-baseline.ps1#L63) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-player-cooked-scene-baseline.ps1:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-cooked-scene-baseline.ps1#L65) — `if ([string]::IsNullOrWhiteSpace($Stage)) {`
+- [Tools/regression/verify-player-cooked-scene-baseline.ps1:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-cooked-scene-baseline.ps1#L74) — `$stagePath = [IO.Path]::GetFullPath($Stage)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 [2026-09-06 1차 정리](CommandletRetirementAudit.md) · [명령 도표](CommandSurfaceTable.md) · [처분표](CommandSurfaceDisposition.tsv) · [보관함](../plans/archive/README.md)
 
 계획이 닫히거나 끝나면 그 계획을 증명하려고 세운 Commandlet 도 함께 끝난다는 판단으로
@@ -106,3 +153,5 @@ Commandlet 을 지워도 그것이 부르던 `Editor/RenderTests/**` 의 구현�
 
 별건으로 HEAD 시점에 **이미** 호출자가 0이던 진입점이 17개 더 있다(`RunExperimentWeldSelfTest` ·
 `RunShaderReflectionSelfTest` 계열). 이번 변경이 만든 것이 아니다.
+
+</details>

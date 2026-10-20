@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-7 공통 Forward+·일반 alpha Blend</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT7CommonForwardBlend.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT7CommonForwardBlend.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-7 공통 Forward+·일반 alpha Blend</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-forward-blend.ps1#L4">Tools/regression/verify-material-forward-blend.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;, &#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;, &#39;Release&#39;),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-forward-blend.ps1#L10">Tools/regression/verify-material-forward-blend.ps1:10</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-forward-blend.ps1#L11">Tools/regression/verify-material-forward-blend.ps1:11</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedForwardLighting.h#L5">Engine/RenderEngine/Render/Graph/EnhancedForwardLighting.h:5</a> — <code>struct EnhancedForwardLighting</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L123">Tools/AssetCooker/AssetCooker.cpp:123</a> — <code>const auto size = std::filesystem::file_size(path, error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L139">Tools/AssetCooker/AssetCooker.cpp:139</a> — <code>while (std::getline(lines, line))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L156">Tools/AssetCooker/AssetCooker.cpp:156</a> — <code>tokens.push_back(std::move(token));</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>2026-10-02 · 다섯 번째 구현 단계 · MAT-7/PHASE 4.25 진행 중</strong></p>
+<h2>구현</h2>
+<ul>
+<li><code>EnhancedForwardPass</code>가 광원 buffer를 한 번 업로드하고 16×16 tile culling 결과를 <code>EnhancedForwardLighting</code>으로 공유한다. Code와 Graph는 같은 count/index, cascade shadow, 읽기 전용 opaque depth와 HDR을 소비한다. tile당 32개 초과는 전체 광원 배열을 평가한다.</li>
+<li>카메라의 forward 방향에 따른 깊이로 Code/Graph draw를 함께 back-to-front 정렬한다. Code 연속 구간만 기존 batch의 범위를 잘라 기록하고 Graph draw는 그 사이에 기록한다. Graph 재질 lookup capture/bake는 동일 Forward+ 순서 안의 준비다.</li>
+<li>generated ShaderMeta에 실제 <code>Forward</code> entry와 Transparent/Alpha state를 추가했다. Core/Layered generation은 shadow·opaque 요청과 함께 alpha color/lookup의 6개 추가 요청까지 총 15개가 Ready일 때 선택한다. graphics owner는 기존 LX 공통 타입을 사용한다.</li>
+<li>Graph Blend는 SRC_ALPHA/INV_SRC_ALPHA이며 depth와 opaque owner mask를 쓰지 않는다. opaque SSAO/Decal을 alpha surface에 적용하지 않고 opaque shadow caster에도 넣지 않는다. Alpha 0은 컬러 출력을 버린다.</li>
+<li>alpha draw는 임시 lookup을 순서대로 재사용한다. opaque temporal cache를 오염시키지 않으며 frame/recording owner와 GPU completion에 따라 자원을 재활용한다. 총 2 GiB payload 예산은 alpha 사용 시 opaque 쌍 2/3, scratch 1/3으로 나눈다.</li>
+<li>Graph texture 범위 t16..127과 충돌하지 않도록 공유 light/count/index를 t128..130에 배치한다. shader ABI/파생 계약 변경으로 <strong>SceneHost identity 11</strong>을 사용하고 기존 10 cook은 재생성한다. LXMC v3·BRDF 1024/environment 4096·기존 품질 상한은 유지한다.</li>
+</ul>
+<h2>검증 방법</h2>
+<p><code>Tools/regression/verify-material-forward-blend.ps1 -SkipDependencyRestore</code>가 두 구성과 두 native backend를 순서대로 빌드·실행한다. 코드 재질은 실제 <code>Forward.shadermeta</code> → LX graphics owner → <code>SealCore/SealCoverage</code> → immutable frame snapshot을 사용한다. Graph는 완성된 Scene product를 준비한 뒤 authoring을 비활성화하고 sealed bytecode에서 PSO를 준비한다. 실행 중 Graph compile submission은 0이다.</p>
+<p>16×16 fixture 12개: Code/Core Graph/Layered Graph/Code의 isolated 색 4개, 혼합 순차/병렬, 수집 순서 역전, 카메라 forward 역전, opaque 깊이 가림, Alpha 0, 65개 광원의 tiled overflow와 whole-light Reference다. isolated 색에 독립 alpha recurrence를 적용한 4,608개 RGB 성분을 허용 오차 <code>0.003 + 0.003×abs(expected)</code>로 대조한다. 65광원 tiled/reference는 <code>0.001 + 0.002×abs(value)</code>로 대조하고 모든 프레임의 depth/owner 보존·finite HDR·validation 0을 검사한다. fixture는 시각 FPS나 Blender BRDF 일치도를 측정하지 않는다.</p>
+<h2>실행 결과</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>실제 게이트</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DX12 Debug mixed GPU</td>
+<td>12 frames·4,608 RGB 대조 성분·21,173 checks·Graph compile 0·validation 0. 최종 특수 transport guard 수정 뒤의 회귀 묶음에서도 재실행해 통과.</td>
+</tr>
+<tr>
+<td>DX12 Release mixed GPU</td>
+<td>위 12 frames·4,608 성분·21,173 checks·compile/validation 0. 최종 소스 613개 hash 무변경을 포함한 실행 게이트 통과.</td>
+</tr>
+<tr>
+<td>Vulkan Debug mixed GPU</td>
+<td>12 frames·4,608 성분·21,174 checks·compile/validation 0. 같은 613개 source hash 무변경 통과. Vulkan Release mixed 실행은 이번 단계에서 검증하지 않았다.</td>
+</tr>
+<tr>
+<td>Debug 전체 에디터</td>
+<td>최종 엔진·Editor/RenderTests·실행 런처 빌드 통과. <code>/bigobj</code>는 빌드 환경에만 적용하고 복원했다.</td>
+</tr>
+<tr>
+<td>기존 SSS Debug</td>
+<td>12 frames·119,415 checks·108,072 GPU 성분·validation 0 통과.</td>
+</tr>
+<tr>
+<td>기존 refraction Debug</td>
+<td>24 frames·184,696 checks·155,505 GPU 성분·validation 0 통과.</td>
+</tr>
+<tr>
+<td>기존 Volume Debug</td>
+<td>33 frames·35,028 checks·57,840 GPU 성분·validation 0 통과. Volume-only에 alpha graphics 요청을 요구하지 않는 조건도 포함한다.</td>
+</tr>
+<tr>
+<td>기존 shadow/Decal Debug</td>
+<td>shadow 42 frames·33,232 checks·32,256 GPU 성분, Decal 114 frames·295,801 checks·290,898 GPU 성분, 각각 validation 0 통과.</td>
+</tr>
+<tr>
+<td>Vulkan generation Debug/Release</td>
+<td>각각 768픽셀·Scene program 2개·Ready 요청 30개·PSO worker 23개·stale 거부 65·실패 주입 2·validation 0 통과. 595개 source hash 무변경. polling 검사 수는 실행 시점에 따라 달라진다.</td>
+</tr>
+<tr>
+<td>기존 Scene/lookup/generation Debug</td>
+<td>55 frames·세대 교체 11 frames·20,293,812 checks·3,240,423 GPU 성분·stale 거부 1·fallback 6·abort 1 통과. 순차/병렬 합성·texture/LOD·cold/warm lookup·입력 변경·실패 보존 회귀.</td>
+</tr>
+<tr>
+<td>대시보드·게이트 구문</td>
+<td>script 1개·42개 phase 진행률 finite, 4.25=80/MAT-7 progress/days:null 유지. 새 PowerShell gate와 갱신한 generation gate 구문 통과.</td>
+</tr>
+</tbody></table></div>
+<p>로그는 <code>Build/Obj/MaterialProductProbe/forward-blend-*</code>, <code>forward-regression-*-Debug.log</code>,
+<code>forward-generation-gate.log</code>에 보존한다. 새 실행 게이트는 <code>forward-blend-gate-Release.log</code>와
+<code>forward-blend-vulkan-gate-Debug.log</code>, 에디터 빌드는 <code>forward-blend-editor-Debug-build.log</code>다.
+검사 수는 backend별 초기 API 검사 차이를 포함하며 고정 frame/픽셀 성분·합성 오차·validation을 판정값으로 사용한다.</p>
+<p>Vulkan 첫 시도는 <code>WaitSceneProgram</code>의 90초 준비 제한으로 실패했다. 테스트의 Vulkan 정확성
+대기 제한을 600초로 늘린 뒤 같은 합성 조건을 통과했다. 제품 준비 정책·이미지 오차 상한을
+변경한 것은 아니다. 재실행 전체 프로세스는 시작/최종 로그 시각 기준 약 326초였고,
+compile/PSO/lookup 준비와 렌더를 모두 포함하며 다른 회귀 도구도 함께 실행 중이었다.
+이를 순수 PSO 시간이나 모델 FPS 측정으로 쓰지 않는다. native 냉간 준비 비용은
+MAT-9 cold/warm 및 PHASE 4.9 backend 성능 게이트에서 분리 측정한다.</p>
+<p>Release 링크의 기존 <code>Utility_Framework.pdb</code> LNK4020과 에디터 Vulkan delay-load LNK4229
+경고는 남는다. 이번 변경으로 해당 디버그 정보·링크 경고를 해결했다고 세지 않는다.</p>
+<h2>후속 상태</h2>
+<p>보조 compute/RT 조회 정리는 <a href="MAT7ComputePipelineOwnership.html">compute 소유권</a>,
+identity 11의 편집·저장·실패 복구와 실제 Player는 <a href="MAT7ProductEditingRecovery.html">제품 회귀</a>,
+identity 12의 SSS·굴절·Volume/alpha 혼합은 <a href="MAT7ForwardTransportComposition.html">공통 transport</a>가 소유한다.
+아래 목록은 이 단계 당시의 잔여 이력이며 현행 미지원 목록으로 사용하지 않는다.</p>
+<details>
+<summary>다섯 번째 단계 당시의 잔여 게이트와 한계</summary>
+
+<ol>
+<li>SSS/transmission 또는 Volume을 포함한 재질의 alpha 혼합은 지원하지 않는다. 진단과 함께 같은 슬롯의 마지막 제출된 재질/coverage를 유지하며 cold model은 부분 메시를 게시하지 않는다. 이들 특수 transport와 일반 Blend 혼합, 굴절 배경에 들어가는 투명 객체 순서를 기존 MAT-7 alpha/transmission 게이트에서 확정·검증한다.</li>
+<li>정렬 단위는 object/draw다. 교차 표면의 OIT/triangle sorting은 미구현이며 하나의 draw 안의 self-overlap도 screen lookup 한 층을 공유한다. 현재 검증 범위는 분리된 alpha 층의 object 정렬·합성이며 제품 지원 문서에 이 한계를 보존한다.</li>
+<li>alpha draw마다 lookup capture와 1024/4096 적분이 반복된다. opaque temporal reuse를 alpha에 그대로 적용하지 않는다. 전체 모델·근접 이동 카메라의 CPU/GPU 비용과 route parity는 MAT-9 수용 게이트다. 이번 fixture의 성공을 성능 개선으로 세지 않는다.</li>
+<li>Preview/Scene/Game의 편집·override·저장 재개방·실패 복구·재import와 identity 11 encrypted cooked Player 재실행은 새 경로의 제품 회귀로 남는다. 이번 Graph fixture는 테스트 준비 단계에서 sealed product를 만들며 실제 AssetCooker/package 실행을 대신하지 않는다.</li>
+<li>Volume/lookup 보조 compute owner와 native compatibility registry 정리는 기존 MAT-7 통합 잔여다. LX UI 마감은 LX-3, Vulkan 전체 제품 수용은 PHASE 4.9가 소유한다.</li>
+</ol>
+<p>MAT-7 <code>progress</code>/미산정, PHASE 4.25 열림을 유지한다. 이 변경은 커밋·푸시하지 않았다.</p>
+</details>
+
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증-방법"></span><span id="sec-구현"></span><span id="sec-실행-결과"></span><span id="sec-후속-상태"></span><span id="검증-방법"></span><span id="구현"></span><span id="실행-결과"></span><span id="후속-상태"></span></details></main></body></html>

@@ -1,210 +1,360 @@
-<!DOCTYPE html>
-<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/RhiGpuMemoryLifetimeDesign.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RHI GPU 메모리·수명 관리 재설계</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>RHI GPU 메모리·수명 관리 재설계</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    color-scheme: dark light;
-    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
-    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
-    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
     --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
-    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
-    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
-    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
-    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
-    --r-1: 4px; --r-2: 10px;
-    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
-      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
-      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
-      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
-    }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
   }
-  html { font-size: 17px; scroll-padding-top: var(--s-6); }
-  * { box-sizing: border-box; margin: 0; }
-  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
-  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
-    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
-    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
-  ::selection { background: var(--accent-dim); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
-  a:hover { color: var(--accent); }
-  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
-  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
-  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
-  main > *, section, figure, header { min-width: 0; }
-  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
-  .crumbs a { color: var(--text-dim); }
-  header.page { display: grid; gap: var(--s-4); }
-  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
-  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
-  h1, h2 { text-box: trim-both cap alphabetic; }
-  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
-  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
-  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
-  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
-  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
-  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
-  .meta p + p { margin-top: var(--s-1); }
-  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
-  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
-  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+}
 
-  /* figure: stage on the dot grid */
-  figure { display: grid; gap: var(--s-3); }
-  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
-  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
-  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
 
-  /* chips: shape + word, never color alone */
-  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
-  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
-  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
-  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-  .chip.risk { color: var(--risk); }
-  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
-  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
 
-  /* KPI strip: one frame, hairline cells */
-  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
-  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
-  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
-  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
 
-  /* stacked status bar */
-  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
-  .stack > i { display: block; min-width: 2px; }
-  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
-  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
-  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
 
-  /* prose */
-  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
-  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
-  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
-  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
-  .prose li::marker { color: var(--text-dim); }
-  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
-  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
-  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
-  .prose hr { border: 0; border-top: 1px solid var(--border); }
-  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
-  .prose strong { font-weight: 600; color: var(--text); }
-  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
 
-  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
-  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
-  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
-  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
-  .sec-head .ve-label { letter-spacing: .08em; }
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
 
-  /* tables */
-  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
-  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
-  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
-  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
-  td.num, th.num { text-align: right; }
-  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
 
-  /* code */
-  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
-  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
-  pre.mermaid { background: var(--bg); text-align: left; }
-  pre.mermaid svg { max-width: none; }
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
 
-  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
-  summary:hover { color: var(--accent); }
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
 
-  /* table of contents with scroll-spy */
-  nav.toc { display: none; }
-  @media (min-width: 75rem) {
-    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
-    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
-    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
-    nav.toc a:hover { color: var(--text); }
-    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
-    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
-  }
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
 
-  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
 
-  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
-  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
-  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
 
-  @media print {
-    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
-    body::before, nav.toc, .crumbs { display: none; }
-    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
-    .js-motion main > * { opacity: 1 !important; transform: none !important; }
-    svg * { filter: none !important; }
-  }
-  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
-  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
-  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
-  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
-  .map-row:hover .map-bar i { background: var(--accent); }
-  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
-  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
-</style>
-</head>
-<body>
-<div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-결정-요약">0. 결정 요약</a></li><li><a href="#1-현재-코드에서-확인한-문제">1. 현재 코드에서 확인한 문제</a></li><li><a href="#2-차용할-것과-차용하지-않을-것">2. 차용할 것과 차용하지 않을 것</a></li><li><a href="#3-목표-구조">3. 목표 구조</a></li><li><a href="#4-rhi-계약">4. RHI 계약</a></li><li><a href="#5-transient-upload-segment-pool">5. Transient Upload Segment Pool</a></li><li><a href="#6-제출과-abort의-단일-소유자">6. 제출과 Abort의 단일 소유자</a></li><li><a href="#7-자산-업로드-트랜잭션">7. 자산 업로드 트랜잭션</a></li><li><a href="#8-persistent-resource-heap-pool">8. Persistent Resource Heap Pool</a></li><li><a href="#9-descriptor와-sbt">9. Descriptor와 SBT</a></li><li><a href="#10-파일-배치">10. 파일 배치</a></li><li><a href="#11-구현-순서">11. 구현 순서</a></li><li><a href="#12-검증-기준">12. 검증 기준</a></li><li><a href="#13-금지-규칙">13. 금지 규칙</a></li><li><a href="#14-최종-판정">14. 최종 판정</a></li><li><a href="#15-공식-참고-자료">15. 공식 참고 자료</a></li></ol></nav>
-<main>
-<header class="page">
-<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="RhiGpuMemoryLifetimeDesign.md">원본 Markdown</a></nav>
-<p class="eyebrow">설계</p>
-<h1>RHI GPU 메모리·수명 관리 재설계</h1>
-<div class="meta"><p>작성: 2026-08-14</p>
-<p>상태: <strong>Slice A~D 및 Slice E-a descriptor versioned recycler 완료 / SBT는 실제 소비 경로 대기</strong></p>
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RhiGpuMemoryLifetimeDesign.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/RhiGpuMemoryLifetimeDesign.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RHI GPU 메모리·수명 관리 재설계</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Live pipeline</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Versions</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">DAG</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Record tasks</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Queue submit</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Completion</text></g></svg></div><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L27">Engine/RenderEngine/RHI/IRenderDeviceServices.h:27</a> — <code>virtual void OnUploadSubmitted(uint64_t recordingId,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L29">Engine/RenderEngine/RHI/IRenderDeviceServices.h:29</a> — <code>virtual void OnUploadCompleted(uint64_t completedValue) = 0;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L80">Engine/RenderEngine/RHI/IRenderDeviceServices.h:80</a> — <code>virtual RHIBufferSlice AllocateUpload(const RHIUploadRequest&amp; request) = 0;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h#L93">Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:93</a> — <code>class RHIPersistentHeapPolicy</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h#L96">Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:96</a> — <code>explicit RHIPersistentHeapPolicy(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h#L99">Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:99</a> — <code>RHIPersistentHeapPolicy(const RHIPersistentHeapPolicy&amp;) = delete;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h#L15">Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h:15</a> — <code>class DX12PersistentHeap</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h#L40">Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h:40</a> — <code>bool CreateBuffer(const D3D12_RESOURCE_DESC&amp; desc,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h#L43">Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h:43</a> — <code>bool CreateTexture(const D3D12_RESOURCE_DESC&amp; desc,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h#L98">Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h:98</a> — <code>RHIDescriptorVersionAcquire BeginRecording(uint64_t recordingId)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h#L168">Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h:168</a> — <code>Slot* const slot = FindRecording(recordingId);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h#L176">Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h:176</a> — <code>completion.IsValid() ? RHIDescriptorVersionState::Pending : RHIDescriptorVersionState::Quarantined;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h#L13">Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h:13</a> — <code>class VulkanPersistentHeap</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h#L62">Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h:62</a> — <code>bool CreateBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h#L65">Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h:65</a> — <code>bool CreateTexture(const RHITextureDesc&amp; desc,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp#L430">Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp:430</a> — <code>void DX12UploadSegmentAllocator::SetBudgetForTesting(uint64_t softBudgetBytes, uint64_t largeCacheBudgetBytes,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp#L446">Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp:446</a> — <code>void DX12UploadSegmentAllocator::Collect(uint64_t completedValue)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp#L484">Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp:484</a> — <code>bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId, std::span&lt;const RHIUploadRequest&gt; requests,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1091">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1091</a> — <code>bool DX12DeviceResources::FlushCommandList(std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1101">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1101</a> — <code>bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1371">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1371</a> — <code>void DX12DeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp#L446">Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp:446</a> — <code>void VulkanUploadSegmentAllocator::Collect(uint64_t completedValue)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp#L472">Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp:472</a> — <code>void VulkanUploadSegmentAllocator::BeginRecording(uint64_t recordingId)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp#L480">Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp:480</a> — <code>bool VulkanUploadSegmentAllocator::ReserveBatch(uint64_t recordingId,</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>작성: 2026-08-14</p>
+<p>상태: <strong>Slice A&#126;D 및 Slice E-a descriptor versioned recycler 완료 / SBT는 실제 소비 경로 대기</strong></p>
 <p>대상: CreatorEngine RHI, DX12, Vulkan</p>
 <p>관련 문서: <code>RhiBoundaryPlan.md</code>, <code>AssetResidencyPlan.md</code></p>
 <p>대체 범위: 두 문서의 upload ring, frame-count 수명, 향후 placed-resource heap 부분</p>
 <p>구현 상태 (2026-08-15):</p>
-</div>
-</header>
-<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
-<div class="stack" role="img" aria-label="완료·통과 1, 차단·중단 2"><i class="ok" style="flex:1"></i><i class="risk" style="flex:2"></i></div>
-<span class="legend"><span class="chip ok">완료·통과 1</span><span class="chip risk">차단·중단 2</span></span></div></div>
-<figure>
-<div class="frame doc-map" role="img" aria-label="절 16개의 분량 막대">
-<a class="map-row" href="#0-결정-요약"><span class="ve-label">§0</span><span class="map-name">결정 요약</span><span class="map-bar"><i style="width:19.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#1-현재-코드에서-확인한-문제"><span class="ve-label">§1</span><span class="map-name">현재 코드에서 확인한 문제</span><span class="map-bar"><i style="width:60.5%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
-<a class="map-row" href="#2-차용할-것과-차용하지-않을-것"><span class="ve-label">§2</span><span class="map-name">차용할 것과 차용하지 않을 것</span><span class="map-bar"><i style="width:25.6%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#3-목표-구조"><span class="ve-label">§3</span><span class="map-name">목표 구조</span><span class="map-bar"><i style="width:24%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#4-rhi-계약"><span class="ve-label">§4</span><span class="map-name">RHI 계약</span><span class="map-bar"><i style="width:58.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#5-transient-upload-segment-pool"><span class="ve-label">§5</span><span class="map-name">Transient Upload Segment Pool</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#6-제출과-abort의-단일-소유자"><span class="ve-label">§6</span><span class="map-name">제출과 Abort의 단일 소유자</span><span class="map-bar"><i style="width:35.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#7-자산-업로드-트랜잭션"><span class="ve-label">§7</span><span class="map-name">자산 업로드 트랜잭션</span><span class="map-bar"><i style="width:32.6%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#8-persistent-resource-heap-pool"><span class="ve-label">§8</span><span class="map-name">Persistent Resource Heap Pool</span><span class="map-bar"><i style="width:65.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#9-descriptor와-sbt"><span class="ve-label">§9</span><span class="map-name">Descriptor와 SBT</span><span class="map-bar"><i style="width:13.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#10-파일-배치"><span class="ve-label">§10</span><span class="map-name">파일 배치</span><span class="map-bar"><i style="width:19.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#11-구현-순서"><span class="ve-label">§11</span><span class="map-name">구현 순서</span><span class="map-bar"><i style="width:83.3%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
-<a class="map-row" href="#12-검증-기준"><span class="ve-label">§12</span><span class="map-name">검증 기준</span><span class="map-bar"><i style="width:57.4%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
-<a class="map-row" href="#13-금지-규칙"><span class="ve-label">§13</span><span class="map-name">금지 규칙</span><span class="map-bar"><i style="width:11.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#14-최종-판정"><span class="ve-label">§14</span><span class="map-name">최종 판정</span><span class="map-bar"><i style="width:11.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#15-공식-참고-자료"><span class="ve-label">§15</span><span class="map-name">공식 참고 자료</span><span class="map-bar"><i style="width:6.4%"></i></span><span class="map-marks"></span></a>
-</div>
-<figcaption><span class="fig-n">그림 1</span>절 16개 가운데 「5. Transient Upload Segment Pool」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
-</figure>
-<section class="prose"><ul>
+<ul>
 <li>Slice A 완료: 의미 기반 요청, all-or-none 배치, recording/completion,
 RHI <code>AbortFrame</code>, 제출 coordinator와 cache transaction listener를 배선했다.</li>
 <li>Slice B 완료: DX12/Vulkan 모두 completion-aware
@@ -308,10 +458,8 @@ Abort 재사용, completion 0 quarantine, generation 갱신, page 내 연속 할
 순차/병렬 결과 byte 차이 0과 픽셀 차이 0/65,536을 확인했다.</li>
 </ul>
 <hr>
-</section>
-<section class="doc-sec" id="sec-0-결정-요약">
-<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-결정-요약">0. 결정 요약</h2></div>
-<div class="prose"><p>CreatorEngine의 업로드 메모리는 더 이상 <strong>프레임 인덱스로 나눈 고정 링 버퍼</strong>를
+<h2>0. 결정 요약</h2>
+<p>CreatorEngine의 업로드 메모리는 더 이상 <strong>프레임 인덱스로 나눈 고정 링 버퍼</strong>를
 핵심 수명 모델로 사용하지 않는다. 다음 네 계층으로 분리한다.</p>
 <ol>
 <li><strong>Transient Upload Segment Pool</strong><ul>
@@ -342,18 +490,48 @@ standby</strong> 개념을 차용한다. 그러나 GPU 주소와 디스크립터
 <p>DX12와 Vulkan은 동일한 RHI 계약과 상태 전이를 구현한다. 한 백엔드만 구현된
 상태는 이 설계의 완료가 아니다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-1-현재-코드에서-확인한-문제">
-<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-현재-코드에서-확인한-문제">1. 현재 코드에서 확인한 문제</h2></div>
-<div class="prose"><h3 id="11-업로드-경로의-비대칭과-고정-상한">1.1 업로드 경로의 비대칭과 고정 상한</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>항목</th><th>DX12 현재 상태</th><th>Vulkan 현재 상태</th><th>문제</th></tr></thead>
-<tbody><tr><td>기본 용량</td><td>프레임당 16 MiB 세그먼트</td><td>프레임당 8 MiB 단일 블록</td><td>동일 RHI 호출이 백엔드마다 다른 크기에서 실패한다</td></tr>
-<tr><td>부족 처리</td><td>실패 수요를 기록하고 다음 <code>BeginFrame</code>에 세그먼트 하나 추가</td><td>즉시 무효 슬라이스 반환</td><td>최초 요청은 실패하며 Vulkan에는 성장 경로도 없다</td></tr>
-<tr><td>대형 요청</td><td>다음 프레임에 요청 크기 세그먼트를 추가</td><td><span class="chip risk">항상 실패</span></td><td>현재 프레임의 큰 메시를 구하지 못한다</td></tr>
-<tr><td>회수 기준</td><td>프레임 슬롯 fence 대기 후 슬롯 전체 reset</td><td>프레임 슬롯 timeline 값 대기 후 offset reset</td><td>중간 제출과 실제 사용 범위를 표현하지 못한다</td></tr>
-<tr><td>동시 할당</td><td>packed cursor CAS</td><td>단순 <code>m_offset</code></td><td>Vulkan 구현은 병렬 기록에 안전하지 않다</td></tr></tbody></table></div>
+<h2>1. 현재 코드에서 확인한 문제</h2>
+<h3>1.1 업로드 경로의 비대칭과 고정 상한</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>DX12 현재 상태</th>
+<th>Vulkan 현재 상태</th>
+<th>문제</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기본 용량</td>
+<td>프레임당 16 MiB 세그먼트</td>
+<td>프레임당 8 MiB 단일 블록</td>
+<td>동일 RHI 호출이 백엔드마다 다른 크기에서 실패한다</td>
+</tr>
+<tr>
+<td>부족 처리</td>
+<td>실패 수요를 기록하고 다음 <code>BeginFrame</code>에 세그먼트 하나 추가</td>
+<td>즉시 무효 슬라이스 반환</td>
+<td>최초 요청은 실패하며 Vulkan에는 성장 경로도 없다</td>
+</tr>
+<tr>
+<td>대형 요청</td>
+<td>다음 프레임에 요청 크기 세그먼트를 추가</td>
+<td>항상 실패</td>
+<td>현재 프레임의 큰 메시를 구하지 못한다</td>
+</tr>
+<tr>
+<td>회수 기준</td>
+<td>프레임 슬롯 fence 대기 후 슬롯 전체 reset</td>
+<td>프레임 슬롯 timeline 값 대기 후 offset reset</td>
+<td>중간 제출과 실제 사용 범위를 표현하지 못한다</td>
+</tr>
+<tr>
+<td>동시 할당</td>
+<td>packed cursor CAS</td>
+<td>단순 <code>m_offset</code></td>
+<td>Vulkan 구현은 병렬 기록에 안전하지 않다</td>
+</tr>
+</tbody></table></div>
 <p>근거가 되는 현재 경로:</p>
 <ul>
 <li>DX12 초기 16 MiB 값: <code>RenderEngine/RHI/DX12/DX12DeviceResources.cpp</code></li>
@@ -361,13 +539,14 @@ standby</strong> 개념을 차용한다. 그러나 GPU 주소와 디스크립터
 <li>Vulkan 고정 블록: <code>RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp</code></li>
 <li>공통 표면: <code>RenderEngine/RHI/IRenderDeviceServices.h::AllocateUpload</code></li>
 </ul>
-<h3 id="12-sceneglb-대형-메시가-사라지는-직접-경로">1.2 <code>scene.glb</code> 대형 메시가 사라지는 직접 경로</h3>
+<h3>1.2 <code>scene.glb</code> 대형 메시가 사라지는 직접 경로</h3>
 <p>현재 DX12 메시 캐시는 정점 버퍼와 인덱스 버퍼를 별도의 호출로 올린다.</p>
 <pre><code class="language-text">Upload vertex staging
   └─ 성공 가능
 Upload index staging
   └─ 프레임 세그먼트 부족 → 실패
-      └─ 메시 전체가 무효 binding으로 반환됨</code></pre>
+      └─ 메시 전체가 무효 binding으로 반환됨
+</code></pre>
 <p>한 요청이 16 MiB를 넘거나, 같은 프레임의 앞선 업로드가 공간을 소비해 합계가
 16 MiB를 넘으면 <code>DX12UploadRing::Allocate</code>가 그 프레임 요청을 거절한다. 현재
 수정안은 다음 프레임부터 세그먼트를 늘리므로 <strong>실패한 최초 프레임을 복구하지
@@ -375,7 +554,7 @@ Upload index staging
 <p>또한 정점 업로드 성공 후 인덱스 업로드가 실패할 수 있어 목적 리소스 생성,
 복사 명령, 통계가 부분적으로 진행될 수 있다. 메시 하나는 정점·인덱스 staging을
 <strong>한 번에 예약하는 all-or-none 배치</strong>여야 한다.</p>
-<h3 id="13-제출보다-먼저-resident가-되는-캐시">1.3 제출보다 먼저 resident가 되는 캐시</h3>
+<h3>1.3 제출보다 먼저 resident가 되는 캐시</h3>
 <p>DX12 메시·텍스처 캐시와 Vulkan 텍스처 캐시는 복사 명령을 기록한 뒤 실제 큐
 제출 성공을 확인하기 전에 resident map에 엔트리를 넣는다. 이후 프레임이
 Abort되거나 제출이 실패하면 캐시는 GPU에 도달하지 않은 리소스를 정상 상주
@@ -383,10 +562,11 @@ Abort되거나 제출이 실패하면 캐시는 GPU에 도달하지 않은 리�
 <p>필요한 상태는 최소 다음 넷이다.</p>
 <pre><code class="language-text">Absent → Recording → Queued(completion) → Resident
                 └──────── Abort ─────────→ Absent
-Resident → Retiring(completion) → Absent</code></pre>
+Resident → Retiring(completion) → Absent
+</code></pre>
 <p><code>Queued</code>는 같은 큐의 뒤 제출에서 사용할 수 있지만 아직 CPU 관점의 완료는 아니다.
 교차 큐 소비나 readback은 <code>Resident</code>, 즉 완료 확인 이후만 허용한다.</p>
-<h3 id="14-제출-추적의-구멍">1.4 제출 추적의 구멍</h3>
+<h3>1.4 제출 추적의 구멍</h3>
 <p><code>DX12DeviceResources::EndFrame</code>은 fence를 신호하지만 다음 경로는 네이티브 큐를
 직접 호출한다.</p>
 <ul>
@@ -397,7 +577,7 @@ Resident → Retiring(completion) → Absent</code></pre>
 <p>직접 제출은 “어느 업로드 세그먼트와 어느 리소스가 어느 완료값에 속하는가”를
 한 곳에서 결정할 수 없게 한다. Vulkan <code>FlushCommandList</code>는 같은 command pool을
 재사용하려고 매번 timeline을 기다려 CPU/GPU 파이프라이닝을 끊는다.</p>
-<h3 id="15-프레임-수-기반-수명은-안전-판정이-아니다">1.5 프레임 수 기반 수명은 안전 판정이 아니다</h3>
+<h3>1.5 프레임 수 기반 수명은 안전 판정이 아니다</h3>
 <p>영상에서 설명한 life-count 방식은 고정 인플라이트 수를 잘 지키면 동작할 수
 있지만, 다음 경우에는 실제 GPU 완료와 어긋난다.</p>
 <ul>
@@ -410,23 +590,44 @@ Resident → Retiring(completion) → Absent</code></pre>
 <p>따라서 frame count는 캐시의 “얼마나 오래 안 썼는가” 정책에는 사용할 수 있지만,
 파괴와 재사용의 안전 판정에는 사용할 수 없다. 안전 판정은 완료값만 담당한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-2-차용할-것과-차용하지-않을-것">
-<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-차용할-것과-차용하지-않을-것">2. 차용할 것과 차용하지 않을 것</h2></div>
-<div class="prose"><h3 id="21-net-gc에서-차용할-것">2.1 .NET GC에서 차용할 것</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>.NET 개념</th><th>RHI 적용</th></tr></thead>
-<tbody><tr><td>관리 힙 세그먼트</td><td>큰 네이티브 메모리 블록을 만들고 그 안에서 빠르게 할당</td></tr>
-<tr><td>bump-pointer 할당</td><td>transient upload를 현재 세그먼트 cursor 증가로 할당</td></tr>
-<tr><td>SOH/LOH 분리</td><td>일반 요청과 대형 전용 세그먼트를 서로 다른 풀에서 관리</td></tr>
-<tr><td>빈 세그먼트 standby</td><td>완료된 세그먼트를 즉시 파괴하지 않고 재사용 후보로 유지</td></tr>
-<tr><td>임계치 동적 조정</td><td>peak, miss, reclaim lag를 보고 예산과 standby 목표를 조정</td></tr>
-<tr><td>allocation context</td><td>필요 시 기록 워커별 chunk를 미리 떼어 CAS 경합을 줄임</td></tr></tbody></table></div>
+<h2>2. 차용할 것과 차용하지 않을 것</h2>
+<h3>2.1 .NET GC에서 차용할 것</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>.NET 개념</th>
+<th>RHI 적용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>관리 힙 세그먼트</td>
+<td>큰 네이티브 메모리 블록을 만들고 그 안에서 빠르게 할당</td>
+</tr>
+<tr>
+<td>bump-pointer 할당</td>
+<td>transient upload를 현재 세그먼트 cursor 증가로 할당</td>
+</tr>
+<tr>
+<td>SOH/LOH 분리</td>
+<td>일반 요청과 대형 전용 세그먼트를 서로 다른 풀에서 관리</td>
+</tr>
+<tr>
+<td>빈 세그먼트 standby</td>
+<td>완료된 세그먼트를 즉시 파괴하지 않고 재사용 후보로 유지</td>
+</tr>
+<tr>
+<td>임계치 동적 조정</td>
+<td>peak, miss, reclaim lag를 보고 예산과 standby 목표를 조정</td>
+</tr>
+<tr>
+<td>allocation context</td>
+<td>필요 시 기록 워커별 chunk를 미리 떼어 CAS 경합을 줄임</td>
+</tr>
+</tbody></table></div>
 <p>.NET의 85,000바이트 LOH 기준이나 실제 세그먼트 크기는 런타임 구현값이므로
 가져오지 않는다. RHI의 임계치는 GPU 업로드 패턴과 VRAM/host-visible 예산을
 측정해 결정한다.</p>
-<h3 id="22-차용하지-않을-것">2.2 차용하지 않을 것</h3>
+<h3>2.2 차용하지 않을 것</h3>
 <ul>
 <li><strong>이동 압축:</strong> GPU 가상 주소, descriptor, SBT record, 인플라이트 command가
 기존 위치를 참조할 수 있어 투명 이동이 불가능하다.</li>
@@ -436,7 +637,7 @@ generation이 아니라 서로 다른 allocator를 사용한다.</li>
 <li><strong>stop-the-world:</strong> 정상 프레임에서 전체 GPU 대기나 <code>vkDeviceWaitIdle</code>로
 메모리를 회수하지 않는다.</li>
 </ul>
-<h3 id="23-영상의-관리-기법에서-차용할-것">2.3 영상의 관리 기법에서 차용할 것</h3>
+<h3>2.3 영상의 관리 기법에서 차용할 것</h3>
 <ul>
 <li>큰 힙을 만들고 내부 free-list에서 재사용한다.</li>
 <li>해제 블록의 앞뒤가 비어 있으면 즉시 병합한다.</li>
@@ -445,11 +646,8 @@ generation이 아니라 서로 다른 allocator를 사용한다.</li>
 </ul>
 <p>단, 고정 life-count 대신 DX12 fence/Vulkan timeline 완료값을 사용한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-3-목표-구조">
-<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-목표-구조">3. 목표 구조</h2></div>
-<div class="prose"><pre class="mermaid">flowchart TD
+<h2>3. 목표 구조</h2>
+<pre><code class="language-mermaid">flowchart TD
     Pass[&quot;공통 패스·자산 캐시&quot;] --&gt; Service[&quot;IRenderDeviceServices&quot;]
     Service --&gt; UploadAPI[&quot;RHI Upload API&quot;]
     Service --&gt; ResourceAPI[&quot;RHI Resource API&quot;]
@@ -467,16 +665,14 @@ generation이 아니라 서로 다른 allocator를 사용한다.</li>
     DXFence --&gt; Deferred[&quot;Deferred Release / Recycle&quot;]
     VKTimeline --&gt; Deferred
     Deferred --&gt; UploadPolicy
-    Deferred --&gt; HeapPolicy</pre>
+    Deferred --&gt; HeapPolicy
+</code></pre>
 <p>공통 코드는 “언제 재사용 가능한가”, “어떤 크기 분류인가”, “어떤 블록을
 선택하는가”를 결정한다. 백엔드는 네이티브 리소스를 생성하고 요구 정렬과
 memory type/heap flag를 결정한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-4-rhi-계약">
-<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-rhi-계약">4. RHI 계약</h2></div>
-<div class="prose"><h3 id="41-의미-기반-업로드-요청">4.1 의미 기반 업로드 요청</h3>
+<h2>4. RHI 계약</h2>
+<h3>4.1 의미 기반 업로드 요청</h3>
 <p>현재 <code>AllocateUpload(bytes, alignment)</code>는 DX12의 256/512 정렬 규칙을 호출부로
 노출한다. 다음 의미 기반 요청으로 바꾼다.</p>
 <pre><code class="language-cpp">enum class RHIUploadUsage : uint8_t
@@ -495,12 +691,14 @@ struct RHIUploadRequest
     uint64_t       bytes{ 0 };
     RHIUploadUsage usage{ RHIUploadUsage::Raw };
     uint64_t       minimumAlignment{ 1 }; // 호출자가 아는 추가 하한
-};</code></pre>
+};
+</code></pre>
 <p>백엔드는 다음 식으로 실제 정렬을 넓힌다.</p>
 <pre><code class="language-text">effectiveAlignment = max(request.minimumAlignment,
-                         backend.RequiredAlignment(request.usage))</code></pre>
+                         backend.RequiredAlignment(request.usage))
+</code></pre>
 <p>DX12 상수/텍스처 배치 규칙과 Vulkan의 device limit은 각각의 adapter 안에 남는다.</p>
-<h3 id="42-배치-예약">4.2 배치 예약</h3>
+<h3>4.2 배치 예약</h3>
 <pre><code class="language-cpp">class IRenderDeviceServices
 {
 public:
@@ -512,7 +710,8 @@ public:
     // 이행 기간 호환 함수. 내부적으로 1개 배치를 호출한다.
     virtual RHIBufferSlice AllocateUpload(
         const RHIUploadRequest&amp; request) = 0;
-};</code></pre>
+};
+</code></pre>
 <p>배치는 다음을 보장한다.</p>
 <ul>
 <li><code>outSlices.size() == requests.size()</code>가 아니면 호출 자체를 거절한다.</li>
@@ -522,17 +721,18 @@ public:
 <li>배치 내부 조각은 한 세그먼트의 연속 예약에서 <code>SubRange</code>로 만든다.</li>
 </ul>
 <p>이 규칙으로 “정점 성공, 인덱스 실패”를 구조적으로 없앤다.</p>
-<h3 id="43-완료점">4.3 완료점</h3>
+<h3>4.3 완료점</h3>
 <p>현재 엔진은 graphics queue 하나에서 업로드와 렌더링을 순서대로 제출하므로
 첫 구현은 단일 단조 증가 값으로 충분하다.</p>
 <pre><code class="language-cpp">struct RHICompletionPoint
 {
     uint64_t value{ 0 };
     bool IsValid() const { return value != 0; }
-};</code></pre>
+};
+</code></pre>
 <p>향후 copy/compute queue를 분리할 때는 <code>queueId + value</code> 또는 완료점 집합으로
 확장한다. 그 전까지 다른 큐에서 이 값을 완료 판정에 사용하는 것은 금지한다.</p>
-<h3 id="44-allocator-내부-계약">4.4 allocator 내부 계약</h3>
+<h3>4.4 allocator 내부 계약</h3>
 <p>이 인터페이스는 패스에 노출하지 않고 <code>IRHIDeviceResources</code> 구현이 소유한다.</p>
 <pre><code class="language-cpp">class IRHIUploadAllocator
 {
@@ -551,16 +751,14 @@ public:
         RHICompletionPoint completion) = 0;
 
     virtual void AbortRecording(uint64_t recordingId) = 0;
-};</code></pre>
+};
+</code></pre>
 <p><code>recordingId</code>는 frame index가 아니다. 한 프레임 안에서 <code>FlushCommandList</code>가
 여러 번 발생하면 제출 구간마다 새 recording ID를 만든다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-5-transient-upload-segment-pool">
-<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-transient-upload-segment-pool">5. Transient Upload Segment Pool</h2></div>
-<div class="prose"><h3 id="51-세그먼트-상태">5.1 세그먼트 상태</h3>
-<pre class="mermaid">stateDiagram-v2
+<h2>5. Transient Upload Segment Pool</h2>
+<h3>5.1 세그먼트 상태</h3>
+<pre><code class="language-mermaid">stateDiagram-v2
     [*] --&gt; Available
     Available --&gt; Active: recording이 획득
     Active --&gt; Pending: 제출 성공 + completion 부여
@@ -568,7 +766,8 @@ public:
     Pending --&gt; Available: 완료값 통과
     Available --&gt; Released: trim 또는 shutdown
     Pending --&gt; Quarantined: 제출은 됐으나 완료점 신호 실패
-    Quarantined --&gt; Released: device teardown</pre>
+    Quarantined --&gt; Released: device teardown
+</code></pre>
 <p>핵심 불변식은 다음과 같다.</p>
 <ol>
 <li><code>Pending</code> 세그먼트의 cursor와 바이트는 절대 수정하지 않는다.</li>
@@ -578,25 +777,61 @@ public:
 <li>frame index는 command allocator 선택에는 쓸 수 있지만 세그먼트 안전 판정에는
 쓰지 않는다.</li>
 </ol>
-<h3 id="52-크기-분류">5.2 크기 분류</h3>
+<h3>5.2 크기 분류</h3>
 <pre><code class="language-text">packedBatchBytes &lt;= largeThreshold
     → Regular pool
 
 packedBatchBytes &gt; largeThreshold
-    → Large pool 또는 dedicated segment</code></pre>
+    → Large pool 또는 dedicated segment
+</code></pre>
 <p>초기 계측용 기본값은 다음처럼 시작할 수 있지만 확정 상수는 아니다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>설정</th><th style="text-align:right">잠정 시작값</th><th>의미</th></tr></thead>
-<tbody><tr><td><code>regularSegmentBytes</code></td><td style="text-align:right">16 MiB</td><td>일반 세그먼트 크기</td></tr>
-<tr><td><code>largeThreshold</code></td><td style="text-align:right">8 MiB</td><td>일반 풀을 오염시키지 않을 배치 기준</td></tr>
-<tr><td><code>largeGranularity</code></td><td style="text-align:right">4 MiB</td><td>대형 세그먼트 반올림 단위</td></tr>
-<tr><td><code>standbyRegularSegments</code></td><td class="num" style="text-align:right">3</td><td>생성 비용을 피하기 위해 유지할 빈 일반 세그먼트</td></tr>
-<tr><td><code>largeCacheBudgetBytes</code></td><td style="text-align:right">64 MiB</td><td>정상 상태에서 유지할 빈 대형 세그먼트의 총량</td></tr>
-<tr><td><code>trimDelayCollects</code></td><td class="num" style="text-align:right">8</td><td>정상 상태에서 재사용 기회를 주는 collect 유예 횟수</td></tr>
-<tr><td><code>softBudgetBytes</code></td><td style="text-align:right">동적, 64~512 MiB</td><td>초과 시 collect/trim 후 재시도할 기준</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>설정</th>
+<th align="right">잠정 시작값</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>regularSegmentBytes</code></td>
+<td align="right">16 MiB</td>
+<td>일반 세그먼트 크기</td>
+</tr>
+<tr>
+<td><code>largeThreshold</code></td>
+<td align="right">8 MiB</td>
+<td>일반 풀을 오염시키지 않을 배치 기준</td>
+</tr>
+<tr>
+<td><code>largeGranularity</code></td>
+<td align="right">4 MiB</td>
+<td>대형 세그먼트 반올림 단위</td>
+</tr>
+<tr>
+<td><code>standbyRegularSegments</code></td>
+<td align="right">3</td>
+<td>생성 비용을 피하기 위해 유지할 빈 일반 세그먼트</td>
+</tr>
+<tr>
+<td><code>largeCacheBudgetBytes</code></td>
+<td align="right">64 MiB</td>
+<td>정상 상태에서 유지할 빈 대형 세그먼트의 총량</td>
+</tr>
+<tr>
+<td><code>trimDelayCollects</code></td>
+<td align="right">8</td>
+<td>정상 상태에서 재사용 기회를 주는 collect 유예 횟수</td>
+</tr>
+<tr>
+<td><code>softBudgetBytes</code></td>
+<td align="right">동적, 64&#126;512 MiB</td>
+<td>초과 시 collect/trim 후 재시도할 기준</td>
+</tr>
+</tbody></table></div>
 <p>DX12와 Vulkan이 같은 숫자를 강제로 쓸 이유는 없다. 두 백엔드는 같은 동작 계약과
 테스트를 공유하되 실제 정렬, memory type, 예산은 별도 telemetry로 정한다.</p>
-<h3 id="53-할당-알고리즘">5.3 할당 알고리즘</h3>
+<h3>5.3 할당 알고리즘</h3>
 <ol>
 <li>요청들의 실제 정렬을 계산해 한 배치의 packed size를 구한다.</li>
 <li>대형이면 완료된 large segment 중 best-fit을 찾는다.</li>
@@ -619,24 +854,25 @@ free slot에 반환하므로 오래된 handle은 무효가 되고 다음 생성�
 안전하게 재사용한다. DX12와 Vulkan 모두 buffer handle slot을 최대 handle 수로 한 번
 고정 할당해 이 조건을 만족하며, 병렬 worker의 네이티브 세그먼트 생성도 slow path
 안에서 허용한다.</p>
-<h3 id="54-병렬-기록">5.4 병렬 기록</h3>
+<h3>5.4 병렬 기록</h3>
 <p>DX12와 Vulkan의 일반 세그먼트는 같은 packed cursor CAS 정책을 사용한다. 한 번의
 CAS 성공이 배치 전체 범위를 확정하므로 all-or-none 의미를 유지한다. active
 세그먼트 교체, large best-fit 및 네이티브 생성만 slow mutex 경로로 보낸다.
 <code>ReserveBatch</code>만 같은 recording 안에서 병렬 호출한다. recording을 여닫고 제출하거나
 Abort하는 owner thread는 해당 recording의 worker를 join한 뒤 경계를 전환한다.</p>
 <p>8 worker/64 MiB fixture를 최종 코드로 두 번 실행해 64회 예약당 백엔드별 CAS
-재시도 1~6회를
+재시도 1&#126;6회를
 관측했다. 현재 수치로는 worker별 chunk의 내부 단편화와 수명 복잡도를 감수할
 이유가 없으므로 allocation context는 넣지 않는다. 실제 프레임 telemetry에서
 재시도가 지속적으로 증가하거나 allocator 대기 시간이 병목으로 확인될 때 다음
 단계로 .NET allocation-context 방식을 적용한다.</p>
-<pre><code class="language-text">worker context가 64~256 KiB chunk를 세그먼트에서 한 번 예약
+<pre><code class="language-text">worker context가 64&amp;#126;256 KiB chunk를 세그먼트에서 한 번 예약
     └─ worker 내부 할당은 local cursor만 증가
-    └─ chunk 부족 시에만 공통 세그먼트와 동기화</code></pre>
+    └─ chunk 부족 시에만 공통 세그먼트와 동기화
+</code></pre>
 <p>Vulkan의 기존 단순 <code>m_offset</code>도 공통 CAS cursor로 교체했으므로 두 백엔드 모두
 병렬 allocator 계약을 만족한다.</p>
-<h3 id="55-trim">5.5 trim</h3>
+<h3>5.5 trim</h3>
 <p>매 프레임 파괴하지 않는다. 정상 상태에서는 다음 조건을 모두 만족하는 세그먼트만
 정리한다.</p>
 <ul>
@@ -649,28 +885,49 @@ standby/cache 목표를 우회해 <code>Available</code> 세그먼트를 즉시 
 <code>Pending</code>은 어떤 압력에서도 trim하지 않는다. 따라서 trim은 안전성이 아니라
 성능/메모리 정책이며, 안전성은 completion 판정으로 끝난 뒤에만 실행된다.</p>
 <p>예산 입력과 압력 판정은 백엔드가 담당하고 allocator는 같은 정책으로 소비한다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>항목</th><th>DX12</th><th>Vulkan</th></tr></thead>
-<tbody><tr><td>실제 예산</td><td><code>IDXGIAdapter3::QueryVideoMemoryInfo</code>; UMA는 local, discrete는 non-local 우선</td><td>upload memory type의 heap에 <code>VK_EXT_memory_budget</code> 사용</td></tr>
-<tr><td>fallback</td><td>조회 실패 시 soft budget 256 MiB</td><td>확장 부재 시 heap size를 estimated budget으로 사용</td></tr>
-<tr><td>soft budget</td><td>현재 segment bytes + 가용 headroom의 1/8, 64~512 MiB clamp</td><td>동일</td></tr>
-<tr><td>pressure</td><td>사용량 90%에서 진입, 80% 이하에서 해제</td><td>실제 budget일 때만 동일; estimated budget은 압력 판정에 쓰지 않음</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>DX12</th>
+<th>Vulkan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>실제 예산</td>
+<td><code>IDXGIAdapter3::QueryVideoMemoryInfo</code>; UMA는 local, discrete는 non-local 우선</td>
+<td>upload memory type의 heap에 <code>VK_EXT_memory_budget</code> 사용</td>
+</tr>
+<tr>
+<td>fallback</td>
+<td>조회 실패 시 soft budget 256 MiB</td>
+<td>확장 부재 시 heap size를 estimated budget으로 사용</td>
+</tr>
+<tr>
+<td>soft budget</td>
+<td>현재 segment bytes + 가용 headroom의 1/8, 64&#126;512 MiB clamp</td>
+<td>동일</td>
+</tr>
+<tr>
+<td>pressure</td>
+<td>사용량 90%에서 진입, 80% 이하에서 해제</td>
+<td>실제 budget일 때만 동일; estimated budget은 압력 판정에 쓰지 않음</td>
+</tr>
+</tbody></table></div>
 <p>예산은 매 frame begin의 completed fence/timeline 값을 읽은 뒤 갱신한다. 이 순서로
 worker join, GPU completion 확인, <code>Pending → Available</code>, trim, 새 recording 시작의
 경계를 유지한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-6-제출과-abort의-단일-소유자">
-<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-제출과-abort의-단일-소유자">6. 제출과 Abort의 단일 소유자</h2></div>
-<div class="prose"><h3 id="61-submission-coordinator">6.1 Submission Coordinator</h3>
+<h2>6. 제출과 Abort의 단일 소유자</h2>
+<h3>6.1 Submission Coordinator</h3>
 <p>모든 제출은 backend <code>DeviceResources</code>의 한 함수로 모은다.</p>
 <pre><code class="language-text">Close/End recording
     → native queue submit
     → completion value signal
     → uploadAllocator.OnSubmitted(recordingId, completion)
     → uploadTransaction.OnSubmitted(completion)
-    → 새 recordingId 시작</code></pre>
+    → 새 recordingId 시작
+</code></pre>
 <ul>
 <li>DX12: <code>ExecuteCommandLists</code> 뒤 같은 queue에서 <code>ID3D12Fence::Signal</code>.</li>
 <li>Vulkan: <code>vkQueueSubmit2</code>의 signal 목록에 timeline 값을 함께 넣는다.</li>
@@ -685,15 +942,16 @@ worker join, GPU completion 확인, <code>Pending → Available</code>, trim, �
 <li>프레임 중간 flush</li>
 <li>향후 copy queue 제출</li>
 </ul>
-<h3 id="62-vulkan-중간-제출">6.2 Vulkan 중간 제출</h3>
+<h3>6.2 Vulkan 중간 제출</h3>
 <p>현재 Vulkan flush는 제출 직후 timeline을 기다리고 같은 command pool을 reset한다.
 재설계 후에는 제출마다 command pool/buffer 세트를 recycler에서 하나 얻는다.</p>
 <pre><code class="language-text">RecordingPool A → submit(value 10) → Pending(10)
 RecordingPool B → 즉시 다음 기록
-completed &gt;= 10 → Pool A reset 후 Available</code></pre>
+completed &gt;= 10 → Pool A reset 후 Available
+</code></pre>
 <p>이렇게 해야 공통 <code>FlushCommandList</code>가 Vulkan에서만 CPU/GPU 동기화 지점이 되는
 비대칭을 없앨 수 있다.</p>
-<h3 id="63-abort">6.3 Abort</h3>
+<h3>6.3 Abort</h3>
 <ul>
 <li>아직 제출되지 않은 current recording:<ul>
 <li>command recording 폐기</li>
@@ -714,12 +972,9 @@ completed &gt;= 10 → Pool A reset 후 Available</code></pre>
 </ul>
 <p><code>AbortFrame</code>은 DX12 전용 편의 함수가 아니라 RHI 프레임 계약에 포함되어야 한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-7-자산-업로드-트랜잭션">
-<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-자산-업로드-트랜잭션">7. 자산 업로드 트랜잭션</h2></div>
-<div class="prose"><h3 id="71-캐시-상태">7.1 캐시 상태</h3>
-<pre class="mermaid">stateDiagram-v2
+<h2>7. 자산 업로드 트랜잭션</h2>
+<h3>7.1 캐시 상태</h3>
+<pre><code class="language-mermaid">stateDiagram-v2
     [*] --&gt; Absent
     Absent --&gt; Recording: 목적 리소스 생성 + copy 기록
     Recording --&gt; Queued: 제출 성공
@@ -727,10 +982,11 @@ completed &gt;= 10 → Pool A reset 후 Available</code></pre>
     Queued --&gt; Resident: completion 통과
     Queued --&gt; Retiring: 사용 취소
     Resident --&gt; Retiring: 미사용/evict
-    Retiring --&gt; Absent: last-use completion 통과</pre>
+    Retiring --&gt; Absent: last-use completion 통과
+</code></pre>
 <p><code>GetOrUpload</code>가 같은 recording 안에서 다시 호출되면 기존 <code>Recording</code> 엔트리를
 재사용할 수 있다. 다른 recording/스레드에는 제출 여부가 명확한 상태만 공개한다.</p>
-<h3 id="72-메시-배치">7.2 메시 배치</h3>
+<h3>7.2 메시 배치</h3>
 <p>메시 하나의 staging은 다음 하나의 배치다.</p>
 <pre><code class="language-cpp">RHIUploadRequest requests[] = {
     { vertexBytes, RHIUploadUsage::VertexData },
@@ -738,13 +994,14 @@ completed &gt;= 10 → Pool A reset 후 Available</code></pre>
 };
 
 RHIBufferSlice slices[2];
-services.ReserveUploadBatch(requests, slices, error);</code></pre>
+services.ReserveUploadBatch(requests, slices, error);
+</code></pre>
 <p>실제 <code>scene.glb</code>는 20 MiB짜리 단일 메시가 아니라 유효 mesh 25개의 vertex/index
 누적 업로드가 21,626,436 B인 자산이다. 이 요청들이 같은 recording에서 regular
 segment를 즉시 확장해 모두 성공해야 한다. 단일 요청 dedicated-large 경로는 별도
 20 MiB fixture로 검증한다. 어느 경우에도 “한 프레임 실패 후 다음 프레임에 성장”은
 허용하지 않는다.</p>
-<h3 id="73-텍스처-배치">7.3 텍스처 배치</h3>
+<h3>7.3 텍스처 배치</h3>
 <ul>
 <li>DX12 footprint와 Vulkan <code>VkBufferImageCopy</code>는 backend가 계산한다.</li>
 <li>여러 mip/array slice의 전체 staging을 하나의 배치로 예약한다.</li>
@@ -755,18 +1012,16 @@ segment를 즉시 확장해 모두 성공해야 한다. 단일 요청 dedicated-
 크기에 맞춰 flush한다.</li>
 </ul>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-8-persistent-resource-heap-pool">
-<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-persistent-resource-heap-pool">8. Persistent Resource Heap Pool</h2></div>
-<div class="prose"><p>Transient upload 문제를 고친 뒤 buffer와 sampled asset texture를 persistent
+<h2>8. Persistent Resource Heap Pool</h2>
+<p>Transient upload 문제를 고친 뒤 buffer와 sampled asset texture를 persistent
 pool에 적용했다. render target/depth/UAV texture와 수명 종료점을 알 수 없는
 범용 생성 경로는 compatibility와 release 계약이 다르므로 적용 범위에서 제외했다.</p>
-<h3 id="81-공통-정책">8.1 공통 정책</h3>
+<h3>8.1 공통 정책</h3>
 <pre><code class="language-text">HeapSegment
   ├─ allocated block: resource handle + offset + size + alignment
   ├─ free block
-  └─ free block</code></pre>
+  └─ free block
+</code></pre>
 <ul>
 <li>주소순 free map: 앞뒤 병합용</li>
 <li>크기순 index: best-fit 검색용</li>
@@ -775,26 +1030,58 @@ pool에 적용했다. render target/depth/UAV texture와 수명 종료점을 알
 <li>completion 통과 후 resource object를 파괴하고 블록을 반환·병합</li>
 <li>완전히 빈 heap segment는 standby 또는 backend memory budget에 따라 반환</li>
 </ul>
-<h3 id="82-백엔드-매핑">8.2 백엔드 매핑</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>공통 개념</th><th>DX12</th><th>Vulkan</th></tr></thead>
-<tbody><tr><td>물리 세그먼트</td><td><code>ID3D12Heap</code></td><td><code>VkDeviceMemory</code></td></tr>
-<tr><td>서브할당 리소스</td><td><code>CreatePlacedResource</code></td><td><code>vkBindBufferMemory</code> / <code>vkBindImageMemory</code></td></tr>
-<tr><td>요구 정렬</td><td><code>GetResourceAllocationInfo</code></td><td><code>vkGet*MemoryRequirements2</code></td></tr>
-<tr><td>풀 분류</td><td><code>ALLOW_ONLY_BUFFERS</code> / <code>ALLOW_ONLY_NON_RT_DS_TEXTURES</code></td><td>memory type index + buffer/optimal-image class</td></tr>
-<tr><td>dedicated 조건</td><td>정책 임계치/특수 리소스</td><td><code>requiresDedicatedAllocation</code> 우선</td></tr>
-<tr><td>해제</td><td>resource object release 후 heap block 반환</td><td>buffer/image destroy 후 memory block 반환</td></tr></tbody></table></div>
+<h3>8.2 백엔드 매핑</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>공통 개념</th>
+<th>DX12</th>
+<th>Vulkan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>물리 세그먼트</td>
+<td><code>ID3D12Heap</code></td>
+<td><code>VkDeviceMemory</code></td>
+</tr>
+<tr>
+<td>서브할당 리소스</td>
+<td><code>CreatePlacedResource</code></td>
+<td><code>vkBindBufferMemory</code> / <code>vkBindImageMemory</code></td>
+</tr>
+<tr>
+<td>요구 정렬</td>
+<td><code>GetResourceAllocationInfo</code></td>
+<td><code>vkGet*MemoryRequirements2</code></td>
+</tr>
+<tr>
+<td>풀 분류</td>
+<td><code>ALLOW_ONLY_BUFFERS</code> / <code>ALLOW_ONLY_NON_RT_DS_TEXTURES</code></td>
+<td>memory type index + buffer/optimal-image class</td>
+</tr>
+<tr>
+<td>dedicated 조건</td>
+<td>정책 임계치/특수 리소스</td>
+<td><code>requiresDedicatedAllocation</code> 우선</td>
+</tr>
+<tr>
+<td>해제</td>
+<td>resource object release 후 heap block 반환</td>
+<td>buffer/image destroy 후 memory block 반환</td>
+</tr>
+</tbody></table></div>
 <p>공통 allocator가 DX12 heap flag나 Vulkan memory type bit를 해석하지 않는다.
 백엔드가 불투명 <code>compatibilityKey</code>, 크기, 정렬, dedicated 요구를 만들어 공통
 free-list 정책에 전달한다.</p>
-<h3 id="83-이동과-aliasing">8.3 이동과 aliasing</h3>
+<h3>8.3 이동과 aliasing</h3>
 <p>첫 구현에서는 살아 있는 리소스를 이동하거나 서로 겹쳐 배치하지 않는다.
 DX12 placed-resource aliasing에는 aliasing barrier가 필요하고 Vulkan에도 메모리
 alias 규칙이 있으므로, free-list 반환이 완료된 블록만 새 리소스에 쓴다.</p>
 <p>나중의 defragmentation은 다음 명시적 이주 트랜잭션으로만 가능하다.</p>
 <pre><code class="language-text">새 블록 할당 → GPU copy → 새 descriptor/version 게시
-→ 옛 handle 마지막 사용 completion 대기 → 옛 블록 반환</code></pre>
-<h3 id="84-구현된-buffertexture-수직-슬라이스">8.4 구현된 buffer·texture 수직 슬라이스</h3>
+→ 옛 handle 마지막 사용 completion 대기 → 옛 블록 반환
+</code></pre>
+<h3>8.4 구현된 buffer·texture 수직 슬라이스</h3>
 <ul>
 <li>공통 <code>RHIPersistentHeapPolicy</code>: 주소순/크기순 인덱스, best-fit, padding 분할,
 양쪽 병합, empty trim, slot generation, pooled/dedicated 통계.</li>
@@ -815,26 +1102,43 @@ completion 뒤 빈 segment trim, 새 할당의 dedicated fallback으로 처리�
 되며, 실제 budget 감소는 segment가 완전히 비어 trim될 때 일어난다.</li>
 </ul>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-9-descriptor와-sbt">
-<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-descriptor와-sbt">9. Descriptor와 SBT</h2></div>
-<div class="prose"><p>descriptor는 byte-addressable GPU heap과 네이티브 모델이 다르므로 persistent
+<h2>9. Descriptor와 SBT</h2>
+<p>descriptor는 byte-addressable GPU heap과 네이티브 모델이 다르므로 persistent
 resource heap에 억지로 합치지 않는다. 대신 완료점 기반 재활용 정책만 공유한다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>대상</th><th>DX12</th><th>Vulkan</th><th>공통 규칙</th></tr></thead>
-<tbody><tr><td>transient descriptor</td><td>shader-visible descriptor page</td><td>descriptor pool/set</td><td>제출 완료 전 reset/overwrite 금지</td></tr>
-<tr><td>persistent descriptor</td><td>CPU/GPU descriptor free-list</td><td>long-lived pool/set</td><td>last-use completion 뒤 반환</td></tr>
-<tr><td>SBT</td><td>buffer record</td><td>RT extension buffer record</td><td>제출 뒤 immutable, 새 버전으로 교체</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>DX12</th>
+<th>Vulkan</th>
+<th>공통 규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>transient descriptor</td>
+<td>shader-visible descriptor page</td>
+<td>descriptor pool/set</td>
+<td>제출 완료 전 reset/overwrite 금지</td>
+</tr>
+<tr>
+<td>persistent descriptor</td>
+<td>CPU/GPU descriptor free-list</td>
+<td>long-lived pool/set</td>
+<td>last-use completion 뒤 반환</td>
+</tr>
+<tr>
+<td>SBT</td>
+<td>buffer record</td>
+<td>RT extension buffer record</td>
+<td>제출 뒤 immutable, 새 버전으로 교체</td>
+</tr>
+</tbody></table></div>
 <p>현재 엔진에 RT 공통 경로가 없으므로 SBT 구현은 이번 업로드 allocator의 완료
 조건이 아니다. 다만 이후 도입 시 단일 가변 버퍼를 제자리 수정하는 설계는
 금지한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-10-파일-배치">
-<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-파일-배치">10. 파일 배치</h2></div>
-<div class="prose"><p>목표 배치는 다음과 같다. 이름은 구현 중 프로젝트 관례에 맞춰 조정할 수 있으나
+<h2>10. 파일 배치</h2>
+<p>목표 배치는 다음과 같다. 이름은 구현 중 프로젝트 관례에 맞춰 조정할 수 있으나
 의존 방향은 바꾸지 않는다.</p>
 <pre><code class="language-text">RenderEngine/RHI/
   RHIUploadTypes.h
@@ -853,7 +1157,8 @@ RenderEngine/RHI/Vulkan/
   VulkanUploadSegmentAllocator.h/.cpp
   VulkanSubmissionCoordinator.h/.cpp
   VulkanCommandPoolRecycler.h/.cpp
-  VulkanPersistentHeap.h/.cpp</code></pre>
+  VulkanPersistentHeap.h/.cpp
+</code></pre>
 <p>다음 구체 타입은 공통 패스와 캐시 표면에서 제거한다.</p>
 <ul>
 <li><code>DX12UploadRing</code></li>
@@ -864,12 +1169,9 @@ RenderEngine/RHI/Vulkan/
 <p><code>RHIBufferSlice</code>는 ring 조각이 아니라 임의 RHI buffer의 범위를 뜻하도록 이름과
 주석을 바로잡되 타입 자체는 유지한다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-11-구현-순서">
-<div class="sec-head"><p class="ve-label">§11</p><h2 id="11-구현-순서">11. 구현 순서</h2></div>
-<div class="prose"><p>각 단계는 <strong>DX12와 Vulkan을 함께 구현하고 함께 검증</strong>해야 닫힌다.</p>
-<h3 id="slice-a--공통-수명-골격">Slice A — 공통 수명 골격</h3>
+<h2>11. 구현 순서</h2>
+<p>각 단계는 <strong>DX12와 Vulkan을 함께 구현하고 함께 검증</strong>해야 닫힌다.</p>
+<h3>Slice A — 공통 수명 골격</h3>
 <p>구현 완료.</p>
 <ol>
 <li>의미 기반 <code>RHIUploadRequest</code>와 배치 예약 계약 추가</li>
@@ -878,7 +1180,7 @@ RenderEngine/RHI/Vulkan/
 <li>raw queue 제출 위치를 inventory하고 coordinator 경유로 전환</li>
 <li>RHI <code>AbortFrame</code> 계약 추가</li>
 </ol>
-<h3 id="slice-b--양쪽-transient-allocator">Slice B — 양쪽 transient allocator</h3>
+<h3>Slice B — 양쪽 transient allocator</h3>
 <p>구현 완료. CAS fast path, stable registry slot reuse, backend budget과 trim 정책까지
 포함한다.</p>
 <ol>
@@ -888,22 +1190,57 @@ RenderEngine/RHI/Vulkan/
 <li>양쪽 constant/texture upload를 새 API로 전환</li>
 <li>양쪽 기존 upload ring 제거</li>
 </ol>
-<h3 id="slice-c--자산-트랜잭션">Slice C — 자산 트랜잭션</h3>
+<h3>Slice C — 자산 트랜잭션</h3>
 <p>현재 DX12 live mesh/texture와 Vulkan texture 소비 경로, 중립
 <code>VulkanMeshCache</code>, 실제 <code>scene.glb</code> indexed-draw fixture 및 editor Vulkan
 <code>TickLive</code> 연결까지 구현했다. ImGui의 DX12/Vulkan 자산 descriptor와
 <code>VulkanTextureCache</code>도 미사용 프레임을 완료점 graveyard로 옮기는 경로를 갖는다.
 기존 release 지점 전수 조사와 공통 retire queue 통합도 완료했다.</p>
-<h4 id="release-지점-전수-조사-판정">Release 지점 전수 조사 판정</h4>
-<div class="table-scroll"><table>
-<thead><tr><th>분류</th><th>대상</th><th>판정</th></tr></thead>
-<tbody><tr><td>completion 묘지</td><td>DX12/Vulkan mesh·texture cache 4곳</td><td>공통 <code>RHICompletionRetireQueue</code>로 이관</td></tr>
-<tr><td>descriptor 묘지</td><td>DX12/Vulkan ImGui shell 2곳</td><td>같은 큐로 이관, descriptor와 직접 소유 image를 함께 보관</td></tr>
-<tr><td>transient upload/descriptor</td><td>segment allocator, versioned page/pool recycler</td><td>submission completion 뒤 재사용</td></tr>
-<tr><td>render-graph transient</td><td>camera display slot의 graph</td><td>해당 slot completion 확인 뒤 <code>reset</code></td></tr>
-<tr><td><span class="chip risk">생성 실패·Abort</span></td><td>cache upload rollback</td><td>제출 전이므로 즉시 반환 유지</td></tr>
-<tr><td>pipeline/cache shutdown</td><td>pass, IBL, readback, resident cache</td><td>owner가 <code>WaitForGpu</code>한 뒤 즉시 파괴 유지</td></tr>
-<tr><td>외부 interop</td><td>DX12 shared texture/handle</td><td>GPU fence만으로 외부 소비 종료를 증명할 수 없어 <code>ExternalInteropRetired</code>로 분리, renderer teardown에서만 해제</td></tr></tbody></table></div>
+<h4>Release 지점 전수 조사 판정</h4>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>분류</th>
+<th>대상</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>completion 묘지</td>
+<td>DX12/Vulkan mesh·texture cache 4곳</td>
+<td>공통 <code>RHICompletionRetireQueue</code>로 이관</td>
+</tr>
+<tr>
+<td>descriptor 묘지</td>
+<td>DX12/Vulkan ImGui shell 2곳</td>
+<td>같은 큐로 이관, descriptor와 직접 소유 image를 함께 보관</td>
+</tr>
+<tr>
+<td>transient upload/descriptor</td>
+<td>segment allocator, versioned page/pool recycler</td>
+<td>submission completion 뒤 재사용</td>
+</tr>
+<tr>
+<td>render-graph transient</td>
+<td>camera display slot의 graph</td>
+<td>해당 slot completion 확인 뒤 <code>reset</code></td>
+</tr>
+<tr>
+<td>생성 실패·Abort</td>
+<td>cache upload rollback</td>
+<td>제출 전이므로 즉시 반환 유지</td>
+</tr>
+<tr>
+<td>pipeline/cache shutdown</td>
+<td>pass, IBL, readback, resident cache</td>
+<td>owner가 <code>WaitForGpu</code>한 뒤 즉시 파괴 유지</td>
+</tr>
+<tr>
+<td>외부 interop</td>
+<td>DX12 shared texture/handle</td>
+<td>GPU fence만으로 외부 소비 종료를 증명할 수 없어 <code>ExternalInteropRetired</code>로 분리, renderer teardown에서만 해제</td>
+</tr>
+</tbody></table></div>
 <p>큐는 owner별 인스턴스로 둔다. 중앙 큐에 backend 파괴 callback을 넣으면 cache가
 먼저 죽은 뒤 callback이 실행될 수 있으므로, <strong>정책과 상태 전이만 공통화하고
 payload 파괴는 살아 있는 owner가 수행</strong>한다.</p>
@@ -914,7 +1251,7 @@ payload 파괴는 살아 있는 owner가 수행</strong>한다.</p>
 <li>Abort와 제출 실패 rollback 연결</li>
 <li>기존 frame-count graveyard를 completion 기반 공통 정책으로 이동</li>
 </ol>
-<h3 id="slice-d--persistent-heap">Slice D — persistent heap</h3>
+<h3>Slice D — persistent heap</h3>
 <ol>
 <li>✔ buffer부터 placed/bound suballocation 적용</li>
 <li>✔ texture compatibility pool 추가</li>
@@ -922,8 +1259,8 @@ payload 파괴는 살아 있는 owner가 수행</strong>한다.</p>
 <li>✔ committed/dedicated fallback 및 soft-budget 정책/통계 추가</li>
 <li>✔ 실제 backend memory-budget source를 persistent heap에 연결</li>
 </ol>
-<h3 id="slice-e--descriptorsbt-확장">Slice E — descriptor/SBT 확장</h3>
-<h4 id="slice-e-a--transient-descriptor-versioned-recycler-">Slice E-a — transient descriptor versioned recycler ✔</h4>
+<h3>Slice E — descriptor/SBT 확장</h3>
+<h4>Slice E-a — transient descriptor versioned recycler ✔</h4>
 <ol>
 <li>공통 <code>RHIDescriptorVersionPolicy</code>의 completion/Abort/quarantine/generation 계약</li>
 <li>DX12 recording 전용 shader-visible heap page와 stale table version 차단</li>
@@ -931,10 +1268,10 @@ payload 파괴는 살아 있는 owner가 수행</strong>한다.</p>
 <li>중간 제출마다 새 version으로 전환하고 완료 뒤에만 reset·재사용</li>
 <li>page/pool 고갈 시 pending version을 건드리지 않고 새 version 성장</li>
 </ol>
-<h4 id="slice-e-b--sbt-versioned-recycler">Slice E-b — SBT versioned recycler</h4>
+<h4>Slice E-b — SBT versioned recycler</h4>
 <p>실제 공통 RT 소비 경로가 생길 때 같은 completion 계약으로 구현한다. 사용처가
 없는 범용 SBT allocator를 먼저 만들지는 않는다.</p>
-<h3 id="남은-구현-목록">남은 구현 목록</h3>
+<h3>남은 구현 목록</h3>
 <p>우선순위는 다음과 같다.</p>
 <ol>
 <li>✔ editor Vulkan <code>TickLive</code>와 <code>IRenderMeshCache</code> 실제 scene pass 연결.</li>
@@ -949,11 +1286,8 @@ relocation 경로와 성능 근거가 생길 때 별도 단계로 검토한다.<
 확장했다. SBT는 실제 공통 RT 소비 경로가 생길 때 같은 정책을 적용한다.</li>
 </ol>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-12-검증-기준">
-<div class="sec-head"><p class="ve-label">§12</p><h2 id="12-검증-기준">12. 검증 기준</h2></div>
-<div class="prose"><h3 id="121-공통-allocator-contract-test">12.1 공통 allocator contract test</h3>
+<h2>12. 검증 기준</h2>
+<h3>12.1 공통 allocator contract test</h3>
 <p>동일 테스트를 DX12와 Vulkan adapter에 인스턴스화한다.</p>
 <ul>
 <li>usage별 정렬 충족</li>
@@ -970,18 +1304,57 @@ relocation 경로와 성능 근거가 생길 때 별도 단계로 검토한다.<
 <li>병렬 예약 범위 중복 0</li>
 <li>OOM에서 기존 cursor와 출력 불변</li>
 </ul>
-<h3 id="122-백엔드-검증">12.2 백엔드 검증</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>검사</th><th>DX12</th><th>Vulkan</th></tr></thead>
-<tbody><tr><td>API 진단</td><td>debug layer + DRED</td><td>validation layer</td></tr>
-<tr><td><span class="chip ok">완료 primitive</span></td><td>fence 값</td><td>timeline semaphore 값</td></tr>
-<tr><td>large texture</td><td>128 MiB staging fixture</td><td>동일 fixture</td></tr>
-<tr><td>multi-submit</td><td>wait 없는 3회 flush</td><td>wait 없는 3회 flush</td></tr>
-<tr><td>parallel fast path</td><td>8 worker/64 MiB, 범위 중복 0, worker growth</td><td>동일 fixture와 판정</td></tr>
-<tr><td>pressure trim</td><td>강제 16 MiB soft budget, trim/retry/slot reuse/high-water/rollback</td><td>동일 fixture와 판정</td></tr>
-<tr><td>Abort</td><td>제출 전/후</td><td>제출 전/후</td></tr>
-<tr><td>기존 회귀</td><td><code>dx12.uploadring</code>을 새 <code>rhi.uploadsegments</code>로 교체 <strong>(2026-09-06 완료 — 구 명령 제거됨)</strong></td><td><code>vk.selftest</code>, <code>vk.gizmoicon</code>에 같은 검사 추가</td></tr></tbody></table></div>
-<h3 id="123-sceneglb-승인-조건">12.3 <code>scene.glb</code> 승인 조건</h3>
+<h3>12.2 백엔드 검증</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>DX12</th>
+<th>Vulkan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>API 진단</td>
+<td>debug layer + DRED</td>
+<td>validation layer</td>
+</tr>
+<tr>
+<td>완료 primitive</td>
+<td>fence 값</td>
+<td>timeline semaphore 값</td>
+</tr>
+<tr>
+<td>large texture</td>
+<td>128 MiB staging fixture</td>
+<td>동일 fixture</td>
+</tr>
+<tr>
+<td>multi-submit</td>
+<td>wait 없는 3회 flush</td>
+<td>wait 없는 3회 flush</td>
+</tr>
+<tr>
+<td>parallel fast path</td>
+<td>8 worker/64 MiB, 범위 중복 0, worker growth</td>
+<td>동일 fixture와 판정</td>
+</tr>
+<tr>
+<td>pressure trim</td>
+<td>강제 16 MiB soft budget, trim/retry/slot reuse/high-water/rollback</td>
+<td>동일 fixture와 판정</td>
+</tr>
+<tr>
+<td>Abort</td>
+<td>제출 전/후</td>
+<td>제출 전/후</td>
+</tr>
+<tr>
+<td>기존 회귀</td>
+<td><code>dx12.uploadring</code>을 새 <code>rhi.uploadsegments</code>로 교체 <strong>(2026-09-06 완료 — 구 명령 제거됨)</strong></td>
+<td><code>vk.selftest</code>, <code>vk.gizmoicon</code>에 같은 검사 추가</td>
+</tr>
+</tbody></table></div>
+<h3>12.3 <code>scene.glb</code> 승인 조건</h3>
 <ul>
 <li>실제 자산의 유효 mesh 25개, 누적 vertex/index 21,626,436 B가 같은 recording의
 <strong>첫 업로드에서 모두 성공</strong>한다.</li>
@@ -995,7 +1368,7 @@ binding으로 indexed draw와 pixel을 확인한다. 이 중립 경로는 완료
 route가 생기기 전에는 Vulkan editor scene 동등성을 완료했다고 보고하지 않는다.</li>
 <li>양쪽 validation/debug message warning 이상 0.</li>
 </ul>
-<h3 id="124-관측값">12.4 관측값</h3>
+<h3>12.4 관측값</h3>
 <p><code>dx12.live status</code>와 Vulkan self-test 로그에 같은 이름으로 출력한다.</p>
 <pre><code class="language-text">upload.activeSegments / activeBytes
 upload.pendingSegments / pendingBytes
@@ -1014,15 +1387,13 @@ upload.registrySlotReuses / registryHighWater
 upload.oldestPendingValue
 upload.reclaimLag
 assetEviction.pressurePasses / pressureRetired / pressureRetiredBytes
-assetEviction.pressureProtectedRecent / pressureUploadPending</code></pre>
+assetEviction.pressureProtectedRecent / pressureUploadPending
+</code></pre>
 <p>백엔드별 전용 수치가 필요하면 공통 수치 뒤에 별도로 붙인다. 서로 다른 의미의
 수치를 같은 이름으로 보고하지 않는다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-13-금지-규칙">
-<div class="sec-head"><p class="ve-label">§13</p><h2 id="13-금지-규칙">13. 금지 규칙</h2></div>
-<div class="prose"><p>구현과 리뷰에서 다음을 기계적으로 확인한다.</p>
+<h2>13. 금지 규칙</h2>
+<p>구현과 리뷰에서 다음을 기계적으로 확인한다.</p>
 <ol>
 <li>공통 RHI 헤더에 <code>ID3D12*</code>, <code>D3D12_*</code>, <code>Vk*</code> 타입을 넣지 않는다.</li>
 <li><code>DeviceResources</code>/submission coordinator 밖에서 raw queue submit을 하지 않는다.</li>
@@ -1034,11 +1405,8 @@ assetEviction.pressureProtectedRecent / pressureUploadPending</code></pre>
 <li>구현 완료를 한 백엔드의 빌드 또는 테스트만으로 판정하지 않는다.</li>
 </ol>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-14-최종-판정">
-<div class="sec-head"><p class="ve-label">§14</p><h2 id="14-최종-판정">14. 최종 판정</h2></div>
-<div class="prose"><p>링 버퍼의 핵심 장점은 선형 할당 자체가 아니라 <strong>언제 앞부분을 다시 써도 되는지
+<h2>14. 최종 판정</h2>
+<p>링 버퍼의 핵심 장점은 선형 할당 자체가 아니라 <strong>언제 앞부분을 다시 써도 되는지
 알 수 있다는 것</strong>이다. CreatorEngine은 이미 DX12 fence와 Vulkan timeline으로
 그 답을 직접 얻을 수 있다. 따라서 고정 원형 주소 공간과 프레임 슬롯 소유권은
 필수가 아니다.</p>
@@ -1052,11 +1420,8 @@ assetEviction.pressureProtectedRecent / pressureUploadPending</code></pre>
 동일하게 유지한다.</li>
 </ul>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-15-공식-참고-자료">
-<div class="sec-head"><p class="ve-label">§15</p><h2 id="15-공식-참고-자료">15. 공식 참고 자료</h2></div>
-<div class="prose"><ul>
+<h2>15. 공식 참고 자료</h2>
+<ul>
 <li><a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals">.NET GC fundamentals</a></li>
 <li><a href="https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/large-object-heap">.NET Large Object Heap</a></li>
 <li><a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/fence-based-resource-management">D3D12 Fence-Based Resource Management</a></li>
@@ -1067,43 +1432,344 @@ assetEviction.pressureProtectedRecent / pressureUploadPending</code></pre>
 <li><a href="https://docs.vulkan.org/samples/latest/samples/extensions/timeline_semaphore/README.html">Vulkan Timeline Semaphores</a></li>
 <li><a href="https://youtu.be/Sew_XGPAVM4?si=LqQsSUOLymmVfqaZ">참고 영상</a></li>
 </ul>
-</div>
-</section>
-<section class="sources" aria-label="출처">
-<p class="ve-label">출처</p>
-<p><a href="RhiGpuMemoryLifetimeDesign.md"><code>docs/design/RhiGpuMemoryLifetimeDesign.md</code></a> · 마지막 커밋 2026-09-06 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
-</section>
-</main>
-</div>
-<script>
-(() => {
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
-  if (links.length) {
-    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
-    const spy = new IntersectionObserver(entries => {
-      for (const e of entries) if (e.isIntersecting) {
-        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
-      }
-    }, { rootMargin: '0px 0px -70% 0px' });
-    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
-  }
-  if (still) return;
-  document.documentElement.classList.add('js-motion');
-  const io = new IntersectionObserver(entries => {
-    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
-  }, { rootMargin: '0px 0px -5% 0px' });
-  for (const el of document.querySelectorAll('main > *')) io.observe(el);
-})();
-</script>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="0-결정-요약"></span><span id="1-현재-코드에서-확인한-문제"></span><span id="10-파일-배치"></span><span id="11-구현-순서"></span><span id="11-업로드-경로의-비대칭과-고정-상한"></span><span id="12-sceneglb-대형-메시가-사라지는-직접-경로"></span><span id="12-검증-기준"></span><span id="121-공통-allocator-contract-test"></span><span id="122-백엔드-검증"></span><span id="123-sceneglb-승인-조건"></span><span id="124-관측값"></span><span id="13-금지-규칙"></span><span id="13-제출보다-먼저-resident가-되는-캐시"></span><span id="14-제출-추적의-구멍"></span><span id="14-최종-판정"></span><span id="15-공식-참고-자료"></span><span id="15-프레임-수-기반-수명은-안전-판정이-아니다"></span><span id="2-차용할-것과-차용하지-않을-것"></span><span id="21-net-gc에서-차용할-것"></span><span id="22-차용하지-않을-것"></span><span id="23-영상의-관리-기법에서-차용할-것"></span><span id="3-목표-구조"></span><span id="4-rhi-계약"></span><span id="41-의미-기반-업로드-요청"></span><span id="42-배치-예약"></span><span id="43-완료점"></span><span id="44-allocator-내부-계약"></span><span id="5-transient-upload-segment-pool"></span><span id="51-세그먼트-상태"></span><span id="52-크기-분류"></span><span id="53-할당-알고리즘"></span><span id="54-병렬-기록"></span><span id="55-trim"></span><span id="6-제출과-abort의-단일-소유자"></span><span id="61-submission-coordinator"></span><span id="62-vulkan-중간-제출"></span><span id="63-abort"></span><span id="7-자산-업로드-트랜잭션"></span><span id="71-캐시-상태"></span><span id="72-메시-배치"></span><span id="73-텍스처-배치"></span><span id="8-persistent-resource-heap-pool"></span><span id="81-공통-정책"></span><span id="82-백엔드-매핑"></span><span id="83-이동과-aliasing"></span><span id="84-구현된-buffertexture-수직-슬라이스"></span><span id="9-descriptor와-sbt"></span><span id="release-지점-전수-조사-판정"></span><span id="sec-0-결정-요약"></span><span id="sec-1-현재-코드에서-확인한-문제"></span><span id="sec-10-파일-배치"></span><span id="sec-11-구현-순서"></span><span id="sec-12-검증-기준"></span><span id="sec-13-금지-규칙"></span><span id="sec-14-최종-판정"></span><span id="sec-15-공식-참고-자료"></span><span id="sec-2-차용할-것과-차용하지-않을-것"></span><span id="sec-3-목표-구조"></span><span id="sec-4-rhi-계약"></span><span id="sec-5-transient-upload-segment-pool"></span><span id="sec-6-제출과-abort의-단일-소유자"></span><span id="sec-7-자산-업로드-트랜잭션"></span><span id="sec-8-persistent-resource-heap-pool"></span><span id="sec-9-descriptor와-sbt"></span><span id="slice-a--공통-수명-골격"></span><span id="slice-b--양쪽-transient-allocator"></span><span id="slice-c--자산-트랜잭션"></span><span id="slice-d--persistent-heap"></span><span id="slice-e--descriptorsbt-확장"></span><span id="slice-e-a--transient-descriptor-versioned-recycler-"></span><span id="slice-e-b--sbt-versioned-recycler"></span><span id="남은-구현-목록"></span></details></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
 
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
-  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
-  mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict', fontFamily: v('--font-body'),
-    themeVariables: { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'),
-      lineColor: v('--text-dim'), secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') } });
-  await mermaid.run({ querySelector: 'pre.mermaid' });
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
 </script>
-</body>
-</html>
+</body></html>

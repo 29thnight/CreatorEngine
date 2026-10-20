@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 살아 있는 화면 split-sum 근사의 Blender 차이 — 2026-10-04</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9SplitSumLiveLookupDifference.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9SplitSumLiveLookupDifference.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 살아 있는 화면 split-sum 근사의 Blender 차이 — 2026-10-04</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_matched_image_probe.cpp#L234">Tools/regression/material_matched_image_probe.cpp:234</a> — <code>CheckWith(assets::ReadCookedEnvironment(value.file, value.cooked, error), &quot;Matched cooked environment &quot;, error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_matched_image_probe.cpp#L277">Tools/regression/material_matched_image_probe.cpp:277</a> — <code>lookupBudget.lookupApproximate=std::getenv(&quot;CREATOR_MAT9_LOOKUP_APPROXIMATE&quot;)!=nullptr;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_matched_image_probe.cpp#L321">Tools/regression/material_matched_image_probe.cpp:321</a> — <code>const auto uploaded = textures.GetOrUpload((cube ? &amp;*cube.borrow() : nullptr), cube ? cube-&gt;NonRehydratableImage() : own::shared_owner&lt;const Texture::CodecImage&gt;{}, error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12">Tools/regression/measure-material-blender-images.ps1:12</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15">Tools/regression/measure-material-blender-images.ps1:15</a> — <code>$Reference=[IO.Path]::GetFullPath($Reference)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49">Tools/regression/measure-material-blender-images.ps1:49</a> — <code>if($ReferenceRepeat) { $comparisonArguments+=@(&#39;--reference-repeat&#39;,[IO.Path]::GetFullPath($ReferenceRepeat)) }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>판정</h2>
+<p>이 기록은 <strong>통과 판정이 아니라 차이 표기</strong>다. 2026-10-04 결정(계획서 §5 같은 날짜 절)으로
+살아 있는 화면의 재질 IBL 룩업은 split-sum 근사(PR #117, <code>23a393cb</code>)만 쓰고, Blender 대비 차이를
+%로 적고 넘어간다. 기준 적분 경로(<code>lookupApproximate = false</code>, BRDF 1024 / environment 4096)의 수용
+상한(RMS≤1%·p95≤1%·max≤5%)은 근사 경로에 적용하지 않는다.</p>
+<p>같은 소스(<code>2ee83fcd</code> + 아래 도구 수정), 같은 Release DX12 탐침·고정 장면·target으로 두 경로를 찍었다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>묶음</th>
+<th align="right">조건</th>
+<th align="right">기준 RMS 평균 / 최대</th>
+<th align="right">근사 RMS 평균 / 최대</th>
+<th>근사 최대 조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>평행광·균일 환경 (<code>material-matched-5.1.1</code>)</td>
+<td align="right">24</td>
+<td align="right">0.08% / 0.18%</td>
+<td align="right">1.94% / 14.27%</td>
+<td><code>furnace-layer_thin_film</code></td>
+</tr>
+<tr>
+<td>HDRI forest·autumn (<code>Mat9Hdri-v5-dense-0</code>, 반복 시드 11)</td>
+<td align="right">26</td>
+<td align="right">0.30% / 0.50%</td>
+<td align="right">8.97% / 60.42%</td>
+<td><code>autumn-layer_anisotropic</code></td>
+</tr>
+<tr>
+<td>특수 부피 (<code>Mat9SpecialVolumeReference-0</code>, 반복 시드 11)</td>
+<td align="right">8</td>
+<td align="right">0.07% / 0.10%</td>
+<td align="right">0.07% / 0.10%</td>
+<td>차이 없음</td>
+</tr>
+<tr>
+<td>특수 표면 SSS·유리 (<code>Mat9SpecialSurfaceReference-0</code>, 반복 시드 11)</td>
+<td align="right">18</td>
+<td align="right">5.63% / 34.79%</td>
+<td align="right">5.64% / 34.79%</td>
+<td>거의 같음(<code>furnace-special_subsurface_off</code> +0.37%p)</td>
+</tr>
+</tbody></table></div>
+<p>기준 경로 수치는 10-01 기록(방향광·균일 환경 최대 0.1792%, HDRI 최대 0.4959%)과 같은 수준이고,
+특수 표면 18장은 10-01 결과와 이미지 SHA-256 까지 같다. 그사이 기준 경로는 바뀌지 않았다.
+특수 표면의 큰 값(투과·유리 34%)은 10-01 부터 남은 폐곡면 투과 미수용이며 근사와 무관하다.</p>
+<h2>읽는 법</h2>
+<ul>
+<li><strong>평행광 조건은 두 경로가 같다.</strong> 환경광이 없으니 룩업 근사가 끼어들 자리가 없다.
+부피도 룩업을 쓰지 않아 같다. 특수 표면(SSS·유리·투과)도 거의 같다 — 그 전송 경로는
+자기 준비 적분을 쓰고, 근사가 닿는 것은 위에 얹힌 반사 성분뿐이다.</li>
+<li><strong>환경광을 받는 거친 유전체(기본·거칠기·법선·쉰)는 1&#126;3%</strong> 대다.</li>
+<li><strong>금속은 균일 환경 9.45%, HDRI 24.69&#126;27.61%.</strong> split-sum 은 반사 방향 하나의 prefiltered 조회로
+로브 전체를 대신하므로, 밝기 차가 큰 HDRI 에서 금속 반사가 크게 갈린다.</li>
+<li><strong>이방성은 균일 환경 13.96%, HDRI 31.15&#126;60.42%.</strong> split-sum 에 이방성 로브가 없다.</li>
+<li><strong>박막은 균일 환경 14.27%, HDRI 15.88&#126;21.20%.</strong> 해석적 DFG(EnvBRDFApprox)에 박막 간섭이 없다.</li>
+<li><strong>코트·혼합은 HDRI 에서 6.11&#126;16.65%.</strong> 위 세 원인이 겹친다.</li>
+<li>max normalized 는 몇 픽셀의 하이라이트가 좌우한다(autumn 이방성 232.69%). 평균 감각은 RMS 로 읽는다.</li>
+</ul>
+<h2>묶음별 수치 (%)</h2>
+<h3>평행광·균일 환경 24조건</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">기준 RMS</th>
+<th align="right">근사 RMS</th>
+<th align="right">근사 p95</th>
+<th align="right">근사 max</th>
+<th align="right">근사−기준 RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sun-core_base</code></td>
+<td align="right">0.04</td>
+<td align="right">0.04</td>
+<td align="right">0.01</td>
+<td align="right">0.02</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-core_metal</code></td>
+<td align="right">0.07</td>
+<td align="right">0.07</td>
+<td align="right">0.00</td>
+<td align="right">0.44</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-core_rough</code></td>
+<td align="right">0.04</td>
+<td align="right">0.04</td>
+<td align="right">0.01</td>
+<td align="right">0.01</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-core_normal</code></td>
+<td align="right">0.04</td>
+<td align="right">0.04</td>
+<td align="right">0.01</td>
+<td align="right">0.03</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-core_emission</code></td>
+<td align="right">0.05</td>
+<td align="right">0.05</td>
+<td align="right">0.07</td>
+<td align="right">0.08</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-layer_coat</code></td>
+<td align="right">0.07</td>
+<td align="right">0.07</td>
+<td align="right">0.01</td>
+<td align="right">0.12</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-layer_sheen</code></td>
+<td align="right">0.04</td>
+<td align="right">0.04</td>
+<td align="right">0.01</td>
+<td align="right">0.01</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-layer_anisotropic</code></td>
+<td align="right">0.07</td>
+<td align="right">0.07</td>
+<td align="right">0.01</td>
+<td align="right">0.14</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-layer_thin_film</code></td>
+<td align="right">0.10</td>
+<td align="right">0.10</td>
+<td align="right">0.01</td>
+<td align="right">0.20</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-layer_mixed</code></td>
+<td align="right">0.07</td>
+<td align="right">0.07</td>
+<td align="right">0.01</td>
+<td align="right">0.13</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-control_white</code></td>
+<td align="right">0.04</td>
+<td align="right">0.04</td>
+<td align="right">0.02</td>
+<td align="right">0.02</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-core_base</code></td>
+<td align="right">0.13</td>
+<td align="right">1.65</td>
+<td align="right">1.54</td>
+<td align="right">1.83</td>
+<td align="right">1.52</td>
+</tr>
+<tr>
+<td><code>furnace-core_metal</code></td>
+<td align="right">0.09</td>
+<td align="right">9.45</td>
+<td align="right">7.78</td>
+<td align="right">7.86</td>
+<td align="right">9.36</td>
+</tr>
+<tr>
+<td><code>furnace-core_rough</code></td>
+<td align="right">0.13</td>
+<td align="right">0.38</td>
+<td align="right">0.52</td>
+<td align="right">0.93</td>
+<td align="right">0.25</td>
+</tr>
+<tr>
+<td><code>furnace-core_normal</code></td>
+<td align="right">0.12</td>
+<td align="right">1.21</td>
+<td align="right">1.53</td>
+<td align="right">1.89</td>
+<td align="right">1.09</td>
+</tr>
+<tr>
+<td><code>furnace-core_emission</code></td>
+<td align="right">0.04</td>
+<td align="right">0.30</td>
+<td align="right">0.79</td>
+<td align="right">0.98</td>
+<td align="right">0.26</td>
+</tr>
+<tr>
+<td><code>furnace-layer_coat</code></td>
+<td align="right">0.15</td>
+<td align="right">1.80</td>
+<td align="right">1.59</td>
+<td align="right">2.19</td>
+<td align="right">1.65</td>
+</tr>
+<tr>
+<td><code>furnace-layer_sheen</code></td>
+<td align="right">0.17</td>
+<td align="right">1.61</td>
+<td align="right">1.21</td>
+<td align="right">1.43</td>
+<td align="right">1.43</td>
+</tr>
+<tr>
+<td><code>furnace-layer_anisotropic</code></td>
+<td align="right">0.17</td>
+<td align="right">13.96</td>
+<td align="right">10.97</td>
+<td align="right">11.14</td>
+<td align="right">13.79</td>
+</tr>
+<tr>
+<td><code>furnace-layer_thin_film</code></td>
+<td align="right">0.18</td>
+<td align="right">14.27</td>
+<td align="right">12.08</td>
+<td align="right">12.39</td>
+<td align="right">14.09</td>
+</tr>
+<tr>
+<td><code>furnace-layer_mixed</code></td>
+<td align="right">0.12</td>
+<td align="right">1.15</td>
+<td align="right">1.27</td>
+<td align="right">1.76</td>
+<td align="right">1.03</td>
+</tr>
+<tr>
+<td><code>furnace-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-control_white</code></td>
+<td align="right">0.07</td>
+<td align="right">0.07</td>
+<td align="right">0.10</td>
+<td align="right">0.20</td>
+<td align="right">0.00</td>
+</tr>
+</tbody></table></div>
+<h3>HDRI 26조건</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">기준 RMS</th>
+<th align="right">근사 RMS</th>
+<th align="right">근사 p95</th>
+<th align="right">근사 max</th>
+<th align="right">근사−기준 RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>forest-core_base</code></td>
+<td align="right">0.31</td>
+<td align="right">1.52</td>
+<td align="right">0.81</td>
+<td align="right">1.64</td>
+<td align="right">1.21</td>
+</tr>
+<tr>
+<td><code>forest-core_metal</code></td>
+<td align="right">0.28</td>
+<td align="right">24.69</td>
+<td align="right">10.02</td>
+<td align="right">31.77</td>
+<td align="right">24.41</td>
+</tr>
+<tr>
+<td><code>forest-core_rough</code></td>
+<td align="right">0.33</td>
+<td align="right">0.71</td>
+<td align="right">0.39</td>
+<td align="right">0.67</td>
+<td align="right">0.38</td>
+</tr>
+<tr>
+<td><code>forest-core_normal</code></td>
+<td align="right">0.32</td>
+<td align="right">1.10</td>
+<td align="right">0.84</td>
+<td align="right">1.69</td>
+<td align="right">0.78</td>
+</tr>
+<tr>
+<td><code>forest-core_emission</code></td>
+<td align="right">0.02</td>
+<td align="right">0.12</td>
+<td align="right">0.36</td>
+<td align="right">0.87</td>
+<td align="right">0.09</td>
+</tr>
+<tr>
+<td><code>forest-layer_coat</code></td>
+<td align="right">0.29</td>
+<td align="right">6.11</td>
+<td align="right">1.03</td>
+<td align="right">19.66</td>
+<td align="right">5.82</td>
+</tr>
+<tr>
+<td><code>forest-layer_sheen</code></td>
+<td align="right">0.32</td>
+<td align="right">1.91</td>
+<td align="right">0.90</td>
+<td align="right">1.77</td>
+<td align="right">1.58</td>
+</tr>
+<tr>
+<td><code>forest-layer_anisotropic</code></td>
+<td align="right">0.48</td>
+<td align="right">31.15</td>
+<td align="right">18.63</td>
+<td align="right">68.55</td>
+<td align="right">30.67</td>
+</tr>
+<tr>
+<td><code>forest-layer_thin_film</code></td>
+<td align="right">0.25</td>
+<td align="right">15.88</td>
+<td align="right">9.34</td>
+<td align="right">13.55</td>
+<td align="right">15.64</td>
+</tr>
+<tr>
+<td><code>forest-layer_mixed</code></td>
+<td align="right">0.30</td>
+<td align="right">2.22</td>
+<td align="right">0.87</td>
+<td align="right">5.06</td>
+<td align="right">1.92</td>
+</tr>
+<tr>
+<td><code>forest-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>forest-control_white</code></td>
+<td align="right">0.36</td>
+<td align="right">0.36</td>
+<td align="right">0.30</td>
+<td align="right">0.70</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>forest-control_mirror</code></td>
+<td align="right">0.47</td>
+<td align="right">2.68</td>
+<td align="right">2.22</td>
+<td align="right">15.01</td>
+<td align="right">2.21</td>
+</tr>
+<tr>
+<td><code>autumn-core_base</code></td>
+<td align="right">0.38</td>
+<td align="right">1.49</td>
+<td align="right">1.38</td>
+<td align="right">3.70</td>
+<td align="right">1.12</td>
+</tr>
+<tr>
+<td><code>autumn-core_metal</code></td>
+<td align="right">0.50</td>
+<td align="right">27.61</td>
+<td align="right">3.40</td>
+<td align="right">56.38</td>
+<td align="right">27.11</td>
+</tr>
+<tr>
+<td><code>autumn-core_rough</code></td>
+<td align="right">0.38</td>
+<td align="right">0.86</td>
+<td align="right">0.76</td>
+<td align="right">1.10</td>
+<td align="right">0.48</td>
+</tr>
+<tr>
+<td><code>autumn-core_normal</code></td>
+<td align="right">0.37</td>
+<td align="right">1.18</td>
+<td align="right">1.22</td>
+<td align="right">5.13</td>
+<td align="right">0.81</td>
+</tr>
+<tr>
+<td><code>autumn-core_emission</code></td>
+<td align="right">0.03</td>
+<td align="right">0.19</td>
+<td align="right">0.55</td>
+<td align="right">2.17</td>
+<td align="right">0.17</td>
+</tr>
+<tr>
+<td><code>autumn-layer_coat</code></td>
+<td align="right">0.36</td>
+<td align="right">16.65</td>
+<td align="right">0.96</td>
+<td align="right">52.85</td>
+<td align="right">16.29</td>
+</tr>
+<tr>
+<td><code>autumn-layer_sheen</code></td>
+<td align="right">0.41</td>
+<td align="right">3.24</td>
+<td align="right">2.54</td>
+<td align="right">5.64</td>
+<td align="right">2.83</td>
+</tr>
+<tr>
+<td><code>autumn-layer_anisotropic</code></td>
+<td align="right">0.21</td>
+<td align="right">60.42</td>
+<td align="right">62.08</td>
+<td align="right">232.69</td>
+<td align="right">60.20</td>
+</tr>
+<tr>
+<td><code>autumn-layer_thin_film</code></td>
+<td align="right">0.36</td>
+<td align="right">21.20</td>
+<td align="right">13.81</td>
+<td align="right">70.63</td>
+<td align="right">20.84</td>
+</tr>
+<tr>
+<td><code>autumn-layer_mixed</code></td>
+<td align="right">0.39</td>
+<td align="right">10.98</td>
+<td align="right">3.21</td>
+<td align="right">40.94</td>
+<td align="right">10.59</td>
+</tr>
+<tr>
+<td><code>autumn-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>autumn-control_white</code></td>
+<td align="right">0.41</td>
+<td align="right">0.41</td>
+<td align="right">0.47</td>
+<td align="right">0.65</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>autumn-control_mirror</code></td>
+<td align="right">0.33</td>
+<td align="right">0.43</td>
+<td align="right">0.15</td>
+<td align="right">0.90</td>
+<td align="right">0.10</td>
+</tr>
+</tbody></table></div>
+<h3>특수 부피 8조건</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">기준 RMS</th>
+<th align="right">근사 RMS</th>
+<th align="right">근사 p95</th>
+<th align="right">근사 max</th>
+<th align="right">근사−기준 RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sun-special_volume_emission</code></td>
+<td align="right">0.10</td>
+<td align="right">0.10</td>
+<td align="right">0.13</td>
+<td align="right">0.19</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_volume_absorption</code></td>
+<td align="right">0.10</td>
+<td align="right">0.10</td>
+<td align="right">0.12</td>
+<td align="right">0.17</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_volume_scattering</code></td>
+<td align="right">0.05</td>
+<td align="right">0.05</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_volume_emission</code></td>
+<td align="right">0.10</td>
+<td align="right">0.10</td>
+<td align="right">0.13</td>
+<td align="right">0.19</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_volume_absorption</code></td>
+<td align="right">0.10</td>
+<td align="right">0.10</td>
+<td align="right">0.12</td>
+<td align="right">0.17</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_volume_scattering</code></td>
+<td align="right">0.09</td>
+<td align="right">0.09</td>
+<td align="right">0.01</td>
+<td align="right">0.01</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+</tbody></table></div>
+<h3>특수 표면 18조건</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">기준 RMS</th>
+<th align="right">근사 RMS</th>
+<th align="right">근사 p95</th>
+<th align="right">근사 max</th>
+<th align="right">근사−기준 RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sun-special_transmission</code></td>
+<td align="right">33.97</td>
+<td align="right">33.97</td>
+<td align="right">7.77</td>
+<td align="right">98.33</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_glass</code></td>
+<td align="right">34.79</td>
+<td align="right">34.79</td>
+<td align="right">3.01</td>
+<td align="right">100.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_ior_one</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_subsurface</code></td>
+<td align="right">4.10</td>
+<td align="right">4.10</td>
+<td align="right">0.93</td>
+<td align="right">1.38</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_subsurface_local</code></td>
+<td align="right">0.09</td>
+<td align="right">0.09</td>
+<td align="right">0.03</td>
+<td align="right">0.05</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_subsurface_off</code></td>
+<td align="right">0.09</td>
+<td align="right">0.09</td>
+<td align="right">0.03</td>
+<td align="right">0.05</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-special_mixed</code></td>
+<td align="right">2.04</td>
+<td align="right">2.04</td>
+<td align="right">0.48</td>
+<td align="right">1.05</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>sun-control_white</code></td>
+<td align="right">0.09</td>
+<td align="right">0.09</td>
+<td align="right">0.04</td>
+<td align="right">0.06</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_transmission</code></td>
+<td align="right">15.10</td>
+<td align="right">15.10</td>
+<td align="right">15.92</td>
+<td align="right">16.11</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_glass</code></td>
+<td align="right">0.70</td>
+<td align="right">0.70</td>
+<td align="right">1.09</td>
+<td align="right">1.18</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_ior_one</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_subsurface</code></td>
+<td align="right">4.24</td>
+<td align="right">4.24</td>
+<td align="right">3.43</td>
+<td align="right">3.91</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_subsurface_local</code></td>
+<td align="right">0.95</td>
+<td align="right">0.95</td>
+<td align="right">1.15</td>
+<td align="right">2.55</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-special_subsurface_off</code></td>
+<td align="right">0.95</td>
+<td align="right">1.32</td>
+<td align="right">1.21</td>
+<td align="right">1.67</td>
+<td align="right">0.37</td>
+</tr>
+<tr>
+<td><code>furnace-special_mixed</code></td>
+<td align="right">3.22</td>
+<td align="right">3.10</td>
+<td align="right">2.07</td>
+<td align="right">2.44</td>
+<td align="right">-0.12</td>
+</tr>
+<tr>
+<td><code>furnace-control_emission</code></td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+<td align="right">0.00</td>
+</tr>
+<tr>
+<td><code>furnace-control_white</code></td>
+<td align="right">1.00</td>
+<td align="right">1.00</td>
+<td align="right">1.96</td>
+<td align="right">3.07</td>
+<td align="right">0.00</td>
+</tr>
+</tbody></table></div>
+<h2>도구 수정</h2>
+<ul>
+<li><code>measure-material-blender-images.ps1 -LookupApproximate</code> 가 <code>CREATOR_MAT9_LOOKUP_APPROXIMATE</code> 를 켜고,
+<code>material_matched_image_probe.cpp</code> 가 그때 <code>SceneHostBudget::lookupApproximate = true</code> 로 준비한다.
+근사 실행의 <code>Native/lookup-approximate.txt</code> 가 표식이다.</li>
+<li>탐침의 첫 장 단정(&quot;Blended composition is not installed&quot; 거부)을 지웠다. 그 거부는 <code>8bfd0be5</code> 에서
+제품 코드에서 사라졌고, 탐침은 그 뒤로 돌지 않아 기준 경로조차 첫 장에서 멈췄다.</li>
+<li><strong>유리 장 게시 거부 수정.</strong> <code>8bfd0be5</code> 이후 투과·알파 draw 는 공통 Forward+ 로 그려지는데, 탐침은
+GBuffer·지연 조명 뒤 <code>DeclareVolume</code> 만 불러 유리가 Forward+ 흐름에 선언되지 않았다. 그래서
+<code>CommitSubmittedFrame</code> 이 &quot;LX alpha cache publication requires the complete Forward+ stream.&quot; 으로
+게시를 거부했다. 탐침을 제품 렌더러 순서(<code>DeclareColor</code> 반환값 → <code>EnhancedForwardPass</code> → 남은
+<code>DeclareVolume</code>)로 맞췄다. 수정 전 기준 경로 붉음(3번째 장) → 수정 후 18/18, 10-01 이미지와 해시 일치.
+부피 8장·평행광/균일 24장도 수정 전 탐침의 이미지와 해시가 같다.</li>
+<li><strong>오류 문구가 늘 비던 원인 수정.</strong> <code>Check(f(error), &quot;label &quot; + error)</code> 는 MSVC 에서 메시지 인자를 먼저
+만들어 호출 전의 빈 <code>error</code> 를 실었다. 17 자리를 <code>CheckWith(f(error), &quot;label &quot;, error)</code> 로 바꿔 실패 때
+실제 문구가 나온다.</li>
+</ul>
+<h2>재현</h2>
+<pre><code class="language-powershell">&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label split-ref-matched
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label split-approx-matched -LookupApproximate
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label split-approx-hdri -LookupApproximate `
+  -Reference Build/Obj/Mat9Hdri-v5-dense-0 -ReferenceRepeat Build/Obj/Mat9Hdri-v5-dense-11
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label split-approx-volume -LookupApproximate `
+  -Reference Build/Obj/Mat9SpecialVolumeReference-0 -ReferenceRepeat Build/Obj/Mat9SpecialVolumeReference-11
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label split-approx-surface -LookupApproximate `
+  -Reference Build/Obj/Mat9SpecialSurfaceReference-0 -ReferenceRepeat Build/Obj/Mat9SpecialSurfaceReference-11
+</code></pre>
+<p>기준 경로는 같은 명령에서 <code>-LookupApproximate</code> 를 빼고 <code>split-ref-*</code> 이름으로 찍었다.</p>
+<p>원자료: <code>MAT9SplitSum{Reference,Approximate}{Matched,Hdri,Volume,Surface}.json</code>,
+<a href="MAT9SplitSumApproximateHdri.png">HDRI 근사 이미지 대조</a>.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="hdri-26조건"></span><span id="sec-도구-수정"></span><span id="sec-묶음별-수치-"></span><span id="sec-읽는-법"></span><span id="sec-재현"></span><span id="sec-판정"></span><span id="도구-수정"></span><span id="묶음별-수치-"></span><span id="읽는-법"></span><span id="재현"></span><span id="특수-부피-8조건"></span><span id="특수-표면-18조건"></span><span id="판정"></span><span id="평행광균일-환경-24조건"></span></details></main></body></html>

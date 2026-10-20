@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 12 — metadata 경합과 종료 flush 검증 (2026-10-10)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="TexturePendingMetadataShutdownValidation20261010.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/TexturePendingMetadataShutdownValidation20261010.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 12 — metadata 경합과 종료 flush 검증 (2026-10-10)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-auto-ui-shutdown.ps1#L24">Tools/regression/verify-texture-auto-ui-shutdown.ps1:24</a> — <code>$flush=[regex]::Match($log,&#39;(?m)^\[AUTOSAVE_FLUSH\] ageMs=(\d+) path=&#39;+[regex]::Escape($sidecar)+&#39;\r?$&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-auto-ui-shutdown.ps1#L25">Tools/regression/verify-texture-auto-ui-shutdown.ps1:25</a> — <code>if(!$flush.Success -or !$log.Contains(&#39;[AUTOSAVE_CONFLICT] pending edit rejected path=&#39;+$sidecar)){throw &#39;Shutdown flush did not reject the conflicting pending save&#39;}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-auto-ui-shutdown.ps1#L31">Tools/regression/verify-texture-auto-ui-shutdown.ps1:31</a> — <code>&#39;conflictshutdown&#39; {$metadata -match &#39;(?m)^\s*maxDimension:\s*1\s*$&#39; -and $metadata.Contains(&#39;33333333-3333-4333-8333-333333333333&#39;)}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>실제 Inspector에서 Maximum Dimension을0→2로 입력한 뒤, 저장 대기400ms 전에
+격리 metadata를 삭제/손상시키고 같은 owner-thread 관찰에서 <code>RequestQuit</code>을 요청했다.
+<code>deleteshutdown</code>/<code>corruptshutdown</code> 검증 모드와 도우미 선택지를 추가했으며 제품의
+자동 저장/종료 구현은 변경하지 않았다. 미검증이던 Debug 유효 외부 설정 변경·종료도
+기존 <code>conflictshutdown</code> 모드로 확인했다. 각 모드는 한 번의 제어된 실행이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성</th>
+<th>모드</th>
+<th align="right">요청 age</th>
+<th align="right">종료 flush age</th>
+<th>종료 후 외부 상태</th>
+<th align="right">종료 코드</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td>삭제+종료</td>
+<td align="right">10ms</td>
+<td align="right">41ms</td>
+<td>metadata 없음, 재생성 금지</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Debug</td>
+<td>손상+종료</td>
+<td align="right">4ms</td>
+<td align="right">28ms</td>
+<td>주입한 손상 bytes 그대로</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Debug</td>
+<td>유효 변경+종료</td>
+<td align="right">3ms</td>
+<td align="right">36ms</td>
+<td>외부 maxDimension1/GUID 유지</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>삭제+종료</td>
+<td align="right">7ms</td>
+<td align="right">27ms</td>
+<td>metadata 없음, 재생성 금지</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>손상+종료</td>
+<td align="right">8ms</td>
+<td align="right">29ms</td>
+<td>주입한 손상 bytes 그대로</td>
+<td align="right">0</td>
+</tr>
+</tbody></table></div>
+<p>다섯 실행 모두 해당 metadata에 대한 <code>AUTOSAVE_FLUSH</code> 다음 <code>AUTOSAVE_CONFLICT</code>를
+기록해 대기 편집2를 쓰지 않았다. 정상 Finalize와 DX12 shutdown pending
+task/batch/retirement0/0/0을 확인했다. 원본 PNG 및 저장 씬 bytes가 유지됐고
+runtime SHA-256이 실행 전후 일치했다. 종료 전 실제 화면에 미저장 <code>UnsavedT0Texture</code>
+객체가 있는 상태에서 입력했다. 미저장 객체의 종료 후 재실행 복구 수용은 아니다.
+종료 뒤 UI 오류 표시·Reload는 이 실행에서 확인하지 않으며 일반 저장 대기의
+<a href="TexturePendingMetadataValidation20261010.html">기존 복구 수용</a>과 구분한다.</p>
+<p>Debug/Release Editor 라이브러리·runtime·launcher 빌드를 통과했다.</p>
+<ul>
+<li>Debug runtime: <code>102999A2B5A93224D422035D3FD794807D103722B7D5E700A8BBDEAB9A8FCE9A</code></li>
+<li>Release runtime: <code>579EC34DC986CC8E2F51A95A2BB7B057D4C84DC230D40AD42301437D0F7BA63E</code></li>
+<li>Debug 결과 (<code>../../Build/TexturePendingMetadata/shutdown-debug-result.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Release 결과 (<code>../../Build/TexturePendingMetadata/shutdown-release-result.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Debug 삭제 로그 (<code>../../Build/TAUI-Debug-deleteshutdown-4457013b/editor.out</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 입력 직전 화면 (<code>../../Build/TAUI-Debug-deleteshutdown-4457013b/before-input.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Debug 손상 로그 (<code>../../Build/TAUI-Debug-corruptshutdown-2b7983a0/editor.out</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 입력 직전 화면 (<code>../../Build/TAUI-Debug-corruptshutdown-2b7983a0/before-input.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Debug 유효 변경 로그 (<code>../../Build/TAUI-Debug-conflictshutdown-27f8efb2/editor.out</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 입력 직전 화면 (<code>../../Build/TAUI-Debug-conflictshutdown-27f8efb2/before-input.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Release 삭제 로그 (<code>../../Build/TAUI-Release-deleteshutdown-89c02646/editor.out</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 입력 직전 화면 (<code>../../Build/TAUI-Release-deleteshutdown-89c02646/before-input.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Release 손상 로그 (<code>../../Build/TAUI-Release-corruptshutdown-38246217/editor.out</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 입력 직전 화면 (<code>../../Build/TAUI-Release-corruptshutdown-38246217/before-input.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+</ul>
+<p><code>verify-texture-auto-ui-shutdown.ps1</code>은 실행 root의 launch/command/exit receipt와 로그를
+읽어 종료 코드, 요청 age400ms 미만, 해당 파일의 flush/충돌 및 최종 외부 상태,
+PNG/저장 씬/runtime 보존과 종료 큐를 검증한다. 실제 입력을 생성하는 스크립트는 아니다.
+<code>exit.json</code>은 실행 중 해당 프로세스 handle을 열어 WaitForExit 후 기록한 종료 결과다.
+Build 증거는 로컬 산출물이며 청소 시 제거될 수 있다.</p>
+<p>12-0-D 후속 보강으로 추가 가중치를 계상하지 않는다. 진행률13.25/20일 =
+66.25% (표시66%) 및 T1b 대기·T3 중단을 유지한다. 최종 디스크 비교 이후 동시 쓰기,
+반복/장시간·다중 창/배율 및 전체 소비자/GPU/품질은 잔여다. 이 제어된 실행은
+실제 OS 창 닫기/강제 종료, 임의 타이밍의 스트레스나 성능 수용으로 확대하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main></body></html>

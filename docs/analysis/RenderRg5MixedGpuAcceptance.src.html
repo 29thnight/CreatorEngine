@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG5-9 실제 versioned SceneHost·Code/Graph 혼합 GPU 수용 — 완료</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg5MixedGpuAcceptance.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg5MixedGpuAcceptance.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG5-9 실제 versioned SceneHost·Code/Graph 혼합 GPU 수용 — 완료</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-mixed.ps1#L7">Tools/regression/verify-rg5-mixed.ps1:7</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-mixed.ps1#L8">Tools/regression/verify-rg5-mixed.ps1:8</a> — <code>$output = [IO.Path]::GetFullPath($OutputDirectory)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-mixed.ps1#L42">Tools/regression/verify-rg5-mixed.ps1:42</a> — <code>$marker = [regex]::Match($log, &#39;(?m)^RG5_MIXED_GPU_OK policies=3 frames=72 components=6804 maxError=([0-9.eE+-]+) graphCompiles=0 validation=0\r?$&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Forward+ Graph stream을 ExplicitVersioned에서 허용하고 ExplicitSingleWriter에서는 구체적 오류로 거부한다. 제품 기본 DeclarationOrder는 유지하며 전체 SceneRenderer의 기본 전환은 RG6 소유다. 실제 생산자·SceneHost·Forward+를 실행하는 DX12 GPU 검증으로 혼합 경로의 보호 조건을 회수했다. RG5 전체는 progress/기성 0이다.</p>
+<h2>구현과 검증 범위</h2>
+<p>기존 material_forward_transport_tests.inl의 실제 24개 장면을 기준 DeclarationOrder, ExplicitVersioned+PreserveDeclarationOrder, ExplicitVersioned+DependencyOrder의 세 정책으로 실행한다. --forward-transport의 기존 단일 정책·허용치는 유지하고 --rg5-mixed만 세 정책을 실행한다. 모든 if/for에 스코프를 작성했다.</p>
+<p>Code/Graph 순서 혼합, alpha 0/1, 역방향 카메라 순서, opaque depth 차폐, identity refraction, SSS, Volume 및 조합, 입력 목록 순서 교체와 4-worker 병렬 기록·제출을 포함한다. 실제 GBuffer·SceneHost::DeclareGBuffer/DeclareColor·DeclareVolume·DeclareBlended·Forward+와 Lookup/Refraction/SSS/Volume 소유자 배선을 사용하며 수정된 출력 핸들을 실제 후속 입력·readback으로 전달한다.</p>
+<p>versioned compile 진단은 LegacyState 접근 0과 반환 색상의 최신 writer를 확인한다. Volume은 별도 LX.Scene.VolumeColor 자원을 반환하므로 동일 자원 번호를 요구하지 않고 실제 반환 자원의 최신 writer를 확인한다. 화면 전체 HDR은 각 구성의 기준 정책과 비교하고 opaque depth/owner 보존, finite HDR, 기존 독립 alpha/refraction/Beer-Lambert 계산식도 검사한다. 정책 간 최대 오차는 두 구성 모두 0이다. 기본 품질 수치와 IBL 1024/4096은 변경하지 않았다.</p>
+<h2>증거</h2>
+<p>증거 루트: Build/Obj/RenderRG5Mixed. runner는 Tools/regression/verify-rg5-mixed.ps1이다.</p>
+<ul>
+<li>Debug/Release probe 최종 빌드와 Editor 빌드 통과: Build/rg5-mixed-{Debug,Release}-final-build.log 및 rg5-mixed-editor-{Debug,Release}-build.log.</li>
+<li>Debug-gpu-v3, Release-gpu-v1: 각각 정책 3 × 장면 24 = 72 frames, 독립 계산식 components 6804, maxError=0, validationProblems=0, exitCode=0. 소스·실행 파일 SHA-256 일치 확인.</li>
+<li>두 구성의 geometry cache: cold uploads=2, hits=160, transforms=7, completed transformHits=155. 실제 cold 및 제출 완료 재사용을 확인했다. Lookup 재사용 횟수를 별도로 계측했다는 주장은 하지 않는다.</li>
+<li>Debug-regression-v1, Release-regression-v1: 기본 제품 경로의 구성별 독립 프로세스 2회 × 캡처 2회 회귀 통과. 실패 0·정상 종료·강제 종료 없음.</li>
+<li>Debug-before-after-v1, Release-before-after-v1, Debug-Release-v1: 직전 통합 기준선 대비 및 구성 간 각 16개 이미지 maxError/RMSE/changedPixels/exceededPixels 모두 0. 동일 inputHash/full graphHash.</li>
+<li>current-baseline-phase-complete-v1.json: 현재 소스·Editor executable/runtime 해시 확인 후 phaseComplete=true.</li>
+<li>rg5-mixed-completion-v1.json: sliceComplete=true, mixedStreamGpuAcceptance=true, versionedProductGpuAcceptance=false, rg5Complete=false. 전체 제품 SceneRenderer의 versioned GPU 수용과 RG6 전환을 혼합 pass 수용과 구분한다.</li>
+</ul>
+<h2>수정 과정의 기록</h2>
+<p>Debug-gpu-v1은 Volume 출력이 기존 lighting과 같은 자원이어야 한다는 잘못된 테스트 단언으로 중단됐다. Volume의 별도 출력 계약과 최신 writer 검증으로 수정했다. Debug-gpu-v2는 실제 GPU 72 frames/maxError=0/validation=0/exitCode=0을 마쳤으나 결과 수집기의 Windows CRLF 성공 표식 처리 때문에 wrapper가 실패했다. 줄바꿈 처리를 수정한 v3에서 native 및 wrapper가 모두 통과했다. 이전 로그는 보존한다.</p>
+<p>Release 빌드의 기존 라이브러리 PDB 관련 LNK4020 경고는 남아 있으며 빌드·GPU 실행은 통과했다. 디버거의 일부 심볼 제한은 이번 렌더링 수용과 별개다.</p>
+<h2>남은 조건</h2>
+<p>나머지 제품·Editor·캡처·fixture 소비자/ReadWrite 이관 및 legacy 추론·임시 adapter 제거, 전체 기본 SceneRenderer의 versioned 수용, RG6 기본 의존성 정렬 전환은 남아 있다. 이 16×16 혼합 pass GPU 검증을 전체 제품 장면의 versioned 전환이나 MAT-9 최종 품질·성능 수용으로 확대 해석하지 않는다. Vulkan 비교는 PHASE 4.9 RenderDoc 캡처→리소스 확인→픽셀별 비교에서만 진행한다.
+현행 기준선은 후속 <a href="RenderRg5DecalMigration.html">RG5-10 Decal 이관 검증</a>으로 갱신했다. 이 문서의 RG5-9 증거는 보존한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-구현과-검증-범위"></span><span id="sec-남은-조건"></span><span id="sec-수정-과정의-기록"></span><span id="sec-증거"></span><span id="구현과-검증-범위"></span><span id="남은-조건"></span><span id="수정-과정의-기록"></span><span id="증거"></span></details></main></body></html>

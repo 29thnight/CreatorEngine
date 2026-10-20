@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 Special Surface 반경·스침각 수정 — 2026-10-01</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9SpecialProfileCorrection.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9SpecialProfileCorrection.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 Special Surface 반경·스침각 수정 — 2026-10-01</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L11">Tools/blender/material_matched_reference.py:11</a> — <code>import struct</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L16">Tools/blender/material_matched_reference.py:16</a> — <code>ROOT = Path(__file__).resolve().parents[2]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L17">Tools/blender/material_matched_reference.py:17</a> — <code>sys.path.insert(0, str(Path(__file__).resolve().parent))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-special-material-images.py#L10">Tools/regression/assess-special-material-images.py:10</a> — <code>SPEC = importlib.util.spec_from_file_location(&#39;images&#39;, Path(__file__).with_name(&#39;compare-material-blender-images.py&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-special-material-images.py#L18">Tools/regression/assess-special-material-images.py:18</a> — <code>parser = argparse.ArgumentParser(description=__doc__)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-special-material-images.py#L24">Tools/regression/assess-special-material-images.py:24</a> — <code>raise ValueError(&#39;Independent reference repeat is required for Special assessment&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12">Tools/regression/measure-material-blender-images.ps1:12</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15">Tools/regression/measure-material-blender-images.ps1:15</a> — <code>$Reference=[IO.Path]::GetFullPath($Reference)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49">Tools/regression/measure-material-blender-images.ps1:49</a> — <code>if($ReferenceRepeat) { $comparisonArguments+=@(&#39;--reference-repeat&#39;,[IO.Path]::GetFullPath($ReferenceRepeat)) }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>판정</h2>
+<p><strong>Scene SSS artist 반경 환산과 Special 준비 단계의 스침각 거부를 수정했다.</strong>
+수렴시킨 Blender 기준과의 Surface 18조건은 기존 target <strong>7/18</strong>, 전체 미수용이다.
+MAT-9 <code>progress</code>, PHASE 4.25 완료 공수 <strong>32/34일</strong>을 유지한다.
+투과 폐곡면 출구 경계와 SSS 공간 응답 개선이 남아 있다.</p>
+<p>이전 <a href="MAT9SpecialTransportComparison.html">Volume 8조건 검증</a>은 보존한다.
+Surface 결과와 다른 세대의 Volume 결과를 합산하여 Special 전체 통과로 세지 않는다.</p>
+<p><a href="MAT9SpecialSurfaceTargets.json">최종 판정</a>, <a href="MAT9SpecialSurfaceComparison.json">전체 이미지 측정</a>,
+<a href="MAT9SpecialSurfaceReference.json">기준 seed 0</a>, <a href="MAT9SpecialSurfaceReferenceRepeat.json">기준 seed 11</a>,
+<a href="MAT9SpecialSurfaceComparison.png">대조 그림</a>, <a href="MAT9SpecialProfileAb.json">같은 기준의 수정 전후 재산출</a>.
+최종 <a href="MAT9SpecialSurfaceVerification.json">실행·소스·바이너리 검증</a>과
+<a href="MAT9SpecialSurfaceDebugTargets.json">Debug 판정</a>을 함께 보존한다.
+그림은 각 행 Blender / Native / 절대 차이 ×10이며, 판정은 pre-tone linear RGB다.</p>
+<h2>제품 수정</h2>
+<h3>1. Scene SSS 입력의 길이 환산</h3>
+<p><code>LXSceneSubsurfacePS → BuildSceneSubsurfaceProfile → BuildSubsurfaceProfile</code>로
+그래프의 artist Radius×Scale을 **<code>1/(4π)</code>**로 환산한 뒤 물리 profile에 공급한다.
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bssrdf.h#L61">Cycles Random Walk/Burley radius 전처리</a>와
+같은 길이 환산이다. 이전 Scene은 artist 반경을 물리 mean free path에 직접 넣었다.</p>
+<p>공용 <code>BuildSubsurfaceProfile</code>의 물리 입력 계약과 기존 numeric golden은 유지했다.
+이를 Cycles Random Walk의 albedo remapping·내부 경로 추적과 동일한 구현으로 해석하지 않는다.
+공간 재분배는 여전히 정규화한 visible-surface dipole이다.</p>
+<h3>2. Glass 준비 적분과 공용 소비의 일치</h3>
+<p><code>MaterialGraphSceneRefractionBake</code>의 glass 반사 적분은
+<code>IntegrateSpecialForward</code>와 같이 <strong>GGX 곱셈 보상을 적용하지 않는 별도 glass budget</strong>을 사용한다.
+이전 준비 단계는 공용 소비와 다르게 기본 보상 옵션을 사용했다.
+반사·투과의 single-interface 에너지 모델을 일치시킨 수정이며,
+폐곡면의 두 경계를 추적하거나 큰 투과 이미지 차이를 해소한 것은 아니다.</p>
+<h3>3. 스침각을 자원 준비 오류로 취급하던 문제</h3>
+<p>전체 이미지에서 Scale=0/off를 추가 대조한 결과, sun의 두 픽셀이 SSS 경로에서
+자홍색 <code>(1,0,1)</code> 오류 표시를 냈다. 기존 공통 내부 303픽셀에서는 검출되지 않았다.
+<code>MaterialGraphSceneSubsurfaceBake</code>와 <code>MaterialGraphSceneRefractionBake</code>가
+standalone directional bake의 <code>N·V≥1e-4</code> 조건을 Scene raster 입력에도 적용한 것이 원인이다.
+smooth normal이 스침각/반대 방향을 향하는 raster 픽셀도 유효한 입력이다.</p>
+<p>Scene용 유효성 검사는 finite·값 범위·tier·nonzero view 조건을 유지한다.
+해당 픽셀의 반사 적분은 필요한 경우 0을 반환하며, 준비 완료 marker를 기록한다.
+standalone 요청은 기존 front-hemisphere 계약을 그대로 사용한다.
+최종 <strong>SceneHost identity 10</strong>으로 이전 셰이더/쿠킹 서명을 거부하도록 갱신했다.</p>
+<p>Scale=0/off 검사는 기존 상한 0.002를 유지하면서 <strong>전체 64×64 RGB·alpha</strong>로 확대했다.
+이미지 오차 판정에 사용하는 공통 mask와 RMS/p95/max/noise 상한은 바꾸지 않았다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Scale=0/off 검사</th>
+<th align="right">수정 전 host 9 전체 RGB max abs</th>
+<th align="right">최종 host 10</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>방향광</td>
+<td align="right">1.000000</td>
+<td align="right"><strong>0; 전체 파일 byte exact</strong></td>
+</tr>
+<tr>
+<td>균일 환경광</td>
+<td align="right">0.829590</td>
+<td align="right"><strong>0; 전체 파일 byte exact</strong></td>
+</tr>
+</tbody></table></div>
+<p><a href="MAT9SpecialSurfacePreGrazingTargets.json">수정 전 전체 이미지 거부 판정</a>을 보존했다.
+이전 보고서의 Scale=0/off bit-exact 주장은 공통 내부 영역에 한정된다.
+최종 결과에서 전체 파일 일치까지 별도로 확인했다.</p>
+<h3>4. 독립 Scene 회귀 기준의 갱신</h3>
+<p>Scene SSS의 CPU profile 기준에도 artist→물리 길이 환산을 적용했다.
+최종 색상 기준에는 이전 GGX 수정 전의 Lambertian multiple-scattering lobe가 남아 있어
+현재의 독립 double-precision energy LUT·곱셈 보상·반사 budget 계산으로 갱신했다.
+Glass CPU 준비 적분도 같은 별도 budget을 사용한다. 허용 오차를 확대하지 않았다.</p>
+<h2>수렴한 기준과 동일 조건의 수정 전후</h2>
+<ul>
+<li>Blender <strong>5.1.1</strong> (<code>b70da489d7f4</code>), Cycles CPU, <strong>131072 samples, seed 0/11</strong>.</li>
+<li>기존의 fixed 7 Surface 재질 + emission/white 제어, 방향광/furnace <strong>18조건</strong>.
+새 재질·임의의 유리한 조건을 추가하지 않았다.</li>
+<li>공유 smooth <strong>80-triangle closed icosphere</strong>, radius 0.5, 64×64.
+geometry SHA-256 <code>c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282</code>.</li>
+<li>카메라 <code>(0,0,3)</code>, FOV π/4, near/far 0.1/10, Gaussian filter width 0.01.
+방향광 <code>normalize(0.35,-0.2,0.8)</code>, irradiance RGB 1; furnace radiance RGB 1.</li>
+<li>reference recipe v2, RNA volume_bounces=0. Surface는 Volume을 연결하지 않는다.
+기본 Principled subsurface method는 <code>RANDOM_WALK</code>다.</li>
+<li>같은 emission-control 내부를 2픽셀 침식한 <strong>303픽셀</strong>에 공통 target을 적용한다.
+normal/view 진단 max abs 0.001641/0.001871은 기존 0.002 상한 이내다.</li>
+<li>독립 시드 오차 <strong>최대 0.227574%</strong>, 모든 18조건이 기존 <strong>0.25%</strong> 상한 이내다.</li>
+</ul>
+<p>아래 두 Native 결과를 <strong>동일한 새 131072-sample 기준</strong>으로 재산출했다.
+수정 전 Native는 기존 v1 manifest를 가진 역사적 캡처이므로 입력·geometry·camera/light identity를
+대조한 A/B 진단에만 사용한다. 최종 수용 판정에는 현재 제품의 v2 입력 캡처를 사용한다.
+이전 보고서의 16384-sample 수치와 직접 이어서 개선 폭을 계산하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">수정 전 RMS</th>
+<th align="right">최종 RMS</th>
+<th align="right">독립 seed RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>방향광 / SSS</td>
+<td align="right">6.2598%</td>
+<td align="right"><strong>4.1009%</strong></td>
+<td align="right">0.2276%</td>
+</tr>
+<tr>
+<td>방향광 / metal + SSS + coat</td>
+<td align="right">2.0096%</td>
+<td align="right"><strong>2.0373%</strong></td>
+<td align="right">0.1336%</td>
+</tr>
+<tr>
+<td>Furnace / SSS</td>
+<td align="right">4.2380%</td>
+<td align="right">4.2380%</td>
+<td align="right">0.2265%</td>
+</tr>
+<tr>
+<td>Furnace / metal + SSS + coat</td>
+<td align="right">3.2178%</td>
+<td align="right">3.2178%</td>
+<td align="right">0.1645%</td>
+</tr>
+<tr>
+<td>방향광 / tinted transmission</td>
+<td align="right">33.9664%</td>
+<td align="right">33.9664%</td>
+<td align="right">0.1335%</td>
+</tr>
+<tr>
+<td>방향광 / pure glass</td>
+<td align="right">34.7890%</td>
+<td align="right">34.7890%</td>
+<td align="right">0.0730%</td>
+</tr>
+<tr>
+<td>Furnace / tinted transmission</td>
+<td align="right">15.0987%</td>
+<td align="right">15.0987%</td>
+<td align="right">0.0752%</td>
+</tr>
+<tr>
+<td>Furnace / pure glass</td>
+<td align="right">0.6969%</td>
+<td align="right">0.6983%</td>
+<td align="right">0.0263%</td>
+</tr>
+</tbody></table></div>
+<p>반경 단위만 변경한 shader snapshot A/B에서도 이전 16384-sample 기준의 sun SSS는
+6.2429→4.0903%로 줄었다. 혼합 sun은 2.0129→2.0442%로 소폭 악화했고,
+furnace는 그대로였다. Glass budget 단독 수정의 이미지 영향은 작았다.
+이 진단을 제품 전체 수용으로 세지 않는다.</p>
+<h3>기존 target 판정</h3>
+<p>RMS≤1%, p95 normalized≤1%, max normalized≤5%, noise RMS≤0.25%를 모두 만족해야 한다.
+현재 <strong>7/18 통과</strong>: sun IOR=1·Scale=0·SSS off·emission·white,
+furnace IOR=1·emission. Scale=0/off 전체 이미지 제어는 별도로 모두 통과한다.</p>
+<ul>
+<li>sun SSS와 mixed는 RMS 미달이다.</li>
+<li>furnace SSS/mixed는 RMS·p95 미달이다.</li>
+<li>tinted transmission은 두 조명 모두 큰 차이가 남는다.</li>
+<li>pure glass furnace는 RMS 0.6983%여도 p95 **1.0898%**로 미달이다.</li>
+<li>furnace Scale=0/off와 white도 p95 미달이다. 기존 flat 진단의 geometry/shading-normal 기여를
+후속 조사에 사용하되 smooth 기준을 flat으로 교체하지 않는다.</li>
+</ul>
+<p>수렴한 seed 변동보다 큰 차이가 남으므로 기준 노이즈만을 원인으로 삼지 않는다.</p>
+<h2>실행 검증과 제한</h2>
+<ul>
+<li>VS18/v145 <strong>전체 Debug CreatorEditor 빌드</strong>와 Release/Debug Native 비교 도구 빌드 통과.</li>
+<li>최종 host 10 <strong>Debug/Release DX12 각각 18 frames, 295717 checks, GPU validation 0</strong>, 정상 종료.
+두 빌드의 <strong>294912 RGBA 성분 byte exact</strong>, Scale=0/off도 두 조명 모두 전체 파일 byte exact다.
+최종 589개 source snapshot의 실행 중 변경은 0개다.</li>
+<li>반경 수정 직후 host 9에서 Debug/Release 각각 SSS <strong>12 frames, 119415 checks</strong>,
+굴절 <strong>24 frames, 185068 checks</strong>를 통과했다. 각 validation 0, 정상 종료.
+프로파일·이웃 확산·재질 격리·최종 색상과 화면 hit/miss·Snell/TIR·rough convolution을 검사했다.
+이 head-on fixture를 나중에 찾은 스침각 오류의 검증으로 대신하지 않았다.</li>
+<li>공용 Special <strong>202049 checks</strong>, 35 cases×6 views×7 variants,
+28 compile/22 rejection, 기존 4410행 numeric golden과 역사적 불변 성분 보존 통과.</li>
+<li>최종 IBL bake/consume Debug/Release 각각 <strong>19351 checks</strong>, 152 points·3 frames·6 compile,
+최대 normalized error 0.000005452. Standalone bake의 기존 입력/소비 계약 회귀 통과.</li>
+<li>현재 reader로 이전 Volume 캡처를 재판정하여 <strong>8/8</strong>을 확인했다. 신규 Volume GPU 캡처는 아니다.</li>
+<li>새 Editor GUI 조작·Vulkan 실제 GPU 실행·cooked Player 실행·모델 FPS 수용은 이 묶음에 포함하지 않는다.
+제품 준비의 DXIL/SPIR-V compile과 실제 DX12 GPU 실행을 구분한다.</li>
+</ul>
+<p>Scene SSS는 가시 surface의 world 거리·projected area·같은 draw owner·normal 조건과
+4픽셀 gather를 사용한다. Cycles Random Walk의 내부 산란과 같은 공간 응답이 아니다.
+Glass는 완성된 opaque Scene의 depth/background 또는 environment를 한 경계에서 샘플링한다.
+출구 경계·그 경계의 굴절/반사·내부 재방문을 추적하지 않는다.
+RGB tint를 임의로 두 번 곱하여 폐곡면 검증을 대체하지 않는다.
+Scene Blended queue도 미지원이며 opaque 캡처로 alpha+transmission 완료를 주장하지 않는다.</p>
+<h2>재현과 다음 기존 작업</h2>
+<pre><code class="language-powershell">&amp; &#39;C:/Program Files/Blender Foundation/Blender 5.1/blender.exe&#39; -b --threads 3 `
+  --python Tools/blender/material_matched_reference.py -- `
+  --suite special-surface --samples 131072 --seed 0 --output Build/Obj/Mat9SpecialSurfaceReference-0
+# seed 11은 별도 출력 디렉터리로 생성한다. 기존 결과를 덮어쓰지 않는다.
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release `
+  -Label special-surface-final10 -Reference Build/Obj/Mat9SpecialSurfaceReference-0 `
+  -ReferenceRepeat Build/Obj/Mat9SpecialSurfaceReference-11
+&amp; &#39;C:/Python313/python.exe&#39; Tools/regression/assess-special-material-images.py `
+  Build/Obj/Mat9Images-Release-special-surface-final10/comparison.json `
+  Build/Obj/Mat9Images-Release-special-surface-final10/targets.json
+# exit 2는 정상 측정 후 target 미수용이다. Shader prepare/GPU 실패와 구분한다.
+</code></pre>
+<p>RGBA32F/EXR·입력·삼각형·실행 로그는 위 Build/Obj 디렉터리에 보존했다.
+최종 source snapshot은 <code>Build/Obj/mat9-special-surface-final10-source-hashes.json</code>이다.
+작업 HEAD는 <code>12f970c7ed3a4408d268479f5d5acb5f80372b8c</code>, 기존 dirty tree에서 진행했다.
+이번 요청에서 commit/push하지 않았다.</p>
+<p>Python 4개 구문 검사, 웹 빌드, 대시보드 inline JavaScript/전체 439항목 파싱·진행률 finite·
+phase-meta 산수와 범위 diff 검사를 확인한다. 이는 문서/정적 검사이며 새 렌더 검증으로 세지 않는다.</p>
+<p>기존 순서를 유지한다:</p>
+<ol>
+<li><strong>폐곡면 굴절 출구 경계·SSS 공간 응답·smooth grazing normal</strong>을 분리하여 개선하고,
+위 고정 target을 다시 판정한다. 실제 Blended 합성의 alpha/transmission 기준도 남아 있다.</li>
+<li>Texture-only/factor×texture/normal-map 기준과 같은 지원 feature의 Deferred/Forward 교차 비교.</li>
+<li>실제 모델의 이동 카메라/tier/cold-warm 성능 수용. 추가 IBL/Special 준비 비용을 포함한다.</li>
+<li>원래 area-light grid의 light ABI/consumer와 rendered gate.</li>
+</ol>
+<p>새 완료 행이나 공수를 추가하지 않는다. 상수 HDRI·bounded Volume의 통과 범위를 그대로 유지한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-scene-sss-입력의-길이-환산"></span><span id="2-glass-준비-적분과-공용-소비의-일치"></span><span id="3-스침각을-자원-준비-오류로-취급하던-문제"></span><span id="4-독립-scene-회귀-기준의-갱신"></span><span id="sec-수렴한-기준과-동일-조건의-수정-전후"></span><span id="sec-실행-검증과-제한"></span><span id="sec-재현과-다음-기존-작업"></span><span id="sec-제품-수정"></span><span id="sec-판정"></span><span id="기존-target-판정"></span><span id="수렴한-기준과-동일-조건의-수정-전후"></span><span id="실행-검증과-제한"></span><span id="재현과-다음-기존-작업"></span><span id="제품-수정"></span><span id="판정"></span></details></main></body></html>

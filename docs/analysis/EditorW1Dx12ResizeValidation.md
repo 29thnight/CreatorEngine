@@ -1,5 +1,43 @@
 # PHASE 21 W1 — DX12 DPI/resize 수정 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-screen-resize-snapshot.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-screen-resize-snapshot.ps1#L1) — `[CmdletBinding()]`
+- [Tools/regression/verify-screen-resize-snapshot.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-screen-resize-snapshot.ps1#L3) — `[ValidateSet('Debug', 'Release', 'All')][string]$Configuration = 'All',`
+- [Tools/regression/verify-screen-resize-snapshot.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-screen-resize-snapshot.ps1#L8) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98) — `enum class ShaderPassQueue : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106) — `enum class ShaderBlendMode : std::uint8_t`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L58) — `class EnhancedSSGIPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L87) — `bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L88) — `void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;`
+- [Engine/RenderEngine/ShaderMeta.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28) — `outError = std::string(context) + ": " + std::string(detail);`
+- [Engine/RenderEngine/ShaderMeta.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65) — `const bool known = std::any_of(allowed.begin(), allowed.end(),`
+- [Engine/RenderEngine/ShaderMeta.cpp:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102) — `else return Fail(context, std::string("'") + key + "'는 true|false여야 한다", outError);`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:326](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L326) — `bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:381](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L381) — `void EnhancedSSGIPass::ReleaseHistory(const EnhancedFrameContext& context)`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:398](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L398) — `void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-12, HEAD `3efbb23f` 위의 W1 작업 트리. 사용자 요청에 따라 DX12를 먼저 수정했다.
 [이전 원인 분석](EditorW1DpiResizeRootCauseAndFixPlan.md) ·
 [정본 W1](../plans/EditorWorkspaceRedesignPlan.md).
@@ -89,3 +127,5 @@ DX12의 장시간 Scene 표시 지연은 이 재현 조건에서 해결됐다.
 **후속 사용자 결정(2026-09-12): Vulkan 대응은 우선 보류하고 W1을 DX12 기준 `done`으로 판정한다.**
 Vulkan 모니터 경계 resize 후 device loss는 미수정·미재검증으로 별도 보류한다.
 이번 상태 변경은 완료 범위의 조정이며 Vulkan 오류 해결이나 새 검증 결과를 뜻하지 않는다.
+
+</details>

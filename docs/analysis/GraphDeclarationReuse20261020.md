@@ -1,5 +1,41 @@
 # GraphDeclare 선언 저장소 재사용 — 2026-10-20
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/GpuGeometryVisibility.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.h#L13) — `struct EnhancedFrameContext;`
+- [Engine/RenderEngine/GpuGeometryVisibility.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.h#L22) — `class GpuGeometryVisibility final : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/GpuGeometryVisibility.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.h#L27) — `enum class MeshletStage : std::uint8_t { Reset, Cull, Count, Finalize, Scatter };`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78) — `enum class RGMeasurementDomain : uint8_t { Normal, Capture };`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79) — `enum class RGQueueFallbackReason : uint8_t`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108) — `enum class RGQueuePlacement : uint8_t`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L77) — `error = std::move(message);`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:91](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L91) — `if (!std::isfinite(matrix.m[row][column]))`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:1427](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1427) — `void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& graph,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34) — `std::free(value);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L43) — `const auto path = prefix + "." + std::to_string(++serial);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L67) — `std::copy_n(source.data(), source.size(), destination.data());`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준 master `1162d4f9a088f251d0801683f7d426959e424c11`에서 패스별 누적 비용을 확인하고 기하·컬링·패킷·하이브리드 가시성의 반복 저장소 생성을 줄였다. GraphDeclare 평균은 5.3156→5.0129ms, Game CPU 중앙값은 13.8340→13.4333ms다. [원본 수치·검증 JSON](GraphDeclarationReuse20261020.json).
 
 ## 코드 변경
@@ -49,3 +85,5 @@ CreatorRobot Debug, DX12 software 경로, Editor 전경, 8워커, Scene/Game 각
 실행 이력: 넓은 `scene-only` 검사는 소스 동결과 검증 범위 조정 과정에서 중단했으며 통과 근거에 포함하지 않는다. 첫 temporal 실행은 fixture가 backend를 생략해 실행하지 않는 SPIR-V까지 생성하면서 E41012로 실패했다. fixture가 실행 backend를 명시하게 수정한 뒤 위 최종 검사가 통과했다. 회귀 도구에는 Debug/Release 선택과 독립 산출물 경로를 추가했다.
 
 원시 로그·프로파일·출력은 `Artifacts/graph-declare-20261020/`에 보존한다. 기존 [소프트웨어 RHI 구현 스펙](../design/RHISoftwareCommandListSpecification.md)에 수명 계약을 함께 기록했다.
+
+</details>

@@ -1,5 +1,52 @@
 # ContactStream 물리 접촉·C# 계약
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 물리 쿼리는 sceneAnchor Entity, 호출자 버퍼와 PhysicsQueryResult를 사용한다. 현재 hit 타입은 PhysicsHit이며 LayerId는 신원 값이다.
+- 접촉은 OnBeginSimulation에서 ContactStream을 등록하고 PostPhysics에서 소비한다. OnTrigger*/OnCollision* 훅과 RaycastAll을 현행 공개 API로 사용하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Native.cs:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L16) — `[StructLayout(LayoutKind.Sequential)]`
+- [ScriptCore/Native.cs:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L17) — `internal unsafe struct ScriptApiTable`
+- [ScriptCore/Native.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L19) — `public int Version;`
+- [Engine/RenderEngine/MeshOptimizer.h:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MeshOptimizer.h#L4) — `class MeshOptimizer`
+- [Engine/RenderEngine/MeshOptimizer.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MeshOptimizer.h#L6) — `public:`
+- [Engine/RenderEngine/MeshOptimizer.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MeshOptimizer.h#L7) — `struct LOD`
+- [Engine/SceneRuntime/ClrHost.cpp:568](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.cpp#L568) — `if (!name || !*name || !ce::profiler().is_initialized()) return 0;`
+- [Engine/SceneRuntime/ClrHost.cpp:575](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.cpp#L575) — `if (marker != 0) ce::profile_scope_begin(marker);`
+- [Engine/SceneRuntime/ClrHost.cpp:580](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.cpp#L580) — `ce::profile_scope_end();`
+- [Engine/EngineDiagnostics/ProfileRecording.cpp:73](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileRecording.cpp#L73) — `std::memcpy(bytes.data() + offset, &value, sizeof(T));`
+- [Engine/EngineDiagnostics/ProfileRecording.cpp:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileRecording.cpp#L88) — `std::memcpy(&value, bytes.data() + offset, sizeof(T));`
+- [Engine/EngineDiagnostics/ProfileRecording.cpp:178](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileRecording.cpp#L178) — `if (crc(std::span(header).first(28)) != header_crc)`
+- [Tools/regression/verify-player-shipping-isolation.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-shipping-isolation.ps1#L1) — `[CmdletBinding()]`
+- [Tools/regression/verify-player-shipping-isolation.ps1:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-shipping-isolation.ps1#L33) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-player-shipping-isolation.ps1:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-shipping-isolation.ps1#L94) — `$text = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($Exe))`
+- [Tools/regression/verify-physics-contact-scene-http.ps1:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-scene-http.ps1#L6) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-physics-contact-scene-http.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-scene-http.ps1#L8) — `$out=Join-Path $repo ('Build/Verification/ContactStream/Product-'+[guid]::NewGuid().ToString('N'))`
+- [Tools/regression/verify-physics-contact-scene-http.ps1:69](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-scene-http.ps1#L69) — `[IO.File]::WriteAllText($shapeFile,$shapes)`
+- [Tools/regression/verify-physics-contact-stream-http.ps1:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-stream-http.ps1#L20) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-physics-contact-stream-http.ps1:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-stream-http.ps1#L22) — `$out=Join-Path $repo ('Build/Verification/ContactStream/Product-'+[guid]::NewGuid().ToString('N'))`
+- [Tools/regression/verify-physics-contact-stream-http.ps1:72](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-stream-http.ps1#L72) — `[IO.File]::WriteAllText($shapeFile,$shapes)`
+- [Tools/regression/verify-physics-contact-stream-player.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-stream-player.ps1#L4) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-physics-contact-stream-player.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-stream-player.ps1#L7) — `$work=if($ReuseWork){[IO.Path]::GetFullPath($ReuseWork)}else{Join-Path $repo ('Build/Verification/ContactStream/Player-'+[guid]::NewGuid().ToString('N'))}`
+- [Tools/regression/verify-physics-contact-stream-player.ps1:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-contact-stream-player.ps1#L55) — `[IO.Path]::GetRelativePath($rootPath,$_.FullName)+'|'+(Get-FileHash -LiteralPath $_.FullName).Hash`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 개정: 2026-10-08 · 상태: 기본 스트림 구현 진행(E0), 제품 통합/확장 게이트 미완료.
 
 ## 확정한 저작 표면
@@ -411,3 +458,5 @@ ABI40 제품 수용은 위3 fixture 범위다. 이전 ABI39 Editor/Shipping suit
 fresh Development Player5범위: solid3122979f/overflow bedd5aae/exception a748bbfa 각2000GT, Scene reload fd99f6cd/body DDOL599cb14f 각2014GT. display 1937,1940,1934,8,8·exit0·패키지 불변 통과. 두 fault 사례 실패콜백/Disable1·정상구독지속·cleanup2/물리8종 생성해제 일치, 두 Scene 사례 목적지Begin2/Persist2·표시8·종료해제/물리ledger 일치. DDOL 동일 captured body wrapper/stream 유지, reload 이전stream 해제+새body/stream 확인. Player runtime assemblyreload API는 추가하지 않는다.
 
 관리 router Release70/steady allocation0, 새 dev/ship 바이너리 소켓·서비스 격리 control 감사 통과(abi40-router.log/abi40-isolation.log). 통합 인덱스 abi40-development-core.json. 기본 최적화 구성의 제한 fixture 수용이며 전체 Editor GPU capture·대표 성능·E0/M3/M4 완료가 아니다. 다른 ABI39 contact 전환 suite는 이력이고 ABI40 전체 회귀로 주장하지 않는다. B1 직접 형상 Inspector 저작 경로·C1 입력/회전 정책·전체 콘텐츠/성능 잔여 유지.
+
+</details>

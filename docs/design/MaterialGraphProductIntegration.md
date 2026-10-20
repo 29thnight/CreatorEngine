@@ -1,5 +1,48 @@
 # LX Material 제품 통합 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-vulkan-scene.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-scene.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-material-vulkan-scene.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-scene.ps1#L9) — `Get-ChildItem (Join-Path $repo 'Engine/RenderEngine'), (Join-Path $repo 'Engine/Utility_Framework'),`
+- [Tools/regression/verify-material-vulkan-scene.ps1:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-scene.ps1#L12) — `Get-Item (Join-Path $PSScriptRoot 'material_raster_surface_probe.cpp'),`
+- [Tools/regression/verify-material-editor-integration.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-editor-integration.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-material-editor-integration.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-editor-integration.ps1#L10) — `$caseRoot = Join-Path $output ("EditorLX-$Configuration-" + [Guid]::NewGuid().ToString('N').Substring(0, 12))`
+- [Tools/regression/verify-material-editor-integration.ps1:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-editor-integration.ps1#L95) — `public static class LXEditorPixels`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [ScriptCore/MeshRenderer.cs:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L33) — `public bool SetMaterialFloat(string valueName, float value)`
+- [ScriptCore/MeshRenderer.cs:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L34) — `=> Native.MeshSetMaterialFloat(OwnerHandle, valueName, value);`
+- [ScriptCore/MeshRenderer.cs:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L37) — `public bool SetMaterialInt(string valueName, int value)`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/MeshRenderer.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19) — `class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>`
+- [Engine/SceneRuntime/MeshRenderer.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L58) — `void SetMaterial(own::shared_owner<Material> material)`
+- [Engine/SceneRuntime/MeshRenderer.h:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L67) — `void SetMaterialAssetReference(own::shared_owner<Material> material, FileGuid baseGuid,`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/MeshRenderer.cpp:610](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L610) — `void MeshRenderer::SetMaterialAssetReference(own::shared_owner<Material> material, FileGuid baseGuid,`
+- [Engine/SceneRuntime/MeshRenderer.cpp:639](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L639) — `SetMaterial(std::move(material));`
+- [Engine/SceneRuntime/MeshRenderer.cpp:684](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L684) — `SetMaterial(std::move(recovered));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 정본: [BlenderMaterialGraphPlan](../plans/BlenderMaterialGraphPlan.md)의 MAT-7.
 이 문서는 고정한 마지막 종료 묶음인 실제 Editor Scene/Game 상태·수명과
 native Vulkan 전체 Scene 실행을 소유한다. artist 노드 편집·preview는 MAT-8,
@@ -130,3 +173,5 @@ Player의 catalog/bytecode-only 경계는 그대로다. 이 창의 UI/HTTP 검�
 Vite 문서 빌드는 통과했다. 전체 dashboard checker는 기존 미산정 `days:null` 24행 및
 PHASE 4.6 meta 불일치 1건 때문에 실패한다. HEAD와 같은 25건이며 이번 변경을 전체
 checker 통과로 기록하지 않는다.
+
+</details>

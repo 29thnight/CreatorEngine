@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>LX Scene shadow caster와 Decal</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSceneShadowDecal.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSceneShadowDecal.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>LX Scene shadow caster와 Decal</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-shadow-decal.ps1#L8">Tools/regression/verify-material-scene-shadow-decal.ps1:8</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-shadow-decal.ps1#L9">Tools/regression/verify-material-scene-shadow-decal.ps1:9</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-shadow-decal.ps1#L10">Tools/regression/verify-material-scene-shadow-decal.ps1:10</a> — <code>$vswhere = Join-Path ${env:ProgramFiles(x86)} &#39;Microsoft Visual Studio\Installer\vswhere.exe&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17">Engine/RenderEngine/MaterialGraphSceneVolume.h:17</a> — <code>struct SceneVolumeTriangle</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L19">Engine/RenderEngine/MaterialGraphSceneVolume.h:19</a> — <code>math::vector4 a, b, c;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31">Engine/RenderEngine/MaterialGraphSceneVolume.h:31</a> — <code>own::shared_owner&lt;const RenderBindings&gt; material;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31</a> — <code>enum class EnhancedLiveDisplayTarget : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39</a> — <code>enum class EnhancedLiveViewFlags : uint32_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177</a> — <code>own::shared_owner&lt;const material_graph::SceneMaterialSource&gt; materialPreview;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h#L61">Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h:61</a> — <code>class EnhancedDecalPass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h#L119">Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h:119</a> — <code>own::shared_owner&lt;TextureFramePins&gt; texturePins = {})</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h#L122">Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h:122</a> — <code>m_texturePins = std::move(texturePins);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L32">Engine/RenderEngine/MaterialGraphSceneVolume.cpp:32</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L41">Engine/RenderEngine/MaterialGraphSceneVolume.cpp:41</a> — <code>assets::Has(geometry.vertexAttributeMask, assets::VertexAttribute::BoneIndices))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L46">Engine/RenderEngine/MaterialGraphSceneVolume.cpp:46</a> — <code>if (!math::try_inverse(source.World()))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3982">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3982</a> — <code>const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8223">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8223</a> — <code>EnhancedSceneRenderer::MutableRenderThreadHooks();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8381">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8381</a> — <code>const auto&amp; hooks = EnhancedSceneRenderer::MutableRenderThreadHooks();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp#L98">Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp:98</a> — <code>bool EnhancedDecalPass::Initialize(const EnhancedFrameContext&amp; context, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp#L109">Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp:109</a> — <code>bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext&amp; context, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp#L204">Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp:204</a> — <code>bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext&amp; context, std::string&amp; outError)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>1. 제품 연결</h2>
+<p><code>EnhancedSceneRenderer</code>의 Shadow 노드는 기존 shadow pass 뒤에
+<code>SceneHost::DeclareShadow()</code>를 선언한다. 두 경로가 같은 세 캐스케이드 D32 배열을
+사용하며 LX 경로는 기존 깊이를 지우지 않는다. 기존 shadow pass는 graph instance를
+제외하고, SceneHost가 선택한 ready/마지막 정상 재질과 현재 world·pose를 사용한다.</p>
+<p>Surface 재질은 별도 depth 전용 <code>LXSceneShadowVS/PS</code>를 사용한다. 픽셀 shader가
+그래프의 Alpha와 numeric override·이미지 샘플링을 평가하고 동일 coverage/cutoff·
+양면 정책을 적용한다. 순수 Volume에는 불투명 shadow caster를 만들지 않는다.
+geometry 생산은 Shadow와 GBuffer가 공유하며 각 graph에서 한 번만 선언한다.
+카메라 가시 목록으로 shadow caster를 잘라내지 않고 light projection의 clipping을 사용한다.</p>
+<p>Decal 노드는 기존 <code>EnhancedDecalPass</code>가 GBuffer를 수정한 뒤 해당 패스의
+기존 diffuse/ORM/normal 사본을 <code>SceneHost::DeclareDecalInputs()</code>에 등록한다.
+baseline을 위한 추가 texture copy는 없다. graph 수명과 barrier 계획이 사본을
+Color/lookup 소비가 끝날 때까지 보존한다. Decal이 없으면 baseline 등록·복사가 없다.</p>
+<pre><code class="language-mermaid">flowchart LR
+    G[현재 pose geometry] --&gt; S[LX shadow Alpha 평가]
+    G --&gt; B[공유 GBuffer]
+    B --&gt; P[기존 Decal snapshot]
+    P --&gt; D[Decal GBuffer 수정]
+    D --&gt; I[변경 채널을 raw MaterialInputs에 반영]
+    P --&gt; I
+    I --&gt; L[픽셀 입력 비교와 IBL bake]
+    I --&gt; C[Principled lobe 재평가]
+    L --&gt; C
+    C --&gt; H[HDR 합성]
+</code></pre>
+<h2>2. 재질 입력과 채널 계약</h2>
+<p>LX 재질을 다시 평가한 뒤, post-Decal과 baseline의 <strong>저장된 채널 값끼리</strong> 비교한다.
+색 RGB·AO·roughness·metallic·world normal 중 바뀐 값만 raw 입력을 교체한다.
+변경이 없는 채널에는 원래 graph의 full precision 값을 사용한다. graph Alpha,
+IOR·specular tint·coat·sheen·anisotropy·thin film·transmission·emission의 독립 입력은 보존한다.
+world normal 변경 시 양면 orientation을 중복 적용하지 않는다.</p>
+<p>raw 입력을 교체한 뒤 Principled를 평가하므로 금속 Fresnel·색 tint·layer 에너지와
+IBL 적분이 같은 변경을 사용한다. 최종 baseColor만 바꾸는 방식으로 처리하지 않는다.
+lookup capture도 같은 입력을 사용하여 변경 픽셀을 다시 적분한다.
+transmission의 별도 GBuffer/lookup/shading 단계에서는 opaque Decal 입력을 적용하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구분</th>
+<th>GBuffer ORM 저장 순서</th>
+<th>Decal texture AO/R/M 처리</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기존 재질</td>
+<td>Metallic / Roughness / Occlusion</td>
+<td>R/B를 교환</td>
+</tr>
+<tr>
+<td>LX 소유자</td>
+<td>Occlusion / Roughness / Metallic</td>
+<td>원래 순서</td>
+</tr>
+</tbody></table></div>
+<p>Decal shader는 owner bitmask의 상위 비트로 둘을 구분한다. bitmask가 없는 기존
+독립 호출은 기존 순서를 유지한다. 현재 Decal의 diffuse alpha 제곱 블렌드,
+normal 출력 alpha 0에 따른 RGB 무변경, ORM의 기존 대상 alpha 블렌드 규칙을 유지한다.
+즉 이번 연결을 normal Decal의 블렌드 의미를 변경한 것으로 세지 않는다.</p>
+<h2>3. 검증</h2>
+<p><code>Tools/regression/verify-material-scene-shadow-decal.ps1 -SkipDependencyRestore</code>는
+source SHA-256을 고정하여 Debug/Release의 shadow·Decal·Volume·굴절·SSS·전체 Scene
+회귀를 실행한다. native D3D12 GPU validation의 WARNING 이상을 실패로 처리한다.</p>
+<p>독립 fixture는 실제 <code>SceneHost</code>, <code>EnhancedGBufferPass</code>, <code>EnhancedDeferredPass</code>,
+<code>EnhancedDecalPass</code>를 사용한다. Shadow는 세 캐스케이드 전체의 깊이를 읽고,
+Decal은 최종 HDR·GBuffer·raw lookup 입력·IBL sample·cache 통계를 읽는다.</p>
+<ul>
+<li>Shadow: Opaque/Masked, Alpha 이미지와 numeric 곱, cutoff, 단면/양면,
+기존 깊이 보존, world 이동, triangle chunk, 현재 skin pose의 밀봉,
+순수 Volume 제외, shadow 비활성, 중복/다른 graph 선언 거부.</li>
+<li>Decal: Core/Layered, diffuse·ORM·동시 적용·normal no-op·투명 no-op,
+LX/기존 채널 순서, unchanged 채널의 정밀도, graph Alpha 보존,
+raw lookup와 derived IBL·최종 lobe HDR, 제거 후 정확한 원래 HDR 복원,
+잘못된 snapshot·중복 선언 거부.</li>
+<li>각각 순차·1 worker·4 worker로 동일 결과를 비교한다. Decal 기준은
+변경된 GBuffer 값으로 새 reference instance를 렌더하고, 기존 블렌드 수식도 별도로 비교한다.</li>
+</ul>
+<h3>3.1 실행 결과 (2026-09-29)</h3>
+<p>VS18/v145 Debug·Release 빌드와 native D3D12 실행이 모두 통과했다.
+각 실행은 DebugLayer/GPUValidation을 켰으며 WARNING 이상 진단은 0건이다.
+576개 source SHA-256을 실행 전후 대조했고 변경은 0개였다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>각 Debug / Release 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shadow</td>
+<td>42 frame · covered 8,856 · 검사 33,230 · GPU 성분 32,256</td>
+</tr>
+<tr>
+<td>Shadow + Decal</td>
+<td>156 frame · 누적 검사 295,799 · GPU 성분 290,898</td>
+</tr>
+<tr>
+<td>Decal</td>
+<td>114 frame · 변경 1,536 / 보존 3,648픽셀 · 잘못된 선언 거부 72회</td>
+</tr>
+<tr>
+<td>Volume 회귀</td>
+<td>33 frame · 검사 35,026 · GPU 성분 57,840</td>
+</tr>
+<tr>
+<td>굴절 회귀</td>
+<td>24 frame · 검사 185,066 · GPU 성분 155,877</td>
+</tr>
+<tr>
+<td>SSS 회귀</td>
+<td>12 frame · 검사 119,413 · GPU 성분 108,072</td>
+</tr>
+<tr>
+<td>전체 raster/Scene 회귀</td>
+<td>검사 21,079,762 · GPU 성분 3,899,966</td>
+</tr>
+<tr>
+<td>기존 Scene 합성 / generation</td>
+<td>56 graph / 12 frame · native PSO worker 25회</td>
+</tr>
+</tbody></table></div>
+<p>Shadow + Decal 수치는 같은 실행의 누적 수치이므로 Shadow 검사를 다시 합산하지 않는다.
+잘못된 선언 거부는 기대한 실패 복구 fixture이며 GPU validation 오류가 아니다.
+기존 전체 회귀의 baseline byte/depth와 current-pose 결과도 유지됐다.</p>
+<p>원본 로그는 <code>Build/Obj/MaterialProductProbe/shadow-decal-gate-final.log</code>,
+개별 native 로그는 <code>shadow-decal-gate-{shadow-decal,volume,refraction,subsurface,raster}-{Debug,Release}.log</code>,
+source manifest는 <code>shadow-decal-source-hashes.json</code>이다. 최종 signature는
+<code>LX_MATERIAL_SCENE_SHADOW_DECAL_GATE_OK sources=576 drift=0 configurations=Debug,Release</code>다.</p>
+<p>같은 변경으로 native Vulkan Debug/Release 준비 gate도 통과했다. source 569개 변경 0개,
+Core/Layered generation 2개·그림자를 포함한 Ready 응답 18개·native PSO worker 15회와
+각 768픽셀 baseline draw를 확인했다. 검사 수는 Debug 14,273 / Release 10,727개이며,
+종료까지 validation WARNING 이상은 0건이다. 자세한 범위는
+<a href="MaterialGraphSceneGeneration.html#61-shadow-caster-%EC%B6%94%EA%B0%80-%ED%9B%84-%EC%9E%AC%EA%B2%80%EC%A6%9D-2026-09-29">Scene generation §6.1</a>이다.
+최종 로그는 <code>Build/Obj/MaterialProductProbe/shadow-decal-vulkan-gate-final.log</code>다.</p>
+<p><code>Editor/CreatorEditor.vcxproj</code>의 x64 Debug 전체 빌드도 종료 코드 0으로 통과했고
+<code>CreatorEditor.runtime.dll</code>과 launcher 실행 파일을 만들었다. 원본 로그는
+<code>Build/Obj/MaterialProductProbe/shadow-decal-editor-build-final.log</code>다.
+빌드에는 LNK4075와 LNK4229 경고가 남았다. 이 결과는 실제 Editor Scene/Game 조작,
+재개방·교체·수명 검증을 완료한 것으로 세지 않는다.</p>
+<h2>4. 범위</h2>
+<p>이 경로는 Surface coverage의 depth shadow와 기존 opaque Decal 계약이다.
+유색 투과 shadow·매질 shadow map이나 기존 normal Decal 블렌드 개선을 구현했다고
+주장하지 않는다. Volume의 광선 내부 감쇠는 별도
+<a href="MaterialGraphSceneVolume.html">Volume transport</a> 계약이다.</p>
+<p>전체 비용/근사 수렴/Blender rendered parity는 MAT-9다. MAT-7의 자동 Scene host
+cook/package·Player는 <a href="MaterialGraphSceneCook.html">MaterialGraphSceneCook.md</a>, 실제 Editor
+Scene/Game·native Vulkan 전체 Scene은 <a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>의
+후속 실행으로 완료했다. native shader/PSO 준비와 실제 Editor 상태·픽셀 검증은 구분한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-제품-연결"></span><span id="2-재질-입력과-채널-계약"></span><span id="3-검증"></span><span id="31-실행-결과-2026-09-29"></span><span id="4-범위"></span><span id="sec-1-제품-연결"></span><span id="sec-2-재질-입력과-채널-계약"></span><span id="sec-3-검증"></span><span id="sec-4-범위"></span></details></main></body></html>

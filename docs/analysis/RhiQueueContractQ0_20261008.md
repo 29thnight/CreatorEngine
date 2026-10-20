@@ -1,5 +1,51 @@
 # Q0 queue/timeline foundation — accepted 2026-10-08
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/RHI/RHIQueueContract.h:151](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueContract.h#L151) — `class IRHIQueueCommandBatch`
+- [Engine/RenderEngine/RHI/RHIQueueContract.h:154](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueContract.h#L154) — `virtual ~IRHIQueueCommandBatch() = default;`
+- [Engine/RenderEngine/RHI/RHIQueueContract.h:171](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueContract.h#L171) — `virtual bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch,`
+- [Editor/EngineEntry/App.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L65) — `enabled |= std::wstring_view(arguments[index]) == L"--smoke-offscreen";`
+- [Editor/EngineEntry/App.cpp:659](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L659) — `Debug::PrintLog(spdlog::level::debug, "[SHUTDOWN] CLI quit 요청 — 종료 시작");`
+- [Editor/EngineEntry/App.cpp:660](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L660) — `std::printf("[SHUTDOWN] CLI quit received\n");`
+- [Engine/Utility_Framework/Contract.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Contract.h#L1) — `#pragma once`
+- [Editor/EngineEntry/ConsoleCommandSystem.h:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L37) — `using ConsoleCommandResultHandler = CommandCore::CommandResult(*)(const ConsoleCommandContext&);`
+- [Editor/EngineEntry/ConsoleCommandSystem.h:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L60) — `void SetAudioDiagnosticsReader(std::function<CommandCore::CommandData()> reader)`
+- [Editor/EngineEntry/ConsoleCommandSystem.h:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L85) — `bool IsQuitRequested() const noexcept { return m_quitRequested.load(std::memory_order_acquire); }`
+- [Engine/RenderEngine/RHI/DX12/DX12QueueService.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12QueueService.h#L5) — `struct DX12QueueServiceState;`
+- [Engine/RenderEngine/RHI/DX12/DX12QueueService.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12QueueService.h#L8) — `class DX12QueueService final : public IRHICommandQueueFactory`
+- [Engine/RenderEngine/RHI/DX12/DX12QueueService.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12QueueService.h#L10) — `public:`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L65) — `class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices, public IRHICommandQueueFactory`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L84) — `DX12DeviceResources();`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L85) — `~DX12DeviceResources();`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:193](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L193) — `stream.handle = ::GetStdHandle(stream.id);`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:195](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L195) — `const DWORD type = ::GetFileType(stream.handle);`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:203](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L203) — `if (nullptr == ::GetConsoleWindow())`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **Q0 accepted for the DX12 queue foundation. RG8/L4 consumers remain separate.** RG7 remains closed/default OFF. Current device/submission/retirement consumers use one queue and an unqualified fence value; Q0 must provide identified queues and producer-owned timeline points before adding scheduling. The first slice added backend-neutral contracts and CPU validation. The second slice adds concrete DX12 queue/timeline primitives; GPU overlap and resource submission acceptance remain pending.
 
 `RHIQueueContract.h` defines Graphics/Compute/Copy kinds, process-unique device-incarnation/queue identity, service capabilities, timeline status and a strongly retained issued point. Fence objects remain opaque; no D3D12/Vulkan native handles enter this API. Capabilities default unavailable and refer to implemented service availability, not assumed hardware concurrency. The abstract factory and queue interfaces declare creation, monotonic signal and GPU-enqueued wait; DX12DeviceResources now implements the factory using DX12QueueService. Vulkan has no provider in this slice.
@@ -48,3 +94,5 @@ VS 2026/v18 Debug and Release final builds passed. Each final Editor runtime pas
 Evidence: `Build/Verification/Phase43/Q0Ownership/{Debug,Release}/{ownership-result.json,binary-metadata.json,results.jsonl,stdout.log,stderr.log}`, `Q0Ownership/closure-result.json`, `q0-ownership-debug-adapter-build.log`, `q0-ownership-release-build.log`, and `q0-ownership-{debug,release}-acceptance.log`. The closure aggregate verifies all three fixed steps in both final configurations and matches current contract/provider/adapter/test sources and runtime hashes. Individual probe `phaseComplete:false` fields were inherited from the slice harness; they are not the plan-closure authority. The aggregate records `phaseComplete:true` after the full bundle passes. Release runtime SHA-256: `6904F066B53FD35E99E96D7C338AE604151F703BCFA1EE68FE8073096D094C37`.
 
 Q0 is **done, earned six days once, estimate six unchanged**. Total estimate 563 / completed 126 / remaining 437 (+unestimated); PHASE 4.3 completed 74 / remaining 26. RG7 remains done/default OFF. RG8 scheduling/adoption, RG9 diagnostics, L4 consumption, MAT-9 and Vulkan runtime are not marked complete by this foundation acceptance.
+
+</details>

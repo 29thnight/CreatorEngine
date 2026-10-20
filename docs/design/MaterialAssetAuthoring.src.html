@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Asset-centered material authoring</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialAssetAuthoring.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialAssetAuthoring.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Asset-centered material authoring</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13">ScriptCore/MeshRenderer.cs:13</a> — <code>public sealed class MeshRenderer : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15">ScriptCore/MeshRenderer.cs:15</a> — <code>public string MaterialName =&gt; Native.MeshGetMaterialName(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24">ScriptCore/MeshRenderer.cs:24</a> — <code>public void InstantiateMaterial(string newName) =&gt; Native.MeshInstantiateMaterial(OwnerHandle, newName);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.h#L5">Engine/SceneRuntime/Socket.h:5</a> — <code>class Entity;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.h#L18">Engine/SceneRuntime/Socket.h:18</a> — <code>math::matrix4x4 m_local{ math::matrix4x4::identity() };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.h#L30">Engine/SceneRuntime/Socket.h:30</a> — <code>math::matrix4x4 m_offset{ math::matrix4x4::identity() };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30">Engine/RenderEngine/DataSystem.h:30</a> — <code>own::shared_owner&lt;const Texture&gt; descriptor;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L44">Engine/RenderEngine/DataSystem.h:44</a> — <code>std::vector&lt;own::shared_owner&lt;const Material&gt;&gt; materials;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45">Engine/RenderEngine/DataSystem.h:45</a> — <code>std::vector&lt;own::shared_owner&lt;const Texture&gt;&gt; textures;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19">Engine/SceneRuntime/MeshRenderer.h:19</a> — <code>class [[reflgen::reflect]] MeshRenderer : public meta::identity&lt;MeshRenderer, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L32">Engine/SceneRuntime/MeshRenderer.h:32</a> — <code>MeshRenderer();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L41">Engine/SceneRuntime/MeshRenderer.h:41</a> — <code>virtual &amp;#126;MeshRenderer() override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Ownership.h#L1">Engine/Utility_Framework/Ownership.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.cpp#L7">Engine/SceneRuntime/Socket.cpp:7</a> — <code>Socket::Socket()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.cpp#L12">Engine/SceneRuntime/Socket.cpp:12</a> — <code>void Socket::ReleaseManagedResources()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.cpp#L14">Engine/SceneRuntime/Socket.cpp:14</a> — <code>if (auto* manager = SceneManager::GetIfAlive())</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L55">Engine/RenderEngine/DataSystem.cpp:55</a> — <code>for (const auto&amp; entry : file::directory_iterator(directory))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L129">Engine/RenderEngine/DataSystem.cpp:129</a> — <code>throw std::runtime_error(&quot;Asset image decoder apartment initialization failed.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L139">Engine/RenderEngine/DataSystem.cpp:139</a> — <code>std::ranges::transform(value, value.begin(), [](unsigned char character)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>The Material Node Editor edits existing material assets independently of Scene selection. It does not introduce a second asset system.</p>
+<h2>Ownership and workflow</h2>
+<ul>
+<li><code>.shadergraph</code> owns nodes, links, graph parameter declarations, and connected Surface Settings</li>
+<li><code>.asset</code> owns its graph GUID, default parameter values, texture references, and material flags</li>
+<li><code>MeshRenderer</code> owns the material asset reference and optional instance overrides</li>
+<li>An open editor session owns its draft graph/defaults, private compiled candidate, and last valid preview</li>
+</ul>
+<p>Open the Material Node Editor from the window menu without selecting an object. Use <strong>New Material Asset</strong> or <strong>Open Material Asset</strong>. The Inspector&#39;s <strong>Open Node Editor</strong> opens the referenced base asset, not a mesh&#39;s instance overrides. An unbound/imported material creates an independent draft; existing legacy assets are retained rather than converted in place.</p>
+<ol>
+<li>Edit nodes and graph parameters. A newly added Parameter node has <strong>Declare Parameter</strong> in Node Details. Graph declarations and material defaults are separate controls. Socket-backed imported parameters retain their existing effective-default source</li>
+<li>The editor coalesces changes for 250 ms and prepares the latest draft on the existing job scheduler. One pending job is allowed per session. Obsolete completions are discarded. CPU compilation produces an isolated owned generation; texture/instance binding returns to the editor thread</li>
+<li><strong>Apply to Material Asset</strong> publishes the prepared valid candidate to the existing cache. Resident assets sharing the edited graph are rebuilt with their own defaults before publication. If any candidate fails validation, publication is rejected</li>
+<li><strong>Save Material Asset</strong> persists the already-applied material and graph. Apply is required before Save. Save checks disk changes, deletions, cache ownership, and asset identities. It does not assign a mesh</li>
+<li><strong>Assign Asset to Selected Mesh</strong> explicitly assigns a saved accepted asset to the current selected, unlocked MeshRenderer. Save the Scene to persist that reference</li>
+</ol>
+<p><strong>Save As Copy</strong> in the graph editor creates independent material and graph identities in an unassigned draft. The Inspector&#39;s material-copy action instead shares the graph, copies the current material values into the new asset defaults, and offers assignment separately. Reload Saved Draft reads the exact saved pair into the editor without publishing it; Apply remains explicit.</p>
+<p>Material node descriptions are available only by hovering the existing information-font glyph at the upper-right of each node header. The icon reserves title space and does not start node selection/drag; pin interaction remains higher priority.</p>
+<p>The generic graph canvas supports stationary right-click on a connected input to disconnect, and dragging a new output onto a connected single input to replace its link. Replacement is one undo/revision and invalid replacement preserves the original graph. Right-drag still pans.</p>
+<h2>Publication and lifetime contracts</h2>
+<ul>
+<li>Accepted material owners use the same immutable ownership_cpp and bounded cache contracts as AssetDepot. Apply clones the draft, validates every replacement and retained-budget admission before compare-and-publish, then refreshes consumers using the accepted owner. Oversized replacement batches fail without publishing</li>
+<li>Isolated and queued graph preparations share a never-reused generation identity space. Authoring publication invalidates stale preparation tickets; cooked AssetDepot graphs retain the same content digest and surface-alpha metadata</li>
+<li>Draft compilation never writes the accepted graph-generation or material caches. Generated-source scratch directories are per request and released after the owned product is created</li>
+<li>Job captures own the graph, paths, output, and error text; they never capture a Session or DataSystem pointer. The document/revision pair must still match before accepting completion</li>
+<li>A compile or binding failure leaves the last good preview and accepted Scene material intact. Pending and error states are visible in the editor</li>
+<li>Preview capture only copies immutable source owners. It does not compile or load the selected mesh. The preview floor uses the same owned background preparation</li>
+<li>Editor shutdown stops new draft submissions, drains pending jobs outside the existing session lock, and releases preview owners before renderer/compiler teardown</li>
+<li>The material cache publication revision gates Scene refresh at the GT render-proxy commit boundary. Unchanged frames do not add per-mesh cache lookups</li>
+<li>A mesh retains the accepted base used to interpret its overrides. Explicit-override provenance survives later asset defaults that happen to equal an override, serialization, and undo/redo</li>
+<li>A removed asset or an incompatible override keeps the last valid mesh instance. Unresolved serialized references retain their original payload for later recovery</li>
+<li>Graph reference serialization uses the existing typed material instance codec, with <code>ref</code> and a <code>graphOverrides</code> delta; legacy and inline material readers remain available</li>
+<li>Explicit alpha mode follows the final connected Surface Settings closure through groups. Its canonical generated-source marker is retained in cooked graph products, so shared-graph assets use the same routing in Editor and source-less Player. Marker-less legacy products retain their material-document mode</li>
+<li>External <code>.asset</code> and <code>.shadergraph</code> changes use validated replacement. A failed reload retains the accepted generation. Cold loads must recheck the current graph before insertion so a concurrent Apply cannot leave a late cache entry on an old generation</li>
+<li>Saving the material, graph, and their sidecars is rollback-capable, not a multi-file filesystem-atomic transaction. Authored final-state fingerprints suppress delayed watcher events from successful writes and rollback; an external differing state is still processed</li>
+</ul>
+<h2>Boundaries</h2>
+<p>This change does not add shader-function libraries, general UE feature parity, or new rendering backends. Transparent surface routing is preserved, but the isolated sphere preview renderer still displays only Opaque and Masked surfaces; the editor states that limitation instead of showing an opaque substitute. GPU pipeline preparation remains asynchronous in the existing renderer after CPU draft compilation.</p>
+<p>Graph document undo/redo handles node/link/socket/layout operations. Material-default and graph-declaration metadata controls are draft edits outside that graph-only undo history. Closing the panel keeps its draft in memory; unsaved drafts are not a replacement for saving before exiting the editor.</p>
+<h2>Validation</h2>
+<p>The integration with master <code>d5a6a26a78da93686b8168429183ee7e0d50a8de</code> was reviewed for immutable cache ownership, asynchronous preparation, cooked metadata, material references, and model texture context. Only source/static checks were performed for this change. No compiler, build, engine execution, unit/runtime tests, or benchmarks were run.</p>
+<p>Owner validation checklist:</p>
+<ul>
+<li>Build Editor and Player in the supported Windows configurations; check DX12 and Vulkan graph paths and cook/package compatibility</li>
+<li>With no mesh selected, create a material, add/edit nodes, inspect the draft preview, Apply, Save, close/reopen, then assign to a mesh</li>
+<li>Share the asset across two meshes. Override one mesh&#39;s roughness. Change the asset default: the inherited mesh updates and the override remains. Change the default to equal the override, then change it again; the override must still remain</li>
+<li>Save/reopen the Scene and exercise undo/redo of assignment and instance edits across asset Apply operations</li>
+<li>Open two distinct material assets sharing one graph, change a graph parameter and alpha mode, Apply/Save, then cook and inspect both in Player</li>
+<li>Try invalid graph links, a missing texture, a private/deleted parameter with existing overrides, and a failing shader compile. Accepted assets and last-good previews must stay valid</li>
+<li>Modify the draft repeatedly during compilation, change the active document/Scene/selection, close the panel, and exit while a job is pending. No obsolete result may publish to another session or object</li>
+<li>Create independent graph-editor copies and shared-graph Inspector copies; cancel/switch selection during modal UI. No unintended mesh assignment or reference loss</li>
+<li>Delete, externally edit, or rename material/graph files while open; verify conflict/reload messages, last-good behavior, and recovery. Force a pair-save failure and confirm the rollback watcher does not undo the accepted in-memory Apply</li>
+<li>Exercise imported/legacy materials, nested/dotted names, exposed textures, socket-backed parameters, masked/transparent routing, and valid/invalid link replacement with one-step undo</li>
+<li>Hover information icons at different zoom/DPI values, including collapsed/readonly nodes; check tooltip wrapping, header/title clipping, pin drag, node dragging, and overlapping windows</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="boundaries"></span><span id="ownership-and-workflow"></span><span id="publication-and-lifetime-contracts"></span><span id="sec-boundaries"></span><span id="sec-ownership-and-workflow"></span><span id="sec-publication-and-lifetime-contracts"></span><span id="sec-validation"></span><span id="validation"></span></details></main></body></html>

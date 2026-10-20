@@ -1,5 +1,52 @@
 # MAT-9 — 근접 카메라 이동 프레임 저하 조사
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/EngineDiagnostics/ProfileCaptureFile.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.cpp#L23) — `enum class chunk_type : std::uint32_t`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.cpp:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.cpp#L84) — `std::memcpy(m_bytes.data() + at, &value, sizeof(T));`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.cpp:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.cpp#L92) — `std::memcpy(m_bytes.data() + at, value.data(), value.size());`
+- [Tools/regression/material_matched_image_probe.cpp:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_matched_image_probe.cpp#L20) — `struct MatchedPassTimer final : IRHIGpuProfiler`
+- [Tools/regression/material_matched_image_probe.cpp:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_matched_image_probe.cpp#L56) — `Check(Uuid::TryParse("11111111-1111-8111-8111-111111111111", mesh.handle.modelId) &&`
+- [Tools/regression/material_matched_image_probe.cpp:57](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_matched_image_probe.cpp#L57) — `Uuid::TryParse("22222222-2222-8222-8222-222222222222", mesh.handle.meshId), "Matched geometry identity");`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang#L33) — `float4 LXLoadSceneInput(uint field, int3 pixel)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang#L75) — `float4 LXLoadPreviousSceneInput(uint field, int3 pixel)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang:180](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang#L180) — `same = same && all(asuint(LXLoadSceneInput(field, int3(pixel, 0)))`
+- [Engine/RenderEngine/RHI/IRHIGpuProfiler.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L5) — `class RHIEncoder;`
+- [Engine/RenderEngine/RHI/IRHIGpuProfiler.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L65) — `class IRHIGpuProfiler`
+- [Engine/RenderEngine/RHI/IRHIGpuProfiler.h:70](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L70) — `virtual ~IRHIGpuProfiler() = default;`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.h:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.h#L48) — `enum class capture_file_error : std::uint8_t`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.h:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.h#L97) — `enum class recording_state : std::uint8_t`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.h#L106) — `struct recording_options`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L12) — `struct SceneLookupResourcePool;`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L15) — `struct SceneLookupStats`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L87) — `class SceneLookupCache : private IRHIUploadTransactionListener`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.cpp:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.cpp#L97) — `auto selected = std::find_if(idle.begin(), idle.end(), isReusable);`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.cpp:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.cpp#L126) — `ce::profile_instant(ce::marker<"MaterialLookupBudgetDeferred">());`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.cpp:346](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.cpp#L346) — `bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_t viewId, RHITextureHandle environment,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-01. **원인은 화면별 IBL lookup 재계산으로 좁혀졌다.**
 이 문서는 원인 조사와 근사 후보 실험이다. 모델 FPS 개선이나 MAT-9 성능 수용 완료를 뜻하지 않는다.
 제품 샘플 수·캐시 판정·쿠킹 형식은 이번 조사에서 변경하지 않았다.
@@ -178,3 +225,5 @@ GPU 전력 상태/클럭도 각 실행에서 변했다. NVML 200ms 간격 표본
   제품 소스 drift는 0이다. 원본 캡처와 기존 다른 세션 변경도 보존했다.
 
 MAT-9는 진행 중이다. 이번 조사로 실제 모델의 moving-camera 성능 수용을 완료 처리하지 않는다.
+
+</details>

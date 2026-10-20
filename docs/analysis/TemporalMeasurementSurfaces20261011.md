@@ -1,5 +1,37 @@
 # TR0 — 측정 표면과 기존 소비자 후속
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-tr0-diagnostics.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-tr0-diagnostics.ps1#L9) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-tr0-diagnostics.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-tr0-diagnostics.ps1#L10) — `$out=Join-Path ([IO.Path]::GetFullPath($Work)) "native-$Config"`
+- [Tools/regression/verify-tr0-diagnostics.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-tr0-diagnostics.ps1#L11) — `[IO.Directory]::CreateDirectory($out)|Out-Null`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/ProfilerViewer/ProfilerViewer.cpp:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/ProfilerViewer/ProfilerViewer.cpp#L44) — `std::snprintf(message, sizeof(message), "%s failed (HRESULT 0x%08lx).",`
+- [Tools/ProfilerViewer/ProfilerViewer.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/ProfilerViewer/ProfilerViewer.cpp#L46) — `throw std::runtime_error(message);`
+- [Tools/ProfilerViewer/ProfilerViewer.cpp:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/ProfilerViewer/ProfilerViewer.cpp#L84) — `throw std::runtime_error("Cannot determine the ProfilerViewer executable directory.");`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정 범위
 
 2026-10-11 구현 후 SDK 활성 Debug/Release Editor·ProfilerViewer 빌드와 검증을 통과했다. 최종 판정 정본은
@@ -71,3 +103,5 @@ SDK 구성 변경으로 모듈을 재컴파일했으므로 빌드 출력 증가�
 
 
 2026-10-11 후속: 현재 바이너리의 BASE-0 실제 population 및 용량 정리는 [TemporalBase0ConsumerWorkload20261011](TemporalBase0ConsumerWorkload20261011.md)과 tr0-base0-workload-20261011/checkpoint.json이 정본이다. SDK D/R 빌드·400표본·204캡처 수용, raw 대표 성공 2/필요 실패 2 및 로그 보존, 여유 93.21GiB. 이전 runtime 해시의 검증은 당시 실행 증거로 유지한다. TR0 progress·기성 0/PHASE 4.5 12/71 유지.
+
+</details>

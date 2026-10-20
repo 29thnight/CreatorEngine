@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Local artifact backing leases</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="ArtifactStoreLeaseProtocol.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/ArtifactStoreLeaseProtocol.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Local artifact backing leases</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/artifact_store_lease_probe.cpp#L60">Tools/regression/artifact_store_lease_probe.cpp:60</a> — <code>Require(ArtifactStoreGuard::BeginPublication(root, publication, failure), failure);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/artifact_store_lease_probe.cpp#L70">Tools/regression/artifact_store_lease_probe.cpp:70</a> — <code>Require(ArtifactStoreGuard::TryAcquireCollection(root, collection, failure) == ArtifactStoreAccess::Busy,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/artifact_store_lease_probe.cpp#L225">Tools/regression/artifact_store_lease_probe.cpp:225</a> — <code>own::make_shared&lt;Cooked::LooseArtifactByteSource&gt;(root);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L9">BuildTool/Paths.cs:9</a> — <code>internal static class Paths</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L24">BuildTool/Paths.cs:24</a> — <code>if (part.EndsWith(&#39; &#39;) || part.EndsWith(&#39;.&#39;) || part.IndexOfAny(Path.GetInvalidFileNameChars()) &gt;= 0 ||</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L50">BuildTool/Paths.cs:50</a> — <code>var length = handle.IsInvalid ? 0 : GetFinalPathNameByHandleW(handle, buffer, (uint)buffer.Capacity, 0);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ArtifactStoreGuard.h#L71">Engine/Utility_Framework/ArtifactStoreGuard.h:71</a> — <code>[[nodiscard]] static ArtifactStoreAccess TryAcquireCollection(const std::filesystem::path&amp; backing,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ArtifactStoreGuard.h#L80">Engine/Utility_Framework/ArtifactStoreGuard.h:80</a> — <code>[[nodiscard]] static bool BeginPublication(const std::filesystem::path&amp; backing,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ArtifactStoreGuard.h#L115">Engine/Utility_Framework/ArtifactStoreGuard.h:115</a> — <code>[[nodiscard]] bool CommitPublication(std::string&amp; failure)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h#L16">Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h:16</a> — <code>class PakAudioClipByteSource final : public ArtifactByteSource</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h#L19">Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h:19</a> — <code>explicit PakAudioClipByteSource(std::shared_ptr&lt;const Pak::Archive&gt; archive)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h#L20">Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h:20</a> — <code>: archive_(std::move(archive)) {}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetPacker/AssetPacker.cpp#L29">Tools/AssetPacker/AssetPacker.cpp:29</a> — <code>throw std::runtime_error(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetPacker/AssetPacker.cpp#L48">Tools/AssetPacker/AssetPacker.cpp:48</a> — <code>if (raw.empty()) Fail(std::string(label) + &quot; path is empty&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetPacker/AssetPacker.cpp#L53">Tools/AssetPacker/AssetPacker.cpp:53</a> — <code>Fail(std::string(label) + &quot; uses a device/extended path namespace: &quot; +</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetDepot.cpp#L177">Engine/RenderEngine/AssetDepot/AssetDepot.cpp:177</a> — <code>own::shared_owner&lt;const experiment::cooked::ArtifactByteSource&gt; byteSource,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetDepot.cpp#L191">Engine/RenderEngine/AssetDepot/AssetDepot.cpp:191</a> — <code>own::shared_owner&lt;const cooked::CookedAssetCatalog&gt; snapshot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetDepot.cpp#L239">Engine/RenderEngine/AssetDepot/AssetDepot.cpp:239</a> — <code>auto published = own::make_shared&lt;const cooked::CookedAssetCatalog&gt;(std::move(candidate));</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>This implementation is a bounded physical-exclusion slice of the approved
+AssetDepot ownership contract. It does not implement a garbage collector, select
+obsolete releases, delete files, repack archives, or infer GPU completion.</p>
+<h2>Existing storage roles</h2>
+<ul>
+<li><code>LooseArtifactByteSource</code> opens one shared OS guard when constructed. Catalog
+snapshots, requests, and unselected lazy-child origins already retain that
+source, so they protect the immutable release without opening every artifact</li>
+<li>A narrowed <code>SingleArtifactSource</code> retains its selected native file and shares
+the release guard. It does not retain the mount source, sibling file handles,
+or decoded payload bytes. Physical collection is conservatively release-wide</li>
+<li><code>Pak::Archive</code> holds its own guard before opening the pak. This covers archives
+that outlive an individual <code>PakAudioClipByteSource</code>; existing native FILE RAII
+and chunk-range reads are unchanged</li>
+<li>A guard is native OS RAII. Engine lifetime sharing uses the existing public
+<code>own::make_shared</code> and <code>own::shared_owner</code> APIs. There is no new manager,
+distributed lease service, or public per-asset lease wrapper</li>
+</ul>
+<h2>Publication and identity</h2>
+<p><code>ArtifactStoreGuard::BeginPublication</code> reserves a new backing path and holds its
+exclusive sibling guard. The producer creates/validates a candidate, atomically
+publishes it, then calls <code>CommitPublication</code> before reporting success. The
+persistent guard record binds the normalized backing path to its volume/device,
+file identity, directory/file kind, and backing incarnation stamp (Windows
+creation time; POSIX ctime seconds and nanoseconds). The guard file&#39;s own ctime
+is deliberately excluded from its identity because publication writes it.
+Existing backing cannot be retroactively
+enrolled, because legacy readers may lack the protocol.</p>
+<p><code>BuildAssetSet</code> performs these publication steps for new immutable loose outputs.
+The guard is a sibling named <code>&lt;backing&gt;.asset-store.guard</code>, outside the release
+and its payload list. It is machine-local coordination metadata, not a portable
+artifact or input to deterministic build keys. Moving/copying a release requires
+fresh publication at a new path; copied guard records do not authorize GC of a
+new file identity. Safe deployment reserves the absent destination with
+<code>BeginPublication</code>, copies into a private candidate, renames it to the destination,
+calls <code>CommitPublication</code>, then releases the exclusive publication guard before
+mounting. Already-extracted final roots remain unmanaged/noncollectible; there is
+no retrofit enrollment operation. Existing <code>AssetPacker</code> replace-in-place outputs are not silently
+converted. Immutable pak producers can use the same new-path publication API.</p>
+<p>Never delete, move, truncate, or replace a persistent guard as part of collection.
+It must remain in a stable parent directory. Abandoned publication records are
+not evidence of a live owner; a new publication may acquire the existing OS guard
+only when the target path is still absent. An incomplete record fails closed for
+readers and collection, and cannot be repaired by inferring process age.</p>
+<p>Paths crossing symlinks/reparse points and multiply-linked file backing/guards
+are rejected. Windows canonical naming also resolves short-name aliases before
+choosing a sidecar. Shared acquisition validates the recorded backing identity;
+source reads that would reopen a loose path validate the root again. Pak open
+also compares its native FILE identity with the acquired guard. On POSIX,
+changing an enrolled immutable root&#39;s metadata invalidates its captured incarnation even when
+the inode is unchanged. Publish a new immutable root rather than touching an
+existing enrolled root. Unmanaged legacy roots still validate directory/file
+identity, but do not enforce the managed incarnation contract for unrelated
+metadata changes. These checks harden ordinary replacement/inode reuse;
+they do not claim to defeat adversarial timestamp restoration.</p>
+<h2>Physical cleanup eligibility</h2>
+<ol>
+<li>Separately establish that an exact release/pak is obsolete under publication
+policy. This API does not decide whether a release will be needed in future</li>
+<li>Call <code>TryAcquireCollection(backing, capability, failure)</code> in a storage worker</li>
+<li><code>Busy</code> means a mount, old snapshot, descriptor, payload origin, job, archive,
+another producer, or another collector still owns an OS guard. <code>Unmanaged</code>
+means no enrollment exists and expressly does not allow collection. <code>Invalid</code>
+includes incomplete/corrupt metadata, aliases, and changed backing identity</li>
+<li>Only <code>Acquired</code> returns a held exclusive capability. Keep it alive throughout
+eventual physical work, use its exact <code>BackingPath</code>, and call
+<code>RevalidateCollection</code> immediately before mutation. Revalidation refuses a
+replaced root/pak/guard. Never turn the result into a cached Boolean</li>
+<li>There is deliberately no destructive API in this slice. A future collector
+must use this protocol for the whole backing and leave the sibling guard
+intact. Ancestor-directory cleanup must first cover every descendant store;
+taking an unrelated ancestor&#39;s guard is not permission to remove descendants</li>
+</ol>
+<p>Windows uses <code>LockFileEx</code>; POSIX uses <code>flock</code> on separate close-on-exec descriptors.
+Locks are nonblocking and cover separate opens in the same process as well as
+independent cooperating processes. OS process termination releases locks, so no
+PID expiry file, <code>use_count()</code>, GPU token, timeout, or stale-file heuristic decides
+whether owners exist. This protocol is for a supported local filesystem; it does
+not claim distributed/network-filesystem lease semantics. Uncooperative external
+mutation can still cause explicit identity/I/O errors and is not made safe by an
+OS advisory protocol.</p>
+<p>Shared acquisition is metadata I/O at source/archive construction. It must not
+be added to <code>TryAcquire</code>, resident cache-hit paths, or GT/RT uploads. Logical
+unmount only drops the new resolver&#39;s source references; it does not release
+references held by old snapshots, descriptors, or jobs.</p>
+<h2>Verification status</h2>
+<p><code>Tools/regression/artifact_store_lease_probe.cpp</code> is added but has not been built
+or run. It covers mounted/retired snapshots, never-read lazy origins, narrowed
+file captures without sibling descriptors, same-process and independent-process
+exclusion, OS release after child termination, missing/corrupt enrollment,
+replacement identity and same-inode incarnation rejection, and Windows pak archive lifetime. Linux checks
+native descriptor counts. Existing catalog/source regressions remain relevant.
+No deletion, repack, build, binary, shader compilation, or test was executed as
+part of this implementation task. Static source review is not a runtime pass.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="existing-storage-roles"></span><span id="physical-cleanup-eligibility"></span><span id="publication-and-identity"></span><span id="sec-existing-storage-roles"></span><span id="sec-physical-cleanup-eligibility"></span><span id="sec-publication-and-identity"></span><span id="sec-verification-status"></span><span id="verification-status"></span></details></main></body></html>

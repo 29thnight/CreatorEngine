@@ -1,5 +1,48 @@
 # Phase 19 R0 철거 기록
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 물리 쿼리는 sceneAnchor Entity, 호출자 버퍼와 PhysicsQueryResult를 사용한다. 현재 hit 타입은 PhysicsHit이며 LayerId는 신원 값이다.
+- 접촉은 OnBeginSimulation에서 ContactStream을 등록하고 PostPhysics에서 소비한다. OnTrigger*/OnCollision* 훅과 RaycastAll을 현행 공개 API로 사용하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Scene.cpp:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L84) — `m_begin = Clock::now();`
+- [Engine/SceneRuntime/Scene.cpp:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L94) — `const TimePoint end = Clock::now();`
+- [Engine/SceneRuntime/Scene.cpp:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L102) — `m_begin = Clock::now();`
+- [Tools/regression/physics-legacy-files.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/physics-legacy-files.json#L1) — `[`
+- [Tools/regression/audit-physics-cutover.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-physics-cutover.ps1#L3) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/audit-physics-cutover.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-physics-cutover.ps1#L13) — `if([IO.Path]::GetFileName($node.Include) -in @($legacy | ForEach-Object {[IO.Path]::GetFileName($_.path)})) {`
+- [Tools/regression/audit-physics-cutover.ps1:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-physics-cutover.ps1#L30) — `if($hits.Count){$consumers+=@{path=[IO.Path]::GetRelativePath($repo,$file.FullName).Replace('\','/');hits=@($hits|ForEach-Object {@{line=$_.LineNumber;text=$_.Line.Trim()}})}}`
+- [ScriptCore/Physics.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13) — `public struct PhysicsHit`
+- [ScriptCore/Physics.cs:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41) — `public readonly struct PhysicsQueryRequest`
+- [ScriptCore/Physics.cs:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65) — `public readonly struct PhysicsBatchResult`
+- [ScriptCore/Collision.cs:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Collision.cs#L1) — `// ContactStream.cs defines the replacement contact value and stream API.`
+- [Engine/Physics/PhysicsScene.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L12) — `enum class resource_kind : std::uint8_t`
+- [Engine/Physics/PhysicsScene.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L29) — `enum class execution_preference : std::uint8_t`
+- [Engine/Physics/PhysicsScene.h:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L35) — `enum class execution_backend : std::uint8_t`
+- [Engine/SceneRuntime/ClrHost.h:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L96) — `enum class AniEventKind : int { Enter = 0, Update = 1, Exit = 2 };`
+- [Engine/SceneRuntime/ClrHost.h:266](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L266) — `enum class BTNodeKind : int { None = 0, Action = 1, Condition = 2, ConditionDecorator = 3 };`
+- [Engine/SceneRuntime/ClrHost.h:341](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L341) — `enum class ScriptFieldType : int`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-01. P0 baseline HEAD: 12f970c7ed3a4408d268479f5d5acb5f80372b8c.
 
 구 구현 55개 파일을 삭제 전에 P0 ZIP의 SHA256과 대조했다. 삭제 목록과 해시는
@@ -45,3 +88,5 @@ Fresh Complete gate 통과: 구 파일55개 제거, 남은 파일/프로젝트 �
 앞의 소비자12개 및 제품 미빌드 기록은 철거 당시 이력이다.
 새 API 제품 빌드·실행은 PhysicsRedesignPlan의 M2 수용 근거와 연결한다.
 R0는 완료로 갱신하며 AST/최종 링크/재유입 감사는 M4에서 수행한다.
+
+</details>

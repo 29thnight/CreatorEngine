@@ -1,5 +1,52 @@
 # JobSystem 도입 타당성 분석
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.
+- 과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Native.cs:318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L318) — `private static int _gameThreadId;`
+- [ScriptCore/Native.cs:324](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L324) — `public static bool IsGameThread`
+- [ScriptCore/Native.cs:363](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L363) — `ReportOffThread(api);`
+- [Engine/SceneRuntime/Animator.h:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L126) — `void OnAddedToScene() override;`
+- [Engine/SceneRuntime/Animator.h:185](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L185) — `void AddClipEvent(int clipIndex);                 // 이름 유일화 신규(구 Animation::AddEvent())`
+- [Engine/SceneRuntime/Animator.h:190](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L190) — `std::size_t InvokeClipEvents(int clipIndex, double currentProgress,`
+- [Engine/RenderEngine/RenderScene.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24) — `class RenderScene`
+- [Engine/RenderEngine/RenderScene.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L46) — `RenderScene() = default;`
+- [Engine/RenderEngine/RenderScene.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L47) — `~RenderScene();`
+- [Engine/SceneRuntime/IAIComponent.h:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/IAIComponent.h#L4) — `enum class AIType`
+- [Engine/SceneRuntime/IAIComponent.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/IAIComponent.h#L10) — `class IAIComponent`
+- [Engine/SceneRuntime/IAIComponent.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/IAIComponent.h#L18) — `virtual void InternalAIUpdate(float deltaSecond) {};`
+- [Editor/EngineEntry/ProgressWindow.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L41) — `ResetEvent(m_hReadyEvent);`
+- [Editor/EngineEntry/ProgressWindow.h:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L56) — `WaitForSingleObject(m_hReadyEvent, kReadyTimeoutMs);`
+- [Editor/EngineEntry/ProgressWindow.h:133](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L133) — `DWORD wait = MsgWaitForMultipleObjects(1, &m_hThread, FALSE, INFINITE, QS_ALLINPUT);`
+- [Engine/SceneRuntime/AnimationController.h:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationController.h#L68) — `std::shared_ptr<AniTransition> CheckTransition();`
+- [Engine/SceneRuntime/AnimationController.h:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationController.h#L74) — `std::shared_ptr<AnimationState> GetAniState();`
+- [Engine/SceneRuntime/AnimationController.h:76](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationController.h#L76) — `std::shared_ptr<AnimationState> CreateState_UI();`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L54) — `enum class ModelMeshDomain : std::uint8_t`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L113) — `enum class ModelTextureColorSpace : std::uint8_t`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:253](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L253) — `struct ModelAnimationEvent final`
+- [Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h#L16) — `class DX12CommandListPool : public IRHIParallelCommandPool`
+- [Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h#L21) — `explicit DX12CommandListPool(job_scheduler& scheduler = ce::get_job_scheduler());`
+- [Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h#L35) — `bool CreateTranslationPool(std::shared_ptr<DX12CommandListPool>& result, std::string& outError);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성: 2026-09-07 · 목적: "JobSystem을 들이면 동시성 최적화가 되는가"에 답한다 · 근거: 코드·계획서 정독 12관점, high 관련도 발견마다 적대 검증(원문 대조·최신성 2렌즈 합산), 설계안 3각도 심판 3인, 종합 1, 완결성 비평 1. 라이브 실측은 하지 않았다(§8). 방법과 한계는 부록 B.
 
 ## 요약
@@ -641,3 +688,5 @@ NORMAL 우선순위 "렌더 스레드"(1ms 작업 300회)를 돌리면서 풀에
 - **첫 실행은 세션 요청 한도(5시간)에 걸려 검증 148건이 실패**했다. 한도 해제 후 검증 부하를 줄여(두 렌즈 → 한 검증자, high만) 완료된 정독 9건을 캐시로 재개했다. 총 에이전트 106, 완료 104.
 - **엔진 라이브 실측 0.** Release exe가 HEAD보다 낡아 하지 않았다. §1~§9의 "이득"은 모두 미측정이다. 예외는 **§10**으로, 엔진 헤더를 그대로 포함한 독립 벤치(MSVC `/O2`, 8논리/4물리)를 돌린 실측이며 엔진 코드는 건드리지 않았다.
 - **코드 변경 0.** 이 문서만 산출했다. 대시보드·계획서는 수정하지 않았다(§3 D7).
+
+</details>

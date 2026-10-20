@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 — Scene material performance investigation</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9MaterialScenePerformance.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9MaterialScenePerformance.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 — Scene material performance investigation</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L12">Tools/regression/compare-material-captures.py:12</a> — <code>parser = argparse.ArgumentParser(description=__doc__)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L23">Tools/regression/compare-material-captures.py:23</a> — <code>raise ValueError(f&quot;Capture inputs differ: {key}&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L25">Tools/regression/compare-material-captures.py:25</a> — <code>raise ValueError(&quot;Requires controlled captures&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/summarize-material-profile.py#L15">Tools/regression/summarize-material-profile.py:15</a> — <code>import struct</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/summarize-material-profile.py#L21">Tools/regression/summarize-material-profile.py:21</a> — <code>raise ValueError(message)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/summarize-material-profile.py#L24">Tools/regression/summarize-material-profile.py:24</a> — <code>class Reader:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-scene-performance.ps1#L22">Tools/regression/measure-material-scene-performance.ps1:22</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-scene-performance.ps1#L41">Tools/regression/measure-material-scene-performance.ps1:41</a> — <code>$yaml=[regex]::Replace($yaml,&#39;(?m)^imguiScale: .+$&#39;,&quot;imguiScale: $($UiScale.ToString([Globalization.CultureInfo]::InvariantCulture))&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-scene-performance.ps1#L42">Tools/regression/measure-material-scene-performance.ps1:42</a> — <code>[IO.File]::WriteAllText($settings,$yaml,[Text.UTF8Encoding]::new($false))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-09-30. MAT-9 is in progress. This records the model placement regression and
+its fixes; the Blender image golden and final tier performance acceptance remain separate gates.</p>
+<h2>Reproduction</h2>
+<ul>
+<li>Xeon W-2223 (4 cores / 8 threads), RTX 4070 Ti, native DX12 Editor.</li>
+<li>Debug, isolated copy of the model material SoT fixture project, Scene 332×202,
+ImGui scale 0.8 held constant, material editor/preview closed, no Play.</li>
+<li>DX12 validation off for timing. Validation on in the correctness probes below.</li>
+<li>Compare <code>LX_CookFixture.creator</code> without Ground/model against CreatorRobot placement.</li>
+<li>Wait for a product frame, warm for three seconds, record eight seconds of continuous
+<code>.ceprof</code>, then measure another eight seconds with recording paused.</li>
+<li>FPS comes from the change in <code>dx12.live.framesRendered</code> over elapsed wall time.
+Engine frame IDs and the profiler&#39;s engine frame duration are not render throughput.</li>
+<li>Builds and GPU correctness probes are excluded from timed windows.</li>
+</ul>
+<h2>Causes and fixes</h2>
+<ol>
+<li>Raster used the IBL compute point batch limit. Four model meshes became sixteen
+mesh chunks, multiplying draw calls in shadow, GBuffer, lookup captures and color.
+Scene raster now has a separate, bounded 1,048,576-point ceiling. The compute
+IBL batch retains its original limit, and callers can still request smaller chunks.</li>
+<li>Every frame allocated and checked a zero LOD array for every source vertex,
+despite cached immutable geometry. Raster builds that transport only on a cache
+miss; perspective pixel UV derivatives still determine texture LOD.</li>
+<li>Every chunk repacked the same current bone palette. Chunk inputs now retain one
+freshly sealed pose owner, with no reuse of the cached original pose.</li>
+<li>Render graph culling repeatedly searched every pass and usage for each read.
+Writer indexing preserves all-writer reachability and declaration order.</li>
+<li>Growing graph arrays repeatedly moved passes containing several Debug STL
+containers. Initial capacities of 128 passes / 256 resources reduce this cost;
+these are capacities, not graph limits.</li>
+<li>Shadow preparation repeated the material texture/uniform preparation. It now
+shares the current recording&#39;s validated packet with its own host pass layout.
+Device, recording, descriptor version and reflected resource layout checks remain.</li>
+</ol>
+<p>New CPU markers expose input seal, mesh plan/prepare, graph compile/cull/order,
+and each live node&#39;s declaration. Runtime marker registration happens when nodes
+are added, without registering strings every frame.</p>
+<h2>Timing evidence</h2>
+<p>Mean CPU durations in milliseconds; scopes are inclusive and must not be summed.
+Capture boundary fragments are excluded. Both captures are complete with no lost events.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Debug section</th>
+<th align="right">Before, empty</th>
+<th align="right">Before, Robot</th>
+<th align="right">After, empty</th>
+<th align="right">After, Robot</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RenderThreadFrame</td>
+<td align="right">7.738</td>
+<td align="right">21.345</td>
+<td align="right">6.188</td>
+<td align="right">14.949</td>
+</tr>
+<tr>
+<td>RenderGraphBuild</td>
+<td align="right">3.248</td>
+<td align="right">7.872</td>
+<td align="right">2.257</td>
+<td align="right">4.386</td>
+</tr>
+<tr>
+<td>RenderViewCapture</td>
+<td align="right">0.104</td>
+<td align="right">3.371</td>
+<td align="right">0.111</td>
+<td align="right">0.940</td>
+</tr>
+<tr>
+<td>MaterialGraphScenePrepare</td>
+<td align="right">0.002</td>
+<td align="right">2.588</td>
+<td align="right">0.002</td>
+<td align="right">2.333</td>
+</tr>
+<tr>
+<td>RenderGpuCollect</td>
+<td align="right">1.380</td>
+<td align="right">3.022</td>
+<td align="right">1.333</td>
+<td align="right">2.293</td>
+</tr>
+</tbody></table></div>
+<p>Before Robot throughput was approximately 49 rendered FPS; this final run measured
+70.13 with recording and 92.48 with recording paused. Empty throughput in the final
+run was 161.04 / 195.58 respectively. This is a CPU-limited small viewport reproduction,
+not an acceptance result for the user&#39;s full-size viewport. Run-to-run host scheduling
+variation is visible; the model still adds real rendering and preparation work.</p>
+<p>Intermediate measured mesh seal cost fell from 3.35 to 0.86 ms. Graph construction
+fell to 3.43 ms in the raster partition measurement. GPU last-sample timings are
+not used as an average or a regression ceiling.</p>
+<p>Local evidence: <code>Build/Obj/MaterialProductProbe/Mat9Perf-Debug-before</code> and
+<code>Mat9Perf-Debug-final</code>. The final run exited normally and captured a finite product
+frame containing four graph material draws, 50 graph passes and no upload/encoder drops.</p>
+<h2>Correctness evidence</h2>
+<ul>
+<li>Native mesh probe, Debug and Release: 1,117,765 checks, 454,560 GPU components,
+eight vertex masks, three poses, and a single raster chunk containing 8,199 referenced
+vertices. Independent CPU world-space reference matches the GPU result.</li>
+<li>Explicit incomplete LOD input is rejected even after a cache hit. The IBL compute
+limit remains enforced. Pose changes, recording/descriptor invalidation, cache
+ownership and declaration-order culling remain covered.</li>
+<li>Render binding probe, Debug and Release: 179 checks and 64 GPU components.
+Same-recording packet sharing works; stale recordings and missing reflected slots
+are rejected while retaining the previously accepted packet.</li>
+<li>Debug full raster probe: 21,067,374 checks, 3,889,591 GPU components, shared depth,
+skinned occlusion, scene composition, lookup mutation/reuse, texture filtering,
+shadow/decal and generation retirement cases pass. Maximum normalized error
+8.59499e-5; maximum sRGB/filter error 9.56118e-4.</li>
+<li>Release full raster probe passes the same 21,067,374 checks / 3,889,591 GPU components
+and error bounds. Both Editor configurations build successfully.</li>
+</ul>
+<h2>Other measured configurations</h2>
+<p>Each cell is empty → Robot. FPS is completed native render throughput of the hidden
+test window, not a monitor presentation rate. These are individual timed runs and
+do not establish a repeated-run percentile acceptance ceiling.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Scene / UI scale</th>
+<th align="right">Mean render CPU ms</th>
+<th align="right">Recording FPS</th>
+<th align="right">Paused recording FPS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td>1612×796 / 1.5</td>
+<td align="right">5.934 → 13.094</td>
+<td align="right">148.01 → 77.22</td>
+<td align="right">174.42 → 93.26</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>332×202 / 0.8</td>
+<td align="right">0.859 → 1.218</td>
+<td align="right">1026.76 → 852.59</td>
+<td align="right">1058.93 → 888.81</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>1612×796 / 1.5</td>
+<td align="right">0.653 → 1.119</td>
+<td align="right">789.65 → 549.49</td>
+<td align="right">693.47 → 487.23</td>
+</tr>
+</tbody></table></div>
+<p>The large runs requested a 2560×1440 window; recorded Scene and captured attachment
+dimensions confirm 1612×796. Both captures contain four material graph draws and
+finite attachments, with normal process exit. The runner&#39;s warm-upload and GPU-timing
+ledger guards passed. Runtime SHA-256 and requested settings are saved per run.
+The UI scale changes apply only to each copied test project.</p>
+<p>Release still adds about 0.36–0.47 ms of mean render CPU for this model. There is a
+measurable cost even where presentation limits may hide its effect. This remains
+input to Standard tier acceptance rather than an excuse to close that gate.</p>
+<p>These probes compare against independent numerical references. They do not establish
+Blender rendered image parity.</p>
+<h2>Debug / Release product image comparison</h2>
+<p>The controlled Robot captures at both 332×202 and 1612×796 have identical camera,
+lights, sample/history policy, model/mesh identities and material uniform/texture
+inputs. Opaque draw publication order differs; comparison sorts full input records
+by identity, preserving every record. All seven attachments (<code>baseColor</code>,
+<code>metalRough</code>, <code>normal</code>, <code>emissive</code>, <code>depth</code>, <code>preToneHdr</code>, <code>display</code>) match exactly:
+maximum absolute difference 0.0 and nonfinite components 0 in both sizes.</p>
+<p>Evidence: <code>Build/Obj/mat9-capture-parity.json</code> and
+<code>Build/Obj/mat9-capture-large-parity.json</code>, produced by
+<code>Tools/regression/compare-material-captures.py</code>. This confirms build-configuration
+image consistency for this fixture; Blender and route parity remain open.</p>
+<h2>Repeat the measurement</h2>
+<p>Use an isolated fixture containing <code>Assets/Models/CreatorRobot.glb</code> and
+<code>Assets/Scenes/LX_CookFixture.creator</code>. The runner copies it before making changes.
+Every label must be new; existing output is rejected.</p>
+<pre><code class="language-powershell">pwsh -NoProfile -File Tools/regression/measure-material-scene-performance.ps1 `
+  -FixtureProject &lt;fixture-project&gt; -Configuration Debug -Label debug-check
+python Tools/regression/summarize-material-profile.py `
+  Build/Obj/MaterialProductProbe/Mat9Perf-Debug-debug-check/robot.ceprof
+</code></pre>
+<p><code>-WindowWidth</code>, <code>-WindowHeight</code> and <code>-UiScale</code> allow another isolated UI configuration.
+The saved viewport/capture dimensions must confirm the actual render size.
+The runner checks live renderer progress, GPU timing ledger changes and warm geometry
+uploads, and saves an actual product frame through the live HTTP capture service.</p>
+<h2>MAT-9 remaining acceptance</h2>
+<ul>
+<li>Full-size and moving-camera Standard/Layered/Special timing ceilings, warm/cold
+variant/cache bounds and repeated Debug/Release runs.</li>
+<li>Matched-lighting scene-linear Blender grid/furnace image comparison and
+Deferred/Forward route parity. The fixed EEVEE reference uses an area light;
+it must not be treated as matched lighting for this engine without a defined comparison setup.</li>
+<li>Preserve the measured remaining cost as an open performance gate; Release visibility
+does not close it. ImGui scale origin analysis remains deferred as requested.</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="causes-and-fixes"></span><span id="correctness-evidence"></span><span id="debug--release-product-image-comparison"></span><span id="mat-9-remaining-acceptance"></span><span id="other-measured-configurations"></span><span id="repeat-the-measurement"></span><span id="reproduction"></span><span id="sec-causes-and-fixes"></span><span id="sec-correctness-evidence"></span><span id="sec-debug--release-product-image-comparison"></span><span id="sec-mat-9-remaining-acceptance"></span><span id="sec-other-measured-configurations"></span><span id="sec-repeat-the-measurement"></span><span id="sec-reproduction"></span><span id="sec-timing-evidence"></span><span id="timing-evidence"></span></details></main></body></html>

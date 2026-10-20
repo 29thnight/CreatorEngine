@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Source-free authored Code materials in AssetSets</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="CodeMaterialAssetSet.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/CodeMaterialAssetSet.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Source-free authored Code materials in AssetSets</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/code_material_runtime_probe.cpp#L28">Tools/regression/code_material_runtime_probe.cpp:28</a> — <code>auto base = own::make_shared&lt;experiment::Material&gt;();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/code_material_runtime_probe.cpp#L188">Tools/regression/code_material_runtime_probe.cpp:188</a> — <code>const auto existing = std::ranges::find(value.properties, propertyName, &amp;experiment::MaterialProperty::name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/code_material_runtime_probe.cpp#L197">Tools/regression/code_material_runtime_probe.cpp:197</a> — <code>Require(experiment::BindPreparedMaterialTextures(value, supplied, error),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp#L136">Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp:136</a> — <code>if (!experiment::SerializeMaterialAuthoring(material, source.Root(), failure))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp#L279">Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp:279</a> — <code>auto material = ck::BuildMaterialAssetSetProduct({CodeId(1), CodeBytes(fixture.materialText),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp#L297">Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp:297</a> — <code>check.Check(!ck::ValidateAuthoredMaterialBinding(document, decoded, failure), &quot;wrong doubleSided raster policy type rejected&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Metadata.cs#L9">BuildTool/Metadata.cs:9</a> — <code>internal sealed record FileEntry(string Path, long Bytes, string Sha256);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Metadata.cs#L11">BuildTool/Metadata.cs:11</a> — <code>internal static class Metadata</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Metadata.cs#L65">BuildTool/Metadata.cs:65</a> — <code>if (value.Int(&quot;schemaVersion&quot;) != 1 || value.Text(&quot;productName&quot;) != &quot;CreatorEngine 2&quot;) throw new BuildException(&quot;Unsupported engine product metadata.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L21">Engine/RenderEngine/ShaderMeta.h:21</a> — <code>struct ShaderMetaAssetOrigin;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L62">Engine/RenderEngine/ShaderMeta.h:62</a> — <code>struct ShaderMaterialSampler</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L174">Engine/RenderEngine/ShaderMeta.h:174</a> — <code>own::shared_owner&lt;const AssetDepot::ShaderMetaAssetOrigin&gt; assetOrigin{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L9">Engine/RenderEngine/Experiment/Model.h:9</a> — <code>class ModelLoader;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L52">Engine/RenderEngine/Experiment/Model.h:52</a> — <code>[[nodiscard]] std::span&lt;const Material&gt; Materials() const noexcept;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L58">Engine/RenderEngine/Experiment/Model.h:58</a> — <code>[[nodiscard]] const Material* TryGetMaterial(MaterialIndex index) const noexcept;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetLink.h#L9">Engine/RenderEngine/AssetDepot/AssetLink.h:9</a> — <code>class Material;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetLink.h#L10">Engine/RenderEngine/AssetDepot/AssetLink.h:10</a> — <code>struct ShaderMeta;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetLink.h#L54">Engine/RenderEngine/AssetDepot/AssetLink.h:54</a> — <code>struct AssetTypeTraits&lt;experiment::Material&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialInstance.h#L34">Engine/RenderEngine/Experiment/MaterialInstance.h:34</a> — <code>explicit MaterialInstance(own::shared_owner&lt;const Material&gt; base)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialInstance.h#L39">Engine/RenderEngine/Experiment/MaterialInstance.h:39</a> — <code>[[nodiscard]] const own::shared_owner&lt;const Material&gt;&amp; Base() const noexcept</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialInstance.h#L87">Engine/RenderEngine/Experiment/MaterialInstance.h:87</a> — <code>own::shared_owner&lt;const Material&gt; base_{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L571">Engine/RenderEngine/ShaderMeta.cpp:571</a> — <code>meta.generatedMaterial = std::move(generated);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L610">Engine/RenderEngine/ShaderMeta.cpp:610</a> — <code>std::filesystem::path ShaderMeta::ResolveSource(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L616">Engine/RenderEngine/ShaderMeta.cpp:616</a> — <code>bool ShaderMetaLoader::LoadFile(const std::filesystem::path&amp; path,</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>This is the separate authored-Code recipe. Existing Lattice material/program
+representation 1 is unchanged. ShaderMeta remains a CPU descriptor and never
+claims compiled-shader readiness.</p>
+<h2>Identities and representations</h2>
+<ul>
+<li><code>Material</code>, representation 2, schema 1, <code>.asset</code>: canonical CEDO envelope
+<code>authored_material</code> containing <code>schema</code>, <code>programAssetId</code>, sorted unique
+<code>defaultTextures</code>, and <code>material</code>. The material subtree is the existing
+<code>experiment::Material</code> schema 1. Its <code>shaderAssetId</code> still names ShaderMeta.</li>
+<li><code>MaterialProgram</code>, representation 2, schema 1, <code>.cecp</code>: bounded CECP value
+product. The program UUID and ShaderMeta UUID must be distinct.</li>
+<li><code>ShaderMeta</code>, representation 1: unchanged canonical descriptor CEDO. Its
+bytes must exactly equal the descriptor carried by the selected Code program.</li>
+</ul>
+<p>A material has exact typed Hard edges to its Code program, ShaderMeta, authored
+nonnull texture references and every metadata default texture. The program has
+exact typed Hard edges to ShaderMeta and every default texture. Deduplication
+is by identity; using one identity for incompatible kinds fails. Internal and
+External scopes are explicit and both work; duplicate, missing, extra, wrong
+kind and non-Hard edges fail. ShaderMeta itself has no program/texture edges.</p>
+<h2>Authored inputs</h2>
+<p>Keep the existing flat material schema 1 file with its canonical UUIDv4 identity.
+Model-derived UUIDv8 materials remain on their model producer recipe. The AssetSet source declaration
+adds an explicit program UUID and a verified bundle path:</p>
+<pre><code class="language-yaml">assetId: 11111111-1111-4111-8111-111111111111
+kind: Material
+source: Materials/example.asset
+codeProgram: 22222222-2222-4222-8222-222222222222
+verifiedProgram: Verified/example.cecp
+dependencies:
+  - {assetId: 22222222-2222-4222-8222-222222222222, kind: MaterialProgram, dependency: Hard}
+  - {assetId: 33333333-3333-4333-8333-333333333333, kind: ShaderMeta, dependency: Hard}
+  # Also declare every authored/default texture as a typed Hard dependency.
+</code></pre>
+<p>The MaterialProgram source uses a <code>.codeprogram</code> descriptor, a program identity
+sidecar (<code>.codeprogram.meta</code>), and explicit <code>verifiedProgram</code>. Its descriptor is:</p>
+<pre><code class="language-yaml">code_program:
+  schema: 1
+  shaderMetaAssetId: 33333333-3333-4333-8333-333333333333
+  metadata: Shaders/example.shadermeta
+  source: Shaders/example.hlsl
+  compilerSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+</code></pre>
+<p>The example digest is a placeholder, not a supported compiler identity. The
+actual digest is an externally verified compiler/toolchain agreement supplied
+by the trusted bundle producer. It must exactly match the recipe. CECP parsing
+validates provenance fields and structural consistency; it does not authenticate
+a third-party compiler or claim to have compiled/validated executable machine
+code. No compiler is invoked by this producer, reader or receipt replay.</p>
+<p><code>formatStamp = creator-code-verified-v1</code> and
+<code>abiStamp = creator-code-material-abi-v1</code> are fixed engine-Code recipe versions.
+The Code ABI is separate from the enclosing AssetSet target ABI/platform; normal
+catalog/mount compatibility still validates that enclosing target. The recipe
+uses default compile options, VS/PS/CS profiles 6.0, both DXIL and SPIR-V,
+canonical material keyword defines, ModelVertexInput&#39;s mask defines, and the
+engine&#39;s Forward lighting constants/REFERENCE_PATH when applicable.</p>
+<h2>Verified bundle and complete coverage</h2>
+<p>CECP is a value-only product: IDs, canonical metadata CEDO, compiler/format/ABI
+stamps, canonical Assets-relative input paths with sizes and SHA-256, and sorted
+backend/pass/keyword/mask/reference variants. Each variant contains ordered
+stage/entry/profile records with bytecode and reflection encoded by
+<code>rhi_shader_verified_cache</code>. Source text, device state, a compiler, runtime
+manager, owning raw pointer and PSO handles are absent.</p>
+<p>The reader reconstructs the binding layout from every carried variant&#39;s stage
+reflections. All variants must agree and pass the shared pure
+<code>LX::Runtime::ValidateShaderGeneration</code> invariant, including the 64 KiB constant
+buffer bound, nonoverlapping numeric fields and unique texture registers.
+Coverage is exhaustive, never truncated:</p>
+<ul>
+<li>Every pass and every keyword combination, on DXIL and SPIR-V</li>
+<li>Graphics: legacy mask 0 and all eight <code>assets::kModelVertexMasks</code></li>
+<li>Forward: both ordinary and reference paths for each graphics variant</li>
+<li>Other graphics: ordinary path only</li>
+<li>Compute: one mask-0, non-reference variant per backend/pass/keyword selection</li>
+<li>Exactly VS+PS for graphics, or CS for compute, with declared entries/profiles</li>
+</ul>
+<p>Duplicate variants, unsupported extra variants, partial backends, inconsistent
+permutations/reflections and unsupported stamps fail. The maximum is 4,096
+variants and 160 MiB per bundle. Retained charges count owned capacities,
+including stage bytecode, reflection, metadata, inputs and all variant strings.</p>
+<h2>Captured-input and publication checks</h2>
+<p>The producer captures and hashes the descriptor and its sidecar, explicit bundle,
+metadata and its sidecar, root shader and its sidecar, and include closure. The
+metadata source canonical CEDO must equal the carried metadata bytes; sidecar
+identities are checked independently. Every captured byte length/SHA-256 must
+match the bundle inventory. Input snapshots are verified again before receipts
+and output publication. Missing bundles or changed inputs never trigger source
+compilation, a last-known product lookup, or metadata-only readiness.</p>
+<p>Version 1 deliberately supports literal <code>#include</code> closure only. Quoted includes
+resolve relative to their containing file; angle includes resolve from Assets.
+Escaped newlines and comments are handled before scanning. Macro includes,
+Slang module imports, file-probing directives, <code>include_next</code> and <code>embed</code> are
+rejected. Includes in conditionally disabled branches are conservatively required
+too. The inventoried shader files must equal the reachable literal closure;
+omitted and unrelated files fail. This narrow contract avoids presenting a
+claimed compiler inventory as proof of unsupported dynamic dependency lookup.</p>
+<p><code>doubleSided</code> is the existing bool raster-policy exception when absent from
+ShaderMeta. Other unknown properties, wrong types, duplicate properties, invalid
+keyword selections and inconsistent default-texture inventories fail binding.</p>
+<p>Receipt identities include the explicit Code program ID, bundle path, recipe
+version and complete captured input inventory. Receipt/CAS payload validation
+selects the exact representation/schema reader. After cooking local products,
+selected material/program binding and independently cooked ShaderMeta CEDO
+identity are checked before publication. External closure checks are deferred to
+the captured union/runtime loader, without local source fallback.</p>
+<h2>Regression source and execution status</h2>
+<p><code>ExperimentCodeMaterialCodecSelfTest.cpp</code> adds synthetic codec/producer checks to
+the existing catalog self-test entry point. Its stage payloads are value-codec
+fixtures, not executable shaders. It covers successful source-free round trips,
+transactional failures, exact dependency kinds/scopes, incomplete coverage,
+stamps, profiles/reflection, oversized/overlapping common layouts, aliased texture
+registers, captured-input changes, original authored schema1,
+default-texture closure and invalid authored values. The test source and project
+entries were added; no build, tests, engine, shader compiler or AOT execution was
+performed for this change.</p>
+<h2>Runtime ownership and consumer boundary</h2>
+<p>The concrete AssetDepot views are deliberately separate:</p>
+<ul>
+<li><code>AssetLink&lt;experiment::Material&gt;</code> accepts authored Material representation 2</li>
+<li><code>AssetLink&lt;::Material&gt;</code> accepts graph representation 1 or the prepared code facade of representation 2</li>
+<li><code>AssetLink&lt;LX::Runtime::ShaderGeneration&gt;</code> accepts Code MaterialProgram representation 2</li>
+<li><code>AssetLink&lt;material_graph::Generation&gt;</code> accepts graph MaterialProgram representation 1</li>
+<li><code>AssetLink&lt;ShaderMeta&gt;</code> remains the independent metadata descriptor</li>
+</ul>
+<p>Wrong concrete representations terminate as <code>Failed/UnsupportedRepresentation</code>.
+A shared manifest kind is never concrete C++ type proof. The existing typed
+request cache/worker DAG owns all program/metadata/texture dependencies and its
+completion covers the complete CPU closure. Metadata decoding alone never
+produces code readiness. Code generations pass the existing LX layout validator
+before Ready, keep weak numeric metadata slots separate from GUID-to-latest
+source metadata, and retain the exact compiled blob/descriptor/default texture
+sources. Cache budgets account for reachable capacities; zero retention does
+not revoke consumer owners. Logical unmount prevents current-link reacquisition
+while already-pinned program/material/frame owners remain self-contained.</p>
+<p>Scene discovery submits mounted material/program IDs asynchronously and waits by
+polling before component construction. Ref-based and inline authored code
+materials keep their exact program and texture generations. A texture override
+outside the base asset closure must receive an explicitly prepared owner from
+the same captured scene resolver revision, using an untransformed default-variant descriptor. <code>BindPreparedMaterialTextures</code> and
+<code>MaterialInstance::BindPreparedTextureOwners</code> extend only the runtime instance&#39;s
+closure, never an asset-cache root. Missing or mismatched owners fail without a
+source or current-catalog fallback. Inline and ref-style authored values keep their explicit
+texture color spaces; generated mip variants are never reused as raw override sources. Source authoring remains on its legacy path when the ID
+is not mounted.</p>
+<p>Existing explicit/reference GBuffer and Forward helpers consume carried graphics
+stages through <code>RestoreCodeGraphics</code>; <code>RestoreCodeCompute</code> exposes carried compute
+stages with the same owner rule. No compiler/cache lookup is performed for these
+mounted code generations. Source-derived GBuffer meshlet/occluder optimizations
+are disabled for sealed code programs because their derivative entries are not
+part of this bundle. GPU upload/PSO readiness and device retirement remain owned
+by the existing renderer.</p>
+<p>The production live renderer remains graph-only. This work does not revive its
+retired code-material live pipelines or claim source-free live code rendering.
+<code>Tools/regression/code_material_runtime_probe.cpp</code> is an unrun dedicated-host
+fixture for async completion, cross-representation rejection, source-free owner
+resolution, zero retention and post-unmount pins. No build/test/runtime/renderer
+execution result is implied by this source-only implementation.</p>
+<p>Code facade serialization uses its pinned metadata and texture sampling values,
+without loading ShaderMeta by GUID. Unmodified metadata-default matrices are
+omitted and restored from the program; edited matrices are rejected because the
+existing authored value schema has no matrix variant. Anonymous inline code
+values that carry only a ShaderMeta ID must acquire a stable cooked base Material
+before source-free construction; a program identity is never guessed from metadata.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="authored-inputs"></span><span id="captured-input-and-publication-checks"></span><span id="identities-and-representations"></span><span id="regression-source-and-execution-status"></span><span id="runtime-ownership-and-consumer-boundary"></span><span id="sec-authored-inputs"></span><span id="sec-captured-input-and-publication-checks"></span><span id="sec-identities-and-representations"></span><span id="sec-regression-source-and-execution-status"></span><span id="sec-runtime-ownership-and-consumer-boundary"></span><span id="sec-verified-bundle-and-complete-coverage"></span><span id="verified-bundle-and-complete-coverage"></span></details></main></body></html>

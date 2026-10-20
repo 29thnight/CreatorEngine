@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>모델 임포트 파이프라인 · 정점 레이아웃 (역사 기록)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../../RefactoringPlanDashboard.html">대시보드</a> · <a href="../MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="ModelImportPipelinePlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/archive/ModelImportPipelinePlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>모델 임포트 파이프라인 · 정점 레이아웃 (역사 기록)</h1><p>이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 종료/승계</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<p><strong>단일 소유 계획:</strong> <a href="../AssetDepotImplementationPlan.html">AssetDepotImplementationPlan</a>. 이 문서는 이전 진입 링크를 보존하는 인계 문서다.</p>
+<ul>
+<li>이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>DataSystem → resolver snapshot → typed request → descriptor/payload owner → frame pin → RHI retirement</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30">Engine/RenderEngine/DataSystem.h:30</a> — <code>own::shared_owner&lt;const Texture&gt; descriptor;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetRequest.h#L108">Engine/RenderEngine/AssetDepot/AssetRequest.h:108</a> — <code>own::shared_owner&lt;const T&gt; asset{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/TextureAssetRuntime.h#L69">Engine/RenderEngine/AssetDepot/TextureAssetRuntime.h:69</a> — <code>own::shared_owner&lt;const experiment::cooked::ArtifactByteSource&gt; byteSource{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/ModelAssetRuntime.h#L18">Engine/RenderEngine/AssetDepot/ModelAssetRuntime.h:18</a> — <code>std::uint64_t resolverRevision{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Ownership.h#L5">Engine/Utility_Framework/Ownership.h:5</a> — <code>#include &quot;../../ThirdParty/ownership_cpp/include/own/ownership.hpp&quot;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="-i7-의-목표-수치--실측으로-확정-2026-08-25"></span>
+<span id="-i7-이행-결과-2026-08-25"></span>
+<span id="-공수-재산정-2026-09-01--9ef369d7-기준--5일이-아니라-24일이다"></span>
+<span id="-반성--포맷을-잘-만들어도-읽는-수단이-병목이면-소용이-없다"></span>
+<span id="-작업-대상은-experiment-계층이다"></span>
+<span id="-첫-피드백--b3e088a008이-산정의-축-하나를-정정했다"></span>
+<span id="0-당시-phase-4-편입-기록--왜-별도-페이즈가-아니었는가"></span>
+<span id="1-지금-무엇이-있는가--측정-2026-08-27-재감사"></span>
+<span id="11--생산-소비자가-0이다"></span>
+<span id="110-모델--머테리얼-배선-재감사-2026-08-27"></span>
+<span id="12-소스cooked-디코더는-섰지만-선택-정책은-아직-없다"></span>
+<span id="13-선언만-있고-소비자-0인-옵션"></span>
+<span id="14-측정된-잔여-손실"></span>
+<span id="15-검사-커버리지의-약점"></span>
+<span id="16-서-있는-것-완료된-자산"></span>
+<span id="17-정점-레이아웃--실측-2026-08-25"></span>
+<span id="18--v2-68b--v3-메시별-packed-buffer-완료-생산-gpu-배선은-아직-없음-2026-08-27"></span>
+<span id="19-라이트맵--uv1-의-소비자가-삭제됐다"></span>
+<span id="2-무엇을-하려는가"></span>
+<span id="3-설계--이미-정해진-것"></span>
+<span id="31-ir-은-의도적으로-부유하다"></span>
+<span id="32-좌표단위는-임포터가-통일한다"></span>
+<span id="33-게이트-설계--실측으로-얻은-규칙-넷"></span>
+<span id="34-실자산-비교로-담보되지-않는-것이-있다"></span>
+<span id="4-v-이행--트랙-v-정점-레이아웃"></span>
+<span id="4-이행--슬라이스"></span>
+<span id="5-완료-기준"></span>
+<span id="6-리스크"></span>
+<span id="7-다른-계획과의-관계"></span>
+<span id="i0-계획기준선--완료"></span>
+<span id="i1-실물-디코더-배선--importermodeldecoder--완료-2026-09-01-재측정"></span>
+<span id="i2-텍스처-자산-해석-정책--완료-2026-09-01--i2-e"></span>
+<span id="i3-노멀-생성-패스--완료"></span>
+<span id="i4-meshoptimizer-연동--둘-완료-lodlevels-잔여"></span>
+<span id="i5-0-materialshadermeta-교차-계약--완료-2026-09-01--i7-c1에서-제품-합류"></span>
+<span id="i5-m-experimentmaterial-정본-승격과-legacy-material-퇴역"></span>
+<span id="i5-런타임-어댑터--b치환-로-확정"></span>
+<span id="i6-전환--legacy-타입-은퇴-그다음-assimp-2026-09-01-정찰로-순서-정정"></span>
+<span id="i7-cooked-경로--포맷코덱-완료-2026-08-25--c8e06ffa"></span>
+<span id="i8-검사-자산게이트-보강"></span>
+<span id="sec-0-당시-phase-4-편입-기록--왜-별도-페이즈가-아니었는가"></span>
+<span id="sec-1-지금-무엇이-있는가--측정-2026-08-27-재감사"></span>
+<span id="sec-2-무엇을-하려는가"></span>
+<span id="sec-3-설계--이미-정해진-것"></span>
+<span id="sec-4-v-이행--트랙-v-정점-레이아웃"></span>
+<span id="sec-4-이행--슬라이스"></span>
+<span id="sec-5-완료-기준"></span>
+<span id="sec-6-리스크"></span>
+<span id="sec-7-다른-계획과의-관계"></span>
+<span id="v0-레이아웃-버전-규약--생산자는-v1-소비자는-i7"></span>
+<span id="v1-속성-기술표--정본-하나--v-트랙의-착수점"></span>
+<span id="v2-무손실-68b---구현검증-완료-2026-08-27"></span>
+<span id="v3-메시별-마스크---packed-스트림-구현검증-완료-2026-08-27"></span>
+<span id="v4-패스의-레이아웃-유도---i5-d로-이행-완료-2026-09-01"></span>
+<span id="v5-멀티-슬롯-정점-버퍼--보류"></span>
+<span id="v6-uv1-스트림---폐기-2026-09-01--lightmapbakerplan-l1이-승계"></span>
+<span id="게이트--experimentcooked"></span>
+<span id="구간-각각의-min--서로-더할-수-없다"></span>
+<span id="남은-것"></span>
+<span id="수치-release-반복-20-쿠킹-대-쿠킹"></span>
+<span id="이-산정의-한계--소거율은-아직-실측이-없다"></span>
+<span id="자--은퇴-래칫-게이트와-같은-자로-잰다"></span>
+<span id="정정-하나--assimp-벤더링은-벤더링이-아니다"></span>
+<span id="측정-①--은퇴-대상은-줄지-않았다-병행-단계가-늘렸다"></span>
+<span id="측정-②--남은-대상-전수-제품-206--하네스-53--합-259"></span>
+<span id="트랙-i"></span>
+<span id="트랙-v"></span>
+<span id="포맷-요점"></span></p>
+</details>
+</main></body></html>

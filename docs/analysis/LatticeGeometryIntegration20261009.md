@@ -1,5 +1,52 @@
 # LX 메시렛 컬링·기하 LOD·현재 깊이 HZB 연결
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:61](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L61) — `std::memcpy(local, static_cast<const std::byte*>(geometry.vertexData) + index * geometry.vertexStride,`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L87) — `sphere.radius = std::hypot(high[0] - low[0], high[1] - low[1], high[2] - low[2]) * .5f * 1.0001f + 1e-4f;`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:89](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L89) — `if (!shadow_math::IntersectsClip(sphere, lightViewProjection))`
+- [Engine/RenderEngine/MaterialGraphSceneInput.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.cpp#L17) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphSceneInput.cpp:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.cpp#L24) — `[](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; });`
+- [Engine/RenderEngine/MaterialGraphSceneInput.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.cpp#L28) — `own::shared_owner<const SceneMaterialSource> SceneMaterialSource::Capture(const Material& material)`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L23) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:809](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L809) — `if (includeHierarchy && geometry.SourceMesh() && !geometry.SourceMesh()->coarseLods.IsEmpty())`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:811](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L811) — `const auto& chain = geometry.SourceMesh()->coarseLods;`
+- [Engine/RenderEngine/MaterialGraphSceneCompiler.cpp:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L13) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphSceneCompiler.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L29) — `staging += ".stage-" + FileGuid::CreateRandomV4().ToString();`
+- [Engine/RenderEngine/MaterialGraphSceneCompiler.cpp:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L37) — `std::filesystem::remove(staging, ignored);`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L18) — `struct LXSceneLight`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:346](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L346) — `void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:471](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L471) — `void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,`
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98) — `enum class ShaderPassQueue : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106) — `enum class ShaderBlendMode : std::uint8_t`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L98) — `class SceneHost final : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L101) — `explicit SceneHost(job_scheduler& scheduler = ce::get_job_scheduler());`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L108) — `bool RequestProgram(const EnhancedFrameContext& context, own::shared_owner<const Generation> generation,`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15) — `own::shared_owner<const Instance> instance;`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21) — `static own::shared_owner<const SceneMaterialSource> Capture(const Material& material);`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L22) — `static own::shared_owner<const SceneMaterialSource> Capture(own::shared_owner<const Instance> instance,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-09. 기준 master는 `cd3fa2e2f8cf40d4c810731430f8be4503a09f1e`이며,
 작업 종료 시 원격 master도 같은 해시였다. 아래 구현은 현재 작업 트리의 후속 변경이다.
 기존 RG8/GCCE 및 workspace 변경은 작업 범위에 포함하지 않았다.
@@ -69,3 +116,5 @@ GPU LOD 선택, visible-meshlet 목록 압축/간접 group 수 감소, 메시렛
 광원별 LOD 품질 정책은 구현하지 않았다. 실제 저장 LOD 전환 장면의 GPU 품질 수용,
 새 cache pressure/overflow 시나리오, Vulkan, 다중 view/큰 workload, Release 성능·VRAM은 별도 gate다.
 따라서 GPU-1/전체 GPU-driven geometry의 완료·기성으로 계상하지 않는다.
+
+</details>

@@ -1,5 +1,50 @@
 # PHASE 12 — Editor 텍스처 임포트 수명 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- SceneManager는 GCCE domain과 Scene root를 소유한다. Scene→Entity→Component의 trace 참조와 논리적 제거·핸들 무효화를 분리한다.
+- 일반 new/unique_ptr 기반 Scene 그래프를 새 이행 목표로 사용하지 않는다. 자산·SDK·GPU 수명은 독립 owner/완료 계약을 따른다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-texture-import-lifecycle.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-lifecycle.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-import-lifecycle.ps1:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-lifecycle.ps1#L51) — `$name = if ($layout -eq 'short') { 'TI-' + [Guid]::NewGuid().ToString('N').Substring(0,8) } else {`
+- [Tools/regression/verify-texture-import-lifecycle.ps1:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-lifecycle.ps1#L71) — `$recoveryRoot = Join-Path $repo ('Build/TCP-Recovery-' + $config + '-' + [Guid]::NewGuid().ToString('N').Substring(0,8))`
+- [Tools/regression/verify-texture-import-editor-source.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-editor-source.py#L20) — `writer = database.split("void EditorAssetDatabase::WriteTextureImportSettings(", 1)[1]`
+- [Tools/regression/verify-texture-import-editor-source.py:62](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-editor-source.py#L62) — `replacement = runtime.split("AssetMountId DataSystem::MountAssetSet(", 1)[1]`
+- [Tools/regression/verify-texture-import-editor-source.py:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-editor-source.py#L63) — `replacement = replacement.split("bool DataSystem::UnmountAssetSet(", 1)[0]`
+- [Engine/RenderEngine/DataSystem.h:116](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L116) — `class DataSystem : public Singleton<DataSystem>`
+- [Engine/RenderEngine/DataSystem.h:137](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L137) — `friend class Singleton<DataSystem>;`
+- [Engine/RenderEngine/DataSystem.h:944](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L944) — `static auto DataSystems = DataSystem::GetInstance();`
+- [Player/ForbiddenIncludes/DirectXTex.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/DirectXTex.h#L1) — `#pragma once`
+- [Editor/EngineEntry/EditorAssetDatabase.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L23) — `class EditorAssetDatabase final`
+- [Editor/EngineEntry/EditorAssetDatabase.h:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L37) — `static EditorAssetDatabase& Get() noexcept;`
+- [Editor/EngineEntry/EditorAssetDatabase.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L39) — `~EditorAssetDatabase();`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/DataSystem.cpp:462](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L462) — `AssetBundleLoadResult DataSystem::AssetBundlePreparation::Snapshot() const`
+- [Engine/RenderEngine/DataSystem.cpp:503](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L503) — `job_handle DataSystem::AssetBundlePreparation::Completion() const`
+- [Engine/RenderEngine/DataSystem.cpp:509](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L509) — `void DataSystem::AssetBundlePreparation::Cancel()`
+- [Editor/EngineEntry/EditorAssetDatabase.cpp:1003](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L1003) — `work->graph = DataSystem::CompileMaterialGraphAuthoring(*source, work->guid,`
+- [Editor/EngineEntry/EditorAssetDatabase.cpp:1610](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L1610) — `|| !EditorAssetDatabase::IsTextureSource(source) || !file::is_regular_file(source, error) || error)`
+- [Editor/EngineEntry/EditorAssetDatabase.cpp:1649](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L1649) — `EditorAssetDatabase::WriteTextureImportSettings(document->Root(), settings);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준일: 2026-10-10 KST. 정본: [TexturePipelinePlan](../plans/TexturePipelinePlan.md).
 앞선 빌드·cook·패키지 결과는 [기존 검증 기록](TexturePipelineValidation20261009.md)에 보존한다.
 
@@ -98,3 +143,5 @@ Shipping GPU 패키지, 새 BC5/BC7 등의 전체 GPU 소비, 모델 전체 samp
 
 T0/T1a/T2는 진행 중이며 `earnedDays: 0`. T1b는 대기, T3는 제품 타깃 부재로 중단한다.
 기존 작업 트리 변경은 보존했고 commit/push는 하지 않았다.
+
+</details>

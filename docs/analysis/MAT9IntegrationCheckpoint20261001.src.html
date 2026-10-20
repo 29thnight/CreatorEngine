@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 4.25·GPU 설계 통합 체크포인트 — 2026-10-01</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9IntegrationCheckpoint20261001.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9IntegrationCheckpoint20261001.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 4.25·GPU 설계 통합 체크포인트 — 2026-10-01</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L1992">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:1992</a> — <code>preparation-&gt;progress = std::move(progress);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L2026">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:2026</a> — <code>preparation-&gt;progress.error = std::move(reason);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3154">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3154</a> — <code>std::printf(&quot;[render.pipeline.progress] phase=%s\n&quot;, phase);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30">Engine/RenderEngine/DataSystem.h:30</a> — <code>own::shared_owner&lt;const Texture&gt; descriptor;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L44">Engine/RenderEngine/DataSystem.h:44</a> — <code>std::vector&lt;own::shared_owner&lt;const Material&gt;&gt; materials;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45">Engine/RenderEngine/DataSystem.h:45</a> — <code>std::vector&lt;own::shared_owner&lt;const Texture&gt;&gt; textures;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringParsedDocument.h#L28">Engine/Utility_Framework/AuthoringParsedDocument.h:28</a> — <code>class ParsedDocument</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringParsedDocument.h#L30">Engine/Utility_Framework/AuthoringParsedDocument.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringParsedDocument.h#L31">Engine/Utility_Framework/AuthoringParsedDocument.h:31</a> — <code>ParsedDocument() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78</a> — <code>enum class RGMeasurementDomain : uint8_t { Normal, Capture };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79</a> — <code>enum class RGQueueFallbackReason : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108</a> — <code>enum class RGQueuePlacement : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31</a> — <code>enum class EnhancedLiveDisplayTarget : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39</a> — <code>enum class EnhancedLiveViewFlags : uint32_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177</a> — <code>own::shared_owner&lt;const material_graph::SceneMaterialSource&gt; materialPreview;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L55">Engine/RenderEngine/DataSystem.cpp:55</a> — <code>for (const auto&amp; entry : file::directory_iterator(directory))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L129">Engine/RenderEngine/DataSystem.cpp:129</a> — <code>throw std::runtime_error(&quot;Asset image decoder apartment initialization failed.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L139">Engine/RenderEngine/DataSystem.cpp:139</a> — <code>std::ranges::transform(value, value.begin(), [](unsigned char character)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringParsedDocument.cpp#L49">Engine/Utility_Framework/AuthoringParsedDocument.cpp:49</a> — <code>ParsedDocument ParsedDocument::ParseText(const std::string&amp; text, std::string&amp; error)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringParsedDocument.cpp#L54">Engine/Utility_Framework/AuthoringParsedDocument.cpp:54</a> — <code>ParsedDocument ParsedDocument::ParseTextWithContext(const std::string&amp; text,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringParsedDocument.cpp#L77">Engine/Utility_Framework/AuthoringParsedDocument.cpp:77</a> — <code>document.m_tree = ryml::parse_in_arena(ryml::to_csubstr(text));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34</a> — <code>std::free(value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L43">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:43</a> — <code>const auto path = prefix + &quot;.&quot; + std::to_string(++serial);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L67">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:67</a> — <code>std::copy_n(source.data(), source.size(), destination.data());</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>현재 결정</h2>
+<p>제품의 <strong>BRDF 1024 / environment 4096</strong>, <strong>CEIBL005</strong>, <strong>SceneHost identity 10</strong>을 유지한다.
+PHASE 4.25와 MAT-9는 **열린 상태(<code>progress</code>, 32/34일)**다. diagnostic 256/4096의 제한된
+고정 이미지 통과를 제품 샘플 축소나 실제 모델 성능 통과로 채택하지 않는다.</p>
+<p>후속 RenderGraph·RHI 수명/동기화·필요한 시간축 기반을 진행하고, GPU-driven 설계에서
+영속 GPU Scene·변경분 업로드·재질/PSO 배칭·간접 드로우와 IBL 재사용/갱신 배선을 함께
+정한다. <strong>실제 후속 구현과 동일 조건의 재측정 뒤</strong> MAT-9 성능 게이트를 회수한다.
+GPU-driven 설계 작성과 성능 수용은 별도다. SSS/투과 품질 오차도 별도 완료 조건으로 남는다.</p>
+<p>BASE-0의 선행은 구현·검증된 <strong>MAT-0&#126;MAT-8 기반</strong>이다. MAT-9 전체 수용을 일괄 착수
+선행으로 받지 않아 MAT-9 → RenderGraph → GPU-driven → MAT-9의 착수 순환을 피한다.
+현재 미달 결과는 알려진 baseline으로 기록하고 구조 변경의 회귀를 계속 검증한다.
+산정 행·일수·완료 공수를 추가하지 않는다.</p>
+<h2>이번 통합에 포함한 제품 변경과 측정 기록</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>묶음</th>
+<th>내용</th>
+<th>판정 범위</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>공통 GGX·박막</td>
+<td>금속/유전체 감쇠 분리, GGX 곱셈 보상, Core graph 계산 모델 일치, E/Eavg·dielectric LUT와 고정 golden</td>
+<td>고정 박막 on/off 각각 16/16 통과 기록; 전체 장면 수용은 아님</td>
+</tr>
+<tr>
+<td>HDRI 수렴</td>
+<td>float32 radiance/source 보존, solid-angle footprint, CDF, source bilinear, 1024+4096 MIS bank</td>
+<td>고정 forest/autumn 재질20·제어6 전체 26/26; RMS 최대 0.495878%</td>
+</tr>
+<tr>
+<td>쿠킹·캐시·bootstrap</td>
+<td>CEIBL005 8-map 형식, proposal bank 영속화, GPU upload/readback, 기본 forest 쿠킹 데이터</td>
+<td>forest artifact 103159928 bytes, cook metadata SHA 일치</td>
+</tr>
+<tr>
+<td>Special Surface</td>
+<td>artist 반경 환산, glass 준비 budget 일치, grazing normal을 준비 오류로 거부하던 문제 수정</td>
+<td>host10 Debug/Release 각각 18 frame·295717 checks·validation 0; 품질 7/18로 미수용</td>
+</tr>
+<tr>
+<td>Volume 기준</td>
+<td>단일 산란에 맞춘 Blender recipe, 최종 제품 Volume 합성 readback·독립 적분</td>
+<td>고정 균질 단일 산란 8/8 통과 기록; 다중/비균질 산란 수용은 아님</td>
+</tr>
+<tr>
+<td>근접 카메라 성능</td>
+<td>사용자 <code>.ceprof</code>, BRDF/environment 근사 후보, 직접 패스 timestamp와 readback 픽셀 보존</td>
+<td>원인 조사·후보 실험; 실제 모델의 이동 FPS 개선 미완료</td>
+</tr>
+</tbody></table></div>
+<p>현재 유리/착색 투과의 문제 조건은 RMS 약 15.10&#126;34.79%, SSS/혼합은 약 2.04&#126;4.24%다.
+일반 HDRI 범위의 낮은 오차를 전체 Material 지원 범위의 품질 통과로 확대하지 않는다.
+기존 RMS≤1%·p95 normalized≤1%·max normalized≤5%·seed RMS≤0.25% 상한을 유지한다.</p>
+<p>근접 캡처는 LookupBake 278표본 중 20개가 72.819&#126;107.506ms다. Scene GPU 구간 273표본의
+중앙값은 1.0024ms지만 p95는 88.4409ms다. CPU prepare/record와 profiler UI·씬 잠금 대기를
+GPU 적분 spike와 분리해 기록했다. inclusive CPU 구간은 서로 더하지 않는다.
+256/4096 후보는 HDRI 26/26·최대 RMS 0.982207%지만 안정적인 전 재질 speedup은 미입증이다.</p>
+<p>상세 증거:</p>
+<ul>
+<li><a href="MAT9GgxClosureComparison.html">GGX·박막 대조</a></li>
+<li><a href="MAT9HdriConvergence.html">전체 HDRI 수렴</a></li>
+<li><a href="MAT9SpecialProfileCorrection.html">Special Surface 최종 검증</a></li>
+<li><a href="MAT9SpecialTransportComparison.html">Volume 기준·대조</a></li>
+<li><a href="MAT9NearCameraPerformance.html">근접 카메라 성능 조사</a></li>
+</ul>
+<h2>다른 세션의 내용</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>세션</th>
+<th>정리한 내용</th>
+<th>완료로 해석할 범위</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GPU-Driven 배선 계획 찾기</td>
+<td><a href="../design/GpuDrivenMeshletDxrWiring.html">Meshlet·Mesh Shader·DXR 상세 계약</a>, 공통 세대/ABI·cook·독립 가시성·bounded indirect·RG/RHI·fallback·abort/fence·구현 슬라이스</td>
+<td>설계 문서 작성. GPU-1/GPU-3 진행, GPU-9 미완료, 실제 구현/지원 probe/성능 수용 미검증</td>
+</tr>
+<tr>
+<td>프로파일링으로 프레임 급감 원인 찾기</td>
+<td>노드 canvas 반복 계산·씬 잠금·표시 대기·재질 준비 분석과 Inspector/preview 개선</td>
+<td>기존 제품 통합 기록으로 보존. <a href="MAT9MaterialScenePerformance.html">당시 성능 보고서</a>의 FPS를 현재 1024/4096 근접 이동 결과로 재사용하지 않음</td>
+</tr>
+<tr>
+<td>RHI 스레드 캡쳐 미응답 분석</td>
+<td>유휴 RHI 루프의 봉인 요청 처리 지점 부재와 <code>finish_pause</code>의 256회 yield 재시도 진단</td>
+<td>소스 분석. 미응답은 봉인 acknowledgement 미수집이며 교착 확정이 아님. 수정/실기동 검증은 미완료</td>
+</tr>
+<tr>
+<td>C++ module 도입 검토</td>
+<td>최신 소스 조사에서 EnhancedRenderGraph·AuthoringParsedDocument·Scene·DataSystem 후보와 헤더 전파 비용 구분</td>
+<td>조사 기록. 최신 후보 평가에는 모듈 구현이나 새 빌드 시간 측정이 없음</td>
+</tr>
+</tbody></table></div>
+<p>GPU 기능의 설계·구현·측정 완료를 구분해 <a href="../plans/GpuFeaturePlanningPlan.html">GPU 기능 계획</a>에
+연결한다. 같은 세션의 <a href="../plans/DxrShaderTraversalExperimentPlan.html">DXR 전환 가설·실험 계획</a>도
+함께 보존한다. Volume 경계 탐색·굴절·SSR/SSGI·Fog visibility의 정확도와 AS 최초 생성/재사용/
+갱신을 포함한 전체 비용을 비교하여 채택·조건부 채택·보류·기각을 판정한다. 실험은 미착수다.
+GPU-driven 배칭이 현재 화면별 IBL 적분을 자동으로 줄인다고 가정하지 않는다.</p>
+<h2>이번 커밋의 범위와 검증 근거</h2>
+<ul>
+<li>통합 시작 시 직전 host10 실행의 589-file source snapshot과 대조하여 <strong>제품 소스 drift 0</strong>을
+확인했다. 이후 완료된 MAT-9 변경은 이 기준선이며 측정 도구의 pass timer만 추가됐다.
+커밋 준비 중 별도 세션 <strong>페이즈 4.3 사전 정찰</strong>이 BASE-0 구현을 시작했다.
+이번 커밋은 완료된 MAT-9·GPU 상세 설계·DXR 실험 계획의 기준 시점으로 고정한다.
+작성 중인 BASE-0 하네스는 작업 트리에 보존하며 미완료 구현을 완료 항목으로 포함하지 않는다.</li>
+<li>두 작업이 함께 수정한 <code>EnhancedSceneRenderer.cpp</code>의 MAT-9 게시본은 직전 snapshot SHA-256
+<code>a74310852caf4ae04acf644e0601a74202c2fea24da21b8779d19bbe6ae159ee</code>와 일치한다.
+BASE-0의 캡처/그래프 진단 변경은 작업 트리에 남겨 해당 세션의 빌드·검증이 계속되도록 한다.</li>
+<li>정상 Debug Editor runtime SHA-256:
+<code>f93b7f3b9bd84f0747f067caac841b275ec0684f7aea3d79c752e7b14e12ed1a</code>.
+<a href="MAT9SpecialSurfaceVerification.json">직전 전체 Debug 빌드와 Debug/Release 실행 기록</a>을 보존한다.</li>
+<li>Release 측정 도구 SHA-256:
+<code>69ddbc4f304a0babe2cb5c31877f191d320f1905556d2a74d29edf1f89c069f1</code>.
+pass timer 추가 후 빌드·실제 실행과 네 diagnostic 조건의 전체 RGBA byte 일치를 확인했다.</li>
+<li>14개 Python 구문·56개 JSON 파싱·6개 PowerShell 구문 검사와 변경 형식 검사를 통과했다.
+게시 전 생성된 GGX 표의 파일 끝 빈 줄 하나를 제거했다. 계산 내용은 검증본과 동일하다.
+대시보드 439항목 전체 파싱·유한 진행률·phase-meta 산수와 문서 웹 빌드도 통과했다.
+계획/대시보드 수정은 문서 검사이며 새 Editor/GPU 성능 수용으로 세지 않는다.</li>
+<li>사용자 원본 프로파일 캡처와 고정 Blender 입력·픽셀·numeric golden, 라이선스/원본 SHA,
+비교 JSON·이미지를 함께 보존한다. 과거 결과의 바이너리 SHA나 판정을 현재 결과로 덮어쓰지 않는다.</li>
+</ul>
+<p>정본은 <a href="../plans/BlenderMaterialGraphPlan.html">Material 계획</a>,
+<a href="../plans/RenderPhaseRoadmap.html">후속 선행 그래프</a>,
+<a href="../plans/RenderGraphDependencySchedulingPlan.html">RenderGraph 계획</a>이다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-다른-세션의-내용"></span><span id="sec-이번-커밋의-범위와-검증-근거"></span><span id="sec-이번-통합에-포함한-제품-변경과-측정-기록"></span><span id="sec-현재-결정"></span><span id="다른-세션의-내용"></span><span id="이번-커밋의-범위와-검증-근거"></span><span id="이번-통합에-포함한-제품-변경과-측정-기록"></span><span id="현재-결정"></span></details></main></body></html>

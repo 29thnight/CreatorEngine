@@ -1,5 +1,52 @@
 # 에디터 리소스 편집 자동 처리 — 2026-10-10
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/App.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L307) — `EditorAssetDatabase::Get().FlushAutomaticSaves();`
+- [Editor/EngineEntry/App.cpp:646](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L646) — `EditorAssetDatabase::Get().TickAutomaticChanges();`
+- [Editor/EngineEntry/App.cpp:787](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L787) — `const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(`
+- [Engine/RenderEngine/Material.cpp:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.cpp#L32) — `Material::Material()`
+- [Engine/RenderEngine/Material.cpp:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.cpp#L36) — `bool Material::ReloadCodeShader(own::shared_owner<const LX::Runtime::ShaderGeneration> shader, std::string& error)`
+- [Engine/RenderEngine/Material.cpp:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.cpp#L45) — `own::shared_owner<const LX::Runtime::Instance> candidate;`
+- [Editor/EngineEntry/PrefabEditor.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/PrefabEditor.cpp#L23) — `PrefabEditor::PrefabEditor()`
+- [Editor/EngineEntry/PrefabEditor.cpp:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/PrefabEditor.cpp#L27) — `void PrefabEditor::Open(const std::string& path)`
+- [Editor/EngineEntry/PrefabEditor.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/PrefabEditor.cpp#L29) — `if (!ConsoleCommandSystem::Get().IsGameThread())`
+- [Engine/SceneRuntime/MeshRenderer.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L28) — `own::shared_owner<const material_graph::Instance> observed;`
+- [Engine/SceneRuntime/MeshRenderer.cpp:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L39) — `const auto authored = std::ranges::find(instance.description.parameters, id,`
+- [Engine/SceneRuntime/MeshRenderer.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L46) — `const auto parameter = std::ranges::find(parameters, id, &LX::LXMaterialParameter::id);`
+- [Engine/SceneRuntime/PrefabUtility.cpp:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L66) — `if (Authoring::NodesEqual(currProp, snapProp))`
+- [Engine/SceneRuntime/PrefabUtility.cpp:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L74) — `out.push_back(std::move(ov));`
+- [Engine/SceneRuntime/PrefabUtility.cpp:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L92) — `Authoring::DocumentAccess::Read(obj.m_prefabOriginal);`
+- [Engine/SceneRuntime/ImageComponent.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L19) — `ImageComponent::ImageComponent()`
+- [Engine/SceneRuntime/ImageComponent.cpp:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L24) — `bool ImageComponent::ReplaceTextureOwner(const Texture* previous,`
+- [Engine/SceneRuntime/ImageComponent.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L25) — `const own::shared_owner<const Texture>& replacement)`
+- [Engine/SceneRuntime/DecalComponent.cpp:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/DecalComponent.cpp#L10) — `void DecalComponent::OnInitialized()`
+- [Engine/SceneRuntime/DecalComponent.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/DecalComponent.cpp#L34) — `void DecalComponent::OnAddedToScene()`
+- [Engine/SceneRuntime/DecalComponent.cpp:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/DecalComponent.cpp#L50) — `void DecalComponent::OnRemovingFromScene()`
+- [Engine/RenderEngine/LXMaterialRuntime.cpp:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/LXMaterialRuntime.cpp#L13) — `error = std::move(message);`
+- [Engine/RenderEngine/LXMaterialRuntime.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/LXMaterialRuntime.cpp#L19) — `if (!MaterialPropertyPacker::ValidateLogicalValue(property, value, error))`
+- [Engine/RenderEngine/LXMaterialRuntime.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/LXMaterialRuntime.cpp#L23) — `if (!std::ranges::all_of(value.m_numericValue, [](float number) { return std::isfinite(number); }))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 사용자 요청은 편집 감지 후 필요한 처리를 자동 실행하고, 재질 그래프 Apply·Save 및
 프리팹 Apply까지 자동화하는 것이다. 이 기록은 소스 구현과 실제 실행 수용을 구분한다.
 기존 dirty worktree의 텍스처 임포트 구현 위에 후속 변경을 적용했으며 전체 변경을
@@ -94,3 +141,5 @@ Release/Shipping, 모든 이미지 포맷·모델·소비자, 직접 마우스/�
 GPU 픽셀 비교, 성능/장시간 수용을 이 변경의 정적 검사로 통과 처리하지 않는다.
 파일 watcher는 안정화 시간을 사용하며, 무효한 편집이나 호환되지 않는 셰이더 계약은
 자동 게시하지 않는다. PHASE 12의 earnedDays와 기존 잔여 품질 게이트는 유지한다.
+
+</details>

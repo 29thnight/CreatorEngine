@@ -1,4 +1,51 @@
-﻿# PhysX API 계약 — PHASE 19
+# PhysX API 계약 — PHASE 19
+
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 물리 쿼리는 sceneAnchor Entity, 호출자 버퍼와 PhysicsQueryResult를 사용한다. 현재 hit 타입은 PhysicsHit이며 LayerId는 신원 값이다.
+- 접촉은 OnBeginSimulation에서 ContactStream을 등록하고 PostPhysics에서 소비한다. OnTrigger*/OnCollision* 훅과 RaycastAll을 현행 공개 API로 사용하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/capture-physics-p0.py:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/capture-physics-p0.py#L4) — `repo=Path(__file__).resolve().parents[2]`
+- [Tools/regression/capture-physics-p0.py:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/capture-physics-p0.py#L19) — `hits=[{'line':i,'text':line.strip()} for i,line in enumerate(text.splitlines(),1) if pattern.search(line)]`
+- [Tools/regression/capture-physics-p0.py:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/capture-physics-p0.py#L33) — `with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:`
+- [Tools/regression/verify-physics-p0.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p0.ps1#L1) — `[CmdletBinding()]`
+- [Tools/regression/verify-physics-p0.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p0.ps1#L2) — `param([ValidateSet('Debug','Release','All')][string]$Configuration = 'All')`
+- [Tools/regression/verify-physics-p0.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p0.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/author-physics-p0.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/author-physics-p0.ps1#L3) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/author-physics-p0.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/author-physics-p0.ps1#L8) — `$process=Start-Process $exe -ArgumentList '--command-service','--console' -WorkingDirectory (Split-Path $exe) -WindowStyle Hidden -RedirectStandardOutput "$out/editor.out" -RedirectStandardError "$out/editor.err" -PassThru`
+- [Tools/regression/author-physics-p0.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/author-physics-p0.ps1#L11) — `$deadline=(Get-Date).AddSeconds(180)`
+- [Tools/regression/verify-physics-p1.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p1.ps1#L1) — `param([ValidateSet('Debug','Release','Shipping','All')][string]$Configuration='All')`
+- [Tools/regression/verify-physics-p1.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p1.ps1#L3) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-physics-p1.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p1.ps1#L15) — `$cmd=$cmd.Replace(' /link ', ' '+($diagnostics -join ' ')+' /link ').Replace(' EngineDiagnostics.lib ',' ').Replace('/DCE_SHIPPING=0','/DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1')`
+- [Tools/regression/verify-physics-p2.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p2.ps1#L1) — `param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All', [switch]$RequireGpu)`
+- [Tools/regression/verify-physics-p2.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p2.ps1#L4) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-physics-p2.ps1:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-physics-p2.ps1#L22) — `if($config -eq 'Shipping'){$cmd=$cmd.Replace('/DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1','/DCE_SHIPPING=1')}`
+- [Engine/EngineDiagnostics/ProfileRecording.cpp:73](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileRecording.cpp#L73) — `std::memcpy(bytes.data() + offset, &value, sizeof(T));`
+- [Engine/EngineDiagnostics/ProfileRecording.cpp:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileRecording.cpp#L88) — `std::memcpy(&value, bytes.data() + offset, sizeof(T));`
+- [Engine/EngineDiagnostics/ProfileRecording.cpp:178](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileRecording.cpp#L178) — `if (crc(std::span(header).first(28)) != header_crc)`
+- [ScriptCore/Prefab.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10) — `public readonly struct Prefab`
+- [ScriptCore/Prefab.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12) — `private readonly string? _name;`
+- [ScriptCore/Prefab.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14) — `private Prefab(string name) => _name = name;`
+- [ScriptCore/Physics.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13) — `public struct PhysicsHit`
+- [ScriptCore/Physics.cs:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41) — `public readonly struct PhysicsQueryRequest`
+- [ScriptCore/Physics.cs:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65) — `public readonly struct PhysicsBatchResult`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
 
 작성: 2026-10-01 · 실행 계획: [PhysicsRedesignPlan](../plans/PhysicsRedesignPlan.md)
 상태: 계약 초안과 현재 SDK/빌드/언어 검증. 제품 baseline/corpus 증거 한계는 아래에 명시한다.
@@ -926,3 +973,5 @@ T1의 실행정책·최적화·계측·worker/workload 선택 근거는 완료�
 전체 제품 평균/p99/메모리, 다른 장비와 전체 콘텐츠의 수용은 기존 M3 범위다.
 보존 인덱스 T1Closure/result.json, measurements.json 및 원시224개 기록.
 바이너리/캡처 사본은 추가하지 않았다. 기존 Build/Obj capture 위치는 원시기록에 유지한다.
+
+</details>

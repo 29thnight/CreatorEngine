@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>ScriptBinder 분할 판단 자료 (E7 잔여 결정)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="ScriptBinderSplitAnalysis.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/ScriptBinderSplitAnalysis.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>ScriptBinder 분할 판단 자료 (E7 잔여 결정)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Managed code</ve-node><ve-node id="n1" at="2 1">API handle</ve-node><ve-node id="n2" at="3 1" key>SceneRuntime</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>현재 managed 표면은 Component·Entity와 세대 핸들이다. OnInitialized&#126;OnUninitializing 수명 훅과 PrePhysics/PostPhysics를 구분한다.</li>
+<li>native 객체 수명, CLR GC, Scope 취소·reload와 자산 owner는 별도 계약이다. 미래 PrSM 효과/저작 체계를 기존 ContactStream 구현으로 판정하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L185">Engine/SceneRuntime/RegisterReflectManual.h:185</a> — <code>failures += &quot;\n  &quot; + std::string(type.name()) + (type.is_serializable() ? &quot;&quot; : &quot; [쓰기 불가]&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L191">Engine/SceneRuntime/RegisterReflectManual.h:191</a> — <code>failures += &quot; &quot; + std::string(field.name()) + &quot;(&quot; + std::string(field.type_name()) + &quot;)&quot;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L204">Engine/SceneRuntime/RegisterReflectManual.h:204</a> — <code>Debug::PrintLog(spdlog::level::critical, &quot;reflgen 서술자가 쓰거나 읽지 못하는 타입(필드의 serializer 가 등록 함수에&quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L84">Engine/SceneRuntime/Scene.cpp:84</a> — <code>m_begin = Clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L94">Engine/SceneRuntime/Scene.cpp:94</a> — <code>const TimePoint end = Clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L102">Engine/SceneRuntime/Scene.cpp:102</a> — <code>m_begin = Clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L18">Engine/SceneRuntime/Entity.cpp:18</a> — <code>Entity::Entity() : Object(&quot;Entity&quot;), m_index(0)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L23">Engine/SceneRuntime/Entity.cpp:23</a> — <code>Entity::Entity(Scene* scene, std::string_view name, GameObjectType,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L29">Engine/SceneRuntime/Entity.cpp:29</a> — <code>Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L64">Engine/SceneRuntime/SceneManager.cpp:64</a> — <code>throw std::runtime_error(&quot;Scene asset bundle preparation failed (status &quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L65">Engine/SceneRuntime/SceneManager.cpp:65</a> — <code>+ std::to_string(static_cast&lt;unsigned&gt;(result.status)) + &quot;, completed &quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L66">Engine/SceneRuntime/SceneManager.cpp:66</a> — <code>+ std::to_string(result.completed) + &quot;/&quot; + std::to_string(result.submitted)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp#L16">Engine/SceneRuntime/RuntimeFrame.cpp:16</a> — <code>void TickManagedPrePhysics(float deltaSeconds)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp#L18">Engine/SceneRuntime/RuntimeFrame.cpp:18</a> — <code>auto&amp; clr = ClrHost::Get();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp#L29">Engine/SceneRuntime/RuntimeFrame.cpp:29</a> — <code>auto&amp; clr = ClrHost::Get();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ComponentFactory.cpp#L33">Engine/SceneRuntime/ComponentFactory.cpp:33</a> — <code>gc::root_ref&lt;Component&gt; TryCreateManagedComponent(gc::domain&amp; domain,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ComponentFactory.cpp#L38">Engine/SceneRuntime/ComponentFactory.cpp:38</a> — <code>if (requested.id() == Meta::ToTypeID(TypeTrait::GUIDCreator::GetTypeID&lt;T&gt;()))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ComponentFactory.cpp#L47">Engine/SceneRuntime/ComponentFactory.cpp:47</a> — <code>gc::root_ref&lt;Component&gt; ComponentFactory::CreateManaged(gc::domain&amp; domain,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LifecycleRegistry.cpp#L43">Engine/SceneRuntime/LifecycleRegistry.cpp:43</a> — <code>void Registry::Store(size_t typeID, uint16_t mask)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LifecycleRegistry.cpp#L48">Engine/SceneRuntime/LifecycleRegistry.cpp:48</a> — <code>uint16_t Registry::Find(size_t typeID)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LifecycleRegistry.cpp#L54">Engine/SceneRuntime/LifecycleRegistry.cpp:54</a> — <code>size_t Registry::Count()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10">ScriptCore/Prefab.cs:10</a> — <code>public readonly struct Prefab</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12">ScriptCore/Prefab.cs:12</a> — <code>private readonly string? _name;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14">ScriptCore/Prefab.cs:14</a> — <code>private Prefab(string name) =&gt; _name = name;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<ul>
+<li>작성일: 2026-08-24</li>
+<li>목적: EngineLayerSeparationPlan E7의 보류 항목 — &quot;<code>ScriptBinder</code>를
+<code>SceneRuntime/ScriptRuntime</code>으로 재명명 <strong>또는 분할</strong>&quot; — 의 결정 자료.</li>
+<li>방법: 194파일 전수를 9개 책임 영역으로 분류하고, 영역 간 include 결합
+행렬과 외부 소비자 분포를 실측했다. 수치는 전부 이 날짜의 실측이다.</li>
+</ul>
+<h2>1. 실체 인벤토리 — 이름과 실체의 불일치</h2>
+<p>총 194파일 · 1,342KB. &quot;스크립트 바인더&quot;라는 이름과 달리 실체는
+<strong>게임 오브젝트 모델 + 전 도메인 컴포넌트 시스템 + C# 실행 계층</strong>의
+게임 런타임 전체다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>영역</th>
+<th align="right">파일</th>
+<th align="right">KB</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>SceneCore</td>
+<td align="right">44</td>
+<td align="right">503</td>
+<td>Scene·SceneManager·Entity·Transform·Prefab·수명·팩토리</td>
+</tr>
+<tr>
+<td>RenderBridge</td>
+<td align="right">32</td>
+<td align="right">168</td>
+<td>렌더 프록시 브리지·Mesh/Light/Decal/Foliage/Terrain/Camera 컴포넌트</td>
+</tr>
+<tr>
+<td>ClrScript</td>
+<td align="right">11</td>
+<td align="right">166</td>
+<td>ClrHost(135KB)·ScriptComponent·ScriptObjectRegistry</td>
+</tr>
+<tr>
+<td>UI</td>
+<td align="right">21</td>
+<td align="right">129</td>
+<td>uGUI 계열(Canvas·RectTransform·UITickSystem·프록시)</td>
+</tr>
+<tr>
+<td>Physics</td>
+<td align="right">21</td>
+<td align="right">108</td>
+<td>PhysicsManager·콜라이더·CCT·래그돌</td>
+</tr>
+<tr>
+<td>Animation</td>
+<td align="right">23</td>
+<td align="right">105</td>
+<td>AnimationJob·Animator·상태기계</td>
+</tr>
+<tr>
+<td>Input</td>
+<td align="right">16</td>
+<td align="right">67</td>
+<td>InputManager·InputAction·PlayerInput</td>
+</tr>
+<tr>
+<td>AI_BT</td>
+<td align="right">18</td>
+<td align="right">47</td>
+<td>AIManager·BT·블랙보드·FSM</td>
+</tr>
+<tr>
+<td>Sound</td>
+<td align="right">7</td>
+<td align="right">37</td>
+<td>SoundManager 계열</td>
+</tr>
+</tbody></table></div>
+<h2>2. 결합 행렬 — 어디에 칼이 들어가고 어디에 안 들어가나</h2>
+<p>영역 간 include(내부 간선, 5건 이상):</p>
+<pre><code>RenderBridge → SceneCore   49      SceneCore → RenderBridge  42
+UI           → SceneCore   36      SceneCore → Physics       36
+Physics      → SceneCore   28      SceneCore → UI            26
+SceneCore    → Animation   14      SceneCore → ClrScript     12
+ClrScript    → SceneCore   10      (이하 한 자리 수)
+</code></pre>
+<h3>2.1 도메인 분할선 — 사실상 막혀 있다</h3>
+<p>SceneCore↔RenderBridge(49+42)·↔Physics(36+28)·↔UI(36+26)가 전부
+<strong>양방향 강결합</strong>이다. Scene이 컴포넌트를 순회·파괴·직렬화하고 컴포넌트가
+Scene·Entity를 아는 구조라, 도메인을 떼려면 컴포넌트 등록·순회의 타입
+소거가 선행돼야 한다 — 그것은 SceneGraphRedesignPlan(파괴 단일점 부재 등
+CRITICAL 4종)의 소관이지 프로젝트 분할로 풀 문제가 아니다.</p>
+<h3>2.2 ClrScript 분할선 — 가장 싸지만 공짜가 아니다</h3>
+<p>ClrScript로의 역방향 유입은 <strong>21건</strong>으로 전 분할선 중 최소다. 그 실체:</p>
+<p><strong>(a) 씬 수명 훅 7지점</strong> — 코어가 C# 실행 계층을 직접 부른다:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>무엇을</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene.cpp</td>
+<td>ClrHost 틱·ScriptComponent 파괴</td>
+</tr>
+<tr>
+<td>SceneManager.cpp</td>
+<td>어셈블리 리로드·씬 언로드 통지(SweepOrphans)</td>
+</tr>
+<tr>
+<td>RuntimeFrame.cpp</td>
+<td>프레임 루프의 TickScripts</td>
+</tr>
+<tr>
+<td>ComponentFactory.cpp</td>
+<td>ScriptComponent 생성·Invalid 폴백</td>
+</tr>
+<tr>
+<td>LifecycleRegistry.cpp</td>
+<td>스크립트 수명 등록</td>
+</tr>
+<tr>
+<td>Entity.cpp</td>
+<td>ScriptObjectRegistry</td>
+</tr>
+<tr>
+<td>RegisterReflectManual.h</td>
+<td>리플렉션 등록</td>
+</tr>
+</tbody></table></div>
+<p><strong>(b) 도메인의 관리 측 연동 6건</strong> — 설계상 의도된 결합:
+BehaviorTreeComponent·BTGraphFlatten(BT 관리 측 재설계 9-8: &quot;BT 틱이
+동기라 노드만 C#은 불변식을 깬다&quot;), AnimationEventBridge·AnimationState
+(ManagedAniBehavior), PlayerInput, FSMState(IScriptedFSM).</p>
+<p>분할하면 (a)의 7지점 전부를 역전 계약(IScriptHost 류 — E4-2 contributor·
+E4-6a sink와 같은 패턴)으로 절단해야 하고, (b)는 BT·애니·입력 3도메인이
+분할선에 걸쳐 있어 절단면이 깨끗하지 않다.</p>
+<h2>3. 외부 소비자 — 분할해도 소비자는 둘 다 문다</h2>
+<p>Editor 149건·Player 12건. Editor 소비 상위는 SceneManager(13)·Scene(11)·
+Entity(8)에 ClrHost(7)와 전 도메인이 골고루 섞여 있다. 분할 시 두 조각을
+모두 참조하게 되므로 <strong>소비자 관점의 이득은 0</strong>이다. Player의 스크립트
+없는 구성(ClrScript 비링크)은 이론상 가능해지지만, 게임 실행체가 C#
+게임플레이를 전제하는 현 제품 방향에서 실익이 없다.</p>
+<h2>4. 판단</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>안</th>
+<th>내용</th>
+<th>비용</th>
+<th>이득</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>단순 개명 → SceneRuntime</strong></td>
+<td>E7-b급 기계 스윕(폴더·vcxproj·sln·검사기 resolve_owner 폴더 힌트·게이트 11파일·$(SolutionDir) 경로)</td>
+<td>이름이 실체를 말한다</td>
+<td><strong>권장</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>2분할(SceneRuntime+ScriptRuntime)</td>
+<td>수명 훅 7지점의 인터페이스 역전 + 걸친 3도메인 재배선 + ClrHost 112KB 재배선</td>
+<td>C# 호스팅의 독립 진화</td>
+<td><strong>보류</strong> — 아래 재평가 조건</td>
+</tr>
+<tr>
+<td>3</td>
+<td>도메인 분할</td>
+<td>SceneCore 양방향 강결합 전면 절단</td>
+<td>—</td>
+<td><strong>기각</strong> — SceneGraph 재설계 소관</td>
+</tr>
+</tbody></table></div>
+<p><strong>안 2의 재평가 조건</strong>: ① BT 관리 측 이관(B축, 9-8) 완료 — (b)의 최대
+지분이 자연 소멸, ② SceneGraph E1(파괴 단일점) 착지 — (a)의 파괴 훅이
+단일점으로 모여 역전 계약이 한 곳이 된다. 두 트랙이 착지하면 역방향
+유입이 실측 기준 절반 이하로 줄어들 것이므로 그때 재실측해 판단한다.</p>
+<p><strong>즉시 실행 가능한 결론</strong>: 개명(안 1)은 분할 결정과 독립적으로 지금 해도
+된다 — 안 2로 가더라도 SceneRuntime이라는 이름은 그대로 살아남는다
+(ScriptRuntime을 나중에 떼어 내는 형태).</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-실체-인벤토리--이름과-실체의-불일치"></span><span id="2-결합-행렬--어디에-칼이-들어가고-어디에-안-들어가나"></span><span id="21-도메인-분할선--사실상-막혀-있다"></span><span id="22-clrscript-분할선--가장-싸지만-공짜가-아니다"></span><span id="3-외부-소비자--분할해도-소비자는-둘-다-문다"></span><span id="4-판단"></span><span id="sec-1-실체-인벤토리--이름과-실체의-불일치"></span><span id="sec-2-결합-행렬--어디에-칼이-들어가고-어디에-안-들어가나"></span><span id="sec-3-외부-소비자--분할해도-소비자는-둘-다-문다"></span><span id="sec-4-판단"></span></details></main></body></html>

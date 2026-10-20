@@ -1,5 +1,41 @@
 # RG5 최종 Fog/PostChain/UI/Editor 및 capture/fixture 수용
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedFinalRg5Tests.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedFinalRg5Tests.h#L30) — `camera.view = math::look_at_lh(camera.eyePosition, math::vector3{0.f, 0.f, 3.f}, math::vector3{0.f, 1.f, 0.f});`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedFinalRg5Tests.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedFinalRg5Tests.h#L31) — `camera.projection = math::perspective_fov_lh(math::quarter_pi, 1.f, 0.5f, 1000.f);`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedFinalRg5Tests.h:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedFinalRg5Tests.h#L32) — `camera.inverseView = math::inverse(camera.view);`
+- [Tools/regression/base0_artifacts.py:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L13) — `import struct`
+- [Tools/regression/base0_artifacts.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L20) — `raise ValueError(message)`
+- [Tools/regression/base0_artifacts.py:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L44) — `expected_order = [i for i, p in enumerate(passes) if not truth(p["culled"])]`
+- [Tools/regression/complete-render-base0.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/complete-render-base0.ps1#L10) — `$output=[IO.Path]::GetFullPath($OutputFile)`
+- [Tools/regression/complete-render-base0.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/complete-render-base0.ps1#L14) — `$path=[IO.Path]::GetFullPath($pair[1])`
+- [Tools/regression/complete-render-base0.ps1:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/complete-render-base0.ps1#L38) — `[IO.Path]::GetFullPath($compare.left) -ne [IO.Path]::GetFullPath($results[0].runs[0].captures[0]) -or`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-07. **RG5 완료·기성 10인일 회수.** 최종 조합·개별 기능·실제 Editor 장면 캡처/fixture 수용이 Debug/Release 모두 통과했다. 이는 계획 공수 회수이며 실제 소요 시간 역산이 아니다. RG6·RG-V는 progress/기성 0으로 유지한다.
 
 ## 최종 조합
@@ -59,3 +95,5 @@ Debug/Release 각각 독립 2프로세스×2캡처를 정상 종료했다. 같�
 RG6은 변경 전후 별도 프로세스의 제품 cutover 및 CPU/GPU 비용 수용을 계속 소유한다. 현행 구성의 반복성 검사만으로 RG6·RG-V·MAT-9·GPU 기능·Vulkan 비교 완료를 판정하지 않는다.
 
 계획서·공수 원장·대시보드에 RG5 done/기성 10을 반영했다. PHASE 4 계열 총 355/기성 98/잔여 257(+미산정), PHASE 4.3 총 100/기성 46/잔여 54다. 대시보드 442항목 전체 JavaScript 파싱·렌더, 문자열/구조 오류 0·진행률 유한값·phase-meta 8개 산수 검사를 통과했다. TASKS의 실제 공수 합계와 RG6/RG-V progress·기성 0도 별도로 계산해 확인했다(`ledger-check.json`). 보고서 상대 링크·수정 PowerShell 구문·Python import 및 `git diff --check` 통과.
+
+</details>

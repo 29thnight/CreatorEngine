@@ -1,5 +1,52 @@
 # Phase 14.5 master 병합 준비 — 2026-09-06
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.
+- scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/ScriptAssemblyLoader.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptAssemblyLoader.cs#L18) — `internal sealed class ScriptLoadContext(string name) : AssemblyLoadContext(name, isCollectible: true)`
+- [ScriptCore/ScriptAssemblyLoader.cs:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptAssemblyLoader.cs#L22) — `private static readonly Assembly CoreAssembly = typeof(Component).Assembly;`
+- [ScriptCore/ScriptAssemblyLoader.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptAssemblyLoader.cs#L24) — `protected override Assembly? Load(AssemblyName assemblyName)`
+- [Engine/SceneRuntime/ScriptComponent.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ScriptComponent.h#L17) — `class [[reflgen::reflect]] ScriptComponent : public meta::identity<ScriptComponent, Component>`
+- [Engine/SceneRuntime/ScriptComponent.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ScriptComponent.h#L21) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/ScriptComponent.h:112](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ScriptComponent.h#L112) — `void PrepareForReload();`
+- [Engine/Utility_Framework/HashingString.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/HashingString.h#L33) — `throw std::invalid_argument("Null pointer provided to HashingString constructor.");`
+- [Engine/Utility_Framework/HashingString.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/HashingString.h#L55) — `throw std::invalid_argument("Null pointer provided in assignment operator for const char*.");`
+- [Engine/Utility_Framework/HashingString.h:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/HashingString.h#L75) — `throw std::invalid_argument("Sized view with a null pointer provided to HashingString.");`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L86) — `static_assert(Meta::TypedDraw::ObjectHidesEnabledFlag(),`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L136) — `const auto* type = Meta::Find(obj->GetTypeID());`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:140](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L140) — `auto before = Meta::SerializeDocument(obj, *type);`
+- [Tools/regression/verify-hashing-string.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L36) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-hashing-string.ps1:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L58) — `throw 'HashingString::data() is not a const accessor returning const char*.'`
+- [Tools/regression/verify-hashing-string.ps1:61](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L61) — `throw 'HashingString::size() is not callable on a const instance.'`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:193](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L193) — `stream.handle = ::GetStdHandle(stream.id);`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:195](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L195) — `const DWORD type = ::GetFileType(stream.handle);`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:203](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L203) — `if (nullptr == ::GetConsoleWindow())`
+- [Tools/regression/verify-script-add-awake-once.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L14) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-script-add-awake-once.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L15) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-script-add-awake-once.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L17) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-cli-consumer-contract.ps1:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-consumer-contract.ps1#L33) — `$repoRoot    = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-cli-consumer-contract.ps1:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-consumer-contract.ps1#L56) — `$lines = [IO.File]::ReadAllLines($file.FullName)`
+- [Tools/regression/verify-cli-consumer-contract.ps1:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-consumer-contract.ps1#L113) — `$serviceText = [IO.File]::ReadAllText($serviceSource)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 최신 `origin/master`의 `6b9c2b792860b5f8bb408956990789f3a2d2b1d2`를 별도 통합 브랜치에서 합쳐 검증했다. **충돌 해결 및 병합 준비 완료**다.
 원본 `phase14.5/lc0-baseline` 작업 트리와 로컬·원격 `master`는 유지한다.
 
@@ -101,3 +148,5 @@ GUI 수동 조작과 canonical 성능의 기존 미확인 항목 때문에 Phase
 남은 조건은 14.5 소유 게이트의 HEAD 재실행과 GUI 수동 조작 둘이며, 근거는 [종결 검토](Phase14_5Closure.md)의 재정의 절에 있다.
 위 표의 실행 증거는 준비 트리의 것이므로 그 재실행을 대신하지 않는다.)
 통합 전의 실행 증거는 [Phase14_5Closure.md](Phase14_5Closure.md)에 별도 보존했다.
+
+</details>

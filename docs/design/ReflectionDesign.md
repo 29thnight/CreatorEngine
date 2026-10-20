@@ -1,5 +1,50 @@
 # 엔진 리플렉션 — reflgen
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.
+- 모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/ReflectionYml.h:379](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L379) — `inline void DeserializePrefab(void* instance, const reflgen::type_descriptor& type,`
+- [Engine/Utility_Framework/ReflectionYml.h:403](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L403) — `inline void DeserializePrefab(IObject* instance, const reflgen::type_descriptor& type,`
+- [Engine/Utility_Framework/ReflectionYml.h:407](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L407) — `DeserializePrefab(ObjectAddress(instance, type), type, newNode, overriddenProperties);`
+- [Engine/Utility_Framework/ReflectionMeta.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionMeta.h#L19) — `template<class T, class Base = no_base>`
+- [Engine/Utility_Framework/ReflectionMeta.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionMeta.h#L20) — `class identity : public Base`
+- [Engine/Utility_Framework/ReflectionMeta.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionMeta.h#L31) — `explicit identity(Args&&... args) : Base(std::forward<Args>(args)...)`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L86) — `static_assert(Meta::TypedDraw::ObjectHidesEnabledFlag(),`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L136) — `const auto* type = Meta::Find(obj->GetTypeID());`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:985](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L985) — `Meta::DrawMethods(static_cast<void*>(static_cast<T*>(&obj)), Meta::LocalMethods(Meta::TypeOf<T>()));`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:103](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L103) — `inline std::string InvokeAndDescribe(void* instance, const reflgen::method_info& method, std::span<void* const> arguments)`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:117](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L117) — `inline void InvokeInspectorMethod(void* instance, const reflgen::method_info& method, MethodUiState& state)`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:153](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L153) — `inline void DrawMethods(void* instance, std::span<const reflgen::method_info> methods)`
+- [Tools/regression/reflection_container_roundtrip_probe.cpp:251](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/reflection_container_roundtrip_probe.cpp#L251) — `Meta::Typed::DeserializeObjectFrom(loaded, parsed.Root());`
+- [Tools/regression/reflection_container_roundtrip_probe.cpp:261](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/reflection_container_roundtrip_probe.cpp#L261) — `Meta::Typed::DeserializeObjectFrom(loaded, invalid.Root());`
+- [Tools/regression/reflection_container_roundtrip_probe.cpp:329](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/reflection_container_roundtrip_probe.cpp#L329) — `Meta::Typed::DeserializeObjectFrom(loaded, parsed.Root());`
+- [Engine/Utility_Framework/ReflectionYml.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.cpp#L18) — `std::unordered_map<size_t, TypeOps>& OpsRegistry()`
+- [Tools/regression/verify-reflection-container.ps1:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reflection-container.ps1#L39) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-reflection-container.ps1:76](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reflection-container.ps1#L76) — `if (-not [string]::IsNullOrWhiteSpace($text)) { $code.Add($text) }`
+- [Tools/regression/verify-reflection-container.ps1:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reflection-container.ps1#L98) — `if (-not (@($typedYmlCode | Where-Object { $_ -match [regex]::Escape($needle) }).Count -gt 0)) {`
+- [Tools/regression/verify-reflection-container-roundtrip.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reflection-container-roundtrip.ps1#L1) — `[CmdletBinding()]`
+- [Tools/regression/verify-reflection-container-roundtrip.ps1:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reflection-container-roundtrip.ps1#L41) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-reflection-container-roundtrip.ps1:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reflection-container-roundtrip.ps1#L65) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성: 2026-09-30 · 근거: `reflgen-adoption` 브랜치(f58d9fc0) · reflgen 1.0.0(`ports/reflgen` 이 `v1.0.0` 태그를 가리킨다)
 이 문서는 엔진 리플렉션의 **현재 설계 정본**이다. 옛 체계(`reflect()` 레시피·`meta::schema`·`Meta::Type`)를
 말하는 문서를 읽을 때는 §9의 대응표를 본다.
@@ -239,3 +284,5 @@ reflgen 표기다(`std::basic_string<char,std::char_traits<char>,…>` 등) — 
 | `Meta::Find` · `Meta::TypeOf` | 같은 이름, 서술자를 돌려준다(`ReflgenRuntime.h`) |
 | `create_enum_type` · `Property::enumType` | `reflgen::enum_descriptor_of<E>()` · `field_info::enumeration()` |
 | `MetaSchema.h` · `ReflgenBridge.h` · `ReflgenParity.h` | 없음 |
+
+</details>

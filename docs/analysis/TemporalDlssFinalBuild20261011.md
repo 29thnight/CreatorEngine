@@ -1,5 +1,39 @@
 # DLSS 최종 바이너리 검증 공백 해소
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+이 문서는 연구/운영/표현 가이드 성격이므로, 아래 파일은 관련 엔진 경계의 근거다. 문서의 제안 전체가 구현됐다는 증거로 해석하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L216) — `const auto started = std::chrono::steady_clock::now();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:230](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L230) — `std::chrono::steady_clock::now() - started).count();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L307) — `const uint64_t generation = std::exchange(token.captureGeneration, 0);`
+- [Engine/RenderEngine/Camera.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L18) — `class [[reflgen::reflect]] Camera`
+- [Engine/RenderEngine/Camera.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L47) — `static constexpr math::vector3 kForward = math::vector3::unit_z();`
+- [Engine/RenderEngine/Camera.h:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L48) — `static constexpr math::vector3 kRight = math::vector3::unit_x();`
+- [Player/PlayerMain.cpp:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L56) — `auto* window = WindowsCoreWindow::GetForCurrentInstance();`
+- [Player/PlayerMain.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L82) — `const Authoring::TextParseTelemetrySnapshot parseTelemetry = Authoring::GetTextParseTelemetry();`
+- [Player/PlayerMain.cpp:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L83) — `std::printf("[runtime.text-parser] calls=%llu\n", static_cast<unsigned long long>(parseTelemetry.calls));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-11. 근거: `Artifacts/PR169/dlss-final-build-20261011/checkpoint.json`, `plan.json`, `storage.json`.
 
 직전 검증의 Quality/Native AA/Balanced 전환 결과는 Performance/Ultra Performance preset 변경 전 빌드였고, Native AA startup은 수동 노출 입력 연결 전 기록이었다. 관련 소스 해시가 직전 최종 소스 기록과 일치함을 확인하고 현재 SDK 활성 Debug/Release 바이너리에서 해당 항목을 실행했다. 이번에는 제품 코드 수정이나 재빌드가 필요하지 않았다.
@@ -13,3 +47,5 @@
 성공 원본은 실행별 대표만 남겼고 대체된 이전 성공 6개 대표의 raw도 제거했다. 이번 정리의 실제 회수량은 3.576GiB, 정리 직후 여유는 82.69GiB다. ledger·로그·판정·manifest·해시는 유지한다. 제거한 raw의 과거 픽셀 재생은 불가능하며 필요한 원래 실패 기록은 보존했다.
 
 이 결과는 DX12 RTX 2080 Ti, Editor Game 뷰, 정적 cube/floor, 고정 SDK 시간 및 지정 품질 전환/해상도에 한정한다. TR2/TR3/TU3 progress와 PHASE 4.5 기성 12/71은 유지한다. 다음 좁은 검증은 수직 FOV/투영 변경의 실제 제출 및 reset 복구다. 멀티뷰·실제 자산 화질·가변 시간·성능·FG·외부 지연 수용도 남는다.
+
+</details>

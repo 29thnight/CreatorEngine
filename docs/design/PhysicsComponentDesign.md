@@ -1,5 +1,52 @@
 # 물리 컴포넌트 구조 설계 — 완결된 바디 정의와 씬 소유 실행
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 물리 쿼리는 sceneAnchor Entity, 호출자 버퍼와 PhysicsQueryResult를 사용한다. 현재 hit 타입은 PhysicsHit이며 LayerId는 신원 값이다.
+- 접촉은 OnBeginSimulation에서 ContactStream을 등록하고 PostPhysics에서 소비한다. OnTrigger*/OnCollision* 훅과 RaycastAll을 현행 공개 API로 사용하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Prefab.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10) — `public readonly struct Prefab`
+- [ScriptCore/Prefab.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12) — `private readonly string? _name;`
+- [ScriptCore/Prefab.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14) — `private Prefab(string name) => _name = name;`
+- [ScriptCore/Physics.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13) — `public struct PhysicsHit`
+- [ScriptCore/Physics.cs:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41) — `public readonly struct PhysicsQueryRequest`
+- [ScriptCore/Physics.cs:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65) — `public readonly struct PhysicsBatchResult`
+- [Engine/SceneRuntime/Prefab.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L10) — `class [[reflgen::reflect]] Prefab : public Object`
+- [Engine/SceneRuntime/Prefab.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L12) — `friend struct reflgen::access;`
+- [Engine/SceneRuntime/Prefab.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L13) — `public:`
+- [Engine/Physics/PhysicsScene.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L12) — `enum class resource_kind : std::uint8_t`
+- [Engine/Physics/PhysicsScene.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L29) — `enum class execution_preference : std::uint8_t`
+- [Engine/Physics/PhysicsScene.h:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L35) — `enum class execution_backend : std::uint8_t`
+- [Engine/SceneRuntime/TagManager.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L6) — `class TagManager : public Singleton<TagManager>`
+- [Engine/SceneRuntime/TagManager.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L8) — `private:`
+- [Engine/SceneRuntime/TagManager.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L98) — `static auto TagManagers = TagManager::GetInstance();`
+- [ScriptCore/PhysicsBodyComponent.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/PhysicsBodyComponent.cs#L10) — `public struct PhysicsBodyState`
+- [ScriptCore/PhysicsBodyComponent.cs:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/PhysicsBodyComponent.cs#L21) — `public struct PhysicsShapeState`
+- [ScriptCore/PhysicsBodyComponent.cs:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/PhysicsBodyComponent.cs#L37) — `public sealed class PhysicsBodyComponent : NativeComponent`
+- [Engine/SceneRuntime/SceneLayerIndex.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneLayerIndex.h#L29) — `if (std::ranges::find(target, entity) != target.end())`
+- [Engine/SceneRuntime/SceneLayerIndex.h:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneLayerIndex.h#L44) — `std::erase(bucket, entity);`
+- [Engine/SceneRuntime/SceneLayerIndex.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneLayerIndex.h#L58) — `std::erase(bucket, entity);`
+- [ScriptCore/CharacterMovementComponent.cs:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/CharacterMovementComponent.cs#L6) — `public enum CharacterCollisionFlags : uint`
+- [ScriptCore/CharacterMovementComponent.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/CharacterMovementComponent.cs#L12) — `public struct CharacterMovementState`
+- [ScriptCore/CharacterMovementComponent.cs:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/CharacterMovementComponent.cs#L29) — `public sealed class CharacterMovementComponent : NativeComponent`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 개정: 2026-10-01 · 실행 계획: [PhysicsRedesignPlan](../plans/PhysicsRedesignPlan.md)
 
 ## 0. 설계 기준
@@ -197,3 +244,5 @@ GeometryResolve/Publish/Cook 계층과 기존 SDK Cook 계층을 노출하며 Ho
 GeometryCook에 포함하지 않는다. 실제 독립 CPU/GPU 게이트와 제품 TU 컴파일 증거는 실행 계획을 따른다.
 
 새 자산 Host 게시 시간은 Physics.GeometryAuthoringPublish로 별도 계측한다.
+
+</details>

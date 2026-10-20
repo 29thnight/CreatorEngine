@@ -1,5 +1,38 @@
 # RG5-12 화면 SSS·SSR 접근·출력 이관 — 완료
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L39) — `own::shared_owner<const Texture> texture(`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L40) — `Texture::CreateFromPixels(1, 1, "RG5.Screen.White", RHIFormat::RGBA8Unorm, &white));`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:89](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L89) — `std::copy(clear.begin(), clear.end(), desc.clearColor);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/regression/verify-rg5-screen.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-screen.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg5-screen.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-screen.ps1#L8) — `$root = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rg5-screen.ps1:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-screen.ps1#L20) — `[IO.File]::WriteAllText($commands, "dx12.rendergraphndx12.validationnquitn")`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 SSS의 두 축과 SSR 소비 체인을 명시 접근으로 이관했다. Material Graph의 Subsurface 소유자(RG5-7)와 별개인 화면 전체 후처리 pass다. 기본 제품 DeclarationOrder와 기존 셰이더·품질 tuning은 유지한다.
 
 ## 배선
@@ -37,3 +70,5 @@ VolumetricFog·후처리·UI 및 Editor/캡처/fixture 소비자, legacy 추론�
 정적 cpp/h 호출은 제품 59·게이트 224(이번과 직전 신규 검사 헤더 포함)이다. inl 전체 목록과 구분하며 호출 수로 이관 완료를 판정하지 않는다. 증거: Build/Obj/RenderRG5Screen/declaration-inventory.json.
 
 IBL 1024/4096 및 MAT-9의 SSS·투과 품질/성능 조건은 유지한다. Vulkan 비교는 PHASE 4.9 RenderDoc 캡처→리소스 확인→픽셀별 비교에서 진행한다.
+
+</details>

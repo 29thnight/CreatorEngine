@@ -1,5 +1,52 @@
 # PHASE 23 Launcher 착수 기준선
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [BuildTool/Program.cs:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Program.cs#L35) — `case "publish-engine": await EnginePublisher.Publish(context); break;`
+- [BuildTool/Program.cs:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Program.cs#L43) — `case "package-game": await GamePackager.Build(context); break;`
+- [BuildTool/Program.cs:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Program.cs#L78) — `internal sealed class BuildException(string message) : Exception(message);`
+- [BuildTool/Tests/Program.cs:238](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Tests/Program.cs#L238) — `var project = Path.Combine(root, "game 한글 & spaces"); Directory.CreateDirectory(Path.Combine(project, "ProjectSetting")); Directory.CreateDirectory(Path.Combine(project, "Assets/Script"));`
+- [BuildTool/Tests/Program.cs:285](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Tests/Program.cs#L285) — `Reject(() => PackageInputs.RemoveCookedTextureSources(cookInput, ["../../outside.png"]), "Texture cleanup escaped Assets");`
+- [BuildTool/Tests/Program.cs:311](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Tests/Program.cs#L311) — `Check(!PackageInputs.Excluded(source), "Font/license excluded from Assets payload: " + relative);`
+- [Editor/EngineEntry/App.cpp:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L136) — `if (std::filesystem::is_directory(candidate / L"Dynamic_CPP", error) &&`
+- [Editor/EngineEntry/App.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L307) — `EditorAssetDatabase::Get().FlushAutomaticSaves();`
+- [Editor/EngineEntry/App.cpp:646](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L646) — `EditorAssetDatabase::Get().TickAutomaticChanges();`
+- [BuildTool/GamePackager.cs:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/GamePackager.cs#L21) — `var selectedAssets = PackageInputs.ReadAssetList(project, options.Get("asset-list"), options.Get("startup-scene"));`
+- [BuildTool/GamePackager.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/GamePackager.cs#L24) — `var assets = Paths.Canonical(Path.Combine(project, "Assets"), true); var settings = Paths.Canonical(Path.Combine(project, "ProjectSetting"), true);`
+- [BuildTool/GamePackager.cs:76](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/GamePackager.cs#L76) — `renderFeatures = RenderFeatureSettings.FromProject(Path.Combine(snapshot, "Dynamic_CPP/ProjectSetting/EngineSettings.asset"));`
+- [BuildTool/PackageInputs.cs:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/PackageInputs.cs#L94) — `_ = Paths.Files(Path.Combine(project, "Assets")).Count(); _ = Paths.Files(Path.Combine(project, "ProjectSetting")).Count();`
+- [BuildTool/PackageInputs.cs:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/PackageInputs.cs#L95) — `var result = await context.Run("git", ["-C", repository, "-c", "core.quotepath=false", "ls-files", "--", "Dynamic_CPP/Assets/**", "Dynamic_CPP/ProjectSetting/**"], echo: false);`
+- [BuildTool/PackageInputs.cs:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/PackageInputs.cs#L136) — `await context.Run("git", ["-C", repository, "archive", "--format=zip", "--output=" + archive, commit, "--", "Dynamic_CPP/Assets", "Dynamic_CPP/ProjectSetting", "Tools/packaging/templates/EngineSettings.runtime.yml"], echo: false);`
+- [BuildTool/EnginePublisher.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L10) — `internal static class EnginePublisher`
+- [BuildTool/EnginePublisher.cs:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L74) — `if (info.FileVersion != version || info.ProductVersion != version) throw new BuildException($"Windows version mismatch: {entry.Path}");`
+- [BuildTool/EnginePublisher.cs:147](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L147) — `Path.Combine(repository, "Dynamic_CPP/Assets", BlueNoiseResource.SourceRelativePath),`
+- [BuildTool/EngineDistribution.cs:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EngineDistribution.cs#L8) — `public string BinaryRoot => Paths.Child(Root, Manifest.Text("binaryRoot"));`
+- [BuildTool/EngineDistribution.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EngineDistribution.cs#L18) — `manifest.Text("binaryRoot") != $"Bin/x64-{manifest.Text("configuration")}" ||`
+- [BuildTool/EngineDistribution.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EngineDistribution.cs#L19) — `!Guid.TryParseExact(manifest.Text("buildId"), "D", out var id) || id == Guid.Empty)`
+- [Engine/Utility_Framework/EnginePaths.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/EnginePaths.h#L9) — `struct EnginePaths`
+- [Engine/Utility_Framework/EnginePaths.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/EnginePaths.h#L29) — `bool IsValid() const noexcept`
+- [Engine/Utility_Framework/EnginePaths.h:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/EnginePaths.h#L97) — `inline std::filesystem::path ResolveProcessExecutableDirectory()`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 확인일: 2026-09-23
 - 범위: DL0 선행 조사. 이 문서는 Launcher, descriptor, MSI의 구현 완료나 실행 검증을 뜻하지 않는다.
 - 정본: [EngineDistributionAndLauncherPlan](../plans/EngineDistributionAndLauncherPlan.md), [EngineVersionPolicy](../design/EngineVersionPolicy.md)
@@ -43,3 +90,5 @@
 - DL0: 소스 및 로컬 배포 기준선을 확보했으나 설치 topology, 서명, descriptor/MSI 실패 fixture와 clean VM 전제가 확정되지 않았다. 완료 표시 불가.
 - DL1/DL4/DL6: 제품 descriptor, Launcher executable, MSI가 없으므로 미착수.
 - DL5: 개발 배포 경로만 부분 구현. 정식 descriptor 선택, 제품 설치, 공식 발행, PHASE 22 오디오 종속 제거는 별도 게이트다.
+
+</details>

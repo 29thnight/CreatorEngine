@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>코드 컨벤션 — 두 층, 두 표기</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="CodingConventions.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/CodingConventions.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>코드 컨벤션 — 두 층, 두 표기</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Job input</ve-node><ve-node id="n1" at="2 1">Scheduler</ve-node><ve-node id="n2" at="3 1" key>Workers</ve-node><ve-node id="n3" at="3 2">Completion</ve-node><ve-node id="n4" at="2 2">Join</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>포매팅 정본은 저장소 .clang-format이다. 현재는 InsertBraces=true, Allman 중괄호, 공백 4칸과 NamespaceIndentation=All을 사용한다. 이전의 짧은 if/for 또는 namespace 들여쓰기 생략 예시는 현행 규약으로 사용하지 않는다.</li>
+<li>포인터·참조는 타입 왼쪽 정렬이다. 엔진 공개 객체와 기반 라이브러리의 기존 명명 책임은 구분하되, 소스 포맷 충돌은 현재 .clang-format을 우선한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L39">Engine/SceneRuntime/Entity.h:39</a> — <code>Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L40">Engine/SceneRuntime/Entity.h:40</a> — <code>Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L53">Engine/SceneRuntime/Entity.h:53</a> — <code>static gc::root_ref&lt;Entity&gt; Create(gc::domain&amp; domain, Scene* scene, size_t instanceID,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L22">.clang-format:22</a> — <code>InsertBraces: true</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L26">.clang-format:26</a> — <code>BreakBeforeBraces: Allman</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L29">.clang-format:29</a> — <code>IndentWidth: 4</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L30">.clang-format:30</a> — <code>NamespaceIndentation: All</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L36">.clang-format:36</a> — <code>PointerAlignment: Left</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Resource.h#L1">Editor/EngineEntry/Resource.h:1</a> — <code>//{{NO_DEPENDENCIES}}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/BoneRegion.h#L9">Engine/RenderEngine/BoneRegion.h:9</a> — <code>enum class BoneRegion</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/BoneRegion.h#L20">Engine/RenderEngine/BoneRegion.h:20</a> — <code>std::string ToLower(std::string boneName);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30">Engine/Utility_Framework/Sha256.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L31">Engine/Utility_Framework/Sha256.h:31</a> — <code>void Update(const void* data, std::size_t length) noexcept</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L47">Engine/Utility_Framework/Sha256.h:47</a> — <code>Transform(m_buffer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L22">Engine/SceneRuntime/InputManager.h:22</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L26">Engine/SceneRuntime/InputManager.h:26</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L79">Engine/SceneRuntime/InputManager.h:79</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.h#L8">Engine/Utility_Framework/Delegate.h:8</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.h#L49">Engine/Utility_Framework/Delegate.h:49</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.h#L87">Engine/Utility_Framework/Delegate.h:87</a> — <code>std::function&lt;Ret(Args...)&gt; callback;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L282">Engine/Utility_Framework/Paklib.hpp:282</a> — <code>std::array&lt;u8, 32&gt; k{}; for (size_t i = 0; i &lt; 32; i++) { unsigned v; std::sscanf(std::string(hex.substr(2 * i, 2)).c_str(), &quot;%02x&quot;, &amp;v); k[i] = (u8)v; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L294">Engine/Utility_Framework/Paklib.hpp:294</a> — <code>Entry e{}; e.path = std::string(virtualPath); e.pathHash = fnv1a64(e.path); e.fileId = (u64)m_entries.size() + 1; e.uncompressedSize = bytes.size(); e.chunkSize = m_opt.chunkSize;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L544">Engine/Utility_Framework/Paklib.hpp:544</a> — <code>if (!data.empty()) fwrite(data.data(), 1, data.size(), fp); std::fclose(fp);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<blockquote>
+<p>2026-09-20 결정. §9의 네 항목에 답이 달렸고(9-1 (a) · 9-2 (b) · 9-3 (a) ·
+9-4 제안대로) 그 결과가 본문에 반영돼 있다. 남은 것은 <strong>이행</strong>이다 — §8의
+개명과 §7.3의 재포맷은 아직 실행되지 않았다. <code>.clang-format</code> 자체는
+커밋됐고 미리보기도 끝났다(§7.2).</p>
+</blockquote>
+<h2>0. 이 문서가 정하는 것과 정하지 않는 것</h2>
+<p><strong>정한다</strong>: 이름의 표기(casing), 접두·접미, 네임스페이스 대소문자, 파일 이름,
+그리고 <strong>어느 규칙이 어느 코드에 걸리는지 판정하는 기준</strong>.</p>
+<p><strong>정하지 않는다</strong>: 설계 선택. &quot;자체 컨테이너를 만들 것인가&quot;는
+<a href="ContainerLibraryDesign.html">ContainerLibraryDesign.md</a>가, &quot;무엇을 리플렉션에
+올릴 것인가&quot;는 <a href="ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a>가
+이미 답했다. 이 문서는 <strong>만들기로 한 것의 이름을 어떻게 적는가</strong>만 다룬다.</p>
+<p><strong>정한다(9-3 결정)</strong>: 포매팅 — 들여쓰기 문자, 중괄호 위치, 줄 길이를
+<code>.clang-format</code>으로 고정한다. 기준값과 그 근거는 §7.1. 표기 규칙과 달리
+이쪽은 <strong>기존 파일 전부를 한 번에 건드리므로</strong> 이행 절차가 따로 붙는다.</p>
+<hr>
+<h2>1. 규칙 둘</h2>
+<ol>
+<li><strong>엔진 객체는 C# 컨벤션으로 적는다.</strong></li>
+<li><strong>엔진이 공용으로 쓰는 컨테이너·유틸리티 객체는 C++ STL 컨벤션으로 적는다.</strong></li>
+</ol>
+<p>이 둘은 취향의 분할이 아니다. <strong>각 층이 실제로 무엇과 나란히 읽히는가</strong>가
+다르기 때문이다.</p>
+<ul>
+<li>엔진 객체는 <code>ScriptCore</code>의 C# 미러와 나란히 읽힌다. 그 대응은 이미 계약이다 —
+<em>&quot;C# 래퍼는 네이티브 이름 그대로이고 예외가 없다(15종 대조 확인)&quot;</em>
+(<a href="../plans/ScriptSurfacePlan.html">ScriptSurfacePlan.md:75</a>). 네이티브가
+<code>GetComponent</code>면 C#도 <code>GetComponent</code>다. 두 표기를 쓰면 대조할 때마다
+옮겨 적어야 하고, 옮겨 적는 자리마다 어긋날 수 있다.</li>
+<li>유틸리티·컨테이너는 <code>std</code>와 나란히 읽히고, 더 중요하게는 <strong><code>std</code>와 맞물려
+돈다</strong>. range-for는 <code>begin</code>/<code>end</code>를, 구조적 바인딩은 <code>tuple_size</code>를,
+할당자는 <code>value_type</code>·<code>allocate</code>·<code>max_size</code>를 이름으로 찾는다. 표기를 바꾸면
+맞물리지 않거나, 맞물리는 부분만 예외가 되어 한 타입 안에 두 표기가 생긴다.</li>
+</ul>
+<p>그리고 치환 비용 — 이 저장소가 이미 적어 둔 이유다:</p>
+<blockquote>
+<p><strong>STL 명명·시맨틱 유지</strong>: 이유는 성능이 아니라 <strong>치환 비용</strong>이다.
+<code>InlineVector</code>가 <code>std::vector</code> 인터페이스 부분집합이었기 때문에 폐기 비용이
+타입 별칭 한 줄이었다. 모양이 달랐으면 되돌릴 수도 없었다.
+— <a href="ContainerLibraryDesign.html">ContainerLibraryDesign.md §2.1</a></p>
+</blockquote>
+<p>즉 층 B의 STL 표기는 <strong>자체 제작물을 언제든 <code>std</code>로 되돌리기 위한 장치</strong>다.
+이 저장소는 실제로 <code>InlineVector</code>·<code>ce::</code> 컨테이너 별칭 20여 개·<code>MemoryPool</code>을
+폐기해 봤고, 그때마다 치환 가능성이 비용을 갈랐다.</p>
+<hr>
+<h2>2. 어느 층인지 판정하는 기준</h2>
+<p>층은 디렉터리로 갈리지 않는다. <code>Engine/Utility_Framework/</code> 안에 두 층이
+같이 살고, 심지어 <strong>같은 파일 안에도 있다</strong>(§5.1의 <code>ReflectionMeta.h</code>).</p>
+<p>다음 질문에 순서대로 답한다. 먼저 걸리는 쪽이 그 타입의 층이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>질문</th>
+<th>예 → 층</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>C# 미러가 있거나, 생길 수 있는가?</td>
+<td><strong>A (C#)</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>리플렉션에 등재되어 인스펙터에 그려지거나 저작 자산으로 직렬화되는가?</td>
+<td><strong>A (C#)</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td>씬·엔티티·컴포넌트·에셋의 <strong>수명이나 상태</strong>를 지니는가?</td>
+<td><strong>A (C#)</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>std</code> 기제에 물리는가 — range-for, <code>std</code> 알고리즘, 구조적 바인딩, 할당자 요구사항, 특성(trait) 탐지?</td>
+<td><strong>B (STL)</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>std</code>의 무엇을 대신하거나 감싸는가? 또는 <code>std</code>로 되돌릴 여지가 있는가?</td>
+<td><strong>B (STL)</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td>타입 없는 자유 함수·템플릿 도구인가?</td>
+<td><strong>B (STL)</strong></td>
+</tr>
+</tbody></table></div>
+<p>어디에도 안 걸리면 <strong>A</strong>다. 층 A가 기본값인 이유는 엔진 코드의 절대다수가
+객체이고, 판정이 애매한 것을 B로 보내면 §6의 어댑터 부담만 늘기 때문이다.</p>
+<h3>2.1 판정 예 (현 저장소)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>타입</th>
+<th>층</th>
+<th>판정 근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Entity</code> · <code>Component</code> · <code>Transform</code> · <code>Scene</code></td>
+<td>A</td>
+<td>①②③ 전부</td>
+</tr>
+<tr>
+<td><code>Meta::Find</code> · <code>Meta::TypeOf</code> · <code>Meta::Deserialize</code></td>
+<td>A</td>
+<td>② — 런타임 리플렉션 창구가 다루는 대상이 객체다</td>
+</tr>
+<tr>
+<td><code>AnimationController</code> · <code>Canvas</code> · <code>AudioService</code></td>
+<td>A</td>
+<td>②③</td>
+</tr>
+<tr>
+<td><code>ce::remove_at_swap</code> · <code>ce::atomic_write</code> · <code>ce::read_file</code></td>
+<td>B</td>
+<td>⑥ — 자유 함수</td>
+</tr>
+<tr>
+<td><code>meta::identity</code></td>
+<td>B</td>
+<td>⑥ — 컴파일타임 도구(정체성 스탬핑)</td>
+</tr>
+<tr>
+<td><code>reflgen::schema_of</code> · <code>reflgen::type_descriptor</code> (서드파티)</td>
+<td>B</td>
+<td>⑤⑥ — 외부 라이브러리의 표기 그대로</td>
+</tr>
+<tr>
+<td><code>plf::colony</code> (서드파티)</td>
+<td>B</td>
+<td>⑤ — <code>std</code> 컨테이너 자리</td>
+</tr>
+<tr>
+<td><code>HashingString</code></td>
+<td><strong>B</strong></td>
+<td>⑤ — <code>std::string</code>의 자리에 놓인다 (§5.3)</td>
+</tr>
+<tr>
+<td><code>MemoryPool</code></td>
+<td>B</td>
+<td>④ — 할당자 요구사항에 물린다</td>
+</tr>
+<tr>
+<td><code>thread_pool</code> · <code>job_scheduler</code> · <code>job_handle</code> · <code>job_group</code></td>
+<td><strong>B</strong></td>
+<td>엔진 공용 실행 유틸리티 (§5.2, 사용자 확정)</td>
+</tr>
+<tr>
+<td><code>LogSystem</code> · <code>CoreWindow</code> · <code>EnginePaths</code></td>
+<td>A</td>
+<td>③</td>
+</tr>
+<tr>
+<td><code>BitFlag</code></td>
+<td><strong>B</strong></td>
+<td>⑤ — <code>std::bitset</code> 자리의 값 타입 (§5.3)</td>
+</tr>
+<tr>
+<td><code>ce::profile_scope</code> · <code>ce::marker&lt;&gt;</code></td>
+<td><strong>B</strong></td>
+<td>엔진 공용 진단 유틸리티 — <code>thread_pool</code> 선례 (§5.4 예외)</td>
+</tr>
+</tbody></table></div>
+<p>★ <code>HashingString</code> · <code>BitFlag</code>의 기존 표기와 판정 차이는 §5.3·§8에서 다룬다.
+★ 리플렉션 행은 2026-09-30 reflgen 전환에 맞춰 갱신했다. 옛 행은 <code>Meta::Type</code>·<code>Meta::Property</code>(A)와
+<code>meta::field</code>·<code>meta::schema</code>·<code>meta::for_each_field</code>(B)였다 — 판정은 그대로이고 타입이 바뀌었다
+(<a href="ReflectionDesign.html">ReflectionDesign.md</a>).
+공용 Job 유틸리티는 새 STL 표기로 이관한다(§5.2).</p>
+<hr>
+<h2>3. 층 A — 엔진 객체 (C# 컨벤션)</h2>
+<p>기준은 .NET 런타임 라이브러리 명명 지침이되, C++가 가진 것(포인터·참조·
+const·연산자 오버로드)은 C++대로 적는다.</p>
+<h3>3.1 표기</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>표기</th>
+<th>예</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>클래스 · 구조체 · 열거형</td>
+<td><code>PascalCase</code></td>
+<td><code>AnimationController</code>, <code>GameObjectType</code></td>
+</tr>
+<tr>
+<td>열거형 값</td>
+<td><code>PascalCase</code></td>
+<td><code>ScenePhase::Playing</code></td>
+</tr>
+<tr>
+<td>메서드</td>
+<td><code>PascalCase</code></td>
+<td><code>GetComponent</code>, <code>AttachComponentLifecycle</code></td>
+</tr>
+<tr>
+<td>공개 상수</td>
+<td><code>k</code> 접두 + <code>PascalCase</code> (§3.4)</td>
+<td><code>Entity::kSceneRootIndex</code></td>
+</tr>
+<tr>
+<td>네임스페이스</td>
+<td><code>PascalCase</code></td>
+<td><code>Authoring</code>, <code>CommandService</code>, <code>Lifecycle</code></td>
+</tr>
+<tr>
+<td>멤버 변수</td>
+<td><code>m_camelCase</code></td>
+<td><code>m_components</code>, <code>m_prefabOverrides</code></td>
+</tr>
+<tr>
+<td>지역 변수 · 매개변수</td>
+<td><code>camelCase</code></td>
+<td><code>parentIndex</code>, <code>component</code></td>
+</tr>
+<tr>
+<td>템플릿 매개변수</td>
+<td><code>PascalCase</code></td>
+<td><code>template&lt;class TComponent&gt;</code></td>
+</tr>
+<tr>
+<td>파일</td>
+<td>주 타입과 같은 이름</td>
+<td><code>AnimationController.h</code> / <code>.cpp</code></td>
+</tr>
+</tbody></table></div>
+<h3>3.2 C#과 다르게 두는 것</h3>
+<p>C#의 프로퍼티(<code>public int Count { get; set; }</code>)는 C++에 없다. <code>Get</code>/<code>Set</code>
+접두 메서드로 적고, C# 미러 쪽에서 프로퍼티로 감싼다 — 지금 <code>ScriptCore</code>가
+하고 있는 그대로다(<code>Native.GetName(Handle)</code> → <code>public string Name</code>).</p>
+<p><code>Engine/Utility_Framework/Core.Property.h</code>의 <code>Property&lt;T&gt;</code>는 이 규칙의 예외로
+두지 않는다. 새 코드에서 쓰지 않는다 — <code>std::function</code> 두 개를 인스턴스마다
+지므로 엔진 객체의 필드로 쓰면 비용이 조용히 붙는다.</p>
+<h3>3.3 접두 <code>m_</code>은 유지한다</h3>
+<p>C# 지침은 <code>_camelCase</code>를 권하지만 이 저장소는 <code>m_</code>이 1,650종이다
+(<code>Engine</code>+<code>Editor</code> 헤더 기준). 바꿀
+근거가 없다 — C# 미러와 대조되는 것은 <strong>공개 표면</strong>이고, 멤버 접두는 그
+표면에 나타나지 않는다. 비용만 있고 이득이 없는 개명이다.</p>
+<p>후치 언더스코어(<code>Delegate.h:17</code>의 <code>id_</code>)는 층 A에서 쓰지 않는다. 그 표기는
+층 B의 것이다(§4.2).</p>
+<h3>3.4 상수 — <code>k</code> 접두를 유지하고 <code>UPPER_SNAKE_CASE</code>를 버린다</h3>
+<p>현재 표기가 갈려 있다. <strong>같은 클래스 안에서도</strong> 갈린다:</p>
+<pre><code class="language-cpp">// Engine/SceneRuntime/Entity.h:43, :49 — 여섯 줄 간격
+static constexpr Entity::Index INVALID_INDEX   = ...;
+static constexpr Entity::Index kSceneRootIndex = 0;
+</code></pre>
+<p>실태를 세면 갈림이 대등하지 않다 — <strong><code>k</code> 접두 687종, <code>UPPER_SNAKE</code> 24종</strong>
+(같은 기준으로 센 상수 선언. <code>Engine</code>·<code>Editor</code>·<code>Player</code>·<code>Dynamic_CPP</code>). 28배다.</p>
+<p>C# 컨벤션을 문자 그대로 적용하면 답은 <code>PascalCase</code>(<code>SceneRootIndex</code>)다.
+그러나 이 한 항목은 <strong>예외로 두고 <code>k</code> 접두를 공식 표기로 삼기를 제안한다.</strong>
+이유 둘:</p>
+<ol>
+<li>C#에서 상수가 <code>PascalCase</code>여도 문제가 없는 것은 그 언어에 타입·메서드·
+프로퍼티를 가르는 다른 장치가 있기 때문이다. C++에서 <code>SceneRootIndex</code>는
+타입인지 상수인지 호출부에서 구분되지 않는다. <code>k</code>는 그 구분을 돌려준다.</li>
+<li>687종을 개명하는 diff는 이 문서의 나머지 전부를 합친 것보다 크다. 이득이
+&quot;C# 지침과의 형식적 일치&quot;뿐이라면 값을 못 한다.</li>
+</ol>
+<p>버리는 쪽은 <code>UPPER_SNAKE_CASE</code> 24종이다. C++에서 그 표기는 <strong>매크로의 것</strong>이고,
+매크로는 스코프를 무시하므로 상수가 같은 모양이면 충돌을 읽어 내기 어렵다.
+24종이라 비용도 작다.</p>
+<p>→ <strong>확정(9-1 (a))</strong>. 이것이 규칙 1번의 유일한 의도적 예외다. <code>k</code> 접두 687종은
+그대로 두고, <code>UPPER_SNAKE</code> 쪽만 <code>k</code> 접두로 옮겼다 — 이행 결과는 §8.1.</p>
+<h3>3.5 약칭을 쓰지 않는다</h3>
+<p><code>SimulationTask</code>이지 <code>SimTask</code>가 아니다. <code>AnimationBehviourFatory</code>(현존
+오타 파일명)처럼 줄이려다 틀린 이름이 남는다. 널리 통용되는 두문자어는
+예외로 두되, 현 저장소 표기를 따라 대문자로 적는다(<code>ID</code>, <code>UUID</code>, <code>GUID</code>,
+<code>RHI</code>, <code>UI</code>).</p>
+<hr>
+<h2>4. 층 B — 공용 컨테이너·유틸리티 (STL 컨벤션)</h2>
+<h3>4.1 표기</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>표기</th>
+<th>예</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>클래스 · 구조체</td>
+<td><code>snake_case</code></td>
+<td><code>dynamic_array</code>, <code>hashing_string</code></td>
+</tr>
+<tr>
+<td>함수 · 메서드</td>
+<td><code>snake_case</code></td>
+<td><code>push_back</code>, <code>remove_at_swap</code>, <code>atomic_write</code></td>
+</tr>
+<tr>
+<td>멤버 변수</td>
+<td><code>snake_case_</code> (후치)</td>
+<td><code>size_</code>, <code>capacity_</code></td>
+</tr>
+<tr>
+<td>타입 별칭</td>
+<td><code>snake_case</code></td>
+<td><code>value_type</code>, <code>size_type</code>, <code>iterator</code></td>
+</tr>
+<tr>
+<td>변수 템플릿 · 특성 술어</td>
+<td><code>snake_case</code> + <code>_v</code> / <code>_t</code></td>
+<td><code>is_container_v</code>, <code>element_t</code></td>
+</tr>
+<tr>
+<td>네임스페이스</td>
+<td><code>lowercase</code></td>
+<td><code>ce</code>, <code>meta</code>, <code>rhi</code>, <code>assets</code>, <code>editor</code></td>
+</tr>
+<tr>
+<td>템플릿 매개변수</td>
+<td><code>PascalCase</code> 한 단어</td>
+<td><code>template&lt;class T, class Alloc&gt;</code></td>
+</tr>
+<tr>
+<td>파일</td>
+<td>주 타입과 같은 이름, 그러나 <strong>파일명만은 <code>PascalCase</code></strong></td>
+<td><code>ThreadPool.h</code>가 <code>thread_pool</code>을 담는다</td>
+</tr>
+</tbody></table></div>
+<p>마지막 줄은 의도된 비대칭이다. 파일 이름은 Visual Studio 필터·<code>vcxproj</code>·
+<code>#include</code> 경로에 박혀 있고 층과 무관하게 한 벌이어야 탐색이 된다. 층 B의
+파일도 <code>PascalCase</code>로 적는다 — 이미 그렇다(<code>ThreadPool.h</code>, <code>JobScheduler.h</code>).
+예시는 2026-09-30에 바꿨다 — 처음 든 <code>MetaSchema.h</code>(<code>meta::schema</code>)는 reflgen 전환으로 사라졌다.</p>
+<h3>4.2 멤버 접두는 <code>m_</code>이 아니라 후치 <code>_</code></h3>
+<p>층 B에서 <code>m_</code>을 쓰면 층이 이름에서 안 보인다. STL 구현체(libstdc++ <code>_M_</code>,
+MSVC <code>_My</code>)는 예약 식별자를 쓰는데 그건 표준 라이브러리에만 허용된 영역이다.
+사용자 코드에서 쓸 수 있는 관례가 후치 <code>_</code>다.</p>
+<h3>4.3 <code>std</code> 기제에 물리는 이름은 <strong>반드시</strong> 규격 그대로</h3>
+<p><code>begin</code> · <code>end</code> · <code>size</code> · <code>empty</code> · <code>data</code> · <code>value_type</code> · <code>iterator</code> ·
+<code>difference_type</code> · <code>swap</code> · <code>operator&lt;=&gt;</code>. 여기에 예외를 두면 그 타입은
+range-for도 <code>std::ranges</code>도 타지 못한다. 이건 컨벤션이 아니라 <strong>동작의
+요구사항</strong>이다 — 이미 저장소가 그렇게 하고 있다
+(<code>AuthoringReadNode.h:176</code>의 <code>begin()</code>, <code>MemoryPool.h:33</code>의 <code>max_size()</code>).</p>
+<p>이 항목이 규칙 2번의 진짜 뿌리다. 표기를 층으로 가르지 않으면 이런 타입은
+<strong>언제나 두 표기가 섞인다</strong> — 규격이 강제하는 몇 개만 snake_case이고 나머지는
+PascalCase인 상태. 층으로 가르면 섞이지 않는다.</p>
+<h3>4.4 자유 함수를 먼저 본다</h3>
+<p><code>ce::remove_at_swap(vec, i)</code>는 새 타입 없이 <code>std::vector</code> 위에서 동작한다.
+새 타입은 리플렉션 특수화·natvis·직렬화를 데리고 온다
+(<a href="ContainerLibraryDesign.html">ContainerLibraryDesign.md §2.4</a>). 자유 함수로
+되면 자유 함수로 둔다.</p>
+<hr>
+<h2>5. 경계에 걸린 것들</h2>
+<h3>5.1 <code>Meta</code> vs <code>meta</code> — 오타가 아니다</h3>
+<pre><code class="language-cpp">// Engine/Utility_Framework/ReflectionMeta.h
+namespace meta { ... }   //  :18  — 컴파일타임 스키마 도구 (field, schema, adapt)
+namespace Meta { ... }   // :177  — 런타임 타입 테이블 (Type, Property, TypeOf)
+namespace meta { ... }   // :190  — 다시 컴파일타임
+</code></pre>
+<p><strong>한 파일 안에서 두 층이 교대한다.</strong> 그리고 이 갈림은 §2의 기준과 정확히
+일치한다 — <code>meta::field</code>는 <code>std::tuple</code>처럼 쓰이는 도구(④⑥)이고,
+<code>Meta::Property</code>는 인스펙터가 그리는 객체(②)다.</p>
+<p>즉 이 컨벤션은 저장소에 새 질서를 들이는 것이 아니라, <strong>이미 암묵적으로
+지켜지던 갈림을 문장으로 적는 것</strong>이다. 이 둘은 통합하지 않는다.</p>
+<p><strong>갱신(2026-09-30, reflgen 전환)</strong>: 위 코드 블록은 전환 전 모습이다. 컴파일타임 스키마와 런타임 타입 표는
+reflgen으로 옮겨 갔고(<code>reflgen::schema_of</code> · <code>reflgen::type_descriptor</code>), 두 이름공간에 남은 것은 이렇다.</p>
+<pre><code class="language-cpp">// Engine/Utility_Framework/ReflectionMeta.h
+namespace meta { ... }   // 층 B — identity&lt;T, Base&gt; (m_name·m_typeID 스탬핑)
+// Engine/Utility_Framework/ReflgenRuntime.h · ReflectionYml.h
+namespace Meta { ... }   // 층 A — 런타임 창구 (Types, Find, TypeOf, SerializeInto, Deserialize)
+</code></pre>
+<p>두 층은 이제 파일로도 갈린다. 갈림의 기준(도구 대 객체)은 그대로다.</p>
+<p>남은 어긋남 둘:</p>
+<ul>
+<li><code>meta::identity::StampIdentity()</code> (<code>ReflectionMeta.h:37</code>) — 층 B 안의
+PascalCase 메서드. <code>stamp_identity()</code>로 고친다. private이라 호출자가 둘뿐이다.</li>
+<li>&#126;&#126;<code>meta::displayName</code> (<code>MetaSchema.h:164</code>) — camelCase. <code>display_name</code>으로
+고친다. 같은 파일의 반환 타입 <code>display_name_attr</code>은 이미 snake_case다.&#126;&#126;
+<strong>해소(2026-09-30)</strong>: <code>MetaSchema.h</code> 와 함께 사라졌다. 표시 이름은 reflgen 속성 <code>reflgen::display_name</code> 이다.</li>
+</ul>
+<h3>5.2 공용 스레드 풀·Job 유틸리티는 층 B다</h3>
+<p>2026-09-20 사용자 확정: 유틸리티·컨테이너 수준의 엔진 공용 사용부는 STL
+컨벤션을 적용한다. 공용 실행 기반은 <code>thread_pool</code> · <code>job_scheduler</code> ·
+<code>job_handle</code> · <code>job_group</code>, 접근자는 <code>ce::get_thread_pool()</code> ·
+<code>ce::get_job_scheduler()</code>로 쓴다. 수명 보유 여부만으로 층 A로 분류하지 않는다.
+파일명은 공통 파일 규칙대로 <code>ThreadPool.h</code>, <code>JobScheduler.h</code>다.
+상세 경계는 <a href="JobSchedulerDesign.html">JobSchedulerDesign.md</a>를 따른다.</p>
+<p>애니메이션 LOD·버짓 등 도메인 정책을 소유하는 <code>AnimationScheduler</code>는 층 A다.
+<code>LogSystem</code> · <code>CoreWindow</code> · <code>DumpHandler</code> · <code>EnginePaths</code>의 기존 층 A 판정은
+유지한다. 디렉터리 위치가 아니라 공용 도구와 엔진 도메인 객체의 역할로 구분한다.</p>
+<h3>5.3 <code>HashingString</code> · <code>BitFlag</code>는 층 B다</h3>
+<p>둘 다 <code>std</code>의 자리에 놓이는 값 타입이다(<code>std::string</code> + 해시 캐시,
+<code>std::bitset</code>). <code>HashingString</code>은 이미 <code>operator&lt;=&gt;</code>·<code>std::hash</code> 연동을
+갖고 있고, 과거 결함도 <code>operator==</code>와 <code>operator&lt;=&gt;</code>의 <strong>규격 불일치</strong>였다
+(<a href="ContainerLibraryDesign.html">ContainerLibraryDesign.md §1.2</a>). 규격에
+맞물리는 타입이라는 증거다.</p>
+<p><strong>확정(9-2 (b)) — 그러나 이유가 제안과 다르다.</strong></p>
+<p><code>BitFlag</code>는 개명한다. <code>BitFlag::Set</code>/<code>Test</code>/<code>Toggle</code>이 <code>bit_flag::set</code>/
+<code>test</code>/<code>toggle</code>이 되고, 이는 <code>std::bitset</code>의 이름과도 같아진다. 사용처 3개
+파일.</p>
+<p><code>HashingString</code>은 <strong>개명하지 않는다 — 새로 작성하기 때문이다.</strong> 이 타입은
+이미 새로 쓰기로 예정돼 있고, 그러면 개명이라는 공정 자체가 없어진다. 새
+타입이 층 B 표기(<code>hashing_string</code>)로 태어나고 호출부가 그쪽으로 옮겨 가면,
+옛 타입은 사용처 0이 된 뒤 사라진다. 직렬화 경로를 건드리는 위험은 &quot;이름을
+바꾸는 일&quot;이 아니라 &quot;타입을 갈아 끼우는 일&quot;의 위험으로 옮겨 가며, 그것은
+이 문서가 아니라 그 교체 작업이 지는 몫이다.</p>
+<p>따라서 §2.1 판정표의 <code>HashingString</code> 항목은 <strong>예외가 아니라 예정</strong>이다 —
+지금은 층 A 표기이지만 그것이 정당해서가 아니라 아직 교체 전이라서다.
+레거시 별칭(<code>using HashingString = hashing_string</code>)은 두지 않는다.</p>
+<h3>5.4 <code>ce::</code>는 층 B의 공용 함수 네임스페이스다</h3>
+<p>현재 276곳에서 쓰이고 전부 snake_case 자유 함수다(<code>ce::valid_name</code>,
+<code>ce::atomic_write</code>, <code>ce::read_file</code>, <code>ce::encode</code>). 새 층 B 자유 함수는
+여기 넣는다. <code>ce::dynamic_array</code>는 만들지 않기로 했으므로(설계 문서 결론)
+<code>ce</code>에 <strong>컨테이너 타입은 들어가지 않는다</strong>.</p>
+<p><strong>예외 — 공용 인프라의 RAII 손잡이(2026-09-20 확정).</strong> <code>ce::profile_scope</code> 는
+타입이지만 <code>ce::</code> 안에 둔다. 이유는 그것이 컨테이너가 아니라 <strong>자유 함수를 쓸 수
+없는 자리의 자유 함수</strong>이기 때문이다 — 구간을 여는 일과 닫는 일은 한 문장이어야
+하고(짝 불균형을 문법적으로 불가능하게 만드는 것이 도입 이유다) 그것을 표현하는
+C++ 수단은 소멸자뿐이다. <code>ce::marker&lt;&quot;...&quot;&gt;()</code> 는 같은 묶음의 자유 함수라 원래
+규칙 그대로다. 판정은 §2 의 ④⑥ — <code>std</code> 기제(RAII·범위)에 물리는 타입 없는 도구.
+이 예외를 컨테이너나 상태를 지닌 객체로 넓히지 않는다.</p>
+<h3>5.5 네임스페이스 대소문자</h3>
+<p><code>editor</code>(65) vs <code>Editor</code>(3), <code>meta</code>(6) vs <code>Meta</code>(21)처럼 갈린 곳이 있다
+(헤더의 <code>namespace</code> 선언 횟수. <code>Meta</code> 쪽은 전방 선언이 여럿 포함된 수다).
+§3.1·§4.1의 규칙을 그대로 적용한다 — <strong>네임스페이스의 표기는 그 안에 든
+것의 층을 따른다</strong>. <code>editor::widgets</code>는 그리기 도구라 소문자가 맞고,
+<code>Editor</code>(3건)는 층 A 객체를 담고 있으면 남기되 <code>editor</code>와 겹치면 하나로
+모은다.</p>
+<hr>
+<h2>6. 두 층이 만나는 자리</h2>
+<p>층 A 객체가 층 B 컨테이너를 필드로 갖는 것은 정상이다. 규칙은 하나다.</p>
+<p><strong>표기는 선언한 쪽을 따른다. 부르는 쪽에 맞춰 바꾸지 않는다.</strong></p>
+<pre><code class="language-cpp">class Entity : public Object          // 층 A
+{
+    void AddChild(Entity* child);     // A의 메서드 — PascalCase
+
+    std::vector&lt;Component*&gt; m_components;   // B의 타입 — 그대로
+};
+
+// 호출부
+for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
+{
+    ...
+}
+</code></pre>
+<p>래퍼를 만들어 표기를 맞추지 않는다. <code>Entity::Size()</code>를 만들어
+<code>m_components.size()</code>를 감싸는 식의 일은 하지 않는다 — 그 래퍼가 늘면 층
+경계가 흐려지고, 컨테이너를 <code>std</code>로 되돌릴 때 §1의 치환 비용이 살아난다.</p>
+<p><strong>예외 하나</strong>: 층 A 객체가 range-for의 대상이 되어야 하면 <code>begin</code>/<code>end</code>를
+층 B 표기로 노출한다. 규격이 그 이름을 요구하기 때문이다(§4.3). 그 두 개만
+예외이고 나머지는 층 A 표기다.</p>
+<hr>
+<h2>7. 층과 무관한 공통 규칙</h2>
+<ul>
+<li><strong>파일</strong>: 헤더는 <code>.h</code>(617), 템플릿 구현 분리는 <code>.inl</code>(5). <code>.hpp</code>(6)은 새로
+만들지 않는다 — 두 확장자가 같은 뜻으로 쓰이고 있다.</li>
+<li><strong>헤더 가드</strong>: <code>#pragma once</code>. 저장소의 헤더 617개 중 613개가 이미 그렇다
+(예외 4개: <code>pch.h</code> 둘, 서드파티 <code>plf_colony.h</code>, 리소스 <code>Resource.h</code>).</li>
+<li><strong>점이 든 파일명</strong>(<code>Core.Property.h</code>, <code>Core.Thread.h</code>)은 새로 만들지 않는다.
+기존 것은 <code>#include</code> 경로에 박혀 있으므로 건드리지 않는다.</li>
+<li><strong>주석은 한글로 적고, 무엇을 하는지가 아니라 왜 그런지를 적는다.</strong> 저장소
+주석의 강점이 이미 그것이다 — &quot;이 길은 이미 깨져 본 길이다&quot;, &quot;예전에는 넷으로
+갈렸다&quot; 같은 기록이 재시도를 막는다.</li>
+<li><strong>개행</strong>: 소스는 저장소 기본(<code>* text=auto</code>), 저작 자산과 셰이더는
+<code>.gitattributes</code>가 LF로 고정한다. <code>docs/</code>의 문서는 CRLF다.</li>
+<li><strong>인코딩</strong>: UTF-8. CP949로 저장된 소스를 편집하면 한글 주석이 깨진다.</li>
+<li><strong>약칭 금지</strong>(§3.5)는 층 B에도 걸린다. 단, STL이 쓰는 확립된 약칭은
+그대로 쓴다(<code>ptr</code>, <code>iter</code>, <code>alloc</code>, <code>impl</code>) — 규격과 나란히 읽히는 것이
+이 층의 목적이므로.</li>
+</ul>
+<h3>7.1 포매팅 — <code>.clang-format</code> (9-3 (a) 확정)</h3>
+<p><strong>필수 본문·들여쓰기 규칙(2026-10-18 추가):</strong></p>
+<ul>
+<li>모든 <code>for</code>(range-for 포함)와 <code>if</code>의 본문은 반드시 중괄호로 감싸고 여러 줄로 쓴다.
+본문이 한 문장이어도 중괄호를 생략하거나 <code>if (condition) { DoWork(); }</code>처럼
+한 줄에 모아 쓰지 않는다. 여는 중괄호와 닫는 중괄호는 각각 별도 줄에 둔다.</li>
+<li>네임스페이스 내부의 모든 선언과 정의는 바깥보다 공백 4칸 들여쓴다.
+중첩·익명 네임스페이스에도 같은 규칙을 적용한다.</li>
+</ul>
+<pre><code class="language-cpp">namespace Authoring
+{
+    void UpdateEntities()
+    {
+        for (auto&amp; entity : entities)
+        {
+            if (entity.IsActive())
+            {
+                entity.Update();
+            }
+        }
+    }
+}
+</code></pre>
+<p>기준 도구는 <strong>VS 2022 동봉 clang-format 19.1.5</strong>
+(<code>VC/Tools/Llvm/bin/clang-format.exe</code>)다. 스타일 기본값은 버전마다 바뀌므로
+버전을 못 박는다. 값은 취향이 아니라 <strong>실측으로</strong> 골랐다 — 무작위 48개 파일에
+후보 조합을 돌려 변경이 가장 적은 것을 취했다.</p>
+<p><code>BasedOnStyle: Microsoft</code>가 출발점이고, 넷은 이미 실태와 맞아 그대로 쓴다:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>Microsoft 기본값</th>
+<th>실태 근거 (<code>Engine</code>+<code>Editor</code>, 서드파티 제외)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>UseTab</code></td>
+<td><code>Never</code></td>
+<td>들여쓴 줄 20.2만 중 스페이스 15.6만(77%)</td>
+</tr>
+<tr>
+<td><code>IndentWidth</code></td>
+<td><code>4</code></td>
+<td>선행 공백의 <strong>98.9%가 4의 배수</strong>. 2칸 들여쓰기는 12줄뿐</td>
+</tr>
+<tr>
+<td><code>ColumnLimit</code></td>
+<td><code>120</code></td>
+<td>120열 초과가 26.4만 줄 중 1,049줄(0.4%)</td>
+</tr>
+<tr>
+<td><code>BreakBeforeBraces</code></td>
+<td><code>Custom</code> (Allman 계열)</td>
+<td>새 줄 여는 중괄호 23,220 대 442(<strong>98%</strong>)</td>
+</tr>
+</tbody></table></div>
+<p><strong>여섯은 덮어쓴다.</strong> 전부 <code>--dump-config</code>로 확인한 실제 기본값이고, 그대로
+두면 재포맷이 의도와 다르게 동작한다:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>기본값</th>
+<th>쓸 값</th>
+<th>덮어쓰지 않으면</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>SortIncludes</code></td>
+<td><code>CaseSensitive</code></td>
+<td><strong><code>Never</code></strong></td>
+<td>★★ include를 알파벳 순으로 <strong>재정렬해 빌드를 깨뜨릴 수 있다</strong></td>
+</tr>
+<tr>
+<td><code>PointerAlignment</code></td>
+<td><code>Right</code></td>
+<td><strong><code>Left</code></strong></td>
+<td>포인터·참조 선언 12,700여 곳이 뒤집힌다</td>
+</tr>
+<tr>
+<td><code>ReflowComments</code></td>
+<td><code>true</code></td>
+<td><strong><code>false</code></strong></td>
+<td>한글 주석이 전부 다시 접힌다</td>
+</tr>
+<tr>
+<td><code>AllowShortFunctionsOnASingleLine</code></td>
+<td><code>None</code></td>
+<td><strong><code>Inline</code></strong></td>
+<td>한 줄 인라인 함수 1,849곳이 세 줄로 펼쳐진다</td>
+</tr>
+<tr>
+<td><code>BreakTemplateDeclarations</code></td>
+<td><code>MultiLine</code></td>
+<td><strong><code>Yes</code></strong></td>
+<td><code>template&lt;class T&gt; void f();</code>로 합쳐진다 (실태 416 대 104)</td>
+</tr>
+<tr>
+<td><code>SpaceAfterTemplateKeyword</code></td>
+<td><code>true</code></td>
+<td><strong><code>false</code></strong></td>
+<td><code>template&lt;</code> 372 대 <code>template &lt;</code> 148(72%)</td>
+</tr>
+</tbody></table></div>
+<p><code>SortIncludes</code>가 가장 위험하다. 이 저장소에는 선행 include에 의존하는 헤더가
+있고(전방 선언·Windows 헤더·유니티 빌드), 재정렬은 포매팅이 아니라 <strong>빌드를
+깨뜨릴 수 있는 코드 변경</strong>이다. 순서는 사람이 정한다.</p>
+<p><code>ReflowComments</code>: 이 저장소의 주석은 한글이고 분량이 많으며, 줄바꿈 위치가
+뜻의 단위로 손수 맞춰져 있다. clang-format은 열 폭을 셀 때 한글의 2열 폭을
+반영하지 못해, 재배치를 허용하면 <strong>주석이 제자리에서 어긋난 채 전부 다시
+접힌다.</strong> 되돌릴 수 없는 손실이므로 끈다.</p>
+<p><strong><code>BinPackArguments</code>/<code>BinPackParameters</code>는 끄지 않는다.</strong> 껐더니 실측에서
+오히려 변경이 늘었다(2,943 → 3,153). 인자를 한 줄에 하나씩 세워 둔 자리
+(예: 옛 <code>Entity::reflect()</code>의 <code>meta::field</code> 나열 — reflgen 전환으로 레시피가 사라져 지금은 그런 블록이
+없다)는 전역 설정이 아니라 그 블록만 <code>// clang-format off</code> / <code>// clang-format on</code>으로 감싸 보호한다.</p>
+<h3>7.2 미리보기 결과 — 재포맷은 코드를 바꾸지 않는다</h3>
+<p><code>.clang-format</code>을 커밋하기 전에 <strong>전체 코퍼스 1,025개 파일</strong>에 돌려 봤다
+(<code>Engine</code>+<code>Editor</code>, 서드파티 제외).</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>지표</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>바뀌는 파일</td>
+<td><strong>994 / 1,025</strong> (그대로인 파일 31)</td>
+</tr>
+<tr>
+<td>변경 줄 (추가+삭제)</td>
+<td>302,726</td>
+</tr>
+<tr>
+<td>선행 공백을 무시한 변경 줄</td>
+<td>101,201</td>
+</tr>
+<tr>
+<td><strong>모든 공백을 제거한 변경</strong></td>
+<td><strong>0.230%</strong> (559자 / 24.3만자, 48개 표본)</td>
+</tr>
+</tbody></table></div>
+<p>줄 수만 보면 거대해 보이지만 <strong>코드는 바뀌지 않는다.</strong> 모든 공백을 지우고
+문자 스트림으로 비교했을 때 남는 0.23%를 추적하니 전부 한 가지였다 —
+<code>FixNamespaceComments</code>가 네임스페이스 닫는 <code>}</code> 뒤에 <code>// namespace Authoring</code>
+같은 <strong>주석을 붙이는 것</strong>. 토큰은 하나도 바뀌지 않는다.</p>
+<p>그래서 이 재포맷의 위험은 &quot;코드가 변할까&quot;가 아니라 &quot;이력이 끊길까&quot;뿐이고,
+그것은 아래 절차로 처리된다.</p>
+<p><strong><code>ColumnLimit</code>을 0으로 두는 선택지도 쟀다.</strong> 그러면 clang-format이 줄바꿈
+위치를 건드리지 않아 변경이 101,201 → 66,210줄로 35% 줄고, 손으로 맞춰 둔
+정렬이 보존된다. <strong>코드 변화는 0.230%로 120일 때와 완전히 동일하다</strong> — 이
+선택은 안전성과 무관하고 &quot;줄바꿈을 도구가 정하는가 사람이 정하는가&quot;일 뿐이다.</p>
+<p><code>120</code>을 택했다. 코드가 안 바뀌는 것이 증명된 이상 diff 크기는 blame-ignore로
+흡수되는 일회성 비용인 반면, <code>ColumnLimit: 0</code>은 포매터를 도입하고도 줄 길이
+관리를 계속 사람이 지는 상태로 남기 때문이다. 손으로 맞춘 정렬은 전역 설정을
+포기하는 대신 <code>// clang-format off</code>로 국소 보호한다.</p>
+<h3>7.3 이행 절차</h3>
+<p>순서를 지킨다:</p>
+<ol>
+<li><code>.clang-format</code>을 커밋한다 (포맷 변경 없음). — <strong>완료</strong></li>
+<li>미리보기로 규모와 안전성을 확인한다. — <strong>완료(§7.2)</strong></li>
+<li>전체 재포맷을 <strong>단독 커밋 하나</strong>로 만든다. 그 커밋에 코드 변경을 섞지 않는다.</li>
+<li>그 커밋 해시를 <code>.git-blame-ignore-revs</code>에 등재하고
+<code>git config blame.ignoreRevsFile .git-blame-ignore-revs</code>를 README에 적는다.</li>
+<li>재포맷 커밋의 <strong>빌드 산출물이 이전과 같은지</strong> 확인한다. §7.2가 토큰 불변을
+보였지만 그것은 표본 기준이고, 빌드는 전수다.</li>
+</ol>
+<p>★ 3단계는 <strong>작업 트리가 깨끗할 때</strong> 해야 한다. 994개 파일을 건드리므로 다른
+세션의 미커밋 변경이 있으면 통째로 휩쓸린다. 착수 전에 <code>git status</code>가 비어
+있는지 확인한다.</p>
+<h3>7.4 리플렉션 속성 배치 (2026-09-30 확정)</h3>
+<p>변수·메서드에 다는 리플렉션 속성(<code>[[reflgen::…]]</code>·<code>[[creator::…]]</code>)은 <strong>자기 줄</strong>에
+두고, 선언은 그 아래 줄에 둔다. 속성을 단 선언이 앞뒤 내용과 이어져 있으면
+<strong>빈 줄</strong>로 가른다.</p>
+<pre><code class="language-cpp">class [[reflgen::reflect]] DoorComponent : public meta::identity&lt;DoorComponent, Component&gt;
+{
+    friend struct reflgen::access;
+public:
+    [[reflgen::reflect, creator::read_only_in_inspector]]
+    bool IsOpen() const;
+
+    void Close();
+
+private:
+    EDoorKind m_kind = EDoorKind::Hinged;
+
+    // 열림 정도는 매 프레임 다시 계산한다
+    [[reflgen::ignore]]
+    float m_openAmount = 0.0f;
+
+    [[reflgen::ignore]]
+    float m_speed = 1.0f;
+};
+</code></pre>
+<ul>
+<li>선언 바로 위의 설명 주석은 그 선언과 한 덩어리다 — 빈 줄은 주석 위에 들어간다.</li>
+<li>범위의 경계와는 가르지 않는다: <code>{</code>로 끝나는 줄 다음, <code>}</code>로 시작하는 줄 앞,
+접근 지정자(<code>public:</code> 등)의 앞뒤.</li>
+<li>여러 줄에 걸친 선언은 선언이 끝나는 줄(<code>;</code> 또는 <code>}</code>)까지가 한 덩어리다.</li>
+<li>클래스 머리의 속성(<code>class [[reflgen::reflect]] X</code>)과 <code>[[nodiscard]]</code> 같은 다른
+속성은 대상이 아니다.</li>
+</ul>
+<p><strong>왜:</strong> reflgen 전환 뒤 반영 범위는 opt-out이다 — 필드는 <code>[[reflgen::ignore]]</code>를
+달지 않는 한 저장된다(<a href="ReflectionDesign.html">ReflectionDesign.md</a> §1). 속성이 선언과
+한 줄에 붙어 있으면 무엇이 저장에서 빠졌는지가 긴 타입 이름 사이에 묻힌다. 자기 줄에
+두면 줄 머리만 훑어도 보이고, 빈 줄로 가르면 속성이 어느 선언에 붙는지 헷갈리지 않는다.</p>
+<p>강제와 도구:</p>
+<ul>
+<li><code>Tools/regression/verify-reflgen-attribute-layout.ps1</code> — 어긋난 배치가 하나라도 있으면
+붉다. 변환 규칙은 합성 표본으로 먼저 자기 시험한다.</li>
+<li><code>python Tools/migration/reflgen_attribute_layout.py --apply</code> — 고친다(두 번 돌려도 같다).
+<code>reflgen_codemod.py</code>도 속성을 단 뒤 이 배치를 거친다.</li>
+<li><code>.clang-format</code>의 <code>BreakAfterAttributes: Leave</code> — 재포맷이 속성 뒤 줄바꿈을 되돌리지
+않는다(<code>Never</code>는 한 줄로 합치고, <code>Always</code>는 다른 속성까지 펼친다). VS 18 동봉
+clang-format 22.1.3으로 확인했다.</li>
+</ul>
+<hr>
+<h2>8. 현재 실태와의 간극 — 그리고 이행</h2>
+<p>이 문서를 그대로 적용하면 개명 대상이 생긴다. 규모는 다음과 같다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>규모</th>
+<th>위험</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>meta::StampIdentity</code> → <code>stamp_identity</code></td>
+<td>호출 2</td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>meta::displayName</code> → <code>display_name</code></td>
+<td>호출 소수</td>
+<td>없음</td>
+</tr>
+<tr>
+<td><code>UPPER_SNAKE</code> 상수 → <code>k</code> 접두</td>
+<td>24종</td>
+<td><strong>완료</strong> (§8.1)</td>
+</tr>
+<tr>
+<td><code>k…</code> 상수 332종</td>
+<td>—</td>
+<td><strong>개명하지 않는다</strong> (§3.4)</td>
+</tr>
+<tr>
+<td><code>BitFlag</code> → <code>bit_flag</code></td>
+<td>3개 파일</td>
+<td>중간</td>
+</tr>
+<tr>
+<td><code>HashingString</code></td>
+<td>12개 파일</td>
+<td><strong>개명 없음</strong> — 새로 작성할 때 <code>hashing_string</code>으로 태어난다 (§5.3)</td>
+</tr>
+<tr>
+<td><code>Delegate.h</code>의 <code>id_</code> → 층 판정 후 정리</td>
+<td>국소</td>
+<td>낮음</td>
+</tr>
+<tr>
+<td>전체 재포맷 (<code>.clang-format</code>)</td>
+<td><strong>994 / 1,025개 파일</strong></td>
+<td>낮음 — 토큰 불변이 §7.2에서 확인됐다. 단 §7.3의 절차를 지킬 것</td>
+</tr>
+</tbody></table></div>
+<p><strong>이행 원칙 셋:</strong></p>
+<ol>
+<li><strong>새로 쓰는 코드는 이 문서를 따른다.</strong> 이건 오늘부터다.</li>
+<li><strong>개명은 컴파일러가 전부 잡아 주는 것부터</strong> 한다. 이름만 바뀌고 문자열로
+새어 나가지 않는 것 — 상수, private 메서드.</li>
+<li><strong>직렬화·리플렉션에 이름이 새는 것은 개명하지 않는다.</strong> 타입 이름이 저작
+자산이나 리플렉션 테이블에 문자열로 적히는 것은 개명이 곧 포맷 변경이다.
+그런 타입은 표기를 맞추려고 이름을 바꾸는 대신, 교체가 예정돼 있으면 그때
+새 표기로 태어나게 한다(<code>HashingString</code> → §5.3). 교체 예정이 없으면
+§2.1 판정표에 현 표기 그대로 기록하고 둔다.</li>
+</ol>
+<p>이 저장소의 규칙상 레거시 호환 계층은 두지 않는다 — 옛 이름의 별칭을 남기는
+식의 이행은 하지 않고, 바꿀 때 한 번에 바꾼다.</p>
+<h3>8.1 이행 기록 — <code>UPPER_SNAKE</code> 정리 (2026-09-20)</h3>
+<p><strong>결과: 21종 개명, 178곳, 49개 파일.</strong> 3종은 근거를 적고 남겼다.</p>
+<p>(치환은 181곳에 닿았다. 그중 3곳은 다른 세션이 작업 중인 미커밋 신규 파일
+<code>Editor/RenderTests/Animation/</code> 둘에 있어 <strong>작업 트리에만 남기고 커밋하지
+않았다</strong> — 선언이 <code>kMaxBones</code>로 바뀐 이상 되돌리면 그 파일이 컴파일되지 않으므로
+치환은 유지해야 하고, 파일 자체는 그 세션이 커밋할 때 함께 간다.)</p>
+<p>대상을 세는 데 정규식이 두 번 틀렸고, 두 번 다 실측이 잡았다:</p>
+<ol>
+<li>첫 패턴은 타입 이름에 숫자가 든 선언을 놓쳤다 — <code>constexpr bool32 USE_NORMAL_MAP</code>
+의 <code>bool32</code>. 문자 집합에 <code>0-9</code>가 없었다.</li>
+<li>두 번째 패턴은 <code>{2,}</code>라 <strong>두 글자 이름을 통째로 놓쳤다</strong> — <code>Camera::UP</code>.</li>
+</ol>
+<p>그래서 처음 &quot;15종&quot;이 최종 <strong>24종</strong>이 됐다. 이름을 세는 일은 한 번에 맞지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>처리</th>
+<th>종수</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>k</code> 접두 (층 A)</td>
+<td>19</td>
+<td><code>INVALID_INDEX</code>→<code>kInvalidIndex</code>(55곳), <code>MAX_BONES</code>→<code>kMaxBones</code>(31곳), <code>ALL_LAYER</code>, <code>MAX_CONTROLLER</code>(15곳), <code>KEYBOARD_COUNT</code>, <code>MOUSE_COUNT</code>, <code>GAMEPAD_KEY_COUNT</code>, <code>MAX_LAYER_SIZE</code>, <code>MAX_STACK_DEPTH</code>, <code>EVENT_BUFFER_SIZE</code>, <code>ALLOCATOR_SIZE</code>, <code>BITS</code>, <code>CHUNKS</code>, <code>Camera::FORWARD</code>·<code>RIGHT</code>·<code>UP</code>, <code>USE_NORMAL_MAP</code>, <code>USE_SHADOW_RECIVE</code>, <code>INVAILD_ID</code></td>
+</tr>
+<tr>
+<td>snake_case (층 B)</td>
+<td>2</td>
+<td><code>Paklib.hpp</code>의 <code>FNV_OFFSET</code>·<code>FNV_PRIME</code> — <code>fnv1a64</code> 자유 함수 안의 지역 상수라 §4.1을 따른다</td>
+</tr>
+<tr>
+<td><strong>남김</strong></td>
+<td>3</td>
+<td>아래</td>
+</tr>
+</tbody></table></div>
+<p><strong>남긴 셋과 이유:</strong></p>
+<ul>
+<li><code>S0</code> · <code>S1</code> (<code>Sha256.h</code>) — SHA-256 사양서의 Σ0·Σ1 표기다. 알고리즘 문헌과
+대조할 수 있다는 것이 이 이름의 값어치이므로 바꾸지 않는다. 같은 파일의
+<code>kRound</code>는 이미 <code>k</code> 접두라 파일 안에서 규칙이 이미 갈려 있고, 그 갈림이 옳다.</li>
+<li><code>MP</code> (<code>ReflectionTypedDraw.h</code>) — 지역 상수와 <strong>템플릿 매개변수가 같은 이름으로
+쌍을 이뤄</strong> 넘어다닌다(<code>CommitMemberChange&lt;Owner, MemberT, MP&gt;</code>). 상수 표기가
+아니라 §3.5(약칭) 축이므로 그 작업에서 함께 다룬다.</li>
+</ul>
+<p><strong>오타 둘을 같이 고쳤다.</strong> <code>INVAILD_ID</code>→<code>kInvalidId</code>, <code>USE_SHADOW_RECIVE</code>→
+<code>kUseShadowReceive</code>. 개명하면서 오타를 새 이름에 옮겨 적을 이유가 없다.</p>
+<p><strong>함정 셋을 만났다:</strong></p>
+<ul>
+<li><code>RIGHT</code>는 <code>Camera::RIGHT</code>(방향 벡터)와 <code>MouseKey::RIGHT</code>(열거형 값) 둘이다.
+단어 경계 치환을 그대로 돌렸으면 열거형까지 바꿨다. <code>Camera::</code> 접두가 붙은
+자리와 선언 파일 안으로 범위를 좁혔다.</li>
+<li><code>kBits</code>·<code>kInvalidIndex</code>는 <strong>이미 다른 곳에 있었다</strong>(<code>EditorStateContract.cpp</code>,
+<code>DX12TargetViewHeap</code>, <code>HierarchyStore</code>). 전부 클래스·파일 스코프라 언어적
+충돌은 없지만, <code>Entity::kInvalidIndex</code>와 <code>HierarchyStore::kInvalidIndex</code>가
+같은 개념의 두 정의인지는 따로 볼 값어치가 있다.</li>
+<li>★ <strong>소스 1,052개 중 56개가 UTF-8이 아니다</strong>(CP949 48, 그 둘 다 아닌 것 8).
+첫 스크립트는 디코딩 실패를 <code>continue</code>로 삼키고 <strong>조용히 건너뛰었다.</strong>
+그 안에 <code>InputManager.h</code>의 <code>MAX_CONTROLLER</code> 8곳이 있었다 — 그대로 적용했으면
+선언만 바뀌고 사용처가 남아 컴파일이 깨졌을 것이다. latin-1로 읽고 latin-1로
+되쓰는 방식(모든 바이트가 1:1 왕복)에 <code>re.ASCII</code>를 더해 해결했다. 적용 후
+인코딩 분포는 그대로다(CP949 48, 기타 8).</li>
+</ul>
+<p>검산은 둘을 걸었다 — ① 파일마다 바뀐 바이트 수가 치환 횟수로 정확히 설명되는지,
+② 적용 후 옛 이름이 남아 있지 않은지. 남은 것은 <code>BoneRegion.h</code>의
+<code>Skeleton::MAX_BONES</code> 하나이고, 이는 은퇴한 옛 심볼을 가리키는 주석이라
+의도적으로 보호했다.</p>
+<hr>
+<h2>9. 결정 기록 (2026-09-20)</h2>
+<p>네 항목 모두 답이 달렸다. 본문은 이 결정을 반영한 상태다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>물었던 것</th>
+<th>결정</th>
+<th>본문</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>9-1</td>
+<td>상수 표기</td>
+<td><strong>(a)</strong> <code>k</code> 접두를 공식 표기로 인정. <code>UPPER_SNAKE</code> 15종만 정리</td>
+<td>§3.4</td>
+</tr>
+<tr>
+<td>9-2</td>
+<td><code>HashingString</code>·<code>BitFlag</code> 개명</td>
+<td><strong>(b)</strong> <code>BitFlag</code>만 개명. <code>HashingString</code>은 새로 작성하며 층 B로 태어난다</td>
+<td>§5.3</td>
+</tr>
+<tr>
+<td>9-3</td>
+<td><code>.clang-format</code></td>
+<td><strong>(a)</strong> 전면 도입 + 재포맷 단독 커밋 + blame-ignore 등재</td>
+<td>§7.1&#126;7.3</td>
+</tr>
+<tr>
+<td>9-4</td>
+<td>게이트 강제</td>
+<td>제안대로 — 9-1·9-2가 정해진 <strong>뒤에</strong> 만든다 (지금이 그 뒤다)</td>
+<td>아래</td>
+</tr>
+<tr>
+<td>9-5</td>
+<td>리플렉션 속성 배치 (2026-09-30 추가)</td>
+<td>속성은 자기 줄, 선언은 그 아래 줄. 이어진 내용과는 빈 줄로 가른다. 게이트와 고치는 도구를 함께 둔다</td>
+<td>§7.4</td>
+</tr>
+</tbody></table></div>
+<h3>9-4 후속 — 게이트</h3>
+<p>9-1·9-2가 정해졌으므로 이제 만들 조건이 됐다. 형태는 <code>Tools/regression/</code>의
+스크립트 하나이고, 최소한 다음 둘을 센다:</p>
+<ul>
+<li>층 B 네임스페이스(<code>ce</code>, <code>meta</code>) 안의 PascalCase 식별자</li>
+<li>층 A 헤더의 snake_case 공개 메서드 — 단 §4.3이 규격상 요구하는 이름
+(<code>begin</code>·<code>end</code>·<code>size</code> 등)은 허용 목록으로 뺀다</li>
+</ul>
+<p><strong>허용 목록을 실태에서 뽑지 않는다.</strong> 지금 있는 위반을 전부 허용 목록에
+넣으면 게이트는 초록인 채 아무것도 막지 못한다. 허용 목록에 들어갈 자격은
+&quot;현재 존재한다&quot;가 아니라 &quot;§4.3이 요구한다&quot;뿐이다. §8의 개명이 끝나기 전에
+만든다면 남은 위반은 허용이 아니라 <strong>알려진 적자</strong>로 따로 세고, 수가 줄기만
+하는지 본다.</p>
+<p>초록이 뜨면 변이로 이빨을 확인한다 — 층 B 파일에 PascalCase 메서드를 하나
+심어 붉어지는지, 층 A 헤더에 snake_case 공개 메서드를 심어 붉어지는지.</p>
+<hr>
+<h2>참고</h2>
+<ul>
+<li><a href="ContainerLibraryDesign.html">ContainerLibraryDesign.md</a> — STL 기본값 원칙,
+치환 비용, 자체 컨테이너 판정 기록</li>
+<li><a href="../plans/ScriptSurfacePlan.html">ScriptSurfacePlan.md</a> — C# 미러의 명명 계약</li>
+<li><a href="ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a> — 리플렉션
+등재 판정</li>
+</ul>
+<h2>10. bool 시퀀스와 비트 플래그</h2>
+<p><code>std::vector&lt;bool&gt;</code>은 엔진·에디터·도구·테스트에서 사용하지 않는다.
+고정 크기 비트 플래그는 <code>std::bitset&lt;N&gt;</code>, 런타임 크기는 <code>ce::dynamic_bitset</code>을 사용한다.
+비트 읽기·쓰기는 <code>test/set</code>으로 명시하고 iterator 프록시를 생성하지 않는다.
+bool 값의 직렬화 형식을 유지해야 하는 시퀀스는 <code>std::deque&lt;bool&gt;</code> 등을 사용한다.
+외부 라이브러리 구현은 이 규칙 때문에 수정하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="0-이-문서가-정하는-것과-정하지-않는-것"></span><span id="1-규칙-둘"></span><span id="2-어느-층인지-판정하는-기준"></span><span id="21-판정-예-현-저장소"></span><span id="3-층-a--엔진-객체-c-컨벤션"></span><span id="31-표기"></span><span id="32-c과-다르게-두는-것"></span><span id="33-접두-m_은-유지한다"></span><span id="34-상수--k-접두를-유지하고-upper_snake_case를-버린다"></span><span id="35-약칭을-쓰지-않는다"></span><span id="4-층-b--공용-컨테이너유틸리티-stl-컨벤션"></span><span id="41-표기"></span><span id="42-멤버-접두는-m_이-아니라-후치-_"></span><span id="43-std-기제에-물리는-이름은-반드시-규격-그대로"></span><span id="44-자유-함수를-먼저-본다"></span><span id="5-경계에-걸린-것들"></span><span id="51-meta-vs-meta--오타가-아니다"></span><span id="52-공용-스레드-풀job-유틸리티는-층-b다"></span><span id="53-hashingstring--bitflag는-층-b다"></span><span id="54-ce는-층-b의-공용-함수-네임스페이스다"></span><span id="55-네임스페이스-대소문자"></span><span id="6-두-층이-만나는-자리"></span><span id="7-층과-무관한-공통-규칙"></span><span id="71-포매팅--clang-format-9-3-a-확정"></span><span id="72-미리보기-결과--재포맷은-코드를-바꾸지-않는다"></span><span id="73-이행-절차"></span><span id="74-리플렉션-속성-배치-2026-09-30-확정"></span><span id="8-현재-실태와의-간극--그리고-이행"></span><span id="81-이행-기록--upper_snake-정리-2026-09-20"></span><span id="9-4-후속--게이트"></span><span id="9-결정-기록-2026-09-20"></span><span id="sec-0-이-문서가-정하는-것과-정하지-않는-것"></span><span id="sec-1-규칙-둘"></span><span id="sec-2-어느-층인지-판정하는-기준"></span><span id="sec-3-층-a--엔진-객체-c-컨벤션"></span><span id="sec-4-층-b--공용-컨테이너유틸리티-stl-컨벤션"></span><span id="sec-5-경계에-걸린-것들"></span><span id="sec-6-두-층이-만나는-자리"></span><span id="sec-7-층과-무관한-공통-규칙"></span><span id="sec-8-현재-실태와의-간극--그리고-이행"></span><span id="sec-9-결정-기록-2026-09-20"></span><span id="sec-참고"></span><span id="참고"></span></details></main></body></html>

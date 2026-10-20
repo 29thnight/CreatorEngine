@@ -1,5 +1,52 @@
 # 엔진 명령 표면 정리 — 2026-09-06
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-editor-command-surface.ps1:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L68) — `Assert ($results[0].data.names -contains 'experiment.cooked' -and $results[0].data.names -contains 'dx12.skinning' -and $results[0].data.names -contains 'dx12.selftest') 'Commandlet discovery is missing a domain'`
+- [Tools/regression/verify-editor-command-surface.ps1:164](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L164) — `function Invoke-Cmd([string]$Name, [string[]]$Arguments = @()) { Invoke-Body @{command=$Name;args=$Arguments} }`
+- [Tools/regression/verify-editor-command-surface.ps1:166](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L166) — `function Read-Object([string]$Target) { Invoke-Body @{ command='object.describe'; parameters=@{target=$Target} } }`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp:699](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp#L699) — `services.RegisterUploadTransactionListener(&probe);`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp:716](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp#L716) — `services.UnregisterUploadTransactionListener(&probe);`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp:1310](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp#L1310) — `const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(1), RHILayout::SrvTable(2, 0), RHILayout::Srv(17),`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [ScriptCore/MeshRenderer.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13) — `public sealed class MeshRenderer : NativeComponent`
+- [ScriptCore/MeshRenderer.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15) — `public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);`
+- [ScriptCore/MeshRenderer.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24) — `public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86) — `own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};`
+- [Engine/SceneRuntime/Animator.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};`
+- [Engine/SceneRuntime/MeshRenderer.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19) — `class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>`
+- [Engine/SceneRuntime/MeshRenderer.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/MeshRenderer.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25) — `Component::gc_trace(tracer);`
+- [Editor/EngineEntry/EditorObjectOperations.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L16) — `enum class ValueType : std::uint16_t;`
+- [Editor/EngineEntry/EditorObjectOperations.h:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L74) — `bool CommitPropertyEdits(std::vector<PropertyEdit> edits);`
+- [Editor/EngineEntry/EditorObjectOperations.h:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L85) — `CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L86) — `static_assert(Meta::TypedDraw::ObjectHidesEnabledFlag(),`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L136) — `const auto* type = Meta::Find(obj->GetTypeID());`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:142](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L142) — `EditorObjectOperations::CommitProperty(*obj, field, std::move(before));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > master 병합 후보: `6b9c2b79`의 `light.proxy` 제품 조회와 텍스처 Commandlet 4개를 보존했다. 통합 검증 및 원본 작업 보존은 [병합 준비 기록](Phase14_5MergePreparation.md)을 따른다.
 
 기준 HEAD `55374f16`. 과거 CLI 보존을 목표로 한 계획을 종료하고, 제품 편집 API와
@@ -138,3 +185,5 @@ MCP 서버는 이번 변경에 포함하지 않는다. 향후 MCP는 HTTP discov
 
 전체 run-all, Commandlet 111개의 모든 모드/코퍼스, GUI 수동 조작, Player Shipping
 빌드 및 성능 수치는 이번 검증 범위에 포함하지 않는다. MCP 서버 구현도 포함하지 않는다.
+
+</details>

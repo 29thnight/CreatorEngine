@@ -1,5 +1,51 @@
 # 엔진 동기화 구조 분석
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Native.cs:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L16) — `[StructLayout(LayoutKind.Sequential)]`
+- [ScriptCore/Native.cs:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L84) — `public delegate* unmanaged<ulong> Engine_GetFrameCount;`
+- [ScriptCore/Native.cs:824](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L824) — `=> Entered() && _api.Engine_GetFrameCount != null ? _api.Engine_GetFrameCount() : 0;`
+- [ScriptCore/ScriptRegistry.cs:520](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L520) — `public static void PrePhysicsTick(float dt)`
+- [ScriptCore/ScriptRegistry.cs:532](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L532) — `b.Scope.Tick(dt);`
+- [ScriptCore/ScriptRegistry.cs:558](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L558) — `public static void PostPhysicsTick(float dt)`
+- [Engine/RenderEngine/DataSystem.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30) — `own::shared_owner<const Texture> descriptor;`
+- [Engine/RenderEngine/DataSystem.h:625](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L625) — `std::size_t DrainQueuedAssetChanges();`
+- [Engine/RenderEngine/DataSystem.h:816](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L816) — `void DrainAssetPreparations();`
+- [Engine/RenderEngine/RenderScene.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24) — `class RenderScene`
+- [Engine/RenderEngine/RenderScene.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L46) — `RenderScene() = default;`
+- [Engine/RenderEngine/RenderScene.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L47) — `~RenderScene();`
+- [Editor/EngineEntry/ProgressWindow.h:70](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L70) — `SendMessageW(m_hWnd, kProgressMessage, static_cast<WPARAM>(std::clamp(value, 0, 100)), 0);`
+- [Editor/EngineEntry/ProgressWindow.h:117](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L117) — `std::this_thread::sleep_for(std::chrono::milliseconds(500));`
+- [Editor/EngineEntry/ProgressWindow.h:343](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L343) — `std::wstring(std::begin(CreatorEngineVersion::Build),`
+- [Engine/RuntimeHost/EngineBootstrap.h:211](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L211) — `ce::profile_scope_begin(ce::marker<"RenderBeginFrame">());`
+- [Engine/RuntimeHost/EngineBootstrap.h:299](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L299) — `std::fputs("[EnginePaths] Host runtime ownership capability is invalid\n", stderr);`
+- [Engine/RuntimeHost/EngineBootstrap.h:305](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L305) — `EngineMode::Set(config.compatibilityRunMode);`
+- [Engine/Utility_Framework/CoreWindow.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/CoreWindow.h#L1) — `#pragma once`
+- [Engine/RenderEngine/ProxyCommandQueue.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L12) — `class ProxyCommandQueueController : public Singleton<ProxyCommandQueueController>`
+- [Engine/RenderEngine/ProxyCommandQueue.h:105](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L105) — `if (m_commands.empty()) { *this = std::move(source); return; }`
+- [Engine/RenderEngine/ProxyCommandQueue.h:399](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L399) — `static auto ProxyCommandQueue = ProxyCommandQueueController::GetInstance();`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 분석 기준: 2026-09-07, `master`, `f84f32b841a4ba7a6db9276588849fa2ebe48085`.
 
 이 문서는 현재 실행 구조를 설명한다. 범용 JobSystem/태스크 그래프 도입을 위한 판단은 마지막 절에 구분했다. 엔진 실행 코드는 변경하지 않았다.
@@ -460,9 +506,9 @@ Mermaid 11개 블록 parser 검사 PASS. source map의 상대 파일 링크는 �
 | S03 | [PlayerMain.cpp](../../Player/PlayerMain.cpp) 275–490; [PlayerApp.cpp](../../Player/PlayerApp.cpp) 265–309 | Player PT, command pump, packet 발행 |
 | S04 | [RuntimeFrame.cpp](../../Engine/SceneRuntime/RuntimeFrame.cpp) 16–91 | 관리 pre/post, pause, Physics/GameLogic 순서 |
 | S05 | [SceneManager.cpp](../../Engine/SceneRuntime/SceneManager.cpp) 328–547; [Scene.cpp](../../Engine/SceneRuntime/Scene.cpp) 2557–2790 | 활성화·시뮬레이션·파괴 단계 |
-| S06 | [AnimationJob.cpp](../../Engine/SceneRuntime/AnimationJob.cpp) 37–193, 532–537, 645–650 | Animator snapshot, fan-out/join, pose와 event |
-| S07 | [Core.ThreadPool.h](../../Engine/Utility_Framework/Core.ThreadPool.h) 20–150; [Core.CountingSemaphore.h](../../Engine/Utility_Framework/Core.CountingSemaphore.h); [Core.Thread.h](../../Engine/Utility_Framework/Core.Thread.h) | task count/event, semaphore, OS thread 수명 |
-| S08 | [WorkerPool.h](../../Engine/Utility_Framework/WorkerPool.h) 27–61; [DataSystem.cpp](../../Engine/RenderEngine/DataSystem.cpp) 1661–1692 | 공용 풀과 실제 bundle 소비 |
+| S06 | AnimationJob.cpp (`../../Engine/SceneRuntime/AnimationJob.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 37–193, 532–537, 645–650 | Animator snapshot, fan-out/join, pose와 event |
+| S07 | Core.ThreadPool.h (`../../Engine/Utility_Framework/Core.ThreadPool.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 20–150; Core.CountingSemaphore.h (`../../Engine/Utility_Framework/Core.CountingSemaphore.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조); Core.Thread.h (`../../Engine/Utility_Framework/Core.Thread.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) | task count/event, semaphore, OS thread 수명 |
+| S08 | WorkerPool.h (`../../Engine/Utility_Framework/WorkerPool.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 27–61; [DataSystem.cpp](../../Engine/RenderEngine/DataSystem.cpp) 1661–1692 | 공용 풀과 실제 bundle 소비 |
 | S09 | [FoliageSystem.cpp](../../Engine/SceneRuntime/FoliageSystem.cpp) 35–73; [FoliageComponent.cpp](../../Engine/SceneRuntime/FoliageComponent.cpp) 315–403 | 매 component async 범위 분할 |
 | S10 | [EnhancedSceneRenderer.cpp](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp) 807–858, 3923–4180, 4396–4570, 4626–4654 | RT 큐·epoch·발행·상태 소유 |
 | S11 | [ProxyCommandQueue.h](../../Engine/RenderEngine/ProxyCommandQueue.h) 45–173; [Scene.cpp](../../Engine/SceneRuntime/Scene.cpp) 1895–2089; [ProxyCommand.cpp](../../Engine/SceneRuntime/ProxyCommand.cpp) | dirty commit, queue, epoch 처리 |
@@ -470,20 +516,22 @@ Mermaid 11개 블록 parser 검사 PASS. source map의 상대 파일 링크는 �
 | S13 | [DX12DeviceResources.cpp](../../Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp) 515–537, 598–879, 1383 이후 | slot fence, submit, Present, GPU drain |
 | S14 | [VulkanDeviceResources.cpp](../../Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp) 655–664, 759 이후, 1222–1291, 1518 이후 | timeline, submit, lifecycle, Present |
 | S15 | [AIManager.cpp](../../Engine/SceneRuntime/AIManager.cpp) 34–87; [Scene.cpp](../../Engine/SceneRuntime/Scene.cpp) 361, 851–855, 1624, 2559–2562, 2753–2790 | AI snapshot, ready poll, lifetime drain |
-| S16 | [Physx.cpp](../../Engine/Physics/Physx.cpp) 165–173, 441–453; [PhysicsManager.cpp](../../Engine/SceneRuntime/PhysicsManager.cpp) 76–105 | dispatcher, simulate/fetch, GT 반영 |
+| S16 | Physx.cpp (`../../Engine/Physics/Physx.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 165–173, 441–453; PhysicsManager.cpp (`../../Engine/SceneRuntime/PhysicsManager.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 76–105 | dispatcher, simulate/fetch, GT 반영 |
 | S17 | [SceneManager.cpp](../../Engine/SceneRuntime/SceneManager.cpp) 387–414, 936–1268 | async load, DDOL 접근, 활성화 |
 | S18 | [EditorModelPlacement.cpp](../../Editor/EngineEntry/EditorModelPlacement.cpp) 25–134, 175–315 | 준비/GT 적용, ready, 취소·join |
 | S19 | [EditorDirectoryWatcher.cpp](../../Editor/EngineEntry/EditorDirectoryWatcher.cpp) 193–281, 340–365, 589 이후; [DataSystem.cpp](../../Engine/RenderEngine/DataSystem.cpp) 1496–1528 | I/O 취소, asset 전달 |
 | S20 | [DX12PSOManager.cpp](../../Engine/RenderEngine/RHI/DX12/DX12PSOManager.cpp) 275–299, 580–590, 681–727 | async API, poll, 잠금 밖 future 회수 |
 | S21 | [CommandService.cpp](../../Engine/CommandService/CommandService.cpp) 133–266, 599 이후; [EditorCommandServiceHost.cpp](../../Editor/EngineEntry/EditorCommandServiceHost.cpp) 194–250; [ConsoleCommandSystem.cpp](../../Editor/EngineEntry/ConsoleCommandSystem.cpp) 487–510, 4594–4645; [PlayerCommandService.cpp](../../Player/PlayerCommandService.cpp) | socket/command/result, stdin 종료 |
 | S22 | [GameThreadSynchronizationContext.cs](../../ScriptCore/GameThreadSynchronizationContext.cs); [ScriptRegistry.cs](../../ScriptCore/ScriptRegistry.cs) 538, 690; [Native.cs](../../ScriptCore/Native.cs) 341–393; [ClrHost.cpp](../../Engine/SceneRuntime/ClrHost.cpp) 2984–3017, 3161–3171 | 관리 재개와 엔진 진입 경계 |
-| S23 | [SoundManager.cpp](../../Engine/SceneRuntime/SoundManager.cpp) 10–44, 99–141; [SoundManager.h](../../Engine/SceneRuntime/SoundManager.h) 107–114 | detached loader, 상태 flag와 종료 불일치 |
-| S24 | [EngineBootstrap.h](../../Editor/EngineEntry/EngineBootstrap.h) 178–246; [ProgressWindow.h](../../Editor/EngineEntry/ProgressWindow.h); [App.cpp](../../Editor/EngineEntry/App.cpp) 168–180 | bootstrap/호스트 수명 |
+| S23 | SoundManager.cpp (`../../Engine/SceneRuntime/SoundManager.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 10–44, 99–141; SoundManager.h (`../../Engine/SceneRuntime/SoundManager.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 107–114 | detached loader, 상태 flag와 종료 불일치 |
+| S24 | [EngineBootstrap.h](../../Engine/RuntimeHost/EngineBootstrap.h) 178–246; [ProgressWindow.h](../../Editor/EngineEntry/ProgressWindow.h); [App.cpp](../../Editor/EngineEntry/App.cpp) 168–180 | bootstrap/호스트 수명 |
 | S25 | [Delegate.inl](../../Engine/Utility_Framework/Delegate.inl) 93–146 | snapshot과 동기 callback |
 | S26 | [AnimationEventBridge.cpp](../../Engine/SceneRuntime/AnimationEventBridge.cpp) 145 이후 | worker clip event → 관리 메시지 큐 |
 | S27 | [Scene.cpp](../../Engine/SceneRuntime/Scene.cpp) 4119–4360, 4723 이후, 4936–5048; [TangentGeneration.cpp](../../Engine/RenderEngine/Experiment/Import/TangentGeneration.cpp) 347–382 | dirty range, fallback, targeted pull, import 병렬 |
-| S28 | [Profiler.cpp](../../Engine/EngineDiagnostics/Profiler.cpp) 52–76, 96–169, 253–300; [Profiler.h](../../Engine/EngineDiagnostics/Profiler.h) | TLS 기록과 수집, registry 잠금 |
+| S28 | Profiler.cpp (`../../Engine/EngineDiagnostics/Profiler.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 52–76, 96–169, 253–300; Profiler.h (`../../Engine/EngineDiagnostics/Profiler.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) | TLS 기록과 수집, registry 잠금 |
 | S29 | [EnhancedRenderGraph.cpp](../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp) 691–818; [DX12CommandListPool.cpp](../../Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp) 81–184; [VulkanCommandBufferPool.cpp](../../Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp) 93–147 | 정적 기록 분배, 단일 배치 join |
-| S30 | [EnhancedSceneRenderer.cpp](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp) 587 이후, 911–1010, 4934–4994, 5095–5195, 5250–5281; [ImGuiDx12Shell.cpp](../../Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp) 451–687; [ImGuiVulkanShell.cpp](../../Editor/HostImGuiPresentation/RHI/Vulkan/ImGuiVulkanShell.cpp) 410–527 | GPU 완료 승격, 뷰 저장소, 표시 |
-| S31 | [AssetJob.cpp](../../Engine/RenderEngine/AssetJob.cpp); [AssetJob.h](../../Engine/RenderEngine/AssetJob.h); [DataSystem.h](../../Engine/RenderEngine/DataSystem.h) 323 | 호출 미확인 잔존 풀/스레드 선언 |
+| S30 | [EnhancedSceneRenderer.cpp](../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp) 587 이후, 911–1010, 4934–4994, 5095–5195, 5250–5281; [ImGuiDx12Shell.cpp](../../Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp) 451–687; ImGuiVulkanShell.cpp (`../../Editor/HostImGuiPresentation/RHI/Vulkan/ImGuiVulkanShell.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 410–527 | GPU 완료 승격, 뷰 저장소, 표시 |
+| S31 | AssetJob.cpp (`../../Engine/RenderEngine/AssetJob.cpp` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조); AssetJob.h (`../../Engine/RenderEngine/AssetJob.h` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조); [DataSystem.h](../../Engine/RenderEngine/DataSystem.h) 323 | 호출 미확인 잔존 풀/스레드 선언 |
 | S32 | [RenderScene.cpp](../../Engine/RenderEngine/RenderScene.cpp) 17–32; [RenderScene.h](../../Engine/RenderEngine/RenderScene.h) 133 | AnimationJob 소유와 풀 회수 |
+
+</details>

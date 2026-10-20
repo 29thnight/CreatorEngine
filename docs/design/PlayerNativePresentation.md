@@ -1,5 +1,46 @@
 # Player native presentation과 Editor DX12 경계
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui_internal.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui_internal.h#L1) — `#pragma once`
+- [Tools/regression/verify-player-presentation-boundary.py:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-presentation-boundary.py#L12) — `ROOT = Path(__file__).resolve().parents[2]`
+- [Tools/regression/verify-player-presentation-boundary.py:122](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-player-presentation-boundary.py#L122) — `require("RuntimeSettings::Initialize(config.renderBackendPolicy)" in bootstrap,`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/PlayerPresentation.slang:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/PlayerPresentation.slang#L12) — `struct PlayerPresentationVertex`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/PlayerPresentation.slang:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/PlayerPresentation.slang#L18) — `PlayerPresentationVertex VSMain(uint vertexId : SV_VertexID)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/PlayerPresentation.slang:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/PlayerPresentation.slang#L26) — `float4 PSMain(PlayerPresentationVertex input) : SV_TARGET`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/PlayerPresentation.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerPresentation.h#L14) — `class Presentation : public IDisplayPresentationSink`
+- [Player/PlayerPresentation.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerPresentation.h#L16) — `public:`
+- [Player/PlayerPresentation.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerPresentation.h#L43) — `m_displayAvailable = std::move(callback);`
+- [Engine/SceneRuntime/Canvas.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14) — `class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>`
+- [Engine/SceneRuntime/Canvas.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Canvas.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20) — `Component::gc_trace(tracer);`
+- [Engine/Utility_Framework/RuntimeSettings.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/RuntimeSettings.h#L50) — `if (!std::isfinite(settings.cpuBudgetMs) || settings.cpuBudgetMs <= 0.`
+- [Engine/Utility_Framework/RuntimeSettings.h:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/RuntimeSettings.h#L51) — `|| !std::isfinite(settings.hysteresis) || settings.hysteresis < 0.`
+- [Engine/Utility_Framework/RuntimeSettings.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/RuntimeSettings.h#L71) — `m_renderPassSettings.skyboxTextureName = std::move(value);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-05 소스 변경. 빌드·컴파일·GPU 실행·테스트·벤치마크 결과가 아니다.
 기준은 master `5ea5221ce647b84315382674183ea30c7bb470b2`다. PR #118의 소유권 변경과
 작업 중 추가된 DX12 device-removal 주입 및 package layer 설정 복사를 그대로 보존한다.
@@ -132,3 +173,5 @@ interpolation, Editor FG, capability fallback 구현이 없다. RG5/6와 별도 
    Player Vulkan 패키징 선택은 그대로 적용되는지 확인
 
 정적 검사만으로 실행 성공, 이미지 동등성, 성능 개선 또는 검증 레이어 0을 주장하지 않는다.
+
+</details>

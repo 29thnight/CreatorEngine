@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Graph 실제 Scene GBuffer·공유 깊이·컬러 합성</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSceneHost.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSceneHost.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Graph 실제 Scene GBuffer·공유 깊이·컬러 합성</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4">Tools/regression/verify-material-raster-surface.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;,&#39;Release&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9">Tools/regression/verify-material-raster-surface.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10">Tools/regression/verify-material-raster-surface.ps1:10</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang#L5">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang:5</a> — <code>float BakeEnvironmentPdf(float3 direction)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang#L8">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang:8</a> — <code>gImportanceRows.GetDimensions(size, rows);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang#L9">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang:9</a> — <code>const float total=gImportanceMarginal.Load(int3(0,rows-1u,0)).r;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15">Engine/RenderEngine/MaterialGraphSceneInput.h:15</a> — <code>own::shared_owner&lt;const Instance&gt; instance;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21">Engine/RenderEngine/MaterialGraphSceneInput.h:21</a> — <code>static own::shared_owner&lt;const SceneMaterialSource&gt; Capture(const Material&amp; material);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L22">Engine/RenderEngine/MaterialGraphSceneInput.h:22</a> — <code>static own::shared_owner&lt;const SceneMaterialSource&gt; Capture(own::shared_owner&lt;const Instance&gt; instance,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L12">Engine/RenderEngine/MaterialGraphSceneLookup.h:12</a> — <code>struct SceneLookupResourcePool;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L15">Engine/RenderEngine/MaterialGraphSceneLookup.h:15</a> — <code>struct SceneLookupStats</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L87">Engine/RenderEngine/MaterialGraphSceneLookup.h:87</a> — <code>class SceneLookupCache : private IRHIUploadTransactionListener</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17">Engine/RenderEngine/MaterialGraphSceneVolume.h:17</a> — <code>struct SceneVolumeTriangle</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L19">Engine/RenderEngine/MaterialGraphSceneVolume.h:19</a> — <code>math::vector4 a, b, c;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31">Engine/RenderEngine/MaterialGraphSceneVolume.h:31</a> — <code>own::shared_owner&lt;const RenderBindings&gt; material;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L30">Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:30</a> — <code>class Texture;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L58">Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:58</a> — <code>class DX12TextureCache : public IRenderTextureCache, public IRHIUploadTransactionListener</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L120">Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:120</a> — <code>const own::shared_owner&lt;const Texture::CodecImage&gt;&amp; image, std::string&amp; outError) override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L10">Engine/RenderEngine/MaterialGraphSceneSubsurface.h:10</a> — <code>struct SceneSubsurfaceReflection</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L12">Engine/RenderEngine/MaterialGraphSceneSubsurface.h:12</a> — <code>math::vector4 metalSingleAlbedo, metalAverage;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L13">Engine/RenderEngine/MaterialGraphSceneSubsurface.h:13</a> — <code>math::vector4 dielectricSingleAlbedo, dielectricAverage;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L10">Engine/RenderEngine/MaterialGraphSceneRefraction.h:10</a> — <code>struct SceneRefractionSample</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L12">Engine/RenderEngine/MaterialGraphSceneRefraction.h:12</a> — <code>math::vector4 glassSingleAlbedo, glassAverage, glassEnvironment, rawTransmission, radiance;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L16">Engine/RenderEngine/MaterialGraphSceneRefraction.h:16</a> — <code>class SceneRefractionFrame</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>1. 설치 범위</h2>
+<p><code>EnhancedSceneRenderer</code>의 DX12/Vulkan live pipeline에 <code>LX.Scene.GBuffer</code>와
+<code>LX.Scene.Color</code>를 연결했다. 입력은 <a href="MaterialGraphSceneInput.html">SceneViewInput</a>이
+소유한 geometry·world·현재 pose·camera·불변 material instance다.</p>
+<p>2026-09-29 <a href="MaterialGraphSceneLookup.html">Scene lookup 캐시</a>를 추가했다. 현재 host는
+4,096²픽셀·4,096 draw와 2 GiB lookup payload 예산을 사용한다. 정확한 평가 입력을
+compute에서 비교하고 변경 픽셀의 IBL만 적분한다. 컬러 fragment는 lookup을 소비한다.
+카메라 이동 시 전체 갱신 비용과 입력 MRT 대역폭·자원 할당 비용의 실시간 수용은 별도다.
+기존 evaluated-point baker의 <code>PrincipledEnvironmentBake.slang</code> 수식과 정확도를 유지한다.</p>
+<p>지원은 Core/Layered 및 <a href="MaterialGraphSceneSubsurface.html">SSS surface</a>,
+<a href="MaterialGraphSceneRefraction.html">단일 표면 transmission/refraction</a>의 Opaque/Masked와
+double-sided coverage다.
+<a href="MaterialGraphTextureFootprints.html">이미지별 Vector·LOD</a>로 둘 이상의 텍스처도 처리한다.
+<a href="MaterialGraphSceneVolume.html">균질 Volume</a>도 별도 transport 경로로 연결했다.
+Core/Layered·SSS/transmission의 Blended coverage와 비alpha transmission은
+<a href="../analysis/MAT7ForwardTransportComposition.html">공통 Forward+ transport</a>에서 Code 재질과 혼합 정렬·합성한다.
+cooked Scene host가 없는 packaged 실행은 진단과 함께 거부한다.
+이전 preview shader를 Scene shader로 이름만 바꾸어 사용하지 않는다.</p>
+<h2>2. 실제 패스 순서</h2>
+<pre><code class="language-text">LX mesh skin/world producer (Shadow/GBuffer가 같은 생산을 공유)
+  -&gt; legacy Shadow + LX.Scene.Shadow (세 캐스케이드의 기존 depth 보존)
+  -&gt; legacy GBuffer (기존 depth clear와 Opaque/Masked capture)
+  -&gt; LX.Scene.GBuffer (투과 제외, 같은 5 MRT와 같은 D32, Less, depth write)
+  -&gt; Decal / SSAO / legacy Deferred
+  -&gt; LX.Scene.LookupCapture (8 + 3 MRT) / LookupBake
+  -&gt; SSS draw가 있으면 SubsurfaceReflection / Capture (7 MRT) / Filter
+  -&gt; LX.Scene.Color (같은 HDR, 같은 D32, Equal, depth write 0)
+  -&gt; LX.Scene.LookupReady
+  -&gt; Skybox / SSGI
+  -&gt; Forward+.Cull (Code/Graph 공통 light list)
+  -&gt; Volume이 있으면 opaque 배경에 카메라 매질 합성 (한 번)
+  -&gt; 혼합 back-to-front 순서:
+     Code Forward+.Shade / Graph lookup 준비 + alpha color
+     SSS·굴절은 draw별 임시 depth/owner -&gt; reflection/source/filter
+     굴절은 현재 뒤쪽 HDR 복사 -&gt; RefractionCapture/Bake -&gt; surface color
+     각 Forward 표면에 해당 표면 깊이까지의 카메라 매질 적용
+  -&gt; SSR / 후처리
+</code></pre>
+<ul>
+<li>LX GBuffer는 depth를 clear하지 않는다. 먼저 기록된 legacy Opaque/Masked와 같은
+깊이 검사에 참여한다. material graph alpha와 coverage cutoff로 Masked를 평가한다.</li>
+<li>GBuffer bitmask에 draw별 <code>0x80000001..0x80001000</code> owner를 기록한다. legacy bitmask와
+분리되며, coplanar의 <code>Equal</code>만으로 다른 재질이 winner를 덮어쓸 수 없다.</li>
+<li>컬러 패스는 같은 mesh/pose/VS/coverage를 사용하고 depth는 읽기 전용으로 바인딩한다.
+정확한 owner가 자기 draw와 일치하는 fragment만 기존 HDR을 교체한다.
+legacy 및 배경 픽셀은 유지한다.</li>
+<li>컬러는 원래 graph를 다시 평가한다. 기본 GBuffer에 담지 못하는 IOR·coat·sheen·
+anisotropy·film을 flat Standard 값으로 복원하지 않는다.</li>
+<li>fine UV derivative는 owner 분기 전에 계산한다. 선택된 view light의 직접광,
+기존 SSAO 값, cascade shadow와 HDR environment를 소비한다.
+Layered 발광도 상위 lobe의 감쇠를 적용한다.</li>
+</ul>
+<p>투과 surface는 자기 순서 직전에 뒤쪽 HDR을 복사하며 이미 합성된 반투명 객체도 읽는다.
+임시 GBuffer의 depth/owner를 사용하고 불투명 depth/owner를 보존한다.
+배경 SSAO를 투과 surface에 적용하지 않는다. 이전 depth 교체 방식과 후속 변경은
+<a href="../analysis/MAT7ForwardTransportComposition.html">공통 transport 검증 기록</a>을 구분해서 읽는다.</p>
+<p>일반 Blend는 opaque depth/owner를 쓰지 않고 같은 HDR에 알파 합성한다. opaque SSAO/Decal을
+앞쪽 alpha surface에 적용하지 않는다. alpha draw는 opaque shadow caster에 넣지 않는다.
+SSS/refraction·Volume과 alpha의 혼합과 굴절 배경의 투명 객체 순서는 공통 transport 게이트에서 검사한다.
+SSAO/SSR/SSGI와의 전체 Scene 시각 회귀는 MAT-9 게이트다. 위 순서의 자원 연결만으로
+해당 renderer 기능 전부를 검증했다고 주장하지 않는다.</p>
+<h2>3. 준비·기록·수명</h2>
+<ol>
+<li><code>SelectReadyInput</code>에서 <a href="MaterialGraphSceneGeneration.html">비동기 generation 준비·마지막 정상 재질</a>을
+선택한다. 신규 generation의 Slang은 worker에서 검증하고 shadow·opaque·alpha color/lookup 및
+필요한 SSS/transmission 보조 PSO가 모두 ready여야 선택한다.
+pending/실패 슬롯은 이전 instance·coverage와 현재 geometry를 사용한다.</li>
+<li>legacy upload/IBL과 <code>SceneHost::PrepareResidency</code>의 LX texture 복사 준비 뒤
+빈 graph에 <code>PrepareParallel</code>로 native prefix를 확정한다.</li>
+<li><code>SceneHost::Prepare</code>가 ready instance의 reflected binding·PSO와 scene constants,
+current mesh producer·index upload를 준비한다. prefix 이전 upload 주소를 재사용하지 않는다.</li>
+<li>Shadow/GBuffer의 최초 선언이 geometry 생산을 등록한다. 이후 선언은 같은 graph output을 읽는다.</li>
+<li>콜백은 전달된 encoder를 사용하며 immutable frame을 캡처한다. 현재 recording과
+descriptor 세대를 다시 확인하고 오래된 준비 결과를 거부한다.</li>
+<li>정확한 graph batch의 completion·티켓 성공 확인 뒤 lookup·재질 슬롯을 게시한다.
+pending 티켓은 다음 owner poll에서 확인하고 stale request의 활성 교체는 거부한다.</li>
+<li>graph/submission owner가 input·generation·PSO·texture·geometry를 GPU 완료까지 유지한다.
+GPU idle 뒤 host를 해제하고 backend/cache를 정리한다.</li>
+</ol>
+<p>프레임 candidate는 전체 성공 후 교체한다. frame/extent·budget·미지원 route·binding·
+shader/PSO·뒤쪽 draw 실패는 이전 accepted frame을 부분 결과로 덮지 않는다.
+실패한 이전 frame을 새 recording으로 다시 그려 성공처럼 처리하지도 않는다.</p>
+<p>저작 모드에서는 exact Scene module의 VS/GBuffer PS/Color PS를 DXIL·SPIR-V로 검증한다.
+두 backend의 material reflection이 제품 layout과 일치해야 active backend PSO를 만든다.
+DX12/Vulkan shader/native PSO의 worker 준비·제출 성공 후 슬롯 교체는 연결 문서가 소유한다.
+Scene host의 자동 cooking은 연결했고 현행 identity 12로 재쿠킹해야 한다. 새 transport와
+encrypted Player·Editor 제품 회귀 결과는 공통 transport 검증 기록을 따른다. 초기 CS의 동기 설치 제거와
+전체 cache 최적화는 별도 개선이며, 최종 실시간 시간/메모리 수용은 MAT-9에서 판정한다.
+lookup의 현재/이전 payload 예산과 Special·refraction의 프레임당 예산은 각각 연결 문서가 소유한다.</p>
+<p>alpha가 있으면 2 GiB lookup 예산 중 2/3을 opaque 현재/이전 쌍, 1/3을 alpha 임시 payload에
+배분한다. 하나의 alpha scratch를 draw마다 순서대로 clear/capture/bake/color에 재사용하고
+opaque temporal cache에 게시하지 않는다. 기록 owner가 scratch를 GPU 완료까지 보관한다.
+per-object 정렬이며 self-overlap/교차 표면을 층별로 분리하는 OIT는 구현하지 않았다.
+SSS·굴절이 있으면 한 개의 임시 5 MRT + D32를 draw 사이에 재사용한다.
+픽셀당 40 byte의 추가 표면 버퍼이며 Core/Layered 일반 Blend에는 생성하지 않는다.
+굴절 배경은 합성 컬러 한 장과 opaque depth다. 투명 층별 depth/교차점은 저장하지 않는다.
+alpha draw마다 1024/4096 적분 준비가 반복되므로 실제 모델 비용 수용은 MAT-9에서 판정한다.</p>
+<h2>4. 검증</h2>
+<p><code>Tools/regression/verify-material-raster-surface.ps1 -SkipDependencyRestore</code>는 실제
+<code>EnhancedGBufferPass</code>·<code>EnhancedDeferredPass</code>와 이 host를 native D3D12 graph에 기록한다.
+24×24 fixture에서 legacy/LX Opaque/Masked discard·coverage, Core/Layered overlap,
+coplanar draw 순서, SSAO 값과 HDR 직접광/IBL·환경맵 없는 경우를 순차·1워커·4워커로 비교한다.
+컬러 전후 depth bytes와 legacy/background HDR 보존도 검사한다.
+frame/예산 실패의 accepted frame 보존과 중복/다른 graph의 컬러 선언을 거부한다.
+새 texture 3개의 업로드를 취소/재시도하여 <code>DX12TextureCache::OnUploadAborted</code>의
+삭제된 iterator 재사용 어설션 수정도 검증한다. Debug 어설션은 팝업 대신 스택 로그로 남긴다.</p>
+<p>HDR target의 half 저장 오차 상한은 상대 <code>0.001 * max(1, abs(expected))</code>다.
+독립 float 재질/IBL 물리 계산의 기존 정규화 <code>0.0001</code>, SRGB 절대 <code>0.001</code>,
+LOD transport 절대 <code>0.0005</code> 게이트는 그대로 유지한다.</p>
+<p>아래는 2026-09-28 설치 검증의 기준 결과다. 2026-09-29 캐시 확장 결과와 로그는
+<a href="MaterialGraphSceneLookup.html">MaterialGraphSceneLookup.md</a>가 소유한다. 후속 이미지별 샘플링 결과는
+<a href="MaterialGraphTextureFootprints.html">MaterialGraphTextureFootprints.md</a>에 기록한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검증</th>
+<th>각 구성의 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전체 raster/material/IBL 회귀</td>
+<td>830,436개 검사 · GPU 659,914성분</td>
+</tr>
+<tr>
+<td>실제 GBuffer·Deferred·LX 컬러 합성</td>
+<td>8 fixture × 순차/1워커/4워커 = 24 graph</td>
+</tr>
+<tr>
+<td>LX 가시 픽셀</td>
+<td>3,582픽셀, 독립 직접광/IBL 계산과 HDR 대조</td>
+</tr>
+<tr>
+<td>준비 실패·중복/다른 graph 선언</td>
+<td>120개 거부, accepted frame 보존</td>
+</tr>
+<tr>
+<td>기존 공유 깊이·스키닝 회귀</td>
+<td>공유 깊이 24 graph · 스키닝 6 graph</td>
+</tr>
+<tr>
+<td>D3D12 GPU validation</td>
+<td>WARNING 이상 0건</td>
+</tr>
+</tbody></table></div>
+<p>새 Scene VS/GBuffer PS/Color PS는 Core/Layered 두 프로그램에 대해 DXIL·SPIR-V
+총 12개 artifact의 컴파일·reflection을 확인했다. 이는 기존 회귀 출력의 <code>compiled=24</code>와
+별도이며 native 실행은 D3D12다. 실제 DX12/Vulkan Scene consumer도 두 구성에서 컴파일했다.
+실행 로그는 <code>Build/Obj/MaterialProductProbe/raster-surface-{Debug,Release}.log</code>,
+최종 게이트 결과는 <code>Build/Obj/MaterialProductProbe/scene-host-gate-final.log</code>다.</p>
+<p>실제 Editor Live Tick과 native Vulkan 전체 Scene 합성은 이 D3D12 pass 검증과 별도다.
+Vulkan native PSO 준비·기본 draw/readback 검증은 <a href="MaterialGraphSceneGeneration.html">Scene generation §6</a>이 소유한다.
+SSS의 실제 Scene transport·독립 물리/HDR 비교와 GPU 검증은
+<a href="MaterialGraphSceneSubsurface.html">MaterialGraphSceneSubsurface.md</a>가 소유한다.
+<a href="MaterialGraphSceneRefraction.html">MaterialGraphSceneRefraction.md</a>는 불투명 배경 확보·최종 투과
+depth/owner·굴절 compute·HDR 합성 및 해당 native 검증을 소유한다.
+<a href="MaterialGraphSceneVolume.html">MaterialGraphSceneVolume.md</a>는 닫힌 균질 매질의 coefficient CS,
+불투명 깊이까지의 흡수·발광·단일 산란과 굴절 ray의 내부 매질 합성을 소유한다.
+MAT-7은 <a href="../analysis/MAT7ForwardTransportComposition.html">공통 혼합 transport·제품 회귀</a>까지
+완료했다. 미산정 작업 시간을 기성에 더하지 않는다. LX 편집·MAT-9는 남는다.</p>
+<p><a href="MaterialGraphSceneShadowDecal.html">MaterialGraphSceneShadowDecal.md</a>는 그래프 Alpha를 쓰는
+세 캐스케이드 shadow caster와 opaque Decal의 raw 입력·derived lobe·IBL 연결을 소유한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-설치-범위"></span><span id="2-실제-패스-순서"></span><span id="3-준비기록수명"></span><span id="4-검증"></span><span id="sec-1-설치-범위"></span><span id="sec-2-실제-패스-순서"></span><span id="sec-3-준비기록수명"></span><span id="sec-4-검증"></span></details></main></body></html>

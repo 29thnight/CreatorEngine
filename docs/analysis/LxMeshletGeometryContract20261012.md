@@ -1,5 +1,34 @@
 # LX 메시렛 쿠킹·GPU 계약 통일 — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang#L6) — `struct LXMeshletDescriptor`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang#L20) — `LXMeshletDescriptor LXLoadMeshlet(ByteAddressBuffer data, uint index)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang#L22) — `const uint descriptor = data.Load(12) + index * data.Load(16);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 일반 GBuffer 제거 후 남아 있던 쿠킹 메시렛과 LX 런타임 재클러스터링의 중복을 제거한다. 신규 LX 배선만 사용하며 이전 산출물의 변환·indexed 복구·A/B 선택 경로를 제공하지 않는다.
 
 ## 식별자와 데이터 소유
@@ -53,3 +82,5 @@ CPU 검사는 primitive/corner 순서, 청크 경계에서 cluster/primitive/ori
 두 구성에서 LX 스키닝·rendergraph, 모델 강제 리임포트/로드/배치, `LX.Scene.GBuffer` mesh shader indirect 기록과 비어 있지 않은 유한 픽셀, GPU validation 문제/메시지 유실 0, 정상 종료 0을 확인했다. 실행 전후 소스와 바이너리 신원도 일치했다. 정적 제거 검사, 변경 범위 whitespace 검사와 문서 구조/링크 검사도 통과했다.
 
 중간 실패의 로그·판정·검토 기록은 보존했다. 구 테스트의 잘못된 bounds/정점 배치와 쿠킹 topology 없는 RG5 픽스처를 수정했으며, indexed 복구를 기대하던 codec probe는 거부 검사로 바꿨다. 독립 codec probe 전체 시나리오를 실행했다고 주장하지 않는다. A:B는 사용자 몫이고 Vulkan 실행 검증은 PHASE 4.9에 남는다. 이번 결과는 성능 이득이나 RE 전체 파이프라인 완성의 수용이 아니다.
+
+</details>

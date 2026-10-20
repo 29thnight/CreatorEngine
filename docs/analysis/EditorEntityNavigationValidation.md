@@ -1,5 +1,45 @@
 # 엔티티 이미지 프리셋·선택 이력·편집 잠금 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-editor-entity-authoring.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-entity-authoring.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-editor-entity-authoring.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-entity-authoring.ps1#L10) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-entity-authoring.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-entity-authoring.ps1#L11) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [ScriptCore/Audio.cs:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L8) — `public readonly struct AudioAssetId : IEquatable<AudioAssetId>`
+- [ScriptCore/Audio.cs:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L46) — `public readonly struct AudioParameter`
+- [ScriptCore/Audio.cs:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L83) — `public struct AudioPlaySettings`
+- [ScriptCore/Prefab.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10) — `public readonly struct Prefab`
+- [ScriptCore/Prefab.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12) — `private readonly string? _name;`
+- [ScriptCore/Prefab.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14) — `private Prefab(string name) => _name = name;`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/Prefab.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L10) — `class [[reflgen::reflect]] Prefab : public Object`
+- [Engine/SceneRuntime/Prefab.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L12) — `friend struct reflgen::access;`
+- [Engine/SceneRuntime/Prefab.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L13) — `public:`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/Prefab.cpp:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L97) — `Debug::PrintLog(spdlog::level::warn, "구 Navigation 링크를 프리팹 로컬 경로로 승격하지 못했다: 대상 instanceID "`
+- [Engine/SceneRuntime/Prefab.cpp:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L98) — `+ std::to_string(legacyTarget) + "가 같은 프리팹 트리에 없다");`
+- [Engine/SceneRuntime/Prefab.cpp:144](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L144) — `if (!Entity::IsValidIndex(sourceIndex))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-13. PHASE 21 Inspector 후속 슬라이스. DX12 기준이며 전체 W2-I 완료 판정은 아니다.
 
 이 문서의 @icons 이미지 출처·화면은 최초 검증 당시의 기록이다. 이후 사용자 요청으로
@@ -72,9 +112,11 @@ Microsoft Fluent Emoji 3D로 교체했다. 현재 리소스·배포 도구·화�
 - 모든 검증용 Editor를 종료하고 EngineSettings.asset와 imgui.ini를 시작 전 바이트로 복원했다.
   사용자 SampleScene의 UI 검증 변경은 저장하지 않았다.
 
-실제 화면: [아이콘 선택 팝업](../../Artifacts/phase21-inspector-navigation/icon-presets-approved.png),
-[편집 잠금](../../Artifacts/phase21-inspector-navigation/entity-locked-approved.png).
+실제 화면: 아이콘 선택 팝업 (`../../Artifacts/phase21-inspector-navigation/icon-presets-approved.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+편집 잠금 (`../../Artifacts/phase21-inspector-navigation/entity-locked-approved.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
 Vulkan, 전체 폭·DPI 매트릭스, 모든 전용 컴포넌트 드로어의 수동 조작 전수 검증은 포함하지 않는다.
 ImGui disabled 상태만으로 드롭이 차단되지 않는 실제 구현을 확인하여 Inspector 드롭 타깃에도
 disabled 가드를 넣었다. Terrain의 자동 컴포넌트 변경·브러시와 Sound 곡선의 읽기 중 변경도 막았다.
+
+</details>

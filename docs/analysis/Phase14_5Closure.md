@@ -1,5 +1,52 @@
 # Phase 14.5 종결 검토 — 2026-09-06
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.
+- scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/dx12-validation/Invoke-Dx12Suite.ps1:107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/dx12-validation/Invoke-Dx12Suite.ps1#L107) — `throw "실행 파일이 없다: $Exe (Debug x64 를 먼저 빌드한다)"`
+- [Tools/dx12-validation/Invoke-Dx12Suite.ps1:132](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/dx12-validation/Invoke-Dx12Suite.ps1#L132) — `if (-not $discoverProc.WaitForExit(180000)) { $discoverProc.Kill(); throw 'Commandlet discovery timed out' }`
+- [Tools/dx12-validation/Invoke-Dx12Suite.ps1:139](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/dx12-validation/Invoke-Dx12Suite.ps1#L139) — `if ($missing.Count) { throw "Unknown Commandlet(s): $($missing -join ', ')" }`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [ScriptCore/MeshRenderer.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13) — `public sealed class MeshRenderer : NativeComponent`
+- [ScriptCore/MeshRenderer.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15) — `public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);`
+- [ScriptCore/MeshRenderer.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24) — `public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);`
+- [Engine/SceneRuntime/Canvas.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14) — `class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>`
+- [Engine/SceneRuntime/Canvas.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Canvas.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20) — `Component::gc_trace(tracer);`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86) — `own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};`
+- [Engine/SceneRuntime/Animator.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};`
+- [Engine/SceneRuntime/MeshRenderer.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19) — `class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>`
+- [Engine/SceneRuntime/MeshRenderer.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/MeshRenderer.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25) — `Component::gc_trace(tracer);`
+- [Engine/CommandService/OperationTable.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/OperationTable.h#L24) — `enum class OperationState : uint8_t`
+- [Engine/CommandService/OperationTable.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/OperationTable.h#L31) — `std::string_view ToString(OperationState state) noexcept;`
+- [Engine/CommandService/OperationTable.h:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/OperationTable.h#L74) — `void Complete(const std::string& id, const std::string& status, const std::string& code,`
+- [Engine/Utility_Framework/HashingString.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/HashingString.h#L33) — `throw std::invalid_argument("Null pointer provided to HashingString constructor.");`
+- [Engine/Utility_Framework/HashingString.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/HashingString.h#L55) — `throw std::invalid_argument("Null pointer provided in assignment operator for const char*.");`
+- [Engine/Utility_Framework/HashingString.h:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/HashingString.h#L75) — `throw std::invalid_argument("Sized view with a null pointer provided to HashingString.");`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 상태: **구현·자동 계약 검증 완료. 전체 페이즈 종결은 보류**. 남은 조건은 [종결 조건 재정의](#종결-조건-재정의--2026-09-15)의 둘이며, 자동 게이트 통과로 GUI 수동 확인을 대체하지 않는다.
 canonical 성능 축은 2026-09-15에 이 페이즈의 종결 조건에서 빼고 소유를 PHASE 3.75로 되돌렸다.
 
@@ -170,3 +217,5 @@ host runtime DLL 을 로드하는 배치로 전환하면서 런처가 `Runtime/l
 다른 페이즈가 공통 편집 API 를 쓰면 이 페이즈의 Undo 표면이 함께 늘어난다 — 착수 시 seed 표에서 다시 뽑는다.
 도메인별 코퍼스 누락·기존 렌더 검사 실패를 완료로 바꾸거나 실패 항목을 삭제하지 않는다 — 소유를 옮겼을 뿐이며,
 옮긴 자리에서 감시가 끊겨 있다는 사실도 함께 적었다.
+
+</details>

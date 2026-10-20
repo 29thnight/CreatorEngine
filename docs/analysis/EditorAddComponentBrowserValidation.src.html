@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Add Component 검색·분류와 C# 생성/부착 검증</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorAddComponentBrowserValidation.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorAddComponentBrowserValidation.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Add Component 검색·분류와 C# 생성/부착 검증</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorComponentCatalog.h#L26">Editor/EngineEntry/EditorComponentCatalog.h:26</a> — <code>if (i &amp;&amp; std::isupper(value)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorComponentCatalog.h#L27">Editor/EngineEntry/EditorComponentCatalog.h:27</a> — <code>&amp;&amp; (std::islower(static_cast&lt;unsigned char&gt;(type[i - 1]))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorComponentCatalog.h#L28">Editor/EngineEntry/EditorComponentCatalog.h:28</a> — <code>|| (i + 1 &lt; type.size() &amp;&amp; std::isupper(static_cast&lt;unsigned char&gt;(type[i - 1]))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16">Tools/regression/verify-editor-theme.ps1:16</a> — <code>$Exe = [IO.Path]::GetFullPath($Exe)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17">Tools/regression/verify-editor-theme.ps1:17</a> — <code>$Work = [IO.Path]::GetFullPath($Work)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36">Tools/regression/verify-editor-theme.ps1:36</a> — <code>$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-script-reload.ps1#L1">Tools/regression/verify-cli-script-reload.ps1:1</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-script-reload.ps1#L63">Tools/regression/verify-cli-script-reload.ps1:63</a> — <code>$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-script-reload.ps1#L174">Tools/regression/verify-cli-script-reload.ps1:174</a> — <code>$failures.Add(&quot;identity-after-failure : ReloadProbeBefore 의 ScriptComponent 가 $($probe1.Count) 개다(기대 1)&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-text-fallback.ps1#L5">Tools/regression/verify-editor-text-fallback.ps1:5</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-text-fallback.ps1#L19">Tools/regression/verify-editor-text-fallback.ps1:19</a> — <code>$korean = Join-Path ([Environment]::GetFolderPath(&#39;Fonts&#39;)) &#39;malgun.ttf&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-text-fallback.ps1#L21">Tools/regression/verify-editor-text-fallback.ps1:21</a> — <code>$emoji = Join-Path ([Environment]::GetFolderPath(&#39;Fonts&#39;)) &#39;seguiemj.ttf&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L14">Tools/regression/verify-script-add-awake-once.ps1:14</a> — <code>$Exe = [IO.Path]::GetFullPath($Exe)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L15">Tools/regression/verify-script-add-awake-once.ps1:15</a> — <code>$Work = [IO.Path]::GetFullPath($Work)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L17">Tools/regression/verify-script-add-awake-once.ps1:17</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-catalog.ps1#L1">Tools/regression/verify-editor-component-catalog.ps1:1</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-catalog.ps1#L5">Tools/regression/verify-editor-component-catalog.ps1:5</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-browser.ps1#L9">Tools/regression/verify-editor-component-browser.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-browser.ps1#L10">Tools/regression/verify-editor-component-browser.ps1:10</a> — <code>$Exe = [IO.Path]::GetFullPath($Exe)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-browser.ps1#L11">Tools/regression/verify-editor-component-browser.ps1:11</a> — <code>$Work = [IO.Path]::GetFullPath($Work)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L8">ScriptCore/Audio.cs:8</a> — <code>public readonly struct AudioAssetId : IEquatable&lt;AudioAssetId&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L46">ScriptCore/Audio.cs:46</a> — <code>public readonly struct AudioParameter</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L83">ScriptCore/Audio.cs:83</a> — <code>public struct AudioPlaySettings</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-09-13. 사용자 요청 범위는 기존 C# 검색·부착과 <strong>새 스크립트 생성 → 컴파일 → 자동 부착</strong>이다.</p>
+<h2>사용 흐름</h2>
+<ul>
+<li>Add Component를 열면 검색란에 포커스를 둔다. 검색하지 않을 때는 Rendering, Physics,
+Animation, Audio, AI, Input, UI, Scripts, Other 카테고리를 탐색한다.</li>
+<li>검색은 표시 이름·원래 타입 이름·카테고리를 대상으로 대소문자 없이 모든 검색 단어를 찾는다.
+카테고리 안에서 검색해도 전체 컴포넌트를 검색한다. 뒤로 버튼으로 루트로 돌아온다.</li>
+<li>이미 붙은 네이티브 컴포넌트는 <code>(Added)</code>로 비활성화한다. C# 스크립트는 <code>(Script)</code>로 구분하며
+한 엔티티에 여러 개를 붙일 수 있다. 방향키·Enter와 마우스 선택을 지원한다.</li>
+<li>Inspector에는 <code>ScriptComponent</code> 대신 스크립트별 이름과 읽기 전용 Script 참조를 표시한다.
+패널 ID는 네이티브 컴포넌트 인스턴스별로 분리한다.</li>
+<li>New Script에서 이름을 입력하고 Create and Add를 누르면 프로젝트의
+<code>Assets/Script/&lt;Name&gt;.cs</code>와 메타데이터를 생성한다. 템플릿은 엔진 Component를 상속하는
+<code>sealed partial</code> C# 클래스이며 <code>OnBeginSimulation</code> 진입점을 포함한다.</li>
+<li>별도 .NET 빌드 프로세스를 비동기로 실행한다. 성공하면 기존 인스턴스의 필드를 보존해
+CoreCLR 스크립트 어셈블리를 교체하고 요청 당시 엔티티에 부착한다.
+팝업을 닫거나 다른 엔티티를 선택해도 대상은 바뀌지 않는다.</li>
+<li>진행/실패 상태, 취소, Retry compilation, Open script, Build log를 Inspector에 표시한다.
+컴파일 실패·취소 시 소스는 남고 빈 컴포넌트를 붙이지 않는다. Play 중 새 생성은 차단하며,
+컴파일 도중 Play에 들어가면 Stop 이후에 부착한다.</li>
+</ul>
+<p>Unity의 <a href="https://docs.unity3d.com/cn/2021.3/Manual/UsingComponents.html">컴포넌트 검색·카테고리 탐색</a>과
+<a href="https://docs.unity3d.com/cn/2022.2/Manual/CreatingComponents.html">스크립트 컴포넌트 생성</a>을
+상호작용 참고로 사용했다. 엔진의 기존 ComponentFactory·CoreCLR·Undo 경로를 사용한다.</p>
+<h2>구현 경계</h2>
+<ul>
+<li><code>EditorComponentCatalog.h</code>: 이름 정리, 분류, 검색, 결정적 정렬. 새 네이티브 타입도 Other에서 검색 가능하다.</li>
+<li><code>InspectorWindow</code>: 카탈로그는 팝업을 열 때 구축한다. 목록 내부만 스크롤하고 생성 버튼은 하단에 둔다.</li>
+<li><code>EditorObjectOperations::AddManagedScript</code>: GUI/CLI 공통 검증·부착·Undo/Redo.
+미등록 타입은 변경 전에 거부한다. 엔티티와 상위 계층의 편집 잠금을 확인한다.</li>
+<li><code>EditorScriptAuthoring</code>: 원래 EntityHandle을 보존하고 완료 시 수명·잠금을 다시 확인한다.
+UI와 별개로 EditorMain의 씬 구조 잠금 안에서 완료를 반영한다.
+종료·취소는 이 요청이 시작한 컴파일러 Job에만 적용한다.</li>
+<li>재로드는 현재 씬의 첫 ScriptComponent에 한정하지 않고 모든 로드된 씬의 각 스크립트를 처리한다.
+새 어셈블리 거부 시 기존 인스턴스를 유지하는 계약도 보존한다.</li>
+<li>소스는 덮어쓰지 않는다. 잘못된 식별자, C# 예약어, Windows 예약 파일명, 이미 등록된 클래스는 거부한다.
+현재 ScriptGenerator의 저장 키는 짧은 클래스 이름이다. 네임스페이스가 달라도 같은 이름의
+등록 스크립트를 새로 만들 수 없다.</li>
+<li><code>GameScripts.csproj</code>는 <code>CreatorScriptSourceRoot</code> 아래 C# 소스를 포함한다.
+현재 프로젝트 배치의 <code>GameScripts/GameScripts.csproj</code>와 설치된 .NET SDK를 사용한다.</li>
+<li>기존 스크립트 소스의 전역 자동 변경 감시, Unity의 AddComponentMenu 속성 및 사용자 지정 분류는
+이번 범위가 아니다. 스크립트 카테고리는 Scripts이며 기존 빈 스크립트의 복구 UI는 유지한다.</li>
+<li>Undo는 엔티티 부착을 취소한다. 생성한 소스 파일까지 삭제하지 않는다.</li>
+</ul>
+<h2>검증</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>결과와 증거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug Editor</td>
+<td>VS18/v145 빌드 통과. <code>Artifacts/phase21-add-component/build-final-debug.log</code></td>
+</tr>
+<tr>
+<td>검색·분류</td>
+<td><code>verify-editor-component-catalog.ps1</code>, 33 checks 통과</td>
+</tr>
+<tr>
+<td>생성·컴파일·부착</td>
+<td><code>verify-editor-component-browser.ps1</code>, 415 checks / 189 commands 통과. <code>authoring-gate-2/summary.json</code></td>
+</tr>
+<tr>
+<td>기존 재로드 계약</td>
+<td><code>verify-cli-script-reload.ps1</code> 통과. 새 어셈블리 거부 시 기존 ID 보존, 이후 추가·정상 재로드, Play 상태 ID 보존</td>
+</tr>
+<tr>
+<td>초기화 1회</td>
+<td><code>verify-script-add-awake-once.ps1</code> 통과. 잘못된 타입 부착 0개, 유효한 Bobber의 Play 초기화 시도 1회</td>
+</tr>
+<tr>
+<td>실제 DX12 UI</td>
+<td>카테고리·검색·이미 추가 상태, 방향키/Enter 부착, 스크립트 이름별 Inspector, 새 스크립트 폼 확인</td>
+</tr>
+</tbody></table></div>
+<p>415는 명령 응답과 비동기 완료 폴링을 포함하는 assertion 수이며 서로 다른 시나리오 수가 아니다.</p>
+<p>2026-09-17 재검증: 같은 날(9-13) 들어온 엔진 배포 전환 뒤로 소스 체크아웃 에디터가 스크립트를 발행
+배포본 스냅샷으로 컴파일해 생성 게이트가 붉어져 있었다(핀 부재 → 낡은 ScriptCore 덮어쓰기 거부).
+체크아웃 에디터는 다시 <code>GameScripts/GameScripts.csproj</code>로 컴파일하고, 배포본 안에서 뜬 에디터만
+<code>CreatorBuildTool compile-game</code>을 쓴다. 생성 게이트 251 checks / 110 commands 통과.
+생성 게이트는 다음 동작을 검사했다.</p>
+<ul>
+<li>잘못된 이름·중복 소스 거부, 미등록 타입이 빈 컴포넌트나 Undo 기록을 남기지 않음.</li>
+<li>같은 Bobber 스크립트 두 인스턴스의 서로 다른 필드 값이 재로드 후 보존됨.</li>
+<li>파일/메타 생성, 실제 컴파일, 정확히 한 번 부착, 부착 Undo/Redo.</li>
+<li>컴파일 중 선택 변경이 대상을 바꾸지 않음.</li>
+<li>의도적 컴파일 오류 후 소스 유지·부착 없음, 오류 수정 후 재시도 성공.</li>
+<li>생성 전 잠금, 컴파일 후 잠금, 취소, 원래 대상 삭제 시 부착 차단.</li>
+</ul>
+<p>새 스크립트 생성 게이트가 만든 소스/메타는 검증 폴더로 이동했고 원래 관리 어셈블리는
+해시 확인 후 복원했다. 실제 UI 확인에서도 사용자 씬을 저장하지 않았고 EngineSettings와
+imgui.ini를 시작 전 바이트로 복원한 뒤 SHA-256 일치를 확인했다.</p>
+<p>최종 화면: 카테고리 (<code>../../Artifacts/phase21-add-component/ui-categories.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+Rendering과 추가 상태 (<code>../../Artifacts/phase21-add-component/ui-rendering.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+검색 (<code>../../Artifacts/phase21-add-component/ui-search.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+새 스크립트 (<code>../../Artifacts/phase21-add-component/ui-new-script.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+이름별 스크립트 패널 (<code>../../Artifacts/phase21-add-component/ui-script-attached.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+방향키 선택 후 검색 입력 유지와 폼 이름 자동 포커스도 확인했다.
+이 최초 검증에서는 노출 필드의 기존 드로어를 유지했다. 배치·한글 글리프 후속 수정은 아래에 기록한다.
+화면과 로그는 <code>Artifacts/phase21-add-component/</code>에 둔다. 이 검증은 DX12 기준이며
+Vulkan과 전체 W2-I 폭/DPI 행렬을 완료한 것으로 계산하지 않는다. W2-I 상태·공수는 유지한다.</p>
+<h2>2026-09-13 후속: 아이콘·한글·스크립트 속성 배치</h2>
+<p>Add Component의 카테고리와 검색 결과에 기존 Microsoft Fluent Emoji 이미지를 연결했다.
+Rendering은 상자, Physics는 번개, Audio는 스피커, Input은 게임패드, Scripts는 두루마리 등으로
+구분하며 Camera·Light·Terrain·Texture·Material 항목은 해당 이미지로 표시한다.
+행 선택·키보드 탐색은 기존 Selectable이 담당하고 이미지·이름·카테고리 화살표만 같은 행 안에 그린다.
+이미지가 준비되지 않으면 Material Symbols를 사용한다.</p>
+<p>Bobber의 <code>?</code>는 <code>[SerializeField(DisplayName = &quot;가로 흔들기&quot;)]</code>로 노출한 bool 필드였다.
+관리 코드의 UTF-8 이름은 정상이고, 기본 Inter에 한글 글리프가 없는 것이 원인이다.
+메뉴용으로 별도 적재한 한글 폰트는 Inspector 본문을 보완하지 않았다.
+<code>EditorFontResources</code>가 각 본문 폰트에 시스템 한글 폰트를 병합하도록 수정했다.
+현재 Windows에서는 Malgun Gothic을 사용하며 Latin 글꼴 메트릭과 Material Symbols의 PUA 영역은 유지한다.</p>
+<p><code>DrawManagedScripts</code>의 Script 참조와 float·int·bool·Float3·string·Entity 필드를
+공통 <code>begin_property_line</code>의 왼쪽 라벨/오른쪽 값 열로 옮겼다. Float3은 네이티브와 같은 축 위젯과
+좁은 폭의 세로 배치 정책을 사용한다. Entity 참조와 해제 버튼은 값 열 안에서 폭을 나누고,
+문자열은 고정 256바이트 버퍼 대신 ImGui의 std::string 입력으로 편집한다.
+기존 CaptureFields 및 엔티티 편집 잠금 경로는 유지한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>결과와 증거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug Editor</td>
+<td>VS18/v145 빌드 통과. <code>Artifacts/phase21-component-polish/build-debug.log</code></td>
+</tr>
+<tr>
+<td>실제 폰트 병합</td>
+<td><code>verify-editor-text-fallback.ps1</code> 366 checks 통과. 12/16/24/32px 한글 실글리프·Latin 메트릭·66개 Material 역할 검사</td>
+</tr>
+<tr>
+<td>DX12 테마</td>
+<td><code>verify-editor-theme.ps1 -Backends dx12</code> 3회 시작, 64 checks 통과. 사용자 배율 100→150→100%, OS DPI 150% 관측</td>
+</tr>
+<tr>
+<td>실제 UI</td>
+<td>카테고리/Rendering/검색 아이콘, Bobber 한글 체크박스 토글, FollowTarget 한글 문자열·Float3 X=3 직접 입력, SoundProbe 문자열/정수 직접 편집 확인</td>
+</tr>
+<tr>
+<td>폭 변화</td>
+<td>창 확대/복원으로 Inspector의 Float3 세로→가로→세로 배치와 수정 값 보존 확인</td>
+</tr>
+</tbody></table></div>
+<p>UI 증거: 카테고리 (<code>../../Artifacts/phase21-component-polish/ui-categories.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+Rendering (<code>../../Artifacts/phase21-component-polish/ui-rendering.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+검색 (<code>../../Artifacts/phase21-component-polish/ui-search.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+한글 체크박스 (<code>../../Artifacts/phase21-component-polish/ui-bobber-korean.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+좁은 폭 (<code>../../Artifacts/phase21-component-polish/ui-script-stacked.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+넓은 폭 (<code>../../Artifacts/phase21-component-polish/ui-script-wide.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+문자열·정수 편집 (<code>../../Artifacts/phase21-component-polish/ui-script-string-int.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+폭 복원 (<code>../../Artifacts/phase21-component-polish/ui-script-width-return.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+오브젝트 참조의 빈 상태·해제 비활성화 배치는 확인했다. 자동화의 drag 동작으로 값 변경을 확인하지
+못했으므로 참조 드롭과 숫자 드래그를 이번 UI 통과 실적으로 세지 않는다. 직접 숫자 입력은 확인했다.
+전체 폭/DPI 행렬과 Vulkan은 이번 검증에 포함하지 않았다.
+UI 검증에서 씬은 저장하지 않았으며 종료 후 EngineSettings와 imgui.ini를 시작 전 바이트로
+복원했다. 두 파일의 SHA-256 일치는 <code>Artifacts/phase21-component-polish/ui-restoration.json</code>에 기록했다.</p>
+<p>검증 도중 나타난 <code>text_fallback_probe.exe</code>의 CRT abort 창은 에디터 제품 실행이 아닌
+새 폰트 검증 코드의 실패였다. ImGui 컨텍스트 초기화와 예외 처리를 추가하고,
+제외 범위를 무시하는 <code>IsGlyphInFont</code> 대신 실제 표시되는 baked glyph로 아이콘 영역을 검사하도록
+수정했다. 최종 실행은 366개 검사를 통과하며 실패도 콘솔 오류와 종료 코드로 보고한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="2026-09-13-후속-아이콘한글스크립트-속성-배치"></span><span id="sec-2026-09-13-후속-아이콘한글스크립트-속성-배치"></span><span id="sec-검증"></span><span id="sec-구현-경계"></span><span id="sec-사용-흐름"></span><span id="검증"></span><span id="구현-경계"></span><span id="사용-흐름"></span></details></main></body></html>

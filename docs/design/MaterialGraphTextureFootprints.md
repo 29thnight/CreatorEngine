@@ -1,5 +1,43 @@
 # Material Graph Scene의 이미지별 UV·LOD
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-raster-surface.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/verify-material-raster-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-raster-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang#L9) — `float4 LXSampleMaterialImage(Texture2D<float4> image, SamplerState sampler, float2 uv, float explicitLod, uint encoding)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang#L13) — `image.GetDimensions(0, width, height, levels);`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang#L22) — `float4 sampled = image.SampleLevel(sampler, uv, lod);`
+- [Lattice/Material/LXMaterialCompiler.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.h#L9) — `struct LXMaterialSource`
+- [Lattice/Material/LXMaterialCompiler.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.h#L28) — `enum class LXMaterialResourceKind : std::uint8_t`
+- [Lattice/Material/LXMaterialCompiler.h:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.h#L74) — `struct LXMaterialCompilerOptions`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Lattice/Material/LXMaterialCompiler.cpp:149](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.cpp#L149) — `Generator(const LXMaterialIR& ir, LXMaterialCompilerOptions options) : ir_(ir), options_(options) {}`
+- [Lattice/Material/LXMaterialCompiler.cpp:752](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.cpp#L752) — `struct LXMaterialContext`
+- [Lattice/Material/LXMaterialCompiler.cpp:904](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.cpp#L904) — `append(std::to_string(LXMaterialProgram::CompilerVersion));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 샘플링 계약
 
 `LXMaterialCompiler`는 Image Texture와 `LXTextureSample`을
@@ -107,3 +145,5 @@ Release 64.2373/7.05165 ms였다. GPU validation이 켜진 단일 측정이고 d
 이 작업은 실제 Scene host의 샘플링 계약이다. native Vulkan 실행·실제 Editor Live Tick,
 named UV set과 Blender 전체 노드 지원, Special/투명 합성, 비동기 generation/PSO 교체,
 자동 Scene host 쿠킹과 일반 Scene의 시간/메모리 수용은 별도다. MAT-7은 진행 중이다.
+
+</details>

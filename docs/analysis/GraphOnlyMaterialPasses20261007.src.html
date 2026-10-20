@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Graph-only material passes — 2026-10-07</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="GraphOnlyMaterialPasses20261007.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/GraphOnlyMaterialPasses20261007.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Graph-only material passes — 2026-10-07</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28">Engine/RenderEngine/ShaderMeta.cpp:28</a> — <code>outError = std::string(context) + &quot;: &quot; + std::string(detail);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65">Engine/RenderEngine/ShaderMeta.cpp:65</a> — <code>const bool known = std::any_of(allowed.begin(), allowed.end(),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102">Engine/RenderEngine/ShaderMeta.cpp:102</a> — <code>else return Fail(context, std::string(&quot;&#39;&quot;) + key + &quot;&#39;는 true|false여야 한다&quot;, outError);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>Product contract</h2>
+<p>Live scene material draws must carry an owning MaterialGraph source and the exact requested graph instance. Graph program preparation defers the frame; unsupported or failed compilation rejects it. Neither a native PBR material nor a previous submitted graph instance may replace that request. A previously completed display can remain visible while preparation runs; it is not a newly rendered fallback frame.</p>
+<h2>Removed structures</h2>
+<ul>
+<li>Live GBuffer/Forward ShaderMeta candidate application, native material sealing, accepted-generation owners and primary catalog loads.</li>
+<li>Graph-to-native fallback draw copies, their GBuffer/Shadow admission, and the capture/replay bridge recording those copies.</li>
+<li>SceneHost selection of previous submitted material/coverage and partial ready draw streams.</li>
+<li>Native material pipeline initialization and native geometry visibility recording in live Shadow/GBuffer. These owners now prepare cascades or initialize neutral targets through explicit graph-target APIs.</li>
+<li>Native Forward material pipeline initialization in the live node. Forward+ retains its shared light-list computation and records graph materials.</li>
+</ul>
+<h2>Pass audit</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Pass family</th>
+<th>Material routing after this change</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shadow</td>
+<td>Cascade fitting and neutral depth initialization; MaterialGraph alone records material geometry/coverage.</td>
+</tr>
+<tr>
+<td>GBuffer</td>
+<td>Neutral attachment initialization; MaterialGraph alone records scene material geometry/coverage.</td>
+</tr>
+<tr>
+<td>Opaque color, transmission/refraction, subsurface, volume</td>
+<td>SceneHost consumes the exact graph input selected for this frame.</td>
+</tr>
+<tr>
+<td>Forward+ blended surfaces</td>
+<td>Shared light lists and graph draw ordering remain; no native material fallback is admitted.</td>
+</tr>
+<tr>
+<td>Decal, Sprite, UI</td>
+<td>Dedicated prepared resources and shaders; no SceneHost-to-native material fallback.</td>
+</tr>
+<tr>
+<td>IBL, Deferred, SSAO, SSGI, SSR, Fog, SkyBox, PostChain, Editor overlays</td>
+<td>Dedicated algorithms/resource consumers; not alternative scene-material routes.</td>
+</tr>
+</tbody></table></div>
+<p>Low-level native pass APIs remain as explicitly invoked standalone regression/reference implementations. They are not initialized or selected as a live material fallback. Indexed geometry capability paths, optional neutral textures, disabled effect pass-through and resource allocation policies are independent from material substitution.</p>
+<h2>CSM cache consequence</h2>
+<p>The live depth map no longer combines native and graph material casters. It still has a clear writer followed by the graph depth writer. A future cache hit must skip both initialization and graph depth recording, retain exact graph dependencies and publish only after successful submission. PR #116&#39;s submission, multi-view and retirement requirements still apply. No depth-content cache is introduced here.</p>
+<h2>Validation</h2>
+<p>Evidence is collected under <code>Build/Verification/GraphOnlyMaterials20261007/</code>. Acceptance requires current Debug/Release builds, native graph-only depth initialization without native material PSOs, exact generation selection/rejection tests, relevant material pass regression and live capture. Earlier RG6 acceptance archives describe their own source hashes and do not prove this later change.</p>
+<p>Completed checks:</p>
+<ul>
+<li>Debug/Release RenderEngine, MaterialRasterSurfaceProbe and CreatorEditor builds passed. Release MaterialVulkanSceneProbe also built with the repository&#39;s Vulkan-Headers include path supplied to the build environment.</li>
+<li>Debug and Release DX12 scene integration passed independently: 59 frames each, five exact generation submissions, seven rejected pending/failed requests, zero material fallbacks, one stale publication rejection and one aborted recording. Neutral GBuffer depth and all three shadow layers were read back at 1.0 without native material PSO initialization.</li>
+<li>Release complete raster regression passed: 59 composition frames, 330 rejected resource/declaration candidates, 24 shared-depth frames, six skinned-depth frames, five exact generation frames and seven pending/failed material rejections. All five updated wrapper signatures match the actual success marker.</li>
+<li>Release shadow/decal passed: 45 shadow frames, 114 decal frames, 72 rejected decal candidates and GPU validation zero. CSM math contracts and 384-instance/192-batch partition equivalence passed with 0/2/4/5/6/8 workers.</li>
+<li>Release special materials passed with GPU validation zero: refraction 24 frames (48 rejected candidates, roughness/TIR/miss/masked/hybrid checks), subsurface 12 frames (spread/boundary/mask checks), volume 33 frames (66 rejected candidates and transport/scattering/interior checks).</li>
+<li>Release product BASE-0 passed again after the final contract comment/fixture repairs: two independent Editor processes, four accepted captures, normal exits, GPU validation zero and no source drift. All accepted draw routes are <code>lattice</code>; each compiled graph contains <code>Shadow.Clear</code> and <code>GBuffer.Clear</code> and contains neither native <code>Shadow</code> nor native <code>GBuffer</code> material pass. See <code>Live-Release-final/result.json</code>, <code>final-live-graph-only-routing.json</code> and <code>final-source-hashes.json</code>. The earlier <code>Live-Release</code> run is retained separately.</li>
+</ul>
+<p>Release Vulkan build passed, but runtime acceptance did not: initial asynchronous material preparation exited 1 before the first scene fixture. <code>WaitSceneProgram</code> has a 600-second SPIR-V deadline; the diagnostic contains no shader/driver detail. No Vulkan pixel/validation success is claimed. Cold preparation diagnosis and actual resource/pixel acceptance are handed to <a href="../plans/BackendParityPlan.html">PHASE 4.9</a>, without restoring material fallback or relaxing the timeout to declare success.</p>
+<p>The earlier scene/raster checks precede the final comment/test-only repairs; engine execution logic did not change afterward. Final Debug/Release engine, probe and Editor builds passed; the final Release product capture verifies the final production source hashes. Scoped format checks passed. No commit or push is part of this change. This is not a new Debug/Release RG6 performance comparison or a CSM depth-content cache acceptance.</p>
+<p>Excluded diagnostic attempts: the first depth-clear check copied only array slice zero; the corrected test explicitly copies each layer. Earlier generation rejection checks used aggregate resource deferral and obscured a shader failure during exception cleanup; selection-stage deferral is now checked separately. The CSM math fixture omitted its required device service and its rejected-cascade assertion confused submitted indirect commands with GPU-visible draws. The corrected fixture requires three submitted GPU candidates (two direct commands on devices without indirect support), checks per-cascade candidate counts, and still requires the rejected cascade&#39;s depth pixels to remain neutral. Failed/hung attempts are retained and excluded from acceptance. Exceptional fixture cleanup remains a separate lifetime issue; successful runs explicitly shut down their resource listeners after GPU idle.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="csm-cache-consequence"></span><span id="pass-audit"></span><span id="product-contract"></span><span id="removed-structures"></span><span id="sec-csm-cache-consequence"></span><span id="sec-pass-audit"></span><span id="sec-product-contract"></span><span id="sec-removed-structures"></span><span id="sec-validation"></span><span id="validation"></span></details></main></body></html>

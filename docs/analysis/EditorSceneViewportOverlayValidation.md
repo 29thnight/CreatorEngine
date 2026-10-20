@@ -1,5 +1,45 @@
 # Scene viewport toolbar / ImViewGuizmo 적용
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineGUIWindow/SceneViewportOverlay.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewportOverlay.h#L7) — `class EditorCameraRig;`
+- [Editor/EngineGUIWindow/SceneViewportOverlay.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewportOverlay.h#L8) — `class GizmoRenderer;`
+- [Editor/EngineGUIWindow/SceneViewportOverlay.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewportOverlay.h#L9) — `struct EnhancedLiveDisplayTexture;`
+- [Tools/regression/verify-editor-theme.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-theme.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-editor-theme.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36) — `$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31) — `enum class EnhancedLiveDisplayTarget : uint8_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39) — `enum class EnhancedLiveViewFlags : uint32_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Editor/EngineGUIWindow/SceneViewportOverlay.cpp:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewportOverlay.cpp#L49) — `draw->AddRectFilled(p, {p.x + width, p.y + height}, ImGui::GetColorU32(color), height * 0.5f, corners);`
+- [Editor/EngineGUIWindow/SceneViewportOverlay.cpp:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewportOverlay.cpp#L50) — `draw->AddRect(p, {p.x + width, p.y + height}, ImGui::GetColorU32(ImGuiCol_Border), height * 0.5f, 1.f, corners);`
+- [Editor/EngineGUIWindow/SceneViewportOverlay.cpp:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewportOverlay.cpp#L51) — `if (ImGui::IsItemFocused()) draw->AddRect(p, {p.x + width, p.y + height},`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L216) — `const auto started = std::chrono::steady_clock::now();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:230](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L230) — `std::chrono::steady_clock::now() - started).count();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L307) — `const uint64_t generation = std::exchange(token.captureGeneration, 0);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 날짜: 2026-09-12
 - 범위: PHASE 21 W2-V의 씬뷰 툴바·방향 기즈모·통계 후속 구현
 - 기준: 사용자가 제공한 Unreal 툴바, 기존 잘림 화면, Blender 방향 기즈모 스크린샷
@@ -71,10 +111,10 @@ Grid settings는 기존 창 연결을 유지한 것이며 신규 그리드 렌�
   프로젝트 설정과 imgui.ini를 검증 전 원본 바이트로 복원했다.
 
 최종 화면:
-[전체 툴바](../../Artifacts/phase21-scene-toolbar/scene-toolbar-wide.png),
-[좁은 폭](../../Artifacts/phase21-scene-toolbar/scene-toolbar-narrow.png),
-[Runtime 통계](../../Artifacts/phase21-scene-toolbar/scene-runtime-stats.png),
-[GPU 패스 시간](../../Artifacts/phase21-scene-toolbar/scene-gpu-passes.png).
+전체 툴바 (`../../Artifacts/phase21-scene-toolbar/scene-toolbar-wide.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+좁은 폭 (`../../Artifacts/phase21-scene-toolbar/scene-toolbar-narrow.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+Runtime 통계 (`../../Artifacts/phase21-scene-toolbar/scene-runtime-stats.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+GPU 패스 시간 (`../../Artifacts/phase21-scene-toolbar/scene-gpu-passes.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
 원시 관측·빌드 로그는 `Artifacts/phase21-scene-toolbar/`에 둔다. GUI 축 검사는 `verified-pos-*.json`과
 `verified-neg-*.json`, 전체/축소 모드 검사는 `interactive-checks.json`, 최종 자가 검사는 `selftest-verified.json`이다.
@@ -85,3 +125,5 @@ W4 렌더 타깃 소유권, W5 Play 입력 전이, Vulkan은 별도 범위다.
 
 2026-09-12 후속 Scene 중앙 crop·기즈모/picking 좌표 통일 및 창 여백 축소 검증은
 [EditorSceneCropValidation.md](EditorSceneCropValidation.md)에 기록한다.
+
+</details>

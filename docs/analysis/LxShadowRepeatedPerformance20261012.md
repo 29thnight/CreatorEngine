@@ -1,5 +1,40 @@
 # LX shadow repeated performance — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:246](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L246) — `gpuMeasurements.Store(submission->domain, std::move(sample));`
+- [Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:258](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L258) — `std::printf("[rg8.live] enabled=true profilerQueue=graphics primary=true\n");`
+- [Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:267](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L267) — `DX12QueueService::NativeQueue(compute.queue), profilerPassCapacity, kFrameCount, error))`
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h#L11) — `struct IDisplayPresentationSink;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h#L12) — `class IRHIParallelCommandPool;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h#L26) — `enum class RHILifecycleCommand : uint8_t;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기존 목록 7번의 선택한 합성 범위 측정을 완료했다. GPU 계측 용량을 1024에서 4096 패스/프레임으로 늘려 MatGrid 8×8의 1710개 구간을 누락 없이 수집했다. 현재 Release 바이너리로 3개 장면, 경로별 4회씩 총 24개 정상 기록을 확보했다. **측정 산출물은 통과했지만 성능 이득은 수용하지 않는다.** 세 장면 모두 그림자 평균합 비교의 독립 반복 CV 기준을 통과하지 못했다.
 
 ## 변경과 방법
@@ -76,17 +111,19 @@ audit은 별도 실행의 **CPU 재현**이며 시간 측정에서 제외했다.
 
 ## 수정 빌드의 기능 회귀
 
-Debug/Release 빌드 성공. 각 구성의 품질·스키닝·IBL·rendergraph·scene 5개 기능 회귀, GPU validation 문제 0·dropped message 0, exit 0·quit 성공, 실행 전후 소스/binary 동일을 확인했다. Debug runtime SHA256: `AE995ED17CF88E3E2CD21D7B0B7701B800E443591E8C7EEB161454BB076624C2`. Release runtime SHA256는 위 24회 측정과 같다. [Debug 판정](../../Build/Verification/ShadowPerformance-20261012-Final/Regression-Debug/verdict.json), [Release 판정](../../Build/Verification/ShadowPerformance-20261012-Final/Regression-Release/verdict.json).
+Debug/Release 빌드 성공. 각 구성의 품질·스키닝·IBL·rendergraph·scene 5개 기능 회귀, GPU validation 문제 0·dropped message 0, exit 0·quit 성공, 실행 전후 소스/binary 동일을 확인했다. Debug runtime SHA256: `AE995ED17CF88E3E2CD21D7B0B7701B800E443591E8C7EEB161454BB076624C2`. Release runtime SHA256는 위 24회 측정과 같다. Debug 판정 (`../../Build/Verification/ShadowPerformance-20261012-Final/Regression-Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Release 판정 (`../../Build/Verification/ShadowPerformance-20261012-Final/Regression-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
 12개 장면의 전체 동치/누락 변이 매트릭스는 이번 계측 변경 뒤 다시 실행하지 않았다. 기존 [장면 검증 보고서](LxShadowCases20261012.md)의 binary SHA와 당시 판정으로 보존한다. 새로운 표면/그림자 shader 또는 컬링 알고리즘 변경 시 다시 실행해야 한다.
 
 ## 증거와 다음 판단
 
-- [통합 판정·입력·전체 반복값](../../Build/Verification/ShadowPerformance-20261012-Final/overall.json)
-- [24회 manifest](../../Build/Verification/ShadowPerformance-20261012-Final/runs.json)
-- [정상 캡처 재사용 거부](../../Build/Verification/ShadowPerformance-20261012-Final/negative-verdict.json)
-- [수정 전 실패 검토](../../Build/Verification/ShadowPerformance-20261012/review.json)
-- [수집 불완전 캡처 검토](../../Build/Obj/LxShadowP0/Run-Release-indexed-20261012-cap4096-boundary-7/review.json)
-- [반복 목록 복구 기록](../../Build/Verification/ShadowPerformance-20261012-cap4096-clip/controller-repair.json)
+- 통합 판정·입력·전체 반복값 (`../../Build/Verification/ShadowPerformance-20261012-Final/overall.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 24회 manifest (`../../Build/Verification/ShadowPerformance-20261012-Final/runs.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 정상 캡처 재사용 거부 (`../../Build/Verification/ShadowPerformance-20261012-Final/negative-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 수정 전 실패 검토 (`../../Build/Verification/ShadowPerformance-20261012/review.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 수집 불완전 캡처 검토 (`../../Build/Obj/LxShadowP0/Run-Release-indexed-20261012-cap4096-boundary-7/review.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 반복 목록 복구 기록 (`../../Build/Verification/ShadowPerformance-20261012-cap4096-clip/controller-repair.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 7번의 선택한 합성 범위 산출물은 완료했다. 8번 compute 구현의 착수 근거는 충족하지 못했다. 제품을 대표하는 입력/해상도와 안정적인 비용 비교, CPU 준비·기록 병목을 확인한 뒤 진행 판단을 갱신한다. CPU audit은 GPU 후보/생존 목록 증명이 아니며, compute 경로를 구현하면 목록 비교·픽셀 동치·누락 변이와 성능을 다시 검사해야 한다. Vulkan은 계속 PHASE 4.9 소유다.
+
+</details>

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>CPU asset preparation and scene publication</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="AsyncAssetPreparation.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/AsyncAssetPreparation.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>CPU asset preparation and scene publication</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L116">Engine/RenderEngine/DataSystem.h:116</a> — <code>class DataSystem : public Singleton&lt;DataSystem&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L326">Engine/RenderEngine/DataSystem.h:326</a> — <code>bool PublishPreparedModel(const ModelPreparation&amp; preparation, std::string&amp; error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L815">Engine/RenderEngine/DataSystem.h:815</a> — <code>bool PublishRuntimeAsset(const own::shared_owner&lt;PreparedRuntimeAsset&gt;&amp; asset, std::string&amp; error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L28">Engine/SceneRuntime/SceneManager.h:28</a> — <code>class SceneManager : public Singleton&lt;SceneManager&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L350">Engine/SceneRuntime/SceneManager.h:350</a> — <code>static auto SceneManagers = SceneManager::GetInstance();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L352">Engine/SceneRuntime/SceneManager.h:352</a> — <code>static auto&amp; PlayModeEvent = SceneManager::GetInstance()-&gt;PlayModeEvent;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L9">Engine/RenderEngine/Experiment/Model.h:9</a> — <code>class ModelLoader;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L13">Engine/RenderEngine/Experiment/Model.h:13</a> — <code>class Model final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L15">Engine/RenderEngine/Experiment/Model.h:15</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L503">Engine/RenderEngine/DataSystem.cpp:503</a> — <code>job_handle DataSystem::AssetBundlePreparation::Completion() const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L719">Engine/RenderEngine/DataSystem.cpp:719</a> — <code>bool DataSystem::PublishRuntimeAsset(const own::shared_owner&lt;PreparedRuntimeAsset&gt;&amp; asset, std::string&amp; error)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L1343">Engine/RenderEngine/DataSystem.cpp:1343</a> — <code>bool DataSystem::PublishPreparedModel(const ModelPreparation&amp; preparation, std::string&amp; error)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L1419">Engine/SceneRuntime/SceneManager.cpp:1419</a> — <code>SceneManager::SceneLoadRequestStatus SceneManager::QuerySceneLoad(std::uint64_t requestId) const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L1447">Engine/SceneRuntime/SceneManager.cpp:1447</a> — <code>Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad&amp; load)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L2243">Engine/SceneRuntime/SceneManager.cpp:2243</a> — <code>bool SceneManager::PreparePhysicsSceneExit(Scene* scene)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.cpp#L14">Engine/RenderEngine/Experiment/Model.cpp:14</a> — <code>std::uint64_t Model::NextGeneration() noexcept</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.cpp#L20">Engine/RenderEngine/Experiment/Model.cpp:20</a> — <code>std::uint64_t Model::Generation() const noexcept { return generation_; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.cpp#L22">Engine/RenderEngine/Experiment/Model.cpp:22</a> — <code>Model::Model(ModelDraft&amp;&amp; draft, ConstructKey) noexcept</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>The editor Open Scene action, <code>scene.load</code>, <code>scene.switch</code> and <code>scene.open_async</code>
+queue CPU preparation and return <code>queued: true</code> plus a <code>requestId</code>. The load command
+leaves activation unchanged; switch/open request the existing frame-boundary
+activation. Query <code>scene.load.status &lt;requestId&gt;</code> for Pending, Ready, Failed,
+Cancelled, Stale or Superseded. Ready means scene construction completed, not GPU
+readiness or completed activation. The last 64 terminal value records are kept;
+expired IDs report an explicit unknown-request error and retain no scene owners.</p>
+<h2>Preparation boundary</h2>
+<p><code>SceneManager</code> parses the document with the common job scheduler. <code>DataSystem</code>
+walks the current scene and referenced material/prefab documents, including
+encoded prefab overrides, inline material instances, bundle entries, named
+sprite/UI textures, and foliage model references. A first open does not require
+a previously written <code>ScenePreload</code> list.</p>
+<ol>
+<li>Workers validate/decode immutable model candidates</li>
+<li>The scene owner publishes completed model generations and discovers their
+generated material graph identities</li>
+<li>Workers prepare graph programs, validation bytes and SHA-256 digests; the
+owner publishes those exact immutable results</li>
+<li>Workers prepare the required CPU material/texture owners, using the existing
+material codecs and texture variant rules</li>
+<li>The scene owner constructs entities and activates the prepared scene at the
+existing scene structure boundary</li>
+</ol>
+<p>Scene loading and editor model placement share model preparation tickets.
+Model placement keeps its existing incremental owner-thread application budget.
+Graph preparation uses <code>GenerationStore::BeginPreparation</code>, <code>Prepare</code>, and
+<code>Publish</code>; expensive compilation/verification does not hold the store mutex.
+Requests for one asset revision share a candidate. An invalidated revision cannot
+publish over the current owner, and a failure preserves the accepted generation.</p>
+<p>The explicit synchronous <code>PrewarmSceneMaterials</code> path also retains generations.
+It no longer discards a cooked program merely to populate the disk cache.
+Subsequent entity loading consumes the prepared owner without decoding that
+cache a second time. Generated compiler inputs are content-keyed and atomically
+published so overlapping requests cannot observe another writer&#39;s truncation.</p>
+<h2>Lifetime and scheduling</h2>
+<p>Preparation uses existing <code>job_handle</code> dependency chains. Asset lanes are bounded
+by compiler capacity and leave two workers unreserved where the pool size allows.
+A normal frame pump polls completion before reading a result; only explicit
+synchronous/lifecycle APIs wait for incomplete jobs. Cancellation prevents scene
+publication and does not attempt to preempt a compiler/decoder already running.</p>
+<p>The request index is weak, so it does not keep another permanent copy of resident
+model/graph owners. Superseded work remains drainable until its callbacks finish.
+Asset changes invalidate request epochs; mount/root changes advance the captured
+resolver revision. Every scene phase and final handoff validates both. Typed mesh,
+image and material requests use the captured catalog. A short construction guard
+blocks root publication using the existing admission mutex, while deserializers
+and callbacks run without a held mutex. Asset-change callbacks defer their event
+until the next drain. Candidate DDOL entities stay in the candidate scene, so a
+rejected construction cannot leave them in the active scene. Once Ready handoff
+succeeds, those actual scene owners remain valid through later mount changes.
+Shutdown drains accepted work before clearing catalogs and caches.</p>
+<p>Texture and Material runtime identities use one out-of-line atomic allocator.
+They are nonzero, never recycled, and fail closed at exhaustion. Persisted
+FileGuid/model identities and content fingerprints are unchanged. Material copy
+and resource move identity behavior is unchanged.</p>
+<h2>Readiness and remaining synchronous work</h2>
+<p>Progress counts CPU preparation items within the displayed stage, including
+instance recipes; it is not a count of unique source assets. Dependency discovery
+has no known total. Shader progress counts live compiler requests rather than
+letting one completed request hide others.</p>
+<p>CPU preparation is distinct from GPU readiness. Texture upload, fences, resource
+retirement, PSO creation, and render-thread scene lookup initialization retain
+their existing ownership and readiness contracts. Entity construction remains on
+the scene owner and may still take a long frame. A small shared worker pool can
+also delay other jobs while non-preemptible decoding/compilation is running.</p>
+<p>Player startup and scene commands use nonblocking preparation. Explicit legacy
+C++ scene helpers, watcher hot-reload acceptance and Material Graph authoring
+apply/preview remain separate synchronous entry points. This does not claim zero
+game-thread stalls or move mixed RHI initialization onto arbitrary workers.</p>
+<h2>Verification scope</h2>
+<p>The patch was reviewed statically. Added regression source covers prepared-owner
+reuse, same-revision coalescing, dirty reload retry, late completion rejection,
+unchanged-product identity, removal and shutdown. Builds, regression execution,
+engine execution, and performance measurements are still required before a
+runtime/performance claim.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="lifetime-and-scheduling"></span><span id="preparation-boundary"></span><span id="readiness-and-remaining-synchronous-work"></span><span id="sec-lifetime-and-scheduling"></span><span id="sec-preparation-boundary"></span><span id="sec-readiness-and-remaining-synchronous-work"></span><span id="sec-verification-scope"></span><span id="verification-scope"></span></details></main></body></html>

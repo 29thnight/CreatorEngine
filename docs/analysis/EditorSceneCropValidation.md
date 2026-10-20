@@ -1,5 +1,36 @@
 # Scene View 중앙 crop과 창 본문 여백
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L38) — `const std::vector<gc::trace_ref<Entity>>& slots);`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L63) — `class SceneViewWindow`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L66) — `void RenderSceneViewWindow();`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L77) — `void SceneViewWindow::RenderSceneViewWindow()`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:133](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L133) — `void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:687](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L687) — `math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-12 사용자 보고: Scene 창을 조절하면 화면이 가로/세로로 왜곡되고, 각 창 본문의 네 면 여백이 과하다.
 
 ## 원인과 수정
@@ -46,3 +77,5 @@
 `scene-wide.png`, `scene-tall.png`, `scene-short.png`, `picking-wide.png`에 화면을 보관했다.
 원시 관측은 `initial.json`, `tall-ready.json`, `short-ready.json`, 요약은 `crop-layout-checks.csv`다.
 검증용 Editor는 종료했고, 설정과 도킹 ini는 검증 직전 원본 바이트로 복원했다.
+
+</details>

@@ -1,5 +1,47 @@
 # 엔진 명령 표면 도표 — 2026-09-12 갱신
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L20) — `public void SetInt(string name, int value) => Native.AnimatorSetInt(OwnerHandle, name, value);`
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [ScriptCore/EngineCallable.cs:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L35) — `[AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]`
+- [ScriptCore/EngineCallable.cs:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L36) — `public sealed class EngineCallableAttribute : Attribute`
+- [Engine/SceneRuntime/Terrain.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L46) — `void Save(const std::wstring& assetRoot, const std::wstring& name);`
+- [Engine/SceneRuntime/Terrain.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L65) — `void AddLayer(const std::wstring& path, const std::wstring& diffuseFile, float tilling);`
+- [Engine/SceneRuntime/Terrain.h:100](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L100) — `bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);`
+- [Engine/SceneRuntime/Animator.h:318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L318) — `own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};`
+- [Engine/SceneRuntime/Animator.h:396](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L396) — `inline void Animator::AddParameter(const std::string valuename, T value, ValueType vType)`
+- [Engine/SceneRuntime/Animator.h:410](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L410) — `inline void Animator::SetParameter(const std::string valuename, T Value)`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/BlackBoard.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L41) — `void RenameKey(const std::string& curKey, const std::string& newKey);`
+- [Engine/SceneRuntime/BlackBoard.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L52) — `bool Serialize(std::string_view name);`
+- [Engine/SceneRuntime/BlackBoard.h:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L53) — `void Deserialize(std::string_view name);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > 2026-09-12: 닫힌·완료 계획 소속 Commandlet 68개를 은퇴시켰다(§5). 제품 명령은 하나도 건드리지 않았다 — 아래 제품 수치는 2026-09-06 기준 그대로다.
 
 현재 작업 트리의 시드와 등록, 런타임 registry를 대조한 표다. 제품 작업은 공통 편집·진단 API로, 검증은 프로세스 범위 Commandlet으로 실행한다.
@@ -497,3 +539,5 @@ Shipping에서는 명령 서비스·소켓이 빌드에서 제외된다. 아래�
 - 없는 CLR 인스턴스·모델·검사 코퍼스, 잘못된 숫자 및 지원하지 않는 동작은 실패 상태를 반환한다. Release에서 Debug CRT 지표를 0으로 보고하지 않는다.
 - `assets.identity`는 예상 벡터 대신 실제 계산 UUID를 반환하여 독립 언어 대조를 유지한다.
 - `dx12.selftest`의 material authoring round trip 실패와 누락된 canonical 코퍼스는 통신/명령 표면 정리 완료로 해결됐다고 간주하지 않는다. 최신 실행 판정은 [종결 검토](Phase14_5Closure.md)에 기록한다.
+
+</details>

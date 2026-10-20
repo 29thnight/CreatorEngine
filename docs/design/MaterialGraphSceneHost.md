@@ -1,5 +1,52 @@
 # Material Graph 실제 Scene GBuffer·공유 깊이·컬러 합성
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-raster-surface.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/verify-material-raster-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-raster-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang#L5) — `float BakeEnvironmentPdf(float3 direction)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang#L8) — `gImportanceRows.GetDimensions(size, rows);`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang#L9) — `const float total=gImportanceMarginal.Load(int3(0,rows-1u,0)).r;`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15) — `own::shared_owner<const Instance> instance;`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21) — `static own::shared_owner<const SceneMaterialSource> Capture(const Material& material);`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L22) — `static own::shared_owner<const SceneMaterialSource> Capture(own::shared_owner<const Instance> instance,`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L12) — `struct SceneLookupResourcePool;`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L15) — `struct SceneLookupStats`
+- [Engine/RenderEngine/MaterialGraphSceneLookup.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L87) — `class SceneLookupCache : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17) — `struct SceneVolumeTriangle`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L19) — `math::vector4 a, b, c;`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31) — `own::shared_owner<const RenderBindings> material;`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L30) — `class Texture;`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L58) — `class DX12TextureCache : public IRenderTextureCache, public IRHIUploadTransactionListener`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:120](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L120) — `const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) override;`
+- [Engine/RenderEngine/MaterialGraphSceneSubsurface.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L10) — `struct SceneSubsurfaceReflection`
+- [Engine/RenderEngine/MaterialGraphSceneSubsurface.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L12) — `math::vector4 metalSingleAlbedo, metalAverage;`
+- [Engine/RenderEngine/MaterialGraphSceneSubsurface.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L13) — `math::vector4 dielectricSingleAlbedo, dielectricAverage;`
+- [Engine/RenderEngine/MaterialGraphSceneRefraction.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L10) — `struct SceneRefractionSample`
+- [Engine/RenderEngine/MaterialGraphSceneRefraction.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L12) — `math::vector4 glassSingleAlbedo, glassAverage, glassEnvironment, rawTransmission, radiance;`
+- [Engine/RenderEngine/MaterialGraphSceneRefraction.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L16) — `class SceneRefractionFrame`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1. 설치 범위
 
 `EnhancedSceneRenderer`의 DX12/Vulkan live pipeline에 `LX.Scene.GBuffer`와
@@ -155,3 +202,5 @@ MAT-7은 [공통 혼합 transport·제품 회귀](../analysis/MAT7ForwardTranspo
 
 [MaterialGraphSceneShadowDecal.md](MaterialGraphSceneShadowDecal.md)는 그래프 Alpha를 쓰는
 세 캐스케이드 shadow caster와 opaque Decal의 raw 입력·derived lobe·IBL 연결을 소유한다.
+
+</details>

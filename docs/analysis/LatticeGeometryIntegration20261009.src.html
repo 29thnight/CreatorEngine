@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>LX 메시렛 컬링·기하 LOD·현재 깊이 HZB 연결</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="LatticeGeometryIntegration20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/LatticeGeometryIntegration20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>LX 메시렛 컬링·기하 LOD·현재 깊이 HZB 연결</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L61">Engine/RenderEngine/MaterialGraphSceneHost.cpp:61</a> — <code>std::memcpy(local, static_cast&lt;const std::byte*&gt;(geometry.vertexData) + index * geometry.vertexStride,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L87">Engine/RenderEngine/MaterialGraphSceneHost.cpp:87</a> — <code>sphere.radius = std::hypot(high[0] - low[0], high[1] - low[1], high[2] - low[2]) * .5f * 1.0001f + 1e-4f;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L89">Engine/RenderEngine/MaterialGraphSceneHost.cpp:89</a> — <code>if (!shadow_math::IntersectsClip(sphere, lightViewProjection))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.cpp#L17">Engine/RenderEngine/MaterialGraphSceneInput.cpp:17</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.cpp#L24">Engine/RenderEngine/MaterialGraphSceneInput.cpp:24</a> — <code>[](float value) { return std::isfinite(value) &amp;&amp; std::abs(value) &lt;= 1e6f; });</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.cpp#L28">Engine/RenderEngine/MaterialGraphSceneInput.cpp:28</a> — <code>own::shared_owner&lt;const SceneMaterialSource&gt; SceneMaterialSource::Capture(const Material&amp; material)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L23">Engine/RenderEngine/MaterialGraphMeshSurface.cpp:23</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L809">Engine/RenderEngine/MaterialGraphMeshSurface.cpp:809</a> — <code>if (includeHierarchy &amp;&amp; geometry.SourceMesh() &amp;&amp; !geometry.SourceMesh()-&gt;coarseLods.IsEmpty())</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L811">Engine/RenderEngine/MaterialGraphMeshSurface.cpp:811</a> — <code>const auto&amp; chain = geometry.SourceMesh()-&gt;coarseLods;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L13">Engine/RenderEngine/MaterialGraphSceneCompiler.cpp:13</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L29">Engine/RenderEngine/MaterialGraphSceneCompiler.cpp:29</a> — <code>staging += &quot;.stage-&quot; + FileGuid::CreateRandomV4().ToString();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L37">Engine/RenderEngine/MaterialGraphSceneCompiler.cpp:37</a> — <code>std::filesystem::remove(staging, ignored);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L18">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:18</a> — <code>struct LXSceneLight</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L346">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:346</a> — <code>void LXSceneMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L471">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:471</a> — <code>void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L98">Engine/RenderEngine/MaterialGraphSceneHost.h:98</a> — <code>class SceneHost final : private IRHIUploadTransactionListener</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L101">Engine/RenderEngine/MaterialGraphSceneHost.h:101</a> — <code>explicit SceneHost(job_scheduler&amp; scheduler = ce::get_job_scheduler());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L108">Engine/RenderEngine/MaterialGraphSceneHost.h:108</a> — <code>bool RequestProgram(const EnhancedFrameContext&amp; context, own::shared_owner&lt;const Generation&gt; generation,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15">Engine/RenderEngine/MaterialGraphSceneInput.h:15</a> — <code>own::shared_owner&lt;const Instance&gt; instance;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21">Engine/RenderEngine/MaterialGraphSceneInput.h:21</a> — <code>static own::shared_owner&lt;const SceneMaterialSource&gt; Capture(const Material&amp; material);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L22">Engine/RenderEngine/MaterialGraphSceneInput.h:22</a> — <code>static own::shared_owner&lt;const SceneMaterialSource&gt; Capture(own::shared_owner&lt;const Instance&gt; instance,</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-10-09. 기준 master는 <code>cd3fa2e2f8cf40d4c810731430f8be4503a09f1e</code>이며,
+작업 종료 시 원격 master도 같은 해시였다. 아래 구현은 현재 작업 트리의 후속 변경이다.
+기존 RG8/GCCE 및 workspace 변경은 작업 범위에 포함하지 않았다.</p>
+<h2>구현</h2>
+<ul>
+<li><strong>메시렛별 프러스텀 컬링:</strong> <code>LXSceneMS</code>와 <code>LXSceneShadowMS</code>가 각 메시렛의
+변환·스키닝 완료 정점을 카메라/해당 cascade의 clip 공간에서 검사한다.
+모든 정점이 같은 clip 평면 밖에 있을 때만 출력 정점·삼각형 수를 0으로 만든다.
+평면 교차·비유한 값은 유지하며 경계 오차 여유를 둔다. bind-pose 구나 cone을
+변형된 메시의 거절 근거로 사용하지 않는다. 모든 mesh group은 여전히 dispatch된다.</li>
+<li><strong>기하 LOD 선택과 제출:</strong> <code>SelectSceneGeometryLod</code>가 저장된 <code>coarseLods</code>의
+simplification error를 화면 오차로 투영한다. 기본 한도는 1 pixel이며,
+직교·원근·비균일 스케일/전단 및 근평면 교차를 다룬다. 선택은 CPU에서 수행한다.
+선택한 level의 실제 인덱스를 seal/partition/변환/토폴로지/간접 bin까지 전달한다.
+정적 partition 캐시는 mesh handle와 LOD를 함께 키로 사용한다.
+저장된 LOD가 없거나 bone palette가 활성화되었거나 오차/투영이 불확실하면 LOD0이다.
+simplifier error는 품질 지표이며 인증된 Hausdorff 거리로 해석하지 않는다.</li>
+<li><strong>독립 그림자 제출:</strong> 카메라가 낮은 LOD를 선택하더라도 그림자는 별도 LOD0
+plan/batch/bin을 유지한다. 광원별 screen-error 정책이 없는 상태에서 카메라 거리로
+캐스터 품질을 낮추지 않는다. 추가 CPU/GPU payload도 view의 합산 예산에 포함한다.
+중복 geometry 선언을 피하고 두 제출 집합 모두 완료점까지 보유한다.</li>
+<li><strong>라이브 HZB:</strong> RG2에서 앞선 occluder depth가 없으면 <code>LX.Scene.OccluderDepth</code>가
+별도 D32 texture를 clear 1로 초기화하고 불투명·마스크 재질의 깊이를 기록한다.
+alpha 평가와 pixel-center 복원은 GBuffer와 같은 계약을 사용한다.
+그 깊이로 pyramid와 <code>Geometry.Visibility.CullOcclusion</code>을 만들고 본 GBuffer를 제출한다.
+본 depth를 선행 패스로 덮어쓰지 않아 기존 Less 및 첫 primitive의 동률 소유권을 보존한다.
+투명·투과 재질은 occluder에서 제외한다. HZB 거절 단위는 draw이며 메시렛 단위 HZB가 아니다.
+history/reprojection을 도입하지 않았으며 compatibility graph는 프러스텀 경로를 유지한다.</li>
+<li><strong>토폴로지 반복 생성 방지:</strong> 최대 descriptor/remap/triangle 크기의 상한으로
+128 MiB·256-entry cache 수용 가능성을 먼저 검사한다. 수용 불가능하면 생성 전에
+transient indexed 경로로 내려간다. <code>CREATOR_LX_MESHLETS=0</code>이면 토폴로지를 만들지 않는다.
+상한 예약은 실제 크기보다 보수적이므로 여유가 작은 cache에서 indexed로 갈 수 있다.</li>
+<li><strong>셰이더 계약:</strong> 깊이 pixel entry를 공통 Scene compile/cook/load/ShaderMeta pass에
+포함하고 Scene host identity를 18로 올렸다. 이전 Scene cooked stage set은 재-cook이 필요하다.
+<code>CREATOR_LX_HZB=0</code>은 HZB/선행 깊이 패스를 끄는 rollback 경로다.</li>
+</ul>
+<p>주요 소스: <code>MaterialGraphSceneLod.h</code>, <code>MaterialGraphSceneInput.cpp</code>,
+<code>MaterialGraphSceneHost.cpp</code>, <code>MaterialGraphMeshSurface.cpp</code>, <code>MaterialGraphSceneCompiler.cpp</code>,
+<code>Includes/MaterialGraphSceneHost.slang</code>.</p>
+<h2>검증</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>증거</th>
+<th>결과</th>
+<th>범위</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Editor x64 Debug/Release build</td>
+<td>모두 성공</td>
+<td>RenderEngine 및 실제 Editor 소비자</td>
+</tr>
+<tr>
+<td>GPU 회귀 Debug</td>
+<td>4조합, 96프레임, 228,980검사, 42,984 GPU component 비교, validation 0</td>
+<td>indexed/mesh × HZB OFF/ON, immediate/1-worker/4-worker</td>
+</tr>
+<tr>
+<td>GPU 회귀 Release</td>
+<td>4조합, 96프레임, 228,980검사, 42,984 GPU component 비교, validation 0</td>
+<td>같은 조건, 독립 Core/Layered 조명·소유권·깊이 참조</td>
+</tr>
+<tr>
+<td>LOD 수치 회귀</td>
+<td>각 실행의 7조건 통과</td>
+<td>직교 화면 크기, 원근 거리, 큰 화면 오차, 비균일 scale, 근평면, NaN error</td>
+</tr>
+<tr>
+<td>실제 Release DX12 TestShadow</td>
+<td>2 sample pair × 16 attachment = 32개 모두 비트 동일</td>
+<td>현재 소스의 indexed/mesh 출력 비교, 두 모드 GPU validation problems/drops 0</td>
+</tr>
+<tr>
+<td>실제 mesh 호출</td>
+<td>surface/shadow 모두 <code>groups=1 indirect=1</code> 첫 호출 로그 확인</td>
+<td>호출 증거이며 총 메시렛 수나 visible count가 아님</td>
+</tr>
+<tr>
+<td>정적 cache 검사</td>
+<td>생성 전 예산 검사·OFF 시 생성 건너뛰기 확인</td>
+<td>cache pressure 실행/성능 gate의 대체 증거가 아님</td>
+</tr>
+</tbody></table></div>
+<p>재현: <code>Tools/regression/verify-lx-meshlet-geometry.ps1</code>.
+각 소스 hash와 실행 binary hash의 불변성을 검사하며 4조합 모두 실행한다.
+TestShadow는 기존 <code>verify-lattice-meshlets.ps1 -Samples 2 -Configuration Release -ValidateGpu</code>로 실행했다.</p>
+<p>실행 증거는 <code>Build/lx-geometry-debug-validation</code>, <code>Build/lx-geometry-release-validation</code>,
+<code>Build/lx-geometry-live-release</code>에 있다. Editor build 로그는
+<code>Build/lx-meshlets-editor-build-Debug.log</code>와 <code>Build/lx-meshlets-editor-build-Release.log</code>다.
+Build 경로는 실행 산출물이며 저장소에 커밋하지 않았다.</p>
+<h2>전체 GPU geometry 수용과의 경계</h2>
+<p>이번 변경으로 LX에 메시렛별 프러스텀 검사, CPU 기하 LOD 선택·제출, 현재 깊이 draw HZB가 연결됐다.
+GPU LOD 선택, visible-meshlet 목록 압축/간접 group 수 감소, 메시렛별 HZB,
+광원별 LOD 품질 정책은 구현하지 않았다. 실제 저장 LOD 전환 장면의 GPU 품질 수용,
+새 cache pressure/overflow 시나리오, Vulkan, 다중 view/큰 workload, Release 성능·VRAM은 별도 gate다.
+따라서 GPU-1/전체 GPU-driven geometry의 완료·기성으로 계상하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증"></span><span id="sec-구현"></span><span id="sec-전체-gpu-geometry-수용과의-경계"></span><span id="검증"></span><span id="구현"></span><span id="전체-gpu-geometry-수용과의-경계"></span></details></main></body></html>

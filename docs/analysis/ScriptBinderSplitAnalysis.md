@@ -1,5 +1,52 @@
 # ScriptBinder 분할 판단 자료 (E7 잔여 결정)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현재 managed 표면은 Component·Entity와 세대 핸들이다. OnInitialized~OnUninitializing 수명 훅과 PrePhysics/PostPhysics를 구분한다.
+- native 객체 수명, CLR GC, Scope 취소·reload와 자산 owner는 별도 계약이다. 미래 PrSM 효과/저작 체계를 기존 ContactStream 구현으로 판정하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/RegisterReflectManual.h:185](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L185) — `failures += "\n  " + std::string(type.name()) + (type.is_serializable() ? "" : " [쓰기 불가]")`
+- [Engine/SceneRuntime/RegisterReflectManual.h:191](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L191) — `failures += " " + std::string(field.name()) + "(" + std::string(field.type_name()) + ")";`
+- [Engine/SceneRuntime/RegisterReflectManual.h:204](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L204) — `Debug::PrintLog(spdlog::level::critical, "reflgen 서술자가 쓰거나 읽지 못하는 타입(필드의 serializer 가 등록 함수에"`
+- [Engine/SceneRuntime/Scene.cpp:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L84) — `m_begin = Clock::now();`
+- [Engine/SceneRuntime/Scene.cpp:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L94) — `const TimePoint end = Clock::now();`
+- [Engine/SceneRuntime/Scene.cpp:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L102) — `m_begin = Clock::now();`
+- [Engine/SceneRuntime/Entity.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L18) — `Entity::Entity() : Object("Entity"), m_index(0)`
+- [Engine/SceneRuntime/Entity.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L23) — `Entity::Entity(Scene* scene, std::string_view name, GameObjectType,`
+- [Engine/SceneRuntime/Entity.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L29) — `Entity::Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType,`
+- [Engine/SceneRuntime/SceneManager.cpp:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L64) — `throw std::runtime_error("Scene asset bundle preparation failed (status "`
+- [Engine/SceneRuntime/SceneManager.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L65) — `+ std::to_string(static_cast<unsigned>(result.status)) + ", completed "`
+- [Engine/SceneRuntime/SceneManager.cpp:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L66) — `+ std::to_string(result.completed) + "/" + std::to_string(result.submitted)`
+- [Engine/SceneRuntime/RuntimeFrame.cpp:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp#L16) — `void TickManagedPrePhysics(float deltaSeconds)`
+- [Engine/SceneRuntime/RuntimeFrame.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp#L18) — `auto& clr = ClrHost::Get();`
+- [Engine/SceneRuntime/RuntimeFrame.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp#L29) — `auto& clr = ClrHost::Get();`
+- [Engine/SceneRuntime/ComponentFactory.cpp:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ComponentFactory.cpp#L33) — `gc::root_ref<Component> TryCreateManagedComponent(gc::domain& domain,`
+- [Engine/SceneRuntime/ComponentFactory.cpp:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ComponentFactory.cpp#L38) — `if (requested.id() == Meta::ToTypeID(TypeTrait::GUIDCreator::GetTypeID<T>()))`
+- [Engine/SceneRuntime/ComponentFactory.cpp:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ComponentFactory.cpp#L47) — `gc::root_ref<Component> ComponentFactory::CreateManaged(gc::domain& domain,`
+- [Engine/SceneRuntime/LifecycleRegistry.cpp:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LifecycleRegistry.cpp#L43) — `void Registry::Store(size_t typeID, uint16_t mask)`
+- [Engine/SceneRuntime/LifecycleRegistry.cpp:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LifecycleRegistry.cpp#L48) — `uint16_t Registry::Find(size_t typeID)`
+- [Engine/SceneRuntime/LifecycleRegistry.cpp:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LifecycleRegistry.cpp#L54) — `size_t Registry::Count()`
+- [ScriptCore/Prefab.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10) — `public readonly struct Prefab`
+- [ScriptCore/Prefab.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12) — `private readonly string? _name;`
+- [ScriptCore/Prefab.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14) — `private Prefab(string name) => _name = name;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 작성일: 2026-08-24
 - 목적: EngineLayerSeparationPlan E7의 보류 항목 — "`ScriptBinder`를
   `SceneRuntime/ScriptRuntime`으로 재명명 **또는 분할**" — 의 결정 자료.
@@ -93,3 +140,5 @@ Entity(8)에 ClrHost(7)와 전 도메인이 골고루 섞여 있다. 분할 시 
 **즉시 실행 가능한 결론**: 개명(안 1)은 분할 결정과 독립적으로 지금 해도
 된다 — 안 2로 가더라도 SceneRuntime이라는 이름은 그대로 살아남는다
 (ScriptRuntime을 나중에 떼어 내는 형태).
+
+</details>

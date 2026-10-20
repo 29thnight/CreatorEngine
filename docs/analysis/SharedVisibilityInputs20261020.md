@@ -1,5 +1,32 @@
 # Shared visibility 입력 조립 최적화 — 2026-10-20
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 `b7ccc2b1a` 기준으로 shared 입력 생성 평균은 **0.09636→0.09200ms(-4.52%)**다. 최종 Game CPU p50은 **13.46990ms**이며 120 FPS의 8.33333ms 예산을 **5.13657ms 초과**한다. 120 FPS 목표는 미달이다. 최종 코드는 shared 경로의 조립 scratch와 메타데이터 소유만 변경한다.
 
 ## 최종 구현
@@ -59,3 +86,5 @@ Shared 입력 생성에 바인딩 생성이 포함되므로 두 절감량을 더
 초기 회귀 도구에는 별도의 잘못된 기대값도 있었다. 현재 master shader는 `GeometryPrepareMeshlet`에서 LOD 선택·residency를 통과한 meshlet만 큐에 게시하지만 검사는 전체 입력이 게시돼야 한다고 요구했다. 첫 진단은 입력 13, 게시·완료 6, 오류 0, partition 208/208, 잔여 작업/lease 0이었다. master 원문 비교는 `assertion-origin.txt`에 보관했다.
 
 검사는 게시 수가 입력 상한 이내이며 완료 수와 정확히 같아야 하고, 게시 0/비0에 맞춰 working wave가 0/비0인지 확인하도록 수정했다. 오류 0, partition 전수 처리, head/tail 회계, 빈 슬롯, 작업·lease 0, 독립 partition 계산 및 픽셀 검사를 유지했다. 거절 partition의 범위와 `0 < publishedJobs < sealedJobs`도 검사한다. 이 수정 뒤 발견된 픽셀 회귀를 기준 엔진과 비교해 위와 같이 제거했다.
+
+</details>

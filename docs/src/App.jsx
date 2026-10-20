@@ -308,7 +308,7 @@ function Docs() {
   const [data, setData] = useState(null), [error, setError] = useState(false), [hash, setHash] = useState(location.hash), [search, setSearch] = useState(''), [sidebarOpen, setSidebarOpen] = useState(false);
   useEffect(() => { fetch('reference.json').then((response) => response.ok ? response.json() : Promise.reject()).then(setData).catch(() => setError(true)); const listener = () => setHash(location.hash); addEventListener('hashchange', listener); return () => removeEventListener('hashchange', listener); }, []);
   const [id, anchor] = useMemo(() => { try { return (hash.slice(1) || 'guide/overview').split('~'); } catch { return ['invalid']; } }, [hash]);
-  const page = data?.pages.find((item) => item.id === id);
+  const page = data?.pages.find((item) => item.id === (data.aliases?.[id] ?? id));
   useEffect(() => { if (page) document.title = `${page.title.replace('\n', ' ')} — Creator Engine`; }, [page]);
   const filtered = useMemo(() => !data ? [] : data.pages.filter((item) => search.trim().normalize('NFKC').toLocaleLowerCase().split(/\s+/).filter(Boolean).every((word) => JSON.stringify([item.title, item.summary, item.members || [], item.sections]).normalize('NFKC').toLocaleLowerCase().includes(word))), [data, search]);
   const navigate = (value) => { location.hash = value; setSidebarOpen(false); };

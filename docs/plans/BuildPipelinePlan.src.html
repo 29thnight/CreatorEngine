@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>빌드 파이프라인 신설과 엔진 계층 전면 개편 (BuildPipelinePlan)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="BuildPipelinePlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/BuildPipelinePlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>빌드 파이프라인 신설과 엔진 계층 전면 개편 (BuildPipelinePlan)</h1><p>진행 중인 build/cook 단계와 B5 게임 CI 레그를 clean 입력부터 Player 실행까지 닫는다. 이미 연결된 SDK·공통 설정·Host 분리는 재구현하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Settings</ve-node><ve-node id="n1" at="2 1">Build</ve-node><ve-node id="n2" at="3 1" key>Cook</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Bootstrap</ve-node><ve-node id="n5" at="1 2">Player</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>진행 중인 build/cook 단계와 B5 게임 CI 레그를 clean 입력부터 Player 실행까지 닫는다. 이미 연결된 SDK·공통 설정·Host 분리는 재구현하지 않는다.</li>
+<li>cook DAG·증분 캐시 무효화·취소/실패 복구·Shipping 의존 격리와 패키지 재현성을 실제 산출물로 검증한다. 오디오 선행 차단은 AU 종료에 따라 해제한다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>project/build settings → build/cook orchestration → cooked manifest/pak → Player bootstrap</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>12.5-1</code> · PHASE 12.5</td>
+<td>B1 — 빌드 기술 단일화 (구성 축소 + props 승격)</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>12.5-2</code> · PHASE 12.5</td>
+<td>B2 — CreatorBuildTool EXE·단일 패키징 구현</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>12.5-3</code> · PHASE 12.5</td>
+<td>B3 — 셰이더 쿡 + 스테이징</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>12.5-4</code> · PHASE 12.5</td>
+<td>B4 — C# 빌드 편입 + Managed 배치</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>12.5-5</code> · PHASE 12.5</td>
+<td>B5 — CI 게임 레그</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>12.5-8</code> · PHASE 12.5</td>
+<td>L3&#39; — 게임 프로젝트화 (구 L3 승계)</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/GameBuilderSystem.h#L5">Editor/EngineEntry/GameBuilderSystem.h:5</a> — <code>class GameBuilderSystem : public Singleton&lt;GameBuilderSystem&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Program.cs#L5">BuildTool/Program.cs:5</a> — <code>public static async Task&lt;int&gt; Main(string[] args)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L74">Engine/RuntimeHost/EngineBootstrap.h:74</a> — <code>inline void InitializeShutdownTrace()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineLaunchConfig.h#L11">Engine/RuntimeHost/EngineLaunchConfig.h:11</a> — <code>using RuntimeContentPrepare = bool (*)(const EnginePaths&amp; paths) noexcept;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L91">Engine/SceneRuntime/SceneManager.cpp:91</a> — <code>&quot;Player 씬 source identity 해석 실패: &quot; + path);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L397">Engine/SceneRuntime/PrefabUtility.cpp:397</a> — <code>value = Authoring::DecodeCookedDocumentTextEnvelope(</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="0-논지--심판이-없으면-개편도-없다"></span>
+<span id="1-실측--다섯-방향"></span>
+<span id="11-빌드-기술이-아홉-벌"></span>
+<span id="12-매크로-경계는-창을-끄지-의존을-끊지-않는다"></span>
+<span id="13-에셋-흐름--b2-model-cookpak은-닫혔고-셰이더-쿡은-아직-비어-있다"></span>
+<span id="14-플레이어는-3세대-전-에디터의-사본이다"></span>
+<span id="15-ci는-게임을-모른다"></span>
+<span id="16-참고--두-상용-엔진의-답과-우리가-취할-것"></span>
+<span id="2-목표"></span>
+<span id="20-결정--게임-빌드는-유니티식이다-2026-08-10-개정"></span>
+<span id="2026-10-07-최근-병합-반영"></span>
+<span id="21-계층--다섯-층"></span>
+<span id="22-빌드-축--구성-2개와-런타임-모드-2026-08-10-개정"></span>
+<span id="23-파이프라인--여섯-단계와-한-오케스트레이터"></span>
+<span id="24-산성-테스트--모든-슬라이스의-심판"></span>
+<span id="3-실행--슬라이스"></span>
+<span id="4-하지-않을-것"></span>
+<span id="5-위험"></span>
+<span id="6-완료-기준-수치"></span>
+<span id="7-문서-관계"></span>
+<span id="editorcore-개편과의-접점"></span>
+<span id="sec-0-논지--심판이-없으면-개편도-없다"></span>
+<span id="sec-1-실측--다섯-방향"></span>
+<span id="sec-2-목표"></span>
+<span id="sec-2026-10-07-최근-병합-반영"></span>
+<span id="sec-3-실행--슬라이스"></span>
+<span id="sec-4-하지-않을-것"></span>
+<span id="sec-5-위험"></span>
+<span id="sec-6-완료-기준-수치"></span>
+<span id="sec-7-문서-관계"></span>
+<span id="트랙-b--심판-세우기-선행"></span></p>
+</details>
+</main></body></html>

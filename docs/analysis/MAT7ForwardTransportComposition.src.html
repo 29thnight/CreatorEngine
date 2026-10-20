@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-7 alpha·SSS·굴절·Volume 공통 Forward+ 합성</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT7ForwardTransportComposition.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT7ForwardTransportComposition.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-7 alpha·SSS·굴절·Volume 공통 Forward+ 합성</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-forward-transport.ps1#L5">Tools/regression/verify-material-forward-transport.ps1:5</a> — <code>[ValidateSet(&#39;Debug&#39;, &#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;, &#39;Release&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-forward-transport.ps1#L10">Tools/regression/verify-material-forward-transport.ps1:10</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-forward-transport.ps1#L11">Tools/regression/verify-material-forward-transport.ps1:11</a> — <code>if (!$SkipBuild -and [string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>범위와 구현</h2>
+<p>2026-10-02. Graph/Code의 공통 소비와 제품 편집·복구 다음에 남았던
+특수 transport와 일반 alpha의 혼합 순서를 연결한다. 품질·전체 프레임 비용은 MAT-9,
+native Vulkan 제품 수용은 PHASE 4.9가 소유한다. 아래 완료 게이트를 통과하여
+<strong>MAT-7 공통 재질 소비 통합을 완료</strong>한다. PHASE 4.25 전체 완료로 확대하지 않는다.</p>
+<ul>
+<li>Surface alpha와 transmission을 같은 카메라 깊이 기준의 back-to-front Forward+ 순서에 넣는다.
+Code/Graph가 같은 타일 light list, opaque depth와 HDR을 소비한다.</li>
+<li>SSS·굴절 draw는 불투명 depth를 복사한 임시 GBuffer에서 자기 surface depth/owner를 만든다.
+Scene의 불투명 depth/owner는 보존한다. Core/Layered 일반 alpha는 추가 GBuffer를 만들지 않는다.</li>
+<li>SSS의 reflection/source/filter와 굴절의 capture/bake는 해당 draw의 순서 안에서 실행한다.
+각 굴절 draw 직전에 현재 HDR을 복사하여 이미 합성된 뒤쪽 Code/Graph alpha를 배경에 포함한다.</li>
+<li>일반 alpha는 SRC_ALPHA/INV_SRC_ALPHA다. alpha=0 표면은 scratch depth를 기록하지 않으며
+최종 컬러도 discard한다. 물리 transmission을 쓴 Opaque/Masked surface는 authored alpha를
+일반 opacity로 해석하지 않고 coverage 검사 뒤 alpha=1로 합성한다.</li>
+<li>Volume은 불투명 배경에 한 번 적용한 뒤 각 Forward 표면에 카메라부터 해당 표면 깊이까지의
+<code>S + T * L</code>을 적용한다. 따라서 매질 앞의 표면을 뒤쪽 매질로 감쇠하거나 alpha 뒤 배경에
+Volume을 중복 적용하지 않는다. Code·Core/Layered·SSS·굴절은 같은 transport helper를 쓴다.</li>
+<li>굴절 배경의 카메라 매질 응답은 hit 위치에서 제거하고 기존 굴절 ray 매질 응답을 적용한다.
+매질 없는 경로는 triangle count=0으로 반환한다.</li>
+<li>host 예약 자원은 <code>b5</code>, <code>t131..134</code>에 둔다. 저작용 Graph texture <code>t16..127</code>과 분리한다.
+Code reflection은 예약 이름/위치가 일치하는 두 host texture만 material table에서 제외한다.</li>
+<li>shader/binding 계약이 바뀌어 <strong>SceneHost identity 12</strong>로 재쿠킹한다. LXMC/artifact v4,
+BRDF 1024 / environment 4096 및 기존 물리 오차 상한은 유지한다.</li>
+</ul>
+<h2>검증 게이트</h2>
+<p><code>Tools/regression/verify-material-forward-transport.ps1</code>는 DX12 Debug/Release에서 실제
+RenderGraph·GBuffer·Forward+·SceneHost를 실행한다. Graph는 전체 Scene product의
+바이너리 왕복 후 source-free generation으로 소비한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>기준</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Code/Core/SSS 혼합</td>
+<td>단독 렌더에서 얻은 surface radiance와 독립 alpha recurrence 대조</td>
+</tr>
+<tr>
+<td>collection 역순/병렬 기록/카메라 정렬 역순</td>
+<td>GPU 합성 순서와 픽셀 대조</td>
+</tr>
+<tr>
+<td>opaque occlusion 및 alpha 0/1</td>
+<td>불투명 depth/owner 보존, 배경 보존/앞쪽 surface 대조</td>
+</tr>
+<tr>
+<td>alpha/비alpha/여러 identity glass</td>
+<td>IOR=1의 독립 straight-through 기준, 뒤쪽 alpha 포함</td>
+</tr>
+<tr>
+<td>Volume 앞·안·뒤 표면과 Code/Graph 혼합</td>
+<td>독립 Beer-Lambert <code>exp(-density * interval)</code> 대조</td>
+</tr>
+<tr>
+<td>모든 픽셀·GPU 상태</td>
+<td>finite HDR, WARNING 이상 0, Graph compile submissions 0</td>
+</tr>
+<tr>
+<td>SSS의 타일 overflow</td>
+<td>같은 총 irradiance를 가진 65개 광원과 단독 기준값 대조</td>
+</tr>
+<tr>
+<td>실제 제품</td>
+<td>새 identity의 Editor Scene/Game 및 재쿠킹·encrypted Player 소비</td>
+</tr>
+</tbody></table></div>
+<p>DX12 Debug/Release 혼합 검증은 각각 <strong>24 frames, 독립 기준 2,268 RGB 성분,
+30,073 checks, Graph compile submissions 0, GPU validation 0</strong>을 통과했다.
+Code/Core emission은 authored radiance와도 대조하여 빈 draw를 기준값으로 쓰지 않는다.
+각 구성에서 소스 615개의 SHA-256 변동 0을 확인했다.
+<code>Build/Obj/MaterialProductProbe/transport-gate-final.log</code>, <code>forward-transport-{Debug,Release}.log</code>.
+현재 추가 회귀 결과:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>실행 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DX12 Debug 기존 굴절</td>
+<td>24 frames, 198,940 checks, GPU 169,701 성분, validation 0</td>
+</tr>
+<tr>
+<td>DX12 Debug 기존 SSS</td>
+<td>12 frames, 119,415 checks, GPU 108,072 성분, validation 0</td>
+</tr>
+<tr>
+<td>DX12 Debug/Release 기존 Volume</td>
+<td>각각 33 frames, 8,448 pixels, 36,065 checks, GPU 58,812 성분, validation 0, 소스 615개 변동 0</td>
+</tr>
+<tr>
+<td>실제 Editor Debug/Release</td>
+<td>각 11 captures, checks 1,465/1,464, 종료 0, 소스 1,256개 변동 0</td>
+</tr>
+<tr>
+<td>실제 encrypted Player Debug/Release</td>
+<td>각 3 programs, 1 material, 120 promotions, Scene compile 0, text parser 0, payload 보존, 소스 642개 변동 0</td>
+</tr>
+</tbody></table></div>
+<p>기존 Volume 회귀의 Surface+Volume 조건에서 카메라 ray가 뒤집히는 결함을 발견했다.
+far homogeneous 지점이 카메라 뒤로 복원되는 projection에서도 가시 배경은 앞에 있었다.
+기존 composite가 <code>normalize(far - near)</code>를 쓰면서 해당 배경까지의 limit를 0으로 잘라
+감쇠를 누락했다. 가시 endpoint에서 방향/거리를 얻고 무한 endpoint는 중간 clip ray와
+무한 transport limit를 사용하도록 수정했다. 카메라 합성·굴절 배경·굴절 결과를 각각
+독립 적분 기준과 다시 대조했다. 순차/1 worker/4 workers의 Surface+Volume 조건을 포함한
+전체 33프레임을 Debug/Release에서 통과했다. 허용 오차는 기존 1.5e-3을 유지했다.
+<code>transport-regression-volume-{Debug,Release}.log</code>, <code>transport-volume-source-hashes.json</code>.
+배경은 Forward 합성 전에 읽어 독립 기준으로 보존하고, 실제 굴절 배경과 굴절 sample도
+별도로 검사하여 감쇠 누락이 최종 합성에서 상쇄돼 가려지지 않게 한다.</p>
+<p>실제 Editor 검증은 HTTP로 값 변경·Undo/Redo·거절·Reload·재import·Save/Apply·Scene/Game·
+Play/Stop·삭제/복구·재시작을 수행하고 실제 HDR 픽셀과 owner를 검사한다. private project는
+사용자 프로젝트의 UI 배율 1.5를 상속한다. Debug 첫 프레임 준비에 76,656 ms가 걸렸다.
+최초 준비만 별도 bounded warmup으로 기다리고 후속 capture의 fence/픽셀 기준은 유지한다.
+최초 Debug 시도는 120초 fence timeout으로 중단돼 성공 증거에 포함하지 않았다.
+Player의 기존 180초 smoke timeout을 넘긴 cold GBV 실행도 성공으로 세지 않았고,
+전용 검증만 600초 상한으로 다시 실행했다. 제품 timeout은 변경하지 않았다.
+이 시간은 GPU validation이 켜진 정확도 검증이며 loading/FPS 성능 통과가 아니다.
+제품 편집/패키지 회귀 뒤의 Volume composite ray 수정은 Volume 조건의 위 실행으로 검증했다.
+Core 제품 경로·생성 ABI·C++ runtime은 그 수정으로 바뀌지 않았다. 최종 소스로
+CreatorEditor·Player·AssetCooker와 probe를 Debug/Release 모두 다시 빌드했다.</p>
+<h2>지원 한계와 후속 소유</h2>
+<p>정렬은 object/draw 단위다. 교차 표면·self-overlap의 triangle sorting/OIT는 지원하지 않는다.
+굴절은 화면 공간의 한 장으로 합성된 뒤쪽 컬러와 불투명 depth를 사용한다. 배경의 반투명
+층별 깊이를 저장하거나 여러 투명 교차점을 ray tracing하는 방식이 아니다. 화면 밖 miss는
+기존 environment fallback을 따른다. 강한 매질의 역변환은 <code>T &gt;= 1e-4</code>로 제한한다.
+이 근사의 색 오차와 전체 transport 비용은 MAT-9에서 판정한다.</p>
+<p>닫힌 균질 Volume의 기존 16 objects / 128 triangles / 64 transport lights 상한은 유지한다.
+표면의 직접광은 공통 Forward+ light list와 32개 tile overflow fallback을 소비한다.
+SSS·굴절의 scratch 5 MRT + D32는 픽셀당 40 byte이며 해당 표면이 있을 때 한 번 생성해 재사용한다.
+Volume helper가 추가된 shader의 최초 PSO 준비와 활성/비활성 Volume의 GPU·VRAM 비용은
+MAT-9 cold/warm 및 전체 프레임 비용 게이트에서 각각 측정해야 한다.</p>
+<p>SSAO/SSR/SSGI 전체 품질 수용, Blender parity, 근접 모델 카메라 이동 비용과
+GPU-driven 이후 비용 게이트는 MAT-9/해당 renderer phase에 남긴다. 이번 연결을 그 게이트의
+완료나 FPS 개선으로 세지 않는다. PHASE 4.25는 열린 상태를 유지한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증-게이트"></span><span id="sec-범위와-구현"></span><span id="sec-지원-한계와-후속-소유"></span><span id="검증-게이트"></span><span id="범위와-구현"></span><span id="지원-한계와-후속-소유"></span></details></main></body></html>

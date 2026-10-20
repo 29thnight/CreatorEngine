@@ -1,5 +1,52 @@
 # 최근 4일 PR 적용 감사 — 2026-10-07
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Player/PlayerDX12Presentation.cpp:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp#L20) — `class DX12Presentation final : public Presentation`
+- [Player/PlayerDX12Presentation.cpp:234](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp#L234) — `std::to_string(static_cast<long>(result));`
+- [Player/PlayerDX12Presentation.cpp:261](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp#L261) — `m_pendingUse = {std::move(consumerLease), cached->resource};`
+- [Player/PlayerVulkanPresentation.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp#L19) — `outError = std::string("Player Vulkan ") + operation + ": " + VulkanApi::ResultToString(result);`
+- [Player/PlayerVulkanPresentation.cpp:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp#L33) — `std::memcpy(words.data(), blob.Data(), blob.Size());`
+- [Player/PlayerVulkanPresentation.cpp:59](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp#L59) — `const auto* end = static_cast<const char*>(std::memchr(begin, 0, (length - 3) * sizeof(uint32_t)));`
+- [Editor/ImGuiHelper/ProfilerLauncher.cpp:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp#L30) — `install_profiler_live_diagnostics(ce::profiler_viewer::viewer_process());`
+- [Editor/ImGuiHelper/ProfilerLauncher.cpp:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp#L35) — `auto& process = ce::profiler_viewer::viewer_process();`
+- [Editor/ImGuiHelper/ProfilerLauncher.cpp:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp#L37) — `const float scale = ImGui::GetStyle().FontScaleMain;`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:80](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L80) — `ImGuiWindow* const window = ImGui::GetCurrentWindow();`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L85) — `const ImVec2 origin = ImGui::GetCursorScreenPos();`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L88) — `ImGui::ItemSize(bounds);`
+- [Tools/regression/verify-plan-dashboard.ps1:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L51) — `$text = [IO.File]::ReadAllText($Dashboard)`
+- [Tools/regression/verify-plan-dashboard.ps1:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L96) — `while ($j -lt $total -and [char]::IsWhiteSpace($chars[$j])) { $j++ }`
+- [Tools/regression/verify-plan-dashboard.ps1:135](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L135) — `while ($j -ge $open -and [char]::IsWhiteSpace($chars[$j])) { $j-- }`
+- [Engine/EngineDiagnostics/ProfilerViewerProcess.cpp:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp#L75) — `environment.data(), security::directory(executable).c_str(),`
+- [Engine/EngineDiagnostics/ProfilerViewerProcess.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp#L82) — `if (!security::logon_sid(GetCurrentProcess(), sid))`
+- [Engine/EngineDiagnostics/ProfilerViewerProcess.cpp:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp#L92) — `const std::wstring descriptor_text = L"D:P(A;;0x0012019b;;;" + std::wstring(text) + L")";`
+- [Editor/EngineEntry/Commands/SceneObjectCommands.cpp:167](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp#L167) — `const auto parsed = std::from_chars(text.data(), text.data() + text.size(), id);`
+- [Editor/EngineEntry/Commands/SceneObjectCommands.cpp:187](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp#L187) — `auto data = CommandData::Object();`
+- [Editor/EngineEntry/Commands/SceneObjectCommands.cpp:188](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp#L188) — `data.Set("requestId", CommandData::String(std::to_string(id)));`
+- [Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:295](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp#L295) — `std::memcpy(s.stack, stack, sizeof(void*) * depth);`
+- [Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:423](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp#L423) — `const file::path assetRoot = PathFinder::Relative();`
+- [Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:435](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp#L435) — `std::sort(metaPaths.begin(), metaPaths.end());`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 기준과 판정
 
 - 기간: **2026-10-04 00:00 KST부터 2026-10-07 조회 시점까지**(오늘 포함 4개 달력 날짜). UTC 시작은 2026-10-03 15:00이다.
@@ -55,3 +102,5 @@ PR만으로 현재 HEAD를 설명하지 않는다. first-parent 이력에서 `7d
 RG6·RG-V는 소스가 병합됐으므로 dashboard의 todo를 progress로 정정하고 **earnedDays=0**을 명시한다. 기존 완료 기반은 유지한다. PHASE 4 계열 355인일/기성 88/잔여 267(+미산정)은 그대로다. PHASE 14 신규 후속 3행은 days=null, earnedDays=0으로 두며 임의의 구현률·공수·납기를 만들지 않는다. AU0~AU9는 progress를 유지한다.
 
 문서 검증 결과: `verify-plan-dashboard.ps1 -RequireFullParse` 통과(TASKS 442개, 문자열/구조 오류 0, 전체 JavaScript 파싱·렌더 실행 성공, 진행률 유한값). 신규 상대 링크 37개가 존재하며, 439→442행의 차이는 14-REC/14-VIEW/14-DX 세 행뿐이다. 기존 행의 추정 공수 및 전체 기성 합계가 작업 전과 동일하고, RG6/RG-V와 신규 행의 상태·기성 0을 확인했다. `git diff --check`도 통과했다. 이 항목은 문서 검사이며 엔진 실행 수용이 아니다.
+
+</details>

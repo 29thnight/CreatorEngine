@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Graph 현재 포즈·공유 깊이</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSharedDepth.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSharedDepth.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Graph 현재 포즈·공유 깊이</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4">Tools/regression/verify-material-raster-surface.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;,&#39;Release&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9">Tools/regression/verify-material-raster-surface.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10">Tools/regression/verify-material-raster-surface.ps1:10</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L160">Engine/RenderEngine/MaterialGraphSceneHost.h:160</a> — <code>bool PrepareResidency(const EnhancedFrameContext&amp; context, const own::shared_owner&lt;const SceneViewInput&gt;&amp; input,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L162">Engine/RenderEngine/MaterialGraphSceneHost.h:162</a> — <code>bool Prepare(const EnhancedFrameContext&amp; context, own::shared_owner&lt;const SceneViewInput&gt; input,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L357">Engine/RenderEngine/MaterialGraphSceneHost.h:357</a> — <code>static void DeclareHardwareVisibility(EnhancedRenderGraph&amp; graph, const own::shared_owner&lt;const FrameInput&gt;&amp; frame,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15">Engine/RenderEngine/MaterialGraphSceneInput.h:15</a> — <code>own::shared_owner&lt;const Instance&gt; instance;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21">Engine/RenderEngine/MaterialGraphSceneInput.h:21</a> — <code>static own::shared_owner&lt;const SceneMaterialSource&gt; Capture(const Material&amp; material);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L91">Engine/RenderEngine/MaterialGraphSceneInput.h:91</a> — <code>static bool Seal(const SceneInputView&amp; view, std::span&lt;const EnhancedDrawItem&gt; draws,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L231">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:231</a> — <code>class EnhancedRenderGraph : private IRHIUploadTransactionListener</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L451">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:451</a> — <code>explicit EnhancedRenderGraph(IRenderDeviceServices&amp; services,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L467">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:467</a> — <code>bool PrepareParallel(IRHIParallelCommandPool&amp; pool, std::string&amp; outError);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31</a> — <code>enum class EnhancedLiveDisplayTarget : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L459">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:459</a> — <code>inline bool EnhancedGraphSnapshotMatchesView(const EnhancedRenderGraph::DiagnosticSnapshot&amp; graph,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L1209">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:1209</a> — <code>std::shared_ptr&lt;const EnhancedRenderGraph::DiagnosticSnapshot&gt; GetLiveGraphSnapshot(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L382">Engine/RenderEngine/ShaderMeta.cpp:382</a> — <code>else if (&quot;less&quot; == depthTest.Scalar()) outState.depthTest = RHICompareOp::Less;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L383">Engine/RenderEngine/ShaderMeta.cpp:383</a> — <code>else if (&quot;lessEqual&quot; == depthTest.Scalar())</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L385">Engine/RenderEngine/ShaderMeta.cpp:385</a> — <code>else return Fail(context, &quot;depthTest는 off|less|lessEqual이어야 한다&quot;, outError);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>1. 구현 범위</h2>
+<p>이 문서는 독립 RHI의 공유 capture 계약이다. 실제 legacy GBuffer·Masked 가림·HDR 합성을
+연결한 후속 host는 <a href="MaterialGraphSceneHost.html">MaterialGraphSceneHost.md</a>에 기록한다.</p>
+<p><code>MeshSurfaceEvaluator::Prepare</code>와 <code>MeshSurfaceBatch::Declare</code>로 이번 입력의 GPU
+skin/world 변환을 raster·재질 평가·IBL과 같은 <code>EnhancedRenderGraph</code>에 기록한다.
+별도 geometry 제출이나 중간 CPU readback을 요구하지 않는다. 업로드·descriptor·PSO는
+기록 전에 준비하고 콜백은 전달된 encoder만 사용한다.</p>
+<p><code>RasterSurfaceCollector::PrepareSharedDepth</code>는 동일 graph의 완전한 불투명 capture를
+소유한다. 선택한 재질의 mesh owner는 그 capture에 포함되어야 한다. viewport·camera·
+view revision·cull policy·recording을 대조하고, 다른 graph나 부분 capture의 depth를
+다시 빌리는 것은 거부한다. 실패는 caller가 가진 이전 packet을 보존한다.</p>
+<p>공유 소비 패스는 D32 depth를 <code>DepthRead</code>와 읽기 전용 DSV로 선언한다. PSO는
+<code>Equal</code>·depth write 0이며 깊이를 clear하지 않는다. DX12/Vulkan 변환표에 <code>Equal</code>을
+추가했다. native Vulkan 실행 검증은 아직 포함하지 않는다.</p>
+<p>depth equality만으로 coplanar draw를 구분할 수 없으므로 전체 capture의 position MRT에
+정확한 draw ID(1..64)를 저장한다. <code>LXRasterSharedPS</code>는 그 ID와 자기 draw를 대조하고
+다른 재질의 fragment를 버린다. UV fine derivative는 ownership 분기 전에 계산한다.
+따라서 최초 <code>Less</code> depth capture가 선택한 동일 깊이의 winner도 유지한다.
+재질별 footprint는 depth producer와 달라도 되며 각 재질의 UV/LOD를 다시 수집한다.
+현재 한 graph context에 LOD 하나를 전달하므로 여러 texture의 독립 footprint 완료는 아니다.</p>
+<h2>2. 호출 순서와 수명</h2>
+<ol>
+<li>제품 <code>EnhancedDrawItem</code>의 geometry·world·palette와 per-view 값을
+<code>MeshSurfaceInput::Seal</code> 또는 <code>MeshSurfacePlan::Build</code>로 복사한다.</li>
+<li>texture/environment를 준비하고, 워커 경로는 빈 graph의 <code>PrepareParallel</code>을 호출한다.</li>
+<li>각 mesh의 <code>Prepare</code>, 완전한 opaque capture의 <code>Prepare</code>, 재질별
+<code>PrepareSharedDepth</code>, <code>SurfaceEvaluator::PrepareGpu</code>, <code>IblBaker::PrepareGpu</code>를 호출한다.</li>
+<li>mesh → opaque capture → 각 재질의 shared capture/evaluation/bake 순서로 선언한다.
+아직 쓰지 않은 mesh buffer를 SRV로 import해 생산 단계를 생략하지 않는다.</li>
+<li>compile 후 순차 또는 병렬 기록을 완료하고, native 제출·GPU 완료까지 graph와
+전체 source/material/environment owner를 유지한다. CPU 콜백 기록 순서와 GPU 제출
+순서는 다르므로 워커 콜백에서 앞선 콜백의 ready flag를 기다리지 않는다.</li>
+<li>GPU 완료 뒤 모든 mesh → opaque capture → 재질별 capture → material 순서로
+readback을 수용한다. ready flag는 기록 완료이며 GPU 완료나 Scene 게시가 아니다.</li>
+</ol>
+<p><code>MeshSurfaceEvaluator::Record</code>는 같은 준비 packet/명령을 사용하는 immediate 호환 경로다.
+<code>RecordSamples</code>는 아직 기록하지 않은 prepared vertex buffer를 거부한다.
+구간 전환·descriptor 변경·abort로 stale upload가 생기면 graph 선언/기록을 거부한다.
+graph reset 뒤에는 이전 mesh output handle을 사용할 수 없다. 생성/reset 세대는 전역적으로
+고유하므로 동일 주소에 graph를 다시 구성해도 이전 buffer index가 producer로 인정되지 않는다.</p>
+<h2>3. 검증</h2>
+<p><code>Tools/regression/verify-material-raster-surface.ps1 -SkipDependencyRestore</code>가 현재 소스를
+Debug/Release로 빌드하고 native D3D12 GPU validation과 함께 실행한다.</p>
+<ul>
+<li>기존 CPU 대조 baseline 7개와 21개 순차/1워커/4워커 graph의 raster/material/IBL
+바이트 일치. 이제 21개 graph 모두 current mesh producer를 같은 graph에 포함한다.</li>
+<li>서로 다른 Core/Layered 재질의 가림, 근평면 clipping, coplanar, 현재 포즈 스키닝
+4종 × draw 순서 2종 × 기록 방식 3종의 공유 깊이 graph 24개.</li>
+<li>모든 가시 픽셀에 재질 owner 하나만 존재하며 CPU depth/coverage·재질·IBL과 대조.
+두 재질의 서로 다른 LOD bias도 검사한다. 소비 전후 공유 depth bytes는 동일해야 한다.</li>
+<li>스키닝 입력의 palette/source를 seal 후 변조해도 GPU 출력은 복사한 포즈를 사용한다.</li>
+<li>누락/다른 mesh owner·camera/viewport·부분 depth source·미선언 producer·다른 graph
+거부, 전체 depth source의 acceptance 순서와 실패 시 이전 capture 보존.</li>
+<li>기존 6개 기록 실패와 4개 mesh prefix/late-prefix/abort/graph 주소 재사용 실패. 아직 기록하지 않은
+geometry가 그럴듯한 CPU 데이터만으로 acceptance를 얻지 못하는 것도 검사한다.</li>
+</ul>
+<p>최종 Debug/Release는 각각 아래 결과를 통과했다. 픽셀 수는 각 configuration의
+fixture 전체 누계이며, 전체 Scene 해상도나 성능 측정값이 아니다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th align="right">각 configuration 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전체 검사 / GPU 성분</td>
+<td align="right">776,402 / 652,048</td>
+</tr>
+<tr>
+<td>current mesh 포함 baseline graph / 공유 깊이 graph</td>
+<td align="right">21 / 24</td>
+</tr>
+<tr>
+<td>공유 가시 픽셀 / coplanar 픽셀</td>
+<td align="right">5,688 / 1,422</td>
+</tr>
+<tr>
+<td>현재 포즈 스키닝 graph</td>
+<td align="right">6</td>
+</tr>
+<tr>
+<td>기록 실패 / mesh 수명 실패 fixture</td>
+<td align="right">6 / 4</td>
+</tr>
+<tr>
+<td>DXIL·SPIR-V 컴파일 산출물</td>
+<td align="right">24</td>
+</tr>
+<tr>
+<td>D3D12 GPU validation WARNING 이상</td>
+<td align="right">0</td>
+</tr>
+</tbody></table></div>
+<p>최대 정규화 오차는 <code>0.0000859499</code>(기준 <code>0.0001</code>), SRGB 절대 오차는
+<code>0.000689566</code>(기준 <code>0.001</code>), LOD transport 절대 오차는 <code>0.000169724</code>
+(기준 <code>0.0005</code>)다. 물리 계산 오차 기준을 늘리지 않았다.</p>
+<p>공용 경로의 현재 소스 회귀도 Debug/Release 각각 통과했다. MeshSurface는
+621,160개 검사·GPU 286,156성분·8 layout×3 pose·8,200정점·82샘플,
+SurfaceBatch는 19,387개 검사·GPU 19,092성분·37지점·8프레임이다.
+이 게이트 모두 D3D12 GPU validation WARNING 이상은 0건이다.
+Vulkan은 shader 컴파일과 변환 코드 빌드 범위이며 native GPU 검증은 아니다.</p>
+<p>원본 로그는 <code>Build/Obj/MaterialProductProbe/shared-depth-gate-final.log</code>와
+<code>raster-surface-{build-,}{Debug,Release}.log</code>에 둔다. 공용 회귀 결과는
+<code>shared-depth-mesh-regression.log</code>, <code>shared-depth-surface-regression.log</code>에 둔다.</p>
+<h2>4. 남은 실제 Scene 설치</h2>
+<p>이 단계는 최대 4096픽셀·64 draw·동일 cull policy의 독립 RHI 범위다. 전체 capture도
+6개 MRT를 사용한다. 이 자원 구성을 제품 full-screen 비용으로 수용한 것은 아니다.
+현재 Scene draw pool 호출이나 GBuffer의 depth를 그대로 연결한 것으로 세지 않는다.</p>
+<ul>
+<li>실제 draw pool/per-view CPU 입력 밀봉은 <a href="MaterialGraphSceneInput.html">MaterialGraphSceneInput.md</a>에서
+연결했다. 해당 입력을 실제 Scene GPU graph host로 공급하는 설치가 남는다.</li>
+<li>기존 ShaderMeta 재질·masked coverage까지 포함한 공유 depth와 draw ownership을 연결한다.</li>
+<li>직접광·컬러·기존 SSAO/SSR/투명 합성과 async publication을 설치한다.</li>
+<li>전체 해상도·재사용·시간/메모리 예산, 환경 변경/device recreation을 판정한다.</li>
+<li>Special SSS/refraction/Volume과 자동 host/compiler cooker closure를 마무리한다.</li>
+</ul>
+<p><code>EnhancedSceneRenderer</code>의 LX 미설치 거부와 MAT-7 progress 상태를 유지한다.
+전체 Editor 빌드·실제 Scene·Vulkan runtime 완료나 추가 완료 공수를 기록하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-구현-범위"></span><span id="2-호출-순서와-수명"></span><span id="3-검증"></span><span id="4-남은-실제-scene-설치"></span><span id="sec-1-구현-범위"></span><span id="sec-2-호출-순서와-수명"></span><span id="sec-3-검증"></span><span id="sec-4-남은-실제-scene-설치"></span></details></main></body></html>

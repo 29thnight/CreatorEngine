@@ -1,5 +1,35 @@
 # Principled Material 공용 Slang ABI — MAT-1 / MAT-3 / MAT-4 / MAT-5
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-abi.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-abi.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L8) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-abi.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L9) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:135](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L135) — `MaterialInputs DefaultMaterialInputs(float3 geometricNormal = float3(0.0, 0.0, 1.0),`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:280](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L280) — `PrincipledSurface EvaluateStandardMaterial(MaterialInputs inputs)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:297](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L297) — `PrincipledSurface UnpackStandardSurface(float4 baseColor, float4 orm,`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-09-28 · 공용 평가 경계와 core/Layered/Special Principled 의미**
 
 정본 코드는
@@ -125,3 +155,5 @@ Special DXIL/SPIR-V CS/PS 28개·route/의존 mask 거부 22개와 GPU/numeric g
 
 이는 공용 ABI의 컴파일·현행 Standard 동작 검증이다. Blender golden과의 수치 일치,
 실제 제품 씬의 Deferred/Forward 교차 허용 오차와 성능 상한은 `MAT-9`에서 판정한다.
+
+</details>

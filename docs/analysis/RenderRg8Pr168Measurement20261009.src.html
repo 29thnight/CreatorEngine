@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG8 PR168: Release product measurement</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg8Pr168Measurement20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg8Pr168Measurement20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG8 PR168: Release product measurement</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L25">Tools/regression/audit-rg8-adoption.py:25</a> — <code>raise ValueError(message)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L56">Tools/regression/audit-rg8-adoption.py:56</a> — <code>&quot;skybox&quot;: Path(manifest[&quot;skyBoxPath&quot;]).name}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L121">Tools/regression/audit-rg8-adoption.py:121</a> — <code>assignment = {p: (i, b[&quot;queue&quot;]) for i, b in enumerate(batches) for p in b[&quot;passes&quot;]}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L17">Tools/regression/verify-rg8-queue-execution.ps1:17</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L18">Tools/regression/verify-rg8-queue-execution.ps1:18</a> — <code>$out = [IO.Path]::GetFullPath($OutputDirectory)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L75">Tools/regression/verify-rg8-queue-execution.ps1:75</a> — <code>$process = [Diagnostics.Process]::Start($start)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Source: <code>d5a6a26a78da93686b8168429183ee7e0d50a8de</code>, Windows, VS 2026 v18,
+RTX 4070 Ti / driver 595.97. TestShadow, DX12, 1496 x 692.</p>
+<p><strong>Performance acceptance failed.</strong> The product scheduler usually has no usable
+pass costs. This collection does not establish async speedup or close RG8.</p>
+<p>Follow-up: the history rejection below was traced to SSGI physical ping-pong
+declaration order and fixed. See <a href="RenderRg8HistoryFix20261009.html">history fix and remeasurement</a>.
+The historical measurements on this page remain unchanged.</p>
+<h2>Build and native correctness</h2>
+<p>The initial Release build failed the command registry&#39;s sorted-name assertion:
+PR168 inserted <code>render.queue.mode</code> before <code>render.live.fence</code>. Moving the new
+entry after <code>render.pbr.uv</code> fixes the ordering without changing its behavior.
+The subsequent VS2026 Release build passed. Existing Utility_Framework PDB
+LNK4020 and managed trimming warnings remain.</p>
+<p>This was a dirty-worktree build, including the preserved GCCE/local test edits
+and the earlier optimized-clear-value fixture correction. It is not a pristine
+PR checkout result. The original patch/status and binary hashes are retained.</p>
+<p>Release <code>verify-rg8-queue-execution.ps1 -FullRegression</code> passed: 428 execution
+checks, 111 schedule checks, full RenderGraph regression and native GPU validation.
+The wrapper did not require measured overlap. These native results do not prove
+product performance or product GPU-validation acceptance.</p>
+<h2>Normal-frame collection</h2>
+<p>Two Editor processes ran the forward 0/1/2 and reverse 2/1/0 sequences. Within
+each process, <code>render.queue.mode</code> switched at render-owner frame boundaries.
+Each segment warmed 16 ordinary frames and collected 64 chronological candidate
+snapshots. GPU validation and image capture were disabled during timing. GPU
+clocks were not locked; sparse clock/power observations are retained, not a
+continuous frequency-control proof. Mode 0 is the existing executor; mode 1 is
+primary-graphics queue execution; mode 2 requests overlap placement.</p>
+<p>The original wrapper aborted after the first insufficient segment. The retained
+initial run is under <code>normal</code>. The wrapper was then changed to collect all mode
+diagnostics before failing. It still requires 32 eligible samples per segment,
+returns failure when any segment lacks them, and leaves acceptance false. The
+complete diagnostic attempt is under <code>normal-complete-diagnostics</code>.</p>
+<p>All 384 candidate identities and calibrated intervals were independently checked
+with <code>audit-rg8-adoption.py</code>&#39;s timing verifier. The following distributions include
+all 64 candidates per segment, including missing-cost fallback. They are
+<strong>diagnostic observations, not accepted warmed async-performance distributions</strong>.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Order / mode</th>
+<th align="right">GPU span median / p95 ms</th>
+<th align="right">Full-view CPU median / p95 ms</th>
+<th align="right">Record-submit CPU median ms</th>
+<th align="right">Eligible samples</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forward 0</td>
+<td align="right">2.9082 / 3.6342</td>
+<td align="right">7.3035 / 11.2548</td>
+<td align="right">1.0730</td>
+<td align="right">32 / 32</td>
+</tr>
+<tr>
+<td>Forward 1</td>
+<td align="right">3.1206 / 3.2614</td>
+<td align="right">7.1030 / 10.8199</td>
+<td align="right">1.4424</td>
+<td align="right">0 / 32</td>
+</tr>
+<tr>
+<td>Forward 2</td>
+<td align="right">2.5175 / 3.9588</td>
+<td align="right">7.8681 / 13.5453</td>
+<td align="right">1.7648</td>
+<td align="right">4 / 32</td>
+</tr>
+<tr>
+<td>Reverse 2</td>
+<td align="right">3.2809 / 3.5953</td>
+<td align="right">7.5824 / 9.8074</td>
+<td align="right">1.5270</td>
+<td align="right">0 / 32</td>
+</tr>
+<tr>
+<td>Reverse 1</td>
+<td align="right">2.6578 / 3.5062</td>
+<td align="right">7.1947 / 10.5457</td>
+<td align="right">1.5904</td>
+<td align="right">2 / 32</td>
+</tr>
+<tr>
+<td>Reverse 0</td>
+<td align="right">2.2159 / 3.5799</td>
+<td align="right">6.2903 / 8.9849</td>
+<td align="right">0.9152</td>
+<td align="right">32 / 32</td>
+</tr>
+</tbody></table></div>
+<p>Of 128 mode-2 candidates, 124 fell back with <code>missing-measurement</code>; only four
+submitted compute. All 128 candidate overlaps were zero, including those four.
+The initial attempt&#39;s full log did contain a small nonzero overlap (maximum
+0.0226 ms), outside this complete candidate matrix. That observation must not be
+substituted for sustained overlap or net speedup.</p>
+<p>In the initial log, missing-cost schedules reported all 68 pass measurements
+missing, rather than one unsupported pass. This points to a history admission,
+freshness or graph-signature problem; the exact rejection path has not yet been
+instrumented and the root cause is <strong>not established</strong>. More repetitions of the
+same benchmark will not resolve that defect.</p>
+<p>Full-view CPU includes preparation, graph construction/compile, recording,
+scheduling, submission and retirement enqueue; it excludes main-thread scene
+generation, presentation and GPU-completion waits. Opt-in evidence serialization
+is included. Record-submit is a narrower scope and must not be confused with it.</p>
+<h2>Decision and next correction</h2>
+<p>Separate correctness captures completed in six normally exited processes (four
+captures per mode/order). The 16 mode-0 versus mode-1/2 comparisons passed with
+all 112 standard attachments at <code>maxAbs=0</code>, no nonfinite values, and matched
+controlled scene inputs. These captures ran with GPU validation disabled and
+are excluded from the normal timing distributions. Both normal-timing processes
+also exited zero; it is the evidence acceptance wrapper that failed.</p>
+<p>Keep RG8 default OFF. Native correctness passes, but product performance does
+not meet the existing acceptance contract. Diagnose exactly why stored normal
+costs are rejected at <code>FindFresh</code> / signature matching before changing thresholds
+or increasing sample counts. Then rerun this same matrix and separately establish
+a sustained-overlap workload and a fully measured negative fallback workload.</p>
+<p>Evidence root: <code>Build/Verification/Phase43/RG8Pr168Perf20261009/</code>. It contains
+source/binary identities, native results, both timing attempts, the independent
+<code>summarize.py</code> and <code>diagnostic-performance-summary.json</code>, and separate image
+captures/comparisons. Build logs: <code>Build/rg8-pr168-release.log</code> and
+<code>Build/rg8-pr168-release-fixed.log</code>.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="build-and-native-correctness"></span><span id="decision-and-next-correction"></span><span id="normal-frame-collection"></span><span id="sec-build-and-native-correctness"></span><span id="sec-decision-and-next-correction"></span><span id="sec-normal-frame-collection"></span></details></main></body></html>

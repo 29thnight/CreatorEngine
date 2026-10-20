@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>엔진 레이어 분리 계획 — Runtime Core와 Editor의 물리적 분리</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="EngineLayerSeparationPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/EngineLayerSeparationPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>엔진 레이어 분리 계획 — Runtime Core와 Editor의 물리적 분리</h1><p>Scene/Prefab 저작 writer의 Editor 소유권 이관과 Runtime read-only 경계를 현재 호출자까지 확인한다. 이미 분리된 bootstrap·렌더 기즈모·설정·프로젝트는 다시 옮기지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Settings</ve-node><ve-node id="n1" at="2 1">Build</ve-node><ve-node id="n2" at="3 1" key>Cook</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Bootstrap</ve-node><ve-node id="n5" at="1 2">Player</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>Scene/Prefab 저작 writer의 Editor 소유권 이관과 Runtime read-only 경계를 현재 호출자까지 확인한다. 이미 분리된 bootstrap·렌더 기즈모·설정·프로젝트는 다시 옮기지 않는다.</li>
+<li>ScriptRuntime 추가 분할·RenderCore 개명·Player 실행 모듈 경계는 비용·의존성 검증 후 별도 선택한다. 기존 GameScripts.dll 분리와 혼동하지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>project/build settings → build/cook orchestration → cooked manifest/pak → Player bootstrap</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/GameBuilderSystem.h#L5">Editor/EngineEntry/GameBuilderSystem.h:5</a> — <code>class GameBuilderSystem : public Singleton&lt;GameBuilderSystem&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Program.cs#L5">BuildTool/Program.cs:5</a> — <code>public static async Task&lt;int&gt; Main(string[] args)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L74">Engine/RuntimeHost/EngineBootstrap.h:74</a> — <code>inline void InitializeShutdownTrace()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineLaunchConfig.h#L11">Engine/RuntimeHost/EngineLaunchConfig.h:11</a> — <code>using RuntimeContentPrepare = bool (*)(const EnginePaths&amp; paths) noexcept;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L91">Engine/SceneRuntime/SceneManager.cpp:91</a> — <code>&quot;Player 씬 source identity 해석 실패: &quot; + path);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L397">Engine/SceneRuntime/PrefabUtility.cpp:397</a> — <code>value = Authoring::DecodeCookedDocumentTextEnvelope(</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="1-범위와-결정"></span>
+<span id="11-이번-계획이-해결하는-것"></span>
+<span id="12-이번-계획의-범위에서-제외하는-것"></span>
+<span id="2-2026-08-21-현재-소스-기준선"></span>
+<span id="2026-10-07-최근-병합-반영"></span>
+<span id="21-물리적-빌드-구조"></span>
+<span id="22-혼합-책임-인벤토리"></span>
+<span id="23-가장-큰-결합-지점"></span>
+<span id="3-목표-구조"></span>
+<span id="31-목표-프로젝트와-책임"></span>
+<span id="32-경계-규칙"></span>
+<span id="4-필요한-경계-계약"></span>
+<span id="41-host-설정과-경로"></span>
+<span id="42-asset-경계"></span>
+<span id="43-editor-play-mode-경계"></span>
+<span id="44-render-확장-경계"></span>
+<span id="45-imgui-경계"></span>
+<span id="5-실행-계획"></span>
+<span id="6-검증-게이트"></span>
+<span id="7-최종-완료-기준"></span>
+<span id="8-구현-원칙과-금지-사항"></span>
+<span id="9-관련-문서"></span>
+<span id="e0--기준선과-경계-게이트-구축--완료-2026-08-21"></span>
+<span id="e1--host설정경로-정책-분리--완료-2026-08-24-항목-6-완결로-전-항목-종료"></span>
+<span id="e2--assetruntime과-editor-asset-기능-분리--sceneprefab-writer-2종만-잔여-2026-08-24"></span>
+<span id="e3--editor-scene-lifecycle-분리--완료-2026-08-23"></span>
+<span id="e4--editor-렌더링-분리--완료-2026-08-24-iseditorview-잔여는-카메라-완결이-해소"></span>
+<span id="e5--developertools와-테스트-분리--완료-2026-08-23"></span>
+<span id="e6--프로젝트-물리-경계-확정--완료-2026-08-24-판정-44--마지막은-p1a가-닫음"></span>
+<span id="e7--선택-후속-작업--재배치개명통폐합facade-정리-완료-잔여-3건-2026-08-26"></span>
+<span id="sec-1-범위와-결정"></span>
+<span id="sec-2-2026-08-21-현재-소스-기준선"></span>
+<span id="sec-2026-10-07-최근-병합-반영"></span>
+<span id="sec-3-목표-구조"></span>
+<span id="sec-4-필요한-경계-계약"></span>
+<span id="sec-5-실행-계획"></span>
+<span id="sec-6-검증-게이트"></span>
+<span id="sec-7-최종-완료-기준"></span>
+<span id="sec-8-구현-원칙과-금지-사항"></span>
+<span id="sec-9-관련-문서"></span></p>
+</details>
+</main></body></html>

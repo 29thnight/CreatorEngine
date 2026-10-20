@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>LX shadow repeated performance — 2026-10-12</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="LxShadowRepeatedPerformance20261012.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/LxShadowRepeatedPerformance20261012.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>LX shadow repeated performance — 2026-10-12</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L246">Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:246</a> — <code>gpuMeasurements.Store(submission-&gt;domain, std::move(sample));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L258">Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:258</a> — <code>std::printf(&quot;[rg8.live] enabled=true profilerQueue=graphics primary=true\n&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp#L267">Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:267</a> — <code>DX12QueueService::NativeQueue(compute.queue), profilerPassCapacity, kFrameCount, error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28">Engine/Utility_Framework/Sha256.h:28</a> — <code>class Sha256</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30">Engine/Utility_Framework/Sha256.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40">Engine/Utility_Framework/Sha256.h:40</a> — <code>std::memcpy(m_buffer + m_bufferUsed, p, take);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h#L11">Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h:11</a> — <code>struct IDisplayPresentationSink;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h#L12">Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h:12</a> — <code>class IRHIParallelCommandPool;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h#L26">Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h:26</a> — <code>enum class RHILifecycleCommand : uint8_t;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>기존 목록 7번의 선택한 합성 범위 측정을 완료했다. GPU 계측 용량을 1024에서 4096 패스/프레임으로 늘려 MatGrid 8×8의 1710개 구간을 누락 없이 수집했다. 현재 Release 바이너리로 3개 장면, 경로별 4회씩 총 24개 정상 기록을 확보했다. <strong>측정 산출물은 통과했지만 성능 이득은 수용하지 않는다.</strong> 세 장면 모두 그림자 평균합 비교의 독립 반복 CV 기준을 통과하지 못했다.</p>
+<h2>변경과 방법</h2>
+<ul>
+<li><code>EnhancedSceneRendererLiveDX12Adapter.cpp</code>의 그래픽/compute 초기화 용량을 공통 상수 4096으로 통일했다. 3프레임에서 24,576개 timestamp query, 192 KiB readback을 예약한다. 메타데이터 메모리는 별도이며, 이 상한을 넘으면 여전히 계측 실패다. 무제한 용량이나 동적 증가를 구현하지 않았다.</li>
+<li><code>measure-lx-shadow-meshlets.ps1</code>은 C0/C1/C2가 모두 계측됐는지 검사하고 호출당 시간, CPU 준비·기록 비용, 시작/종료 카운터, 소스·바이너리 해시와 정상 종료를 기록한다. 상속된 Debug query 제한은 제거한다.</li>
+<li><code>measure-lx-shadow-repeat.ps1</code>은 indexed→meshlets→meshlets→indexed를 두 번 실행한다. 독립 프로세스·격리 프로젝트, 경로별 4개의 8초 녹화다. 측정 중 다른 빌드나 GPU 검증을 실행하지 않았다.</li>
+<li><code>assess-lx-shadow-performance.py</code>는 프로파일 SHA, 출처, 동일 모델·셰이더·배치·카메라 입력, 동일 바이너리와 해상도, 실뷰당 3개 캐스케이드 누락 없음, 정상 종료를 확인한다. 동일 캡처의 반복 제출은 의도적으로 거부했다.</li>
+<li>변동계수는 4개의 독립 녹화 평균에 대한 sample SD / mean이다. 두 경로 모두 CV ≤ 10%여야 안정성 기준 통과다. 표의 변화율은 <code>(meshlet/indexed-1)*100</code>이며 음수는 비용 감소다. 불안정한 평균의 방향을 확정 이득/손실로 수용하지 않는다.</li>
+</ul>
+<p>Release runtime SHA256: <code>5E9DF26F5B0BF237B8E5D0C535277A03003070C62A7CB241D90E1453ACA10A0F</code>.</p>
+<p>실제 뷰와 display extent는 모두 <strong>332×182</strong>였다. 시간 측정은 validation off, 기능 회귀는 별도의 GPU validation on 실행으로 분리했다. <code>CREATOR_LX_MESHLETS</code>는 그림자 외 표면 경로에도 영향을 주므로 CPU 값은 전체 장면 준비/기록 비용이며 그림자만의 인과 비용으로 분리한 값이 아니다. 제품 해상도, FPS, 표시 지연, compute 사전 컬링 성능 수용은 아니다.</p>
+<h2>GPU 비용</h2>
+<p>캐스케이드 호출당 평균을 사용한다. 각 녹화에서 C0/C1/C2 호출 수는 실제 뷰 렌더 수와 같았다. <code>Shadow.SumOfPassMeans</code>는 세 평균의 합이며, 엔진/UI 프레임당 값과 혼동하지 않는다. 캐스케이드별 원시 통계와 엔진 프레임당 값도 개별 <code>result.json</code>과 <code>.ceprof.summary.json</code>에 보존했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>장면</th>
+<th>GPU 항목</th>
+<th align="right">indexed ms</th>
+<th align="right">meshlet ms</th>
+<th align="right">indexed CV %</th>
+<th align="right">meshlet CV %</th>
+<th align="right">변화 %</th>
+<th>CV ≤ 10%</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MatGrid 8×8</td>
+<td>LX.Scene.Shadow.C0</td>
+<td align="right">5.3281</td>
+<td align="right">5.2745</td>
+<td align="right">10.34</td>
+<td align="right">1.71</td>
+<td align="right">-1.01</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>MatGrid 8×8</td>
+<td>LX.Scene.Shadow.C1</td>
+<td align="right">4.0816</td>
+<td align="right">4.9844</td>
+<td align="right">15.66</td>
+<td align="right">3.98</td>
+<td align="right">22.12</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>MatGrid 8×8</td>
+<td>LX.Scene.Shadow.C2</td>
+<td align="right">3.1977</td>
+<td align="right">3.3163</td>
+<td align="right">10.06</td>
+<td align="right">7.59</td>
+<td align="right">3.71</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>MatGrid 8×8</td>
+<td>Shadow.SumOfPassMeans</td>
+<td align="right">12.6074</td>
+<td align="right">13.5753</td>
+<td align="right">11.16</td>
+<td align="right">1.28</td>
+<td align="right">7.68</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>LX.Scene.Shadow.C0</td>
+<td align="right">0.1573</td>
+<td align="right">0.1919</td>
+<td align="right">13.48</td>
+<td align="right">4.93</td>
+<td align="right">22.02</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>LX.Scene.Shadow.C1</td>
+<td align="right">0.4412</td>
+<td align="right">0.5074</td>
+<td align="right">26.54</td>
+<td align="right">15.52</td>
+<td align="right">15.00</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>LX.Scene.Shadow.C2</td>
+<td align="right">0.3952</td>
+<td align="right">0.6514</td>
+<td align="right">11.25</td>
+<td align="right">19.00</td>
+<td align="right">64.82</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>Shadow.SumOfPassMeans</td>
+<td align="right">0.9937</td>
+<td align="right">1.3507</td>
+<td align="right">15.82</td>
+<td align="right">14.67</td>
+<td align="right">35.93</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>LX.Scene.Shadow.C0</td>
+<td align="right">0.5799</td>
+<td align="right">0.5330</td>
+<td align="right">6.21</td>
+<td align="right">21.10</td>
+<td align="right">-8.09</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>LX.Scene.Shadow.C1</td>
+<td align="right">0.3860</td>
+<td align="right">0.4124</td>
+<td align="right">3.28</td>
+<td align="right">14.50</td>
+<td align="right">6.85</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>LX.Scene.Shadow.C2</td>
+<td align="right">0.4617</td>
+<td align="right">0.3560</td>
+<td align="right">12.01</td>
+<td align="right">21.36</td>
+<td align="right">-22.90</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>Shadow.SumOfPassMeans</td>
+<td align="right">1.4276</td>
+<td align="right">1.3014</td>
+<td align="right">6.56</td>
+<td align="right">18.61</td>
+<td align="right">-8.84</td>
+<td>미수용</td>
+</tr>
+</tbody></table></div>
+<p>MatGrid는 각 캡처·캐스케이드당 24개 실제 렌더 샘플을 포함한다. Suzanne 기본은 439&#126;508개, far=30 조건은 446&#126;507개다. 따라서 MatGrid는 다수 GPU 구간을 검증한 스트레스 장면이지만 실제 렌더 표본은 적다는 한계가 있다.</p>
+<h2>CPU 비용</h2>
+<p>준비와 기록은 각 marker 호출당 평균이다. <code>RenderThreadFrame</code>은 다른 단계와 대기를 포함하므로 GPU 시간에 더해 FPS나 지연으로 계산하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>장면</th>
+<th>CPU 항목</th>
+<th align="right">indexed ms</th>
+<th align="right">meshlet ms</th>
+<th align="right">indexed CV %</th>
+<th align="right">meshlet CV %</th>
+<th align="right">변화 %</th>
+<th>CV ≤ 10%</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MatGrid 8×8</td>
+<td>CPU.RenderThreadFrame</td>
+<td align="right">158.4106</td>
+<td align="right">157.1860</td>
+<td align="right">2.44</td>
+<td align="right">0.73</td>
+<td align="right">-0.77</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>MatGrid 8×8</td>
+<td>CPU.MaterialGraphScenePrepare</td>
+<td align="right">192.5034</td>
+<td align="right">191.7006</td>
+<td align="right">0.86</td>
+<td align="right">0.58</td>
+<td align="right">-0.42</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>MatGrid 8×8</td>
+<td>CPU.RenderCommandRecord</td>
+<td align="right">4.7272</td>
+<td align="right">5.0307</td>
+<td align="right">2.95</td>
+<td align="right">0.48</td>
+<td align="right">6.42</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>CPU.RenderThreadFrame</td>
+<td align="right">10.5477</td>
+<td align="right">10.7631</td>
+<td align="right">10.93</td>
+<td align="right">6.40</td>
+<td align="right">2.04</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>CPU.MaterialGraphScenePrepare</td>
+<td align="right">5.6543</td>
+<td align="right">5.7752</td>
+<td align="right">10.78</td>
+<td align="right">6.88</td>
+<td align="right">2.14</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>CPU.RenderCommandRecord</td>
+<td align="right">1.1560</td>
+<td align="right">1.2097</td>
+<td align="right">6.13</td>
+<td align="right">3.18</td>
+<td align="right">4.65</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>CPU.RenderThreadFrame</td>
+<td align="right">11.0278</td>
+<td align="right">10.4416</td>
+<td align="right">4.30</td>
+<td align="right">11.42</td>
+<td align="right">-5.32</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>CPU.MaterialGraphScenePrepare</td>
+<td align="right">5.9916</td>
+<td align="right">5.5676</td>
+<td align="right">3.10</td>
+<td align="right">13.01</td>
+<td align="right">-7.08</td>
+<td>미수용</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>CPU.RenderCommandRecord</td>
+<td align="right">1.1897</td>
+<td align="right">1.2101</td>
+<td align="right">1.46</td>
+<td align="right">5.77</td>
+<td align="right">1.72</td>
+<td>통과</td>
+</tr>
+</tbody></table></div>
+<p>CPU 기록 비용은 MatGrid 평균 +6.42%, Suzanne 기본 +1.72%, far=30 조건 +4.65%이며 해당 반복 CV 기준은 통과했다. MatGrid 준비는 약 192 ms로 큰 비용을 보인다. 이 측정만으로 특정 함수/업로드가 원인이라고 확정하지 않는다.</p>
+<h2>경계와 거부율</h2>
+<p>audit은 별도 실행의 <strong>CPU 재현</strong>이며 시간 측정에서 제외했다. 실제 GPU 생존 목록 readback 증거가 아니다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>장면</th>
+<th>C0</th>
+<th>C1</th>
+<th>C2</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MatGrid 8×8</td>
+<td>0 / 16,065 (0%)</td>
+<td>0 / 16,065 (0%)</td>
+<td>0 / 16,065 (0%)</td>
+</tr>
+<tr>
+<td>Suzanne 12×12</td>
+<td>0 / 2,593 (0%)</td>
+<td>0 / 2,593 (0%)</td>
+<td>0 / 2,593 (0%)</td>
+</tr>
+<tr>
+<td>Suzanne 12×12, far=30</td>
+<td>41 / 235 (17.45%)</td>
+<td>150 / 1,387 (10.81%)</td>
+<td>0 / 2,593 (0%)</td>
+</tr>
+</tbody></table></div>
+<p>기본 장면을 경계 성능 증거로 승격하지 않았다. <code>camera.lens.probe ProbeCamera 60 0.1 30</code>과 editor camera match로 별도 조건을 만들었다. far=30에서는 인스턴스 가시 수가 14/78/145이며 일부 인스턴스 안의 메시렛이 클립 밖으로 나간다. C0/C1의 양수 거부율과 부분 인스턴스 가시 수를 종료 조건으로 검사했다. 이는 모든 경계·재질·애니메이션 장면 수용은 아니다.</p>
+<h2>제외한 실패와 보관</h2>
+<ol>
+<li>MatGrid 16×16 탐색은 aggregate chunk/CPU/GPU payload 제한을 넘었다. 측정 전에 제외하고 로그와 review를 보존했다.</li>
+<li>수정 전 1024 슬롯의 MatGrid 8×8은 overflow 카운터가 13,178→30,328로 증가해 거부했다. 해당 실패와 이전 바이너리의 Suzanne 8회 기록은 보존하되 새 평균에 섞지 않았다.</li>
+<li>수정 후 MatGrid 마지막 indexed 캡처는 <code>complete=false</code>였다. 슬롯 초과/손실 카운터는 0이지만 녹화 종료 262.28 ms 시점에 GPU 제출 하나가 남아 stop drain deadline을 넘었다. 원본 <code>.ceprof</code>와 판정을 보존하고 제외했다. 원인을 검토한 뒤 <strong>동일 바이너리·동일 절차·동일 기준</strong>으로 한 번 재실행했고 complete=true, pending GPU=0으로 통과했다. 250 ms stop drain 경계 자체를 수정하거나 실패를 정상화하지 않았다.</li>
+<li>추가 반복 도구에서 빈 배열 초기화가 null로 열거되어 dictionary merge 오류가 났다. 명시적 배열로 수정했다. 이미 통과한 두 정상 캡처를 검증해 목록을 복구했고 이전 manifest와 복구 기록을 보존했다. GPU 결과를 재작성하지 않았다.</li>
+</ol>
+<p>모든 <code>.ceprof</code>, 로그, 원시 평균 표본, SHA, manifest와 판정을 보존했다. 매 GPU 실행 전 실제 여유 공간 30 GiB 이상을 확인했다. 이 측정은 원본 그림자 픽셀을 캡처하지 않았고 픽셀 동치 판정을 새로 부여하지 않는다. 이전 12개 합성 정확도 검증의 Debug/Release 원본 144개씩은 보존했다.</p>
+<h2>수정 빌드의 기능 회귀</h2>
+<p>Debug/Release 빌드 성공. 각 구성의 품질·스키닝·IBL·rendergraph·scene 5개 기능 회귀, GPU validation 문제 0·dropped message 0, exit 0·quit 성공, 실행 전후 소스/binary 동일을 확인했다. Debug runtime SHA256: <code>AE995ED17CF88E3E2CD21D7B0B7701B800E443591E8C7EEB161454BB076624C2</code>. Release runtime SHA256는 위 24회 측정과 같다. Debug 판정 (<code>../../Build/Verification/ShadowPerformance-20261012-Final/Regression-Debug/verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Release 판정 (<code>../../Build/Verification/ShadowPerformance-20261012-Final/Regression-Release/verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+<p>12개 장면의 전체 동치/누락 변이 매트릭스는 이번 계측 변경 뒤 다시 실행하지 않았다. 기존 <a href="LxShadowCases20261012.html">장면 검증 보고서</a>의 binary SHA와 당시 판정으로 보존한다. 새로운 표면/그림자 shader 또는 컬링 알고리즘 변경 시 다시 실행해야 한다.</p>
+<h2>증거와 다음 판단</h2>
+<ul>
+<li>통합 판정·입력·전체 반복값 (<code>../../Build/Verification/ShadowPerformance-20261012-Final/overall.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>24회 manifest (<code>../../Build/Verification/ShadowPerformance-20261012-Final/runs.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>정상 캡처 재사용 거부 (<code>../../Build/Verification/ShadowPerformance-20261012-Final/negative-verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>수정 전 실패 검토 (<code>../../Build/Verification/ShadowPerformance-20261012/review.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>수집 불완전 캡처 검토 (<code>../../Build/Obj/LxShadowP0/Run-Release-indexed-20261012-cap4096-boundary-7/review.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>반복 목록 복구 기록 (<code>../../Build/Verification/ShadowPerformance-20261012-cap4096-clip/controller-repair.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+</ul>
+<p>7번의 선택한 합성 범위 산출물은 완료했다. 8번 compute 구현의 착수 근거는 충족하지 못했다. 제품을 대표하는 입력/해상도와 안정적인 비용 비교, CPU 준비·기록 병목을 확인한 뒤 진행 판단을 갱신한다. CPU audit은 GPU 후보/생존 목록 증명이 아니며, compute 경로를 구현하면 목록 비교·픽셀 동치·누락 변이와 성능을 다시 검사해야 한다. Vulkan은 계속 PHASE 4.9 소유다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="cpu-비용"></span><span id="gpu-비용"></span><span id="sec-cpu-비용"></span><span id="sec-gpu-비용"></span><span id="sec-경계와-거부율"></span><span id="sec-변경과-방법"></span><span id="sec-수정-빌드의-기능-회귀"></span><span id="sec-제외한-실패와-보관"></span><span id="sec-증거와-다음-판단"></span><span id="경계와-거부율"></span><span id="변경과-방법"></span><span id="수정-빌드의-기능-회귀"></span><span id="제외한-실패와-보관"></span><span id="증거와-다음-판단"></span></details></main></body></html>

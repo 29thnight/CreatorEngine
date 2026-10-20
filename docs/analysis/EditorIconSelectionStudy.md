@@ -1,5 +1,50 @@
 # W1 아이콘 선정과 비동기 썸네일 표시 계약
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineGUIWindow/EditorWindowNames.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowNames.h#L86) — `struct legacy_name { std::string_view old_name, stable_id; };`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:428](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L428) — `!assets::IsSupportedModelVertexLayout(vertexAttributeMask) ||`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:429](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L429) — `vertexStride != assets::StrideOf(vertexAttributeMask) ||`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:556](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L556) — `[[nodiscard]] bool IsSceneComplete() const noexcept { return IsComplete() || StreamMetadata(); }`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:281](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L281) — `ImGui::GetFontSize(), ImGui::GetStyle().DisplaySafeAreaPadding.y, ImGui::GetIO().DisplayFramebufferScale.y);`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:1036](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L1036) — `const bool paused = SceneManagers->IsGamePaused();`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:2107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L2107) — `ImGui::InputText("Search", searchQuery, sizeof(searchQuery));`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:145](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L145) — `const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L216) — `sceneDisplay.completedSceneEpoch != renderScene->GetSceneEpoch())`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:709](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L709) — `Ray SceneViewWindow::CreateRayFromCamera(const FrameCameraSnapshot& camera, const ImVec2& mousePos)`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:118](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L118) — `void queue_hierarchy_edit(Scene* scene, std::function<CommandCore::CommandResult(Scene&)> edit)`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:147](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L147) — `queue_hierarchy_edit(scene, [handles = std::move(handles)](Scene& current)`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:174](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L174) — `queue_hierarchy_edit(scene, [name = std::string(name), type](Scene& current)`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:1392](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L1392) — `EditorObjectOperations::Transform(gameObject->GetScene()->HandleOf(gameObject->m_index), math::vector3{position.x, position.y, position.z}, gameObject->Transform_().GetRotation(), gameObject->Transform_().GetScale());`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:1439](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L1439) — `EditorObjectOperations::Transform(gameObject->GetScene()->HandleOf(gameObject->m_index), gameObject->Transform_().GetPosition(), math::quaternion{rotation.x, rotation.y, rotation.z, rotation.w}, gameObject->Transform_().GetScale());`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:1520](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L1520) — `ImGui::Image((ImTextureID)EditorImGuiTexture::From(texture), ImVec2(preview, preview));`
+- [Editor/EngineEntry/EditorAssetDatabase.cpp:434](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L434) — `Debug::PrintLog(spdlog::level::err, "Editor layer-settings authoring failed: " +`
+- [Editor/EngineEntry/EditorAssetDatabase.cpp:439](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L439) — `Debug::PrintLog(spdlog::level::err, "Editor layer-settings authoring failed with an "`
+- [Editor/EngineEntry/EditorAssetDatabase.cpp:761](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L761) — `for (const auto& entry : file::recursive_directory_iterator(m_root))`
+- [Editor/EngineEntry/EditorAssetPresentation.cpp:193](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetPresentation.cpp#L193) — `searchFilter.Draw(EditorIcon::Label<EditorIcon::Search, " Search">, availableWidth);`
+- [Editor/EngineEntry/EditorAssetPresentation.cpp:213](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetPresentation.cpp#L213) — `ImGui::PushID(displayName);`
+- [Editor/EngineEntry/EditorAssetPresentation.cpp:221](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetPresentation.cpp#L221) — `ImGui::PushID(displayName);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-11. 기준: HEAD `c46b4fdc`와 조사 시점 작업 트리, 사용자가 제공한 `editor.webp`.
 이 문서는 선정 당시의 비교 근거와 비동기 썸네일 설계다. 이후 W1 제품 적용·검증은
 [EditorMaterialSymbolsW1Validation.md](EditorMaterialSymbolsW1Validation.md)를 따른다.
@@ -384,8 +429,8 @@ DataSystems->BindModelGenerationTextures(*material, *generation);
 
 ## 선정 조사 산출물과 검증
 
-- [아이콘 비교 HTML](../../Artifacts/phase21-icon-study/comparison.html)
-- [비교 PNG](../../Artifacts/phase21-icon-study/comparison.png) / [SVG](../../Artifacts/phase21-icon-study/comparison.svg)
+- 아이콘 비교 HTML (`../../Artifacts/phase21-icon-study/comparison.html` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 비교 PNG (`../../Artifacts/phase21-icon-study/comparison.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) / SVG (`../../Artifacts/phase21-icon-study/comparison.svg` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 - `Artifacts/phase21-icon-study/sources/`: 현재 비교에 쓰는 공식 SVG 39개와 라이선스
   (이전 Live Code 비교용 `code.svg` 3개는 조사 캐시에만 남아 있으며 현재 비교·출처 manifest에서 제외)
 - `sources.json`: 출처 URL·저장소 commit·SHA-256·현재 폰트 name table
@@ -406,3 +451,5 @@ Material Symbols 열에 선정 결과를 표시했다. 실제로 렌더한 PNG�
 선정 조사 시에는 제품 C++/프로젝트 파일을 변경하거나 빌드·런타임 검사를 수행하지 않았다.
 그 뒤 제품 적용과 빌드·회귀 결과는 위 W1 검증 기록으로 분리했다.
 동시에 진행 중인 다른 UI 변경은 보존했다.
+
+</details>

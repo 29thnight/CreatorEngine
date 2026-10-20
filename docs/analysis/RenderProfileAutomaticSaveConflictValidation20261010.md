@@ -1,5 +1,31 @@
 # PHASE 12 — RenderProfile 자동 저장 경합 실행 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- CPU engine frame·render submission·GPU pass·presenter 관측은 서로 다른 식별 축이다. bounded producer 기록과 손실/출처를 보존한다.
+- 집계 메모리 표본은 객체별 native/CLR/GPU 소유 그래프가 아니다. 과거 .ceprof/ETW 기록은 그 실행 신원에만 유효하다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 실제 경로와 검사 범위
 
 `QueueAutomaticRenderProfile`은 GUID를 실제 `.renderprofile` 경로로 해석하고 typed profile을
@@ -31,7 +57,7 @@ metadata 전체 bytes 동일성은 정상 watcher timestamp 갱신과 충돌해 
 본문 삭제 시 sidecar 제거 정책도 반영하고 삭제 이벤트 처리를 끝낸 뒤 자산 쌍을 복원한다.
 초기 Release 실행에서는 Windows 삭제 진행 중 sidecar 상태 조회가 Access denied 예외를
 던졌다. 오류 코드를 받는 조회로 바꾸고 삭제가 완료된 부재 상태까지 기다리도록 했다.
-[검사기 삭제 대기 실패 로그](../../Build/RenderProfileAutomaticConflict/delete-pending-fixture-failure.log).
+검사기 삭제 대기 실패 로그 (`../../Build/RenderProfileAutomaticConflict/delete-pending-fixture-failure.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 이 실패들은 최종 수용 검사 횟수에 포함하지 않는다.
 
 ## 최종 판정
@@ -54,10 +80,10 @@ Release 두 번째 반복은 검사기의 실패 즉시 중단 정책으로 실�
 실패로 확인한 것이며 단순 검사 타이밍 실패로 제외하거나 재시도 성공으로 덮지 않는다.
 정확한 CPU 명령 순서는 이 검사로 계측하지 않았다.
 
-- [실패 판정·각 실행 로그·실패 시 소스 hash](../../Build/RenderProfileAutomaticConflict/result.json)
-- [실패 로그](../../Build/RenderProfileAutomaticConflict/run-Release-long-1.log)
-- [보존된 실제 덮어쓰기 결과](../../Build/RenderProfileAutomaticConflict/overwritten.renderprofile)
-- [기대했던 외부 손상 bytes](../../Build/RenderProfileAutomaticConflict/expected-external.renderprofile)
+- 실패 판정·각 실행 로그·실패 시 소스 hash (`../../Build/RenderProfileAutomaticConflict/result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 실패 로그 (`../../Build/RenderProfileAutomaticConflict/run-Release-long-1.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 보존된 실제 덮어쓰기 결과 (`../../Build/RenderProfileAutomaticConflict/overwritten.renderprofile` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 기대했던 외부 손상 bytes (`../../Build/RenderProfileAutomaticConflict/expected-external.renderprofile` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 성공한 전체 실행은5회×149=745 checks다. 전체 검증은 실패했으며 최종 sourceDrift 검사까지
 진행하지 않았다. 이 부분 성공을 RenderProfile 경합 전체 수용으로 계상하지 않는다.
@@ -79,3 +105,5 @@ RenderProfile 경합 전체 수용, 다중 창/배율 및 다른 실제 UI 반�
 시작 시 원본 복구를 구현하고 Debug/Release 총8회×166 checks 및 제어된 프로세스 종료
 복구12 checks를 통과했다. 현재 수용 범위와 경로 부재·UI·전원 차단 검증 한계는
 [조건부 게시 수정 기록](ConditionalAssetPublishValidation20261010.md), 정본 계획 §30을 따른다.
+
+</details>

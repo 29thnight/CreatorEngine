@@ -16,6 +16,56 @@
 실제 공용 RHI와 scheduler/allocator를 사용한 CPU 회귀, source-hash 고정, sanitizer 검사 및 `CE_SHIPPING=0` profiler core/codec 검사를 수행한다. DX12 native 두 프레임 readback·owned queue·timeline·pool 재사용 회귀는 추가했으나 이 Linux 호스트에서 실행하지 않았다. Vulkan CPU native-boundary 검사를 Vulkan GPU validation으로 간주하지 않는다. 따라서 §12의 제품 수용·기본 전환은 실제 Windows/GPU 실행 전까지 보류한다. `RenderGraphDeclare` 전체 노드 callback 병렬화도 별도다.
 
 
+> 위 2026-10-21 상태를 우선한다. 다음 2026-10-20 대조는 고정 커밋의 감사 스냅샷이다.
+
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/RHI/RHISoftwareBatch.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISoftwareBatch.h#L6) — `class RHISoftwareRecorder;`
+- [Engine/RenderEngine/RHI/RHISoftwareBatch.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISoftwareBatch.h#L9) — `struct RHISoftwareRecordingStorage`
+- [Engine/RenderEngine/RHI/RHISoftwareBatch.h:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISoftwareBatch.h#L51) — `bool IsValid() const { return m_state == RHISoftwareBatchState::Sealed; }`
+- [Engine/RenderEngine/RHI/IRHICommandTranslator.h:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L54) — `virtual bool Translate(RHISoftwareBatch&& softwareBatch, const RHICommandTranslationOptions& options,`
+- [Engine/RenderEngine/RHI/IRHICommandTranslator.h:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L64) — `RHICommandTranslator(IRHIParallelCommandPool& pool, IRenderDeviceServices& services, RHIQueueIdentity queue)`
+- [Engine/RenderEngine/RHI/IRHICommandTranslator.h:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L68) — `bool Translate(RHISoftwareBatch&& softwareBatch, const RHICommandTranslationOptions& options,`
+- [Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1050](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1050) — `bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,`
+- [Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1113) — `!pool->GetTranslationRecording(recordingId, descriptorVersion) ||`
+- [Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1184](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1184) — `bool RHISubmissionThread::EnqueueTranslatedBatch(const void* owner,`
+- [Engine/RenderEngine/RHI/RHICommandTranslator.cpp:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L6) — `bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHICommandTranslationOptions& options,`
+- [Engine/RenderEngine/RHI/RHICommandTranslator.cpp:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L27) — `if (!m_pool.GetTranslationRecording(uploadRecordingId, descriptorVersion))`
+- [Engine/RenderEngine/RHI/RHICommandTranslator.cpp:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L32) — `if (!input.GetDesc().uploadRecordingId || !input.GetDesc().descriptorVersion ||`
+- [Engine/RenderEngine/RHI/RHIEncoder.h:215](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L215) — `virtual bool DrawIndexedIndirect(RHIBufferHandle, uint64_t = 0)`
+- [Engine/RenderEngine/RHI/RHIEncoder.h:231](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L231) — `virtual bool DispatchMeshIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,`
+- [Engine/RenderEngine/RHI/RHIEncoder.h:236](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L236) — `virtual bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,`
+- [Engine/RenderEngine/RHI/IRHIGpuProfiler.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L5) — `class RHIEncoder;`
+- [Engine/RenderEngine/RHI/IRHIGpuProfiler.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L10) — `struct GpuPassTimingIdentity`
+- [Engine/RenderEngine/RHI/IRHIGpuProfiler.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L65) — `class IRHIGpuProfiler`
+- [Engine/RenderEngine/RHI/RHIRecordedBatch.h:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L68) — `bool IsValid() const { return RHIRecordedBatchState::Empty != m_state; }`
+- [Engine/RenderEngine/RHI/RHIRecordedBatch.h:69](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L69) — `bool IsReadyForSubmit() const { return RHIRecordedBatchState::Recorded == m_state; }`
+- [Engine/RenderEngine/RHI/RHIRecordedBatch.h:70](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L70) — `bool IsSubmitted() const { return RHIRecordedBatchState::Submitted == m_state; }`
+- [Engine/RenderEngine/RHI/RHIQueueRecorder.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h#L22) — `class IRHIQueueRecorder`
+- [Engine/RenderEngine/RHI/RHIQueueRecorder.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h#L25) — `explicit IRHIQueueRecorder(job_scheduler& scheduler = ce::get_job_scheduler())`
+- [Engine/RenderEngine/RHI/RHIQueueRecorder.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h#L27) — `virtual ~IRHIQueueRecorder() = default;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-20 shared visibility 입력 후속: shared descriptor scratch를 독점 non-pmr 아레나로 바꾸고, 고정 8뷰 메타데이터와 밀봉 count 입력을 재사용한다. 최종 shared 생성 평균 0.09636→0.09200ms(-4.52%), 기록 OFF 완료 처리량 55.35→57.02뷰/초(+3.00%)다. Game CPU p50은 13.41405→13.46990ms이며 120 FPS 목표는 미달이다. 32프레임·7212픽셀·shared queue header 224개 및 제품 출력 재생을 검증했다. [계측·검증](../analysis/SharedVisibilityInputs20261020.md).
 
 작성일: 2026-10-19. 상태: 기존 제품 경로 연결 및 CPU 계약 검증, native 제품 수용 대기. 초기 기준: CreatorEngine `2935f29452698d08f4c0cf720c255ae383c3ca3f` 및 작업 트리, 로컬 UE 5.6.1 소스. 본문은 전체 구현 계약이며 현재 추가된 범위는 아래 진행 기록으로 구분한다.
@@ -24,7 +74,7 @@ GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프
 
 이전 후속(권장 1→2→4→5)은 작업 그래프·입력·segment 객체·네이티브 상태를 재사용한다. 이번 동일 조건 비교에서 Game CPU 중앙값 14.1255→13.6965ms, 기록 평균 2.1666→1.9426ms, 번역 평균 1.9076→1.7150ms다. 120 FPS 예산은 미달이다. [후속 계측·검증](../analysis/RhiSoftwareFollowup20261020.md).
 
-이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 [기록·번역 재사용 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 [비동기 제품 배선 검증](../../Artifacts/rhi-async-20261019/index.html)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. 이 초기 기록 당시 owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계였다. 현재 연결 범위와 미완료 수용 항목은 문서 상단의 2026-10-21 기록을 따른다.
+이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. [최종 계측·검증](../analysis/RhiSoftwareArenaOptimization20261020.md). 이전 기록·번역 검증은 기록·번역 재사용 검증 (`../../Artifacts/rhi-record-reuse-20261020/index.html` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 비동기 제품 배선 검증 (`../../Artifacts/rhi-async-20261019/index.html` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. `CREATOR_RHI_SOFTWARE_COMMANDS=1`로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. 이 초기 기록 당시 owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계였다. 현재 연결 범위와 미완료 수용 항목은 문서 상단의 2026-10-21 기록을 따른다.
 
 ### 2026-10-19 구현 API와 수명
 
@@ -72,7 +122,7 @@ GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프
 - CPU 준비 `PreparationScratch::Work`와 RDG 컴파일·기록 임시 배열은 작업 합류 후 컨테이너·객체를 먼저 소멸시키고 lease를 반환한다. 중첩 RDG 호출과 병렬 패킷 작업은 별도 lease를 사용한다.
 - 프레임 Draw/그림자 Draw/입력 범위/정렬 순서는 `FrameInput::m_cpuStorage`에 속한다. lease 필드를 컨테이너보다 먼저 선언해 마지막에 소멸시킨다. 그래프 callback과 RHI batch의 기존 lifetime token이 FrameInput을 유지하며, GPU retirement 및 마지막 CPU 소유자 해제 뒤 reset한다. 물리적인 Present 시점을 강제 reset 경계로 사용하지 않는다.
 - 영속 구조 캐시, 업로드 버퍼, descriptor/native command pool은 기존 수명 계약을 유지한다. 소프트웨어 명령 아레나는 같은 비-pmr 풀을 사용하고 마지막 CPU 번역·취소 소비 뒤 블록을 재사용한다.
-- 회귀 검사는 안정 주소·4096바이트 정렬·병렬 writer 영역·지연 CPU/GPU 소유자·반환 주소 재사용·보관 한도·조기 예외 종료와 실제 RHI 게이트/GPU retirement를 검사한다. [전후 측정](../../Artifacts/render-arena-20261020/index.html).
+- 회귀 검사는 안정 주소·4096바이트 정렬·병렬 writer 영역·지연 CPU/GPU 소유자·반환 주소 재사용·보관 한도·조기 예외 종료와 실제 RHI 게이트/GPU retirement를 검사한다. 전후 측정 (`../../Artifacts/render-arena-20261020/index.html` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
 ### 2026-10-20 렌더 할당자와 오류 관리
 
@@ -81,7 +131,7 @@ GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프
 - 소스는 `ThirdParty/mimalloc`의 고정 커밋으로 벤더링한다. C `src/static.c`만 unity/PCH 밖에서 O2로 컴파일하고 Debug에는 upstream `MI_DEBUG=2`를 유지한다. vcpkg를 사용하지 않는다.
 - `RHISoftwareCommandList::GetError()`는 고정 리터럴을 참조하는 `string_view`다. `RHICommandFailure::Reset()`은 진단 문자열 용량을 보존하고 나머지 필드를 기본값으로 돌린다. translator는 segment 오류 객체를 배치 내 재사용한다.
 - private heap을 파괴하지 않으며 생산 스레드 종료 뒤 소비 스레드가 해제할 수 있다. descriptor/upload/native target의 GPU retirement와 제출 FIFO 계약은 유지한다.
-- 실행 근거: [할당자 전후 측정](../../Artifacts/render-mimalloc-20261020/index.html).
+- 실행 근거: 할당자 전후 측정 (`../../Artifacts/render-mimalloc-20261020/index.html` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
 ### 2026-10-20 기록 저장소와 번역 풀 재사용
 
@@ -92,7 +142,7 @@ GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프
 - `DX12CommandListPool::CreateTranslationPool`: producer의 frame slot별 fork를 캐시한다. 외부 shared owner가 모두 사라진 fork만 재사용한다. pending CPU 번역·GPU retirement가 소유 중이면 별도 fork를 만든다. native encoder와 barrier scratch를 유지하며, 재사용 가능한 CPU RTV·DSV·UAV clear heap에 새 descriptor를 복사한다. upload·shader-visible descriptor lease와 recording ID는 매번 새 recording에서 캡처한다.
 - 명령 arena는 마지막 CPU 소비·취소 시 반환한다. GPU upload·descriptor·자원 수명은 기존 retirement가 유지한다. 순회는 컨테이너를 변경하지 않는 구간에서 pointer/count span을 사용하며 전역 iterator debug 설정은 변경하지 않는다.
 
-수정 전후의 양쪽 실행은 `CREATOR_RHI_SOFTWARE_COMMANDS=1`을 사용한다. [기록·번역 최적화 검증](../../Artifacts/rhi-record-reuse-20261020/index.html)에 결과를 기록한다.
+수정 전후의 양쪽 실행은 `CREATOR_RHI_SOFTWARE_COMMANDS=1`을 사용한다. 기록·번역 최적화 검증 (`../../Artifacts/rhi-record-reuse-20261020/index.html` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 결과를 기록한다.
 
 
 ## 1. 목표와 적용 범위
@@ -397,3 +447,5 @@ UE 기준 루트: `C:/Program Files/Epic Games/UE_5.6/Engine`, 버전 5.6.1 CL44
 | `Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp`의 `SetupParallelExecute` | RDG 실행 분할과 context 경계 유지 |
 
 UE의 명령 분리 원칙을 현재 RHI 경계에 적용한다. UE의 allocator 구현, linked-list 저장 형식, task thread 배치, 모든 RDG 기능을 동일하게 복제하는 계약은 아니다. UE식 명령 목록 도입과 고정 프레임 지연 설정은 별도다.
+
+</details>

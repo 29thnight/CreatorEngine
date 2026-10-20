@@ -1,5 +1,53 @@
 # RE ENGINE와 CreatorEngine 렌더링 배선
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L109) — `class LiveBlackboard`
+- [Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L130) — `throw std::runtime_error("A resource-list slot requires GetList.");`
+- [Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:137](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L137) — `void SetList(const std::string& slot, std::vector<RGHandle> handles) { m_slots[slot] = std::move(handles); }`
+- [Editor/EngineEntry/App.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L65) — `enabled |= std::wstring_view(arguments[index]) == L"--smoke-offscreen";`
+- [Editor/EngineEntry/App.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L82) — `result = std::filesystem::absolute(arguments[i + 1]).lexically_normal();`
+- [Editor/EngineEntry/App.cpp:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L121) — `requested |= std::wstring_view(arguments[i]) == L"--warmup-check";`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L77) — `error = std::move(message);`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:91](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L91) — `if (!std::isfinite(matrix.m[row][column]))`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:124](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L124) — `const double length = std::hypot(coefficients[0], coefficients[1], coefficients[2]);`
+- [Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L39) — `RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameInput>& frame,`
+- [Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L106) — `throw std::runtime_error("Shadow raster target differs from its sealed light extent/slice.");`
+- [Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L109) — `? RHIDepthTargetDesc::Depth(texture, RHIFormat::D32Float)`
+- [Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L2) — `SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shared_owner<const FrameInput>& prepared,`
+- [Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L27) — `throw std::runtime_error("METEOR visibility requires depth, visibility and prepared commands.");`
+- [Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L38) — `std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_owner<const FrameInput>& prepared,`
+- [Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl#L2) — `void SceneHost::HistoryStage::DeclareHistory(const own::shared_owner<const FrameInput>& prepared,`
+- [Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl#L7) — `prepared->CheckCurrent(&graph);`
+- [Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl#L9) — `throw std::runtime_error("METEOR history requires its final surface depth.");`
+- [Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl#L2) — `RGHandle SceneHost::OccluderStage::DeclareOccluder(const own::shared_owner<const FrameInput>& prepared,`
+- [Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl#L10) — `RequireStage(first.list, {}, "METEOR.Scene.Occluder received a list for an empty frame.");`
+- [Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl#L38) — `bool SceneHost::OccluderStage::Prepare(const FrameInput& frame, const EnhancedFrameContext& context,`
+- [Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L2) — `SceneFirstCullOutputs SceneHost::FirstCullStage::DeclareFirstCull(const own::shared_owner<const FrameInput>& prepared,`
+- [Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L9) — `RequireStage(geometry, {}, "METEOR.Scene.Cull.First received geometry for an empty frame.");`
+- [Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L12) — `frame->CheckCurrent(&graph);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준일: 2026-10-16. 기존 저장소 문서는 열거나 재사용하지 않고 작성했다.
 RE는 Capcom RE ENGINE으로 해석했다. RE 쪽은 REAC 2025 발표의 Monster Hunter Wilds 경로를 기준으로 재구성했으며, 2026년 RE 전체 제품의 최신 구현을 뜻하지 않는다.
 CreatorEngine 쪽은 미커밋 변경을 포함한 현재 작업 디렉터리 소스의 정적 배선이다. 빌드, 실행, GPU 캡처 검증은 수행하지 않았다.
@@ -193,3 +241,5 @@ flowchart TB
 | 해석 한계 | 발표에서 공개된 특정 제품·시점의 구조 | 미커밋 변경을 포함한 정적 코드 연결, 실행 성공·성능 동등성은 미검증 |
 
 우리 엔진의 Shadow 경로를 RE의 Camera Depth Reprojection 경로와 동일하게 그리지 않았다. 또한 비슷한 단계가 존재한다는 이유로 재질 처리 방식이나 성능이 동등하다고 판단하지 않았다.
+
+</details>

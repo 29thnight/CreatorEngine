@@ -1,5 +1,52 @@
 # Material Graph Scene generation 준비와 마지막 정상 재질
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/TypeTrait.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L41) — `inline constexpr bool is_gc_strong_ref_v<gc::trace_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L43) — `inline constexpr bool is_gc_strong_ref_v<gc::root_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L52) — `constexpr bool is_shared_ptr_v<own::shared_owner<T>> = true;`
+- [Tools/regression/verify-material-raster-surface.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/verify-material-raster-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-raster-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-vulkan-generation.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-generation.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-vulkan-generation.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-generation.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-vulkan-generation.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-generation.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Engine/RenderEngine/RHI/RHIRecordedBatch.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L28) — `enum class RHIRecordedBatchState : uint8_t`
+- [Engine/RenderEngine/RHI/RHIRecordedBatch.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L55) — `MoveFrom(std::move(other));`
+- [Engine/RenderEngine/RHI/RHIRecordedBatch.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L63) — `MoveFrom(std::move(other));`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17) — `struct SceneVolumeTriangle`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31) — `own::shared_owner<const RenderBindings> material;`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:89](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L89) — `void ShutdownAfterIdle();`
+- [Engine/RenderEngine/MaterialGraphSceneSubsurface.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L10) — `struct SceneSubsurfaceReflection`
+- [Engine/RenderEngine/MaterialGraphSceneSubsurface.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L12) — `math::vector4 metalSingleAlbedo, metalAverage;`
+- [Engine/RenderEngine/MaterialGraphSceneSubsurface.h:61](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L61) — `void ShutdownAfterIdle();`
+- [Engine/RenderEngine/MaterialGraphSceneRefraction.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L10) — `struct SceneRefractionSample`
+- [Engine/RenderEngine/MaterialGraphSceneRefraction.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L12) — `math::vector4 glassSingleAlbedo, glassAverage, glassEnvironment, rawTransmission, radiance;`
+- [Engine/RenderEngine/MaterialGraphSceneRefraction.h:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L64) — `void ShutdownAfterIdle();`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h#L121) — `class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSignatureCache`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h:124](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h#L124) — `explicit VulkanPipelineCache(job_scheduler& scheduler = ce::get_job_scheduler()) : m_scheduler(scheduler) {}`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h:125](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h#L125) — `~VulkanPipelineCache() override;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-09-29 · MAT-7 완료. Core/Layered·SSS·transmission Scene host의 준비·교체 경계.**
 
 ## 1. 설치 범위
@@ -206,3 +253,5 @@ source manifest와 개별 빌드/native 로그는 같은 폴더의 `vulkan-gener
 이는 당시 shader/PSO 설치와 기존 baseline draw의 검증이다. 이후 native Vulkan 전체 Scene
 합성은 [MaterialGraphProductIntegration.md](MaterialGraphProductIntegration.md)의 Debug/Release
 6개 실제 실행 경로로 확인했다.
+
+</details>
