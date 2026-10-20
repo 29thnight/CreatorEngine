@@ -1,5 +1,34 @@
 # DLSS Quality 첫 이동 잔상 수정 — 2026-10-11
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp#L44) — `if (message) std::fprintf(stderr, "[Streamline:%u] %s\n", static_cast<unsigned>(type), message);`
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp:430](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp#L430) — `DlssTemporalAdapter::DlssTemporalAdapter() : m_implementation(std::make_unique<Implementation>()) {}`
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp:436](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp#L436) — `::ce::contracts::assert_that(`
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.h:72](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.h#L72) — `enum class DlssLatencyMarker : uint8_t`
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.h:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.h#L78) — `enum class DlssDX12ProxyKind : uint8_t { Device, Factory, Swapchain };`
+- [Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.h#L79) — `enum class DlssPacingOwner : uint8_t { Unspecified, Streamline, ApplicationWaitableObject };`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정
 
 **이전 턴의 재현 실패는 수정·검증 완료. PHASE 4.5 전체 완료는 아니다.**
@@ -44,3 +73,5 @@ DX12 RTX 2080 Ti, 창 1280×720, 실제 display 760×312/render 507×208, Qualit
 최종 구성별 warmed/startup 대표 frame-1 총 4개와 고정 조건의 기본 모델 실패 전체 1개를 보존했다. 원래 실패의 중복 raw는 289개 해시 일치 확인 후 제거했다. 중간 성공 원본도 비교/변이 검사 완료 뒤 제거했다. 모든 판정·manifest·로그·해시는 보존하며, 삭제 ledger가 과거 전체 픽셀 재생 불가를 명시한다.
 
 실제 **3.42 GiB 회수**, 종료 여유 **86.59 GiB**, 30 GiB 하한 유지. 전체 바이너리 사본은 만들지 않았다. 앞으로 SDK 품질 실행기는 configuration/provider/quality/warmed-or-startup별 성공을 관리하고, 추가 비교용 `KeepRawCaptures`가 없으면 성공 후 첫 이동 대표만 보존한다. 저장 정책 회귀 검사도 통과했다.
+
+</details>

@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 14.5 조건 ② — GUI 수동 조작 체크리스트</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="Phase14_5ManualGuiChecklist.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/Phase14_5ManualGuiChecklist.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 14.5 조건 ② — GUI 수동 조작 체크리스트</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">UI component</ve-node><ve-node id="n1" at="2 1">UIManager</ve-node><ve-node id="n2" at="3 1" key>Canvas</ve-node><ve-node id="n3" at="3 2">Prepared data</ve-node><ve-node id="n4" at="2 2">UI pass</ve-node><ve-node id="n5" at="1 2">Submission</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.</li>
+<li>scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp#L345">Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp:345</a> — <code>std::is_sorted(std::begin(kSeeds), std::end(kSeeds),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp#L350">Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp:350</a> — <code>std::adjacent_find(std::begin(kSeeds), std::end(kSeeds),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp#L357">Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp:357</a> — <code>const auto found = std::lower_bound(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14">ScriptCore/Animator.cs:14</a> — <code>public sealed class Animator : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18">ScriptCore/Animator.cs:18</a> — <code>public void SetBool(string name, bool value) =&gt; Native.AnimatorSetBool(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19">ScriptCore/Animator.cs:19</a> — <code>public void SetFloat(string name, float value) =&gt; Native.AnimatorSetFloat(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L49">Engine/SceneRuntime/Animator.h:49</a> — <code>struct [[reflgen::reflect]] BoneTransformConstraint final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L136">Engine/SceneRuntime/Animator.h:136</a> — <code>void CreateController(std::string name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L137">Engine/SceneRuntime/Animator.h:137</a> — <code>std::shared_ptr&lt;AnimationController&gt; CreateController_UI();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.h#L11">Editor/EngineGUIWindow/InspectorWindow.h:11</a> — <code>class Entity;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.h#L19">Editor/EngineGUIWindow/InspectorWindow.h:19</a> — <code>void DrawAddComponent(Entity* entity);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.h#L48">Editor/EngineGUIWindow/InspectorWindow.h:48</a> — <code>void ImGuiDrawHelperTransformComponent(Entity* gameObject);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L6">Editor/EngineGUIWindow/HierarchyWindow.h:6</a> — <code>class Entity;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L7">Editor/EngineGUIWindow/HierarchyWindow.h:7</a> — <code>class HierarchyWindow</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L9">Editor/EngineGUIWindow/HierarchyWindow.h:9</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L38">Editor/EngineGUIWindow/SceneViewWindow.h:38</a> — <code>const std::vector&lt;gc::trace_ref&lt;Entity&gt;&gt;&amp; slots);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L42">Editor/EngineGUIWindow/SceneViewWindow.h:42</a> — <code>const Ray&amp; ray, const std::vector&lt;gc::trace_ref&lt;Entity&gt;&gt;&amp; slots);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L71">Editor/EngineGUIWindow/SceneViewWindow.h:71</a> — <code>Ray CreateRayFromCamera(const FrameCameraSnapshot&amp; camera, const ImVec2&amp; mousePos);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L33">Editor/EngineEntry/EditorObjectOperations.h:33</a> — <code>CommandCore::CommandResult Rename(EntityHandle target, const std::string&amp; name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L82">Editor/EngineEntry/EditorObjectOperations.h:82</a> — <code>CommandCore::CommandResult NavigateSelection(Scene* scene, int direction);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L85">Editor/EngineEntry/EditorObjectOperations.h:85</a> — <code>CommandCore::CommandResult MaterialMode(const std::vector&lt;own::shared_owner&lt;Material&gt;&gt;&amp; materials, MaterialRenderingMode mode);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L13">Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:13</a> — <code>struct DescriptorSeed</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L65">Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:65</a> — <code>const DescriptorSeed* FindDescriptorSeed(std::string_view canonical);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L67">Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:67</a> — <code>std::size_t DescriptorSeedCount() noexcept;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><a href="Phase14_5Closure.html">종결 검토</a>의 재정의가 남긴 마지막 조건이다. 자동 게이트는 <strong>HTTP 경로로</strong> 공통
+편집 API 를 때려 실제 상태 복원을 확인했다. 그것이 <strong>위젯 조작을 대신했다고 주장하지 않는다</strong> — 같은
+서비스라도 GUI 는 자기 입력 확정·선택 상태·다중 선택 묶음을 거쳐 들어가고, 그 구간은 자동 게이트 밖이다.</p>
+<h2>대상을 어떻게 정했나</h2>
+<p><code>CommandDescriptorSeeds.cpp</code> 의 <code>undoable = true</code> 를 정본으로 삼는다. <strong>24 개</strong>다.</p>
+<p><a href="Phase14_5Closure.html">종결 검토</a>와 <a href="CommandSurfaceTable.html">CommandSurfaceTable.md</a> 는 <strong>21 개</strong>라고 적는다.
+그 수는 2026-09-06 당시 옳았다 — <strong>틀린 것이 아니라 그 뒤에 늘었다.</strong> <code>object.icon</code> · <code>object.lock</code> ·
+<code>scene.navigate</code> 셋을 2026-09-13 의 <code>4737ec60</code>(PHASE 21 에디터 워크스페이스 재설계)이 더했고, 도표의
+마지막 갱신은 그 전날인 <code>0ec60573</code>(09-12)이다. 도표에는 Undo 열이 빈 것이 아니라 <strong>행 자체가 없다</strong>.
+같은 이유로 도표는 제품 명령 28 개를 모른다(<code>editor.*</code> 16 · <code>play.*</code> 5 · 위 셋 · <code>scene.populate</code> ·
+<code>script.create*</code> · <code>dx12.validation</code>).</p>
+<p>★ <strong>이 수는 고정이 아니다.</strong> 다른 페이즈가 공통 편집 API 를 쓰면 14.5 의 Undo 표면이 함께 늘어난다.
+확인에 착수할 때 seed 표에서 <strong>다시 뽑아</strong> 이 표와 맞대라 — 줄 수가 다르면 그 사이에 늘어난 것이다.
+이 체크리스트는 도표가 아니라 seed 표에서 유도했다. 도표 갱신은 별도 과제다.</p>
+<h2>판정 규칙</h2>
+<p>항목마다 넷을 본다. 하나라도 어긋나면 그 줄은 실패이며, 실패를 지우지 말고 관측값을 적는다.</p>
+<ol>
+<li><strong>반영</strong> — GUI 조작이 실제 상태를 바꾼다(되읽어서 확인한다. &quot;명령이 성공했다&quot; 로 그치지 않는다).</li>
+<li><strong>Undo</strong> — 한 번에 조작 <strong>전</strong> 상태로 돌아간다. 여러 객체를 한 번에 바꾼 조작은 <strong>Undo 한 항목</strong>이다.</li>
+<li><strong>Redo</strong> — 다시 조작 후 상태가 된다.</li>
+<li><strong>무변경·오입력</strong> — 값이 그대로이거나 잘못된 입력이면 <strong>Undo 항목이 늘지 않는다</strong>.</li>
+</ol>
+<p><code>undo</code> 자신은 3·4 를 스택 깊이로 본다. 프리팹 정의 저장·씬 저장은 영속 자산 서비스라 이 표에 없다
+(계획서 §편집 HTTP 계약). 프리팹 <strong>소환</strong>은 씬 편집이므로 있다.</p>
+<h2>확인 전 준비</h2>
+<ul>
+<li>Debug 또는 Release Editor 를 띄우고 빈 씬에서 시작한다. 재생 중이 아닌 <strong>편집 모드</strong>다.</li>
+<li>각 항목은 독립으로 본다. 앞 항목의 Undo 스택이 남아 있으면 4 번 판정이 흐려진다.</li>
+<li>같은 조작을 CLI 로도 한 번 해 보면 &quot;공통 경로&quot; 주장이 함께 확인된다(선택).</li>
+</ul>
+<h2>A. GUI 호출처가 소스에서 확인된 18 개</h2>
+<p><code>EditorObjectOperations::&lt;API&gt;</code> 를 GUI 파일이 실제로 부르는 것을 확인한 항목이다.
+경로는 <strong>호출 관계</strong>이지 화면 위치가 아니다 — 패널 안 어디를 누르는지는 확인하며 채운다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>명령</th>
+<th>공통 API</th>
+<th>GUI 패널</th>
+<th>조작 · 기대</th>
+<th align="center">반영</th>
+<th align="center">Undo</th>
+<th align="center">Redo</th>
+<th align="center">무변경</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>component.add</code></td>
+<td><code>AddComponent</code></td>
+<td>InspectorWindow</td>
+<td>오브젝트에 컴포넌트를 붙인다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>component.remove</code></td>
+<td><code>RemoveComponent</code></td>
+<td>InspectorWindow</td>
+<td>Remove an optional component with Undo</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>object.create</code></td>
+<td><code>Create</code></td>
+<td>HierarchyWindow</td>
+<td>빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>object.delete</code></td>
+<td><code>Delete</code></td>
+<td>HierarchyWindow</td>
+<td>Delete an object subtree with Undo</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>object.icon</code></td>
+<td><code>SetIcon</code></td>
+<td>InspectorWindow</td>
+<td>Set entity image preset with Undo</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>object.lock</code></td>
+<td><code>SetEditLocked</code></td>
+<td>InspectorWindow</td>
+<td>Lock or unlock entity authoring with Undo</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>object.parent</code></td>
+<td><code>Parent</code></td>
+<td>HierarchyWindow</td>
+<td>오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>object.rename</code></td>
+<td><code>Rename</code></td>
+<td>InspectorWindow</td>
+<td>Rename through the shared editor undo transaction</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>object.transform</code></td>
+<td><code>Transform</code></td>
+<td>InspectorWindow</td>
+<td>변환을 지정한다(회전은 도)</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code>prefab.instantiate</code></td>
+<td><code>InstantiatePrefab</code></td>
+<td>SceneViewWindow</td>
+<td>프리팹을 씬에 소환한다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>render.matmode</code></td>
+<td><code>MaterialMode</code></td>
+<td>ImGuiDrawHelperMeshRenderer</td>
+<td>오브젝트 재질의 렌더링 모드를 바꾼다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>12</td>
+<td><code>scene.navigate</code></td>
+<td><code>NavigateSelection</code></td>
+<td>InspectorWindow</td>
+<td>Navigate entity selection history</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>13</td>
+<td><code>scene.select</code></td>
+<td><code>Select</code></td>
+<td>HierarchyWindow, SceneViewWindow</td>
+<td>오브젝트를 에디터 선택으로 지정한다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>14</td>
+<td><code>ui.anchor</code></td>
+<td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td>
+<td>SceneViewWindow</td>
+<td>앵커를 직접 지정한다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>15</td>
+<td><code>ui.pos</code></td>
+<td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td>
+<td>SceneViewWindow</td>
+<td>UI anchored position을 편집한다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>16</td>
+<td><code>ui.screenpos</code></td>
+<td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td>
+<td>SceneViewWindow</td>
+<td>UI 화면 위치를 편집한다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>17</td>
+<td><code>ui.size</code></td>
+<td><code>CapturePropertyEdit,CommitPropertyEdits,Properties,PropertyEdit</code></td>
+<td>SceneViewWindow</td>
+<td>UI 크기를 편집한다</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>18</td>
+<td><code>undo</code></td>
+<td><code>UndoRedo</code></td>
+<td>HierarchyWindow</td>
+<td>에디터의 Ctrl+Z / Ctrl+Y와 같은 호출</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+</tbody></table></div>
+<h2>B. GUI 호출처를 찾지 못한 6 개 — 먼저 볼 것</h2>
+<p>아래는 &quot;GUI 에 기능이 없다&quot; 는 뜻이 <strong>아니다</strong>. 셋 중 하나다 —
+① GUI 가 공통 API 가 아닌 <strong>다른 경로</strong>로 같은 편집을 한다(그렇다면 LC6 의 공통 경로 주장에 구멍이 있다),
+② 호출이 메뉴·명령 디스패치를 거쳐 정적 grep 에 안 잡힌다, ③ 애초에 GUI 표면이 없다.
+<strong>어느 쪽인지 확인하는 것이 이 절의 일이다.</strong> ②·③ 이면 그 사실을 적고 넘어가며, ① 이면 결함이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>명령</th>
+<th>인자</th>
+<th>동작</th>
+<th>판정(①/②/③)</th>
+<th align="center">반영</th>
+<th align="center">Undo</th>
+<th align="center">Redo</th>
+<th align="center">무변경</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>animator.param</code></td>
+<td><code>&lt;오브젝트&gt; &lt;파라미터&gt; &lt;bool|float|int|trigger&gt;</code></td>
+<td>Animator 파라미터를 저작한다</td>
+<td></td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>model.place</code></td>
+<td><code>&lt;이름&gt;</code></td>
+<td>임포트한 모델을 활성 씬에 배치한다</td>
+<td></td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>object.duplicate</code></td>
+<td><code>&lt;오브젝트&gt; [새 이름]</code></td>
+<td>오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)</td>
+<td></td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>object.property</code></td>
+<td><code>&lt;오브젝트&gt; &lt;컴포넌트&gt; &lt;필드&gt; &lt;값&gt;</code></td>
+<td>리플렉션으로 프로퍼티를 설정한다</td>
+<td></td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>tag.add</code></td>
+<td><code>&lt;name&gt;</code></td>
+<td>Add and persist a project tag with Undo</td>
+<td></td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>tag.remove</code></td>
+<td><code>&lt;name&gt;</code></td>
+<td>Remove and persist a project tag with Undo</td>
+<td></td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+<td align="center">☐</td>
+</tr>
+</tbody></table></div>
+<h2>기록</h2>
+<p>확인이 끝나면 결과를 이 문서에 그대로 남기고 <a href="Phase14_5Closure.html">종결 검토</a>의 조건 ② 를 닫는다.
+<strong>통과한 것만 적지 않는다</strong> — 실패와 미확인도 같은 표에 남긴다. 이 저장소는 &quot;검사 0 건·빈 집합을
+성공으로 접지 않는다&quot; 를 관례로 삼는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="a-gui-호출처가-소스에서-확인된-18-개"></span><span id="b-gui-호출처를-찾지-못한-6-개--먼저-볼-것"></span><span id="sec-a-gui-호출처가-소스에서-확인된-18-개"></span><span id="sec-b-gui-호출처를-찾지-못한-6-개--먼저-볼-것"></span><span id="sec-기록"></span><span id="sec-대상을-어떻게-정했나"></span><span id="sec-판정-규칙"></span><span id="sec-확인-전-준비"></span><span id="기록"></span><span id="대상을-어떻게-정했나"></span><span id="판정-규칙"></span><span id="확인-전-준비"></span></details></main></body></html>

@@ -1,5 +1,30 @@
 # 연속 프로파일 기록과 비동기 보기
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- CPU engine frame·render submission·GPU pass·presenter 관측은 서로 다른 식별 축이다. bounded producer 기록과 손실/출처를 보존한다.
+- 집계 메모리 표본은 객체별 native/CLR/GPU 소유 그래프가 아니다. 과거 .ceprof/ETW 기록은 그 실행 신원에만 유효하다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 PR #117의 보완 계약이다. 빌드·엔진 실행·회귀 검사·벤치마크는 실행하지 않았으며,
 아래 동작은 구현과 정적 검토 기준이다. 성능 개선 수치나 물리 화면 FPS를 주장하지 않는다.
 
@@ -206,3 +231,5 @@ OpenScopesAtStop은 실제 종료를 못 본 절단 구간의 수다. CPU timeou
 추가한 회귀 소스는 disabled parent, 재귀/깊이 초과, Stop/새 세대, 주인 종료,
 미응답 producer의 공개 시작점과 CAS 선점 양방향, 늦은 GPU 결과/옛 token,
 v3 불완전 EOF 복구와 legacy reader를 다룬다. 이 목록은 실행 통과 목록이 아니다.
+
+</details>

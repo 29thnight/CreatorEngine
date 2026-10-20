@@ -1,5 +1,52 @@
 # PHASE 21 W0 기준선 — 창 목록 · 스타일 지점 · 성능 · 셸 캡처
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Editor/EngineEntry/App.cpp:687](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L687) — `ImGuiIO& io = ImGui::GetIO();`
+- [Editor/EngineEntry/App.cpp:700](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L700) — `ImGuiIO& io = ImGui::GetIO();`
+- [Editor/EngineEntry/App.cpp:714](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L714) — `ImGuiIO& io = ImGui::GetIO();`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:208](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L208) — `ImGui::PushStyleVar(ImGuiStyleVar_TableAngledHeadersAngle, .5f);`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:282](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L282) — `ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f * scale, titlePaddingY));`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:285](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L285) — `ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,`
+- [Editor/EditorWindow/EditorWindowHost.cpp:170](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/EditorWindowHost.cpp#L170) — `ImGui::PushStyleColor(ImGuiCol_WindowBg,`
+- [Editor/EditorWindow/EditorWindowHost.cpp:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/EditorWindowHost.cpp#L177) — `ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,`
+- [Editor/EditorWindow/EditorWindowHost.cpp:209](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/EditorWindowHost.cpp#L209) — `if (auto* window = ImGui::FindWindowByName(entry.stable_id.data()); window && !window->DockId)`
+- [Editor/EngineGUIWindow/EditorRenderer.cpp:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorRenderer.cpp#L136) — `ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_DockSpace);`
+- [Editor/EngineGUIWindow/EditorRenderer.cpp:334](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorRenderer.cpp#L334) — `ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));`
+- [Editor/EngineGUIWindow/EditorRenderer.cpp:335](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorRenderer.cpp#L335) — `ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:138](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L138) — `const ImVec2 contentOrigin = ImGui::GetCursorScreenPos();`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:139](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L139) — `const ImVec2 contentSize = ImGui::GetContentRegionAvail();`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:161](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L161) — `ImGui::Dummy(m_canvas.ContentExtent());`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:673](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L673) — `ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(editor::ThemePixels(8.f), editor::ThemePixels(6.f)));`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:764](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L764) — `ImGui::PushStyleColor(ImGuiCol_Header, editor::ThemeColorValue(editor::ThemeColor::Selection));`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:1052](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L1052) — `ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, ImGui::GetStyle().FramePadding.y));`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:110](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L110) — `ImGui::PushStyleColor(ImGuiCol_Header, hierarchy_color(T::SelectedRow));`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:111](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L111) — `ImGui::PushStyleColor(ImGuiCol_HeaderHovered, hierarchy_color(T::SelectedHoveredRow));`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:112](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L112) — `ImGui::PushStyleColor(ImGuiCol_HeaderActive, hierarchy_color(T::SelectedRow));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-11. 계획서 `docs/plans/EditorWorkspaceRedesignPlan.md`의 W0 후반 산출물이다.
 
 W7·W8의 성능 판정과 W1의 토큰 이주가 전부 **"W0 기준선과 비교"**를 전제한다. 그 기준선이
@@ -229,3 +276,5 @@ golden"을 만들 때 시작 크기 문제와 검은 뷰포트가 먼저 닫혀 
 | `undocked`/`ghost`를 legacy ini에서 0으로 | W3 | 이주가 없으면 낡은 파일이 배치를 정한다 |
 | 손상 ini 복구 | W3 | `damaged-halfwritten.ini`가 `undocked=4`를 낸다 |
 | 시작 창 크기 설정 | 미배정 | `lastWindowSize`가 죽은 키다. 어느 슬라이스도 이것을 적지 않았다 |
+
+</details>

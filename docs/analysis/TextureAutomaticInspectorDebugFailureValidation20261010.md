@@ -1,5 +1,43 @@
 # PHASE 12 — Debug Inspector 파일 실패·복구 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/start-texture-auto-ui.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L9) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/start-texture-auto-ui.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L10) — `$fixture=[IO.Path]::GetFullPath($FixtureProject)`
+- [Tools/regression/start-texture-auto-ui.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L13) — `$root=Join-Path $repo ('Build/TAUI-'+$Configuration+'-'+$Mode+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))`
+- [Tools/regression/verify-texture-reimport-scene.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-reimport-scene.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L15) — `$root = Join-Path $repo ('Build/TRS-' + $config + '-' + [guid]::NewGuid().ToString('N').Substring(0,8))`
+- [Tools/regression/verify-texture-reimport-scene.ps1:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L24) — `[IO.File]::WriteAllText($texture + '.meta', "guid: 33333333-3333-4333-8333-333333333333n")`
+- [Engine/SceneRuntime/ImageComponent.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L14) — `class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent, UIComponent>`
+- [Engine/SceneRuntime/ImageComponent.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L19) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/ImageComponent.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L21) — `UIComponent::gc_trace(tracer);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/ImageComponent.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L19) — `ImageComponent::ImageComponent()`
+- [Engine/SceneRuntime/ImageComponent.cpp:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L24) — `bool ImageComponent::ReplaceTextureOwner(const Texture* previous,`
+- [Engine/SceneRuntime/ImageComponent.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L25) — `const own::shared_owner<const Texture>& replacement)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 실행: 2026-10-10 KST. 소스 HEAD `d3c85faf182e93842217dd46eee3d3aabf4afc13`.
 현재 Debug Editor에서 실제 Ctrl+C/Ctrl+V, Reload Disk Settings, Retry Import를 조작했다.
 기존 Debug runtime을 실행했으며 이 기록은 새 빌드 완료를 주장하지 않는다.
@@ -33,17 +71,17 @@ Reload/Retry는 실제 UI 입력이다. 외부 충돌 probe와 파일 잠금·�
 manual 실행의 첫 잠금은 선택 전에 걸려 Inspector를 읽지 못했다. 잠금을 해제해 선택한 뒤
 다시 잠그고 편집한 실행만 자동 저장 실패 수용에 사용했다.
 
-- [집계 receipt](../../Build/TextureAutomaticInspectorDebugFailure-result.json)
-- [Debug 소비자 회귀](../../Build/TextureSidecarDiagnostics/previous-scene-result.json)
-- [외부 충돌 receipt](../../Build/TAUI-Debug-conflict-6d2c7780/commands.jsonl)
-- [잠긴 파일 Reload](../../Build/TAUI-Debug-conflict-6d2c7780/locked-reload.png)
-- [손상 후 편집 값 2](../../Build/TAUI-Debug-conflict-6d2c7780/corrupt-draft.png)
-- [손상 파일 Reload](../../Build/TAUI-Debug-conflict-6d2c7780/corrupt-reload.png)
-- [Retry 정상 상태](../../Build/TAUI-Debug-conflict-6d2c7780/retry-recovered.png)
-- [Retry 오류 해제](../../Build/TAUI-Debug-conflict-6d2c7780/retry-errors-cleared.png)
-- [자동 저장 잠금 실패](../../Build/TAUI-Debug-manual-6c1e823c/automatic-save-locked.png)
-- [Reload 복구](../../Build/TAUI-Debug-manual-6c1e823c/reload-recovered.png)
-- [새 편집 복구](../../Build/TAUI-Debug-manual-6c1e823c/fresh-edit-recovered.png)
+- 집계 receipt (`../../Build/TextureAutomaticInspectorDebugFailure-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 소비자 회귀 (`../../Build/TextureSidecarDiagnostics/previous-scene-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 외부 충돌 receipt (`../../Build/TAUI-Debug-conflict-6d2c7780/commands.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 잠긴 파일 Reload (`../../Build/TAUI-Debug-conflict-6d2c7780/locked-reload.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 손상 후 편집 값 2 (`../../Build/TAUI-Debug-conflict-6d2c7780/corrupt-draft.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 손상 파일 Reload (`../../Build/TAUI-Debug-conflict-6d2c7780/corrupt-reload.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Retry 정상 상태 (`../../Build/TAUI-Debug-conflict-6d2c7780/retry-recovered.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Retry 오류 해제 (`../../Build/TAUI-Debug-conflict-6d2c7780/retry-errors-cleared.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 자동 저장 잠금 실패 (`../../Build/TAUI-Debug-manual-6c1e823c/automatic-save-locked.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Reload 복구 (`../../Build/TAUI-Debug-manual-6c1e823c/reload-recovered.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 새 편집 복구 (`../../Build/TAUI-Debug-manual-6c1e823c/fresh-edit-recovered.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 - 정상 종료 로그: `Build/TAUI-Debug-{conflict-6d2c7780,manual-6c1e823c}/editor.out`
 
 Build 증거는 로컬 산출물이며 Git에 포함하지 않는다. 과거 실행의 Build fixture가 정리되어
@@ -59,3 +97,5 @@ Build 증거는 로컬 산출물이며 Git에 포함하지 않는다. 과거 실
 이번 한정 Debug 입력·실패 재읽기·오류 해제 수용을 `12-0-D` 0.25일로 분리한다.
 T0 잔여는 0.25일, 활성 총20일은 유지한다. 완료13.25/20 = 66.25%, 대시보드 반올림 66%.
 계획 가중치이며 실제 투입 시간이나 전체 T0 완료를 뜻하지 않는다.
+
+</details>

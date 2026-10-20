@@ -1,5 +1,40 @@
 # Material Graph 실제 Scene 투과·굴절
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-scene-refraction.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-refraction.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-scene-refraction.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-refraction.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-scene-refraction.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-refraction.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17) — `struct SceneVolumeTriangle`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L19) — `math::vector4 a, b, c;`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31) — `own::shared_owner<const RenderBindings> material;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.cpp:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L32) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.cpp:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L41) — `assets::Has(geometry.vertexAttributeMask, assets::VertexAttribute::BoneIndices))`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L46) — `if (!math::try_inverse(source.World()))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-10-02 후속:** [공통 Forward+ transport](../analysis/MAT7ForwardTransportComposition.md)는
 Opaque/Masked 및 alpha transmission을 Code·Graph와 함께 정렬하고 각 draw 직전의
 뒤쪽 합성 HDR을 읽는다. 임시 depth/owner를 사용하여 Scene의 opaque depth/owner를 보존한다.
@@ -127,3 +162,5 @@ native Vulkan 전체 Scene 및 Refraction Debug/Release 각 24 frame과 실제 E
 Scene/Game·교체/재개방·수명은 [MaterialGraphProductIntegration.md](MaterialGraphProductIntegration.md),
 자동 Scene host cook/package·Player는 [MaterialGraphSceneCook.md](MaterialGraphSceneCook.md)의
 후속 실행으로 완료했다. 후처리 품질은 PHASE 4.75, rendered parity·성능 수용은 MAT-9가 소유한다.
+
+</details>

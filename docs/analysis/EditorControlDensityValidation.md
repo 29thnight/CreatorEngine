@@ -1,5 +1,45 @@
 # Editor 입력 컨트롤·메뉴 간격 보정 (2026-09-12)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-editor-theme.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-theme.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-editor-theme.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36) — `$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [ScriptCore/LightComponent.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/LightComponent.cs#L4) — `public enum LightType`
+- [ScriptCore/LightComponent.cs:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/LightComponent.cs#L17) — `public enum LightStatus`
+- [ScriptCore/LightComponent.cs:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/LightComponent.cs#L40) — `public sealed class LightComponent : NativeComponent`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/LightComponent.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L19) — `class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent, Component>`
+- [Engine/SceneRuntime/LightComponent.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L23) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/LightComponent.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L25) — `Component::gc_trace(tracer);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/LightComponent.cpp:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.cpp#L5) — `void LightComponent::OnInitialized()`
+- [Engine/SceneRuntime/LightComponent.cpp:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.cpp#L36) — `void LightComponent::OnAddedToScene()`
+- [Engine/SceneRuntime/LightComponent.cpp:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.cpp#L50) — `void LightComponent::OnRemovingFromScene()`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 원인과 수정
 
 | 증상 | 원인 | 수정 |
@@ -41,10 +81,12 @@ ImGui Checkbox와 기존 Component::SetEnabled 경로를 계속 사용한다.
 - 검증용 Editor 종료 후 EngineSettings.asset와 imgui.ini를 시작 전 바이트로 복원했다.
   변경 파일 `git diff --check` 및 대시보드 JavaScript 구문 검사 통과.
 
-최종 탭/숫자 입력 화면: [tabs-restored-camera.png](../../Artifacts/phase21-control-density/tabs-restored-camera.png).
-좁은 패널: [add-component-wrapped.png](../../Artifacts/phase21-control-density/add-component-wrapped.png).
-메뉴 간격: [edit-menu.png](../../Artifacts/phase21-control-density/edit-menu.png).
+최종 탭/숫자 입력 화면: tabs-restored-camera.png (`../../Artifacts/phase21-control-density/tabs-restored-camera.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+좁은 패널: add-component-wrapped.png (`../../Artifacts/phase21-control-density/add-component-wrapped.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+메뉴 간격: edit-menu.png (`../../Artifacts/phase21-control-density/edit-menu.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 메뉴/LightComponent 동작 캡처는 탭 높이 복원 전 중간 빌드의 증거이며,
 최종 빌드의 탭과 입력칸 크기는 `tabs-restored-camera.png`를 기준으로 한다.
 
 Vulkan은 사용자 결정에 따라 보류한다. 이 작업은 W2-I 전체나 비동기 썸네일 W7의 완료를 의미하지 않는다.
+
+</details>

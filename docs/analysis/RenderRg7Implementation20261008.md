@@ -1,5 +1,50 @@
 # RG7 transient buffers and placed heap sharing — 2026-10-08
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-rg7-live.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-live.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg7-live.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-live.ps1#L10) — `$output = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rg7-live.ps1:104](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-live.ps1#L104) — `$lower = [int][Math]::Floor(($samples.Count - 1) / 2)`
+- [Tools/regression/verify-rg7-transients.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-transients.ps1#L4) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg7-transients.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-transients.ps1#L9) — `$out = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rg7-transients.ps1:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-transients.ps1#L25) — `$env:CREATOR_EDITOR_WORKSPACE_DIR = Join-Path $out ('workspace-' + [guid]::NewGuid().ToString('N'))`
+- [Tools/regression/audit-rg7-preparation.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-preparation.ps1#L4) — `$root = [IO.Path]::GetFullPath($EvidenceDirectory)`
+- [Tools/regression/audit-rg7-preparation.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-preparation.ps1#L14) — `$matches = [regex]::Matches($log, 'RG7_PREPARE_CPU mode=(\d+) milliseconds=([0-9.]+)')`
+- [Tools/regression/audit-rg7-preparation.ps1:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-preparation.ps1#L19) — `$milliseconds = [double]::Parse($match.Groups[2].Value, [Globalization.CultureInfo]::InvariantCulture)`
+- [Tools/regression/audit-rg7-heap-memory.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-heap-memory.ps1#L2) — `param([Parameter(Mandatory)][string]$EvidenceDirectory)`
+- [Tools/regression/audit-rg7-heap-memory.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-heap-memory.ps1#L4) — `$root = [IO.Path]::GetFullPath($EvidenceDirectory)`
+- [Tools/regression/audit-rg7-product-views.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-product-views.ps1#L3) — `[Parameter(Mandatory)][string]$EvidenceDirectory,`
+- [Tools/regression/audit-rg7-product-views.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-product-views.ps1#L5) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/audit-rg7-product-views.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-product-views.ps1#L8) — `$root = [IO.Path]::GetFullPath($EvidenceDirectory)`
+- [Tools/regression/verify-rg7-product-views.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-product-views.ps1#L14) — `$out = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rg7-product-views.ps1:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-product-views.ps1#L24) — `$environment[$name] = [Environment]::GetEnvironmentVariable($name)`
+- [Tools/regression/verify-rg7-product-views.ps1:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg7-product-views.ps1#L68) — `[Environment]::SetEnvironmentVariable($entry.Key, $entry.Value)`
+- [Tools/regression/audit-rg7-product-preparation.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-product-preparation.ps1#L10) — `$root = [IO.Path]::GetFullPath($EvidenceDirectory)`
+- [Tools/regression/audit-rg7-product-preparation.ps1:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-product-preparation.ps1#L20) — `historyPolicy=$manifest.historyPolicy; skyBoxName=[IO.Path]::GetFileName($manifest.skyBoxPath);`
+- [Tools/regression/audit-rg7-product-preparation.ps1:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg7-product-preparation.ps1#L83) — `if ([Math]::Abs([double]$measurement.cpuTransientPrepareMs - [double]$manifest.graph.transientPrepareCpuMs) -gt 0.00001)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 RG7 is closed for bounded DX12 implementation/correctness/measurement with default OFF. See [final closure and adoption decision](RenderRg7Closure20261008.md). Sections below retain chronological evidence and historical pending statements; the final closure supersedes them. Q0, RG8 and RG9 remain pending.
 
 ## Implemented scope
@@ -218,3 +263,5 @@ Execution order is C4 -> C5 -> C6. Any new blocker must identify a violated C1-C
 - RG8: cross-queue shared-heap handoff execution/fence dependencies. Current sharing assumes serialized GPU execution; introducing overlap requires RG8 acceptance.
 
 Historical checklist reconciliation initially claimed no native implementation or fresh runtime measurement. Final measurement/closure is now recorded in RenderRg7Closure20261008.md. The previously collected capture-boundary samples do not satisfy C4's uninterrupted series. The current historical performance observations do not satisfy C5's independent reversed-order repeats. The subsequent final closure recovers those 14 planned effort days; scope reconciliation alone did not earn them.
+
+</details>

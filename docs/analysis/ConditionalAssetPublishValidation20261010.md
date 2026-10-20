@@ -1,5 +1,34 @@
 # PHASE 12 — 조건부 자동 저장 게시와 중간 종료 복구 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/ConditionalAssetPublish.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConditionalAssetPublish.h#L26) — `::CloseHandle(value_);`
+- [Editor/EngineEntry/ConditionalAssetPublish.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConditionalAssetPublish.h#L46) — `std::memcpy(rename->FileName, destination.c_str(), nameBytes);`
+- [Editor/EngineEntry/ConditionalAssetPublish.h:57](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConditionalAssetPublish.h#L57) — `const bool exists = std::filesystem::exists(backup, error);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 수정 범위
 
 [이전 RenderProfile 실패](RenderProfileAutomaticSaveConflictValidation20261010.md)는 원본 비교와
@@ -25,8 +54,8 @@ Windows의 공유 모드와 이름 변경 조건은 [CreateFileW 문서](https:/
 
 ## 실행 및 판정
 
-최종 실행 결과와 소스/바이너리 hash는 [검증 receipt](../../Build/ConditionalAssetPublish/result.json),
-[전체 실행 로그](../../Build/ConditionalAssetPublish/verify-All.log)에 보존한다.
+최종 실행 결과와 소스/바이너리 hash는 검증 receipt (`../../Build/ConditionalAssetPublish/result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+전체 실행 로그 (`../../Build/ConditionalAssetPublish/verify-All.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 보존한다.
 
 | 구성 | 짧은/긴 경로 | 서비스·게시 검사 | 중간 종료/시작 복구 |
 |---|---:|---:|---:|
@@ -42,7 +71,7 @@ Texture/일반 metadata staging 경합2유형×8회=16회가 위 서비스 검�
 확인했다. 비결정적 실행에서 잠금 거부가 실제 발생했다고 주장하지 않는다.
 
 Debug/Release Editor 정적 라이브러리와 실행 host 빌드를 통과했다.
-[빌드 receipt와 runtime hash](../../Build/ConditionalAssetPublish/build-result.json)를 별도로 남긴다.
+빌드 receipt와 runtime hash (`../../Build/ConditionalAssetPublish/build-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)를 별도로 남긴다.
 현재 수정 후 실제 Inspector UI 실행은 추가하지 않았다.
 
 검사기는 실제 Editor 자산 서비스·watcher·DataSystem을 사용한다. 외부 쓰기가 성공한
@@ -69,3 +98,5 @@ Inspector 입력, 네이티브 닫기 버튼, GPU 화면 적용, 다중 Editor �
 
 12-0의 조건부 게시 실패 회귀를 한정 수용하되 입력/종료 반복 확장·다중 창/배율은
 잔여다. 추가 계획 가중치 없이66.25%(표시66%), T1b 대기·T3 중단을 유지한다.
+
+</details>

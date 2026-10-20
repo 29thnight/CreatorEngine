@@ -1,5 +1,52 @@
 # PHASE 12 구현 적용 및 수용 검증 — 2026-10-09
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Interfaces/AssetAuthoringPort.h:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/AssetAuthoringPort.h#L94) — `using SourceTextureLoader = own::shared_owner<const Texture::CodecImage> (*)(`
+- [Engine/RenderEngine/Interfaces/AssetAuthoringPort.h:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/AssetAuthoringPort.h#L96) — `using SourceTextureMipGenerator = own::shared_owner<const Texture::CodecImage> (*)(`
+- [Engine/RenderEngine/Interfaces/AssetAuthoringPort.h:105](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/AssetAuthoringPort.h#L105) — `static own::shared_owner<const Texture::CodecImage> LoadSourceTexture(`
+- [Engine/RenderEngine/Texture.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.cpp#L18) — `void Texture::CodecImage::Account()`
+- [Engine/RenderEngine/Texture.cpp:332](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.cpp#L332) — `own::shared_owner<const CodecImage> image, std::string_view name,`
+- [Engine/RenderEngine/Texture.cpp:367](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.cpp#L367) — `own::shared_owner<const Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress, std::string_view assetPath)`
+- [Engine/RenderEngine/DataSystem.cpp:1258](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L1258) — `DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_view path, bool allowMounted)`
+- [Engine/RenderEngine/DataSystem.cpp:1627](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L1627) — `? Authoring::WriteDocument::ParseText(entry.value.AsString(), &error)`
+- [Engine/RenderEngine/DataSystem.cpp:2275](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L2275) — `const auto loaded = LoadMaterialShared(std::string_view(materialName));`
+- [Engine/SceneRuntime/MeshRenderer.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L28) — `own::shared_owner<const material_graph::Instance> observed;`
+- [Engine/SceneRuntime/MeshRenderer.cpp:671](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L671) — `const auto document = Authoring::ParsedDocument::ParseText(m_unresolvedMaterialReference, error);`
+- [Engine/SceneRuntime/MeshRenderer.cpp:1137](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L1137) — `const auto unresolved = Authoring::ParsedDocument::ParseText(m_unresolvedMaterialReference, error);`
+- [Tools/regression/material_codegen_probe.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L19) — `throw std::runtime_error(message);`
+- [Tools/regression/material_codegen_probe.cpp:72](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L72) — `std::ranges::reverse(records);`
+- [Tools/regression/material_codegen_probe.cpp:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L85) — `throw std::runtime_error("Missing " + identifier);`
+- [Tools/regression/verify-material-codegen.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-codegen.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-codegen.ps1:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-codegen.ps1#L6) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-codegen.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-codegen.ps1#L7) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp#L19) — `if (!EditorAssetDatabase::IsTextureSource(source))`
+- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp#L40) — `(void)cooked::ParseTextureImportSettings(document, draft.settings, draft.parseError);`
+- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp#L60) — `if (disk && cooked::ParseTextureImportSettings(disk->Dump(), diskSettings, failure))`
+- [Tools/regression/experiment_contract_probe.cpp:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/experiment_contract_probe.cpp#L97) — `std::fprintf(stderr, "EXPERIMENT_COM_FAILED hr=%08lx\n", comResult);`
+- [Tools/regression/experiment_contract_probe.cpp:104](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/experiment_contract_probe.cpp#L104) — `DirectX::SetWICFactory(nullptr);`
+- [Tools/regression/experiment_contract_probe.cpp:117](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/experiment_contract_probe.cpp#L117) — `if (nullptr != filter && 0 != std::strcmp(filter, contract.name))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작업 시작 2026-10-09, 최종 결과 정리 2026-10-10 KST. 파일명은 시작일 기준이다.
 
 ## 범위와 출처
@@ -80,3 +127,5 @@ Release 링크에는 기존 라이브러리 PDB type record 관련 LNK4020 경�
 5. 현재 코퍼스의 품질·cook 시간·메모리·디스크·recook/reload 지연을 측정한다. 과거 수치를 재사용하지 않는다.
 
 T0/T1a/T2는 진행 중, `earnedDays: 0`. T1b는 품질/성능 수용 대기. T3는 실제 모바일/Web 제품 타깃이 정해질 때까지 중단이다.
+
+</details>

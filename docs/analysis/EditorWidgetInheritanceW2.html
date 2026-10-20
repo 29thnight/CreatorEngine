@@ -1,195 +1,351 @@
-<!DOCTYPE html>
-<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EditorWidgetInheritanceW2.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>W2 승계 결정표 — 확정본</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>W2 승계 결정표 — 확정본</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    color-scheme: dark light;
-    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
-    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
-    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
     --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
-    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
-    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
-    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
-    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
-    --r-1: 4px; --r-2: 10px;
-    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
-      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
-      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
-      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
-    }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
   }
-  html { font-size: 17px; scroll-padding-top: var(--s-6); }
-  * { box-sizing: border-box; margin: 0; }
-  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
-  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
-    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
-    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
-  ::selection { background: var(--accent-dim); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
-  a:hover { color: var(--accent); }
-  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
-  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
-  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
-  main > *, section, figure, header { min-width: 0; }
-  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
-  .crumbs a { color: var(--text-dim); }
-  header.page { display: grid; gap: var(--s-4); }
-  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
-  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
-  h1, h2 { text-box: trim-both cap alphabetic; }
-  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
-  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
-  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
-  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
-  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
-  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
-  .meta p + p { margin-top: var(--s-1); }
-  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
-  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
-  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+}
 
-  /* figure: stage on the dot grid */
-  figure { display: grid; gap: var(--s-3); }
-  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
-  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
-  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
 
-  /* chips: shape + word, never color alone */
-  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
-  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
-  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
-  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-  .chip.risk { color: var(--risk); }
-  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
-  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
 
-  /* KPI strip: one frame, hairline cells */
-  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
-  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
-  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
-  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
 
-  /* stacked status bar */
-  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
-  .stack > i { display: block; min-width: 2px; }
-  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
-  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
-  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
 
-  /* prose */
-  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
-  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
-  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
-  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
-  .prose li::marker { color: var(--text-dim); }
-  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
-  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
-  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
-  .prose hr { border: 0; border-top: 1px solid var(--border); }
-  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
-  .prose strong { font-weight: 600; color: var(--text); }
-  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
 
-  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
-  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
-  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
-  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
-  .sec-head .ve-label { letter-spacing: .08em; }
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
 
-  /* tables */
-  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
-  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
-  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
-  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
-  td.num, th.num { text-align: right; }
-  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
 
-  /* code */
-  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
-  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
-  pre.mermaid { background: var(--bg); text-align: left; }
-  pre.mermaid svg { max-width: none; }
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
 
-  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
-  summary:hover { color: var(--accent); }
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
 
-  /* table of contents with scroll-spy */
-  nav.toc { display: none; }
-  @media (min-width: 75rem) {
-    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
-    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
-    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
-    nav.toc a:hover { color: var(--text); }
-    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
-    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
-  }
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
 
-  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
 
-  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
-  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
-  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
 
-  @media print {
-    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
-    body::before, nav.toc, .crumbs { display: none; }
-    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
-    .js-motion main > * { opacity: 1 !important; transform: none !important; }
-    svg * { filter: none !important; }
-  }
-  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
-  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
-  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
-  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
-  .map-row:hover .map-bar i { background: var(--accent); }
-  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
-  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
-</style>
-</head>
-<body>
-<div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-확정표">1. 확정표</a></li><li><a href="#2-근거">2. 근거</a></li><li><a href="#3-이-표가-w2-구현-순서에-주는-것">3. 이 표가 W2 구현 순서에 주는 것</a></li><li><a href="#4-상태-matrix--실측-2026-09-11-추가">4. 상태 matrix — 실측 (2026-09-11 추가)</a></li><li><a href="#41-검사가-붙은-자리와-그-이빨-2026-09-11-추가">4.1 검사가 붙은 자리와 그 이빨 (2026-09-11 추가)</a></li><li><a href="#5-계획서-항목-하나는-이미-끝나-있다">5. 계획서 항목 하나는 이미 끝나 있다</a></li><li><a href="#6-이-표가-답하지-않는-것">6. 이 표가 답하지 않는 것</a></li></ol></nav>
-<main>
-<header class="page">
-<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EditorWidgetInheritanceW2.md">원본 Markdown</a></nav>
-<p class="eyebrow">분석</p>
-<h1>W2 승계 결정표 — 확정본</h1>
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
 
-</header>
-<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
-<div class="stack" role="img" aria-label="진행·부분 3"><i class="info" style="flex:3"></i></div>
-<span class="legend"><span class="chip info">진행·부분 3</span></span></div></div>
-<figure>
-<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
-<a class="map-row" href="#1-확정표"><span class="ve-label">§1</span><span class="map-name">확정표</span><span class="map-bar"><i style="width:5%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">2</span></span></a>
-<a class="map-row" href="#2-근거"><span class="ve-label">§2</span><span class="map-name">근거</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">1</span></span></a>
-<a class="map-row" href="#3-이-표가-w2-구현-순서에-주는-것"><span class="ve-label">§3</span><span class="map-name">이 표가 W2 구현 순서에 주는 것</span><span class="map-bar"><i style="width:7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#4-상태-matrix--실측-2026-09-11-추가"><span class="ve-label">§4</span><span class="map-name">상태 matrix — 실측 (2026-09-11 추가)</span><span class="map-bar"><i style="width:14.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#41-검사가-붙은-자리와-그-이빨-2026-09-11-추가"><span class="ve-label">§4.1</span><span class="map-name">검사가 붙은 자리와 그 이빨 (2026-09-11 추가)</span><span class="map-bar"><i style="width:10.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#5-계획서-항목-하나는-이미-끝나-있다"><span class="ve-label">§5</span><span class="map-name">계획서 항목 하나는 이미 끝나 있다</span><span class="map-bar"><i style="width:2.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#6-이-표가-답하지-않는-것"><span class="ve-label">§6</span><span class="map-name">이 표가 답하지 않는 것</span><span class="map-bar"><i style="width:2.3%"></i></span><span class="map-marks"></span></a>
-</div>
-<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「2. 근거」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
-</figure>
-<section class="prose"><ul>
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorWidgetInheritanceW2.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorWidgetInheritanceW2.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>W2 승계 결정표 — 확정본</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Editor</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Command</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Transaction</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Component</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Dirty delta</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Proxy</text></g></svg></div><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L9">Editor/ImGuiHelper/PinHelper.h:9</a> — <code>enum class PinType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L52">Editor/ImGuiHelper/PinHelper.h:52</a> — <code>void DrawPinIcon(const PinType&amp; pintype, bool connected, int alpha)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L71">Editor/ImGuiHelper/PinHelper.h:71</a> — <code>ax::Widgets::Icon(ImVec2(static_cast&lt;float&gt;(m_PinIconSize), static_cast&lt;float&gt;(m_PinIconSize)), iconType, connected, color, ImColor(32, 32, 32, alpha));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L2">Editor/EngineEntry/EditorMain.h:2</a> — <code>class ProjectLayerSettings;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L5">Editor/EngineEntry/EditorMain.h:5</a> — <code>class AudioHost;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L6">Editor/EngineEntry/EditorMain.h:6</a> — <code>class PlaybackService;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L5">Editor/EngineGUIWindow/EditorTheme.h:5</a> — <code>struct ImGuiStyle;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L18">Editor/EngineGUIWindow/EditorTheme.h:18</a> — <code>struct EditorThemeTokens</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L128">Editor/EngineGUIWindow/EditorTheme.h:128</a> — <code>void ApplyEditorTheme(ImGuiStyle&amp; style, float userScale, float dpiScale) noexcept;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/HorizontalLayout.h#L26">Editor/ImGuiHelper/HorizontalLayout.h:26</a> — <code>ImGui::PushID(id);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/HorizontalLayout.h#L46">Editor/ImGuiHelper/HorizontalLayout.h:46</a> — <code>ImGui::SameLine();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/HorizontalLayout.h#L65">Editor/ImGuiHelper/HorizontalLayout.h:65</a> — <code>ImGui::PushID(id);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RectTransformComponent.h#L30">Engine/SceneRuntime/RectTransformComponent.h:30</a> — <code>math::vector2 anchorMin;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RectTransformComponent.h#L31">Engine/SceneRuntime/RectTransformComponent.h:31</a> — <code>math::vector2 anchorMax;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RectTransformComponent.h#L88">Engine/SceneRuntime/RectTransformComponent.h:88</a> — <code>bool DriveAsCanvasRoot(const math::rect&amp; screenRootRect, float scale);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L352">Editor/EngineGUIWindow/ReflectionTypedDraw.h:352</a> — <code>ImGui::TextDisabled(&quot;%zu&quot;, value.m_ID_Data);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L370">Editor/EngineGUIWindow/ReflectionTypedDraw.h:370</a> — <code>ImGui::TextDisabled(&quot;[no widget]&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L853">Editor/EngineGUIWindow/ReflectionTypedDraw.h:853</a> — <code>ImGui::TextDisabled(&quot;[%d] [no widget]&quot;, index);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/widgets.cpp#L5">Editor/ImGuiHelper/widgets.cpp:5</a> — <code>void ax::Widgets::Icon(const ImVec2&amp; size, IconType type, bool filled, const ImVec4&amp; color/* = ImVec4(1, 1, 1, 1)*/, const ImVec4&amp; innerColor/* = ImVec4(0, 0, 0, 0)*/)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/widgets.cpp#L7">Editor/ImGuiHelper/widgets.cpp:7</a> — <code>if (ImGui::IsRectVisible(size))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/widgets.cpp#L11">Editor/ImGuiHelper/widgets.cpp:11</a> — <code>ax::Drawing::DrawIcon(drawList, cursorPos, cursorPos + size, type, filled, ImColor(color), ImColor(innerColor));</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<ul>
 <li>작성: 2026-09-11</li>
 <li>대상: <code>docs/plans/EditorWorkspaceRedesignPlan.md</code> §7.1 의 초기 판정표</li>
 <li>범위: <code>Editor/ImGuiHelper/</code> 의 기존 자산과 W2 가 세울 네 family 의 관계</li>
@@ -203,42 +359,107 @@
 <code>Checkbox</code> …)까지 &quot;내보내는 심볼&quot; 로 잡아 <code>CustomCollapsingHeader.h</code> 의 소비자가 476건으로
 나왔다. 다섯 파일이 합쳐 476줄이라 읽는 편이 빨랐고 정확했다.</p>
 <hr>
-</section>
-<section class="doc-sec" id="sec-1-확정표">
-<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-확정표">1. 확정표</h2></div>
-<div class="prose"><div class="table-scroll"><table>
-<thead><tr><th>family</th><th>기존 자산</th><th>계획서 초기 판정</th><th><strong>확정</strong></th></tr></thead>
-<tbody><tr><td><code>EditorSectionHeader</code></td><td><code>CustomCollapsingHeader.h</code></td><td>승계</td><td><strong>승계</strong> (유지)</td></tr>
-<tr><td><code>EditorPropertyRow</code></td><td><code>TableAPIHelper.h</code></td><td><span class="chip info">부분 승계</span></td><td><strong>승계</strong> — label column 규약의 정본이 이미 여기 있다</td></tr>
-<tr><td><code>EditorPropertyRow</code></td><td><code>HorizontalLayout.h</code></td><td><span class="chip info">부분 승계</span></td><td><strong>범위 밖으로 정정</strong> — 소비자가 노드 에디터뿐</td></tr>
-<tr><td><code>EditorAxisField3</code></td><td>RectTransform 의 축 필드</td><td>승격</td><td><strong>신설로 정정</strong> — 승격할 구현이 없다</td></tr>
-<tr><td><code>EditorModeButton</code></td><td><code>ToggleUI.h</code></td><td>판정 필요</td><td><strong>은퇴</strong> — 소비자 0</td></tr>
-<tr><td><code>EditorModeButton</code></td><td><code>widgets.{h,cpp}</code></td><td>판정 필요</td><td><strong>범위 밖으로 정정</strong> — <code>ax::Widgets::Icon</code> 이다</td></tr>
-<tr><td>—</td><td><code>drawing.{h,cpp}</code> · <code>BlueprintBuilder</code> · <code>NodeEditor</code></td><td>범위 밖</td><td><strong>범위 밖</strong> (유지)</td></tr></tbody></table></div>
+<h2>1. 확정표</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>family</th>
+<th>기존 자산</th>
+<th>계획서 초기 판정</th>
+<th><strong>확정</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EditorSectionHeader</code></td>
+<td><code>CustomCollapsingHeader.h</code></td>
+<td>승계</td>
+<td><strong>승계</strong> (유지)</td>
+</tr>
+<tr>
+<td><code>EditorPropertyRow</code></td>
+<td><code>TableAPIHelper.h</code></td>
+<td>부분 승계</td>
+<td><strong>승계</strong> — label column 규약의 정본이 이미 여기 있다</td>
+</tr>
+<tr>
+<td><code>EditorPropertyRow</code></td>
+<td><code>HorizontalLayout.h</code></td>
+<td>부분 승계</td>
+<td><strong>범위 밖으로 정정</strong> — 소비자가 노드 에디터뿐</td>
+</tr>
+<tr>
+<td><code>EditorAxisField3</code></td>
+<td>RectTransform 의 축 필드</td>
+<td>승격</td>
+<td><strong>신설로 정정</strong> — 승격할 구현이 없다</td>
+</tr>
+<tr>
+<td><code>EditorModeButton</code></td>
+<td><code>ToggleUI.h</code></td>
+<td>판정 필요</td>
+<td><strong>은퇴</strong> — 소비자 0</td>
+</tr>
+<tr>
+<td><code>EditorModeButton</code></td>
+<td><code>widgets.{h,cpp}</code></td>
+<td>판정 필요</td>
+<td><strong>범위 밖으로 정정</strong> — <code>ax::Widgets::Icon</code> 이다</td>
+</tr>
+<tr>
+<td>—</td>
+<td><code>drawing.{h,cpp}</code> · <code>BlueprintBuilder</code> · <code>NodeEditor</code></td>
+<td>범위 밖</td>
+<td><strong>범위 밖</strong> (유지)</td>
+</tr>
+</tbody></table></div>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-2-근거">
-<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-근거">2. 근거</h2></div>
-<div class="prose"><h3 id="21-customcollapsingheaderh--editorsectionheader-승계-유지">2.1 <code>CustomCollapsingHeader.h</code> → <code>EditorSectionHeader</code> 승계 (유지)</h3>
+<h2>2. 근거</h2>
+<h3>2.1 <code>CustomCollapsingHeader.h</code> → <code>EditorSectionHeader</code> 승계 (유지)</h3>
 <p><code>ImGui::DrawCollapsingHeaderWithButton</code> 오버로드 둘(<code>bool* pChecked</code> 유무)을 내보낸다.
 소비자 <strong>3건</strong>.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>소비자</th><th style="text-align:right">건수</th></tr></thead>
-<tbody><tr><td><code>EngineGUIWindow/InspectorWindow.cpp</code></td><td class="num" style="text-align:right">2</td></tr>
-<tr><td><code>EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp</code></td><td class="num" style="text-align:right">1</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>소비자</th>
+<th align="right">건수</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EngineGUIWindow/InspectorWindow.cpp</code></td>
+<td align="right">2</td>
+</tr>
+<tr>
+<td><code>EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp</code></td>
+<td align="right">1</td>
+</tr>
+</tbody></table></div>
 <p><code>pChecked</code> 를 받는 오버로드가 계획서 §7.1 의 &quot;component header, enable toggle, fold,
 context menu&quot; 중 enable toggle 과 context menu 버튼을 이미 든다. 토큰화해서 개명하면 된다.
 138줄.</p>
-<h4 id="이관-결과--착지-2026-09-11">이관 결과 — 착지 (2026-09-11)</h4>
+<h4>이관 결과 — 착지 (2026-09-11)</h4>
 <p><code>Editor/ImGuiHelper/EditorSectionHeader.{h,cpp}</code> 로 옮기고 <code>CustomCollapsingHeader.h</code> 를
 지웠다. 소비자 3 을 모두 옮겼고, 자산 참조는 0 이다.</p>
 <p>승계하며 <strong>죽은 코드 셋</strong>이 드러났다. 개명만으로는 안 되는 것들이다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>원본의 것</th><th>실상</th></tr></thead>
-<tbody><tr><td><code>ImGuiCol_HeaderHovered</code> 분기</td><td><code>bool hovered = false;</code> 선언 <strong>직후</strong> 그 값으로 배경색을 골랐고, 진짜 hover 는 20여 줄 <strong>뒤</strong>에 대입했다. hover 색이 한 번도 그려지지 않았다.</td></tr>
-<tr><td><code>bool held</code></td><td><code>IsItemActive()</code> 로 읽었지만 맨 <code>ItemAdd</code> 는 ActiveId 를 세우지 않는다. 읽히지 않은 것이 아니라 <strong>참이 될 수 없었다.</strong></td></tr>
-<tr><td><code>ImGuiTreeNodeFlags flags</code> 인자</td><td>세 호출자가 모두 <code>ImGuiTreeNodeFlags_DefaultOpen</code> 을 넘기는데 본문이 한 번도 보지 않았다.</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>원본의 것</th>
+<th>실상</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ImGuiCol_HeaderHovered</code> 분기</td>
+<td><code>bool hovered = false;</code> 선언 <strong>직후</strong> 그 값으로 배경색을 골랐고, 진짜 hover 는 20여 줄 <strong>뒤</strong>에 대입했다. hover 색이 한 번도 그려지지 않았다.</td>
+</tr>
+<tr>
+<td><code>bool held</code></td>
+<td><code>IsItemActive()</code> 로 읽었지만 맨 <code>ItemAdd</code> 는 ActiveId 를 세우지 않는다. 읽히지 않은 것이 아니라 <strong>참이 될 수 없었다.</strong></td>
+</tr>
+<tr>
+<td><code>ImGuiTreeNodeFlags flags</code> 인자</td>
+<td>세 호출자가 모두 <code>ImGuiTreeNodeFlags_DefaultOpen</code> 을 넘기는데 본문이 한 번도 보지 않았다.</td>
+</tr>
+</tbody></table></div>
 <p>고친 방식은 순서를 바꾼 것이다. 자리를 먼저 잡고(<code>ItemAdd</code> → <code>ButtonBehavior</code>) 상태를 읽은
 <strong>뒤에</strong> 배경을 그린다. 클릭 영역이 양옆 컨트롤을 비켜서 잡히므로 버튼·체크박스의 클릭을
 빼앗지 않는다.</p>
@@ -246,12 +467,35 @@ context menu&quot; 중 enable toggle 과 context menu 버튼을 이미 든다. �
 <code>ImGuiCol_HeaderActive</code> 를 <strong>같은 값</strong>(<code>Selection</code>)으로 설정한다. 그래서 원본 구조대로 hover 를
 살려도 눈에 보이는 차이가 없다 — 닫힌 머리줄이 hover 되면 열린 것과 똑같이 보인다. 토큰을
 직접 읽어 넷을 가른다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>상태</th><th>토큰</th><th>값</th></tr></thead>
-<tbody><tr><td>닫힘</td><td><code>Panel</code></td><td><code>0x343434</code></td></tr>
-<tr><td>열림</td><td><code>PanelRaised</code></td><td><code>0x484848</code></td></tr>
-<tr><td>hover</td><td><code>Selection</code></td><td><code>0x525252</code></td></tr>
-<tr><td>누름</td><td><code>Primary</code></td><td><code>0x2E70EA</code></td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>상태</th>
+<th>토큰</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>닫힘</td>
+<td><code>Panel</code></td>
+<td><code>0x343434</code></td>
+</tr>
+<tr>
+<td>열림</td>
+<td><code>PanelRaised</code></td>
+<td><code>0x484848</code></td>
+</tr>
+<tr>
+<td>hover</td>
+<td><code>Selection</code></td>
+<td><code>0x525252</code></td>
+</tr>
+<tr>
+<td>누름</td>
+<td><code>Primary</code></td>
+<td><code>0x2E70EA</code></td>
+</tr>
+</tbody></table></div>
 <p>넷 다 불투명이다. 처음에는 hover 를 <code>Selection</code> 45% 로 썼다가 버렸다 — 알파는 깔린 색에 따라
 결과가 달라진다. 계산해 보니 <code>Panel</code>(<code>0x34</code>) 위에서 0x41 이 되어 열림(<code>0x48</code>)과 6/255 밖에
 벌어지지 않았고, 같은 머리줄이 Inspector(<code>ChildBg</code>=<code>Panel</code>)와 창 바닥(<code>Canvas</code>)에서 서로 다른
@@ -264,10 +508,22 @@ context menu&quot; 중 enable toggle 과 context menu 버튼을 이미 든다. �
 값을 <code>section_header_surface_hex</code> 로 내보내고, <code>EditorThemeSelfTest</code> 가 넷의 기대 hex 와 여섯
 쌍의 상이함을 단정한다(<code>verify-editor-theme.ps1</code> 이 도는 세트에 있다).</p>
 <p><strong>변이로 이빨을 쟀다.</strong></p>
-<div class="table-scroll"><table>
-<thead><tr><th>변이</th><th>결과</th></tr></thead>
-<tbody><tr><td>제품에서 <code>Hovered</code> 토큰을 <code>Selection</code> → <code>PanelRaised</code> (열림과 충돌)</td><td>빌드 exit 0, 게이트 <strong>붉음</strong> — 193 중 2 실패. 붉은 것은 <code>section header: hovered</code> 와 <code>section header: states differ</code> 둘뿐이고 다른 검사는 하나도 건드리지 않았다.</td></tr>
-<tr><td>위 변이를 유지한 채 검사의 기대 hex 만 새 값으로 완화</td><td>빌드 exit 0, 게이트 <strong>붉음</strong> — 193 중 1 실패, <code>states differ</code> 단독. 상이성 단정 혼자서도 잡는다.</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>변이</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>제품에서 <code>Hovered</code> 토큰을 <code>Selection</code> → <code>PanelRaised</code> (열림과 충돌)</td>
+<td>빌드 exit 0, 게이트 <strong>붉음</strong> — 193 중 2 실패. 붉은 것은 <code>section header: hovered</code> 와 <code>section header: states differ</code> 둘뿐이고 다른 검사는 하나도 건드리지 않았다.</td>
+</tr>
+<tr>
+<td>위 변이를 유지한 채 검사의 기대 hex 만 새 값으로 완화</td>
+<td>빌드 exit 0, 게이트 <strong>붉음</strong> — 193 중 1 실패, <code>states differ</code> 단독. 상이성 단정 혼자서도 잡는다.</td>
+</tr>
+</tbody></table></div>
 <p>치수 둘도 매직 넘버였다. 버튼 너비 <code>24.0f</code> 는 <code>GetFrameHeight()</code> 로, 아래 여백 <code>3.0f</code> 는
 <code>EditorThemeTokens::CompactGap</code> 으로 바꿨다. 너비를 <code>ThemePixels(ControlHeight)</code> 로 재지
 않은 이유가 있다 — ImGui 1.92 의 <code>FontScaleMain</code>/<code>FontScaleDpi</code> 는 폰트만 키우고 <code>ImGuiStyle</code>
@@ -277,16 +533,37 @@ context menu&quot; 중 enable toggle 과 context menu 버튼을 이미 든다. �
 구조체 하나로 돌려준다 — 원본은 &quot;눌렸을 때만 true 를 써 넣는&quot; 출력 인자라 호출자가 매 프레임
 스스로 초기화해야 했다. 옛 규약에 기대는 소비자가 하나 있어(<code>InspectorWindow.cpp</code> 의
 <code>static bool isOpen</code>) 그 자리는 <code>menu_clicked</code> 일 때만 쓰는 것으로 옮겼다.</p>
-<h3 id="22-tableapihelperh--editorpropertyrow-승계-초기-판정-부분-승계-보다-강함">2.2 <code>TableAPIHelper.h</code> → <code>EditorPropertyRow</code> 승계 <span class="chip info">초기 판정 &quot;부분 승계&quot; 보다 강함</span></h3>
+<h3>2.2 <code>TableAPIHelper.h</code> → <code>EditorPropertyRow</code> 승계 (초기 판정 &quot;부분 승계&quot; 보다 강함)</h3>
 <p>이 파일은 이름이 가리키는 범용 표 헬퍼가 아니다. 내보내는 다섯이 전부 RectTransform 의
 vec2·앵커 행이다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>심볼</th><th>소비자</th></tr></thead>
-<tbody><tr><td><code>DrawVec2Row</code></td><td><code>ImGuiDrawHelperRectTransformComponent.cpp</code> 3</td></tr>
-<tr><td><code>DrawVec2RowAbs</code></td><td>같은 파일 2</td></tr>
-<tr><td><code>DrawAnchorIconButton</code></td><td>같은 파일 1</td></tr>
-<tr><td><code>DrawAnchorIconVisual</code></td><td>같은 파일 1</td></tr>
-<tr><td><code>VecEq</code></td><td>같은 파일 2</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>심볼</th>
+<th>소비자</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DrawVec2Row</code></td>
+<td><code>ImGuiDrawHelperRectTransformComponent.cpp</code> 3</td>
+</tr>
+<tr>
+<td><code>DrawVec2RowAbs</code></td>
+<td>같은 파일 2</td>
+</tr>
+<tr>
+<td><code>DrawAnchorIconButton</code></td>
+<td>같은 파일 1</td>
+</tr>
+<tr>
+<td><code>DrawAnchorIconVisual</code></td>
+<td>같은 파일 1</td>
+</tr>
+<tr>
+<td><code>VecEq</code></td>
+<td>같은 파일 2</td>
+</tr>
+</tbody></table></div>
 <p>소비자가 한 파일뿐이다. 그리고 <code>DrawVec2Row</code> 의 몸통이 곧 <code>EditorPropertyRow</code> 의 규약이다 —
 0번 열이 라벨(<code>AlignTextToFramePadding</code> + <code>PushTextWrapPos</code>), 그 뒤가 축마다 한 열,
 <code>SetNextItemWidth(-FLT_MIN)</code> 로 셀 가용폭 전부. <strong>label column 규약의 정본이 이미 여기 있다.</strong>
@@ -294,14 +571,29 @@ vec2·앵커 행이다.</p>
 <p>이 파일은 CP949 였다. 계획서 §1.10 이 &quot;편집 대상에 비-UTF8 파일이 있으면 인코딩을 먼저
 정리한 뒤 내용을 고친다&quot; 고 정했으므로 인코딩만 바꾸는 커밋을 먼저 넣었다(<code>63e87c78</code>,
 Editor 트리의 CP949 소스 여덟을 함께). 내용 이관은 그 위에 선다.</p>
-<h4 id="이관-결과--착지-2026-09-11-1">이관 결과 — 착지 (2026-09-11)</h4>
+<h4>이관 결과 — 착지 (2026-09-11)</h4>
 <p><code>Editor/ImGuiHelper/EditorPropertyRow.{h,cpp}</code> 로 옮기고 <code>TableAPIHelper.h</code> 를 지웠다.</p>
 <p>승계하며 셋을 바꿨다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>원본의 것</th><th>바꾼 것</th></tr></thead>
-<tbody><tr><td>X·Y 두 열이 몸통에 박힘</td><td>열 개수를 인자로. <code>math::vector2</code> 가 <code>float x, y;</code> 연속 멤버라 원본도 사실상 float 배열을 쓰고 있었고, 열 수만 올리면 vec3·vec4 가 같은 규약에 든다</td></tr>
-<tr><td>오버로드 둘 (<code>DrawVec2Row</code> / <code>DrawVec2RowAbs</code>)</td><td>하나로. 차이가 <code>min</code>/<code>max</code> 뿐이었고 Abs 는 <code>0,0</code> 을 넘겨 제한을 껐다. 기본값을 <code>0,0</code> 으로 두면 같은 뜻이다</td></tr>
-<tr><td>필드 ID <code>&quot;##x&quot;</code>·<code>&quot;##y&quot;</code></td><td>열 인덱스로 고정한 표. 세 번째 열을 더할 때 이름을 새로 짓지 않아도 되고, 매 프레임 문자열을 만들지 않는다</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>원본의 것</th>
+<th>바꾼 것</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>X·Y 두 열이 몸통에 박힘</td>
+<td>열 개수를 인자로. <code>math::vector2</code> 가 <code>float x, y;</code> 연속 멤버라 원본도 사실상 float 배열을 쓰고 있었고, 열 수만 올리면 vec3·vec4 가 같은 규약에 든다</td>
+</tr>
+<tr>
+<td>오버로드 둘 (<code>DrawVec2Row</code> / <code>DrawVec2RowAbs</code>)</td>
+<td>하나로. 차이가 <code>min</code>/<code>max</code> 뿐이었고 Abs 는 <code>0,0</code> 을 넘겨 제한을 껐다. 기본값을 <code>0,0</code> 으로 두면 같은 뜻이다</td>
+</tr>
+<tr>
+<td>필드 ID <code>&quot;##x&quot;</code>·<code>&quot;##y&quot;</code></td>
+<td>열 인덱스로 고정한 표. 세 번째 열을 더할 때 이름을 새로 짓지 않아도 되고, 매 프레임 문자열을 만들지 않는다</td>
+</tr>
+</tbody></table></div>
 <p><strong>파일이 통째로 사라진 이유.</strong> 행 함수 둘을 걷어내고 남는 것은 <code>NearEq</code>·<code>VecEq</code>·
 <code>DrawAnchorIconButton</code>·<code>DrawAnchorIconVisual</code> 넷인데 전부 RectTransform 앵커 전용이고
 소비자도 그 한 파일이다. 범용 헤더가 아닌 것을 범용 이름으로 남겨 둘 이유가 없어
@@ -309,10 +601,25 @@ Editor 트리의 CP949 소스 여덟을 함께). 내용 이관은 그 위에 선
 (<code>InspectorWindow.cpp</code>, <code>ImGuiDrawHelperTerrainComponent.cpp</code>)도 함께 없어졌다.</p>
 <p><strong>내리면서 결함 하나가 드러났다 — 뒤집힌 Y 축.</strong> 같은 그림을 그리는 함수가 두 벌이었고
 세로 축이 서로 <strong>반대</strong>였다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>함수</th><th>세로 축</th><th>판정</th></tr></thead>
-<tbody><tr><td><code>DrawAnchorIconButton</code></td><td><code>ImLerp(Min.y, Max.y, ny)</code> — ny=0 이 화면 위</td><td>맞다</td></tr>
-<tr><td><code>DrawAnchorIconVisual</code></td><td><code>ImLerp(Max.y, Min.y, ny)</code> — ny=0 이 화면 아래</td><td><strong>틀렸다</strong></td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>함수</th>
+<th>세로 축</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DrawAnchorIconButton</code></td>
+<td><code>ImLerp(Min.y, Max.y, ny)</code> — ny=0 이 화면 위</td>
+<td>맞다</td>
+</tr>
+<tr>
+<td><code>DrawAnchorIconVisual</code></td>
+<td><code>ImLerp(Max.y, Min.y, ny)</code> — ny=0 이 화면 아래</td>
+<td><strong>틀렸다</strong></td>
+</tr>
+</tbody></table></div>
 <p>앵커 표는 y-down 이다 — <code>TopLeft={0,0}</code>, <code>BottomLeft={0,1}</code>
 (<code>RectTransformComponent.h:16</code>). 즉 인스펙터의 &quot;현재 프리셋&quot; 버튼은 고른 것과 위아래가
 뒤집힌 그림을 보이고 있었다. 팝업 안의 3x3 은 버튼 쪽 함수를 쓰므로 멀쩡했고, 그래서
@@ -322,29 +629,47 @@ Editor 트리의 CP949 소스 여덟을 함께). 내용 이관은 그 위에 선
 <code>DragFloat</code> 자신이 든다. disabled 는 넣지 않았다 — 다섯 소비자 중 쓰는 자리가 없어
 한 번도 돌지 않는 경로가 된다. §4 가 &quot;disabled 만 지금 뚫을 값이 있다&quot; 고 한 것은
 저장소 전체를 센 것이고, 이 줄의 소비자로 좁히면 공집합이다.</p>
-<h3 id="23-horizontallayouth--범위-밖-정정">2.3 <code>HorizontalLayout.h</code> → 범위 밖 (정정)</h3>
+<h3>2.3 <code>HorizontalLayout.h</code> → 범위 밖 (정정)</h3>
 <p><code>BeginHorizontal</code>·<code>EndHorizontal</code>·<code>BeginVertical</code>·<code>EndVertical</code>·<code>Spring</code> 을 내보낸다.
 소비자는 <strong><code>Editor/ImGuiHelper/BlueprintBuilder.cpp</code> 하나뿐</strong>이다(각 4건, <code>Spring</code> 13건).
 <code>LayoutState</code> 는 소비자 0.</p>
 <p>BlueprintBuilder 는 노드 에디터 전용이고 계획서가 이미 범위 밖으로 둔 것이다. 이 헤더가
 Inspector 에 닿은 적이 없으므로 <code>EditorPropertyRow</code> 의 입력이 아니다. 초기 판정이 이름
 (<code>HorizontalLayout</code> → &quot;행 배치&quot;)에서 추론한 것으로 보인다.</p>
-<h3 id="24-editoraxisfield3--신설-정정">2.4 <code>EditorAxisField3</code> → 신설 (정정)</h3>
+<h3>2.4 <code>EditorAxisField3</code> → 신설 (정정)</h3>
 <p>계획서는 &quot;창 안에 흩어진 구현을 정본으로 끌어올린다&quot; 고 적었다. <strong>끌어올릴 구현이 없다.</strong></p>
 <p>X/Y/Z 색 badge 는 저장소에 한 자리도 없다. vec3 를 그리는 자리는 넷이고 전부 맨
 <code>DragFloat3</code> 에 <code>ImGui::Text</code> 라벨이다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>자리</th><th>내용</th></tr></thead>
-<tbody><tr><td><code>InspectorWindow.cpp:528</code></td><td><code>DragFloat3(&quot;##Position&quot;, …)</code></td></tr>
-<tr><td><code>InspectorWindow.cpp:567</code></td><td><code>DragFloat3(&quot;##Rotation&quot;, …)</code></td></tr>
-<tr><td><code>InspectorWindow.cpp:613</code></td><td><code>DragFloat3(&quot;##Scale&quot;, …)</code></td></tr>
-<tr><td><code>ReflectionTypedDraw.h:304</code></td><td><code>DragFloat3(label, &amp;v.x)</code> — 리플렉션 경로의 정본</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>자리</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>InspectorWindow.cpp:528</code></td>
+<td><code>DragFloat3(&quot;##Position&quot;, …)</code></td>
+</tr>
+<tr>
+<td><code>InspectorWindow.cpp:567</code></td>
+<td><code>DragFloat3(&quot;##Rotation&quot;, …)</code></td>
+</tr>
+<tr>
+<td><code>InspectorWindow.cpp:613</code></td>
+<td><code>DragFloat3(&quot;##Scale&quot;, …)</code></td>
+</tr>
+<tr>
+<td><code>ReflectionTypedDraw.h:304</code></td>
+<td><code>DragFloat3(label, &amp;v.x)</code> — 리플렉션 경로의 정본</td>
+</tr>
+</tbody></table></div>
 <p>계획서가 지목한 <code>ImGuiDrawHelperRectTransformComponent.cpp</code> 의 축 필드는 <strong>vec2</strong> 이고
 (§2.2 의 <code>DrawVec2Row</code>), vec3 가 아니다. 승격이 아니라 신설이며, 승계할 것이 있다면 축
 <strong>필드</strong>가 아니라 §2.2 의 <strong>행 규약</strong>이다.</p>
 <p>이관 대상 넷 중 <code>ReflectionTypedDraw.h:304</code> 가 가장 넓다 — 리플렉션이 그리는 모든 vector3 가
 그 한 줄을 지난다. 대표 지점을 고른다면 여기다.</p>
-<h4 id="이관-결과--착지-2026-09-11-2">이관 결과 — 착지 (2026-09-11)</h4>
+<h4>이관 결과 — 착지 (2026-09-11)</h4>
 <p><code>Editor/ImGuiHelper/EditorAxisField3.{h,cpp}</code> 를 새로 세우고 네 자리를 모두 옮겼다 —
 <code>ReflectionTypedDraw.h</code> 의 vector3 분기와 <code>InspectorWindow.cpp</code> 의 Position·Rotation·Scale.</p>
 <p><strong>라벨은 ImGui 규약을 그대로 쓴다.</strong> 라벨을 왼쪽으로 옮기는 규약을 새로 세우지 않았다.
@@ -355,11 +680,30 @@ Inspector 에 닿은 적이 없으므로 <code>EditorPropertyRow</code> 의 입�
 <code>Primary</code>(파랑)가 크기도 색상도 딱 맞지만 그대로 쓰면 세 축이 곧 오류·성공·강조가 된다.
 그러면 이 줄에 error 상태를 넣는 순간 X 축과 색이 겹쳐 상태 표시가 사라진다 —
 <code>EditorSectionHeader</code> 가 hover 를 잃었던 것과 같은 충돌이다. 그래서 따로 두었다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>축</th><th>값</th><th>흰 글자 대비</th></tr></thead>
-<tbody><tr><td>X</td><td><code>0xC0392B</code></td><td>5.4:1</td></tr>
-<tr><td>Y</td><td><code>0x4F7A28</code></td><td>5.1:1</td></tr>
-<tr><td>Z</td><td><code>0x2D6FA8</code></td><td>5.3:1</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>축</th>
+<th>값</th>
+<th>흰 글자 대비</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>X</td>
+<td><code>0xC0392B</code></td>
+<td>5.4:1</td>
+</tr>
+<tr>
+<td>Y</td>
+<td><code>0x4F7A28</code></td>
+<td>5.1:1</td>
+</tr>
+<tr>
+<td>Z</td>
+<td><code>0x2D6FA8</code></td>
+<td>5.3:1</td>
+</tr>
+</tbody></table></div>
 <p>대비를 재 둔 이유가 있다. 밝은 <code>Positive</code>(<code>0x5AEB5C</code>)를 그대로 쓰면 흰 글자 대비가
 <strong>2.1:1</strong> 이라 badge 의 글자가 배경에 묻는다. 색만으로 축을 알리면 색을 구별하지 못하는
 눈에는 세 칸이 같은 칸이 되므로 글자는 장식이 아니다. 그래서 이 표는 주석이 아니라
@@ -370,19 +714,19 @@ Inspector 에 닿은 적이 없으므로 <code>EditorPropertyRow</code> 의 입�
 <code>Canvas</code> 라 두 색이 같기 때문이다(hover 하면 <code>FrameBgHovered</code> 가 떠올라 드러난다).
 이 위젯이 만든 성질이 아니라 테마가 두 칸을 같은 값으로 둔 결과이고, 이번에도 같은
 충돌 양식이다. W1 이 아직 <code>progress</code> 라 여기서 값을 바꾸지 않고 기록만 했다.</p>
-<h3 id="25-toggleuih--은퇴-소비자-0">2.5 <code>ToggleUI.h</code> → 은퇴 (소비자 0)</h3>
+<h3>2.5 <code>ToggleUI.h</code> → 은퇴 (소비자 0)</h3>
 <p><code>ImGui::ToggleSwitch(const char*, bool)</code> 하나를 내보내고 <strong>소비자가 0</strong> 이다. 계획서는
 &quot;겹치면 승계, 아니면 신설 후 은퇴&quot; 로 두었고 실측이 후자로 답했다.</p>
 <p>은퇴 비용이 0 이다 — 끊을 소비자가 없다. 다만 저장소 규약대로 <strong>소비자를 실제로 끊어 본 뒤</strong>
 지운다는 조건은 여기서 공집합이므로, 지우는 커밋이 곧 증명이다(빌드가 서면 소비자가 없었다).</p>
 <p><code>ToggleSwitch</code> 의 시각(둥근 트랙 + 원형 손잡이)은 <code>EditorModeButton</code> 의 &quot;flat icon/active
 marker&quot; 와 다른 물건이다. 승계하면 두 벌이 남는다.</p>
-<h3 id="26-widgetshcpp--범위-밖-정정">2.6 <code>widgets.{h,cpp}</code> → 범위 밖 (정정)</h3>
+<h3>2.6 <code>widgets.{h,cpp}</code> → 범위 밖 (정정)</h3>
 <p><code>ax::Widgets::Icon(size, IconType, filled, color, innerColor)</code> 하나다. <code>ax::</code> 는 노드
 에디터의 이름공간이고, 소비자는 <code>Editor/ImGuiHelper/PinHelper.h</code> 하나뿐이다(핀 아이콘).
 <code>widgets.cpp</code> 는 <code>drawing.{h,cpp}</code> 의 <code>DrawIcon</code> 을 부른다 — 계획서가 이미 범위 밖으로 둔
 쌍이다. <code>EditorModeButton</code> 의 입력이 아니다.</p>
-<h4 id="editormodebutton-이관-결과--착지-2026-09-11"><code>EditorModeButton</code> 이관 결과 — 착지 (2026-09-11)</h4>
+<h4><code>EditorModeButton</code> 이관 결과 — 착지 (2026-09-11)</h4>
 <p><code>Editor/ImGuiHelper/EditorModeButton.{h,cpp}</code> 를 세우고 툴바의 Play·Pause 둘을 옮긴 뒤
 <code>ToggleUI.h</code> 를 지웠다. 빌드가 섰으므로 소비자가 없었다는 것이 그 자리에서 증명된다.</p>
 <p><strong>원본 자리에 결함이 있었다.</strong> <code>MenuBarWindow::RenderToolBar</code> 는 일시정지 중일 때
@@ -395,7 +739,7 @@ marker&quot; 와 다른 물건이다. 승계하면 두 벌이 남는다.</p>
 <p><strong>disabled 는 여기서 실제로 돈다.</strong> 재생 중이 아닐 때 일시정지 버튼이 그 상태다.
 <code>BeginDisabled</code> 로 감싸지 않고 위젯이 직접 든 이유는 그것이 전체 알파를 내려 marker 까지
 흐리기 때문이다 — 켜져 있는데 손댈 수 없는 상태에서 켜짐 표시를 잃을 이유가 없다.</p>
-<h3 id="27-곁가지--죽은-include-하나">2.7 곁가지 — 죽은 include 하나</h3>
+<h3>2.7 곁가지 — 죽은 include 하나</h3>
 <p><code>EngineGUIWindow/InspectorWindow.cpp:53</code> 이 <code>PinHelper.h</code> 를 들이는데 <code>DrawPinIcon</code> 을
 <strong>한 번도 부르지 않는다.</strong> 계획서 W2 가 목록에 둔 <code>ImGuiContext.h</code> 의 죽은
 <code>imgui_impl_dx11.h</code> include 와 같은 종류인데, 그쪽은 이미 없어졌다(§5). 남은 것은 이
@@ -408,42 +752,79 @@ include 다 — <code>ToggleSwitch</code> 를 부르지 않는다. §2.5 의 은
 않았다. 즉 이 자산의 include 는 4 이고 소비자는 3 이었다. <code>EditorSectionHeader</code> 이관에서
 그 한 줄을 함께 걷었다. 호출 건수와 include 건수는 다른 자다.</p>
 <hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-3-이-표가-w2-구현-순서에-주는-것">
-<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-이-표가-w2-구현-순서에-주는-것">3. 이 표가 W2 구현 순서에 주는 것</h2></div>
-<div class="prose"><ol>
-<li><del><strong><code>EditorSectionHeader</code></strong> — 승계. 기존 138줄을 토큰화·개명하고 소비자 3을 옮긴다.</del>
+<h2>3. 이 표가 W2 구현 순서에 주는 것</h2>
+<ol>
+<li>&#126;&#126;<strong><code>EditorSectionHeader</code></strong> — 승계. 기존 138줄을 토큰화·개명하고 소비자 3을 옮긴다.&#126;&#126;
 <strong>착지했다 (2026-09-11, §2.1 의 &quot;이관 결과&quot;).</strong> 죽은 코드 셋을 함께 고쳤고 색은 Header 칸
 대신 토큰을 직접 읽는다.</li>
-<li><del><strong><code>EditorPropertyRow</code></strong> — 승계. 행 규약을 일반화한다(vec2 전용 → 열 개수 인자).</del>
+<li>&#126;&#126;<strong><code>EditorPropertyRow</code></strong> — 승계. 행 규약을 일반화한다(vec2 전용 → 열 개수 인자).&#126;&#126;
 <strong>착지했다 (2026-09-11, §2.2 의 &quot;이관 결과&quot;).</strong> <code>TableAPIHelper.h</code> 가 통째로 사라졌고
 앵커 아이콘의 뒤집힌 Y 축을 함께 고쳤다.</li>
-<li><del><strong><code>EditorAxisField3</code></strong> — 신설.</del> <strong>착지했다 (2026-09-11, §2.4 의 &quot;이관 결과&quot;).</strong>
+<li>&#126;&#126;<strong><code>EditorAxisField3</code></strong> — 신설.&#126;&#126; <strong>착지했다 (2026-09-11, §2.4 의 &quot;이관 결과&quot;).</strong>
 네 자리를 모두 옮겼고 축 색은 의미 색과 구별되게 따로 두었다.</li>
-<li><del><strong><code>EditorModeButton</code></strong> — 신설. 착지 뒤 <code>ToggleUI.h</code> 를 지운다.</del>
+<li>&#126;&#126;<strong><code>EditorModeButton</code></strong> — 신설. 착지 뒤 <code>ToggleUI.h</code> 를 지운다.&#126;&#126;
 <strong>착지했다 (2026-09-11, §2.6 뒤의 &quot;이관 결과&quot;).</strong> 켜짐을 marker 로 옮겨 원본이 잃었던
 hover/press 를 되살렸고 <code>ToggleUI.h</code> 를 지웠다.</li>
 </ol>
 <p>은퇴 대상은 <code>ToggleUI.h</code> 하나다. <code>HorizontalLayout.h</code>·<code>widgets.{h,cpp}</code> 는 은퇴가 아니라
 <strong>범위 밖</strong>이다 — 노드 에디터가 쓰고 있으므로 건드리지 않는다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-4-상태-matrix--실측-2026-09-11-추가">
-<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-상태-matrix--실측-2026-09-11-추가">4. 상태 matrix — 실측 (2026-09-11 추가)</h2></div>
-<div class="prose"><p>계획서 §7.1 은 <code>EditorPropertyRow</code> 에 &quot;mixed/disabled/error 상태&quot; 를, W2 본문은
+<h2>4. 상태 matrix — 실측 (2026-09-11 추가)</h2>
+<p>계획서 §7.1 은 <code>EditorPropertyRow</code> 에 &quot;mixed/disabled/error 상태&quot; 를, W2 본문은
 &quot;hover/active/focus/nav/disabled/mixed/error 상태 matrix 를 고정한다&quot; 를 요구한다. 그 일곱이
 지금 저장소에서 <strong>실제로 쓰이는 자리</strong>를 셌다(<code>Editor/</code>, <code>ImGuiHelper/</code>·<code>RenderTests/</code> 제외,
 주석 제거 후).</p>
-<div class="table-scroll"><table>
-<thead><tr><th>상태</th><th>표현</th><th style="text-align:right">건수</th><th>판정</th></tr></thead>
-<tbody><tr><td>hover</td><td><code>IsItemHovered</code></td><td class="num" style="text-align:right">15</td><td>실재</td></tr>
-<tr><td>active</td><td><code>IsItemActive</code></td><td class="num" style="text-align:right">1</td><td>거의 없음</td></tr>
-<tr><td>focus</td><td><code>IsItemFocused</code></td><td class="num" style="text-align:right"><strong>0</strong></td><td><strong>소비자 0</strong></td></tr>
-<tr><td>nav</td><td><code>ImGuiCol_Nav*</code></td><td class="num" style="text-align:right">3</td><td>전부 테마·탐침. 위젯 코드는 묻지 않는다</td></tr>
-<tr><td>disabled</td><td><code>BeginDisabled</code> 6 + <code>TextDisabled</code> 14</td><td class="num" style="text-align:right">20</td><td>실재. 다만 <strong>기구가 둘</strong></td></tr>
-<tr><td>mixed</td><td><code>CheckboxFlags</code> (tristate)</td><td class="num" style="text-align:right"><strong>0</strong></td><td><strong>소비자 0</strong></td></tr>
-<tr><td>error</td><td>빨강 <code>PushStyleColor(ImGuiCol_Text)</code></td><td class="num" style="text-align:right"><strong>2</strong></td><td>사실상 없음</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>상태</th>
+<th>표현</th>
+<th align="right">건수</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>hover</td>
+<td><code>IsItemHovered</code></td>
+<td align="right">15</td>
+<td>실재</td>
+</tr>
+<tr>
+<td>active</td>
+<td><code>IsItemActive</code></td>
+<td align="right">1</td>
+<td>거의 없음</td>
+</tr>
+<tr>
+<td>focus</td>
+<td><code>IsItemFocused</code></td>
+<td align="right"><strong>0</strong></td>
+<td><strong>소비자 0</strong></td>
+</tr>
+<tr>
+<td>nav</td>
+<td><code>ImGuiCol_Nav*</code></td>
+<td align="right">3</td>
+<td>전부 테마·탐침. 위젯 코드는 묻지 않는다</td>
+</tr>
+<tr>
+<td>disabled</td>
+<td><code>BeginDisabled</code> 6 + <code>TextDisabled</code> 14</td>
+<td align="right">20</td>
+<td>실재. 다만 <strong>기구가 둘</strong></td>
+</tr>
+<tr>
+<td>mixed</td>
+<td><code>CheckboxFlags</code> (tristate)</td>
+<td align="right"><strong>0</strong></td>
+<td><strong>소비자 0</strong></td>
+</tr>
+<tr>
+<td>error</td>
+<td>빨강 <code>PushStyleColor(ImGuiCol_Text)</code></td>
+<td align="right"><strong>2</strong></td>
+<td>사실상 없음</td>
+</tr>
+</tbody></table></div>
 <p>읽는 법 셋.</p>
 <p><strong>① <code>mixed</code> 와 <code>focus</code> 는 소비자가 0 이다.</strong> 계획서가 요구한 상태 중 둘이 저장소에 한 자리도
 없다. 이 저장소는 &quot;계획서가 지목한 대상이 이미 죽어 있을 수 있다&quot; 로 한 번 데었다. 쓰는 데가
@@ -459,73 +840,403 @@ hover/press 를 되살렸고 <code>ToggleUI.h</code> 를 지웠다.</li>
 받으려면 그 14건을 먼저 두 뜻으로 갈라야 한다 — 그것은 이관 슬라이스의 일이다.</p>
 <p>정리하면 <strong>처음 구현에 넣을 상태는 hover·active·disabled 셋</strong>이고, focus·nav·mixed·error 는
 소비자가 생길 때 더한다. 그 판단의 근거가 위 표다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-41-검사가-붙은-자리와-그-이빨-2026-09-11-추가">
-<div class="sec-head"><p class="ve-label">§4.1</p><h2 id="41-검사가-붙은-자리와-그-이빨-2026-09-11-추가">4.1 검사가 붙은 자리와 그 이빨 (2026-09-11 추가)</h2></div>
-<div class="prose"><p>네 family 가 모두 착지하면서 <code>EditorThemeSelfTest</code> 의 검사가 <strong>193 → 237</strong> 로 늘었다.
+<h2>4.1 검사가 붙은 자리와 그 이빨 (2026-09-11 추가)</h2>
+<p>네 family 가 모두 착지하면서 <code>EditorThemeSelfTest</code> 의 검사가 <strong>193 → 237</strong> 로 늘었다.
 늘어난 44 는 세 위젯이 고르는 값을 읽어 단정한다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>위젯</th><th>단정</th></tr></thead>
-<tbody><tr><td><code>EditorPropertyRow</code></td><td>필드 ID 가 <code>##</code> 로 숨겨질 것, 서로 다를 것, 범위 밖은 <code>nullptr</code> 일 것</td></tr>
-<tr><td><code>EditorAxisField3</code></td><td>축 색 셋의 기대 hex, 셋이 서로 다를 것, <strong>의미 색 셋과 다를 것</strong>, 흰 글자 대비 3:1 이상일 것</td></tr>
-<tr><td><code>EditorModeButton</code></td><td>표면 셋의 기대 hex, 서로 다를 것, <strong>marker 가 표면 셋 어느 것과도 다를 것</strong>, 꺼진 글자색이 다를 것</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>위젯</th>
+<th>단정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EditorPropertyRow</code></td>
+<td>필드 ID 가 <code>##</code> 로 숨겨질 것, 서로 다를 것, 범위 밖은 <code>nullptr</code> 일 것</td>
+</tr>
+<tr>
+<td><code>EditorAxisField3</code></td>
+<td>축 색 셋의 기대 hex, 셋이 서로 다를 것, <strong>의미 색 셋과 다를 것</strong>, 흰 글자 대비 3:1 이상일 것</td>
+</tr>
+<tr>
+<td><code>EditorModeButton</code></td>
+<td>표면 셋의 기대 hex, 서로 다를 것, <strong>marker 가 표면 셋 어느 것과도 다를 것</strong>, 꺼진 글자색이 다를 것</td>
+</tr>
+</tbody></table></div>
 <p><strong>변이로 이빨을 쟀다.</strong> 셋을 한 번에 넣고 어느 검사가 붉어지는지 이름으로 확인했다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>변이</th><th>붉어진 검사</th></tr></thead>
-<tbody><tr><td>필드 ID 표에서 <code>&quot;##f2&quot;</code> → <code>&quot;##f1&quot;</code> (중복)</td><td><code>property row: field ids differ</code></td></tr>
-<tr><td>X 축 색 → <code>Positive</code>(<code>0x5AEB5C</code>)</td><td><code>axis x: badge color</code> · <code>axis x: badge is not a meaning color</code> · <code>axis x: badge letter stays readable</code></td></tr>
-<tr><td>marker → <code>Selection</code> (Held 와 충돌)</td><td><code>mode button: marker stands out from every surface</code></td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>변이</th>
+<th>붉어진 검사</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>필드 ID 표에서 <code>&quot;##f2&quot;</code> → <code>&quot;##f1&quot;</code> (중복)</td>
+<td><code>property row: field ids differ</code></td>
+</tr>
+<tr>
+<td>X 축 색 → <code>Positive</code>(<code>0x5AEB5C</code>)</td>
+<td><code>axis x: badge color</code> · <code>axis x: badge is not a meaning color</code> · <code>axis x: badge letter stays readable</code></td>
+</tr>
+<tr>
+<td>marker → <code>Selection</code> (Held 와 충돌)</td>
+<td><code>mode button: marker stands out from every surface</code></td>
+</tr>
+</tbody></table></div>
 <p>237 중 <strong>5 실패</strong>이고, 붉은 다섯이 모두 그 변이가 깨뜨린 계약의 이름이다. 나머지 232 는
 하나도 건드리지 않았다. 대비 단정이 세 번째 줄에서 혼자 붉어진 것이 특히 값이 있다 —
 색을 바꿔도 대비가 충분하면 그 검사는 조용하고, 실제로 묻는 색을 골랐을 때만 운다.</p>
 <p>되돌린 뒤 Debug·Release 빌드가 서고 <code>verify-editor-theme.ps1</code> 이 DX12·Vulkan 6기동
 103검사로 통과한다. 이웃 게이트 넷(obsolete surface · declaration wiring · workspace ·
 icon resources)도 초록이다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-5-계획서-항목-하나는-이미-끝나-있다">
-<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-계획서-항목-하나는-이미-끝나-있다">5. 계획서 항목 하나는 이미 끝나 있다</h2></div>
-<div class="prose"><p>W2 목록의 &quot;<code>ImGuiContext.h</code> 의 죽은 <code>imgui_impl_dx11.h</code> include 를 걷는다&quot; 는 할 일이 없다.
+<h2>5. 계획서 항목 하나는 이미 끝나 있다</h2>
+<p>W2 목록의 &quot;<code>ImGuiContext.h</code> 의 죽은 <code>imgui_impl_dx11.h</code> include 를 걷는다&quot; 는 할 일이 없다.
 <code>ImGuiContext.h</code> 가 저장소에 없고, <code>imgui_impl_dx11</code> 이라는 이름이 남은 곳은
 <code>EngineEntry/EditorMain.h:39</code> 의 <strong>주석 한 줄</strong>뿐이다(무엇을 걷었는지 적어 둔 기록).</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-6-이-표가-답하지-않는-것">
-<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-이-표가-답하지-않는-것">6. 이 표가 답하지 않는 것</h2></div>
-<div class="prose"><p><code>EditorSectionHeader</code> 와 <code>EditorPropertyRow</code> 의 토큰화는 <code>EditorTheme.h</code> 의
+<h2>6. 이 표가 답하지 않는 것</h2>
+<p><code>EditorSectionHeader</code> 와 <code>EditorPropertyRow</code> 의 토큰화는 <code>EditorTheme.h</code> 의
 <code>EditorThemeTokens</code>(RowHeight·ControlRadius 등)를 읽어야 하는데, 이 글을 쓰는 시점에 그 파일은
 다른 세션이 미커밋으로 들고 있다. 치수를 <code>ImGuiStyle</code> 에서만 뽑으면 두 번 고치게 되므로
 구현은 그 커밋 뒤로 미뤘다.</p>
-</div>
-</section>
-<section class="sources" aria-label="출처">
-<p class="ve-label">출처</p>
-<p><a href="EditorWidgetInheritanceW2.md"><code>docs/analysis/EditorWidgetInheritanceW2.md</code></a> · 마지막 커밋 2026-09-11 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
-</section>
-</main>
-</div>
-<script>
-(() => {
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
-  if (links.length) {
-    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
-    const spy = new IntersectionObserver(entries => {
-      for (const e of entries) if (e.isIntersecting) {
-        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
-      }
-    }, { rootMargin: '0px 0px -70% 0px' });
-    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
-  }
-  if (still) return;
-  document.documentElement.classList.add('js-motion');
-  const io = new IntersectionObserver(entries => {
-    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
-  }, { rootMargin: '0px 0px -5% 0px' });
-  for (const el of document.querySelectorAll('main > *')) io.observe(el);
-})();
-</script>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-확정표"></span><span id="2-근거"></span><span id="21-customcollapsingheaderh--editorsectionheader-승계-유지"></span><span id="22-tableapihelperh--editorpropertyrow-승계-초기-판정-부분-승계-보다-강함"></span><span id="23-horizontallayouth--범위-밖-정정"></span><span id="24-editoraxisfield3--신설-정정"></span><span id="25-toggleuih--은퇴-소비자-0"></span><span id="26-widgetshcpp--범위-밖-정정"></span><span id="27-곁가지--죽은-include-하나"></span><span id="3-이-표가-w2-구현-순서에-주는-것"></span><span id="4-상태-matrix--실측-2026-09-11-추가"></span><span id="41-검사가-붙은-자리와-그-이빨-2026-09-11-추가"></span><span id="5-계획서-항목-하나는-이미-끝나-있다"></span><span id="6-이-표가-답하지-않는-것"></span><span id="editormodebutton-이관-결과--착지-2026-09-11"></span><span id="sec-1-확정표"></span><span id="sec-2-근거"></span><span id="sec-3-이-표가-w2-구현-순서에-주는-것"></span><span id="sec-4-상태-matrix--실측-2026-09-11-추가"></span><span id="sec-41-검사가-붙은-자리와-그-이빨-2026-09-11-추가"></span><span id="sec-5-계획서-항목-하나는-이미-끝나-있다"></span><span id="sec-6-이-표가-답하지-않는-것"></span><span id="이관-결과--착지-2026-09-11"></span><span id="이관-결과--착지-2026-09-11-1"></span><span id="이관-결과--착지-2026-09-11-2"></span></details></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
 
-</body>
-</html>
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
+</script>
+</body></html>

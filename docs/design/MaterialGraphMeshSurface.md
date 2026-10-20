@@ -1,5 +1,52 @@
 # Material Graph 메시·스키닝 평가 입력
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- GPU scene packet과 resident/visibility·REAC 경로는 live graph의 구현 기반이다. 과거 EnhancedSceneRenderer 설치 미완료·단계적 도입 표기는 이전 설계 기록으로만 보존한다.
+- 공유 LX graph 기술과 METEOR material의 scene/view/geometry stage 소비 경계를 따른다. 구현된 설치를 후속 작업으로 중복 계획하지 않으며, 출력·오류·전체 비용 수용은 별도 검증한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang#L6) — `struct LXTransformJob`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang#L74) — `TransformPbrFrame(normal, tangent.xyz, bitangent, frameTransform, n, t, b);`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang:103](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang#L103) — `void LXSampleMesh(uint3 id : SV_DispatchThreadID)`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L34) — `static bool Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L216) — `class MeshSurfaceBatch final : public SurfaceGeometrySource`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:341](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L341) — `bool RecordSamples(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceBatch> vertices,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:718](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L718) — `void MeshSurfaceInput::SealInstanceBounds()`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:769](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L769) — `bool MeshSurfaceInput::Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:1500](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L1500) — `bool MeshSurfaceBatch::ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const`
+- [Engine/Utility_Framework/TypeTrait.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L41) — `inline constexpr bool is_gc_strong_ref_v<gc::trace_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L43) — `inline constexpr bool is_gc_strong_ref_v<gc::root_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L52) — `constexpr bool is_shared_ptr_v<own::shared_owner<T>> = true;`
+- [Tools/regression/verify-material-mesh-surface.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-mesh-surface.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-mesh-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-mesh-surface.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-mesh-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-mesh-surface.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang#L4) — `struct LXSurfacePoint`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang#L13) — `bool LXValidSurfaceVector(float4 value)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang#L18) — `bool LXValidSurfacePoint(LXSurfacePoint point, float3 eye)`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.h#L21) — `class RasterSurfaceBatch final : public SurfaceGeometrySource`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.h#L24) — `~RasterSurfaceBatch() override;`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.h:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.h#L42) — `bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;`
+- [Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h#L10) — `struct PackedBoneMatrix final`
+- [Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h#L14) — `[[nodiscard]] static PackedBoneMatrix From(const math::matrix4x4& matrix) noexcept`
+- [Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h#L22) — `[[nodiscard]] static PackedBoneMatrix Identity() noexcept`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 MAT-7 잔여 중 제품 정점 ABI의 공간 입력과 GPU 평가 결과의 게시 경계를 연결했다.
 `EnhancedSceneRenderer`의 graph pass 설치 완료는 아니다. 실제 Scene의 LX 거부 경계와
 기본 capability는 유지한다.
@@ -156,3 +203,5 @@ Scene raster의 perspective 보정 결과인지는 해당 host가 검증해야 �
 - 환경 MIS/수렴, Special SSS/refraction/Volume, 자동 host/compiler cook closure.
 
 MAT-7 전체는 진행 중이며 완료 공수를 추가하지 않는다.
+
+</details>

@@ -1,5 +1,40 @@
 # Phase 22 cloud audio validation
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- AudioHost/PlaybackService·clip directory와 miniaudio/Null backend가 재생 수명을 소유한다. resident/stream 및 개별 PlaybackHandle을 구분한다.
+- FMOD 채택을 필수 선행으로 재도입하지 않는다. 과거 선택 씬의 종료/stream 수용과 현재 CI·설치 제품 수용은 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/AssetCooker/SoundAssetCookProducer.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/SoundAssetCookProducer.h#L23) — `std::ranges::transform(value, value.begin(), [](unsigned char letter)`
+- [Tools/AssetCooker/SoundAssetCookProducer.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/SoundAssetCookProducer.h#L40) — `clips.insert(wave::ClipKey::FromGuid(entry.assetId.value));`
+- [Tools/AssetCooker/SoundAssetCookProducer.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/SoundAssetCookProducer.h#L50) — `product.entry.artifactPath = graph ? ck::MakeDerivedSoundGraphArtifactPath(id) : ck::MakeDerivedSoundPresetArtifactPath(id);`
+- [Tools/regression/audio/evidence/results.json:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audio/evidence/results.json#L7) — `"tested_tree_identity": "source-sha256.json; working-tree implementation before publication",`
+- [Tools/regression/audio/evidence/source-sha256.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audio/evidence/source-sha256.json#L1) — `{`
+- [Tools/regression/audio/evidence/targeted-recheck.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audio/evidence/targeted-recheck.json#L1) — `{`
+- [Tools/regression/audio/evidence/failure-canaries.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audio/evidence/failure-canaries.json#L1) — `[`
+- [Tools/regression/audio/evidence/compile-provenance.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audio/evidence/compile-provenance.json#L1) — `{`
+- [Tools/regression/audio/evidence/fixture-determinism.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audio/evidence/fixture-determinism.json#L1) — `{`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Date: 2026-10-05 UTC
 Implementation branch: `phase22-fmod-retirement-20261005`
 Base: `86f7efd30314de4dd19e3dbb30da9f820506e3dd`
@@ -71,3 +106,5 @@ The final generated logs are under `Build/Validation/Phase22Final/<configuration
 This evidence does **not** certify physical output, WASAPI, listening/loopback, hardware latency or underruns, a 30-minute hardware soak, the Windows MSVC wrapper, full Editor/Player builds, package/PE checks, native Windows cache/CNG paths, real Pak mounting/encryption/immutability, or C# product execution. The non-ASCII alias tests run on Linux; the Windows encoding fix still needs its native platform gate.
 
 Logical Null backend tests, miniaudio software-device tests and explicit no-device PCM tests are separate boundaries. A separate scene-consumer probe uses Scene/Entity/logger stubs and is not product scene integration. LeakSanitizer is disabled under this host's ptrace environment; leak freedom is not verified. These exclusions remain Phase 22 acceptance work rather than inferred passes.
+
+</details>

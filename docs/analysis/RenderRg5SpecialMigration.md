@@ -1,5 +1,32 @@
 # RG5-7 Refraction·Subsurface·Volume 소유자 버전 핸들 — 완료
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Refraction/SSS 입력 캡처는 소유자의 DeclareCaptureOutputs가 Write 버전을 반환하며 SceneHost가 그 핸들을 선언한다. Refraction Background는 lighting/depth Read 및 복사 목적지 Write를 선언하고 콜백에 그 선언 당시의 출력 핸들을 값으로 보관한다. Bake sample은 Write, SSS reflection/irradiance도 각각 Write다.
 
 Lookup GraphInputs는 graph/epoch/upload/descriptor 소유권을 검사한 뒤 최신 캡처 버전을 반환한다. Refraction Bake와 SSS Reflection은 FindImportedTexture의 v0 복구 대신 이를 읽는다. 물리 자원·PSO·캐시·제출 수명 계약은 유지한다.
@@ -20,3 +47,5 @@ Volume은 한 번의 완전한 계수 선언과 합성 선언 계약을 유지�
 rg5-special-completion-v1.json: sliceComplete=true, rg5Complete=false, versionedProductGpuAcceptance=false, productDefault=DeclarationOrder. declaration-inventory.json: 제품 59·게이트 213 호출. 전체 4.x 공수 355·기성 88 및 RG5 progress/earnedDays 0은 유지한다. IBL 1024/4096·MAT-9 별도 품질/성능 게이트도 유지한다.
 
 다음 구현은 GraphSurface/Draw 자원 접근 선언과 중복 읽기 정리, DeclareBlended의 갱신 색상 반환이다. Code/Graph 혼합 스트림 실제 GPU 검증을 마친 뒤 guard를 제거한다. 나머지 소비자/ReadWrite·legacy 추론 제거와 RG6 기본 정렬 전환은 계속 열린 조건이다.
+
+</details>

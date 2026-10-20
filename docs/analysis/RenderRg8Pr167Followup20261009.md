@@ -1,5 +1,53 @@
 # RG8 PR167 follow-up: execution evidence and acceptance contracts
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/audit-rg8-adoption.py:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L25) — `raise ValueError(message)`
+- [Tools/regression/audit-rg8-adoption.py:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L56) — `"skybox": Path(manifest["skyBoxPath"]).name}`
+- [Tools/regression/audit-rg8-adoption.py:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L121) — `assignment = {p: (i, b["queue"]) for i, b in enumerate(batches) for p in b["passes"]}`
+- [Tools/regression/measure-rg8-adoption.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L4) — `[ValidateSet('Debug','Release')][string]$Configuration='Release',`
+- [Tools/regression/measure-rg8-adoption.ps1:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L32) — `$estimatedTelemetryGiB=if($TimingOnly){[math]::Max(1,$NormalCandidates/64.0)}else{1}`
+- [Tools/regression/measure-rg8-adoption.ps1:269](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L269) — `function Cmd([string]$name,[string[]]$arguments=@(),[bool]$allowPreparing=$false)`
+- [Tools/regression/verify-rg8-live-queues.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L3) — `[ValidateSet('Debug','Release')][string]$Configuration = 'Debug',`
+- [Tools/regression/verify-rg8-live-queues.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L13) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg8-live-queues.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L14) — `$out = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/compare-material-captures.py:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L12) — `parser = argparse.ArgumentParser(description=__doc__)`
+- [Tools/regression/compare-material-captures.py:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L23) — `raise ValueError(f"Capture inputs differ: {key}")`
+- [Tools/regression/compare-material-captures.py:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L25) — `raise ValueError("Requires controlled captures")`
+- [Tools/regression/verify-rg8-queue-execution.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L3) — `[ValidateSet('Debug','Release')][string]$Configuration = 'Debug',`
+- [Tools/regression/verify-rg8-queue-execution.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L17) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg8-queue-execution.ps1:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L18) — `$out = [IO.Path]::GetFullPath($OutputDirectory)`
+- [BuildTool/Paths.cs:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L9) — `internal static class Paths`
+- [BuildTool/Paths.cs:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L38) — `public static string Canonical(string path, bool mustExist = false)`
+- [BuildTool/Paths.cs:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L86) — `public static void Copy(string source, string destination, bool overwrite = false)`
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+- [Engine/RenderEngine/Experiment/Model.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L9) — `class ModelLoader;`
+- [Engine/RenderEngine/Experiment/Model.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L13) — `class Model final`
+- [Engine/RenderEngine/Experiment/Model.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L15) — `public:`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Status: Scheduler CPU reduction and Debug/Release native correctness/workload evidence verified on 2026-10-11; controlled performance and adoption **unvalidated**.
 Async compute remains **default OFF**. RG7 transient aliasing remains explicitly unsupported by the owned queue executor. This document does not close RG8, award earned days, or supersede the historical measurements in `RenderRg8Barriers20261009.md`.
 
@@ -351,3 +399,5 @@ Evidence: `Artifacts/PR169/rg8-scheduler-cpu-20261011/rg8-scheduler-cpu-checkpoi
 final `Debug-optimized` and `Release` matrix audits, normal adoption-measurements,
 native/mutation results and retention ledgers. Intermediate `Debug`/`Debug-final`
 verdicts are preserved but their superseded raw pixels are no longer replayable.
+
+</details>

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>물리 재설계 — C++23 PhysX API 선행 재작성 (PHASE 19)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="PhysicsRedesignPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/PhysicsRedesignPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>물리 재설계 — C++23 PhysX API 선행 재작성 (PHASE 19)</h1><p>M3: 현재 Player/SDK와 실제 장면에서 frame/tick/task p99·스케줄 대기·프로파일러 계측 영향을 분리해 판정한다. 이미 구현된 body/shape/contact routing·cleanup을 다시 설계하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Scene</ve-node><ve-node id="n1" at="2 1">Simulation</ve-node><ve-node id="n2" at="3 1" key>Body / shape</ve-node><ve-node id="n3" at="3 2">Contact stream</ve-node><ve-node id="n4" at="2 2">PostPhysics</ve-node><ve-node id="n5" at="1 2">Managed code</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>M3: 현재 Player/SDK와 실제 장면에서 frame/tick/task p99·스케줄 대기·프로파일러 계측 영향을 분리해 판정한다. 이미 구현된 body/shape/contact routing·cleanup을 다시 설계하지 않는다.</li>
+<li>M4: 전체 제품·지원/실패·장기 수명 회귀와 배포 산출물의 일치성을 닫는다. 과거 단일 Player/ETW 결과를 현재 master 전체 성능 수용으로 확대하지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>Scene → physics simulation → body/shape handles → contact stream → PostPhysics managed consumer</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>M3</code> · PHASE 19</td>
+<td>제품 회귀·성능 측정</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>M4</code> · PHASE 19</td>
+<td>빅뱅 완료 감사</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L40">Engine/SceneRuntime/Scene.h:40</a> — <code>class PhysicsBodyComponent;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ContactStream.cs#L6">ScriptCore/ContactStream.cs:6</a> — <code>public enum ContactPhases { Begin = 1, Persist = 2, End = 4, All = 7 }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/Physics.vcxproj#L25">Engine/Physics/Physics.vcxproj:25</a> — <code>&lt;RootNamespace&gt;Physics&lt;/RootNamespace&gt;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="0-확정-방향과-범위"></span>
+<span id="1-실측--2026-08-18-전수-조사"></span>
+<span id="11-자산-지도"></span>
+<span id="12-과거-결함-목록--새-api가-반드시-제거할-회귀-위험"></span>
+<span id="13-구조적-결함--재작성이-뒤집어야-할-것"></span>
+<span id="14-죽은-자산"></span>
+<span id="15-병렬화-가능성--층별-판정"></span>
+<span id="16-소비자-표면--재작성이-깨뜨릴-것"></span>
+<span id="2-목표-구조"></span>
+<span id="2026-10-02-c0-native-캐릭터-실행-슬라이스"></span>
+<span id="2026-10-02-c0c1--cooked-player-release--shipping-실행-검증"></span>
+<span id="2026-10-02-c0c1--실제-inspector-입력폭-전환기즈모-화면-검증"></span>
+<span id="2026-10-02-c0m0-c-캐릭터-실행-경계"></span>
+<span id="2026-10-02-c1-가속감쇠점프시간제-강제-이동-구현"></span>
+<span id="2026-10-02-c1-단위-정책경사계단강제-이동-회귀"></span>
+<span id="2026-10-02-cooked-triangle-mesh-바닥--실제-player-drshipping"></span>
+<span id="2026-10-02-debug-cooked-player-캐릭터-제품-검증"></span>
+<span id="2026-10-02-editor-ddol-자식-계층-회귀"></span>
+<span id="2026-10-02-player-convexheightfield-및-mesh-ddol--drshipping"></span>
+<span id="2026-10-02-player-ddol-cooked-재로드-실행-증거"></span>
+<span id="2026-10-02-player-ddol-비활성-자식-계층scene-핸들--drshipping"></span>
+<span id="2026-10-02-player-필수-시뮬레이션-실패-종료-정책--drshipping"></span>
+<span id="2026-10-02-목적지-재착지실제-player-geometry-실패--drshipping"></span>
+<span id="2026-10-02-서로-다른-cooked-목적지로-player-ddol-전환--drshipping"></span>
+<span id="2026-10-02-실제-단검-동적-convex--debugreleaseshipping-player"></span>
+<span id="2026-10-02-잘못된-cooked-목적지의-player-전환-실패--drshipping"></span>
+<span id="2026-10-02-캐릭터-ddol-제품-수명-게이트"></span>
+<span id="2026-10-02-캐릭터-inspector기즈모-연결"></span>
+<span id="2026-10-03-l0-완료-실제-editor-정책-변경undostop-통합"></span>
+<span id="2026-10-03-m1-capsule-축높이-이전-및-cct-진단-연결"></span>
+<span id="2026-10-03-m1-cct-reviewed-migration-and-reference-closure"></span>
+<span id="2026-10-03-m1-explicit-geometry-identity-bindings"></span>
+<span id="2026-10-03-m1-external-type-reference-closure"></span>
+<span id="2026-10-03-m1-geometry-source-recovery-preflight"></span>
+<span id="2026-10-03-m1-native-geometry-policy-acceptance"></span>
+<span id="2026-10-03-m1-real-dagger-source-equivalence-and-migrated-package"></span>
+<span id="2026-10-03-m1-reviewed-geometry-shape-conversion"></span>
+<span id="2026-10-03-m1-착수-primitive-일회성-변환차단원본-회수"></span>
+<span id="2026-10-03-m2-ddol-동반-editor-활성화-실패와-반복-복원"></span>
+<span id="2026-10-03-m2-debugshipping-ddol-목적지-오류-검증-확장"></span>
+<span id="2026-10-03-m2-debugshipping-제품-종료-ledger-수용"></span>
+<span id="2026-10-03-m2-native-개별-핸들-수명-게이트-보강"></span>
+<span id="2026-10-03-m2-release-player-ddol-동반-목적지-geometry-실패"></span>
+<span id="2026-10-03-m2-release-player-실패-후-c-wrapper-수명-검증"></span>
+<span id="2026-10-03-m2-sdk-include-경계-전체-감사와-기존-검사-복구"></span>
+<span id="2026-10-03-m2-복합-ddol-계층-목적지-geometry-실패-drshipping"></span>
+<span id="2026-10-03-m2-완료-debugshipping-wrapper-검증과-수용-근거-대조"></span>
+<span id="2026-10-03-m2-종료-소유권-ledger"></span>
+<span id="2026-10-03-r0b0m0-수용-정리와-l0-검증기-수정"></span>
+<span id="2026-10-04-affine-fix-editor-lifecycle-verification"></span>
+<span id="2026-10-04-cema-classification-correction-and-retirement"></span>
+<span id="2026-10-04-converted-corpus-product-handoff"></span>
+<span id="2026-10-04-corpus-player-first-render-wait-resolved-by-measured-readiness"></span>
+<span id="2026-10-04-corpus-smoke-camera-fixture-and-disk-capacity-blocker"></span>
+<span id="2026-10-04-editor-completed-display-gate"></span>
+<span id="2026-10-04-explicit-legacy-model-scene-reference-migration"></span>
+<span id="2026-10-04-full-corpus-cook-and-model-jpg-path-contract"></span>
+<span id="2026-10-04-generation-texture-export-path-correction"></span>
+<span id="2026-10-04-m1-corpus-model-generation-recovery"></span>
+<span id="2026-10-04-m1-current-corpus-preflight"></span>
+<span id="2026-10-04-m1-current-corpus-reviewed-cct-policy"></span>
+<span id="2026-10-04-m1-physics-render-affine-transport-fix"></span>
+<span id="2026-10-04-m1-player-timeout-phase-isolation"></span>
+<span id="2026-10-04-m1-render-startup-versus-steady-sealing-failure"></span>
+<span id="2026-10-04-preserved-corpus-relocation-and-fresh-product-retry"></span>
+<span id="2026-10-08-e0--접촉-작업과-c-접근-계약-제안-아래-contactstream-결정으로-대체"></span>
+<span id="2026-10-08-e0-disable삭제-retired-binding-정리"></span>
+<span id="2026-10-08-e0-sensor-대상-집계-관리-구현"></span>
+<span id="2026-10-08-e0-sensor-대상-집계-제품-수용"></span>
+<span id="2026-10-08-e0-sensorsolid-단계별-연속-교체-제품-수용"></span>
+<span id="2026-10-08-e0-늦은-sensor-구독-제품-수용"></span>
+<span id="2026-10-08-e0-복합-sensor-형상-교체body-slot-신원-수용"></span>
+<span id="2026-10-08-e0-삭제-end의-clr-publication-제품-수용"></span>
+<span id="2026-10-08-e0-센서-persist초기-overlap-관측"></span>
+<span id="2026-10-08-e0-역할-저작-스키마"></span>
+<span id="2026-10-08-e0-저작-표면-재확정-및-기본-스트림-구현"></span>
+<span id="2026-10-08-e0-저장-역할-런타임-소비-수용"></span>
+<span id="2026-10-08-접촉-계측-후속-검증"></span>
+<span id="2026-10-09-abi40-development-재빌드핵심-editorplayer-재수용"></span>
+<span id="2026-10-09-abi40-native-재빌드shipping-lateoverlapretirement-수용"></span>
+<span id="2026-10-09-b1-boxcapsule-치수-실제-ui-검증"></span>
+<span id="2026-10-09-b1-physicsbody-inspector-검증-경로-수정"></span>
+<span id="2026-10-09-b1-shape-실제-inspector-클릭저작-소유권-수정"></span>
+<span id="2026-10-09-b1-바디-motion-실제-inspector-편집-검증"></span>
+<span id="2026-10-09-b1-바디캐릭터-전체-입력과-대표-잠금play-검증"></span>
+<span id="2026-10-09-b1-반경기존-레이어-ui-및-초안-undo-소유권-수정"></span>
+<span id="2026-10-09-b1-실제-공유-cooked-convex-연결-및-루트-형제-순서-복원"></span>
+<span id="2026-10-09-b1-역할geometry-참조-입력-수정과-검증"></span>
+<span id="2026-10-09-b1-완료--필수-종료-조건-묶음-수용"></span>
+<span id="2026-10-09-b1-종료-조건-고정"></span>
+<span id="2026-10-09-b1-질량속도캐릭터-반경-실제-inspector-검증"></span>
+<span id="2026-10-09-b1-치수-유지-실제-씬-활성화playstop재로드"></span>
+<span id="2026-10-09-b1-형상-종류-ui-트랜잭션-검증"></span>
+<span id="2026-10-09-c1-실제-이전-대상-조사-및-p0-변환-재수용"></span>
+<span id="2026-10-09-c1-입력-프런트엔드와-facing-책임"></span>
+<span id="2026-10-09-c1-평면-입력-editor-playstop-복원"></span>
+<span id="2026-10-09-c1-평면-입력-shipping-수용"></span>
+<span id="2026-10-09-c1-평면-입력-실제-development-player-검증"></span>
+<span id="2026-10-09-contactstream-overflowpostphysics-예외-제품-격리-수용"></span>
+<span id="2026-10-09-contactstream-씬-이탈-관측-초기화editor-reloadddol-수용"></span>
+<span id="2026-10-09-e0-fetch-전-다중-교체-제품-수용"></span>
+<span id="2026-10-09-e0-물리-컴포넌트-단독-제거-제품-수용"></span>
+<span id="2026-10-09-editor-어셈블리-reload-contactstream-수용"></span>
+<span id="2026-10-09-m3--debug-editor-수명playstop재로드-완료"></span>
+<span id="2026-10-09-m3--debug-player-contactstreamcct-완료"></span>
+<span id="2026-10-09-m3--p99-조건-민감도-조사"></span>
+<span id="2026-10-09-m3--release-player-쿼리-계측-onoff-측정"></span>
+<span id="2026-10-09-m3--solver-활성변경-비율-행렬"></span>
+<span id="2026-10-09-m3--실제-player-cpugpu-시간-분포-측정"></span>
+<span id="2026-10-09-m3--실제-player-독립-실행-안정성-판정"></span>
+<span id="2026-10-09-m3--실제-표시-완료-후-gpu-캡처"></span>
+<span id="2026-10-09-m3--최신-debug-sdk-실제-player-회귀"></span>
+<span id="2026-10-09-player-scene-reloadbody-ddol-접촉-수용"></span>
+<span id="2026-10-09-retirement-한도rollback-native-gate"></span>
+<span id="2026-10-09-role-전환-제품-수용"></span>
+<span id="2026-10-09-shipping-scene-reloadbody-ddol-접촉-수용"></span>
+<span id="2026-10-09-shipping-subscriberroletopology-접촉-전환-수용"></span>
+<span id="2026-10-09-solid-형상-쌍-소비-계약-확정"></span>
+<span id="2026-10-09-subscriber-disableenable-관리-수명-수정"></span>
+<span id="2026-10-09-subscriber-disableenable-제품-수용"></span>
+<span id="2026-10-09-동기화-후-developmentshipping-player-핵심-재수용"></span>
+<span id="2026-10-09-동일-owner-재생성-gate의-적용-범위-정정"></span>
+<span id="2026-10-09-동일-owner-재생성-관리-래퍼-신원-회귀"></span>
+<span id="2026-10-09-복합-solid-실제-editorplayer-접촉-수용"></span>
+<span id="2026-10-09-원격-master-동기화-및-abi-통합"></span>
+<span id="2026-10-09-저장-role-제거--scope-바인딩-제품-수용"></span>
+<span id="2026-10-09-저장소-동기화-후-release-editor-핵심-재수용"></span>
+<span id="2026-10-09-최신-contactstream-shipping-접촉-통합-수용"></span>
+<span id="2026-10-09-컴포넌트-수명-실패-전파-보강"></span>
+<span id="2026-10-10-m3--cpu-실행선점-분리-etw-준비환경-제한"></span>
+<span id="2026-10-10-m3--etw-독립-집계-검증-및-tick-완료-상관관계"></span>
+<span id="2026-10-10-m3--p99-물리-ticktask-지연-위치-분석"></span>
+<span id="2026-10-10-m3--pool-잠금-분리-제품-sdk-반영etw-off-독립-3회-측정"></span>
+<span id="2026-10-10-m3--pool-잠금-분리-후-제품-etw-대조-완료"></span>
+<span id="2026-10-10-m3--profiler-chunk-pool-잠금-분리반환-임계구역-단축"></span>
+<span id="2026-10-10-m3--runrelease-계측-제품-sdk-재빌드player-검증"></span>
+<span id="2026-10-10-m3--worker-대기-사유-및-sdk-runrelease-계측-분리"></span>
+<span id="2026-10-10-m3--새-runrelease-etw-대조-완료계측-경로-대기-발견"></span>
+<span id="2026-10-10-m3--실제-player-etw-수집-및-task-스케줄-상태-대조"></span>
+<span id="2026-10-10-m3--최신-pool-분리-sdk-쿼리-계측-abba-비용-측정"></span>
+<span id="3-c23-physx-api-계약"></span>
+<span id="4-실행-순서와-완료-게이트"></span>
+<span id="5-생명주기와-고정-스텝"></span>
+<span id="6-이번-범위-밖과-미래-계획"></span>
+<span id="b0-실행-기록-2026-10-01-에디터-playstop-경계-구현-중"></span>
+<span id="b1-inspectorhttp-형상-목록-트랜잭션-2026-10-01"></span>
+<span id="b1-offline-sdk-cookcemfpak-연결-2026-10-01"></span>
+<span id="b1-공유-지오메트리-sourcecook-연결-2026-10-01"></span>
+<span id="b1-새-지오메트리-자산-생성-hostcli-2026-10-01"></span>
+<span id="b1-지오메트리-revision-수정undosource-archive-2026-10-01"></span>
+<span id="b1-형상-공통-layer-overrideidle-교체스케일-2026-10-01"></span>
+<span id="b1-형상-목록-저작-연결-2026-10-01-progress"></span>
+<span id="b2-차등-transform-동기화렌더-보간-2026-10-02"></span>
+<span id="c0-editor-http-제품-검증"></span>
+<span id="c0-완료--현재-cooked-player-수용-2026-10-09"></span>
+<span id="c0-종료-묶음--현재-editor-수용-2026-10-09"></span>
+<span id="c1-motion-구현-검증-결과"></span>
+<span id="c1-완료--현재-저장소-이전-범위-2026-10-09"></span>
+<span id="e0-release-editorcooked-player-기본-접촉-제품-게이트"></span>
+<span id="e0-다중-ddol-계층-shipping-수용-완료-2026-10-09"></span>
+<span id="e0-다중-ddol-부모자식-계층--development-제품-수용-2026-10-09"></span>
+<span id="e0-완료--현행-contactstream-제품-행렬-2026-10-09"></span>
+<span id="e0-현행-editor-전체-전환失敗-suite-수용-2026-10-09"></span>
+<span id="m0-clrc-abi-교체-2026-10-01-progress"></span>
+<span id="m0-기즈모-소비자-교체-2026-10-01-progress"></span>
+<span id="m0-모델-자동-충돌-소비자-교체-2026-10-01-progress"></span>
+<span id="m1-완료--현재-저장소-스키마-이전-범위-2026-10-09"></span>
+<span id="p0-실행-기록-2026-10-01"></span>
+<span id="p1-실행-기록-2026-10-01"></span>
+<span id="p2-실행-기록-2026-10-01"></span>
+<span id="p3-capsule-cct-2026-10-01"></span>
+<span id="p3-ticktask-계측-2026-10-01"></span>
+<span id="p3-명령이벤트불변-스냅샷-2026-10-01"></span>
+<span id="p3-수치-계측-및-저수준-완료-게이트-2026-10-01"></span>
+<span id="p3-실행-기록-2026-10-01-저수준-api-범위-완료"></span>
+<span id="r0-실행-기록-2026-10-01"></span>
+<span id="sec-0-확정-방향과-범위"></span>
+<span id="sec-1-실측--2026-08-18-전수-조사"></span>
+<span id="sec-2-목표-구조"></span>
+<span id="sec-2026-10-03-l0-완료-실제-editor-정책-변경undostop-통합"></span>
+<span id="sec-2026-10-03-m1-capsule-축높이-이전-및-cct-진단-연결"></span>
+<span id="sec-2026-10-03-m1-착수-primitive-일회성-변환차단원본-회수"></span>
+<span id="sec-2026-10-03-r0b0m0-수용-정리와-l0-검증기-수정"></span>
+<span id="sec-2026-10-08-e0--접촉-작업과-c-접근-계약-제안-아래-contactstream-결정으로-대체"></span>
+<span id="sec-3-c23-physx-api-계약"></span>
+<span id="sec-4-실행-순서와-완료-게이트"></span>
+<span id="sec-5-생명주기와-고정-스텝"></span>
+<span id="sec-6-이번-범위-밖과-미래-계획"></span>
+<span id="sec-b0-실행-기록-2026-10-01-에디터-playstop-경계-구현-중"></span>
+<span id="sec-c0-완료--현재-cooked-player-수용-2026-10-09"></span>
+<span id="sec-c0-종료-묶음--현재-editor-수용-2026-10-09"></span>
+<span id="sec-c1-완료--현재-저장소-이전-범위-2026-10-09"></span>
+<span id="sec-e0-다중-ddol-계층-shipping-수용-완료-2026-10-09"></span>
+<span id="sec-e0-다중-ddol-부모자식-계층--development-제품-수용-2026-10-09"></span>
+<span id="sec-e0-완료--현행-contactstream-제품-행렬-2026-10-09"></span>
+<span id="sec-e0-현행-editor-전체-전환失敗-suite-수용-2026-10-09"></span>
+<span id="sec-m1-완료--현재-저장소-스키마-이전-범위-2026-10-09"></span>
+<span id="sec-p0-실행-기록-2026-10-01"></span>
+<span id="sec-p1-실행-기록-2026-10-01"></span>
+<span id="sec-p2-실행-기록-2026-10-01"></span>
+<span id="sec-p3-실행-기록-2026-10-01-저수준-api-범위-완료"></span>
+<span id="sec-r0-실행-기록-2026-10-01"></span>
+<span id="sec-t1-실행-배치-후보-및-실측-기록-2026-10-02-후보-평가-이력"></span>
+<span id="sec-t1-완료--현재-worker-예산계측-수용-2026-10-09"></span>
+<span id="sec-t2-actual-written-변환-버퍼-최적화-2026-10-03"></span>
+<span id="sec-t2-cpu-배치-통제-진단-2026-10-03"></span>
+<span id="sec-t2-http-저작-고밀도다중-hit-player-검증-2026-10-03"></span>
+<span id="sec-t2-managed-profiler-onoff제품-계층-capture-2026-10-03"></span>
+<span id="sec-t2-managednative-bridge-비용-분해-2026-10-03"></span>
+<span id="sec-t2-owner-cpu-소비원시-지연-계측-2026-10-03"></span>
+<span id="sec-t2-sdk-내부tail-분해-2026-10-03"></span>
+<span id="sec-t2-결과-변환-내부-비용-분해-2026-10-03"></span>
+<span id="sec-t2-네이티브-혼합-쿼리-계측-2026-10-03"></span>
+<span id="sec-t2-동일-probe기본-jit-재검증-2026-10-03"></span>
+<span id="sec-t2-변동-진단--tiered-jit-비활성-조건-2026-10-03"></span>
+<span id="sec-t2-실제-managed-moving-query-부하-2026-10-03"></span>
+<span id="sec-t2-실제-mixed-player-기능-수용capture-미수용-2026-10-09"></span>
+<span id="sec-t2-쿼리-배치-완료--실제-동적-player-무손실-capture-2026-10-09"></span>
+<span id="sec-t2-회전-kinematic-쿼리-구조-검증-2026-10-09"></span>
+<span id="sec-최신-완료-상태-2026-10-09"></span>
+<span id="sec-현재-생명주기실행-기반-대조-2026-10-01"></span>
+<span id="t0-요청스냅샷-수명과-스레딩-계약-2026-10-02"></span>
+<span id="t1-active-first-병합-후보-평가-2026-10-03"></span>
+<span id="t1-dynamic-dynamic-적층worker-예산-검증-2026-10-03"></span>
+<span id="t1-sdk-successor-wake-후보-비교-2026-10-03"></span>
+<span id="t1-sdk-worker-예산-비교-2026-10-03"></span>
+<span id="t1-sdk-계측-게시-비용-축소--제품-적용-2026-10-03"></span>
+<span id="t1-solverdispatchersnapshotmerge-비용-분리-2026-10-03"></span>
+<span id="t1-성능-회귀-후보의-제품-철회-2026-10-02"></span>
+<span id="t1-실행-배치-후보-및-실측-기록-2026-10-02-후보-평가-이력"></span>
+<span id="t1-완료--현재-worker-예산계측-수용-2026-10-09"></span>
+<span id="t1-지속-접촉4096-바디-후보-비교-2026-10-03"></span>
+<span id="t2-actual-written-변환-버퍼-최적화-2026-10-03"></span>
+<span id="t2-c-다중-요청-배치제품-검증-2026-10-03"></span>
+<span id="t2-cpu-배치-통제-진단-2026-10-03"></span>
+<span id="t2-http-저작-고밀도다중-hit-player-검증-2026-10-03"></span>
+<span id="t2-managed-profiler-onoff제품-계층-capture-2026-10-03"></span>
+<span id="t2-managednative-bridge-비용-분해-2026-10-03"></span>
+<span id="t2-owner-cpu-소비원시-지연-계측-2026-10-03"></span>
+<span id="t2-owner-query-batch-첫-구현-2026-10-03"></span>
+<span id="t2-scene-세션소비자-연결-2026-10-03"></span>
+<span id="t2-sdk-내부tail-분해-2026-10-03"></span>
+<span id="t2-결과-변환-내부-비용-분해-2026-10-03"></span>
+<span id="t2-고밀도-제한-구간-profiler-캡처-2026-10-03"></span>
+<span id="t2-공유-출력-4096-hit-최대-경계-검증-2026-10-03"></span>
+<span id="t2-네이티브-혼합-쿼리-계측-2026-10-03"></span>
+<span id="t2-동일-probe기본-jit-재검증-2026-10-03"></span>
+<span id="t2-동적128-body-고밀도-쿼리-검증-2026-10-03"></span>
+<span id="t2-변동-진단--tiered-jit-비활성-조건-2026-10-03"></span>
+<span id="t2-실제-managed-moving-query-부하-2026-10-03"></span>
+<span id="t2-실제-mixed-player-기능-수용capture-미수용-2026-10-09"></span>
+<span id="t2-쿼리-배치-완료--실제-동적-player-무손실-capture-2026-10-09"></span>
+<span id="t2-회전-kinematic-쿼리-구조-검증-2026-10-09"></span>
+<span id="계획-공수-2026-10-01-재산정"></span>
+<span id="공통-레이어-정리--l0-이번-빅뱅의-선행-작업"></span>
+<span id="적극-적용할-언어라이브러리-구조"></span>
+<span id="최신-완료-상태-2026-10-09"></span>
+<span id="프로파일러-실행-계층--필수-구현완료-조건"></span>
+<span id="현재-생명주기실행-기반-대조-2026-10-01"></span></p>
+</details>
+</main></body></html>

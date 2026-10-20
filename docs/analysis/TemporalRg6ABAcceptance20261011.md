@@ -1,5 +1,37 @@
 # TR0 — 현재 소스 legacy/product RG6 A/B
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/GpuGeometryOcclusion.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L11) — `struct EnhancedFrameContext;`
+- [Engine/RenderEngine/GpuGeometryOcclusion.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L15) — `class GpuGeometryOcclusion final`
+- [Engine/RenderEngine/GpuGeometryOcclusion.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L17) — `struct HistoryPool;`
+- [Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h:111](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h#L111) — `const auto name = "hdr-" + std::to_string(stages.size()) + "-" + node.name;`
+- [Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h:182](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h#L182) — `Authoring::EnsureRymlErrorPolicy();`
+- [Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h:196](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h#L196) — `h["fixedSdkClock"] << c4::fmt::boolalpha(historyFixedSdkClock);`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L46) — `bytes += std::uint64_t(width) * height * sizeof(float);`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L53) — `const auto found = std::ranges::find_if(`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:119](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L119) — `std::uint32_t GpuGeometryOcclusion::LevelCount(std::uint32_t width, std::uint32_t height)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 SDK 활성 Debug/Release에서 같은 소스의 진단 DeclarationOrder 빌드와 제품
 ExplicitVersioned/DependencyOrder 빌드를 각각 독립 두 프로세스로 비교한다.
 현재 재현 가능한 작은 authored plane/camera/light fixture를 사용한다.
@@ -86,3 +118,5 @@ reference는 원래 Bin에서 실행하고 판정용 exe/runtime만 Reference/x6
 UI 육안/화면, 실제 Player generated 신원, 외부 기구의 표시·지연 및 제품 budget/전체 frame
 수용은 남는다. TR0 progress/기성 0, PHASE 4.5 12/71을 유지한다. 기존 RG6 기성을 중복 계상하지 않는다.
 이전 BASE-0 checkpoint는 당시 바이너리 증거이고 최신 A/B/source/runtime 정본은 이 실행의 final-result.json이다.
+
+</details>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Editor 렌더 설정·진단 표면 정리</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="EditorRenderingSurfacesPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/EditorRenderingSurfacesPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>Editor 렌더 설정·진단 표면 정리</h1><p>Workspace W9: Preferences와 Project Settings의 저장 범위·default profile/환경 resolver·quality tier·Player cook 소비를 일치시킨다. temporal renderFeatures 설정의 구현된 부분은 재작성하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>Workspace W9: Preferences와 Project Settings의 저장 범위·default profile/환경 resolver·quality tier·Player cook 소비를 일치시킨다. temporal renderFeatures 설정의 구현된 부분은 재작성하지 않는다.</li>
+<li>14-LIVE: 녹화에 독립적인 Rendering 진단의 데이터 신선도·손실·비용·실제 UI를 수용한다. compiled graph viewer와 RenderCapture의 수명을 합치지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>Editor window/commands → common editing transaction → scene component → dirty publication</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>W9</code> · PHASE 21</td>
+<td>Preferences·Project Settings 설정 소유권·저장·Quality</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>14-LIVE</code> · PHASE 14</td>
+<td>Rendering - Live·Scene 통계의 녹화 독립 view 귀속</td>
+<td>progress</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L459">Editor/EngineGUIWindow/MenuBarWindow.cpp:459</a> — <code>if (ImGui::BeginMenu(&quot;Settings&quot;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandRegistry.h#L15">Engine/RuntimeHost/CommandCore/CommandRegistry.h:15</a> — <code>class CommandRegistry</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptor.h#L134">Engine/RuntimeHost/CommandCore/CommandDescriptor.h:134</a> — <code>struct CommandDescriptor</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L428">Engine/SceneRuntime/Scene.h:428</a> — <code>bool PublishRenderProxyDirty(Component* component, ProxyDirty dirty);</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="1-배치와-현재-적용-범위"></span>
+<span id="2-w9--preferences--project-settings-소유권저장-계약-phase-21-미산정"></span>
+<span id="3-14-live--rendering-live-완료-계약-phase-14-미산정"></span>
+<span id="4-추적과-누락-방지"></span>
+<span id="sec-1-배치와-현재-적용-범위"></span>
+<span id="sec-2-w9--preferences--project-settings-소유권저장-계약-phase-21-미산정"></span>
+<span id="sec-3-14-live--rendering-live-완료-계약-phase-14-미산정"></span>
+<span id="sec-4-추적과-누락-방지"></span>
+<span id="w9-완료-게이트"></span></p>
+</details>
+</main></body></html>

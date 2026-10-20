@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>메모리 프로파일러 확장</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="MemoryProfilerPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/MemoryProfilerPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>메모리 프로파일러 확장</h1><p>MP2~6: allocator 소유자/생애·CoreCLR 객체/루트 그래프·GPU 개별 리소스/residency를 출처가 있는 스냅샷으로 연결한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Producers</ve-node><ve-node id="n1" at="2 1">Records</ve-node><ve-node id="n2" at="3 1" key>Collector</ve-node><ve-node id="n3" at="3 2">Snapshot</ve-node><ve-node id="n4" at="2 2">Stream</ve-node><ve-node id="n5" at="1 2">Viewer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>MP2&#126;6: allocator 소유자/생애·CoreCLR 객체/루트 그래프·GPU 개별 리소스/residency를 출처가 있는 스냅샷으로 연결한다.</li>
+<li>버전/무결성 있는 저장·재열람·A/B 차이·큰 스냅샷 비차단 UI와 실제 D/R 비용/지연을 수용한다. 구현된 수동 스냅샷/Memory 탭과 집계 VRAM을 객체별 소유권 완료로 보지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>producer counters/events → bounded profiler records → snapshot/stream → viewer</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>14-MP2</code> · PHASE 14</td>
+<td>MP2 — 네이티브 할당 소유자</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>14-MP3</code> · PHASE 14</td>
+<td>MP3 — 관리 객체 참조 그래프</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>14-MP4</code> · PHASE 14</td>
+<td>MP4 — GPU 개별 리소스 메모리</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>14-MP5</code> · PHASE 14</td>
+<td>MP5 — 스냅샷 저장과 장기 비교</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>14-MP6</code> · PHASE 14</td>
+<td>MP6 — 제품 정확성·비용 게이트</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerTransport.h#L127">Engine/EngineDiagnostics/ProfilerViewerTransport.h:127</a> — <code>codec(timing.frame_close_ticks) &amp;&amp; codec(timing.snapshot_ticks) &amp;&amp; codec(timing.replenish_ticks) &amp;&amp;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MemoryProfilerSnapshot.cpp#L180">Editor/EngineGUIWindow/MemoryProfilerSnapshot.cpp:180</a> — <code>auto result = std::make_shared&lt;snapshot&gt;();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MemoryProfilerSnapshot.h#L13">Editor/EngineGUIWindow/MemoryProfilerSnapshot.h:13</a> — <code>using snapshot = ce::profiler_viewer::diagnostics::memory_snapshot;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="sec-검증-기록"></span>
+<span id="sec-아직-같지-않은-것"></span>
+<span id="sec-진행-순서와-완료-조건"></span>
+<span id="sec-현재-계약"></span>
+<span id="검증-기록"></span>
+<span id="아직-같지-않은-것"></span>
+<span id="진행-순서와-완료-조건"></span>
+<span id="현재-계약"></span></p>
+</details>
+</main></body></html>

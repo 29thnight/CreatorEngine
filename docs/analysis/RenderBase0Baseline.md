@@ -1,5 +1,49 @@
 # BASE-0 구현과 검증 기록
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/base0_artifacts.py:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L13) — `import struct`
+- [Tools/regression/base0_artifacts.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L20) — `raise ValueError(message)`
+- [Tools/regression/base0_artifacts.py:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L44) — `expected_order = [i for i, p in enumerate(passes) if not truth(p["culled"])]`
+- [Tools/regression/verify-render-base0.ps1:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L25) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-render-base0.ps1:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L26) — `$output = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-render-base0.ps1:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L64) — `if ($ExecutablePath) { $exe=[IO.Path]::GetFullPath($ExecutablePath) }`
+- [Tools/regression/complete-render-base0.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/complete-render-base0.ps1#L10) — `$output=[IO.Path]::GetFullPath($OutputFile)`
+- [Tools/regression/complete-render-base0.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/complete-render-base0.ps1#L14) — `$path=[IO.Path]::GetFullPath($pair[1])`
+- [Tools/regression/complete-render-base0.ps1:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/complete-render-base0.ps1#L38) — `[IO.Path]::GetFullPath($compare.left) -ne [IO.Path]::GetFullPath($results[0].runs[0].captures[0]) -or`
+- [Tools/regression/generate-film-sensitivity-upload.py:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/generate-film-sensitivity-upload.py#L6) — `root = Path(__file__).resolve().parents[2]`
+- [Tools/regression/generate-film-sensitivity-upload.py:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/generate-film-sensitivity-upload.py#L9) — `parser = argparse.ArgumentParser()`
+- [Tools/regression/generate-film-sensitivity-upload.py:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/generate-film-sensitivity-upload.py#L17) — `raise ValueError("Missing canonical table: " + name)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/Transition.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Transition.h#L7) — `class FSMState;  // Forward declaration of FSMState class`
+- [Engine/SceneRuntime/Transition.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Transition.h#L8) — `class Transition`
+- [Engine/SceneRuntime/Transition.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Transition.h#L10) — `public:`
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98) — `enum class ShaderPassQueue : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106) — `enum class ShaderBlendMode : std::uint8_t`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-04 RG5-12 화면 SSS/SSR 이관 이후 현행 기준선은 [화면 소비 체인 검증](RenderRg5ScreenMigration.md)을 따른다. Debug/Release GPU 각 3정책·48 frames·정책 간 오차 0·validation 0, 기본 제품 반복 회귀·변경 전후/구성 간 각 16개 이미지 오차 0·현행 소스/바이너리 SHA-256 및 phaseComplete=true를 확인했다. RG5 전체와 전체 제품 SceneRenderer의 versioned GPU 수용/RG6 기본 전환은 열려 있다. 아래 과거 증거는 보존한다.
 
 ## 현재 완료 계약 — 2026-10-02 범위 정리
@@ -268,3 +312,5 @@ Vulkan의 CaptureHistoryGuard가 resource_prepare 블록 안에 있어 PrepareFr
 | display 상한 초과 픽셀 | 20553 | 186 |
 
 GBuffer 5종은 계속 bit-exact이며 남은 상한 초과는 SSGI 이후에서 시작한다. SSGI 내부 추적·누적·필터 중 잔여 오차의 단독 원인은 아직 미확정이다. 범용 sealed frame packet replay도 미구현이다. 하네스는 staticFixtureGatesComplete와 genericPacketReplayVerified를 구분하여 정지 fixture만으로 BASE-0 complete를 올리지 않는다. 현재 교차 gate는 여전히 실패로 보존하며 기준 변경이나 MAT-9 완료를 적용하지 않았다.
+
+</details>

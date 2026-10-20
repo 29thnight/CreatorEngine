@@ -1,5 +1,48 @@
 # Content Browser 배치와 Scene 시작 탭
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-editor-workspace.ps1:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-workspace.ps1#L49) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-workspace.ps1:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-workspace.ps1#L50) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-editor-workspace.ps1:132](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-workspace.ps1#L132) — `$schemaHeaderPath = [IO.Path]::GetFullPath($schemaHeaderPath)`
+- [Tools/regression/verify-content-browser-splitter.ps1:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-content-browser-splitter.ps1#L45) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-content-browser-splitter.ps1:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-content-browser-splitter.ps1#L46) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-content-browser-splitter.ps1:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-content-browser-splitter.ps1#L58) — `public static class BrowserSplitterInput {`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Editor/EngineEntry/EditorImGuiTexture.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorImGuiTexture.h#L26) — `uint64_t From(const own::shared_owner<const Texture>& texture);`
+- [Editor/EngineEntry/EditorImGuiTexture.h:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorImGuiTexture.h#L49) — `void Prime(const own::shared_owner<const Texture>& texture,`
+- [Editor/EngineEntry/EditorImGuiTexture.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorImGuiTexture.h#L50) — `const own::shared_owner<const Texture::CodecImage>& image);`
+- [Editor/EngineEntry/EditorAssetDatabase.h:107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L107) — `own::shared_owner<const Material> publishedMaterial;`
+- [Editor/EngineEntry/EditorAssetDatabase.h:112](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L112) — `bool SaveMaterialGraph(own::shared_owner<Material> preparedMaterial,`
+- [Editor/EngineEntry/EditorAssetDatabase.h:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L113) — `const own::shared_owner<const Material>& expectedMaterial,`
+- [Editor/EngineEntry/EditorAssetPresentation.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetPresentation.h#L18) — `class EditorAssetPresentation final`
+- [Editor/EngineEntry/EditorAssetPresentation.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetPresentation.h#L46) — `static EditorAssetPresentation& Get() noexcept;`
+- [Editor/EngineEntry/EditorAssetPresentation.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetPresentation.h#L79) — `EditorAssetPresentation() = default;`
+- [Editor/EngineEntry/EditorImGuiTexture.cpp:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorImGuiTexture.cpp#L13) — `own::weak_owner<const Texture> descriptor;`
+- [Editor/EngineEntry/EditorImGuiTexture.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorImGuiTexture.cpp#L15) — `own::shared_owner<const Texture::CodecImage> image;`
+- [Editor/EngineEntry/EditorImGuiTexture.cpp:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorImGuiTexture.cpp#L79) — `: own::shared_owner<const Texture::CodecImage>{};`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-12. 사용자 제공 S&Box Asset Browser 및 CreatorEngine 구형 브라우저 스크린샷을 기준으로 수정한다.
 
 ## 변경
@@ -73,3 +116,5 @@ payload 경로는 유지했지만 이번 실행에서 drop 소비자까지 재�
 W2-B 전체 완료 판정은 하지 않는다. 최근/전체 검색, 방문별 검색·선택 복원, W3 workspace 상태 통합,
 W7 목록 snapshot/cache/clipping 및 비동기 썸네일 교체는 남아 있다. 현 단계는 파일 유형 아이콘을 표시한다.
 Vulkan은 사용자 요청에 따라 이번 검증에서 제외한다.
+
+</details>

@@ -664,3 +664,14 @@ Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
 
 !Tools/regression/fixtures/PhysicsQueryDynamic.creator
 !Tools/regression/fixtures/PhysicsQueryDynamic.creator.meta
+
+# Local visual-explainer inspection sheets and interrupted renderer files.
+/docs/plans/*.sheet*.png
+/docs/plans/archive/*.sheet*.png
+/docs/plans/*.html.*.tmp
+/Tools/docs/__pycache__/
+/docs/analysis/**/*.sheet*.png
+/docs/design/**/*.sheet*.png
+/docs/*.sheet*.png
+/docs/analysis/**/*.html.*.tmp
+/docs/design/**/*.html.*.tmp

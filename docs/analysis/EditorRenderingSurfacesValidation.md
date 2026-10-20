@@ -1,5 +1,42 @@
 # Editor 렌더 표면 적용 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-plan-dashboard.ps1:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L51) — `$text = [IO.File]::ReadAllText($Dashboard)`
+- [Tools/regression/verify-plan-dashboard.ps1:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L96) — `while ($j -lt $total -and [char]::IsWhiteSpace($chars[$j])) { $j++ }`
+- [Tools/regression/verify-plan-dashboard.ps1:135](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L135) — `while ($j -ge $open -and [char]::IsWhiteSpace($chars[$j])) { $j-- }`
+- [Tools/regression/verify-neutral-environment.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-neutral-environment.ps1#L8) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-neutral-environment.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-neutral-environment.ps1#L9) — `$case=[IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-neutral-environment.ps1:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-neutral-environment.ps1#L113) — `$corrupt=[IO.File]::ReadAllBytes((Join-Path $repo 'Resources/Environment/forest.ceibl'))`
+- [Tools/regression/verify-editor-rendering-surfaces.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-rendering-surfaces.ps1#L13) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-editor-rendering-surfaces.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-rendering-surfaces.ps1#L14) — `$case=[IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-editor-rendering-surfaces.ps1:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-rendering-surfaces.ps1#L26) — `[IO.File]::WriteAllText($existingDraft,'previous-session-recovery')`
+- [Tools/regression/compare-editor-environment-visibility.py:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-editor-environment-visibility.py#L10) — `parser = argparse.ArgumentParser()`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-01. 사용자가 승인한 여섯 UI/수명 변경의 즉시 적용 슬라이스 검증이다.
 후속 소유권과 완료선은 [EditorRenderingSurfacesPlan.md](../plans/EditorRenderingSurfacesPlan.md),
 환경 의미는 [EnvironmentRenderingPlan.md](../plans/EnvironmentRenderingPlan.md)에 고정했다.
@@ -119,3 +156,5 @@ Core에서 source/배경 on을 함께 발행하고, Editor 드래그/HTTP 소비
 실제 수치를 남겼다. 드래그 경로는 동일 Core 선택 및 Scene 표시 API 배선을 확인했고, 이번 실제
 선택 조작은 HTTP로 수행했다. Vulkan 실제 실행·사용자 HDRI 저장/재시작·후속 IBL weight·표시 색
 편집·성능 수용 완료로 확대하지 않는다.
+
+</details>

@@ -1,5 +1,47 @@
 # Software RHI 비-pmr 아레나·락 최적화
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-rhi-software-native.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rhi-software-native.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rhi-software-native.ps1:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rhi-software-native.ps1#L6) — `$out = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rhi-software-native.ps1:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rhi-software-native.ps1#L34) — `$process = [Diagnostics.Process]::Start($start)`
+- [Tools/regression/verify-rhi-software-commands.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rhi-software-commands.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rhi-software-commands.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rhi-software-commands.ps1#L11) — `$baseMethods = @([regex]::Matches($encoderSource, 'virtual\s+(?:void|bool|uint64_t)\s+(\w+)\s*\(') |`
+- [Tools/regression/verify-rhi-software-commands.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rhi-software-commands.ps1#L13) — `$overrides = @([regex]::Matches($softwareSource, '(?:void|bool|uint64_t)\s+(\w+)\s*\([^;{}]*\)\s*(?:const\s*)?override') |`
+- [Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.h#L21) — `class DX12GpuProfiler : public IRHIGpuProfiler`
+- [Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.h#L23) — `public:`
+- [Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.h#L25) — `struct PassTiming`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78) — `enum class RGMeasurementDomain : uint8_t { Normal, Capture };`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79) — `enum class RGQueueFallbackReason : uint8_t`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108) — `enum class RGQueuePlacement : uint8_t`
+- [Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp#L18) — `bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t maxPassesPerFrame,`
+- [Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp:99](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp#L99) — `void DX12GpuProfiler::Shutdown()`
+- [Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp:603](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12GpuProfiler.cpp#L603) — `void DX12GpuProfiler::MergeSlices(const FrameTimings& timings, std::vector<PassTiming>& outTimings)`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34) — `std::free(value);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L43) — `const auto path = prefix + "." + std::to_string(++serial);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:4201](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L4201) — `bool EnhancedRenderGraph::RecordSoftware(IRHIParallelCommandPool& pool, uint32_t workerCount,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-20. 기준 HEAD `2935f29452698d08f4c0cf720c255ae383c3ca3f`와 기존 소프트웨어 RHI 작업 트리에서 전후 비교했다. PR에는 명령 기록·네이티브 번역의 제품 배선과 이 후속 최적화를 함께 포함한다.
 
 ## 실행 결과
@@ -66,3 +108,5 @@ pwsh -NoProfile -File Tools/regression/verify-rhi-software-native.ps1 -OutputDir
 ## 참고 근거
 
 [CPU Performance Engineering](https://github.com/usamahz/cpu-performance-engineering)의 측정·동시성·allocator 지침을 확인했다. 현재 연결된 MCP 도구 목록에는 해당 서버가 없어 원본 자료를 사용했다. 저장된 ETW의 `std::_Lockit`, iterator orphan/adopt, heap 할당 스택과 현재 RHI 소스를 연결해 변경 대상을 골랐다. 전역 Debug 검사 해제 대신 수명별 재사용과 연속 저장소로 해당 호출을 줄였다.
+
+</details>

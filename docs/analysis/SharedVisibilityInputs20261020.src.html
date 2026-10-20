@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Shared visibility 입력 조립 최적화 — 2026-10-20</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="SharedVisibilityInputs20261020.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/SharedVisibilityInputs20261020.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Shared visibility 입력 조립 최적화 — 2026-10-20</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28">Engine/Utility_Framework/Sha256.h:28</a> — <code>class Sha256</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30">Engine/Utility_Framework/Sha256.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40">Engine/Utility_Framework/Sha256.h:40</a> — <code>std::memcpy(m_buffer + m_bufferUsed, p, take);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><code>b7ccc2b1a</code> 기준으로 shared 입력 생성 평균은 **0.09636→0.09200ms(-4.52%)**다. 최종 Game CPU p50은 <strong>13.46990ms</strong>이며 120 FPS의 8.33333ms 예산을 <strong>5.13657ms 초과</strong>한다. 120 FPS 목표는 미달이다. 최종 코드는 shared 경로의 조립 scratch와 메타데이터 소유만 변경한다.</p>
+<h2>최종 구현</h2>
+<p><code>PrepareMeshlets → PrepareInternal → Frame::DeclareMeshletBatch → BuildShared → ReserveUploadBatch/CreateBindings → SharedBatch::Dispatch</code> 경로에서, <code>BuildShared</code>는 최대 8뷰·4096개 bin을 합친다. candidate의 view/bin/job offset, 5행 world/bounds, projection/history, 출력 UAV 및 geometry/topology SRV를 구성한다.</p>
+<ul>
+<li>Shared 조립은 <code>BufferPool::UploadScratch</code> 대신 기존 <code>ce::RenderArenaPool</code>의 독점 lease로 descriptor 배열을 구성한다. 이 풀은 8개 CAS 반환 슬롯과 최대 16MiB retained raw block을 사용하며 pmr을 사용하지 않는다. 중첩 선언도 별도 lease를 받는다. 함수 종료 시 CPU 조립용 아레나를 즉시 반환한다.</li>
+<li>HZB owner와 밀봉 입력 owner는 고정 8칸 배열이다. 진단용 count vector와 복사를 없애고 보유한 <code>MeshletInputs::bins</code>에서 값을 읽는다. <code>MeshletInputs</code>에는 Frame 역참조가 없어 순환 소유가 없다. Frame·graph callback·upload retirement가 GPU 입력과 batch 수명을 유지한다.</li>
+<li>Batch 객체는 renderer allocator로 만든다. batch 객체와 lease control block의 할당은 남으며 raw block을 재사용한다. Shared descriptor scratch의 mutex 획득과 vector proxy/capacity 관리가 제거됐다.</li>
+<li>Shared GPU 입력의 6개 업로드 요청과 6개 descriptor table 생성, job/bin 배치, shader와 dispatch는 기존 계약을 사용한다. 단일 뷰 업로드 및 DX12 리소스 해소는 기존 구현이다.</li>
+</ul>
+<p>뷰별 candidate/bin vector, 선언 scratch mutex, buffer/readback pool mutex와 매 배치 descriptor 생성 비용은 남는다. 이번 변경이 엔진 전체의 할당·잠금을 제거하지는 않는다.</p>
+<h2>최종 동일 조건 계측</h2>
+<p>Debug, software RHI 명시 활성화, Game/Scene 두 뷰, 각 1186×514, 8워커, 같은 카메라·draw 입력이다. profiler ON/OFF 각 15초이며 빌드·GPU 회귀 실행과 겹치지 않았다. 비교는 <code>before</code>와 <strong><code>after-safe</code></strong> 한 쌍이다. 수용하지 않은 중간 바이너리의 <code>after</code>/<code>after-final</code> 수치는 최종 결과에 합치지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구간</th>
+<th align="right">변경 전</th>
+<th align="right">최종 변경 후</th>
+<th align="right">변화</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Shared 입력 생성 평균</td>
+<td align="right">0.09636ms</td>
+<td align="right">0.09200ms</td>
+<td align="right">-4.52%</td>
+</tr>
+<tr>
+<td>Shared 바인딩 생성 평균</td>
+<td align="right">0.04045ms</td>
+<td align="right">0.04047ms</td>
+<td align="right">+0.06%</td>
+</tr>
+<tr>
+<td>카메라 1차 컬링 선언 평균</td>
+<td align="right">0.70323ms</td>
+<td align="right">0.69885ms</td>
+<td align="right">-0.62%</td>
+</tr>
+<tr>
+<td>그림자 최종 컬링 선언 평균</td>
+<td align="right">0.46307ms</td>
+<td align="right">0.45586ms</td>
+<td align="right">-1.56%</td>
+</tr>
+<tr>
+<td>전체 그래프 선언 평균</td>
+<td align="right">5.04950ms</td>
+<td align="right">5.04524ms</td>
+<td align="right">-0.08%</td>
+</tr>
+<tr>
+<td>그래프 컴파일 평균</td>
+<td align="right">0.81515ms</td>
+<td align="right">0.82921ms</td>
+<td align="right">+1.73%</td>
+</tr>
+<tr>
+<td>명령 기록 평균</td>
+<td align="right">1.91299ms</td>
+<td align="right">1.93959ms</td>
+<td align="right">+1.39%</td>
+</tr>
+<tr>
+<td>기록 dependency graph 평균</td>
+<td align="right">1.73484ms</td>
+<td align="right">1.76005ms</td>
+<td align="right">+1.45%</td>
+</tr>
+<tr>
+<td>소프트웨어 명령 번역 평균</td>
+<td align="right">1.72102ms</td>
+<td align="right">1.70775ms</td>
+<td align="right">-0.77%</td>
+</tr>
+<tr>
+<td>Game CPU p50</td>
+<td align="right">13.41405ms</td>
+<td align="right">13.46990ms</td>
+<td align="right">+0.42%</td>
+</tr>
+<tr>
+<td>Game CPU p95</td>
+<td align="right">15.86500ms</td>
+<td align="right">15.74600ms</td>
+<td align="right">-0.75%</td>
+</tr>
+<tr>
+<td>Game CPU max</td>
+<td align="right">18.73340ms</td>
+<td align="right">18.61710ms</td>
+<td align="right">-0.62%</td>
+</tr>
+<tr>
+<td>Scene CPU p50</td>
+<td align="right">13.57790ms</td>
+<td align="right">13.56830ms</td>
+<td align="right">-0.07%</td>
+</tr>
+<tr>
+<td>Scene CPU p95</td>
+<td align="right">15.84930ms</td>
+<td align="right">15.57500ms</td>
+<td align="right">-1.73%</td>
+</tr>
+<tr>
+<td>Scene CPU max</td>
+<td align="right">19.85700ms</td>
+<td align="right">18.99900ms</td>
+<td align="right">-4.32%</td>
+</tr>
+<tr>
+<td>기록 OFF 완료 뷰/초</td>
+<td align="right">55.3548</td>
+<td align="right">57.0178</td>
+<td align="right">+3.00%</td>
+</tr>
+</tbody></table></div>
+<p>Shared 입력 생성에 바인딩 생성이 포함되므로 두 절감량을 더하지 않는다. 뷰당 shared 생성은 2회이며 이 구간의 뷰당 절감은 0.00870ms다. 완료 뷰/초는 두 뷰의 처리량이며 표시 FPS가 아니다. 위 Game/Scene CPU 값과 120 FPS 예산을 별도로 판정한다.</p>
+<h2>검증</h2>
+<ul>
+<li>최종 Editor Debug 및 MaterialRasterSurfaceProbe Debug 빌드: <code>build-safe.log</code>, <code>probe-build-shared-isolated.log</code>.</li>
+<li>최종 DX12 전체 RenderGraph GPU validation: <code>native-safe/result.json</code>. software 기록·비동기 번역·업로드 rollover·retirement를 검사한다.</li>
+<li>Shared 큐/LOD: <code>shared-isolated/verdict.json</code>, sourceStable=true. 32프레임·7212픽셀·6364개 전환·mixed LOD 8프레임, queue header 224개, shared queue read 192개를 검사했다. 밀봉 job 9152개 중 2712개가 게시·완료됐고 6440개는 게시 전에 필터됐다. 오류 0이다.</li>
+<li>최종 4096-bin dispatch/admission, HZB/history, temporal 버킷: <code>material-safe/verdict.json</code>. 실제 실행 결과와 GBV coverage notice 수는 JSON에 보존한다.</li>
+<li>제품 matched/reload replay의 depth/baseColor/normal/metalRough/emissive/sceneHdr 여섯 출력은 기준과 비트 동일하다.</li>
+<li>전후 profiler complete, unacked/dropped/invalid provenance 0, GPU event 전부 matched. GPU pass 표본/실제 프레임 수는 Game 139, Scene 142로 동일하다.</li>
+<li>변경 구간 clang-format 19.1.5, diff 공백 검사, 시작 시 tracked 변경 10개 보존 검사를 수행했다.</li>
+</ul>
+<p>원본은 <code>Artifacts/shared-visibility-20261020</code>, 저장소에 보관하는 수치·판정은 <a href="SharedVisibilityInputs20261020.json">JSON</a>이다. 최종 제품 캡처와 native GPU 검증의 runtime SHA256 일치를 검사한다. 이 결과는 DX12 Debug 경로이며 Vulkan 실행 결과를 포함하지 않는다.</p>
+<h2>검증 중 제외한 변경</h2>
+<p>초기 실험에는 단일 뷰의 history projection 업로드 통합과 DX12 descriptor 리소스 포인터 재사용이 포함됐다. 추가 LOD 검증에서 픽셀 깊이 회귀가 발생했다. 변경 전 엔진 3개 소스와 실행 파일을 <code>baseline-build</code>에 별도 보관해 같은 검사로 비교했다. 기준 엔진은 32프레임·7212픽셀·header 224개를 통과했다. 전체 실험은 actual 0.194015/expected 0.249719, DX12 변경을 제외한 visibility 실험도 actual 0.248759/expected 0.249719로 실패했다.</p>
+<p>단일 뷰 변경을 원복하고 shared 조립만 남긴 <code>shared-isolated</code>는 전체 검사를 통과했다. 단일 뷰 업로드 확장과 DX12 포인터 재사용은 최종 변경에서 제외했다. 실패 결과를 보존하며 성능 수용 근거로 사용하지 않는다.</p>
+<p>초기 회귀 도구에는 별도의 잘못된 기대값도 있었다. 현재 master shader는 <code>GeometryPrepareMeshlet</code>에서 LOD 선택·residency를 통과한 meshlet만 큐에 게시하지만 검사는 전체 입력이 게시돼야 한다고 요구했다. 첫 진단은 입력 13, 게시·완료 6, 오류 0, partition 208/208, 잔여 작업/lease 0이었다. master 원문 비교는 <code>assertion-origin.txt</code>에 보관했다.</p>
+<p>검사는 게시 수가 입력 상한 이내이며 완료 수와 정확히 같아야 하고, 게시 0/비0에 맞춰 working wave가 0/비0인지 확인하도록 수정했다. 오류 0, partition 전수 처리, head/tail 회계, 빈 슬롯, 작업·lease 0, 독립 partition 계산 및 픽셀 검사를 유지했다. 거절 partition의 범위와 <code>0 &lt; publishedJobs &lt; sealedJobs</code>도 검사한다. 이 수정 뒤 발견된 픽셀 회귀를 기준 엔진과 비교해 위와 같이 제거했다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main></body></html>

@@ -1,5 +1,52 @@
 # Player 모듈 경계(DLL화) 판단 자료 (E7 잔여 결정)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Mesh.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Mesh.h#L26) — `ModelNode(std::string_view name) : m_name(name) {}`
+- [Engine/RenderEngine/Mesh.h:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Mesh.h#L66) — `static_assert(sizeof(math::matrix4x4) == 64u);`
+- [Engine/RenderEngine/Mesh.h:99](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Mesh.h#L99) — `Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);`
+- [Engine/SceneRuntime/Scene.h:348](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L348) — `Entity* CreateEntity(std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);`
+- [Engine/SceneRuntime/Scene.h:349](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L349) — `Entity* LoadEntity(size_t instanceID, std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);`
+- [Engine/SceneRuntime/Scene.h:803](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L803) — `static gc::root_ref<Scene> LoadScene(gc::domain& domain, std::string_view name);`
+- [Engine/SceneRuntime/Object.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Object.h#L33) — `Object(std::string_view name, size_t instanceID) : m_name(name), m_instanceID(instanceID)`
+- [Engine/SceneRuntime/Object.h:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Object.h#L35) — `TypeTrait::GUIDCreator::InsertGUID(m_instanceID);`
+- [Engine/SceneRuntime/Object.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Object.h#L40) — `void MakeInstanceID() { TypeTrait::GUIDCreator::EraseGUID(m_instanceID); m_instanceID = make_guid(); }`
+- [Engine/RenderEngine/Texture.h:194](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L194) — `own::shared_owner<const CodecImage> image, std::string_view name,`
+- [Engine/RenderEngine/Texture.h:224](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L224) — `static auto& OnResizeReleaseEvent = TextureManager::GetInstance()->OnTextureReleaseEvent;`
+- [Engine/RenderEngine/Texture.h:225](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L225) — `static auto& OnResizeEvent = TextureManager::GetInstance()->OnTextureResizeEvent;`
+- [Engine/RenderEngine/Material.h:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.h#L82) — `static own::shared_owner<Material> InstantiateShared(const Material* origin, std::string_view newName = {});`
+- [Engine/RenderEngine/Material.h:164](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.h#L164) — `bool TrySetValue(std::string_view cb, std::string_view var, const void* src, size_t size);`
+- [Engine/RenderEngine/Material.h:187](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.h#L187) — `static bool SplitQualified(std::string_view q, std::string& outCB, std::string& outVar);`
+- [Engine/SceneRuntime/BTBuildGraph.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BTBuildGraph.h#L26) — `rootNode.Position = math::vector2(0, 0); // 초기 위치 설정`
+- [Engine/SceneRuntime/BTBuildGraph.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BTBuildGraph.h#L39) — `BTBuildNode* CreateNode(const BehaviorNodeType type, std::string_view name, math::vector2 pos = { 0, 0 })`
+- [Engine/SceneRuntime/BTBuildGraph.h:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BTBuildGraph.h#L64) — `if (BT::IsDecoratorNode(selectedNodeType) && 0 < selectedNodeChildContainer.size()) return; // Decorator 노드는 자식이 최대 1개만 허용됨`
+- [Engine/Utility_Framework/TypeTrait.h:274](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L274) — `for (std::string_view prefix : { std::string_view("class "),`
+- [Engine/Utility_Framework/TypeTrait.h:402](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L402) — `static inline void Register(std::string_view typeName, const Uuid::Uuid16& uuid)`
+- [Engine/Utility_Framework/TypeTrait.h:407](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L407) — `static inline const Uuid::Uuid16* FindByName(std::string_view typeName)`
+- [Editor/EngineEntry/GameObjectCommand.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/GameObjectCommand.h#L23) — `TypeTrait::GUIDCreator::EraseGUID(object.m_instanceID);`
+- [Editor/EngineEntry/GameObjectCommand.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/GameObjectCommand.h#L25) — `TypeTrait::GUIDCreator::InsertGUID(id);`
+- [Editor/EngineEntry/GameObjectCommand.h:141](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/GameObjectCommand.h#L141) — `TypeTrait::GUIDCreator::EraseGUID(HashedGuid(restored->GetInstanceID()));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 작성일: 2026-08-26 (재정찰 갱신: 2026-09-06 — §10)
 - 목적: EngineLayerSeparationPlan E7의 미착수 항목 — "Player thin exe +
   game module DLL 구조 또는 Player DLL export 구조 검토" — 의 결정 자료.
@@ -737,3 +784,5 @@ Step 0 변경만 되돌린 빌드(A)와 적용한 빌드(B)를 각각 3회씩 �
   `.git/index.lock`을 잡아 `git checkout`이 중간에 실패했는데, 스크립트를 그대로
   재실행하면 이미 HEAD로 돌아간 파일을 백업에 덮어써 내 변경을 잃는다. 백업은
   한 번만 뜨도록 고쳤다.
+
+</details>

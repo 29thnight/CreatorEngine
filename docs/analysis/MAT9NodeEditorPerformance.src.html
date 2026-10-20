@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 노드 편집기·인스펙터 성능 측정</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9NodeEditorPerformance.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9NodeEditorPerformance.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 노드 편집기·인스펙터 성능 측정</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.cpp#L53">Editor/EngineGUIWindow/MaterialGraphWindow.cpp:53</a> — <code>own::shared_owner&lt;const material_graph::Generation&gt; previousGeneration;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.cpp#L54">Editor/EngineGUIWindow/MaterialGraphWindow.cpp:54</a> — <code>own::shared_owner&lt;const material_graph::Generation&gt; generation;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.cpp#L77">Editor/EngineGUIWindow/MaterialGraphWindow.cpp:77</a> — <code>std::ranges::any_of(name, [](unsigned char value) { return value &lt; 32; }))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp#L52">Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp:52</a> — <code>ImGui::PushID(label);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp#L53">Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp:53</a> — <code>ImGui::SetNextItemWidth(sheet.line(label));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp#L54">Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp:54</a> — <code>ImGui::InputText(&quot;##Value&quot;, &amp;value, ImGuiInputTextFlags_ReadOnly);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13">ScriptCore/MeshRenderer.cs:13</a> — <code>public sealed class MeshRenderer : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15">ScriptCore/MeshRenderer.cs:15</a> — <code>public string MaterialName =&gt; Native.MeshGetMaterialName(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24">ScriptCore/MeshRenderer.cs:24</a> — <code>public void InstantiateMaterial(string newName) =&gt; Native.MeshInstantiateMaterial(OwnerHandle, newName);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19">Engine/SceneRuntime/MeshRenderer.h:19</a> — <code>class [[reflgen::reflect]] MeshRenderer : public meta::identity&lt;MeshRenderer, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23">Engine/SceneRuntime/MeshRenderer.h:23</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25">Engine/SceneRuntime/MeshRenderer.h:25</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.h#L6">Editor/EngineGUIWindow/MaterialGraphWindow.h:6</a> — <code>class MeshRenderer;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.h#L7">Editor/EngineGUIWindow/MaterialGraphWindow.h:7</a> — <code>struct EnhancedLiveViewRequest;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.h#L11">Editor/EngineGUIWindow/MaterialGraphWindow.h:11</a> — <code>bool Open(MeshRenderer&amp; renderer, std::string&amp; error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L28">Engine/SceneRuntime/MeshRenderer.cpp:28</a> — <code>own::shared_owner&lt;const material_graph::Instance&gt; observed;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L39">Engine/SceneRuntime/MeshRenderer.cpp:39</a> — <code>const auto authored = std::ranges::find(instance.description.parameters, id,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L46">Engine/SceneRuntime/MeshRenderer.cpp:46</a> — <code>const auto parameter = std::ranges::find(parameters, id, &amp;LX::LXMaterialParameter::id);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>측정일: <strong>2026-09-30</strong>. 별도 세션 「프로파일링으로 프레임 급감 원인 찾기」의
+실제 창 조작·HTTP·프로파일 결과를 PHASE 4.25 기록으로 통합한다.
+수치는 reflgen 병합 <strong>전</strong> 측정이며, 병합 후 재측정 결과로 해석하지 않는다.</p>
+<h2>수정과 소스 확인</h2>
+<ul>
+<li>LX 캔버스의 핀·열 너비 등 반복 계산을 캐시하고 그리기 과정의 중복 작업을 줄였다.</li>
+<li>노드 편집기의 미리보기 패널을 선택 노드 설명·소켓 정보 패널로 바꿨다.</li>
+<li>MeshRenderer Inspector에 머테리얼 검색·선택·에셋 추가와 기본 수치 편집을 연결했다.</li>
+<li>구체·격자 바닥 미리보기는 Inspector에서 기본 접힘으로 제공한다. 재질 변경·Refresh에
+갱신하고 완료 결과를 재사용한다. 노드 창을 닫은 상태에서도 Inspector 미리보기는 유지한다.</li>
+<li><code>ImGuiDrawHelperMeshRenderer.cpp</code>의 <code>DrawInspectorPreview()</code> 호출과
+<code>MaterialGraphWindow.cpp</code>의 독립 Inspector preview 요청을 현재 소스에서 확인했다.</li>
+<li>해당 세션이 기록한 최종 소스 8개의 SHA-256은 통합 전 작업 트리와 모두 일치했다.</li>
+</ul>
+<h2>실제 실행 측정</h2>
+<p>CreatorRobot, Scene <strong>1302×614</strong>, 워밍업 후 약 18&#126;20초 구간이다.
+노드 편집기와 Inspector를 표시하고 프로파일러 창은 닫았다.
+FPS는 구간 전체에서 완료된 Scene frame 수를 시간으로 나눈 값이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">완료 Scene FPS</th>
+<th align="right">캔버스 CPU 평균</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug 수정 전, 미리보기 접힘</td>
+<td align="right">28.99</td>
+<td align="right">미계측</td>
+</tr>
+<tr>
+<td>Debug 수정 전, 미리보기 펼침</td>
+<td align="right">29.12</td>
+<td align="right">미계측</td>
+</tr>
+<tr>
+<td>Debug 계측 추가, 수정 전</td>
+<td align="right">31.88</td>
+<td align="right">26.34 ms</td>
+</tr>
+<tr>
+<td>Debug 수정 후, 미리보기 접힘</td>
+<td align="right">43.06</td>
+<td align="right">9.27 ms</td>
+</tr>
+<tr>
+<td>Debug 수정 후, 미리보기 펼침</td>
+<td align="right">41.71</td>
+<td align="right">9.70 ms</td>
+</tr>
+<tr>
+<td>Release 수정 후, 미리보기 접힘</td>
+<td align="right">310.99</td>
+<td align="right">0.697 ms</td>
+</tr>
+<tr>
+<td>Release 수정 후, 미리보기 펼침</td>
+<td align="right">330.22</td>
+<td align="right">0.618 ms</td>
+</tr>
+<tr>
+<td>Release 기록 중지, 미리보기 펼침</td>
+<td align="right">342.67</td>
+<td align="right">미계측</td>
+</tr>
+</tbody></table></div>
+<p>Presentation의 긴 CPU 구간을 DXGI Present 자체의 비용으로 분류하면 안 된다.
+실제 DXGI Present는 평균 0.35&#126;0.37 ms였고, 캔버스 계산과 Scene 잠금 대기가
+프레임 경로를 지연시켰다. Debug 렌더 스레드 CPU 약 23 ms는 이 창 배치에서 남는다.
+Release 보관 프레임 제한으로 저장 표본에는 공백이 있다. CPU/GPU 평균은 수집된
+유효 구간, FPS는 전체 측정 구간의 완료 프레임 수를 사용한다.</p>
+<p>이 조건은 <a href="MAT9MaterialScenePerformance.html">MAT9MaterialScenePerformance</a>의
+작은/큰 SceneView CPU 측정 조건과 다르므로 FPS 숫자를 직접 이어 붙이지 않는다.
+GPU/GBuffer/tier별 최종 성능 상한과 이동 카메라 수용을 대신하지 않는다.</p>
+<h2>검증과 한계</h2>
+<ul>
+<li>Lattice Debug 자체 검사 통과.</li>
+<li>Material Node Editor 제품 회귀: Debug <strong>1,341개</strong>, Release <strong>1,339개</strong> 검사,
+각 실제 capture 5회, source drift 0, 정상 종료. GPU 검증 문제 0건.</li>
+<li>실제 UI의 에셋 추가·재선택·Undo·노드 창 종료 후 미리보기 유지 확인.</li>
+<li>임시 검증 에셋 제거·Release workspace 복원·검증 Editor 정상 종료 확인.</li>
+<li>별도 <code>editor.windows</code> 등록 감사는 MaterialGraph 창을 bodyless 1건으로 보고했다.
+실제 그리기와 제품 회귀가 통과했어도 이 감사 항목을 해결된 것으로 세지 않는다.</li>
+<li>MAT-8은 완료 상태를 유지하고 MAT-9는 진행 상태를 유지한다. ImGui scale 최초 0.8
+원인 분석은 사용자가 미뤄 둔 별도 후속 항목이다.</li>
+</ul>
+<p>보존한 집계·소스 identity·회귀 종료값은
+<a href="MAT9NodeEditorPerformance.json">MAT9NodeEditorPerformance.json</a>에 있다.
+원시 <code>.ceprof</code> 및 임시 workspace·검증 에셋은 제품 소스 커밋에 넣지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증과-한계"></span><span id="sec-수정과-소스-확인"></span><span id="sec-실제-실행-측정"></span><span id="검증과-한계"></span><span id="수정과-소스-확인"></span><span id="실제-실행-측정"></span></details></main></body></html>

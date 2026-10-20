@@ -1,5 +1,44 @@
 # RG5-11 Sprite 접근·출력 버전 이관 — 완료
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Canvas.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14) — `class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>`
+- [Engine/SceneRuntime/Canvas.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Canvas.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20) — `Component::gc_trace(tracer);`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L29) — `own::shared_owner<const Texture> texture(`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L30) — `Texture::CreateFromPixels(1, 1, "RG5.Sprite.White", RHIFormat::RGBA8Unorm, &white));`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:125](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L125) — `RHIDepthTargetDesc::Depth(ec.ResolveHandle(depth), SceneSurfaceTargets::kDepthFormat);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/Canvas.cpp:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L14) — `Canvas::Canvas()`
+- [Engine/SceneRuntime/Canvas.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L18) — `void Canvas::OnPropertyChanged(`
+- [Engine/SceneRuntime/Canvas.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L34) — `float Canvas::ComputeScaleFactor(const math::rect& screenRect) const`
+- [Tools/regression/verify-rg5-sprite.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-sprite.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg5-sprite.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-sprite.ps1#L8) — `$root = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rg5-sprite.ps1:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-sprite.ps1#L20) — `[IO.File]::WriteAllText($commands, "dx12.rendergraphndx12.validationnquitn")`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 월드 Sprite/3D Canvas pass가 기존 HDR에 합성할 때 Modify/ReadWrite를 사용하고, 독립 출력은 초기 Write 버전을 생성하도록 이관했다. 깊이는 Read로 선언하고 실제 업로드 완료 상태 PixelShaderResource의 원본 텍스처를 import/Read한다. FindImportedTexture와 중복 usage 검사로 같은 텍스처를 여러 배치가 사용해도 import·읽기를 하나로 유지한다.
 
 실행 callback은 출력·깊이 핸들을 값으로 보관한다. GetOutput을 소비하는 기존 블랙보드 배선은 최신 색상 버전을 전달한다. Sprite가 비어 있으면 입력 색상을 그대로 반환한다. 수정한 if/for에는 다중 행 스코프를 작성하고 namespace 내부를 들여썼다.
@@ -37,3 +76,5 @@ Editor의 dx12.rendergraph에 EnhancedSpriteRg5Tests.h를 연결했다. verify-r
 IBL 1024/4096 및 MAT-9의 SSS·투과 품질/성능 조건은 유지한다. Vulkan 비교는 PHASE 4.9 RenderDoc 캡처→리소스 확인→픽셀별 비교에서 진행한다.
 
 현행 기준선은 후속 [RG5-12 화면 SSS/SSR 이관 검증](RenderRg5ScreenMigration.md)으로 갱신했다. 이 문서의 RG5-11 증거는 보존한다.
+
+</details>

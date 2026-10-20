@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Graph Scene의 정확한 픽셀 IBL 캐시</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSceneLookup.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSceneLookup.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Graph Scene의 정확한 픽셀 IBL 캐시</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L12">Engine/RenderEngine/MaterialGraphSceneLookup.h:12</a> — <code>struct SceneLookupResourcePool;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L15">Engine/RenderEngine/MaterialGraphSceneLookup.h:15</a> — <code>struct SceneLookupStats</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.h#L87">Engine/RenderEngine/MaterialGraphSceneLookup.h:87</a> — <code>class SceneLookupCache : private IRHIUploadTransactionListener</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.cpp#L97">Engine/RenderEngine/MaterialGraphSceneLookup.cpp:97</a> — <code>auto selected = std::find_if(idle.begin(), idle.end(), isReusable);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.cpp#L126">Engine/RenderEngine/MaterialGraphSceneLookup.cpp:126</a> — <code>ce::profile_instant(ce::marker&lt;&quot;MaterialLookupBudgetDeferred&quot;&gt;());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneLookup.cpp#L129">Engine/RenderEngine/MaterialGraphSceneLookup.cpp:129</a> — <code>selected = std::find_if(idle.begin(), idle.end(), isReusable);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4">Tools/regression/verify-material-raster-surface.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;,&#39;Release&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9">Tools/regression/verify-material-raster-surface.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10">Tools/regression/verify-material-raster-surface.ps1:10</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>입력 수집과 소비</h2>
+<p><code>MaterialGraphSceneLookup.{h,cpp}</code>는 실제 Scene host가 수집한 Core/Layered 재질의
+공간·시선별 IBL 결과를 불변 프레임으로 보관한다. 컬러 fragment의 1,024회 적분과
+환경 convolution을 compute bake로 옮겼다. 컬러는 직접광을 계산하고 현재 AO와
+캐시의 base/coat/sheen 환경 응답을 소비한다.</p>
+<pre><code class="language-text">같은 GBuffer depth와 draw owner
+  -&gt; LX.Scene.LookupCapture0/1 (8 + 3 RGBA32 MRT)
+  -&gt; LX.Scene.LookupBake (변경 픽셀만 적분)
+  -&gt; LX.Scene.Color (lookup 소비, 기존 HDR 합성)
+  -&gt; LX.Scene.LookupReady (다음 프레임의 읽기 상태)
+</code></pre>
+<p>입력은 <code>IblBakePoint</code>의 11 float4다. graph를 먼저 평가하고 fine UV derivative와
+coverage를 계산한 뒤 정확한 draw owner가 일치하는 픽셀만 저장한다. 재질 값,
+normal·tangent·회전, coat·sheen·film, 시선과 tier를 모두 포함한다.</p>
+<h2>재사용 판정</h2>
+<ul>
+<li>같은 view ID·scene epoch·viewport·환경 handle·환경 generation의 이전 제출 결과를 찾는다.</li>
+<li>가시 픽셀의 입력 44개 float를 <code>asuint</code>로 정확히 비교한다. hash·양자화·보간을 쓰지 않는다.</li>
+<li>같고 이전 sample이 유효하면 9 float4의 응답을 복사한다. 다르면 그 픽셀을 새로 적분한다.</li>
+<li>가림과 배경은 validity만 기록한다. 새로 노출된 픽셀은 이전 배경을 재사용하지 않는다.</li>
+<li>환경 generation 변경은 모든 가시 픽셀을 갱신한다. 같은 texture handle의 재생성도 포함한다.</li>
+<li>환경맵이 없어도 Layered 직접광에 필요한 적분은 유지하고 환경 convolution은 생략한다.</li>
+</ul>
+<p>material generation 자체를 키로 삼아 무조건 전체 갱신하지 않는다. 현재 평가값이 같으면
+안전하게 재사용하며, 실제 카메라·world·UV·parameter 변경은 해당 입력 비교에 반영된다.</p>
+<h2>게시와 수명</h2>
+<p>프레임 candidate는 준비가 전부 성공한 뒤 교체한다. graph 콜백은 현재 recording,
+descriptor와 graph resource epoch를 확인한다. compute와 ready 콜백 기록만으로 캐시를
+게시할 수 없다. native upload transaction listener가 같은 recording의 실제 제출과
+completion point를 확인한 뒤 <code>PublishSubmittedCache</code>를 허용한다.</p>
+<p>실패·abort·잘못된 frame·제출 전 게시·중복/과거 게시를 거부한다. graph/submission owner가
+이전 sample과 현재 자원을 GPU 완료까지 유지한다. published frame의 history는 weak owner로
+두어 프레임 체인이 쌓이지 않는다. 제출된 view는 최근 2개를 보관하며 GPU idle 뒤 정리한다.</p>
+<h2>예산과 남은 비용</h2>
+<p>기본 host 한도는 viewport 4,096²픽셀·4,096 draw, lookup payload 2 GiB다.
+메모리 검사는 현재 candidate와 같은 view의 이전 캐시를 포함한다. 한 픽셀의 입력은
+176 B, 응답은 144 B로 프레임당 320 B다. 1920×1080의 두 프레임은 약 1.24 GiB다.
+이 값에는 드라이버 정렬·다른 view·GPU에서 아직 쓰는 retirement owner가 포함되지 않는다.</p>
+<p>계산 dispatch는 최대 4,096픽셀씩 나누며 그 안에서 배경과 재사용을 빠르게 건너뛴다.
+큰 viewport의 자원·상태 전환과 캐시 재사용을 지원하지만, 카메라 이동으로 모든 픽셀이
+갱신될 때의 적분 비용과 매 프레임 자원 할당/입력 MRT 대역폭은 아직 높다. 자원 풀·압축·
+오차가 판정된 공간/시선 lookup·환경 MIS/수렴·일반 Scene의 시간 예산은 후속이다.</p>
+<p>이미지별 texture footprint와 Vector·sampler의 독립 샘플링은
+<a href="MaterialGraphTextureFootprints.html">MaterialGraphTextureFootprints.md</a>에 확장했다.
+Special/Blended, 자동 Scene host 쿠킹은 이 캐시 범위에 포함되지 않는다.
+실제 Editor Live Tick·Vulkan GPU 실행과 MAT-9 성능 수용도 별도다.</p>
+<h2>검증</h2>
+<p><code>Tools/regression/verify-material-raster-surface.ps1 -SkipDependencyRestore</code>가 기존
+shared depth·HDR reference에 순차/1워커/4워커의 정확한 재사용,
+camera/world/environment 갱신, parameter/UV의 부분 갱신, 제출 게시 실패와
+1920×1080 viewport를 추가한다.</p>
+<p>입력 transport는 별도로 검사한다. SRGB RGB는 정규화 오차 0.001,
+나머지 41개 입력은 0.0001을 적용한다. 후속 이미지별 sampling fixture의 선형 필터 Data alpha는
+<a href="MaterialGraphTextureFootprints.html">별도 transport 기준</a>을 따른다.
+GPU rasterization의 subpixel vertex snapping으로
+시선에 약 1e-5의 차이가 생길 수 있으며 roughness 0의 직접광 반사 피크에 증폭된다.
+따라서 검증된 GPU 전달 입력으로 독립 CPU double IBL/직접광 계산을 수행한다.
+IBL 36성분의 정규화 0.0001, HDR half 출력의 <code>0.001 * max(1, abs(expected))</code>
+기준은 유지한다. 캐시 재사용/갱신 카운터와 최종 컬러를 모두 읽어 검사한다.</p>
+<p>2026-09-29 캐시 도입 시 동결 소스의 Debug/Release 빌드·native D3D12 GPU validation 결과:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검증</th>
+<th>각 구성의 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전체 회귀</td>
+<td>20,762,086개 검사 · GPU 3,623,244성분</td>
+</tr>
+<tr>
+<td>실제 Scene 합성</td>
+<td>36 graph · 가시 42,292픽셀</td>
+</tr>
+<tr>
+<td>준비/선언 실패 복구</td>
+<td>192개 거부 · accepted frame 보존</td>
+</tr>
+<tr>
+<td>입력 갱신</td>
+<td>10프레임 · 카메라/world/환경 전체 갱신, parameter/UV 부분 갱신</td>
+</tr>
+<tr>
+<td>lookup 작업</td>
+<td>새 적분 20,491픽셀 · 정확한 재사용 21,801픽셀</td>
+</tr>
+<tr>
+<td>1920×1080</td>
+<td>cold/warm 2프레임 · 가시 픽셀 합계 3,120</td>
+</tr>
+<tr>
+<td>D3D12 GPU validation</td>
+<td>WARNING 이상 0건</td>
+</tr>
+</tbody></table></div>
+<p>Full HD fixture는 작은 삼각형의 희소 coverage다. capture/bake/color/ready GPU timestamp:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성</th>
+<th>cold</th>
+<th>warm</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td>114.512 ms</td>
+<td>12.676 ms</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>17.6696 ms</td>
+<td>7.74218 ms</td>
+</tr>
+</tbody></table></div>
+<p>GPU validation이 켜진 단일 cold/warm 측정으로 성능 수용 기준이나 일반 Scene benchmark가
+아니다. 모든 픽셀이 재질인 Full HD와 카메라 이동 시 전체 갱신 비용을 통과한 것으로
+해석하지 않는다. 시간값에는 제품 generation 컴파일·자원 할당의 CPU 비용도 포함하지 않는다.</p>
+<p>Core/Layered Scene의 VS/GBuffer PS/lookup PS 2종/Color PS는 DXIL·SPIR-V 20개,
+lookup bake/clear CS는 두 backend의 4개 artifact를 검증한다. 기존 probe 출력의
+<code>compiled=24</code>와 별도다. DX12/Vulkan 실제 Scene consumer를 빌드하지만 native GPU 실행은
+D3D12다. 실제 Editor Live Tick·Vulkan GPU 실행을 이 회귀에 포함하지 않는다.</p>
+<p>로그는 <code>Build/Obj/MaterialProductProbe/scene-lookup-{Debug,Release}.log</code>,
+빌드 로그는 <code>scene-lookup-build-{Debug,Release}.log</code>, 소스 동결 기록은
+<code>scene-lookup-source-hashes.json</code>이다. 확장 runtime signature로 두 구성의 결과와 소스 hash를
+확인한 최종 판정은 <code>scene-lookup-gate-final.log</code>다. 후속 이미지별 샘플링을 포함한
+44 graph/43,644픽셀·새 적분 21,021/재사용 22,623픽셀의 Debug/Release 결과와
+<code>texture-footprint-*</code> 로그는 <a href="MaterialGraphTextureFootprints.html">MaterialGraphTextureFootprints.md</a>가
+소유한다. MAT-7은 진행 중이며 완료 공수를 추가하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증"></span><span id="sec-게시와-수명"></span><span id="sec-예산과-남은-비용"></span><span id="sec-입력-수집과-소비"></span><span id="sec-재사용-판정"></span><span id="검증"></span><span id="게시와-수명"></span><span id="예산과-남은-비용"></span><span id="입력-수집과-소비"></span><span id="재사용-판정"></span></details></main></body></html>

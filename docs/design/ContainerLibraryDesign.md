@@ -1,5 +1,50 @@
 # ce 컨테이너 라이브러리 설계 — `ce::dynamic_array`
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.
+- 과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/ReflectionTypedYml.h:123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionTypedYml.h#L123) — `inline void ReadScalar(const Authoring::ReadNode& n, std::string& out) { out = ScalarDetail::StringOf(n); }`
+- [Engine/Utility_Framework/ReflectionTypedYml.h:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionTypedYml.h#L130) — `inline void ReadScalar(const Authoring::ReadNode& n, math::vector2& out)`
+- [Engine/Utility_Framework/ReflectionTypedYml.h:135](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionTypedYml.h#L135) — `inline void ReadScalar(const Authoring::ReadNode& n, math::vector3& out)`
+- [Engine/Utility_Framework/ReflectionRegister.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionRegister.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/Scene.cpp:1851](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L1851) — `void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached)`
+- [Engine/SceneRuntime/Scene.cpp:2049](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L2049) — `Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& objects)`
+- [Engine/SceneRuntime/Scene.cpp:5605](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L5605) — `ce::physics::result<ce::physics::query_result> Scene::RaycastPhysics(math::vector3 origin, math::vector3 direction, float distance,`
+- [Engine/SceneRuntime/TagManager.cpp:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.cpp#L136) — `void TagManager::SetTagDefinitions(const std::vector<std::string>& tags)`
+- [Engine/SceneRuntime/TagManager.cpp:145](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.cpp#L145) — `void TagManager::AddTag(std::string_view tag)`
+- [Engine/SceneRuntime/TagManager.cpp:159](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.cpp#L159) — `void TagManager::RemoveTag(std::string_view tag)`
+- [Tools/regression/verify-hashing-string.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L36) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-hashing-string.ps1:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L92) — `throw 'Scene assigns m_sceneName through string_view::data() again (length is lost).'`
+- [Tools/regression/verify-hashing-string.ps1:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L127) — `$branchEnd = $typedDrawText.IndexOf('else if constexpr', $branchStart)`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:1041](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L1041) — `CommandCore::CommandResult HandleSceneTransformDigest(const std::vector<std::string>& parts)`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:1217](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L1217) — `CommandCore::CommandResult HandleSceneFlag(const std::vector<std::string>& parts)`
+- [Editor/EngineEntry/ConsoleCommandSystem.cpp:1315](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L1315) — `CommandCore::CommandResult HandleSceneBoneDump(const std::vector<std::string>& parts)`
+- [Engine/SceneRuntime/ClrHost.h:114](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L114) — `std::vector<std::string> GetAniBehaviorTypeNames();`
+- [Engine/SceneRuntime/ClrHost.h:270](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L270) — `std::vector<std::string> GetBTNodeTypeNames(BTNodeKind kind);`
+- [Engine/SceneRuntime/ClrHost.h:296](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L296) — `std::vector<std::string> GetComponentTypeNames();`
+- [Engine/SceneRuntime/TagManager.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L24) — `void SetTagDefinitions(const std::vector<std::string>& tags);`
+- [Engine/SceneRuntime/TagManager.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L26) — `std::vector<std::string>& GetTags() { return m_tags; }`
+- [Engine/SceneRuntime/TagManager.h:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L45) — `std::vector<Entity*> GetObjectsWithTag(std::string_view tag) const`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > ## ⛔ 결론 (2026-08-18): **만들지 않는다.**
 >
 > C0 측정이 끝났고 사전에 정한 판정 규칙(§4)에 그대로 걸렸다.
@@ -632,3 +677,5 @@ swap-and-pop을 대체한다. 타입을 안 바꾸니 리플렉션·직렬화에
 - [SceneGraphRedesignPlan.md](../plans/archive/SceneGraphRedesignPlan.md) — K2 스테이지 B 폐기 결정, SBO 재적용 기준
 - [ReflectionRedesignPlan.md](../plans/archive/ReflectionRedesignPlan.md) — 리플렉션 표면
 - [PPLContainerMigrationAnalysis.md](../analysis/PPLContainerMigrationAnalysis.md) — PPL 컨테이너 축
+
+</details>

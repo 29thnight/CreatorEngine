@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>UI 시스템 재설계 — Scene 소유 UI Runtime과 값 타입 렌더 제출 (PHASE 16)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="UISystemRedesignPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/UISystemRedesignPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>UI 시스템 재설계 — Scene 소유 UI Runtime과 값 타입 렌더 제출 (PHASE 16)</h1><p>U0/T/U1~7: UI/Transform 진실의 저장소, scene-local 입력 routing·layout dirty·값 UIDrawSnapshot·그리기 기능과 Editor/직렬화의 남은 수직 슬라이스를 구현·수용한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">UI component</ve-node><ve-node id="n1" at="2 1">UIManager</ve-node><ve-node id="n2" at="3 1" key>Canvas</ve-node><ve-node id="n3" at="3 2">Prepared data</ve-node><ve-node id="n4" at="2 2">UI pass</ve-node><ve-node id="n5" at="1 2">Submission</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>U0/T/U1&#126;7: UI/Transform 진실의 저장소, scene-local 입력 routing·layout dirty·값 UIDrawSnapshot·그리기 기능과 Editor/직렬화의 남은 수직 슬라이스를 구현·수용한다.</li>
+<li>현재 Canvas/UIManager 소비자·이벤트·GC trace/수명을 조사해 전역 UIManager 퇴역을 단계화한다. 스냅샷은 render thread가 live Component를 역참조하지 않도록 한다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>UI components → UIManager/Canvas → prepared render data → UI rendering</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>U0-a</code> · PHASE 16</td>
+<td>저작·측정 표면 신설 — 자를 먼저 세운다</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U0-b</code> · PHASE 16</td>
+<td>지혈 — C1·C3·dead path</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U0-c</code> · PHASE 16</td>
+<td>게이트 보강 — 눈먼 초록 제거</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>T0</code> · PHASE 16</td>
+<td>트랙 T — 폰트 자산과 SDF 아틀라스 정본</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>T1</code> · PHASE 16</td>
+<td>트랙 T — 텍스트 draw item</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>T2</code> · PHASE 16</td>
+<td>트랙 T — 스케일·해상도 대응</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U1</code> · PHASE 16</td>
+<td>UISceneContext와 shadow registry</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U2</code> · PHASE 16</td>
+<td>등록 통합과 장기 raw pointer 제거</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>U3</code> · PHASE 16</td>
+<td>InputRouter 통합</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U4a</code> · PHASE 16</td>
+<td>Layout dirty propagation</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U4b</code> · PHASE 16</td>
+<td>Layout 컴포넌트 — LayoutGroup·ContentSizeFitter</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U5a</code> · PHASE 16</td>
+<td>값 타입 UIDrawSnapshot</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U5b</code> · PHASE 16</td>
+<td>렌더 기능 완성</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U6</code> · PHASE 16</td>
+<td>에디터·직렬화 정합 + C# UI 표면 재정렬</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>U7</code> · PHASE 16</td>
+<td>전역 UIManager 퇴역</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/UIManager.h#L16">Engine/SceneRuntime/UIManager.h:16</a> — <code>class UIManager : public Singleton&lt;UIManager&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L7">Engine/SceneRuntime/Canvas.h:7</a> — <code>#include &quot;CanvasScaleMode.h&quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/UIButton.h#L9">Engine/SceneRuntime/UIButton.h:9</a> — <code>class [[reflgen::reflect]] UIButton : public meta::identity&lt;UIButton, UIComponent&gt;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="0-개정-사유"></span>
+<span id="00-2026-08-30-전면-개정"></span>
+<span id="01-최종-목표-유지"></span>
+<span id="02-채택-모델-유지"></span>
+<span id="03-인접-계획과의-경계"></span>
+<span id="04-이번-개정에서-신설하는-것--트랙-t-텍스트-렌더"></span>
+<span id="05-기존-계획에서-제거하는-항목"></span>
+<span id="06-2026-09-15-3차-개정--레이어-판정--인접-페이즈-접점--트랙-t-승격"></span>
+<span id="1-현재-코드-기준선--2026-08-30-실측"></span>
+<span id="10-순서-제약"></span>
+<span id="11-구조-지도"></span>
+<span id="11-삭제-및-마이그레이션-표"></span>
+<span id="12-이미-닫힌-기반-재확인"></span>
+<span id="12-필수-불변식"></span>
+<span id="13-살아-있는-결함--구-c1c10-재판정"></span>
+<span id="13-위험과-대응"></span>
+<span id="14-명시적-비범위"></span>
+<span id="14-새로-드러난-것-기존-계획서에-없음"></span>
+<span id="15-제거-후보-dead-path-재확인--전부-유효"></span>
+<span id="16-회귀-기준선--2026-08-30-실행-결과"></span>
+<span id="17-저작관측-표면-인벤토리"></span>
+<span id="2-설계-원칙"></span>
+<span id="21-단일-소유권"></span>
+<span id="22-단일-hierarchy"></span>
+<span id="23-명시적-mountunmount"></span>
+<span id="24-resolve는-사용-지점에서-짧게"></span>
+<span id="25-저작-데이터와-런타임-캐시-분리"></span>
+<span id="26-타입-규약-신설"></span>
+<span id="3-목표-참조-모델"></span>
+<span id="31-엔티티-참조"></span>
+<span id="32-ui-컴포넌트-참조"></span>
+<span id="33-canvas-membership"></span>
+<span id="34-navigation-참조"></span>
+<span id="35-target-graphic"></span>
+<span id="4-생명주기-계약"></span>
+<span id="41-이벤트별-동작"></span>
+<span id="42-ordering-불변식"></span>
+<span id="43-thread-규칙"></span>
+<span id="5-recttransform-좌표-계약"></span>
+<span id="51-방향-규약-명시--기존-계획서-누락분"></span>
+<span id="52-공개-의미"></span>
+<span id="53-canonical-식"></span>
+<span id="54-좌표-변환-규칙"></span>
+<span id="55-검증-행렬"></span>
+<span id="6-입력-아키텍처"></span>
+<span id="61-uiinputrouter"></span>
+<span id="62-capability-분리"></span>
+<span id="63-상태-소유권"></span>
+<span id="64-멀티-뷰-규칙-신설"></span>
+<span id="7-layout과-invalidation"></span>
+<span id="71-1차-목표"></span>
+<span id="72-dirty-root-규칙"></span>
+<span id="73-현재-구현에서-승계할-것"></span>
+<span id="74-후속-기능-기초-안정화-후에만"></span>
+<span id="8-렌더-제출-경계"></span>
+<span id="81-최종-구조-타입-정정"></span>
+<span id="82-전환-경로"></span>
+<span id="83-공통-sort-key"></span>
+<span id="84-클리핑-rhi-중립-제약"></span>
+<span id="9-실행-계획"></span>
+<span id="90-착수-전-판정-항목-works-배정-전에-결정한다"></span>
+<span id="d-5-근거--ui-저작을-c-스크립트-레이어로-올린다가-지금-성립하지-않는-이유"></span>
+<span id="sec-0-개정-사유"></span>
+<span id="sec-1-현재-코드-기준선--2026-08-30-실측"></span>
+<span id="sec-10-순서-제약"></span>
+<span id="sec-11-삭제-및-마이그레이션-표"></span>
+<span id="sec-12-필수-불변식"></span>
+<span id="sec-13-위험과-대응"></span>
+<span id="sec-14-명시적-비범위"></span>
+<span id="sec-2-설계-원칙"></span>
+<span id="sec-3-목표-참조-모델"></span>
+<span id="sec-4-생명주기-계약"></span>
+<span id="sec-5-recttransform-좌표-계약"></span>
+<span id="sec-6-입력-아키텍처"></span>
+<span id="sec-7-layout과-invalidation"></span>
+<span id="sec-8-렌더-제출-경계"></span>
+<span id="sec-9-실행-계획"></span>
+<span id="u0-a--저작측정-표면-신설-선행--다른-모든-단계보다-먼저"></span>
+<span id="u0-b--지혈"></span>
+<span id="u0-c--게이트-보강-눈먼-초록-제거"></span>
+<span id="u1--uiscenecontext와-shadow-registry"></span>
+<span id="u2--등록-통합과-장기-raw-pointer-제거"></span>
+<span id="u3--inputrouter-통합"></span>
+<span id="u4a--layout-dirty-propagation"></span>
+<span id="u4b--layout-컴포넌트"></span>
+<span id="u5a--값-타입-uidrawsnapshot"></span>
+<span id="u5b--렌더-기능-완성"></span>
+<span id="u6--에디터와-직렬화"></span>
+<span id="u7--전역-uimanager-퇴역"></span>
+<span id="①-텍스트스프라이트시트는-소비자가-0이다--불일치가-아니라-생산만"></span>
+<span id="②-updateuilayout은-ui가-아니라-씬-전체를-훑고-프레임당-3회-돈다"></span>
+<span id="③-저작-ui-자산이-저장소에-하나도-없다"></span>
+<span id="④-ddol-게이트에-사각지대--멤버십-재구축이-무측정"></span>
+<span id="⑤-uimanager의-포인터-목록은-등록부가-아니라-작업-목록이다"></span>
+<span id="⑥-위젯-하나의-팬아웃이-34파일이다"></span>
+<span id="⑦-폰트-계통은-미구현이-아니라-은퇴가-남긴-고아다-9-15-실측"></span>
+<span id="⑧-ui-런타임에-스레딩-코드가-0이다--enkits-보강-대상이-아니다"></span>
+<span id="트랙-t--텍스트-렌더-신설--04--9-15-개정에서-u1-앞으로-승격"></span></p>
+</details>
+</main></body></html>

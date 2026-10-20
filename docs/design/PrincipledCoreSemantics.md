@@ -1,5 +1,44 @@
 # Core Principled 의미 — MAT-3
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-abi.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-abi.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L8) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-abi.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L9) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Tools/regression/verify-plan-dashboard.ps1:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L51) — `$text = [IO.File]::ReadAllText($Dashboard)`
+- [Tools/regression/verify-plan-dashboard.ps1:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L96) — `while ($j -lt $total -and [char]::IsWhiteSpace($chars[$j])) { $j++ }`
+- [Tools/regression/verify-plan-dashboard.ps1:135](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L135) — `while ($j -ge $open -and [char]::IsWhiteSpace($chars[$j])) { $j-- }`
+- [Tools/regression/verify-principled-core.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-core.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-principled-core.ps1:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-core.ps1#L40) — `if ([Math]::Abs($actual[$index] - $expected[$index]) -gt 0.0000001) {`
+- [Tools/regression/verify-principled-core.ps1:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-core.ps1#L47) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json#L5) — `"variant_rule": "Each writable enum changes alone from the node default; enum combinations are not enumerated.",`
+- [Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json:7318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json#L7318) — `"label": "Mix (Legacy)",`
+- [Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json:8497](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json#L8497) — `"label": "Squeeze Value (Legacy)",`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang#L1) — `#pragma once`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-09-28 · 공용 Slang 평가·직접광·IBL 응답 구현 및 독립 GPU 검증**
 
 ## 기준과 소유권
@@ -92,3 +131,5 @@ MAT-3 완료 판정을 그 전체 검사 통과로 바꿔 적지 않는다.
 
 MAT-3는 공용 core 의미 구현과 GPU 대조까지 완료다. Editor/LX 연결, graph codegen, 제품의
 비기본 IOR lookup/packing, Blender golden·route parity·성능 판정은 LX-3/MAT-6/MAT-7/MAT-9에 남는다.
+
+</details>

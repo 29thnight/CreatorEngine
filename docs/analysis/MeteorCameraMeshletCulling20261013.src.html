@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>METEOR camera compute meshlet work — 2026-10-13</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MeteorCameraMeshletCulling20261013.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MeteorCameraMeshletCulling20261013.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>METEOR camera compute meshlet work — 2026-10-13</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletHzbProbe.inl#L7">Tools/regression/support/MeshletHzbProbe.inl:7</a> — <code>const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletHzbProbe.inl#L8">Tools/regression/support/MeshletHzbProbe.inl:8</a> — <code>RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletHzbProbe.inl#L9">Tools/regression/support/MeshletHzbProbe.inl:9</a> — <code>RHILayout::SrvBufferTable(4096, 4114), RHILayout::Srv(8211), RHILayout::SrvTable(16, 2)};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletBatchDispatchProbe.inl#L7">Tools/regression/support/MeshletBatchDispatchProbe.inl:7</a> — <code>const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletBatchDispatchProbe.inl#L8">Tools/regression/support/MeshletBatchDispatchProbe.inl:8</a> — <code>RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18), RHILayout::SrvBufferTable(4096, 4114),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletBatchDispatchProbe.inl#L9">Tools/regression/support/MeshletBatchDispatchProbe.inl:9</a> — <code>RHILayout::Srv(8211)};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L11">Engine/RenderEngine/GpuGeometryOcclusion.h:11</a> — <code>struct EnhancedFrameContext;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L15">Engine/RenderEngine/GpuGeometryOcclusion.h:15</a> — <code>class GpuGeometryOcclusion final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L17">Engine/RenderEngine/GpuGeometryOcclusion.h:17</a> — <code>struct HistoryPool;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L236">Engine/RenderEngine/GpuGeometryOcclusion.cpp:236</a> — <code>void GpuGeometryOcclusion::Pyramid::CheckCurrent(const EnhancedRenderGraph* graph) const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L313">Engine/RenderEngine/GpuGeometryOcclusion.cpp:313</a> — <code>std::shared_ptr&lt;const GpuGeometryOcclusion::Pyramid&gt; GpuGeometryOcclusion::ReadHistory(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L330">Engine/RenderEngine/GpuGeometryOcclusion.cpp:330</a> — <code>void GpuGeometryOcclusion::Pyramid::ImportHistory(EnhancedRenderGraph&amp; graph) const</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>Implementation</h2>
+<ul>
+<li>The camera prepares one metadata range per geometry/material bin. CPU preparation no longer constructs a candidate for every meshlet.</li>
+<li>Compute tests the actual transformed/posed vertices against the camera clip planes and atomically compacts surviving meshlet ordinals.</li>
+<li><code>METEOR.CameraMeshlet.Reset/Cull</code> produces the count-prefixed frustum stream for the depth prepass. The B1 follow-up adds <code>METEOR.CameraMeshlet.HZB.Reset/Cull</code> for the final surface stream. Both use GPU-finalized indirect arguments; mesh shaders do not replay culling.</li>
+<li>Camera instance HZB rejection remains in the GPU owner gate; the final meshlet list additionally rejects occluded posed bounds. Shadows use independent light projections and the same count-prefixed work contract.</li>
+<li>GPU arguments support multiple rows with X &lt;= 65535. Mesh shaders guard padding groups before emitting output. Preparation checks the native per-axis and total group limits and rejects an unsupported range; it does not truncate or fall back.</li>
+<li><code>CookedProgramVersion</code> and <code>kMaterialProgramArtifactVersion</code>: <strong>5 -&gt; 6</strong>. <code>SceneHostIdentity</code>: <strong>22 -&gt; 23</strong>. Previous material programs must be recooked; no old-program binding route was added. Meshlet payload schema/profile remain 2.</li>
+</ul>
+<h2>Initial frustum gates</h2>
+<p>GPU-based DX12 validation was enabled. All accepted processes exited normally with code 0.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Debug</th>
+<th>Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MaterialRasterSurfaceProbe build</td>
+<td>Passed</td>
+<td>Passed</td>
+</tr>
+<tr>
+<td><code>--lx-meshlet-only</code></td>
+<td>Passed</td>
+<td>Passed after native-limit guard</td>
+</tr>
+<tr>
+<td><code>--shadow-decal-only</code></td>
+<td>Passed</td>
+<td>Passed before the final native-limit guard; Debug also covers that guard</td>
+</tr>
+<tr>
+<td><code>--forward-blend</code></td>
+<td>Passed</td>
+<td>Passed before the final native-limit guard; Debug also covers that guard</td>
+</tr>
+<tr>
+<td>CreatorEditor build and METEOR cutover</td>
+<td>Not rerun in this change</td>
+<td>Passed</td>
+</tr>
+</tbody></table></div>
+<p>Camera mode: <strong>24 frames, 67488 checks, 12501 GPU components, validation=0</strong>. Its readback compares the exact GPU ID set with an independent CPU clip replay over captured transformed vertices and packed topology; it also checks duplicates, capacity and the indirect dimensions. Readbacks depend on the producer&#39;s current graph versions, not imported version zero.</p>
+<p>The real <code>MeshletFinalizeCS</code> boundary gate checks survivor counts <strong>0, 1, 65535, 65536 and 131071</strong>. This verifies GPU argument generation; it is not a 131071-meshlet product-scene performance result.</p>
+<p>The Release Editor gate passed <code>dx12.meshletcontract</code>, <code>dx12.skinning</code>, the full render-graph regression, empty HDR capture and live geometry capture: depth/lit pixels <strong>252/252</strong>, indirect mesh submission <strong>1</strong>, Deferred passes <strong>0</strong>, validation problems <strong>0</strong>. The skinning gate reads the new count header and independently audits shadow survivor IDs against posed vertices.</p>
+<p>Evidence under <code>Build/Verification/MeteorCameraMeshlets20261013/</code>:</p>
+<ul>
+<li><code>Debug-Acceptance/verdict.json</code>: current camera, shadow and blend probes; source stable.</li>
+<li><code>Release-Limits/verdict.json</code>: camera and argument boundaries after the native-limit guard; source stable.</li>
+<li><code>Release-Acceptance/verdict.json</code>: camera, shadow and blend probes before that small guard; source stable.</li>
+<li><code>Release-Boundaries/verdict.json</code>: standalone GPU argument boundary gate.</li>
+<li><code>Editor-Release-Acceptance/verdict.json</code>: current Release Editor product gate; source stable.</li>
+</ul>
+<p>Failed runs were reviewed and retained. Corrections covered single-call mesh output counts, reset/cull ID-buffer write versions and UAV barriers, producer-version readback dependencies, the boundary probe&#39;s copy argument order, and the Editor skinning probe&#39;s previous ID-only list contract.</p>
+<h2>Remaining boundaries</h2>
+<ul>
+<li>CPU still owns material/geometry bins and PSO submission. Cross-bin native compute dispatch fusion was added in the follow-up below.</li>
+<li>Meshlet-level current-depth HZB is implemented in the B1 follow-up below. History/current-depth two-stage occlusion remains B2.</li>
+<li>Performance improvement and a large product workload are <strong>not accepted</strong> by these correctness gates.</li>
+<li>Vulkan runtime equivalence remains deferred to Phase 4.9.</li>
+</ul>
+<h2>B3 follow-up: one native cull dispatch per view</h2>
+<p>Camera and shadow views now bind structured vertex SRVs and raw topology SRVs in two buffer tables. Each view accepts at most 4096 geometry bins and retains the existing 32 MiB output budget. Unsupported ranges fail preparation; there is no per-bin dispatch fallback.</p>
+<p>CPU preparation uploads one range per bin, including its first 64-thread group. The compute shader searches these ordered ranges using the group ID, selects that bin&#39;s two buffers, and enumerates its meshlets. Padding lanes and extra groups in the last 2D dispatch row return before reading topology. Buffer selection is uniform within each workgroup. Geometry buffers remain owned by their batches and are read directly; no aggregate geometry copy was added.</p>
+<p>Native dispatch count per nonempty culling stage/view is <strong>reset 1 + cull 1 + finalize 1</strong>, independent of bin count within the supported capacity. Three shadow cascades remain three separate views. CPU material/geometry bins and graphics PSO submission are still present, so B3 as a whole remains partial.</p>
+<p>RHI now describes structured/raw buffer SRV tables. DX12 validates buffer view ranges before descriptor creation. Its immutable per-recording descriptor page grew from 4096 to 131072 entries so camera/shadow input tables can coexist with transform/material tables. Vulkan descriptor type translation was adjusted, but Vulkan array/runtime equivalence is still a Phase 4.9 task.</p>
+<p><code>MeshletBatchDispatchProbe.inl</code> exercises the production reset/cull/finalize shaders with 1, 2 and 4096 bins, different topology sizes, distinct buffer slices, partial/all/zero survivors, padded lanes, and a second compute dispatch row. The largest case has 73727 groups. Every survivor ID and indirect argument is checked. A buffer SRV extending beyond its allocation is rejected before submission. This synthetic kernel gate is correctness evidence, not a 4096-object Editor acceptance or a performance measurement.</p>
+<p>The standalone Release batch gate passed with GPU validation on, normal exit 0 and stable source hashes:
+<code>Build/Verification/MeteorMeshletBatch20261013/Release-Batch/verdict.json</code>.</p>
+<p>Follow-up acceptance (all passed, normal exit 0, stable source hashes):</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Evidence under <code>Build/Verification/MeteorMeshletBatch20261013/</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Release camera, shadow/decal, blend</td>
+<td><code>Release-Acceptance/verdict.json</code></td>
+</tr>
+<tr>
+<td>Debug camera and native batch boundaries</td>
+<td><code>Debug-Acceptance/verdict.json</code></td>
+</tr>
+<tr>
+<td>Release Editor meshlet contract, skinning, render graph, empty/live captures</td>
+<td><code>Editor-Release-Acceptance/verdict.json</code></td>
+</tr>
+</tbody></table></div>
+<p>Both camera probe configurations passed 24 frames, 2265120 checks and 12501 GPU components with validation=0. The new batch checks account for the larger check count. The Release Editor live capture had 252 covered/lit pixels, one mesh indirect submission, zero Deferred passes and zero validation problems; the empty scene retained its METEOR HDR clear. Debug Editor was not rerun. No performance acceptance is claimed.</p>
+<p>Per the user&#39;s 2026-10-13 instruction, performance measurement and optimization are deferred until all structural implementation is complete. Current gates check build, GPU validation, output correctness and regressions only.</p>
+<h2>B1 follow-up: current-frame meshlet HZB</h2>
+<p>The camera now uses two independent GPU lists. <code>METEOR.CameraMeshlet.Reset/Cull</code> emits the frustum list consumed by <code>METEOR.Scene.OccluderDepth</code>. One current-frame <code>GpuGeometryOcclusion::Pyramid</code> is built from that depth. Both instance visibility and <code>METEOR.CameraMeshlet.HZB.Reset/Cull</code> read the same pyramid. The surface mesh shader consumes only the final HZB-compacted IDs and GPU-finalized indirect arguments. The depth producer never consumes the HZB result, so the graph has no feedback dependency.</p>
+<p>The HZB kernel constructs each meshlet&#39;s world AABB from the actual transformed/posed vertices, then projects its corners conservatively. It retains uncertain/nonfinite bounds, near/W-plane crossings and equal-depth surfaces. It expands the projected rectangle by one source pixel and samples every covered max-depth cell at the selected level (at most 2x2), including odd image extents. The existing frustum and shadow kernels continue to share the same compaction/output contract.</p>
+<p>Scene culling requires the explicit versioned graph. The previous unversioned Scene test routes were migrated rather than adding a no-HZB fallback. Test readbacks use producer versions; subsurface and refraction frames expose their current graph inputs for that purpose. The extra HZB table changes the compute root layout, so finalization explicitly rebinds all inputs after its pipeline switch.</p>
+<p>This B1 step does not change the cooked meshlet payload or add an old-format reader. The earlier material-program version-6 recook requirement remains. History reprojection, a second recovery pass and temporal invalidation are B2; Vulkan runtime parity remains Phase 4.9. Performance measurement and optimization remain deferred.</p>
+<h3>B1 correctness gates</h3>
+<p><code>MeshletHzbProbe.inl</code> rasterizes a controlled D32 depth image, runs the production HZB builder and meshlet reset/cull/finalize kernels, then checks exact expected ID sets and arguments. Its eight cases cover solid occlusion, a center hole, removal of the occluder, a near/W crossing, invalid projection, camera movement, an edge hole at odd resolution, and the original view again. Front/equal-depth geometry and nonfinite posed vertices are included. Wrong view dimensions, frame/projection identity and previous recordings are rejected. This is a correctness fixture, not a performance workload.</p>
+<p>The product Scene probe additionally checks that the final HZB list is a unique subset of the independently replayed frustum list and that its count controls the indirect dimensions. Existing pixel, material, skinning and submission-lifetime checks remain active.</p>
+<p>Each of the camera&#39;s frustum and HZB stages keeps the cross-bin batch dispatch: one reset, one cull and one finalize per nonempty stage. B1 adds a second stage, not a per-mesh dispatch loop. Shadow views retain their existing frustum stages.</p>
+<p>Accepted B1 evidence under <code>Build/Verification/MeteorMeshletHzb20261013/</code>:</p>
+<ul>
+<li><code>Release-Hzb/verdict.json</code>: eight native HZB cases, normal exit, validation=0.</li>
+<li><code>Release-Final-Hzb/verdict.json</code>: the same eight cases rerun against the final sources, source stable, normal exit, validation=0.</li>
+<li><code>Release-Scene-RG2/verdict.json</code>: shadow/decal, forward blend, subsurface, refraction, volume, forward transport and Scene integration all passed with GPU validation enabled, source stable and exit code 0. Scene integration covered 59 frames, 25189669 checks and 3901990 GPU components, including the camera list readbacks; unexpected fallbacks=0.</li>
+<li><code>Release-Acceptance/runs.json</code>: camera mode passed 24 frames, 2265686 checks and 12501 GPU components; the subsequent old shadow fixture failed, so this entire run is <strong>not</strong> an accepted aggregate verdict.</li>
+<li><code>Debug-Accepted/verdict.json</code>: the same camera/HZB/batch gates passed, source stable, normal exit, validation=0. Byte-identical shader/fixture copies use isolated generated-source/cache paths; their hashes are recorded.</li>
+<li><code>Editor-Release-Acceptance/verdict.json</code>: meshlet contracts, posed skinning/shadow lists, full render-graph gate and empty/live captures passed. Live coverage/lit pixels: 252/252; indirect mesh submissions: 1; Deferred passes: 0; validation problems: 0. Source stable and normal quit. Debug Editor was not rerun.</li>
+<li><code>matched-release-verdict.json</code>: 24 native matched-image cases passed finite-output and GPU-validation checks; no timing mode or Blender material-quality acceptance was used.</li>
+</ul>
+<p>The failed shadow fixture still used a declaration-order graph. Related Scene probes were moved to RG2 with explicit read/write versions. The diagnostic Debug attempt was stopped and retained as a failure. The first isolated Debug fixture lacked its output directory and was rejected before GPU execution; the corrected <code>Debug-Accepted</code> run passed. These failures are not counted as successful gates.</p>
+<p>After the full gates, only trailing EOF whitespace was normalized; before/after hashes and content-equivalence checks are in <code>eof-normalization.json</code>. The final HZB rerun and <code>git diff --check</code> passed. No performance acceptance is claimed.</p>
+<h2>B2 follow-up: temporal two-stage occlusion</h2>
+<p>The camera now uses the newest completed, accepted HZB for its first list. Current posed world bounds are projected with that history&#39;s view-projection; current-view frustum rejection still uses the current matrix. The first list writes occluder depth. A shared current HZB then tests only meshlets rejected by the first stage. Every first-stage survivor is retained, recovered IDs are appended once, and the final surface consumes this union through GPU-generated indirect arguments. Cold views use current frustum classification in the same first-stage wiring.</p>
+<p>Each bin&#39;s internal allocation contains a count, capacity for compacted IDs, and one classification word per source meshlet. The mesh shader still reads only the count and compacted-ID prefix. Source flags are overwritten for every valid invocation, including rejected work, and the graph declares the first list as an SRV dependency of recovery. The 32 MiB per-stage budget includes the classification storage. Each nonempty stage retains one reset, one cull and one finalize dispatch across bins.</p>
+<p>The final opaque surface depth builds a separate immutable persistent pyramid for the next view. Its graph passes are retained for this external output. History promotion happens only after the exact successful submission passes Scene publication checks; reuse additionally waits for GPU completion. Recording-local readers pin the texture owner and validate device, recording, descriptor and graph identities. Aborted or rejected recordings are not promoted, and an unsubmitted pyramid cannot be imported as history. In-flight ownership remains with submitted frames, so replacing a history entry cannot release textures still in use.</p>
+<p>History selection checks scene epoch, view ID, extent, frame order, history revision, Temporal revision/reset, camera-cut revision and lens/projection identity. Temporal camera metadata supplies the unjittered projection for the lens key, while the stored raster view-projection is used for HZB lookup. Ordinary camera movement and posed geometry changes are handled by reprojection and current-frame recovery. If the latest accepted frame is still in flight, the newest completed compatible history is used; this is not a promise of exactly one-frame latency.</p>
+<p>This step retains the current depth-first surface renderer: the first raster writes depth, and the final surface shades the union. HW/SW visibility-buffer raster stages and material packet shading remain C2/C4 work. The cooked payload is unchanged, and no compatibility reader or legacy Scene route was introduced.</p>
+<h3>B2 correctness gates</h3>
+<p>The native HZB probe adds eight temporal cases with exact independent first/final ID sets: cold start, removed occluder recovery, retention of first-stage survivors, persistent occlusion, camera movement, lookup through a different previous projection, posed geometry movement, and repeated recovery. It reads back source classifications and bounded indirect arguments. It also rejects unsubmitted history and mismatched extent, scene and frame order. The original eight B1 boundary cases remain active.</p>
+<p>The 24-frame camera Scene gate checks actual accepted-history reuse, invalidation after camera cuts/history revision/view changes, the first/final union, independent frustum bounds, existing pixel oracles, and normal GPU retirement. Debug and Release passed with GPU validation enabled, 2266174 checks and 12501 GPU components each. Evidence: <code>Build/Verification/MeteorMeshletTemporal20261013/Release-Camera/verdict.json</code> and <code>Debug-Camera/verdict.json</code>. The isolated Debug shader/fixture hashes are recorded in <code>copied-inputs.json</code>. Release native HZB also passed separately in <code>Release-Hzb/verdict.json</code>.</p>
+<p><code>Editor-Release/verdict.json</code> passed meshlet contracts, skinning, render-graph checks, and empty/live product captures with normal quit, stable sources, 12 shadow GPU-list checks and 12 payload checks. The live image had 252 covered/lit geometry pixels and zero validation problems; the empty image retained the METEOR HDR clear. Debug Editor and the separate matched-image probe were not rerun for B2.</p>
+<p><code>Release-Regression/verdict.json</code> passed all six related modes: shadow/decal, forward blend, subsurface, refraction, volume and forward transport. All gates exited normally with stable source hashes and GPU validation enabled. The aggregate <code>b2-verdict.json</code> records the accepted verdict hashes and verification scope; <code>git diff --check</code> passed. No performance measurement or optimization was performed. Vulkan runtime equivalence remains Phase 4.9.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="b1-correctness-gates"></span><span id="b1-follow-up-current-frame-meshlet-hzb"></span><span id="b2-correctness-gates"></span><span id="b2-follow-up-temporal-two-stage-occlusion"></span><span id="b3-follow-up-one-native-cull-dispatch-per-view"></span><span id="implementation"></span><span id="initial-frustum-gates"></span><span id="remaining-boundaries"></span><span id="sec-b1-follow-up-current-frame-meshlet-hzb"></span><span id="sec-b2-follow-up-temporal-two-stage-occlusion"></span><span id="sec-b3-follow-up-one-native-cull-dispatch-per-view"></span><span id="sec-implementation"></span><span id="sec-initial-frustum-gates"></span><span id="sec-remaining-boundaries"></span></details></main></body></html>

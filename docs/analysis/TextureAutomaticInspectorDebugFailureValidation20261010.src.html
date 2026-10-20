@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 12 — Debug Inspector 파일 실패·복구 검증</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="TextureAutomaticInspectorDebugFailureValidation20261010.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/TextureAutomaticInspectorDebugFailureValidation20261010.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 12 — Debug Inspector 파일 실패·복구 검증</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L9">Tools/regression/start-texture-auto-ui.ps1:9</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L10">Tools/regression/start-texture-auto-ui.ps1:10</a> — <code>$fixture=[IO.Path]::GetFullPath($FixtureProject)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L13">Tools/regression/start-texture-auto-ui.ps1:13</a> — <code>$root=Join-Path $repo (&#39;Build/TAUI-&#39;+$Configuration+&#39;-&#39;+$Mode+&#39;-&#39;+[guid]::NewGuid().ToString(&#39;N&#39;).Substring(0,8))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L5">Tools/regression/verify-texture-reimport-scene.ps1:5</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L15">Tools/regression/verify-texture-reimport-scene.ps1:15</a> — <code>$root = Join-Path $repo (&#39;Build/TRS-&#39; + $config + &#39;-&#39; + [guid]::NewGuid().ToString(&#39;N&#39;).Substring(0,8))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L24">Tools/regression/verify-texture-reimport-scene.ps1:24</a> — <code>[IO.File]::WriteAllText($texture + &#39;.meta&#39;, &quot;guid: 33333333-3333-4333-8333-333333333333n&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L14">Engine/SceneRuntime/ImageComponent.h:14</a> — <code>class [[reflgen::reflect]] ImageComponent : public meta::identity&lt;ImageComponent, UIComponent&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L19">Engine/SceneRuntime/ImageComponent.h:19</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L21">Engine/SceneRuntime/ImageComponent.h:21</a> — <code>UIComponent::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L19">Engine/SceneRuntime/ImageComponent.cpp:19</a> — <code>ImageComponent::ImageComponent()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L24">Engine/SceneRuntime/ImageComponent.cpp:24</a> — <code>bool ImageComponent::ReplaceTextureOwner(const Texture* previous,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L25">Engine/SceneRuntime/ImageComponent.cpp:25</a> — <code>const own::shared_owner&lt;const Texture&gt;&amp; replacement)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>실행: 2026-10-10 KST. 소스 HEAD <code>d3c85faf182e93842217dd46eee3d3aabf4afc13</code>.
+현재 Debug Editor에서 실제 Ctrl+C/Ctrl+V, Reload Disk Settings, Retry Import를 조작했다.
+기존 Debug runtime을 실행했으며 이 기록은 새 빌드 완료를 주장하지 않는다.
+runtime SHA-256은 <code>B286C2E2BCBB5626DFC7DEF2120CFB18940FA2D5D7E5D9D52723317702559FD0</code>이며
+두 UI 실행 전후 동일했다. 제품 코드는 이 검증에서 수정하지 않았다.</p>
+<h2>실행 결과</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경계</th>
+<th>실제 조작 및 관찰</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug 수정 후 붙여넣기</td>
+<td>other.png의 최대 크기 2를 Ctrl+C로 복사하고 fixture.png의 0에 Ctrl+V로 붙여넣음</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>저장 대기 외부 충돌</td>
+<td>실제 UI 입력 후 대기 age 3ms에 probe가 외부 설정 1 주입. 자동 저장 거부와 Inspector 오류 표시, 외부 bytes 보존 receipt</td>
+<td>통과, 일반 저장 1건</td>
+</tr>
+<tr>
+<td>잠긴 metadata 재읽기</td>
+<td>FileShare.None 잠금 중 실제 Reload 클릭. failed to open authoring document 표시, 잠금 해제 후 외부 bytes hash 동일</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>손상 metadata 재읽기</td>
+<td>격리 sidecar를 닫히지 않은 YAML 배열로 교체 후 실제 Reload 클릭. missing terminating ] 표시, 편집 값 2 유지</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>Retry 오류 해제</td>
+<td>정상 외부 bytes 복원 후 실제 Retry 클릭. 자동 저장 오류와 로컬 파싱 오류 해제, Cooked generation ready 및 metadata 2</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>잠금 중 자동 저장</td>
+<td>선택해 읽은 초안에 파일 잠금을 걸고 실제 Ctrl+V. 자동 저장 실패 표시, 잠금 해제 후 baseline bytes 동일</td>
+<td>보존·복구 통과, 진단 문구 개선 잔여</td>
+</tr>
+<tr>
+<td>Reload와 새 편집 복구</td>
+<td>잠금 해제 후 Reload로 디스크 0을 읽고 오류 해제. 새 Ctrl+V 입력 뒤 자동 저장으로 metadata 2</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>미저장 씬 보존·정상 종료</td>
+<td>두 실행 모두 UnsavedT0Texture가 UI에 유지됨. 저장 씬·원본 PNG bytes와 GUID 보존, Finalize 완료 및 DX12 pending 0/0/0</td>
+<td>통과</td>
+</tr>
+</tbody></table></div>
+<p>현재 Debug 소비자 회귀도 별도로 통과했다: <code>verify-texture-reimport-scene.ps1 -Configuration Debug</code>,
+248 checks, sourceDrift 0. ImageComponent/SpriteRenderer의 자동 4→2 연결, 미저장 씬·Undo,
+cook/reload 실패 보존 및 4 복구가 포함된다. UI 화면만으로 GPU 픽셀 정확도나 품질을 판정하지 않는다.</p>
+<h2>재현 및 로컬 증거</h2>
+<p>격리 fixture 준비와 Editor 실행을 저장소의
+<a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1"><code>start-texture-auto-ui.ps1</code></a>에 보존했다.
+먼저 소비자 회귀로 만든 <code>Build/TextureReimportScene/result.json</code>의 project를 FixtureProject로
+전달하고 conflict 또는 manual 모드로 실행한다. 준비 명령은 씬·브라우저만 열며 값 편집과
+Reload/Retry는 실제 UI 입력이다. 외부 충돌 probe와 파일 잠금·손상은 제어된 실패 주입이다.
+manual 실행의 첫 잠금은 선택 전에 걸려 Inspector를 읽지 못했다. 잠금을 해제해 선택한 뒤
+다시 잠그고 편집한 실행만 자동 저장 실패 수용에 사용했다.</p>
+<ul>
+<li>집계 receipt (<code>../../Build/TextureAutomaticInspectorDebugFailure-result.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Debug 소비자 회귀 (<code>../../Build/TextureSidecarDiagnostics/previous-scene-result.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>외부 충돌 receipt (<code>../../Build/TAUI-Debug-conflict-6d2c7780/commands.jsonl</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>잠긴 파일 Reload (<code>../../Build/TAUI-Debug-conflict-6d2c7780/locked-reload.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>손상 후 편집 값 2 (<code>../../Build/TAUI-Debug-conflict-6d2c7780/corrupt-draft.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>손상 파일 Reload (<code>../../Build/TAUI-Debug-conflict-6d2c7780/corrupt-reload.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Retry 정상 상태 (<code>../../Build/TAUI-Debug-conflict-6d2c7780/retry-recovered.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Retry 오류 해제 (<code>../../Build/TAUI-Debug-conflict-6d2c7780/retry-errors-cleared.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>자동 저장 잠금 실패 (<code>../../Build/TAUI-Debug-manual-6c1e823c/automatic-save-locked.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>Reload 복구 (<code>../../Build/TAUI-Debug-manual-6c1e823c/reload-recovered.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>새 편집 복구 (<code>../../Build/TAUI-Debug-manual-6c1e823c/fresh-edit-recovered.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>정상 종료 로그: <code>Build/TAUI-Debug-{conflict-6d2c7780,manual-6c1e823c}/editor.out</code></li>
+</ul>
+<p>Build 증거는 로컬 산출물이며 Git에 포함하지 않는다. 과거 실행의 Build fixture가 정리되어
+현재 실행은 새 fixture로 재검증했다. 이전 기록을 이번 실행 결과로 소급 대체하지 않는다.</p>
+<h2>잔여와 진행률</h2>
+<p>파일 잠금 자동 저장 오류가 <code>Texture sidecar must have a valid canonical UUIDv4 identity</code>로
+표시된다. 실제 파일 신원은 정상이고 읽기가 잠금으로 실패했으므로 원인 구분 진단은 잔여다.
+삭제, 저장 대기 중 손상 외부 bytes 충돌, 최종 비교 이후 동시 쓰기, 반복/장시간,
+다중 창/배율은 미실행이다. Debug 종료 충돌 재검증과 다른 소비자/GPU/품질도 확대 수용하지 않는다.</p>
+<p>이번 한정 Debug 입력·실패 재읽기·오류 해제 수용을 <code>12-0-D</code> 0.25일로 분리한다.
+T0 잔여는 0.25일, 활성 총20일은 유지한다. 완료13.25/20 = 66.25%, 대시보드 반올림 66%.
+계획 가중치이며 실제 투입 시간이나 전체 T0 완료를 뜻하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-실행-결과"></span><span id="sec-잔여와-진행률"></span><span id="sec-재현-및-로컬-증거"></span><span id="실행-결과"></span><span id="잔여와-진행률"></span><span id="재현-및-로컬-증거"></span></details></main></body></html>

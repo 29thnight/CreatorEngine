@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG5 종결 검사 — 2026-10-07</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg5Closure20261007.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg5Closure20261007.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG5 종결 검사 — 2026-10-07</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L142">Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:142</a> — <code>if (!sprite.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L146">Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:146</a> — <code>sprite.Declare(graph, frame);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L271">Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:271</a> — <code>if (!sprite.PrepareFrame(frame, error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L146">Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:146</a> — <code>if (!sprite.PrepareFrame(frame, error) || !sss.PrepareFrame(frame, error) ||</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L147">Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:147</a> — <code>!ssr.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L151">Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:151</a> — <code>sprite.Declare(graph, frame);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-decal.ps1#L7">Tools/regression/verify-rg5-decal.ps1:7</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-decal.ps1#L8">Tools/regression/verify-rg5-decal.ps1:8</a> — <code>$output = [IO.Path]::GetFullPath($OutputDirectory)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-decal.ps1#L42">Tools/regression/verify-rg5-decal.ps1:42</a> — <code>$marker = [regex]::Match($log, &#39;(?m)^RG5_DECAL_GPU_OK policies=3 frames=([1-9][0-9]*) maxError=([0-9.eE+-]+) validation=0\r?$&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp#L12">Engine/RenderEngine/MaterialGraphIblBake.cpp:12</a> — <code>if (!std::ranges::all_of(values, [](float value) { return std::isfinite(value) &amp;&amp; std::abs(value) &lt;= 1e6f; }))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp#L26">Engine/RenderEngine/MaterialGraphIblBake.cpp:26</a> — <code>const double normalLength = std::hypot(normal[0], normal[1], normal[2]);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp#L266">Engine/RenderEngine/MaterialGraphIblBake.cpp:266</a> — <code>bool IblBakeResult::Declare(EnhancedRenderGraph&amp; graph, std::string&amp; error) const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_scene_decal_tests.inl#L111">Tools/regression/material_scene_decal_tests.inl:111</a> — <code>Check(decal.PrepareFrame(context, error),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_scene_decal_tests.inl#L124">Tools/regression/material_scene_decal_tests.inl:124</a> — <code>Check(decal.PrepareGpuVisibility(context, error),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_scene_decal_tests.inl#L185">Tools/regression/material_scene_decal_tests.inl:185</a> — <code>lighting = SceneHost::DeclareHdrTarget(*graph, context);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L12">Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:12</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L19">Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:19</a> — <code>[](float value) { return std::isfinite(value) &amp;&amp; std::abs(value) &lt;= 1e6f; });</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L385">Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:385</a> — <code>bool SurfaceBatch::Declare(EnhancedRenderGraph&amp; graph, std::string&amp; error) const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp#L11">Engine/RenderEngine/MaterialGraphRasterSurface.cpp:11</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp#L29">Engine/RenderEngine/MaterialGraphRasterSurface.cpp:29</a> — <code>if (!std::isfinite(value) || std::abs(value) &gt; 1e6f)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp#L155">Engine/RenderEngine/MaterialGraphRasterSurface.cpp:155</a> — <code>bool RasterSurfaceBatch::Declare(EnhancedRenderGraph&amp; graph, std::string&amp; error) const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L886">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:886</a> — <code>if (!pipeline.decal.PrepareGpuVisibility(context, error)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L887">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:887</a> — <code>|| !pipeline.sprite.PrepareGpuVisibility(context, error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3982">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3982</a> — <code>const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>최신 판정:</strong> reference 및 최종 Fog/PostChain/UI/Editor·실제 capture/fixture 수용까지 완료해 RG5를 done/기성 10인일로 닫았다. <a href="RenderRg5FinalAcceptance20261007.html">최종 수용 기록</a>. 아래 보류 판정과 실패/복구 증거는 이 검사의 중간 이력으로 보존하며 RG6 전환 전후 수용은 별도로 남는다.</p>
+<h2>판정 범위</h2>
+<p>대상 HEAD는 <code>3afe1daaee7b75f644ac10b12d96fb684a0e74c8</code>이며 기존 계획서/대시보드 미커밋 변경을 보존했다. 이 검사는 RG5의 접근 선언 이관·fixture 정합성 검사다. RG6의 전체 제품 전환 전후 이미지·성능 수용을 대신하지 않는다.</p>
+<p>증거 디렉터리: <code>Build/Verification/RG5Closure20261007</code>. 시작 시 Release 바이너리의 SHA-256을 기록하고 <code>dx12.rendergraph</code>, <code>dx12.decal</code>, <code>dx12.validation</code>을 GPU validation 활성 상태로 실행했다. 기존 Release 바이너리 실행은 수정 전 재현용이며 이번 소스 전체 재빌드 증거가 아니다.</p>
+<h2>수정 전 재현</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>dx12.rendergraph</td>
+<td><code>command.exception</code>: Sprite GPU visibility must be prepared before graph declaration.</td>
+</tr>
+<tr>
+<td>dx12.decal</td>
+<td><code>command.exception</code>: Decal GPU visibility must be prepared before graph declaration.</td>
+</tr>
+<tr>
+<td>dx12.validation</td>
+<td>GPU validation 활성, problems=0, droppedMessages=0</td>
+</tr>
+<tr>
+<td>프로세스</td>
+<td>정상 종료, exitCode=5(명령 실패)</td>
+</tr>
+</tbody></table></div>
+<p>근거: <code>Release-before/results.jsonl</code>, <code>identity.json</code>, <code>process.json</code>. validation 0은 앞의 두 검사 통과를 뜻하지 않는다.</p>
+<p>현재 제품 SceneRenderer는 준비된 recording 경계에서 <code>PrepareGpuVisibility</code>를 호출한다. 오래된 Sprite/Screen/Decal fixture는 <code>PrepareFrame</code> 뒤 바로 <code>Declare</code>를 호출했다. 다음 검사 호출부에 누락된 준비를 추가했으며 indirect 경로를 끄거나 예외를 삼키는 우회는 추가하지 않았다.</p>
+<ul>
+<li><code>Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h</code></li>
+<li><code>Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h</code></li>
+<li><code>Editor/RenderTests/RHI/DX12/Tests/Geometry/EnhancedDecalTest.cpp</code></li>
+<li><code>Tools/regression/material_scene_decal_tests.inl</code>: 병렬 upload prefix 뒤, graph 선언 전 GBuffer/Decal visibility 준비.</li>
+</ul>
+<h2>선언 감사</h2>
+<p>현재 live 그래프 생성 두 곳은 <code>EnhancedSceneRenderer.cpp</code>에서 모두 <code>ExplicitVersioned + DependencyOrder</code>를 명시한다. versioned compile은 명시적 Read/Write/ReadWrite가 아닌 접근을 거부한다. 따라서 소스에 <code>LegacyState</code> 문자열이 있다는 이유만으로 live 제품이 암묵 추론을 사용한다고 판정하지 않는다.</p>
+<p>Fog/PostChain/UI/Grid/WireFrame/GizmoIcon/GizmoLine에는 명시적 접근·Write/Modify 배선이 있다. 과거 문서의 “이 소비자들을 아직 구현하지 않았다”는 설명은 현재 상태가 아니다. 다만 이들 전체 옵션/입력 조합에 대한 RG5 최종 실행 수용을 이번 정적 확인으로 대체하지 않는다.</p>
+<p><strong>검사 당시 남았던 접근 생략 경로</strong>는 정밀 bake/reference/probe용 API다. 아래 표는 최초 검사 이력이다. 후속 <a href="RenderRg5ReferenceMigration20261007.html">reference API 이관</a>에서 세 API의 명시 Read/Write·생산 버전 반환과 D/R 3정책·일반 체인 63 frames·공유 depth 72 frames·GPU validation 0·exit 0 수용을 완료했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>파일·선언</th>
+<th>확인한 잔여</th>
+<th>실제 소비</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp">MaterialGraphIblBake.cpp</a>, IblBakeResult::Declare</td>
+<td>입력/환경 Read 및 출력 UAV Write·Ready Read의 접근 모드 생략, 출력 버전 진전 없음</td>
+<td>material_raster_surface_probe.cpp의 raster→surface→baked graph</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp">MaterialGraphSurfaceBatch.cpp</a>, SurfaceBatch::Declare</td>
+<td>입력·texture Read, 결과 UAV Write·Ready Read 접근 생략</td>
+<td>같은 probe의 SurfaceBatch graph consumer</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp">MaterialGraphRasterSurface.cpp</a>, RasterSurfaceBatch::Declare</td>
+<td>capture/resolve/readiness 접근 생략·버전 배선 잔여</td>
+<td>같은 probe의 capture/resolve graph</td>
+</tr>
+</tbody></table></div>
+<p>최초 검사 당시 이 선언들은 <code>RGPassUsage::access</code>의 기본 <code>LegacyState</code>에 의존했다. 후속 이관에서는 명시 모드의 compiled snapshot에 암묵 접근이 없고 writer v1·version edge가 존재함을 확인했다. DeclarationOrder는 의도한 기준 비교 분기로 유지한다. 이 reference 수용은 live SceneHost 전체 수용과 구분한다.</p>
+<p><code>declaration-inventory-before.json</code>은 파일·행·원문 목록이다. 보조 검색은 <code>.AddPass</code>/<code>-&gt;AddPass</code> 및 Split/Repeated 호출 행 기준 제품 69·fixture 250행을 찾았다. 다중 행 호출·매크로·주석을 완전히 해석한 AST 수가 아니며, 이 숫자를 이관률로 사용하지 않는다. <code>LegacyState</code> 검색의 제품 호환 분기 87행·graph core 6행·fixture 18행도 같은 이유로 미이관 개수가 아니다.</p>
+<h2>종결 전 잔여</h2>
+<ol>
+<li><strong>완료:</strong> 수정한 fixture의 Debug/Release 실행·GPU validation·픽셀/정책 대조 통과(아래 결과).</li>
+<li><strong>완료:</strong> 위 reference API의 명시 Read/Write·생산 버전 반환 및 probe의 versioned preserve/dependency·기존 기준 정책 대조. 단일 결과 생산에는 Write를 사용하며, legacy 비교 분기는 의도한 호환 계약으로 분류한다.</li>
+<li><strong>후속 완료:</strong> 최종 소비자(Fog/PostChain/UI/Editor)와 capture/fixture의 접근·반환 출력·중복 Read/Modify·잘못된 입력 거부를 <a href="RenderRg5FinalAcceptance20261007.html">최종 수용</a>에서 확인했다.</li>
+</ol>
+<p>RG6의 전체 live frame 전환 전후 픽셀·성능 증거는 RG6에 남긴다. RG5의 10인일은 위 완료 조건이 모두 닫힌 최종 수용에서 회수했다.</p>
+<h2>수정 후 실행</h2>
+<p><strong>검사 복구와 후속 reference 이관은 통과, RG5 전체 종결은 보류</strong>다. 최초 <code>closure-result.json</code>은 작성 당시의 reference/최종 소비자 잔여를 보존하며, 현재 남은 완료 조건은 최종 소비자 조합 및 capture/fixture 수용이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>Debug</th>
+<th>Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>dx12.rendergraph</td>
+<td>succeeded</td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td>dx12.decal</td>
+<td>succeeded</td>
+<td>succeeded</td>
+</tr>
+<tr>
+<td>GPU validation / 유실</td>
+<td>0 / 0</td>
+<td>0 / 0</td>
+</tr>
+<tr>
+<td>commandlet 종료</td>
+<td>정상, exit 0</td>
+<td>정상, exit 0</td>
+</tr>
+<tr>
+<td>Sprite 정책별 전체 이미지</td>
+<td>3정책·18프레임·오차 0</td>
+<td>3정책·18프레임·오차 0</td>
+</tr>
+<tr>
+<td>화면 SSS/SSR 정책별 전체 이미지</td>
+<td>3정책·48프레임·오차 0</td>
+<td>3정책·48프레임·오차 0</td>
+</tr>
+<tr>
+<td>재질 Decal 별도 probe</td>
+<td>3정책·342프레임·오차 0·validation 0·exit 0</td>
+<td>3정책·342프레임·오차 0·validation 0·exit 0</td>
+</tr>
+</tbody></table></div>
+<p>RenderGraph 명령은 기존 RG1&#126;RG4 양·음성/정렬 검사와 RG5 producer·consumer·indirect·Forward·Lookup·Special·Surface 검사도 통과했다. 일반 Decal 검사는 변경 픽셀 2,048/기대 2,048, 상자 밖 누출 0·하늘 0 및 색/채널·batch 검사를 통과했다. GPU visibility 후보 준비는 실제 culling 비율이나 전체 제품 성능의 증거로 세지 않는다.</p>
+<p>증거는 <code>Debug-final</code>/<code>Release-final</code>의 <code>results.jsonl</code>, <code>identity.json</code>, <code>process.json</code>, <code>Debug-decal-final</code>/<code>Release-decal-v2</code>의 결과·로그·소스 해시다. 최종 소스 1,705파일의 SHA-256이 검사 뒤에도 동일했다. <code>finalize-results.ps1</code>은 명령 4행의 성공·marker·validation·정상 종료와 두 probe 결과·소스 불변을 재확인했다.</p>
+<p>빌드는 VS18/v145를 사용했다. Debug Editor는 전체 프로젝트 의존성을 빌드한 뒤 마지막 Decal 단정 수정분을 재빌드/링크했다. Release는 기존 의존 라이브러리를 재사용하고 RenderTests·Editor host·probe를 증분 빌드했다. 전체 Release clean rebuild나 Player/Shipping 빌드 통과를 주장하지 않는다. 기존 C4244/C4456/미사용 변수·managed trimming 등 경고와 Release probe의 Utility_Framework PDB LNK4020 경고를 로그에 보존했다.</p>
+<h2>하네스·재현 주의</h2>
+<ul>
+<li><code>Release-after-v1</code>은 과거 RG4 fixture에 GeometryVisibility.slang이 없어 실패했다. 원본 fixture는 보존하고 별도 <code>fixture/Project</code>에 Assets/ProjectSetting을 복사한 뒤 현행 기본 셰이더를 배치했다. <code>fixture-shader-hashes.json</code>에 해시를 기록했다.</li>
+<li><code>Release-after-v2</code>에서 rendergraph는 통과했지만 Decal의 고정 3패스 단정이 실패했다. 실제 픽셀 결과는 이미 맞았으며 GPU reset/cull을 포함한 5패스·후보 1개 단정으로 보완했다. 최종 결과는 <code>*-final</code>만 사용한다.</li>
+<li><code>Release-decal-v1</code>은 실행 DLL 검색 경로가 없어 빈 로그로 하네스가 실패했다. 실제 설치 경로 <code>vcpkg_installed/x64-windows/x64-windows/{bin,debug/bin}</code>을 PATH에 포함해 재실행했다. 전역 환경 설정은 변경하지 않았다.</li>
+<li>기존 <code>verify-rg5-decal.ps1</code>의 결과 필드 <code>productDefault=DeclarationOrder</code>는 과거의 고정 문자열이다. 이 검사는 세 정책을 대조하며, 현재 제품 기본 모드 판정에는 그 필드를 사용하지 않는다. 실제 live 생성자의 ExplicitVersioned/DependencyOrder와 구분한다.</li>
+<li>재현 진입점: 증거 폴더의 <code>run-commandlet.ps1</code>에 구성·새 Tag·<code>-Fixture Build/Verification/RG5Closure20261007/fixture/Project</code>를 지정한다. 재질 검사는 실제 구성별 DLL 경로를 PATH에 추가한 세션에서 <code>Tools/regression/verify-rg5-decal.ps1</code>에 구성과 새 OutputDirectory를 지정한다.</li>
+</ul>
+<p>문서 대시보드 442항목의 전체 파싱/렌더·상태 구조 검사 및 <code>git diff --check</code>를 통과했다. 기존 완료 공수는 늘리지 않았다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-선언-감사"></span><span id="sec-수정-전-재현"></span><span id="sec-수정-후-실행"></span><span id="sec-종결-전-잔여"></span><span id="sec-판정-범위"></span><span id="sec-하네스재현-주의"></span><span id="선언-감사"></span><span id="수정-전-재현"></span><span id="수정-후-실행"></span><span id="종결-전-잔여"></span><span id="판정-범위"></span><span id="하네스재현-주의"></span></details></main></body></html>

@@ -1,5 +1,44 @@
 # CSM correctness and optimization
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/csm_math_probe.cpp:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/csm_math_probe.cpp#L8) — `const auto perspective = math::perspective_fov_lh(1.f, 1.7f, .1f, 1000.f);`
+- [Tools/regression/csm_math_probe.cpp:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/csm_math_probe.cpp#L9) — `const auto ortho = math::orthographic_off_center_lh(-3.f, 7.f, -2.f, 4.f, .1f, 1000.f);`
+- [Tools/regression/csm_math_probe.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/csm_math_probe.cpp#L15) — `const auto p = shadow_math::ViewCorner(math::inverse(projection), x, y, depth);`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/FogScatter.slang:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/FogScatter.slang#L16) — `[[vk::image_format("rgba16f")]]`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/FogScatter.slang:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/FogScatter.slang#L25) — `struct Light`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/FogScatter.slang:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/FogScatter.slang#L77) — `float HenyeyGreensteinPhaseFunction(float3 viewDir, float3 lightDir, float g)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L25) — `class EnhancedShadowPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L58) — `void SetBias(float bias) { m_baseBias = bias * (2.f * kShadowMapSize); }`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:59](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L59) — `void SetBiasTexels(float bias) { m_baseBias = (std::max)(0.f, bias); }`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L8) — `bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L19) — `void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:190](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L190) — `void EnhancedShadowPass::DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Base: `033858a7d22451ff93aa54a3947c6990b59f53a7`.
 
 ## Implemented scope
@@ -81,3 +120,5 @@ Functional GPU readbacks and submission counts do not establish a measured perfo
 DX12 Debug volume (33 frames), refraction (24), subsurface (12) and full raster aggregates completed with exit zero and their pixel assertions intact. The shadow/decal gate had stale raster expectations (56 composition / 12 generation frames): unchanged baseline source intentionally validates generation step 11 without submitting a GPU frame, producing 55 / 11. The gate now expects those exact counts and documents the skipped submission; no pixel assertion was relaxed. Additional Release aggregate results are reported in PR #115 without altering renderer/test inputs. The isolated AddressSanitizer engine compile completed, but the probe link failed with LNK2038 `annotate_optional` (existing ryml/c4core libraries use 0; instrumented MSVC code uses 1). No ASan runtime pass is claimed and existing dependencies were not rebuilt. Malformed layout/palette rejection is covered by the native Scene input regression. Vulkan Debug and Release expanded shadow/decal executions both passed with validation zero and encoder drops zero.
 
 Graph camera visibility is conservative: relevant offscreen graph casters may still incur shared surface preparation. A separate per-pass surface visibility contract can remove that work without losing shadow casters.
+
+</details>

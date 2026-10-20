@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 Blender / native image comparison</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9BlenderImageComparison.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9BlenderImageComparison.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 Blender / native image comparison</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L11">Tools/blender/material_matched_reference.py:11</a> — <code>import struct</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L16">Tools/blender/material_matched_reference.py:16</a> — <code>ROOT = Path(__file__).resolve().parents[2]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L17">Tools/blender/material_matched_reference.py:17</a> — <code>sys.path.insert(0, str(Path(__file__).resolve().parent))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-blender-images.py#L9">Tools/regression/compare-material-blender-images.py:9</a> — <code>import struct</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-blender-images.py#L13">Tools/regression/compare-material-blender-images.py:13</a> — <code>sys.path.insert(0, str(Path(__file__).resolve().parents[1] / &#39;blender&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-blender-images.py#L24">Tools/regression/compare-material-blender-images.py:24</a> — <code>raise ValueError(&#39;Invalid RGBA32F image: &#39; + str(path))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12">Tools/regression/measure-material-blender-images.ps1:12</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15">Tools/regression/measure-material-blender-images.ps1:15</a> — <code>$Reference=[IO.Path]::GetFullPath($Reference)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49">Tools/regression/measure-material-blender-images.ps1:49</a> — <code>if($ReferenceRepeat) { $comparisonArguments+=@(&#39;--reference-repeat&#39;,[IO.Path]::GetFullPath($ReferenceRepeat)) }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-09-30. Matched <strong>Core / Layered constant-input</strong> image measurement, updated
+after the visible-spectrum thin-film implementation.
+MAT-9 remains in progress; these results do not close Special transport, the
+textured area-light/HDRI grid, route parity or performance acceptance.</p>
+<h2>Shared inputs and capture</h2>
+<ul>
+<li>Blender <strong>5.1.1 Cycles</strong> (build <code>b70da489d7f4</code>), 64×64 perspective view, eye (0,0,3), 45° FOV,
+no denoising, exposure zero, Raw view, 1,024 samples.</li>
+<li>One shared imported sphere: Blender exports the exact triangle corner positions,
+normals, active UV tangents and UVs consumed by native raster.</li>
+<li>Twelve cases under a unit-irradiance directional light with no environment, then
+under a unit-radiance white environment with no direct lights: <strong>24 images</strong>.</li>
+<li>Ten MAT-0 Core/Layered authored constant-value cases plus an emission-only control
+and a diffuse white / IOR=1 control. The <code>core_normal</code> case uses the default
+geometry normal here; the MAT-0 normal texture is excluded from this measurement.</li>
+<li>Native DX12 Release uses actual graph generation, complete Scene compilation,
+immutable material instance, geometry sealing, SceneHost GBuffer/lookup/color and
+shared depth. AO is neutral white; shadows, decals and post effects are excluded.</li>
+<li>Native half-float lighting is read back and converted to bottom-up RGBA32F for
+comparison with Blender scene-linear EXR pixels. No display transform is used
+for metrics. The contact sheet applies the same sRGB display transform to both.</li>
+<li>A common emission-control mask is eroded by two pixels. Every material uses this
+same interior mask; highlight pixels are retained. Nonfinite values and changed
+input/reference identities are rejected before error measurement.</li>
+</ul>
+<p>The original <code>material-reference-5.1.1</code> area-light/HDRI fixture is preserved.
+The supplemental frozen reference is <code>Tools/blender/fixtures/material-matched-5.1.1</code>.</p>
+<h2>Comparison setup corrections</h2>
+<p>Two apparent rendering errors came from differing inputs:</p>
+<ol>
+<li>Blender BOX reconstruction ignores its RNA width and always uses a one-pixel
+box. Native raster evaluates pixel centers. A 0.01-width Gaussian reference
+isolates point shading; it does not verify anti-aliasing equivalence.</li>
+<li>Blender&#39;s unconnected anisotropy tangent is not the engine&#39;s imported UV tangent.
+The matched reference explicitly links the active UV tangent. Generated/default
+Blender tangent semantics are outside this particular comparison.</li>
+</ol>
+<p>Source checks used the pinned Blender
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/blender/sync.cpp">film synchronization</a>,
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/scene/shader_nodes.cpp">shader nodes</a>
+and <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/svm/closure.h">closure setup</a>.
+The geometry diagnostic additionally captures normal/view fields from the native
+lookup and emits Blender geometry normal/incoming fields independently.</p>
+<h2>Measured results</h2>
+<p>Relative RMS is <code>sqrt(sum((native-reference)^2) / sum(reference^2))</code> over the common
+interior RGB samples. It is not a frame-rate metric. Final results use
+345 interior pixels per image. Native DX12 <strong>Debug and Release each</strong> completed
+24 captures, 400,495 checks, zero GPU validation messages and normal shutdown.
+All 393,216 RGBA components of the 24 images are byte-identical across configurations.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th align="right">Directional relative RMS</th>
+<th align="right">Furnace relative RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Core base</td>
+<td align="right">0.697%</td>
+<td align="right">0.284%</td>
+</tr>
+<tr>
+<td>Core metal</td>
+<td align="right">0.269%</td>
+<td align="right">0.365%</td>
+</tr>
+<tr>
+<td>Core rough</td>
+<td align="right">1.941%</td>
+<td align="right">0.136%</td>
+</tr>
+<tr>
+<td>Core geometry normal</td>
+<td align="right">0.760%</td>
+<td align="right">0.119%</td>
+</tr>
+<tr>
+<td>Core emission</td>
+<td align="right">0.045%</td>
+<td align="right">0.104%</td>
+</tr>
+<tr>
+<td>Coat</td>
+<td align="right">0.182%</td>
+<td align="right">0.147%</td>
+</tr>
+<tr>
+<td>Sheen</td>
+<td align="right">0.090%</td>
+<td align="right">0.176%</td>
+</tr>
+<tr>
+<td>Anisotropy, explicit UV tangent</td>
+<td align="right">0.937%</td>
+<td align="right">1.019%</td>
+</tr>
+<tr>
+<td>Thin film, current Fourier LUT / F82</td>
+<td align="right"><strong>2.835%</strong></td>
+<td align="right"><strong>1.352%</strong></td>
+</tr>
+<tr>
+<td>Mixed layers</td>
+<td align="right">0.071%</td>
+<td align="right">0.120%</td>
+</tr>
+<tr>
+<td>Emission-only control</td>
+<td align="right"><strong>0.000%</strong></td>
+<td align="right"><strong>0.000%</strong></td>
+</tr>
+<tr>
+<td>Diffuse white control</td>
+<td align="right">0.045%</td>
+<td align="right">0.066%</td>
+</tr>
+</tbody></table></div>
+<p>Small differences include the native BRDF/integration approximations, Monte Carlo
+noise and half-float lighting quantization. They must not all be attributed to one
+of those terms without an additional isolation test.</p>
+<p>The historical RGB 650/550/450nm film baseline was <strong>18.348% / 15.646%</strong>.
+The current LUT, dielectric diffuse weighting and substrate Fss corrections reduce
+that difference to the table above. Non-film cases retain their previous values.
+See <a href="MAT9ThinFilmAndEnvironment.html">thin-film implementation, dense spectral reference and GPU cost</a>
+for the separately measured contributions and approximation limits.</p>
+<h3>Reference noise isolation</h3>
+<p>A second complete Blender render used seed <strong>11</strong> instead of <strong>0</strong>, retaining the
+same mesh, inputs, 1,024 samples and render settings. Over the same comparison mask:</p>
+<ul>
+<li>Directional maximum seed-to-seed relative RMS: <strong>0.05802%</strong> (Core metal).</li>
+<li>Furnace maximum seed-to-seed relative RMS: <strong>0.22359%</strong> (thin film).</li>
+<li>Thin film seed-to-seed: <strong>0.00636%</strong> directional / <strong>0.22359%</strong> furnace, compared
+with current native/reference differences of 2.835% / 1.352% (historically
+18.348% / 15.646% for RGB 3 wavelengths).</li>
+<li>Core rough directional seed-to-seed: <strong>0.00132%</strong>, compared with 1.941% native
+difference. That remaining direct-light difference cannot be explained by the
+measured reference noise alone. Its BRDF/energy approximation needs separate judgment.</li>
+</ul>
+<p>This is one independent seed pair, not a statistical confidence interval or a
+universal convergence bound. It identifies the measured film difference as much
+larger than this reference&#39;s sampling variation.</p>
+<p>The current engine uses visible-spectrum Fourier sensitivity, three Airy orders
+and an F82 model at the film/metal interface. The residual difference remains above
+the measured seed variation. This is <strong>not accepted rendered parity</strong>; spectral
+order truncation, RGB optical reconstruction and the remaining BRDF approximations
+need material-specific acceptance bounds.
+See the pinned <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_util.h">Cycles Fresnel implementation</a>
+and <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_microfacet.h">microfacet Fresnel</a>.</p>
+<h2>Reproduction and evidence</h2>
+<pre><code class="language-powershell">&amp; &#39;C:\Program Files\Blender Foundation\Blender 5.1\blender.exe&#39; --background --factory-startup `
+  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/Mat9NewReference
+&amp; Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label comparison
+# Independent reference noise measurement:
+&amp; &#39;C:\Program Files\Blender Foundation\Blender 5.1\blender.exe&#39; --background --factory-startup `
+  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/Mat9Repeat --seed 11
+&amp; &#39;C:\Python313\python.exe&#39; Tools/regression/compare-material-blender-images.py `
+  Tools/blender/fixtures/material-matched-5.1.1 Build/Obj/Mat9Images-Release-comparison/Native `
+  Build/Obj/Mat9Images-Release-comparison/comparison-with-noise.json --reference-repeat Build/Obj/Mat9Repeat
+</code></pre>
+<p>The script reports <strong>measurement completion</strong>, leaving material acceptance pending.
+It rejects existing output directories, uses the native GPU validation layer,
+restores its environment and never launches or modifies the user&#39;s live Editor.
+Reference and captured native triangle bytes and parsed graph values are checked
+against the manifest before comparison, in addition to the reference image hashes.</p>
+<p>Local evidence:</p>
+<ul>
+<li><code>Tools/blender/fixtures/material-matched-5.1.1</code>: frozen Blender source images and setup.</li>
+<li><code>Build/Obj/Mat9Images-Release-frozen-final</code> and <code>Mat9Images-Debug-frozen-final</code>:
+historical RGB-3 native captures, inputs/geometry, build and validation logs.</li>
+<li><code>Build/Obj/Mat9Images-Release-film-spectral-v4</code> and
+<code>Mat9Images-Debug-film-spectral-final</code>: current LUT captures and regression evidence.</li>
+<li><code>Build/Obj/Mat9MatchedReference-repeat-11</code>: independent seed-11 reference.</li>
+<li><code>Build/Obj/mat9-blender-comparison-frozen-final.json</code> and <code>.png</code>: metrics, reference
+noise measurements and contact sheet.</li>
+<li>Identity rejection checks: modified input value, triangle bytes, reference pixels
+and an added case were all rejected; frozen input files were preserved.</li>
+<li>Dashboard full parse: 435 entries, no malformed rows, all progress values finite.</li>
+</ul>
+<h2>Film sweep follow-up — 2026-10-01</h2>
+<p>The <a href="MAT9ThinFilmAcceptance.html">fixed eight-pair film sweep</a> adds 36 captures and an
+independent seed repeat. Only 4 of 16 film conditions meet the declared image target.
+The subnanometer double blend and 0.1nm cutoff have been corrected; the original
+550nm measurements above are unchanged. Mixed-metal film-off controls also show
+large residuals. Common metal/dielectric attenuation and GGX compensation must be
+resolved before rendered acceptance; increasing a tolerance is not a fix.</p>
+<p>The subsequent <a href="MAT9GgxClosureComparison.html">GGX closure comparison</a> resolves those
+common terms and the Scene Core fallback. The same fixed film/off inputs now pass
+16/16 film and 16/16 off conditions under the unchanged targets. The values above
+remain the earlier measurement, not the current shader result.</p>
+<h2>Next required work</h2>
+<p>The historical <a href="MAT9HdriImageComparison.html">HDRI follow-up</a> did not accept parity.
+The subsequent <a href="MAT9HdriConvergence.html">full HDRI convergence</a> passes the fixed
+forest/autumn constant-material 26 conditions under the unchanged image/noise targets.
+This does not close the original textured grid or the unimplemented area-light consumer.</p>
+<p>The <a href="MAT9SpecialTransportComparison.html">Special follow-up</a> accepts eight fixed
+homogeneous single-scattering Volume conditions after matching the reference transport
+and capturing the final product Volume composite. Transmission/SSS remain unaccepted;
+the initial 24-condition reference is diagnostic, and Scene alpha blending is rejected.</p>
+<p>The subsequent <a href="MAT9SpecialProfileCorrection.html">Special Surface correction</a> fixes
+Scene artist-radius units and grazing-angle residency rejection. Two 131072-sample
+references converge under the existing noise bound; the final product passes only
+7/18 fixed Surface conditions. Directional SSS RMS improves from 6.2598% to 4.1009%,
+while mixed directional SSS slightly worsens and furnace SSS is unchanged. Full-image
+zero-scale/off controls pass after removing the edge error colors. Transmission and
+SSS spatial-response acceptance remain pending.</p>
+<ol>
+<li>Correct transmission boundary and SSS spatial-response differences, converge their
+independent references and recheck the same image/noise targets. Verify a real
+blended-composition path for the existing alpha/transmission criterion.</li>
+<li>Measure texture-only, factor-times-texture and normal-map reference scenes with
+shared supported geometry/background/transport conditions and explicit approximation limits.</li>
+<li>Continue Deferred/Forward parity and moving-camera/tier/cold-warm performance
+acceptance, including the increased environment integration cost on actual models.</li>
+<li>Implement and measure the original area-light ABI/consumer and grid. Fixed constant
+film/off, HDRI and bounded Volume results do not establish parity at every scene/angle.</li>
+</ol>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="comparison-setup-corrections"></span><span id="film-sweep-follow-up--2026-10-01"></span><span id="measured-results"></span><span id="next-required-work"></span><span id="reference-noise-isolation"></span><span id="reproduction-and-evidence"></span><span id="sec-comparison-setup-corrections"></span><span id="sec-film-sweep-follow-up--2026-10-01"></span><span id="sec-measured-results"></span><span id="sec-next-required-work"></span><span id="sec-reproduction-and-evidence"></span><span id="sec-shared-inputs-and-capture"></span><span id="shared-inputs-and-capture"></span></details></main></body></html>

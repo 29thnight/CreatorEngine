@@ -1,5 +1,43 @@
 # Hierarchy S&Box 스타일 적용 및 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EditorWindow/Windows/EditorStandardWindows.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.h#L58) — `struct editor_panel_windows`
+- [Editor/EditorWindow/Windows/EditorStandardWindows.h:116](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.h#L116) — `struct editor_tool_windows`
+- [ScriptCore/Prefab.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10) — `public readonly struct Prefab`
+- [ScriptCore/Prefab.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12) — `private readonly string? _name;`
+- [ScriptCore/Prefab.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14) — `private Prefab(string name) => _name = name;`
+- [Engine/SceneRuntime/Prefab.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L10) — `class [[reflgen::reflect]] Prefab : public Object`
+- [Engine/SceneRuntime/Prefab.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L12) — `friend struct reflgen::access;`
+- [Engine/SceneRuntime/Prefab.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L13) — `public:`
+- [Engine/SceneRuntime/Prefab.cpp:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L97) — `Debug::PrintLog(spdlog::level::warn, "구 Navigation 링크를 프리팹 로컬 경로로 승격하지 못했다: 대상 instanceID "`
+- [Engine/SceneRuntime/Prefab.cpp:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L98) — `+ std::to_string(legacyTarget) + "가 같은 프리팹 트리에 없다");`
+- [Engine/SceneRuntime/Prefab.cpp:144](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L144) — `if (!Entity::IsValidIndex(sourceIndex))`
+- [Editor/EditorWindow/Windows/EditorStandardWindows.cpp:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.cpp#L13) — `EDITOR_DEFINE_WINDOW_ENTRY(light_map,               EditorWindowName::kLightMap)`
+- [Editor/EditorWindow/Windows/EditorStandardWindows.cpp:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.cpp#L14) — `EDITOR_DEFINE_WINDOW_ENTRY(collision_matrix,        EditorWindowName::kCollisionMatrix)`
+- [Editor/EditorWindow/Windows/EditorStandardWindows.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.cpp#L15) — `EDITOR_DEFINE_WINDOW_ENTRY(texture_import_selector, EditorWindowName::kTextureImportSelector)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 날짜: 2026-09-12
 - 범위: PHASE 21 W2의 Hierarchy 시각 스타일 후속 슬라이스
 - 기준: 사용자가 제공한 S&Box Hierarchy 스크린샷
@@ -50,10 +88,12 @@ Material Symbols의 GameObject / Prefab 의미 아이콘과 기존 씬 그룹 �
 샘플 씬의 생성/이동은 저장하지 않았으며 검증용 Editor는 종료했다.
 프로젝트 설정과 imgui.ini는 검증 전 원본과 바이트 단위로 동일하게 복원했다.
 
-화면: [적용 결과](../../Artifacts/phase21-hierarchy-style/hierarchy-applied.png),
-[검색](../../Artifacts/phase21-hierarchy-style/hierarchy-search.png),
-[스크롤](../../Artifacts/phase21-hierarchy-style/hierarchy-scrolled.png).
+화면: 적용 결과 (`../../Artifacts/phase21-hierarchy-style/hierarchy-applied.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+검색 (`../../Artifacts/phase21-hierarchy-style/hierarchy-search.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+스크롤 (`../../Artifacts/phase21-hierarchy-style/hierarchy-scrolled.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 명령 결과 JSON 및 빌드/배율 로그: `Artifacts/phase21-hierarchy-style/`.
 
 W2 전체는 `progress`다. 모든 생성 종류·키보드 탐색·다중 선택·disabled 상태의 전수 조작,
 대규모 계층의 성능 gate, Vulkan은 이번 검증 실적에 포함하지 않는다.
+
+</details>

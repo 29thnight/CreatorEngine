@@ -1,34 +1,52 @@
 # 렌더러 품질 계획 (PHASE 4.75)
 
-**2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
+> 2026-10-20 정리 · master `27de3f5a02aadde7456aab680db3184c36ee735e` · 잔여 구현·수용 계획
 
+판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
 
-**2026-09-23 분리 · 활성 4행 재산정 28일(RND-1~3 18일 + RND-ENV 10일). 기존 RND-1~3 미착수, RND-ENV 배경 토글 슬라이스 진행.** 현재 소유권과 공수 원장은
-[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)다. 이 계획은 재질 자체의 Principled
-의미가 아니라 렌더러의 반사·그림자·표시 결과를 소유한다.
+[전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RendererQualityPlan.md)
 
-| ID | 범위 | 산정 | 선행과 완료 게이트 |
-|---|---|---:|---|
-| `RND-1` | local reflection probe, specular AO | 5일 | `MAT-9` 뒤 probe 자산·캡처·바인딩과 AO의 renderer golden·성능 판정 |
-| `RND-2` | 공용 shadow sampling, point/spot atlas, quality tier | 8일 | cascade/point/spot의 각 품질 단계와 masked·normal-offset·far fade 픽셀/성능 판정 |
-| `RND-3` | display OETF, AgX, auto exposure, bloom | 5일 | pre-tone material golden 뒤 표시 변환·post 순서와 효과별 golden·성능 판정 |
-| `RND-ENV` | Environment 배경과 diffuse/specular IBL의 독립 설정·제품 소비 | 10 | `MAT-7` 기반, W9 resolver·RND-1 probe 우선순위 공유. [ENV-A~E](EnvironmentRenderingPlan.md)의 쿠킹/캐시·전체 route·픽셀/성능 gate |
+## 남은 작업과 완료 판정
 
-기존 세 행의 게이트는 독립적으로 기록한다. `RND-1 → RND-2`는 현재 구현 선행 근거가
-없어 페이즈 전체 의존으로 묶지 않는다. `MAT-9`의 재질 출력, PHASE 4.3의 compiled
-graph, 필요한 시간축 입력은 소비하지만 이 계획에서 각각의 계약을 재정의하지 않는다.
-C# IR로 각 Pass를 선택하는 제품 저작 전환은
-[`CSharpRenderPipelinePlan.md`](CSharpRenderPipelinePlan.md)가 소유한다. native Pass의
-품질 게이트를 C# 전환의 완료로 대신하지 않는다.
+- RND-1: local reflection probe/specular AO의 자산·우선순위·golden/비용을 닫는다.
+- RND-2: 공용 shadow sampling·point/spot atlas·quality tier의 masked/normal offset/far fade 픽셀·비용을 수용한다.
+- RND-3: OETF/AgX·노출·bloom의 pre-tone 기준과 post 순서/효과별 golden을 수용한다. RND-ENV의 잔여는 EnvironmentRenderingPlan을 따른다.
 
-각 행은 동일한 밀봉 입력에서 DX12 effect off/on·지원 범위·픽셀과 GPU
-비용을 기록한다. 현재 28일은 2026-10-01 DX12 범위로 재산정한 계획 추정이고, 문서 분리는 구현 또는
-런타임 검증의 증거가 아니다.
+## 적용할 구조와 경계
 
-## RND-ENV — 배경과 IBL 환경 설정
+`material document → compiled program → sealed scene inputs → material graph stages → RHI submission`
 
-2026-10-01 추가. progress/days:10. 배경 표시·세기·fallback 색과 diffuse/specular IBL의
-독립 enable/intensity, default HDRI/profile 참조, Standard/LX·Deferred/Forward·Editor/Player
-동일 의미와 캐시/쿠킹·픽셀/비용을 [EnvironmentRenderingPlan.md](EnvironmentRenderingPlan.md)의
-ENV-A~E로 완료 판정한다. 현재 중립 회색 fallback·기본 forest의 배경 숨김·명시적 환경 선택 시
-자동 표시와 중립 Grid가 적용됐다. 색 편집/profile resolver·IBL weight 전체 지원은 후속 gate다.
+위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.
+
+## 추적할 잔여 항목
+
+| 추적 ID | 소유 단위 (잔여 작업은 위 목록) | 대시보드 보존 상태 |
+|---|---|---|
+| `RND-1` · PHASE 4.75 | local reflection probe·specular AO | todo |
+| `RND-2` · PHASE 4.75 | shadow module·point/spot atlas·quality tier | todo |
+| `RND-3` · PHASE 4.75 | display OETF·AgX·auto exposure·bloom | todo |
+| `RND-ENV` · PHASE 4.75 | Environment 배경·diffuse/specular IBL 독립 설정 | progress |
+
+대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.
+
+## master 소스 근거
+
+모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.
+
+- [Engine/RenderEngine/Experiment/MaterialResolver.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialResolver.cpp#L23) — `bool NormalizeMaterialKeywordSelections(const Material& material,`
+- [Engine/RenderEngine/LXMaterialPipeline.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/LXMaterialPipeline.h#L18) — `std::string dependencies, sealedProgramIdentity;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L90) — `using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;`
+- [Engine/RenderEngine/RenderScene.h:59](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L59) — `bool BeginProxyFrame(uint64_t sceneEpoch);`
+
+## 검증 경계
+
+이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.
+
+<details><summary>이전 절 링크 호환</summary>
+
+이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.
+
+<span id="rnd-env--배경과-ibl-환경-설정"></span>
+<span id="sec-rnd-env--배경과-ibl-환경-설정"></span>
+
+</details>

@@ -1,5 +1,52 @@
 # PPL 동시성 컨테이너 → STL 교체 분석
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.
+- 과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/DataSystem.h:827](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L827) — `std::vector<own::weak_owner<SceneAssetPreparation>> m_sceneAssetPreparations;`
+- [Engine/RenderEngine/DataSystem.h:935](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L935) — `std::vector<own::weak_owner<SceneAssetPreparation>> scenes;`
+- [Engine/RenderEngine/DataSystem.h:938](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L938) — `std::vector<own::shared_owner<SceneAssetPreparation>> scenePins;`
+- [Engine/RenderEngine/RenderScene.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L11) — `class Scene;`
+- [Engine/RenderEngine/RenderScene.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L18) — `class TerrainComponent;`
+- [Engine/RenderEngine/RenderScene.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24) — `class RenderScene`
+- [Engine/RenderEngine/ProxyCommandQueue.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L43) — `void push_back(ProxyCommand&& command) { m_commands.push_back(std::move(command)); }`
+- [Engine/RenderEngine/ProxyCommandQueue.h:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L84) — `m_extraArenas.push_back({ base, std::move(arena) });`
+- [Engine/RenderEngine/ProxyCommandQueue.h:105](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L105) — `if (m_commands.empty()) { *this = std::move(source); return; }`
+- [Engine/RenderEngine/RHI/DX12/DX12PSOManager.h:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.h#L68) — `bool Initialize(DX12DeviceResources* resources, const std::wstring& cacheFilePath,`
+- [Engine/RenderEngine/RHI/DX12/DX12PSOManager.h:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.h#L130) — `ComPtr<ID3D12PipelineState> CreateOne(const RHIGraphicsPipelineDesc& desc,`
+- [Engine/RenderEngine/RHI/DX12/DX12PSOManager.h:132](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.h#L132) — `ComPtr<ID3D12PipelineState> CreateOneCompute(const RHIComputePipelineDesc& desc,`
+- [Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L63) — `class EnhancedUIPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:99](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L99) — `bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;`
+- [Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L113) — `void SetRects(const std::vector<Rect>* rects,`
+- [Editor/EngineEntry/App.cpp:153](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L153) — `if (!EditorSettingsStore::Get().Initialize()) return false;`
+- [Editor/EngineEntry/App.cpp:259](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L259) — `void Core::App::Initialize(WindowsCoreWindow& coreWindow, CoreWindow& window)`
+- [Editor/EngineEntry/App.cpp:298](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L298) — `void Core::App::Finalize()`
+- [Engine/SceneRuntime/Scene.cpp:359](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L359) — `void Scene::InitializeManaged()`
+- [Engine/SceneRuntime/Scene.cpp:1851](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L1851) — `void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached)`
+- [Engine/SceneRuntime/Scene.cpp:2049](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L2049) — `Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& objects)`
+- [Engine/SceneRuntime/Terrain.cpp:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.cpp#L37) — `void TerrainComponent::Initialize()`
+- [Engine/SceneRuntime/Terrain.cpp:643](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.cpp#L643) — `bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out)`
+- [Engine/SceneRuntime/Terrain.cpp:655](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.cpp#L655) — `bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성: 2026-08-08 · 목적: 외부 라이브러리 최소화 · 근거: 사용처 32건/16파일 전수 조사
 
 ## 요약
@@ -382,3 +429,5 @@ static·skinned·terrain·foliage·decal·sprite 잡이 **동시에 같은 벡�
 - 렌더 큐 판정은 [MultiCameraRenderPlan.md](../plans/archive/MultiCameraRenderPlan.md) / DX12 라이브 파이프라인 작업과 한 몸.
 - `using namespace concurrency;` 헤더 오염은 [Phase5CouplingPlan.md](../plans/archive/Phase5CouplingPlan.md)의 인용 경로 규칙과 같은 결.
 - 종료 크래시 수명 문제는 [Tools/regression/SHUTDOWN-CRASH-NOTES.md](../../Tools/regression/SHUTDOWN-CRASH-NOTES.md) — 컨테이너 교체로 해결되지 않음.
+
+</details>

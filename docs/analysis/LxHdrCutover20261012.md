@@ -1,5 +1,37 @@
 # LX HDR 최초 발행 전환 — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L24) — `class GraphSceneFixture`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L27) — `GraphSceneFixture() = default;`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L28) — `GraphSceneFixture(const GraphSceneFixture&) = delete;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L36) — `bool GraphSceneFixture::Initialize(const EnhancedFrameContext& context, std::string& error, float alpha)`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L101) — `std::uint32_t GraphSceneFixture::AddMesh(const std::vector<Vertex>& vertices,`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:148](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L148) — `void GraphSceneFixture::CookMesh(uint32_t index)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 일반 `Deferred` 조명 패스를 삭제했다. 현재 렌더러는 `LX.Scene.Color` 노드에서 LX 소유 HDR 타깃을 생성·초기화하고 LX 셰이딩을 수행한다. 기존 조명 결과를 받아 보정하는 배선은 없다.
 
 ## 현재 배선
@@ -55,12 +87,14 @@ LitColor 최초 발행"]
 
 ## 증거
 
-- [최종 통합 판정](../../Build/Verification/LxHdrCutover-20261012/final-verdict.json)
-- [현재 소스 계약](../../Build/Verification/LxHdrCutover-20261012/source-audit.json)
-- [변경 파일 SHA](../../Build/Verification/LxHdrCutover-20261012/scope-manifest.json)
-- [Debug 실행](../../Build/Verification/LxHdrCutover-20261012/Debug-Accepted/verdict.json)
-- [Release 실행](../../Build/Verification/LxHdrCutover-20261012/Release-Accepted/verdict.json)
-- [변이 검사](../../Build/Verification/LxHdrCutover-20261012/oracle-mutations.json)
-- [초기 검사 실패 검토](../../Build/Verification/LxHdrCutover-20261012/Release-Initial/review.json)
+- 최종 통합 판정 (`../../Build/Verification/LxHdrCutover-20261012/final-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 현재 소스 계약 (`../../Build/Verification/LxHdrCutover-20261012/source-audit.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 변경 파일 SHA (`../../Build/Verification/LxHdrCutover-20261012/scope-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 실행 (`../../Build/Verification/LxHdrCutover-20261012/Debug-Accepted/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 실행 (`../../Build/Verification/LxHdrCutover-20261012/Release-Accepted/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 변이 검사 (`../../Build/Verification/LxHdrCutover-20261012/oracle-mutations.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 초기 검사 실패 검토 (`../../Build/Verification/LxHdrCutover-20261012/Release-Initial/review.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 최신 성공의 Debug/Release 빈 장면·표면 원본은 보존한다. 이전 실패 원본과 로그도 검토 근거로 보존한다. 이 전환은 메시별 변환 패스 배치화나 GPU culling/LOD 구조를 변경하지 않는다.
+
+</details>

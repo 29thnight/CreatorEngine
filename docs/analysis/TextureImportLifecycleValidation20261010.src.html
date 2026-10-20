@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 12 — Editor 텍스처 임포트 수명 검증</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="TextureImportLifecycleValidation20261010.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/TextureImportLifecycleValidation20261010.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 12 — Editor 텍스처 임포트 수명 검증</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Scene owner</ve-node><ve-node id="n1" at="2 1">GC roots</ve-node><ve-node id="n2" at="3 1" key>Scene</ve-node><ve-node id="n3" at="3 2">Entity</ve-node><ve-node id="n4" at="2 2">Component</ve-node><ve-node id="n5" at="1 2">Collection</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>SceneManager는 GCCE domain과 Scene root를 소유한다. Scene→Entity→Component의 trace 참조와 논리적 제거·핸들 무효화를 분리한다.</li>
+<li>일반 new/unique_ptr 기반 Scene 그래프를 새 이행 목표로 사용하지 않는다. 자산·SDK·GPU 수명은 독립 owner/완료 계약을 따른다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-lifecycle.ps1#L9">Tools/regression/verify-texture-import-lifecycle.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-lifecycle.ps1#L51">Tools/regression/verify-texture-import-lifecycle.ps1:51</a> — <code>$name = if ($layout -eq &#39;short&#39;) { &#39;TI-&#39; + [Guid]::NewGuid().ToString(&#39;N&#39;).Substring(0,8) } else {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-lifecycle.ps1#L71">Tools/regression/verify-texture-import-lifecycle.ps1:71</a> — <code>$recoveryRoot = Join-Path $repo (&#39;Build/TCP-Recovery-&#39; + $config + &#39;-&#39; + [Guid]::NewGuid().ToString(&#39;N&#39;).Substring(0,8))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-editor-source.py#L20">Tools/regression/verify-texture-import-editor-source.py:20</a> — <code>writer = database.split(&quot;void EditorAssetDatabase::WriteTextureImportSettings(&quot;, 1)[1]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-editor-source.py#L62">Tools/regression/verify-texture-import-editor-source.py:62</a> — <code>replacement = runtime.split(&quot;AssetMountId DataSystem::MountAssetSet(&quot;, 1)[1]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-import-editor-source.py#L63">Tools/regression/verify-texture-import-editor-source.py:63</a> — <code>replacement = replacement.split(&quot;bool DataSystem::UnmountAssetSet(&quot;, 1)[0]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L116">Engine/RenderEngine/DataSystem.h:116</a> — <code>class DataSystem : public Singleton&lt;DataSystem&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L137">Engine/RenderEngine/DataSystem.h:137</a> — <code>friend class Singleton&lt;DataSystem&gt;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L944">Engine/RenderEngine/DataSystem.h:944</a> — <code>static auto DataSystems = DataSystem::GetInstance();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/DirectXTex.h#L1">Player/ForbiddenIncludes/DirectXTex.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L23">Editor/EngineEntry/EditorAssetDatabase.h:23</a> — <code>class EditorAssetDatabase final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L37">Editor/EngineEntry/EditorAssetDatabase.h:37</a> — <code>static EditorAssetDatabase&amp; Get() noexcept;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.h#L39">Editor/EngineEntry/EditorAssetDatabase.h:39</a> — <code>&amp;#126;EditorAssetDatabase();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L462">Engine/RenderEngine/DataSystem.cpp:462</a> — <code>AssetBundleLoadResult DataSystem::AssetBundlePreparation::Snapshot() const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L503">Engine/RenderEngine/DataSystem.cpp:503</a> — <code>job_handle DataSystem::AssetBundlePreparation::Completion() const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L509">Engine/RenderEngine/DataSystem.cpp:509</a> — <code>void DataSystem::AssetBundlePreparation::Cancel()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L1003">Editor/EngineEntry/EditorAssetDatabase.cpp:1003</a> — <code>work-&gt;graph = DataSystem::CompileMaterialGraphAuthoring(*source, work-&gt;guid,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L1610">Editor/EngineEntry/EditorAssetDatabase.cpp:1610</a> — <code>|| !EditorAssetDatabase::IsTextureSource(source) || !file::is_regular_file(source, error) || error)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorAssetDatabase.cpp#L1649">Editor/EngineEntry/EditorAssetDatabase.cpp:1649</a> — <code>EditorAssetDatabase::WriteTextureImportSettings(document-&gt;Root(), settings);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>기준일: 2026-10-10 KST. 정본: <a href="../plans/TexturePipelinePlan.html">TexturePipelinePlan</a>.
+앞선 빌드·cook·패키지 결과는 <a href="TexturePipelineValidation20261009.html">기존 검증 기록</a>에 보존한다.</p>
+<h2>실행 경계</h2>
+<p>새 <code>TextureImportLifecycleProbe</code>는 실제 Editor 정적 라이브러리의
+<code>EditorAssetDatabase</code>와 <code>DataSystem</code>을 연결한다. 실제 worker scheduler, 파일 watcher,
+sidecar 저장, DirectXTex producer, immutable artifact, runtime publication과 image cache를
+사용한다. 격리된 프로젝트에서 <code>DrainQueuedAssetChanges()</code>를 호출해 게시 경계를 진행한다.
+ImGui에 진입하면 즉시 실패하는 검사기이며 UI 클릭·실제 렌더 frame·씬 reload는 실행하지 않는다.</p>
+<p>입력은 기존 <code>Tiny4.png</code> 4×4 fixture다. 프로젝트 및 원본/sidecar 변경은 ignored <code>Build</code>의
+새 디렉터리에 한정한다. Debug/Release 각각 짧은 경로와 긴 경로를 검사한다.</p>
+<h2>검사 계약</h2>
+<ul>
+<li>typed 설정 저장 후 GUID, 별도 사용자 필드, 확장자와 sampler wrap 보존</li>
+<li>최대 크기 2 적용 후 새 description/image 게시 및 기존 4×4 참조 보존</li>
+<li>잘못된 compression enum 거부 시 sidecar 바이트와 정상 세대 불변</li>
+<li>손상 PNG cook 실패 시 정상 2×2 description과 image view 치수 보존; 유효한 원본 복구 후 4×4 재게시</li>
+<li>연속 요청에서 후속 recipe 적용; 이전 세대 strong owner 보존</li>
+<li>image cache 예산 0 및 외부 image owner 해제 후 이전 이미지가 실제로 사라졌는지 확인;
+이전 description의 정확한 immutable artifact를 재로딩해 2×2 복원</li>
+<li>cook 요청 직후 이름 변경; source/sidecar 쌍 이동과 GUID 보존, 새 경로의 recipe 게시,
+기존 세대 owner의 image view 치수 보존</li>
+</ul>
+<p>각 실행은 36개 단정을 수행한다. 손상 PNG의 decode 오류는 의도한 음성 검사다.
+watcher가 이동한 이전 경로의 작업을 다시 요청하면 missing source 진단이 발생할 수 있다.
+이를 성공으로 세지 않으며 새 경로의 최종 ready/이미지/GUID를 별도로 단정한다.</p>
+<h2>발견한 문제와 수정</h2>
+<ol>
+<li>긴 프로젝트 경로의 파일 기록 실패: generation 경로에 자산 GUID와 임의 GUID를 두고,
+산출물 경로에도 자산 GUID를 넣어 Windows 경로 제한을 넘었다. generation root의
+중복 자산 GUID 디렉터리를 제거했다. 임의 GUID와 산출물의 자산 GUID는 유지한다.
+기존 세대는 저장된 exact byte source 경로를 계속 사용한다. 일반적인 Windows
+무제한 경로 지원이나 longPathAware 전환을 검증한 것은 아니다.</li>
+<li>Release에서 cook과 rename이 겹칠 때 sidecar 공유 위반을 실제로 재현했다.
+producer의 공통 입력 읽기에 <code>FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE</code>
+핸들을 사용한다. 최초 capture와 cook 뒤 독립적인 디스크 재읽기를 모두 수정했다.
+capture만 수정한 중간 버전은 반복 검사에서 원본 rename 공유 위반으로 실패했다.
+백그라운드 읽기가 Editor의 rename/save를 막지 않으며 파일 핸들을
+RAII로 닫는다. 512 MiB 원본/16 MiB metadata 제한과 읽기 전후 크기 검사를 유지한다. producer의 재읽기 hash와
+publication의 stamp/revision 검사를 유지하므로 변경된 입력이나 stale 결과를 게시하지 않는다.
+cook 전체에 authoring lock을 걸거나 game thread에서 worker를 기다리지 않는다.</li>
+<li>기존 정적 검사에서 앞선 컴파일 수정 전 <code>scene.string()</code> 문자열을 기대하던 항목을
+실제 <code>file::path(scene).string()</code> 호출로 최신화했다. 이는 UI 실행 검증이 아니다.</li>
+</ol>
+<h2>실행 결과와 재현</h2>
+<p>최종 반복 실행 결과는 <code>Build/TextureImportLifecycle/result.json</code>과 구성별 로그에 기록한다.
+이 결과에는 실행 파일 SHA-256, 입력 소스 9개 SHA-256, 실행 경로와 검사 수를 보존한다.
+최종 실행: Debug/Release × short/long × 각각 5회, 총 20회 모두 성공했다.
+각 실행 36개 단정(총 720개), 검증 대상 소스 9개 <code>sourceDrift=0</code>이다.
+RenderEngine/Editor 라이브러리와 실제 CreatorEditor host를 Debug/Release 모두 다시 빌드했다.
+최종 producer를 반영한 실제 Inspector/씬 실행 결과로 확대하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사기</th>
+<th>최종 실행 파일 SHA-256</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td><code>DACF3885AF995360E4B37C0621B8E8A4B197660A52CB3759721D8D7B7833D98A</code></td>
+</tr>
+<tr>
+<td>Release</td>
+<td><code>F51A3F64E592BC626BDC9EC1B7666A1A80BA188BD77CFEA8E412F79238F5C42F</code></td>
+</tr>
+</tbody></table></div>
+<p>texture import 정적 검사는 5/5 통과했다. 변경 파일의 whitespace 검사도 통과했다.
+producer 변경 후 texcook 회귀는 Debug/Release 각각 기존 138/138 및 PHASE 12
+53/53 통과했다. 이 합성 계약 검사 결과를 실제 압축 품질 측정으로 해석하지 않는다.</p>
+<pre><code class="language-powershell">Tools/regression/verify-texture-import-lifecycle.ps1 -Configuration All -Repetitions 5
+python Tools/regression/verify-texture-import-editor-source.py
+</code></pre>
+<p><code>-SkipProjectReferences</code>는 의존 프로젝트를 현재 소스로 별도 빌드한 경우에만 사용한다.
+Editor 라이브러리 및 실제 host의 구성별 빌드 로그는
+<code>Build/phase12-import-editor-{debug,release}-build.log</code>와
+<code>Build/phase12-import-host-{debug,release}-build.log</code>에 보존한다.
+producer 변경을 반영한 RenderEngine 구성별 빌드와 texcook 회귀 로그는
+<code>Build/phase12-import-render-{debug,release}-build.log</code> 및
+<code>Build/phase12-import-texcook.log</code>에 보존한다.</p>
+<p>대시보드 전체 JavaScript 파싱·렌더와 유한 진행률 계산은 통과했다.
+구조 검사기는 이전 기록과 동일하게 PHASE 4.85의 quoted-key RTP 14개에 대해
+문자열 위반 140건/항목 모양 14건을 보고한다. 이번 PHASE 12 변경의 오류로
+표시하거나 전체 구조 검사 통과로 기록하지 않는다.</p>
+<h2>남은 수용 조건</h2>
+<p>Inspector Save and Reimport의 실제 조작과 미저장 씬 확인 UI는 남아 있다.
+후속 실제 Editor 명령 경로의 Reload Saved Scene과 같은 재로드 성공/실패 및
+기존 씬·entity identity 보존은 <a href="TextureSceneReloadValidation20261010.html">씬 재로드 검증 기록</a>에서 구분한다.
+손상 runtime publication의 모든
+실패 주입, 장시간·대규모·외부 프로세스 파일 변경 race도 이번 작은 fixture의 범위 밖이다.
+Shipping GPU 패키지, 새 BC5/BC7 등의 전체 GPU 소비, 모델 전체 sampling과 현재 코퍼스
+품질·시간·메모리 수용은 기존 잔여 조건으로 유지한다.
+이 검사기는 description identity와 image view 치수를 확인하며 최종 화면 픽셀이나
+임포트 전후 모든 texel의 독립 기대값을 대조하지 않는다.</p>
+<p>T0/T1a/T2는 진행 중이며 <code>earnedDays: 0</code>. T1b는 대기, T3는 제품 타깃 부재로 중단한다.
+기존 작업 트리 변경은 보존했고 commit/push는 하지 않았다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검사-계약"></span><span id="sec-남은-수용-조건"></span><span id="sec-발견한-문제와-수정"></span><span id="sec-실행-결과와-재현"></span><span id="sec-실행-경계"></span><span id="검사-계약"></span><span id="남은-수용-조건"></span><span id="발견한-문제와-수정"></span><span id="실행-결과와-재현"></span><span id="실행-경계"></span></details></main></body></html>

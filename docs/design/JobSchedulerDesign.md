@@ -1,5 +1,52 @@
 # 공용 thread_pool · job_scheduler
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.
+- 과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/JobScheduler.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.h#L13) — `class job_handle`
+- [Engine/Utility_Framework/JobScheduler.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.h#L28) — `explicit job_handle(std::shared_ptr<job_detail::completion_state> state) : state_(std::move(state)) {}`
+- [Engine/Utility_Framework/JobScheduler.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.h#L50) — `void on_complete(std::function<void(std::exception_ptr)> observer) { terminal_observer_ = std::move(observer); }`
+- [Engine/Utility_Framework/JobScheduler.cpp:198](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L198) — `throw std::logic_error("pool workers must express dependencies, not block on job_handle::wait");`
+- [Engine/Utility_Framework/JobScheduler.cpp:270](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L270) — `job_handle job_scheduler::submit_after(std::span<const job_handle> dependencies, job_group group)`
+- [Engine/Utility_Framework/JobScheduler.cpp:318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L318) — `job_handle job_scheduler::submit_indexed(std::size_t count, std::function<void(std::size_t)> task)`
+- [Engine/Utility_Framework/ThreadPool.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.h#L5) — `class job_scheduler;`
+- [Engine/Utility_Framework/ThreadPool.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.h#L8) — `class thread_pool`
+- [Engine/Utility_Framework/ThreadPool.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.h#L23) — `struct worker_hooks`
+- [Tools/regression/test-recording-jobs.py:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/test-recording-jobs.py#L63) — `for identity, unit in enumerate(trace["units"]):`
+- [Tools/regression/test-recording-jobs.py:114](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/test-recording-jobs.py#L114) — `class RecordingJobsTests(unittest.TestCase):`
+- [Tools/regression/test-recording-jobs.py:439](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/test-recording-jobs.py#L439) — `class RecordingTopologyTests(unittest.TestCase):`
+- [Tools/regression/analyze-recording-jobs.py:128](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/analyze-recording-jobs.py#L128) — `raise ValueError("schema 2 policy must contain only ownerWaitMode='blocking'")`
+- [Tools/regression/analyze-recording-jobs.py:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/analyze-recording-jobs.py#L130) — `raise ValueError("schema 2 must not contain removed ownerWait/workerSpin sections")`
+- [Tools/regression/analyze-recording-jobs.py:259](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/analyze-recording-jobs.py#L259) — `raise ValueError("available topology must not have truncated nodes, units, or topology")`
+- [Tools/regression/recording_task_graph_probe.cpp:80](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/recording_task_graph_probe.cpp#L80) — `Require(thread_pool::is_worker_thread(), "caller executed recording work");`
+- [Tools/regression/recording_task_graph_probe.cpp:274](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/recording_task_graph_probe.cpp#L274) — `Require(graph.nodes.empty() && topology.unitNodes.empty(), "empty topology retained previous units");`
+- [Tools/regression/recording_task_graph_probe.cpp:479](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/recording_task_graph_probe.cpp#L479) — `Require(std::this_thread::get_id() != submitter && thread_pool::is_worker_thread(),`
+- [Tools/regression/verify-recording-task-graph.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-recording-task-graph.ps1#L4) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-recording-task-graph.ps1:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-recording-task-graph.ps1#L34) — `$stdout = [IO.File]::ReadAllText("$out/$name.out")`
+- [Tools/regression/verify-recording-task-graph.ps1:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-recording-task-graph.ps1#L35) — `$stderr = [IO.File]::ReadAllText("$out/$name.err")`
+- [Engine/RenderEngine/DataSystem.h:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L307) — `own::shared_owner<AssetBundlePreparation> LoadAssetBundleAsync(const AssetBundle& bundle);`
+- [Engine/RenderEngine/DataSystem.h:522](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L522) — `std::string& error, own::shared_owner<const Material>* published = nullptr);`
+- [Engine/RenderEngine/DataSystem.h:809](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L809) — `job_handle SubmitAssetWorkLocked(job_group work,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-20 확정. [코딩 컨벤션](CodingConventions.md)과
 [PHASE 13 계획](../plans/AnimationSchedulerPlan.md)의 공용 실행 기반이다.
 
@@ -313,3 +360,5 @@ Game 및 Record p50/p95/max, 완료 뷰/s, CPU 사용을 비교하고 원인 분
 별도 수집한다. 완료 뷰/s는 Scene+Game 합계이며 실제 표시 FPS가 아니다. Material/Temporal의
 callback 내부 visibility SRV 재사용과 Prepare/Declare 하위 marker는
 [정리 구현 기록](../analysis/LiveRenderWiring20261012.html#performance-recording-cleanup-20261018)을 따른다.
+
+</details>

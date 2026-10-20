@@ -1,5 +1,51 @@
 # LX Scene material packet
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- GPU scene packet과 resident/visibility·REAC 경로는 live graph의 구현 기반이다. 과거 EnhancedSceneRenderer 설치 미완료·단계적 도입 표기는 이전 설계 기록으로만 보존한다.
+- 공유 LX graph 기술과 METEOR material의 scene/view/geometry stage 소비 경계를 따른다. 구현된 설치를 후속 작업으로 중복 계획하지 않으며, 출력·오류·전체 비용 수용은 별도 검증한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/support/MaterialGraphScenePacket.h:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MaterialGraphScenePacket.h#L35) — `bool CreateScenePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& material,`
+- [Tools/regression/support/MaterialGraphScenePacket.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MaterialGraphScenePacket.h#L86) — `bool Prepare(IRenderTextureCache& textures, IRenderPipelineCache& pipelines, RenderBindingCache& bindings,`
+- [Tools/regression/support/MaterialGraphScenePacket.h:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MaterialGraphScenePacket.h#L92) — `bool Bind(RHIEncoder& encoder, const SceneMaterialPacket& packet, std::string& error) const;`
+- [Tools/regression/support/MaterialGraphScenePacket.cpp:76](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MaterialGraphScenePacket.cpp#L76) — `bool CreateScenePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& material,`
+- [Tools/regression/support/MaterialGraphScenePacket.cpp:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MaterialGraphScenePacket.cpp#L130) — `bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCache& pipelines,`
+- [Tools/regression/support/MaterialGraphScenePacket.cpp:274](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MaterialGraphScenePacket.cpp#L274) — `bool SceneMaterialSlot::Bind(RHIEncoder& encoder, const SceneMaterialPacket& packet, std::string& error) const`
+- [Engine/Utility_Framework/TypeTrait.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L41) — `inline constexpr bool is_gc_strong_ref_v<gc::trace_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L43) — `inline constexpr bool is_gc_strong_ref_v<gc::root_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L52) — `constexpr bool is_shared_ptr_v<own::shared_owner<T>> = true;`
+- [Tools/regression/verify-material-scene-packet.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-packet.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-scene-packet.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-packet.ps1#L8) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-scene-packet.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-packet.ps1#L9) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang#L8) — `float ApplyPbrCoverage(float alpha, float cutoff, uint flags, bool frontFace)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang#L18) — `float3 OrientPbrNormal(float3 normal, uint flags, bool frontFace)`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15) — `own::shared_owner<const Instance> instance;`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21) — `static own::shared_owner<const SceneMaterialSource> Capture(const Material& material);`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L22) — `static own::shared_owner<const SceneMaterialSource> Capture(own::shared_owner<const Instance> instance,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:235](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L235) — `bool IsPreparedForGraph() const override;`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:269](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L269) — `static bool PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:271](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L271) — `static bool PrepareDeclarationDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L113) — `own::shared_owner<const RenderBindings> bindings_;`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:149](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L149) — `bool PrepareGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:158](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L158) — `bool PrepareInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 상태: MAT-7의 render owner 경계 구현. `EnhancedSceneRenderer`의 LX pass 설치 완료는 아니다.
 
 ## 1. 함께 소유하는 값
@@ -126,3 +172,5 @@ raw 로그는 `Build/Obj/MaterialProductProbe/scene-packet-{build-,}{Debug,Relea
 이 게이트는 실제 Scene mesh/animation/light pass, texture-varying 공간·시선 lookup,
 환경 MIS/수렴/실시간 예산, 환경 eviction/device recreation, async native submission
 실패 주입, Editor 재개방을 검증하지 않는다. 해당 설치·검증 후에 Scene capability를 켠다.
+
+</details>

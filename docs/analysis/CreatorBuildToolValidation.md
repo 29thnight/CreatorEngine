@@ -1,5 +1,46 @@
 # CreatorBuildTool EXE 전환 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.
+- scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.cpp#L90) — `[[nodiscard]] bool ReadText(const std::filesystem::path& path,`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:796](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.cpp#L796) — `if (!ReadText(request.identityHeaderPath, headerText)`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:797](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.cpp#L797) — `|| !ReadIdentityEpochHeader(headerText, header, headerIssues))`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Decal.slang:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Decal.slang#L10) — `struct DecalInstance`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Decal.slang:73](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Decal.slang#L73) — `struct VSOut`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Decal.slang:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Decal.slang#L79) — `VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L1) — `struct SpriteInstance`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L25) — `struct VSOut`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L33) — `VSOut VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)`
+- [Engine/RenderEngine/Experiment/AssetIdentity.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/AssetIdentity.h#L11) — `[[nodiscard]] inline bool IsAssetIdV4(const AssetId& id) noexcept`
+- [Engine/RenderEngine/Experiment/AssetIdentity.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/AssetIdentity.h#L25) — `if (!Uuid::TryParse(text, parsed)) return false;`
+- [Engine/RenderEngine/Experiment/AssetIdentity.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/AssetIdentity.h#L28) — `if (!IsAssetIdV4(candidate) || Uuid::ToString(parsed) != text)`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L54) — `enum class ModelMeshDomain : std::uint8_t`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L113) — `enum class ModelTextureColorSpace : std::uint8_t`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:173](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L173) — `own::shared_owner<const ModelMeshDescriptor> streamDescriptor{};`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 검증일: 2026-09-13. 작업 공간의 기존 변경을 포함한 개발 빌드이며 공식 릴리스 검증이 아니다.
 
 ## 구현 범위
@@ -101,3 +142,5 @@
 - 모델은 패키지 cook 입력에만 포함된다. 시작 씬은 모델을 그리지 않으므로 모델 렌더링,
   Vulkan/Shipping/clean VM 검증으로 확대하지 않는다. 비동기 씬 전환·종료 검증은
   TaskSchedulerUnificationPlan의 별도 Player gate에 기록한다.
+
+</details>

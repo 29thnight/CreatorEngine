@@ -1,5 +1,52 @@
 # Material Graph 공간·시선 평가 배치
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L52) — `virtual bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const = 0;`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:140](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L140) — `bool Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:144](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L144) — `bool RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L82) — `bool SurfaceBatch::Matches(const Instance& instance, const SurfaceView& view,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L101) — `bool SurfaceBatch::ValidateReadback(std::span<const IblBakePoint> points, std::string& error) const`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:205](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L205) — `bool SurfaceEvaluator::RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,`
+- [Engine/Utility_Framework/TypeTrait.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L41) — `inline constexpr bool is_gc_strong_ref_v<gc::trace_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L43) — `inline constexpr bool is_gc_strong_ref_v<gc::root_ref<T>> = true;`
+- [Engine/Utility_Framework/TypeTrait.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L52) — `constexpr bool is_shared_ptr_v<own::shared_owner<T>> = true;`
+- [Tools/regression/verify-material-surface-batch.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-surface-batch.ps1#L4) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/verify-material-surface-batch.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-surface-batch.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-surface-batch.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-surface-batch.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang#L17) — `LXMaterialContext LXSurfaceContext(LXSurfacePoint point)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang#L28) — `PrincipledIblBakePoint LXPackSurface(MaterialInputs inputs, LXMaterialContext context, float3 view)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang#L60) — `if (!LXValidSurfacePoint(spatial, lx_surfaceEye.xyz))`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L34) — `static bool Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L55) — `const SurfaceView& View() const { return view_; }`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.h:264](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.h#L264) — `bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.h#L28) — `const SurfaceView& View() const override { return meshes_.front()->View(); }`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.h#L29) — `std::uint64_t RecordingId() const override { return recordingId_; }`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.h:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.h#L42) — `bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 MAT-7의 Scene lookup 입력 단계. `MaterialGraphSurfaceBatch`는 실제 엔진 RHI에서
 텍스처와 typed instance를 평가해 `IblBakePoint` GPU buffer를 만든다.
 `IblBaker::RecordGpu`가 그 buffer를 직접 읽어 기존 물리 적분을 기록한다.
@@ -116,3 +163,5 @@ SRGB 입력만 이 별도 기준으로 확인한 뒤 실제 decode 값을 CPU do
 - 환경 MIS/수렴, Special SSS/refraction/Volume 합성과 자동 host/compiler cook closure.
 
 MAT-7 전체와 Editor LX 편집은 아직 완료되지 않았다.
+
+</details>

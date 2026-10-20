@@ -1,5 +1,50 @@
 # 텍스처 CPU 이미지 경계 설계
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 텍스처 cook와 GPU-ready 소비·typed 이미지 owner 경계는 구현돼 있다. 과거 미착수·raw DirectXTex 소유 노출 진단은 현재 상태로 재사용하지 않는다.
+- TextureAssetRuntime의 upload/retention과 BuildTool의 codec·포맷 선택을 분리한다. 지원 포맷과 실패 경로는 현재 선언·검증 도구를 기준으로 확인하고 당시 단일 포맷 실험을 전체 지원 범위로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp:825](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp#L825) — `void DataSystem::SetTextureAssetCacheBudget(std::size_t bytes)`
+- [Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp:1123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp#L1123) — `image = Texture::DecodeOwnedImage(bytes, work->key, failure);`
+- [Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp:1247](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp#L1247) — `void DataSystem::SetTextureImageCacheBudget(std::size_t bytes)`
+- [Engine/RenderEngine/Texture.h:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L75) — `static own::shared_owner<const Texture> LoadFormPath(_In_ const file::path& path, bool isCompress = false);`
+- [Engine/RenderEngine/Texture.h:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L88) — `static own::shared_owner<const Texture> LoadSharedFromPath(`
+- [Engine/RenderEngine/Texture.h:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L95) — `static own::shared_owner<const Texture> LoadSharedFromMemory(`
+- [Engine/SceneRuntime/KeyState.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/KeyState.h#L9) — `enum class InputType`
+- [Engine/SceneRuntime/KeyState.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/KeyState.h#L16) — `enum class KeyState`
+- [Engine/SceneRuntime/KeyState.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/KeyState.h#L40) — `class KeyboardState`
+- [Engine/RenderEngine/SpriteSheet.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/SpriteSheet.h#L63) — `std::advance(it, index);`
+- [Engine/RenderEngine/SpriteSheet.h:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/SpriteSheet.h#L83) — `throw std::runtime_error("SpriteSheet failed to load .txt data");`
+- [Engine/RenderEngine/SpriteSheet.h:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/SpriteSheet.h#L85) — `inFile.imbue(std::locale::classic());`
+- [Engine/SceneRuntime/InputAction.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputAction.h#L8) — `enum class ActionType`
+- [Engine/SceneRuntime/InputAction.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputAction.h#L15) — `enum class InputValueType`
+- [Engine/SceneRuntime/InputAction.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputAction.h#L39) — `class [[reflgen::reflect]] InputAction`
+- [Engine/RenderEngine/RHI/RHIFormat.h:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIFormat.h#L109) — `constexpr uint32_t RHIFormatBytes(RHIFormat format)`
+- [Engine/RenderEngine/RHI/RHIFormat.h:150](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIFormat.h#L150) — `constexpr uint32_t RHIFormatChannels(RHIFormat format)`
+- [Engine/RenderEngine/RHI/RHIFormat.h:185](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIFormat.h#L185) — `constexpr bool RHIFormatIsBlockCompressed(RHIFormat format)`
+- [Player/ForbiddenIncludes/DirectXTex.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/DirectXTex.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/DumpHandler.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/DumpHandler.h#L106) — `std::snprintf(line, sizeof(line), "  #%02d %s  (%s:%lu)\n",`
+- [Engine/Utility_Framework/DumpHandler.h:111](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/DumpHandler.h#L111) — `std::snprintf(line, sizeof(line), "  #%02d %s + 0x%llX\n",`
+- [Engine/Utility_Framework/DumpHandler.h:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/DumpHandler.h#L136) — `std::snprintf(line, sizeof(line), "[크래시] %s (0x%08lX) at 0x%p\n",`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성: 2026-09-04
 
 상태: **설계 — 미착수**
@@ -401,3 +446,5 @@ DirectXTex 는 경계 **위쪽**에만 남는다. 아래쪽에서 DXGI 를 아�
    들어오는 경우(DDS)는 `metadata.mipLevels > 1` 이 될 수 있다. DX12 는 그것을
    처리하고 Vulkan 은 `mipLevels` 를 읽되 크기 계산이 비압축 전제다. B4 에서
    함께 본다.
+
+</details>

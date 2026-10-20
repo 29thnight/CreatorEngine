@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG8 PR167 follow-up: execution evidence and acceptance contracts</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg8Pr167Followup20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg8Pr167Followup20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG8 PR167 follow-up: execution evidence and acceptance contracts</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L25">Tools/regression/audit-rg8-adoption.py:25</a> — <code>raise ValueError(message)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L56">Tools/regression/audit-rg8-adoption.py:56</a> — <code>&quot;skybox&quot;: Path(manifest[&quot;skyBoxPath&quot;]).name}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L121">Tools/regression/audit-rg8-adoption.py:121</a> — <code>assignment = {p: (i, b[&quot;queue&quot;]) for i, b in enumerate(batches) for p in b[&quot;passes&quot;]}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L4">Tools/regression/measure-rg8-adoption.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string]$Configuration=&#39;Release&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L32">Tools/regression/measure-rg8-adoption.ps1:32</a> — <code>$estimatedTelemetryGiB=if($TimingOnly){[math]::Max(1,$NormalCandidates/64.0)}else{1}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L269">Tools/regression/measure-rg8-adoption.ps1:269</a> — <code>function Cmd([string]$name,[string[]]$arguments=@(),[bool]$allowPreparing=$false)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L3">Tools/regression/verify-rg8-live-queues.ps1:3</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string]$Configuration = &#39;Debug&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L13">Tools/regression/verify-rg8-live-queues.ps1:13</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L14">Tools/regression/verify-rg8-live-queues.ps1:14</a> — <code>$out = [IO.Path]::GetFullPath($OutputDirectory)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L12">Tools/regression/compare-material-captures.py:12</a> — <code>parser = argparse.ArgumentParser(description=__doc__)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L23">Tools/regression/compare-material-captures.py:23</a> — <code>raise ValueError(f&quot;Capture inputs differ: {key}&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-captures.py#L25">Tools/regression/compare-material-captures.py:25</a> — <code>raise ValueError(&quot;Requires controlled captures&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L3">Tools/regression/verify-rg8-queue-execution.ps1:3</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string]$Configuration = &#39;Debug&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L17">Tools/regression/verify-rg8-queue-execution.ps1:17</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-queue-execution.ps1#L18">Tools/regression/verify-rg8-queue-execution.ps1:18</a> — <code>$out = [IO.Path]::GetFullPath($OutputDirectory)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L9">BuildTool/Paths.cs:9</a> — <code>internal static class Paths</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L38">BuildTool/Paths.cs:38</a> — <code>public static string Canonical(string path, bool mustExist = false)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L86">BuildTool/Paths.cs:86</a> — <code>public static void Copy(string source, string destination, bool overwrite = false)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28">Engine/Utility_Framework/Sha256.h:28</a> — <code>class Sha256</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30">Engine/Utility_Framework/Sha256.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40">Engine/Utility_Framework/Sha256.h:40</a> — <code>std::memcpy(m_buffer + m_bufferUsed, p, take);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L9">Engine/RenderEngine/Experiment/Model.h:9</a> — <code>class ModelLoader;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L13">Engine/RenderEngine/Experiment/Model.h:13</a> — <code>class Model final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L15">Engine/RenderEngine/Experiment/Model.h:15</a> — <code>public:</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Status: Scheduler CPU reduction and Debug/Release native correctness/workload evidence verified on 2026-10-11; controlled performance and adoption <strong>unvalidated</strong>.
+Async compute remains <strong>default OFF</strong>. RG7 transient aliasing remains explicitly unsupported by the owned queue executor. This document does not close RG8, award earned days, or supersede the historical measurements in <code>RenderRg8Barriers20261009.md</code>.</p>
+<p>The original sections below describe the 2026-10-09 source-only follow-up. Their
+&quot;not run&quot; statements apply to that date. The 2026-10-11 checkpoint appended below
+records actual current-binary execution and the remaining acceptance boundary.</p>
+<h2>Changes</h2>
+<h3>TestShadow performance run after native validation (2026-10-09)</h3>
+<p>Measured the same Release binary from the Windows validation below, with GPU validation OFF and no concurrent build or GPU test. This compares current mode 0 (baseline), 1 (owned graphics executor), and 2 (overlap scheduler), not a rebuilt pre-PR binary. TestShadow at 1496x692 was run in separate processes in forward 0/1/2 and reverse 2/1/0 order, with 32 unique normal submissions per case (192 total). NVIDIA RTX 4070 Ti/595.97 clocks and power were sampled. Clocks were not locked, and this is not a same-process randomized comparison; the numbers below are observations, not a causal speedup percentage.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Order/mode</th>
+<th align="right">GPU span median / p95 ms</th>
+<th align="right">Full record-submit CPU median / p95 ms</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forward 0</td>
+<td align="right">3.0080 / 3.6188</td>
+<td align="right">0.7989 / 1.1046</td>
+</tr>
+<tr>
+<td>Forward 1</td>
+<td align="right">2.9793 / 3.3679</td>
+<td align="right">1.1593 / 1.5392</td>
+</tr>
+<tr>
+<td>Forward 2</td>
+<td align="right">2.7182 / 3.2481</td>
+<td align="right">1.1120 / 1.7007</td>
+</tr>
+<tr>
+<td>Reverse 2</td>
+<td align="right">2.8227 / 3.4509</td>
+<td align="right">1.2185 / 1.6168</td>
+</tr>
+<tr>
+<td>Reverse 1</td>
+<td align="right">3.0761 / 3.2983</td>
+<td align="right">1.0766 / 1.4813</td>
+</tr>
+<tr>
+<td>Reverse 0</td>
+<td align="right">3.1565 / 3.9086</td>
+<td align="right">0.8812 / 1.1532</td>
+</tr>
+</tbody></table></div>
+<p>The mode-2 normal samples had <strong>zero compute submissions and zero measured overlap in all 64 frames</strong>. Only one of those 64 schedules had complete cost prediction input; the remaining 63 fell back with incomplete input. Thus this is not proof that a fully informed scheduler finds TestShadow unprofitable. Across the full two mode-2 logs, two earlier submissions selected compute; both also reported zero measured overlap. No async-compute performance gain was demonstrated. Full CPU median increased by 0.3131/0.3373 ms versus mode 0 in the two orders; this includes opt-in evidence serialization. Mode-2 scheduling median was 0.0081/0.00835 ms, recording 0.5615/0.5825 ms, and submission 0.2333/0.24425 ms.</p>
+<p>Separate controlled captures (4 per case, 24 total) matched graph inputs and all 7 float attachments exactly: <strong>168 comparisons, maxAbs=0, no nonfinite output</strong>. These diagnostic captures are excluded from the normal timing distributions. All six timing and six capture processes exited zero.</p>
+<p>The strict per-run adoption audit failed for owned modes with <code>Timing has no matching actual schedule</code>. There were 1-2 unmatched early timing records per run, around backend-generation changes. Selected normal samples had matching execution/timing/CPU identities; they were summarized separately without calling the strict audit a pass. The generation mismatch cause and missing normal cost inputs require follow-up. A raw timing difference with no compute work must not be presented as RG8 overlap benefit.</p>
+<p>Evidence: <code>Build/Verification/Phase43/RG8Pr167Perf20261009/</code> contains normal/capture runs, exact binary identities, <code>performance-summary.json</code>, <code>pixel-summary.json</code>, GPU state samples, and the retained summarization scripts. The results do not close RG8 or establish product adoption. Existing process-separated tooling cannot satisfy the requested controlled same-process performance gate.</p>
+<h3>Windows validation after synchronization (2026-10-09)</h3>
+<ul>
+<li>Fast-forwarded master from <code>2965dc48</code> to <code>4bb4978897e2c99ae7f64233d3e691b0a113ad9b</code> (PR #167). Existing local GCCE/command test edits were preserved and included in the build; this is not a clean-checkout-only result.</li>
+<li>VS 2026 v18 MSBuild built <code>Editor/CreatorEditor.vcxproj</code>, x64 Debug and Release. Release reported LNK4020 warnings for existing <code>Utility_Framework.pdb</code> type records; build exit code was zero. ScriptCore trimming warnings were also retained in the logs.</li>
+<li>The first Debug native run failed the zero-validation-message gate: all seven new overlap cases cleared the final render target to <code>(0.25, 0.5, 0.75, 1)</code> while its optimized creation clear value remained zero. Set the fixture&#39;s creation clear value to the actual clear value. No warning filters, payload expectations, or acceptance thresholds were relaxed.</li>
+<li>After correction, both configurations passed <code>verify-rg8-queue-execution.ps1 -FullRegression</code>: native 361 checks, queue-plan 82 checks, full RenderGraph regression, payload error zero, validation problems zero, process exit zero.</li>
+<li>Evidence root: <code>Build/Verification/Phase43/RG8Pr167Sync20261009/</code>. The initial failed run remains in <code>native-debug</code>; successful runs are <code>native-debug-fixed</code> and <code>native-release</code>, each with raw command results, logs and binary/source hashes in <code>execution-result.json</code>. Build logs and the pre-test local diff are retained beside them.</li>
+<li>This run did not measure product-scene overlap or GPU speedup. Both receipts retain <code>measuredOverlapEstablished=false</code>, <code>liveSceneQueueCutover=false</code>, and <code>phaseComplete=false</code>. RG8 remains incomplete/default OFF.</li>
+</ul>
+<h3>Stable measurement identity</h3>
+<p>GPU profiler display aggregation remains unchanged. Scheduler costs use the raw slices&#39; graph-declaration signature and authored pass slot instead. Two passes with the same display name retain different identities; split pieces of one pass contribute to that one slot. Literal names such as <code>name(x2)</code> are not parsed or rewritten.</p>
+<p>The signature is a length-delimited exact serialization of graph declarations, not a hash or a pointer to a graph. It excludes frame epochs and native handle values. Delayed profiler collection retains only an immutable signature, never the graph&#39;s resources. The live cache stores complete snapshots for bounded exact-signature variants per view, rejects incompatible signatures and partial/invalid timing collections, bounds retained views, and expires old source-frame measurements. A successful resize invalidates measurements because imported native dimensions are not part of the declaration signature.</p>
+<p>Opaque callback inputs and dynamic GPU contention are still outside this identity. A stable declaration does not establish a stable workload or a performance win.</p>
+<h3>Model boundaries</h3>
+<p>Overlap placement requires a valid timing sample for every executed pass. A measured zero-length empty scope remains distinct from an unavailable sample; no artificial positive cost is invented. Missing timings and saturated arithmetic keep the original graphics order. Time additions saturate rather than wrap. The initial compute wait on the graphics prologue is included as a lower bound. Disabled compute and incomplete timing use a linear serial-cost sum and avoid the trial ready-list scheduler entirely.</p>
+<p>The 20 microsecond handoff and 50 microsecond minimum-gain defaults are <strong>uncalibrated analytical assumptions</strong>. <code>predictionCalibrated</code> stays false. Neither a positive predicted gain nor a compute submission is an observed overlap or speedup. Candidate placement remains a heuristic with repeated ready-list scans; it does not optimize all assignments and does not model detailed GPU contention, all boundary transitions, or every extra submission cost. Scheduling CPU time is now visible rather than hidden inside an unmeasured gap.</p>
+<h3>Actual submitted plan</h3>
+<p>The graph retains a value-only diagnostic report of its specialized schedule, recorded batches, per-batch barriers, reduced queue waits, and which submissions/waits were accepted. The same precomputed batch/wait list drives native execution and evidence publication. Prefix and final-join waits are explicit. No diagnostic batch or timeline retains graph/resource/fence ownership.</p>
+<p>Counts come from the actual batch list. They are not derived from mode, a fixed number of compute passes, or <code>3 * graphs + 2 * computeBatches</code>. Barriers include the actual graph boundary plans and repeated phases. Empty prologue/epilogue command lists are still present in the current executor and remain visible in the counts.</p>
+<p><code>completed</code> means all graph batches were accepted. It is not GPU completion proof. Submission rejection keeps partial accepted counters and <code>recoveryRequired</code>; existing quarantine and no-retry behavior remains. Final resource-state writeback occurs only after all submissions are accepted.</p>
+<p>The live Inspector copies the graph after <code>SubmitOwnedGraph</code> specializes its order, lifetime positions and barriers. A failed frame still follows the existing failure/cleared-publication path. PBR capture and the Inspector therefore refer to the same specialized graph on success.</p>
+<h3>Honest CPU and GPU timing</h3>
+<p>Queue execution reports separate scheduling, recording, submission, and total CPU durations, including rejected attempts. Submission time includes owned queue operations&#39; CPU submission-thread ticket waits. Those are <strong>not CPU waits for GPU completion</strong>, and they are not GPU queue-wait durations.</p>
+<p>Live record-plus-submit timing covers both the original mode-0 path and the owned path through <code>EndFrame</code>. This is separate from narrow native recording time and compile time. Optional per-frame evidence is gated by <code>CREATOR_RG8_EVIDENCE=1</code>; ordinary rendering does not emit these diagnostic log records. Diagnostic capture/readback overhead must be excluded from normal-frame performance acceptance.</p>
+<p>A frame with compute submissions is reported as compute-submitted. Real overlap requires nonzero intersection of actual graphics and compute pass intervals on a validated common CPU-clock axis. Different queues&#39; raw GPU ticks must never be subtracted from each other.</p>
+<h2>Authored acceptance coverage</h2>
+<p>The queue-plan and native wrappers pin versioned success identities, exact deterministic check counts, ordered command results, and binary/source metadata. A loose success substring or arbitrary check count is insufficient.</p>
+<p>The native fixture selects Overlap explicitly. Its positive case records independent graphics work before compute-chain consumers in the new order, dispatches real GPU payload work, reads back both chains, and validates imported final states, batch/wait accounting and retention. Negative cases cover no-benefit graphics fallback and preserved declaration order. Fault cases exercise recording rejection and partially accepted queue work with quarantine/retirement safety. These are <strong>authored tests</strong>, not results from this change.</p>
+<p>Live/adoption tooling consumes actual per-frame plans and calibrated timing evidence. Product-scene mode 2 may legitimately fall back. Adoption still requires both a known positive overlap workload and a known negative fallback workload; an implementation that always falls back must fail. Strict image comparison, validation messages, queue retirement, pool accounting and barrier accounting remain mandatory.</p>
+<h2>Required future validation</h2>
+<p>No builds, compilers, linkers, shader compilation, test execution, executable probes, native GPU runs, or benchmarks were performed for this follow-up. Static review cannot establish compilation or GPU correctness.</p>
+<p>Before native/performance acceptance:</p>
+<ol>
+<li>Build the exact appended head on Windows in Debug and Release after authorization. Preserve commit, executable, runtime, shader and source identities.</li>
+<li>Run the versioned queue planning and native execution wrappers, full render-graph regression, and D3D12 GPU validation. Retain raw results rather than only summary text.</li>
+<li>Collect actual-schedule and common-clock interval evidence for an overlap-capable workload and a serial/fallback workload. Neither analytical test costs nor <code>computeBatches &gt; 0</code> satisfy the positive overlap gate.</li>
+<li>Calibrate overhead assumptions, control/report GPU clock and power conditions, and collect normal-frame p50/p95 for GPU end-to-end span and CPU compile/schedule/record/submit cost.</li>
+<li>Evaluate <strong>mode 0 versus mode 1</strong> as executor/parallel-recording overhead separately from <strong>mode 1 versus mode 2</strong> as queue-placement benefit. Graphics fallback in mode 2 still uses the owned executor; it is not mode-0 performance parity.</li>
+<li>Keep RG7 guards until queue-aware resource lifetimes and aliasing savings have their own validation. Do not remove a safety guard to obtain a passing combined run.</li>
+</ol>
+<p>Known structural work remains: mode-0 parallel recording is not integrated into owned execution, cross-queue physical resource uses (including read/read) remain conservatively serialized, and model calibration has not been established. These limits are separate from the implementation fixes above.</p>
+<h2>Evidence collection contract (authored, not run)</h2>
+<p>The updated harnesses remain unvalidated source changes. No command below was
+executed for this follow-up. Existing historical results are not schema-2 evidence.
+Queue execution remains opt-in/default OFF.</p>
+<p><code>measure-rg8-adoption.ps1</code> now sets <code>CREATOR_RG8_EVIDENCE=1</code>, records complete
+per-submission <code>[rg8.execution]</code>, <code>[rg8.timing]</code>, and <code>[rg8.cpu]</code> JSON, and preserves
+these records in each run&#39;s <code>queue-evidence.json</code>. <code>-ScenePath</code> selects an explicit
+real workload scene; omitting it retains TestShadow. Selecting a scene does not
+prove that it can overlap. A workload that always falls back cannot satisfy the
+positive gate.</p>
+<p>A future authorized Windows collection uses separate fresh output directories:</p>
+<pre><code class="language-powershell">./Tools/regression/measure-rg8-adoption.ps1 -OutputDirectory &lt;captures&gt;
+./Tools/regression/measure-rg8-adoption.ps1 -OutputDirectory &lt;normal&gt; -TimingOnly
+./Tools/regression/measure-rg8-adoption.ps1 -OutputDirectory &lt;validation&gt; -ValidateGpu
+# Repeat the collection with -ScenePath &lt;positive-scene&gt; and &lt;negative-scene&gt;
+# for explicitly prepared overlap-capable and known non-overlappable workloads.
+python Tools/regression/audit-rg8-adoption.py &lt;captures&gt; &lt;normal&gt; `
+  --native-evidence &lt;same-binary-native-full-regression&gt; `
+  --validation-evidence &lt;validation&gt; --workload-evidence &lt;workload-evidence.json&gt;
+</code></pre>
+<p>The supplied workload manifest is a required evidence index, not a test result or
+an automatically generated success declaration. Its exact schema is:</p>
+<pre><code class="language-json">{
+  &quot;schemaVersion&quot;: 2,
+  &quot;binary&quot;: { &quot;head&quot;: &quot;&lt;exact source SHA&gt;&quot;, &quot;exe&quot;: &quot;&lt;SHA256&gt;&quot;, &quot;runtime&quot;: &quot;&lt;SHA256&gt;&quot; },
+  &quot;workloads&quot;: [
+    {
+      &quot;kind&quot;: &quot;positive-overlap&quot;,
+      &quot;stdout&quot;: &quot;&lt;positive normal mode-2 run&gt;/stdout.log&quot;,
+      &quot;runBinary&quot;: &quot;&lt;positive normal collection&gt;/binary.json&quot;,
+      &quot;validationBinary&quot;: &quot;&lt;positive validation collection&gt;/binary.json&quot;,
+      &quot;captureBinary&quot;: &quot;&lt;positive capture collection&gt;/binary.json&quot;,
+      &quot;nativeEvidence&quot;: &quot;&lt;same-binary native run&gt;/execution-result.json&quot;,
+      &quot;validationEvidence&quot;: &quot;&lt;positive validation mode-2 run&gt;/validation.json&quot;,
+      &quot;pixelComparison&quot;: &quot;&lt;exact mode-0 versus mode-2 comparison&gt;/comparison.json&quot;,
+      &quot;frames&quot;: [
+        { &quot;backendGeneration&quot;: 1, &quot;frameId&quot;: 100, &quot;viewId&quot;: 1,
+          &quot;submissionId&quot;: 100, &quot;captureGeneration&quot;: 0 }
+      ]
+    },
+    {
+      &quot;kind&quot;: &quot;negative-fallback&quot;,
+      &quot;stdout&quot;: &quot;&lt;negative normal mode-2 run&gt;/stdout.log&quot;,
+      &quot;runBinary&quot;: &quot;&lt;negative normal collection&gt;/binary.json&quot;,
+      &quot;validationBinary&quot;: &quot;&lt;negative validation collection&gt;/binary.json&quot;,
+      &quot;captureBinary&quot;: &quot;&lt;negative capture collection&gt;/binary.json&quot;,
+      &quot;nativeEvidence&quot;: &quot;&lt;same-binary native run&gt;/execution-result.json&quot;,
+      &quot;validationEvidence&quot;: &quot;&lt;negative validation mode-2 run&gt;/validation.json&quot;,
+      &quot;pixelComparison&quot;: &quot;&lt;exact mode-0 versus mode-2 comparison&gt;/comparison.json&quot;,
+      &quot;frames&quot;: [
+        { &quot;backendGeneration&quot;: 1, &quot;frameId&quot;: 100, &quot;viewId&quot;: 1,
+          &quot;submissionId&quot;: 100, &quot;captureGeneration&quot;: 0 }
+      ]
+    }
+  ]
+}
+</code></pre>
+<p>All placeholder values and frame identities must be replaced with actual retained
+records. Paths are relative to the manifest. The comparison report is produced by
+<code>compare-material-captures.py</code>; the new gates require every attachment&#39;s <code>maxAbs</code>
+and <code>nonfinite</code> to be zero even if that script&#39;s older tolerance gate passes.
+Native evidence must be current schema 2 and include full regression, reordered
+execution/failure, declaration-order, shared-read ownership, and retirement
+coverage. It does not itself claim calibrated overlap.</p>
+<p>The positive workload needs actual compute batches, complete measured pass costs,
+and positive intersection of the two queues&#39; unioned raw pass intervals in the
+calibrated QPC domain, larger than reported calibration drift. The negative
+workload must have complete measured costs and select no compute; a cold start
+with missing cost history cannot satisfy it. Timing/queue identities, all batch
+and wait counts, barriers, and recording-pool leases are reconciled with the
+executed plan. Diagnostic capture submissions cannot masquerade as normal frames.</p>
+<p><code>verify-rg8-live-queues.ps1 -AsyncCompute</code> also requires <code>-WorkloadEvidence</code> with
+this manifest. It may accept a particular TestShadow frame falling back only when
+the separate positive and negative workload gates are both satisfied. Until those
+real artifacts exist, this strict gate is intentionally blocked rather than
+claiming an unmeasured GPU overlap result.</p>
+<p>The report distinguishes 0→1 owned-executor overhead from 1→2 compute-placement
+delta, with ordinary full record/schedule/submit CPU and graph scheduling CPU.
+Full CPU timing includes opt-in adapter evidence serialization; graph executor
+phase timings exclude that serialization. Process-separated forward/reverse
+measurements, drift indicators, and the uncalibrated cost model do not establish
+speedup. Even valid evidence reports <code>evidenceValid=true</code>,
+<code>performanceValidated=false</code>, <code>adoptionEstablished=false</code>, and
+<code>phaseComplete=false</code>; controlled performance/calibration acceptance remains open.</p>
+<h2>2026-10-11 executed workload checkpoint</h2>
+<p>Release/DX12 offscreen verification passed on the current PR169 working-tree
+binary. Debug was not rebuilt or accepted by this checkpoint. The reused private
+<code>Mat9Robot.creator</code> scene contains three Aria geometry batches; the private
+<code>RG8Empty.creator</code> provides the actual warm negative workload. Native AA was used,
+with frame generation, spatial scaling and DVC disabled. This is not an SDK matrix
+or a master-build performance comparison.</p>
+<ul>
+<li>Native queue execution: <strong>428 checks</strong>, queue scheduling: <strong>117 checks</strong>, full
+render-graph regression, normal exit and D3D12 GPU validation passed.</li>
+<li>Actual viewports: <strong>332×152</strong> and <strong>1108×512</strong>, with <strong>192 ordinary frames per
+viewport</strong>. Each same-process order, 0→1→2 and 2→1→0, uses the first 32 eligible
+chronological observations per mode after ordinary warmup; capture submissions
+do not supply the normal performance population.</li>
+<li>Four captures per mode/order passed strict attachment and diagnostic-stage
+equality, finite values and exact submitted-plan/timing identity. Instrumented
+validation captures also match the uninstrumented mode-0 reference. Main-scene
+geometry recording has three batches; the larger view has 2,500 foreground depth
+pixels. The negative scene has zero draws and cleared depth.</li>
+<li>The canonical workload gate passed both actual normal-frame positive overlap
+and complete-cost negative <code>insufficient-gain</code> fallback. Each proof retains four
+actual qualifying submissions from its ordinary warm observation window. These
+are existence proofs, separate from the 32-frame performance population. GPU
+validation reported zero problems and zero dropped messages. Native timing
+admission accepted 384 retained observations and rejected 52 damaged inputs.</li>
+</ul>
+<p>This run repaired three source defects: alternating SSGI history-buffer roles
+invalidated a single-signature cost cache; delayed GPU timing used a mutable
+backend generation instead of its submitted generation; capture JSON serialized
+<code>normalFrameComparable</code> as numeric zero. Exact signatures now have a bounded
+four-variant per-view history, without mixing pass costs or weakening age/domain
+guards. Six new history contract checks are included in the 117 scheduling checks.
+Submission generation is frozen, and the manifest contains a typed <code>false</code>.</p>
+<p>Two harness failures were reviewed before retry: instrumented shader preparation
+took about 79 seconds and exceeded the capture&#39;s 60-second Pending deadline, and
+an endpoint replacement raced its initial file read. Ordinary valid-frame readiness
+now precedes readback, and endpoint I/O retries within the existing startup bound.
+The capture deadline remains enforced. Failed logs and actual retry paths are
+retained; failed runs were not relabeled as successful executions.</p>
+<p>Evidence: <code>Artifacts/PR169/rg8-workload-20261011/rg8-workload-checkpoint-20261011.json</code>,
+both <code>verified</code> and <code>full-viewport</code> strict audit reports, native full-regression
+results, workload manifests and retention ledgers. Final cleanup recovered
+<strong>3.42 GiB</strong> by actual drive free-space change and left <strong>111.54 GiB</strong> free.
+The task directory has about <strong>2.30 GiB of unique file lengths</strong>, including about
+<strong>0.47 GiB</strong> of representative raw pixels; hardlinked logs are counted once.
+Historical verdicts/logs/hashes remain, but removed samples cannot be pixel-replayed.</p>
+<p>Both canonical reports retain <code>evidenceValid=true</code>, <code>performanceValidated=false</code>,
+<code>adoptionEstablished=false</code> and <code>phaseComplete=false</code>. Actual overlap is established;
+net speedup is not. Full CPU measurements include opt-in evidence serialization.
+Debug acceptance, cost-model calibration, controlled net-performance comparison
+and RG7 combined lifetime/aliasing acceptance remain open. Default OFF and RG8
+progress/zero earned days are unchanged.</p>
+<h2>2026-10-11 Debug workload checkpoint</h2>
+<p>The subsequent current-source Debug build and complete DX12 workload matrix
+passed. The collector now accepts <code>-Configuration Debug|Release</code> (default Release),
+records that configuration, and hashes the runtime DLL alongside the selected
+executable both before and after collection. Previously both executable selection
+and the final runtime immutability guard were fixed to Release paths.</p>
+<p>The existing <code>Bin/x64-Debug</code> and build intermediates were reused. The private Aria
+and empty scenes were also reused, with actual viewports 1108×512 and 332×152
+respectively. SDK composition is outside this native-AA/FG-off checkpoint.</p>
+<ul>
+<li>Debug native execution <strong>428 checks</strong>, scheduling <strong>117 checks</strong>, full render
+graph regression and normal exit passed.</li>
+<li>The main scene supplied <strong>192 ordinary frames</strong> across same-process forward
+and reverse mode orders. The empty negative scene supplied <strong>32 ordinary
+observations</strong>. All 224 passed native measurement admission; <strong>52 mutations</strong>
+were rejected without changing the source observations.</li>
+<li>Four captures per required mode/order passed exact attachment/stage equality
+and submitted-plan/timing joins. GPU-validation captures also match their
+uninstrumented mode-0 references. Model recording has three meshlet batches
+and 2,500 foreground pixels; the negative scene has zero draws/foreground.</li>
+<li>Both actual workload gates passed: 28 qualifying positive-overlap submissions
+and 651 complete-cost negative fallback submissions occurred in the ordinary
+observation windows. Each workload manifest uses four qualifying submissions
+as existence proof, not as the normal-frame performance population.</li>
+<li>GPU validation reported zero problems and zero dropped messages. All six
+collection families completed without a retry in this Debug run.</li>
+</ul>
+<p>Debug mode-2 scheduling CPU medians are <strong>78.556 ms forward / 77.819 ms reverse</strong>;
+mode-1 scheduling medians are <strong>0.199 / 0.189 ms</strong>. These are executor scheduling
+timers, separate from opt-in adapter log serialization. Full graph CPU medians
+are 94.409/93.474 ms in mode 2 and 12.864/12.520 ms in mode 1; those full-scope
+numbers include evidence serialization. The active placement heuristic is the
+next measured CPU bottleneck to address. Actual overlap does not establish net
+speedup, and this checkpoint does not accept default async-compute adoption.</p>
+<p>After both strict audits passed, redundant pixels were pruned while retaining
+eight representatives, all metadata/logs and normal-frame evidence. Actual drive
+free-space change recovered <strong>3.12 GiB</strong>, leaving <strong>105.79 GiB</strong> free. Unique file
+lengths total about <strong>0.69 GiB</strong>, including about <strong>0.45 GiB</strong> of raw pixels; this
+is not an allocated-space or recovery estimate. The retained representatives were
+read back and checked for correct payload sizes and finite values after pruning.</p>
+<p>Evidence: <code>Artifacts/PR169/rg8-debug-workload-20261011/rg8-debug-workload-checkpoint-20261011.json</code>,
+<code>matrix-audit.json</code>, <code>normal-final/adoption-measurements.json</code> and <code>final-retention.json</code>.
+Debug correctness/workload acceptance is now closed. Cost-model calibration,
+scheduler CPU reduction, controlled net-performance acceptance and RG7 combined
+lifetime/aliasing acceptance remain open. Default OFF, progress and zero earned
+days remain unchanged.</p>
+<h2>Scheduler CPU follow-up — 2026-10-11</h2>
+<p>This supersedes the preceding scheduler CPU backlog. The default stays OFF;
+controlled net-performance adoption and RG7 combined acceptance remain open.</p>
+<p>The placement heuristic still trials the same candidate components and individual
+toggles, using current complete measurements and the same minimum-gain guard.
+Planning scratch is local to one invocation and resets every dependency epoch,
+queue clock and trial state. Adjacency lists, epoch frontiers and simulation arrays
+reuse storage between trials. The two-queue ready/future heaps preserve earliest
+start, compute-ancestor priority and compiled-position ties, including the change
+to tie ordering when the queue clock clamps multiple readiness times. Simulation
+now uses O(P log P + E) selection rather than repeated whole-frontier scans.
+Byte flags, fixed span traversal and stable pointer ranges for sorting/heaps reduce
+MSVC Debug iterator bookkeeping without changing build-wide iterator settings.
+No plan or measurement is reused across frames by this scratch object.</p>
+<p>Actual planning dependency/simulation CPU subtotals and placement-trial counts
+are logged separately from GPU estimates. The strict auditor requires finite,
+nonnegative subtotals bounded by the enclosing scheduling duration. A hand-derived
+67-pass wide-frontier fixture checks ancestor hoisting, declaration ties, analytic
+span and restoration after a measurement-triggered serial fallback. Scheduling
+coverage is now 121 checks. The standalone plan wrapper also reports the correct
+121 checks (its old numeric metadata still said 111).</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th align="right">Earlier schedule p50, forward/reverse</th>
+<th align="right">Current schedule p50, forward/reverse</th>
+<th align="right">Reduction</th>
+<th align="right">Earlier/current full CPU p50, forward/reverse</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td align="right">78.556/77.819 ms</td>
+<td align="right">16.082/16.140 ms</td>
+<td align="right">79.5%/79.3%</td>
+<td align="right">94.409/93.474 / 31.282/31.512 ms</td>
+</tr>
+<tr>
+<td>Release</td>
+<td align="right">3.319/3.198 ms</td>
+<td align="right">0.783/0.726 ms</td>
+<td align="right">76.4%/77.3%</td>
+<td align="right">6.316/6.096 / 3.623/3.829 ms</td>
+</tr>
+</tbody></table></div>
+<p>Each order/mode uses the first 32 eligible chronological ordinary observations
+from 64 candidates after 16 ordinary warm observations. Both final configurations
+passed 428 native execution checks, 121 scheduling checks, the full render-graph
+regression, 192 model observations and 32 empty-scene observations. Strict pixel,
+stage, queue/common-clock, real positive-overlap and negative-fallback oracles and
+GPU validation passed; output max absolute error is zero. Per configuration,
+224 unchanged actual snapshots passed admission and 52 damaged variants were
+rejected. The corrected standalone Debug plan wrapper also passed.</p>
+<p>These are historical before/after CPU measurements on the same private scene and
+viewport, not controlled old/new-binary ABBA or master-build performance evidence.
+Full CPU scopes include opt-in evidence serialization; executor scheduling timers
+exclude adapter log serialization. CPU reduction is verified, while overall net
+speedup and adoption remain unvalidated. The remaining Debug dependency-planning
+cost and placement-search budget, handoff/batch/contention cost-model calibration,
+conservative boundary transitions and RG7 composition are still open. RG8 remains
+progress with zero earned days.</p>
+<p>Evidence: <code>Artifacts/PR169/rg8-scheduler-cpu-20261011/rg8-scheduler-cpu-checkpoint-20261011.json</code>,
+final <code>Debug-optimized</code> and <code>Release</code> matrix audits, normal adoption-measurements,
+native/mutation results and retention ledgers. Intermediate <code>Debug</code>/<code>Debug-final</code>
+verdicts are preserved but their superseded raw pixels are no longer replayable.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="2026-10-11-debug-workload-checkpoint"></span><span id="2026-10-11-executed-workload-checkpoint"></span><span id="actual-submitted-plan"></span><span id="authored-acceptance-coverage"></span><span id="changes"></span><span id="evidence-collection-contract-authored-not-run"></span><span id="honest-cpu-and-gpu-timing"></span><span id="model-boundaries"></span><span id="required-future-validation"></span><span id="scheduler-cpu-follow-up--2026-10-11"></span><span id="sec-2026-10-11-debug-workload-checkpoint"></span><span id="sec-2026-10-11-executed-workload-checkpoint"></span><span id="sec-authored-acceptance-coverage"></span><span id="sec-changes"></span><span id="sec-evidence-collection-contract-authored-not-run"></span><span id="sec-required-future-validation"></span><span id="sec-scheduler-cpu-follow-up--2026-10-11"></span><span id="stable-measurement-identity"></span><span id="testshadow-performance-run-after-native-validation-2026-10-09"></span><span id="windows-validation-after-synchronization-2026-10-09"></span></details></main></body></html>

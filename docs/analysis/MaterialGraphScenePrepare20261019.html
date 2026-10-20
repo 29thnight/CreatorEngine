@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MaterialGraphScenePrepare: 가시성 작업의 시작 시점과 반복 CPU 비용</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
+
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
+
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
+
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
+
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
+
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
+
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
+
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
+
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
+
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphScenePrepare20261019.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MaterialGraphScenePrepare20261019.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MaterialGraphScenePrepare: 가시성 작업의 시작 시점과 반복 CPU 비용</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Document</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Program</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Frame input</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Scene stages</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">GPU packets</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">RHI submit</text></g></svg></div><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L84">Engine/RenderEngine/MaterialGraphSceneGpuData.h:84</a> — <code>bool AssignGeometry(uint32_t record, const std::shared_ptr&lt;const MeshSurfaceBatch&gt;&amp; current,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L170">Engine/RenderEngine/MaterialGraphSceneGpuData.h:170</a> — <code>bool PrepareBindings(IRenderDeviceServices&amp; device, std::string&amp; error)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L200">Engine/RenderEngine/MaterialGraphSceneGpuData.h:200</a> — <code>cache.Prepare({sceneEpoch, viewId, 2}, materialBytes, 16, &quot;METEOR.Scene.Materials&quot;, materialBuffer, error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h#L52">Engine/RenderEngine/MaterialGraphPreparationTasks.h:52</a> — <code>throw std::runtime_error(failure.empty() ? &quot;Scene preparation task failed.&quot; : failure);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h#L63">Engine/RenderEngine/MaterialGraphPreparationTasks.h:63</a> — <code>throw std::runtime_error(&quot;Scene preparation task admission limit exceeded.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h#L69">Engine/RenderEngine/MaterialGraphPreparationTasks.h:69</a> — <code>slot = scheduler_.submit_indexed(1, [execute = std::move(execute)](std::size_t) mutable</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L37">Engine/Utility_Framework/ThreadPool.cpp:37</a> — <code>std::swprintf(name, std::size(name), L&quot;Creator.JobWorker.%u&quot;, threadnum - kExternalThreads);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L76">Engine/Utility_Framework/ThreadPool.cpp:76</a> — <code>const bool previous = std::exchange(executing_pool_work, true);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L77">Engine/Utility_Framework/ThreadPool.cpp:77</a> — <code>enki::ICompletable::OnDependenciesComplete(scheduler, thread);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L19">Engine/Utility_Framework/JobScheduler.cpp:19</a> — <code>notifications.push_back({std::move(callback), error});</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L28">Engine/Utility_Framework/JobScheduler.cpp:28</a> — <code>auto next = std::move(notifications.back());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L39">Engine/Utility_Framework/JobScheduler.cpp:39</a> — <code>std::chrono::duration_cast&lt;std::chrono::nanoseconds&gt;(std::chrono::steady_clock::now().time_since_epoch())</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L603">Engine/RenderEngine/GpuGeometryVisibility.cpp:603</a> — <code>bool GpuGeometryVisibility::PrepareMeshlets(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L719">Engine/RenderEngine/GpuGeometryVisibility.cpp:719</a> — <code>if (!PrepareInternal(context, projection, candidates, bins, result, error,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L915">Engine/RenderEngine/GpuGeometryVisibility.cpp:915</a> — <code>bool GpuGeometryVisibility::PrepareInternal(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1614">Engine/RenderEngine/MaterialGraphSceneHost.cpp:1614</a> — <code>bool SceneHost::PrepareProgram(const EnhancedFrameContext&amp;, const Instance&amp; instance,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1782">Engine/RenderEngine/MaterialGraphSceneHost.cpp:1782</a> — <code>bool SceneHost::PrepareResidency(const EnhancedFrameContext&amp; context,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1813">Engine/RenderEngine/MaterialGraphSceneHost.cpp:1813</a> — <code>bool SceneHost::Prepare(const EnhancedFrameContext&amp; context, own::shared_owner&lt;const SceneViewInput&gt; input,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-geometry-pages.py#L13">Tools/regression/verify-scene-geometry-pages.py:13</a> — <code>SOURCE = Path(&#39;Engine/RenderEngine/MaterialGraphSceneGpuData.h&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-geometry-pages.py#L49">Tools/regression/verify-scene-geometry-pages.py:49</a> — <code>method, line = block(source, &#39;bool AssignGeometry(&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-geometry-pages.py#L50">Tools/regression/verify-scene-geometry-pages.py:50</a> — <code>bindings, binding_line = block(source, &#39;bool PrepareBindings(&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-cpu-preparation.py#L100">Tools/regression/verify-scene-cpu-preparation.py:100</a> — <code>definitions += emit(baseline, baseline_path, &#39;struct SceneCpuPreparation final&#39;, True) + &#39;}\n&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-cpu-preparation.py#L102">Tools/regression/verify-scene-cpu-preparation.py:102</a> — <code>&#39;struct PreparationScratch; };\n&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-cpu-preparation.py#L103">Tools/regression/verify-scene-cpu-preparation.py:103</a> — <code>definitions += emit(source, root / HOST, &#39;struct SceneCpuPreparation final&#39;, True)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>기준 커밋: <code>001ff417b7745401622f4f9ab8e8b9b15fb9ab4d</code> (<code>master</code>, 2026-10-19).
+앞선 RenderGraphDeclare PR #184가 병합된 이후의 최신 코드에서 시작했다.</p>
+<h2>범위와 결론</h2>
+<p>이번 변경은 <code>SceneHost::Prepare</code>의 <strong>MaterialGraphScenePrepare 내부</strong>를 대상으로 한다.
+카메라 메시렛 가시성 입력이 확정되는 시점에 작업을 시작하고, Draw 레코드 조립과
+기하 테이블 게시를 그 작업과 겹친다. 카메라 목록과 기하 테이블을 모두 필요로 하는
+표면 준비는 두 결과가 완성된 직후 실행하며 그림자 준비의 완료를 먼저 요구하지 않는다.</p>
+<p>같은 범위에서 반복되던 메시렛 임시 컨테이너·검증 정렬·복사,
+청크 CPU 메타데이터 저장소의 재할당, Draw별 4,800-byte 상수 초기 복사,
+기하 페이지의 중복 검색과 작업 callback의 중복 type-erasure를 줄였다.
+공용 JobScheduler/ThreadPool, RenderGraphDeclare, 그래프 Compile, 명령 기록과 셰이더는 변경하지 않는다.</p>
+<p>CPU 함수 비교에서 확인한 개선을 전체 ScenePrepare 또는 Game 프레임의 개선율로 옮기지 않는다.
+현재 실행 환경은 Linux이며 Windows/MSVC/DX12 실제 장면의 전후 측정은 별도 수용 항목이다.</p>
+<p>호출 경계는 <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp">SceneHost</a>와
+<a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">EnhancedSceneRenderer</a>에 있다.
+<code>PrepareSceneRecording</code>의 residency, graph 준비, animation palette, decal/sprite 준비는
+<code>SceneHost::Prepare</code> 이전 작업이므로 이번 개선의 대상에 포함하지 않는다.</p>
+<h2>저장된 계측이 말하는 것</h2>
+<p>출처는 기준 커밋의 <a href="LiveRenderWiring20261012.html">렌더링 배선 보고서</a>다.
+파일 이름은 10월 12일이지만 10월 19일 결과까지 누적되어 있다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>기록</th>
+<th>저장된 결과</th>
+<th>설계에 반영한 점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>최신 Draw 바인딩/메시 병렬 준비</td>
+<td>동시 Running 교집합 <strong>0.291 ms/준비</strong>, Game CPU p50 <strong>12.759 → 12.041 / 11.974 ms</strong></td>
+<td>기존 병렬 생산자를 유지하고 그 이후의 의존성과 반복 CPU 작업을 조사한다.</td>
+</tr>
+<tr>
+<td>직전 메시/바인딩 비용 개선</td>
+<td>ScenePrepare 평균 <strong>3.003&#126;3.102 → 2.548 / 2.555 ms</strong></td>
+<td>최신 master의 절대 기준 시간으로 사용하지 않는다. 서로 다른 변경 단계의 측정이다.</td>
+</tr>
+<tr>
+<td>합류 지원 개선</td>
+<td>Waiting <strong>0.915 → 0.308 ms</strong>, wall <strong>4.413 → 4.303 ms</strong>; owner가 305회 중 269회 지원 실행</td>
+<td>합류 방식뿐 아니라 실제 작업 총량과 작업이 준비되는 시점을 함께 줄인다.</td>
+</tr>
+<tr>
+<td>앞선 묶음 병렬화</td>
+<td>평균 <strong>4.302 → 3.930 / 3.954 ms</strong></td>
+<td>작은 작업을 무조건 추가하지 않고 기존 실행 묶음을 활용한다.</td>
+</tr>
+</tbody></table></div>
+<p>최신 기록에는 최신 master의 ScenePrepare 절대 평균이 없다.
+10월 18일의 Draw 계측 1.985 ms는 현재 <code>MaterialSceneDrawsPrepare</code>보다 넓은 과거 구간이므로
+이를 이번 상수 복사/페이지 배치의 시간으로 귀속하지 않는다.
+보고서가 연결한 <code>Artifacts/...</code> 원본 capture는 Git 트리에 없으므로 요약 수치를 확인했으며
+ETW 원본에서 새로운 통계를 산출한 것은 아니다. CreatorRobot의 62 entities도 62 Draw나 62 bin으로 해석하지 않는다.</p>
+<h2>CPU 성능 MCP와 적용 원칙</h2>
+<p><a href="https://github.com/usamahz/cpu-performance-engineering">cpu-performance-engineering</a>의
+공식 <code>cpu-perf==0.1.1</code> MCP를 사용했다. 장면 준비의 준비된 작업 시작 시점, allocator 경합,
+임시 컨테이너 복사와 critical path에 관한 <code>ask(..., section=9)</code>를 조회했다.
+앞선 선언 최적화에서 조회한 <code>get_benchmark(slug=&quot;9&quot;, parts=[&quot;method&quot;, &quot;reproduce&quot;])</code>의
+warm-up, 반복 표본, 검증 가능한 checksum과 계측 범위 구분도 유지한다.</p>
+<p>MCP는 이 환경에서 저장소 지식만 제공하며 원문 source library는 비활성화되어 있다.
+MCP가 읽지 않은 논문에 결과를 귀속하지 않는다.
+<a href="https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/Controlling_Chunking_os.html">oneTBB의 chunking 설명</a>과
+<a href="https://publications.csail.mit.edu/lcs/pubs/pdf/MIT-LCS-TM-548.pdf">Cilk 분석 원문</a>을 별도로 확인했다.
+전체 작업량과 가장 긴 의존 경로를 함께 줄이고, 작은 항목마다 task를 추가하지 않는 설계에 참고했다.
+이론적 work-stealing 경계나 외부 CPU의 배속은 CreatorEngine의 성능 보장이 아니다.</p>
+<h2>구현과 소유권</h2>
+<h3>카메라 작업을 Draw 조립보다 먼저 시작한다</h3>
+<p>기존에는 메시 소유자가 준비되어도 Draw 상수/레코드 생성과 기하 테이블 게시가 끝난 다음
+카메라 first/recovery 및 blended 가시성 작업을 제출했다.
+새 코드는 메시 준비와 가시성 pipeline preflight 뒤 카메라 입력 목록을 봉인하고 제출한다.
+worker는 이 불변 목록과 frame의 개별 가시성 출력만 사용한다.
+owner는 머티리얼 생산자와 합류한 다음 Draw 레코드와 기하 테이블을 완성한다.</p>
+<pre><code class="language-mermaid">flowchart TD
+    A[&quot;메시 소유자·pipeline 준비&quot;] --&gt; B[&quot;카메라 first/recovery·blended&quot;]
+    A --&gt; C[&quot;Draw 바인딩 합류·레코드·기하 게시&quot;]
+    A --&gt; D[&quot;그림자 setup&quot;]
+    B --&gt; E[&quot;카메라 합류·표면 준비&quot;]
+    C --&gt; E
+    E --&gt; F[&quot;그림자 setup 합류·패킷 준비&quot;]
+    D --&gt; F
+</code></pre>
+<p>이는 CPU 의존성을 설명하는 그림이다. GPU pass 실행 순서를 변경하는 그림이 아니다.
+Occlusion builder의 history/current pyramid 설정은 기존 소유 스레드에서 수행한다.
+가시성 first 결과를 recovery가 사용하는 순서와 blended 원본 순서는 유지한다.
+최종 Draw를 덮어쓸 때 먼저 계산한 <code>cameraMeshletBin</code>을 명시적으로 보존한다.
+기하 페이지, 머티리얼 offset, primitive address 예약은 기존 순서대로 단일 생산자가 결정한다.</p>
+<p><code>SurfaceStagesPrepare</code>는 완성된 Draw/기하 테이블과 카메라 first/recovery 결과를 읽는다.
+그림자 snapshot을 읽지 않으므로 별도의 그림자 setup 합류 전에 실행한다.
+그림자 snapshot에 머티리얼 Draw를 연결하는 작업은 여전히 setup 합류 이후다.</p>
+<h3>SceneHost가 임시 용량을 보유하고 Frame은 결과를 소유한다</h3>
+<p><code>PreparationScratch</code>는 CPU 청크 메타데이터와 카메라/blended 입력 목록의 용량을 보유한다.
+<code>inputRanges</code>와 <code>blendedOrder</code>는 새 Frame의 최종 저장소에 직접 작성한다.
+이전 Frame의 컨테이너를 빌리거나 아직 GPU가 사용하는 Frame의 용량을 가져오지 않는다.</p>
+<p><code>Prepare</code> 진입의 <code>atomic_flag</code> guard는 같은 host의 재귀/동시 준비를 거부한다.
+guard는 모든 작업 소유자보다 먼저 생성하므로 조기 return과 예외에서도
+수락한 작업이 먼저 완료된 다음 scratch를 다시 사용할 수 있게 된다.
+카메라 입력 목록의 shared_ptr는 이 시점에 clear하며 vector 용량만 유지한다.
+TLS group lookup도 geometry/frame/residency의 소유자를 저장하지 않는다.</p>
+<p>CPU 메타데이터의 job handle은 호출 스코프의 RAII 객체가 소유한다.
+worker가 빌리는 입력과 결과는 그 객체보다 먼저 생성된다.
+blended 입력이 없는 뷰에서는 정렬 결과 vector를 미리 reserve하지 않는다.
+blended 정렬은 마지막 비교 키가 유일한 입력 index이므로 <code>std::sort</code>로도
+기존 <code>stable_sort</code>와 같은 전체 순서를 얻으며 임시 정렬 버퍼가 필요하지 않다.</p>
+<h3>메시렛 준비에서 최종 입력을 한 번만 만든다</h3>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp">GpuGeometryVisibility</a>의
+<code>PrepareMeshlets</code>는 Frame이 유지할 <code>MeshletInputs</code>를 만들고 그 candidate/bin 배열을 직접 채운다.
+<code>PrepareInternal</code>은 같은 객체의 소유권을 결과 Frame으로 넘긴다.
+호출자는 history/first-stage/feedback 검사가 끝날 때까지 별도의 shared_ptr를 유지한다.
+따라서 임시 candidate/bin 배열을 만든 뒤 최종 배열로 복사하는 단계가 없다.</p>
+<p>이 경로는 bin당 candidate가 정확히 하나이고 output range가 정렬·정렬단위 조건을 만족한다.
+<code>PrepareInternal</code>은 실제 배열 주소와 크기를 확인한 뒤 스칼라 순회로
+bin 대응, 정렬단위, overlap, 32-bit 주소 상한을 검증한다.
+메시렛에 사용되지 않던 <code>vector&lt;vector&lt;uint8_t&gt;&gt; preservedSources</code>와
+<code>OutputRange</code> 배열·sort를 거치지 않는다. 일반 instance visibility의 검증 경로는 유지한다.
+Frame이 최종 소유하는 meshlet offset 배열도 한 번 reserve하여 중간 확장을 줄인다.</p>
+<p>기존의 bin별 <code>std::map&lt;GroupKey, uint32_t&gt;</code>는 thread-local 고정 lookup으로 대체한다.
+최대 4,096 bin에 8,192 slot을 사용하며 slot 저장소는 <strong>96 KiB</strong>다.
+측정 ABI에서 control/padding을 포함한 고정 공간은 스레드당 <strong>98,312 byte</strong>다.
+세대 번호로 이전 호출의 슬롯을 구분하여 매 호출마다 전체 배열을 초기화하지 않는다.
+hash가 같아도 stream 주소, residency 주소와 world 행렬 16개 float의 비트를 모두 비교한다.
+최초 bin이 그룹 소유자가 되는 규칙과 hierarchy domain 검사는 유지한다.
+같은 스레드에서 중첩 호출되면 현재 호출의 입력을 선형 검색하여 활성 TLS 저장소를 건드리지 않는다.
+다른 worker를 직렬화하는 전역 mutex는 추가하지 않는다.</p>
+<h3>기하 페이지 검색과 callback 생성 비용을 줄인다</h3>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h">SceneGpuData::AssignGeometry</a>는
+페이지 여유 검사 중 찾은 현재/이전 정점 슬롯과 topology 슬롯을 삽입에 재사용한다.
+현재/이전 stream이 같으면 같은 슬롯을 쓰며, 새 페이지가 생길 때만 검색 결과를 무효화한다.
+동일 handle이라도 정점 수가 다르거나 topology offset/size가 다르면 별개의 슬롯으로 유지한다.
+페이지 크기 64, 레코드/페이지 순서, descriptor 순서와 shared_ptr 소유권은 유지한다.</p>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h">ScenePreparationTasks</a>의 <code>Add</code>는
+callable을 template 인자로 받아 scheduler에 넘길 때 한 번만 type-erasure한다.
+중간 <code>std::function&lt;bool(string&amp;)&gt;</code>의 별도 할당과 간접 호출을 제거한다.
+callable은 계속 값으로 소유하며 기존의 즉시 제출, bounded handle 배열, inline 실행,
+합류 지원과 실패 시 수락한 작업 회수는 유지한다.
+새 항목별 job을 추가하거나 측정 없이 병렬 진입 임계치를 변경하지 않는다.</p>
+<h3>지역 동적 컨테이너에 대한 조건</h3>
+<p>변경한 hot path에 매 호출마다 확장되는 지역 소유 동적 컨테이너를 추가하지 않았다.
+재사용할 작업 공간은 SceneHost/TLS에 있고, Frame 수명 동안 필요한 결과 배열은 Frame이 소유한다.
+지역에서는 참조·span·스칼라·고정 크기 값과 RAII 소유자를 사용한다.
+최초 scratch 생성/용량 증가와 각 Frame의 최종 결과 할당까지 0이라고 주장하지 않는다.</p>
+<h2>CPU 검증과 측정</h2>
+<p>측정 환경은 AMD EPYC 9V74, Linux 6.18.55, glibc 2.39, GCC 13.3.0의 C++23 <code>-O2</code>다.
+프로세스 affinity는 CPU 0&#126;8, cgroup CPU quota는 <code>800000 100000</code>(8 CPU 상당)이다.
+단독 측정 구간은 이 작업의 다른 컴파일·벤치마크를 중지했다는 의미이며,
+공유 호스트의 외부 부하까지 통제했다는 의미는 아니다.
+모든 수치와 소스 hash는 <a href="MaterialGraphScenePrepareCpu20261019.json">동반 CPU 계측 JSON</a>에 기록한다.</p>
+<p>측정 기준은 위 기준 커밋의 실제 함수 본문이다. 기하 페이지 검사는
+<code>AssignGeometry</code>와 <code>PrepareBindings</code>, RHI 값 타입과 record/page 선언을 사용한다.
+mesh/device 경계는 CPU 모형이다. 연산 횟수를 세기 위해 명시적으로 instrument한 복사본과
+정확성/시간 측정용 수정하지 않은 본문은 구분한다.</p>
+<p>기하 페이지 측정은 조건마다 32회 warm-up과 129개 표본을 사용하며
+동일 process에서 기준/변경 실행 순서를 교대로 바꾼다.
+입력 구성은 측정 밖이며 페이지 생성과 배치는 측정 안이다.
+다른 에이전트의 컴파일·벤치마크를 중지한 구간에서 측정했다.</p>
+<h3>기하 페이지 배치 결과</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>4,096 레코드 입력</th>
+<th align="right">기준 p50</th>
+<th align="right">변경 p50</th>
+<th align="right">감소</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>같은 기하 반복</td>
+<td align="right">66.089 µs</td>
+<td align="right">41.672 µs</td>
+<td align="right">36.95%</td>
+</tr>
+<tr>
+<td>서로 다른 기하</td>
+<td align="right">449.909 µs</td>
+<td align="right">230.618 µs</td>
+<td align="right">48.74%</td>
+</tr>
+<tr>
+<td>현재/이전 stream이 다름</td>
+<td align="right">476.690 µs</td>
+<td align="right">306.082 µs</td>
+<td align="right">35.79%</td>
+</tr>
+<tr>
+<td>같은 정점, 다른 topology</td>
+<td align="right">248.154 µs</td>
+<td align="right">152.961 µs</td>
+<td align="right">38.36%</td>
+</tr>
+<tr>
+<td>혼합 입력</td>
+<td align="right">550.460 µs</td>
+<td align="right">300.283 µs</td>
+<td align="right">45.45%</td>
+</tr>
+</tbody></table></div>
+<p>단일 레코드의 대부분 조건은 p50이 같았다. 작은 입력에서 같은 비율의 개선을 주장하지 않는다.
+모든 조건의 최종 페이지 저장소 할당 수는 기준과 동일하다.
+기존 페이지의 슬롯을 반복 재사용한 4,096건 × 8회에서는 추가 할당이 0회다.
+같은 기하 4,096건에서 정점 검색은 <strong>12,288 → 4,096회</strong>, topology 검색은 <strong>8,192 → 4,096회</strong>였다.</p>
+<p>정확성 검사는 정상 빌드 및 ASan+UBSan에서 각각 <strong>3,750,080 checks</strong>를 통과했다.
+0&#126;64 슬롯 경계, rollover, 동일/서로 다른 이전 stream, handle은 같고 count는 다른 경우,
+topology alias/offset/size, 4,096 및 4,129 혼합 레코드, 잘못된 입력과 주소 범위를 비교했다.
+레코드 224 byte, page/owner/descriptor와 오류 결과를 대조했다.</p>
+<h3>메시렛 준비 결과</h3>
+<p>조건마다 12 cohort를 warm-up하고 96개 표본에서 기준/변경 순서를 교대했다.
+한 표본은 카메라와 그림자 3개 view에 각각 first/recovery를 실행하는 <strong>8회 PrepareMeshlets</strong>다.
+제품의 실제 준비 함수, Frame, BufferPool과 RHI 값 타입을 사용하지만,
+shader/pipeline 생성과 mesh/device 및 buffer/readback은 CPU용 서비스 경계로 대체했다.
+입력 생성, 결과 비교와 Frame/recording 정리는 측정 밖이며 TLS와 pipeline은 warm 상태다.
+두 버전 모두 같은 allocation counter를 사용하므로 그 비용은 시간에 포함된다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>view당 bin 수 / 입력</th>
+<th align="right">기준 p50</th>
+<th align="right">변경 p50</th>
+<th align="right">기준 → 변경 p95</th>
+<th align="right">표본당 CPU 할당</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4 / 변환된 기하</td>
+<td align="right">3.876 µs</td>
+<td align="right">3.135 µs</td>
+<td align="right">4.107 → 3.305 µs</td>
+<td align="right">108 → 60</td>
+</tr>
+<tr>
+<td>4 / direct unique</td>
+<td align="right">5.999 µs</td>
+<td align="right">4.147 µs</td>
+<td align="right">6.220 → 4.587 µs</td>
+<td align="right">140 → 60</td>
+</tr>
+<tr>
+<td>128 / direct unique</td>
+<td align="right">202.476 µs</td>
+<td align="right">61.052 µs</td>
+<td align="right">236.116 → 73.912 µs</td>
+<td align="right">1,172 → 60</td>
+</tr>
+<tr>
+<td>4,096 / 변환된 기하</td>
+<td align="right">1,407.944 µs</td>
+<td align="right">892.807 µs</td>
+<td align="right">1,683.219 → 1,097.927 µs</td>
+<td align="right">188 → 60</td>
+</tr>
+<tr>
+<td>4,096 / direct 11개 key 공유</td>
+<td align="right">3,738.580 µs</td>
+<td align="right">2,697.800 µs</td>
+<td align="right">4,907.634 → 3,397.957 µs</td>
+<td align="right">276 → 60</td>
+</tr>
+<tr>
+<td>4,096 / direct unique</td>
+<td align="right">10,474.253 µs</td>
+<td align="right">2,595.646 µs</td>
+<td align="right">16,161.854 → 3,201.170 µs</td>
+<td align="right">32,956 → 60</td>
+</tr>
+</tbody></table></div>
+<p>4,096-bin 조건의 p50 감소는 각각 **36.59%, 27.84%, 75.22%**다.
+전체 18개 조건은 4/32/128/512/2,048/4,096 bin과 3가지 기하 형태를 조합했다.
+기하당 meshlet 수는 1&#126;7을 순환하고 hierarchy group 수는 17이다.
+<code>direct-shared11</code>의 실제 key 수는 <code>min(bin 수, 11)</code>이므로 4-bin 조건에는 공유가 없다.
+이는 합성 CPU 입력이며 저장된 장면 capture의 실제 bin 분포를 재현했다고 주장하지 않는다.
+특히 4,096-bin × 8회는 스트레스 조건이다.</p>
+<p>변환된 4,096-bin 입력에서 제거한 128회 할당은 사용하지 않는 일반 검증 배열 16회,
+중간 candidate/bin 복사 16회와 meshlet offset 확장 96회로 분해된다.
+direct unique에서는 여기에 map node 32,768회가 제거된다.
+새 코드의 60회는 Frame 결과와 기존 준비 메타데이터 등의 할당을 포함한다.
+기존 readback pool의 128-entry 상한을 바꾸지 않았으므로 direct unique 4,096-bin 입력은
+warm-up 뒤에도 논리적 readback 생성 호출이 <strong>16,256 → 16,256회</strong>다.
+native GPU 자원 생성 비용까지 캐시되었다거나 전체 준비가 무할당이라는 결론은 내리지 않는다.</p>
+<p>정상 회귀는 <strong>33,910 checks</strong>를 통과했다. candidate/bin/constants/offset/group/flags,
+오류 결과, generic upload byte, retained owner와 feedback 결과를 비교했다.
+0&#126;4,097 bin, 4,096개 고유 key의 전체 용량, 32-bit hash 충돌,
+signed zero/NaN 비트, generation wrap과 중첩·예외·8-thread 동시 준비를 포함한다.</p>
+<h3>작업 제출과 수명</h3>
+<p>실제 엔진 <code>JobScheduler.cpp</code>, <code>ThreadPool.cpp</code>와 enkiTS v1.12
+(<code>0289cf6ffce86697e1f46cb4eeca1c946bffec71</code>)로 기준/변경 helper를 실행했다.
+동시 진행, 합류 결과 게시/반복 합류, worker 실패/unknown 예외/owner 예외,
+mutable inline callable, 16개 admission 경계, callback 복사 실패,
+setup 실패 후 수락된 cascade 수명과 owner assistance를 검증했다.
+변경 helper는 ASan+UBSan 검사도 통과했다.
+<code>CE_CONTRACT_STANDALONE=1</code>, <code>CE_SHIPPING=1</code>이므로 GPU와 제품 CPU profiler는 검증 범위에 없다.</p>
+<p>작업 제출 비교는 <strong>같은 활성 enkiTS pool</strong>에서 각 표본의 기준/변경 순서를 교대로 바꾸고,
+32회 warm-up 뒤 129개 표본을 3개 block에서 측정했다. worker 수는 2와 8이다.
+callback은 고정 크기 8 또는 136 byte이며 표본마다 8개를 제출하고 assisted join까지 잰다.
+allocation counter는 제출 소유 스레드에서만 활성화하며 join assistance 전에 끈다.
+따라서 이 수치를 전체 worker의 총 할당이라고 해석하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>8개 callback / 제출 경로</th>
+<th align="right">기준 → 변경 소유 스레드 할당</th>
+<th>해석</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8-byte / inline</td>
+<td align="right">0 → 0</td>
+<td>간접 호출을 제거하며 추가 할당은 없다.</td>
+</tr>
+<tr>
+<td>136-byte / inline</td>
+<td align="right">8 → 0</td>
+<td>중간 callable 저장소 할당을 제거한다.</td>
+</tr>
+<tr>
+<td>8-byte / 병렬</td>
+<td align="right">40 → 40</td>
+<td>기존 scheduler job 저장소는 유지한다.</td>
+</tr>
+<tr>
+<td>136-byte / 병렬</td>
+<td align="right">48 → 40</td>
+<td>2/8 workers, 3개 block 모두 동일하다.</td>
+</tr>
+</tbody></table></div>
+<p>136-byte callback의 8-worker 병렬 p50은 block별 기준 <strong>335.326 / 335.496 / 327.775 µs</strong>,
+변경 <strong>339.392 / 334.034 / 333.022 µs</strong>였다. 이 조건에는 일관된 wall-time 개선이 없다.
+inline 경로의 같은 callback은 기준 <strong>0.241 / 0.320 / 0.311 µs</strong>에서
+변경 <strong>0.080 / 0.110 / 0.110 µs</strong>였다. helper 변경은 중복 할당·호출 제거를 근거로 반영하며,
+병렬 준비 시간의 큰 개선을 이 결과에 귀속하지 않는다.</p>
+<h3>CPU 메타데이터와 연속된 준비 의존성</h3>
+<p>실제 <code>SceneCpuPreparation</code> 본문을 stopped scheduler와 1/4 workers에서 기준과 대조했다.
+동일한 깊이·geometry key를 갖는 blended 정렬, opaque/transmission, 복수 chunk,
+temporal reset과 이전 geometry, host scratch 재사용 및 이전 Frame의 결과 불변성을 확인했다.</p>
+<p>현재의 <code>MaterialSceneCameraPrepare</code>부터 <code>MaterialSceneIndirectCommandsPrepare</code> 직전까지
+연속된 제품 코드를 수정 없이 추출하여 실제 scheduler와 CPU 서비스 경계에서 실행했다.
+Draw 상수 <strong>4,800 byte</strong>, GPU 레코드 <strong>224 byte</strong>, 기하 레코드 <strong>128 byte</strong>를 비교하고,
+카메라 작업과 owner 업로드의 동시 진행, first → recovery 순서와 bin 보존,
+그림자 setup 완료 전 surface 시작을 실행 gate로 검증했다.
+같은/다른 스레드의 host 재진입과 owner upload, visibility, geometry publication,
+surface 실패 때 수락한 작업이 종료된 뒤 scratch가 해제되는 것도 검사했다.
+이는 서비스 경계를 대체한 CPU 실행 검증이며 native DX12 함수 전체를 빌드한 결과는 아니다.</p>
+<p>메타데이터 시간은 실제 Start/Join과 결과 객체 파괴를 포함한다.
+sealed input과 math는 fixture이며 기존 호출자의 <code>inputRanges</code> 추가 복사,
+카메라 작업, RHI와 전체 Prepare 시간은 포함하지 않는다.
+같은 pool에서 16쌍 warm-up 뒤 128쌍을 교대로 실행했다.
+모든 스레드의 allocation 수는 warm-up 후 별도의 시간 외 실행에서 계수했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>4,096 Draw/chunk / workers / 입력</th>
+<th align="right">기준 p50</th>
+<th align="right">변경 p50</th>
+<th align="right">감소</th>
+<th align="right">기준 → 변경 p95</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 / opaque</td>
+<td align="right">163.898 µs</td>
+<td align="right">126.451 µs</td>
+<td align="right">22.85%</td>
+<td align="right">223.848 → 196.217 µs</td>
+</tr>
+<tr>
+<td>1 / mixed</td>
+<td align="right">244.600 µs</td>
+<td align="right">205.540 µs</td>
+<td align="right">15.97%</td>
+<td align="right">420.875 → 330.648 µs</td>
+</tr>
+<tr>
+<td>4 / opaque</td>
+<td align="right">150.768 µs</td>
+<td align="right">92.750 µs</td>
+<td align="right">38.48%</td>
+<td align="right">231.680 → 138.118 µs</td>
+</tr>
+<tr>
+<td>4 / mixed</td>
+<td align="right">218.360 µs</td>
+<td align="right">184.038 µs</td>
+<td align="right">15.72%</td>
+<td align="right">279.552 → 303.418 µs</td>
+</tr>
+<tr>
+<td>8 / opaque</td>
+<td align="right">196.507 µs</td>
+<td align="right">127.753 µs</td>
+<td align="right">34.99%</td>
+<td align="right">286.322 → 206.391 µs</td>
+</tr>
+<tr>
+<td>8 / mixed</td>
+<td align="right">279.792 µs</td>
+<td align="right">274.249 µs</td>
+<td align="right">1.98%</td>
+<td align="right">525.954 → 469.303 µs</td>
+</tr>
+</tbody></table></div>
+<p>128/512/4,096 Draw/chunk, opaque/mixed와 inline/1/4/8 workers를 포함한
+전체 36개 비교에서 이 실행의 p50은 감소했지만 <strong>6개 조건의 p95는 증가했다</strong>.
+예를 들어 128 mixed/1 worker의 p95는 <strong>37.617 → 66.891 µs</strong>였다.
+따라서 tail latency 전반의 개선이나 이 조건에서 worker 수를 늘리는 것이 유리하다는 주장은 하지 않는다.
+할당은 모든 크기에서 inline opaque <strong>3 → 1</strong>, mixed <strong>4 → 2</strong>,
+활성 scheduler opaque <strong>8 → 6</strong>, mixed <strong>9 → 7</strong>이었다.</p>
+<h2>최종 검증 상태</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>결과와 범위</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기하 페이지 정상/ASan+UBSan</td>
+<td>각각 3,750,080 checks. 0&#126;64 슬롯 경계, 레코드·소유자·descriptor·오류 대조.</td>
+</tr>
+<tr>
+<td>메시렛 정상/ASan+UBSan</td>
+<td>각각 33,910 checks. 준비 함수와 수명, collision·wrap·중첩·동시 실행 대조.</td>
+</tr>
+<tr>
+<td>메시렛 결함 검출</td>
+<td>full-key 비교 제거와 활성 TLS 재사용 결함을 각각 parity/중첩 소유권 assertion으로 검출.</td>
+</tr>
+<tr>
+<td>CPU 메타데이터·연속 준비 구간</td>
+<td>실제 scheduler의 정상 실행과 ASan+UBSan. 상수·레코드·정렬·의존성·실패 배출 대조.</td>
+</tr>
+<tr>
+<td>준비 task helper</td>
+<td>실제 scheduler 정상 실행과 ASan+UBSan. admission·예외·소유권·assisted join 검증.</td>
+</tr>
+<tr>
+<td>코드 형식</td>
+<td><code>.clang-format</code> 19.1.5, 변경 구간과 새 probe에 적용. 새 hot-path 분기/loop는 중괄호 사용.</td>
+</tr>
+<tr>
+<td>변경 범위</td>
+<td>CPU 준비 helper·scratch·Prepare 외의 SceneHost 코드, lookup·Prepare 외의 visibility 코드, AssignGeometry 외의 SceneGpuData와 Add 외의 task helper가 기준과 같다.</td>
+</tr>
+<tr>
+<td>include 경계</td>
+<td>기준과 변경 모두 기존 27개 상향 include·69개 물리 경계 부채로 실패. 출력이 동일하며 추가 위반은 없다.</td>
+</tr>
+<tr>
+<td>Windows/MSVC/DX12·전체 프레임</td>
+<td>미실행. 아래 native 수용 항목으로 남긴다.</td>
+</tr>
+</tbody></table></div>
+<p>Sanitizer runner는 <code>-fno-sanitize-recover=all</code>로 UB 진단이 성공 종료로 처리되지 않게 한다.
+추출한 제품 코드의 원본 bytes와 SHA256을 함께 잡고 종료 후 source/probe가 바뀌지 않았는지 확인한다.
+작업량 계수용 본문 수정과 결함을 의도적으로 넣는 mutation 검사는 정상·성능 실행과 분리한다.</p>
+<p>최종 sanitizer 검증 중 한 번의 timeout은 fixture가 뒤의 surface를 기다리는 가짜 shadow 작업을
+앞의 draw join에서 owner가 지원 실행할 수 있도록 만든 순환 대기였다.
+fixture의 더미 바인딩 완료·shadow worker 시작을 먼저 확정하고, gate에 취소/시간 제한을 넣어
+진단 가능한 실패로 바꾼 뒤 ASan+UBSan을 다시 통과했다. 추출한 제품 구간은 변경하지 않았다.
+이 변경은 메타데이터 성능 경로와 무관한 검증 fixture 수정이며,
+JSON은 시간 측정 당시 probe hash와 최종 검증 probe hash를 별도로 보존한다.</p>
+<h2>재현과 남은 native 수용</h2>
+<p>로컬 enkiTS 경로를 지정하며 러너는 의존성을 다운로드하거나 제품 소스를 수정하지 않는다.</p>
+<pre><code class="language-bash">python3 Tools/regression/verify-scene-geometry-pages.py
+python3 Tools/regression/verify-scene-geometry-pages.py --benchmark
+ASAN_OPTIONS=detect_leaks=0 python3 Tools/regression/verify-scene-geometry-pages.py --sanitize
+
+python3 Tools/regression/verify-scene-preparation-tasks.py --enkits /path/to/enkiTS
+python3 Tools/regression/verify-scene-preparation-tasks.py --enkits /path/to/enkiTS --benchmark
+ASAN_OPTIONS=detect_leaks=0 python3 Tools/regression/verify-scene-preparation-tasks.py --enkits /path/to/enkiTS --sanitize
+
+python3 Tools/regression/verify-meshlet-preparation-cpu.py
+python3 Tools/regression/verify-meshlet-preparation-cpu.py --benchmark
+ASAN_OPTIONS=detect_leaks=0 python3 Tools/regression/verify-meshlet-preparation-cpu.py --sanitize address
+python3 Tools/regression/verify-meshlet-preparation-cpu.py --mutation hash-only
+python3 Tools/regression/verify-meshlet-preparation-cpu.py --mutation borrow-active
+
+python3 Tools/regression/verify-scene-cpu-preparation.py --enkits /path/to/enkiTS
+python3 Tools/regression/verify-scene-cpu-preparation.py --enkits /path/to/enkiTS --benchmark --workers 1 4 8
+ASAN_OPTIONS=detect_leaks=0 python3 Tools/regression/verify-scene-cpu-preparation.py --enkits /path/to/enkiTS --sanitize address
+</code></pre>
+<p>이 환경은 LeakSanitizer의 <code>/proc</code> task 열거가 제한되어 <code>detect_leaks=0</code>으로 실행한다.
+AddressSanitizer와 UndefinedBehaviorSanitizer는 활성화한다.
+sanitizer 결과를 성능 표본에 포함하지 않는다.</p>
+<p>Windows에서는 Debug/Release의 RenderEngine/Editor 및 관련 non-unity 빌드,
+<code>verify-material-render-bindings.ps1</code>, <code>verify-material-scene-probes.ps1</code>의
+object-space, shadow correctness, meshlet HZB/dispatch 검증을 실행해야 한다.
+일반 frame 성능은 GPUValidation 비용과 분리하고 기준/변경의 동일 CreatorRobot·8 workers·
+Scene+Game 1186×514·Playing/Possessed·native·전경·unlimited·동일 계측 조건으로 비교한다.
+ScenePrepare 전체/세부 scope의 p50/p95, Running/Ready/Waiting, 카메라/owner 실행 중첩,
+CPU Game 시간과 GPU 출력 일치 여부를 함께 확인한다.
+이 native 빌드·GPU 회귀·전체 프레임 재측정은 현재 환경에서 실행하지 않았으며 통과로 표시하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
+
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
+</script>
+</body></html>

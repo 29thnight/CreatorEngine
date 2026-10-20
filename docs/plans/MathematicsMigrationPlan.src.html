@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Mathematics 이주 계획</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="MathematicsMigrationPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/MathematicsMigrationPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>Mathematics 이주 계획</h1><p>이미 이관된 math::* 저장 타입·연산과 DirectX 수학 별칭 제거는 활성 계획에서 제외한다. 잔여는 동일 camera/projection/bounds 결과의 제품 픽셀과 실제 Physics simulation 수용이다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Math values</ve-node><ve-node id="n1" at="2 1">Transform</ve-node><ve-node id="n2" at="3 1" key>Camera</ve-node><ve-node id="n3" at="3 2">Snapshot</ve-node><ve-node id="n4" at="2 2">ABI convert</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>이미 이관된 math::* 저장 타입·연산과 DirectX 수학 별칭 제거는 활성 계획에서 제외한다. 잔여는 동일 camera/projection/bounds 결과의 제품 픽셀과 실제 Physics simulation 수용이다.</li>
+<li>ABI·YAML·GPU·PhysX 경계의 필드 변환/레이아웃과 D/R 제품 회귀를 확인한다. 과거 빌드 통과를 현재 master의 실행 결과로 재사용하지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>math value types → Transform/Camera snapshots → render and physics boundary conversion</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Transform.h#L90">Engine/SceneRuntime/Transform.h:90</a> — <code>math::vector3 GetPosition() const;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L25">Engine/RenderEngine/Camera.h:25</a> — <code>math::matrix4x4 CalculateProjection() const;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Mathematics.Intersect.h#L18">Engine/Utility_Framework/Mathematics.Intersect.h:18</a> — <code>#include &lt;mathematics/intersect.hpp&gt;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="-기본값-규약이-둘-달랐다--조용히-넘어가면-안-되는-종류다"></span>
+<span id="0-결론"></span>
+<span id="01-남은-작업-목록--2026-08-27-재작성"></span>
+<span id="1-현재-배선"></span>
+<span id="11-진입점"></span>
+<span id="12-2026-08-27-현재-수치"></span>
+<span id="13-값이-흐르는-주요-경계"></span>
+<span id="2-mathematics-적합성"></span>
+<span id="21-그대로-맞는-규약"></span>
+<span id="22-직접-매핑"></span>
+<span id="23-단순-치환이-안-되는-지점"></span>
+<span id="3-의존성-배선"></span>
+<span id="31-권장-방식-고정-벤더링"></span>
+<span id="32-컴파일-설정-계약"></span>
+<span id="33-전환용-interop-규칙"></span>
+<span id="4-구현-슬라이스"></span>
+<span id="5-s0-구현-패치의-실제-범위"></span>
+<span id="6-판정표"></span>
+<span id="s0-dependency--contract-probe-소비자-미배선--완료-2026-08-25"></span>
+<span id="s1-coremathfh-해체--구현빌드-게이트-완료-2026-08-25"></span>
+<span id="s2-camera---framecamerasnapshot---render-첫-수직-슬라이스"></span>
+<span id="s2-구현-결과-2026-08-25"></span>
+<span id="s3-transform--transformstore--yamlreflection--구현-완료-physics-runtime-gate-보류-2026-08-25"></span>
+<span id="s4-a-proxycommand-world-transform-payload-2026-08-25"></span>
+<span id="s4-b-renderproxy-world-transform-storage-2026-08-25"></span>
+<span id="s4-c-renderproxy-world-aabb-storage-2026-08-25"></span>
+<span id="s4-d-mesh-assetcomponent-bounds--cache-rebuild-2026-08-25"></span>
+<span id="s4-e-animator-bone-palette-storage--gpu-staging-2026-08-25"></span>
+<span id="s4-experiment-구간-구현-결과-2026-08-25"></span>
+<span id="s4-f-enhanceddrawitem-world-matrix--instance-staging-2026-08-25"></span>
+<span id="s4-g-decalsprite-world-payload--billboard-assembly-2026-08-25"></span>
+<span id="s4-h-foliage-derived-world-matrix--asset-schema-gate-2026-08-25"></span>
+<span id="s4-i-decalsprite-frame-constant-matrices-2026-08-26"></span>
+<span id="s4-j-gbuffer-frame-matrix--skinning-fallback-2026-08-26"></span>
+<span id="s4-k1-camera-storageapi--editorruntime-consumers-2026-08-26"></span>
+<span id="s4-k2-render-lightshadowfoggizmo-values--dead-scene-light-dto-removal-2026-08-26"></span>
+<span id="s4-l1-animationskeletonsocket-storage--evaluation-2026-08-26"></span>
+<span id="s4-l2a-material-typed-value-boundary--flow-dto-2026-08-26"></span>
+<span id="s4-l2b1-meshimport-vertex--model-node-abi-2026-08-26"></span>
+<span id="s4-l2b2-navigationspritesheetterrain-dto--dead-bridge-cleanup-2026-08-26"></span>
+<span id="s4-render-payload--meshimportanimation"></span>
+<span id="s5-a-physics-query-dto--physx-adapter-2026-08-26"></span>
+<span id="s5-b-physics-actorcollider--mesh-cooking-경계-2026-08-26"></span>
+<span id="s5-c-character-controller--movementforced-move-경계-2026-08-26"></span>
+<span id="s5-d-ragdollarticulation--physics-root-cleanup-2026-08-26"></span>
+<span id="s5-physics-독립-섬--구조-전환-완료-live-simulation-gate-없음"></span>
+<span id="s6-a-color-저장직렬화gpu-전달-2026-08-26"></span>
+<span id="s6-b-rect-저장ui-hitbox-2026-08-26"></span>
+<span id="s6-c-native-vector234와-helper-teardown-2026-08-26"></span>
+<span id="s6-d-easingtween-upstream-계약-및-legacy-teardown-2026-08-26"></span>
+<span id="s6-e-consumer-owned-tweenmanager-기반-2026-08-26"></span>
+<span id="s6-uieditor나머지-값-타입"></span>
+<span id="s7-a1-product-frustum-chain-2026-08-27"></span>
+<span id="s7-a2-product-bounds--editor-ray-picking-2026-08-27"></span>
+<span id="s7-b1-simplemath--mathematicsinterop-root-teardown-2026-08-27"></span>
+<span id="s7-b2-product-raw-directxmath-teardown-2026-08-27"></span>
+<span id="s7-b3-contract-oracle--direct-dependency-root-teardown-2026-08-27"></span>
+<span id="s7-boundsfrustum--directx-수학-의존-제거"></span>
+<span id="sec-0-결론"></span>
+<span id="sec-1-현재-배선"></span>
+<span id="sec-2-mathematics-적합성"></span>
+<span id="sec-3-의존성-배선"></span>
+<span id="sec-4-구현-슬라이스"></span>
+<span id="sec-5-s0-구현-패치의-실제-범위"></span>
+<span id="sec-6-판정표"></span>
+<span id="검증-완료-2026-08-25"></span>
+<span id="배선"></span>
+<span id="별칭을-두지-않았다"></span>
+<span id="회전은-quaternion-으로-갈라-넣었다"></span></p>
+</details>
+</main></body></html>

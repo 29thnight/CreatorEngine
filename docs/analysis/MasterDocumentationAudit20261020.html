@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>CreatorEngine 전체 문서 master 대조</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
+
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
+
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
+
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
+
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
+
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
+
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
+
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
+
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
+
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><header><p class="eyebrow">MASTER · API / DESIGN / ANALYSIS</p><h1>현재 구현과 과거 실행 기록을 분리했다</h1><p>기준 master <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드를 보존하며 API 선언과 문서별 소스 경계를 대조했다.</p><p><a href="MasterDocumentationAudit20261020.json">문서·소스·링크 처리 원장</a> · <a href="../api/">현재 API</a> · <a href="../RefactoringPlanDashboard.html">대시보드</a></p></header><figure><svg class="ve-bars" viewBox="0 0 240 388" role="img" aria-label="문서별 현행 근거 대조"><text y="12">material</text><rect x="84" y="5" width="27.6" height="14" rx="2"/><text x="119.6" y="12">69 문서</text><text y="40">graph</text><rect x="84" y="33" width="24.8" height="14" rx="2"/><text x="116.8" y="40">62 문서</text><text y="68">asset</text><rect x="84" y="61" width="14.4" height="14" rx="2"/><text x="106.4" y="68">36 문서</text><text y="96">editor</text><rect x="84" y="89" width="10.4" height="14" rx="2"/><text x="102.4" y="96">26 문서</text><text y="124">temporal</text><rect x="84" y="117" width="6.8" height="14" rx="2"/><text x="98.8" y="124">17 문서</text><text y="152">build</text><rect x="84" y="145" width="2.8" height="14" rx="2"/><text x="94.8" y="152">7 문서</text><text y="180">core</text><rect x="84" y="173" width="2.4" height="14" rx="2"/><text x="94.4" y="180">6 문서</text><text y="208">ui</text><rect x="84" y="201" width="2" height="14" rx="2"/><text x="94" y="208">5 문서</text><text y="236">serialize</text><rect x="84" y="229" width="2" height="14" rx="2"/><text x="94" y="236">5 문서</text><text y="264">profile</text><rect x="84" y="257" width="2" height="14" rx="2"/><text x="94" y="264">5 문서</text><text y="292">scene</text><rect x="84" y="285" width="1.6" height="14" rx="2"/><text x="93.6" y="292">4 문서</text><text y="320">physics</text><rect x="84" y="313" width="1.6" height="14" rx="2"/><text x="93.6" y="320">4 문서</text><text y="348">audio</text><rect x="84" y="341" width="1.2" height="14" rx="2"/><text x="93.2" y="348">3 문서</text><text y="376">script</text><rect x="84" y="369" width="0.4" height="14" rx="2"/><text x="92.4" y="376">1 문서</text></svg><figcaption>각 문서의 참조 파일·현재 선언·소유 경계를 고정 master의 Git blob과 행으로 대조한다.</figcaption></figure><section><h2>공개 선언이 바뀐 API를 바로잡았다</h2><p>Component의 제거된 충돌 훅은 ContactStream 등록/소비로 교체했다. 물리 쿼리는 sceneAnchor·버퍼·PhysicsQueryResult를 사용하며 현재 hit 타입은 PhysicsHit다. RaycastHit의 예전 문서 주소는 alias로 보존한다. SoundComponent의 개별 재생 handle과 RGHandle의 version/kind/epoch, RenderGraph 생성자 정책을 현재 선언으로 갱신했다.</p><p>선별 API 31개 페이지의 224개 멤버를 소스 선언으로 대조했다. 전체 엔진의 모든 내부 심볼을 자동 API로 공개한 것은 아니다.</p></section><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="선언 metadata와 frozen target 병렬 번역·제출은 구현 기반이다. 제품 비용 수용과 별도 저작 체계를 합치지 않는다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Live pipeline</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Versions</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">DAG</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Record tasks</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Queue submit</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Completion</text></g></svg></div><figcaption>선언 metadata와 frozen target 병렬 번역·제출은 구현 기반이다. 제품 비용 수용과 별도 저작 체계를 합치지 않는다.</figcaption></figure><section><h2>기존 누락 732건을 분류하여 정리했다</h2><p>미보존 실행 산출물 679건, 이전 소스·문서 경로 52건, 코드 예제 오인식 1건이다. 이동한 소스·게시 보고서는 현행 경로로 연결하고 사라진 로컬 Build/Artifacts 파일은 원래 경로와 미보존 상태를 남긴다. 미보존에는 로컬에만 남아 저장소·배포본에 포함되지 않는 산출물도 포함한다. 과거 수치·해시·장치 조건은 현재 master의 실행 통과로 재발급하지 않는다.</p><p><a href="DocumentationLinkRemediation20261020.json">732건별 처리 원장</a> · <a href="MasterDocumentationAudit20261020.verification.json">최종 문서 검증 결과</a></p></section><section><h2>문서별 현행 대조</h2><div class="ve-table table-scroll"><table><thead><tr><th>문서</th><th>경계</th><th>근거 종류</th><th>소스 파일</th></tr></thead><tbody><tr><td><a href="ArtifactRetention20261011.html">ArtifactRetention20261011</a></td><td>asset</td><td>document references</td><td>2</td></tr><tr><td><a href="AutomaticResourceEditingValidation20261010.html">AutomaticResourceEditingValidation20261010</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="ClosedPlanCommandletRetirement.html">ClosedPlanCommandletRetirement</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="CommandletRetirementAudit.html">CommandletRetirementAudit</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="CommandRegistryAudit.html">CommandRegistryAudit</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="CommandSurfaceImplementation.html">CommandSurfaceImplementation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="CommandSurfaceTable.html">CommandSurfaceTable</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="ConditionalAssetPublishValidation20261010.html">ConditionalAssetPublishValidation20261010</a></td><td>asset</td><td>document references</td><td>2</td></tr><tr><td><a href="ConditionalPublishActualInspectorValidation20261010.html">ConditionalPublishActualInspectorValidation20261010</a></td><td>asset</td><td>document references</td><td>1</td></tr><tr><td><a href="CreatorBuildToolValidation.html">CreatorBuildToolValidation</a></td><td>ui</td><td>document references</td><td>6</td></tr><tr><td><a href="CsmCorrectnessOptimization.html">CsmCorrectnessOptimization</a></td><td>graph</td><td>document references</td><td>5</td></tr><tr><td><a href="EditorAddComponentBrowserValidation.html">EditorAddComponentBrowserValidation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorContentBrowserLayoutValidation.html">EditorContentBrowserLayoutValidation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorControlDensityValidation.html">EditorControlDensityValidation</a></td><td>editor</td><td>document references</td><td>7</td></tr><tr><td><a href="EditorEntityHeaderPolishValidation.html">EditorEntityHeaderPolishValidation</a></td><td>editor</td><td>document references</td><td>5</td></tr><tr><td><a href="EditorEntityNavigationValidation.html">EditorEntityNavigationValidation</a></td><td>editor</td><td>document references</td><td>7</td></tr><tr><td><a href="EditorFluentEmojiValidation.html">EditorFluentEmojiValidation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorHierarchyStyleValidation.html">EditorHierarchyStyleValidation</a></td><td>graph</td><td>document references</td><td>5</td></tr><tr><td><a href="EditorIconAlignmentValidation.html">EditorIconAlignmentValidation</a></td><td>editor</td><td>document references</td><td>3</td></tr><tr><td><a href="EditorIconSelectionStudy.html">EditorIconSelectionStudy</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorInspectorLayoutW2I.html">EditorInspectorLayoutW2I</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorInspectorStyleValidation.html">EditorInspectorStyleValidation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorLogStorageValidation.html">EditorLogStorageValidation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorMaterialSymbolsW1Validation.html">EditorMaterialSymbolsW1Validation</a></td><td>material</td><td>document references</td><td>6</td></tr><tr><td><a href="EditorMenuSurfaceAndPhase21Preflight.html">EditorMenuSurfaceAndPhase21Preflight</a></td><td>serialize</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorPanelCostBaselineW7.html">EditorPanelCostBaselineW7</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorRenderingSurfacesValidation.html">EditorRenderingSurfacesValidation</a></td><td>graph</td><td>document references</td><td>5</td></tr><tr><td><a href="EditorSceneCropValidation.html">EditorSceneCropValidation</a></td><td>editor</td><td>document references</td><td>4</td></tr><tr><td><a href="EditorSceneViewportOverlayValidation.html">EditorSceneViewportOverlayValidation</a></td><td>editor</td><td>document references</td><td>7</td></tr><tr><td><a href="EditorThemeW1Validation.html">EditorThemeW1Validation</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorTitleBarValidation.html">EditorTitleBarValidation</a></td><td>editor</td><td>document references</td><td>6</td></tr><tr><td><a href="EditorW1DpiResizeRootCauseAndFixPlan.html">EditorW1DpiResizeRootCauseAndFixPlan</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorW1Dx12ResizeValidation.html">EditorW1Dx12ResizeValidation</a></td><td>editor</td><td>document references</td><td>5</td></tr><tr><td><a href="EditorW1InteractiveValidation.html">EditorW1InteractiveValidation</a></td><td>editor</td><td>document references</td><td>4</td></tr><tr><td><a href="EditorWidgetInheritanceW2.html">EditorWidgetInheritanceW2</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EditorWorkspaceW0Baseline.html">EditorWorkspaceW0Baseline</a></td><td>editor</td><td>document references</td><td>8</td></tr><tr><td><a href="EngineSynchronizationArchitecture.html">EngineSynchronizationArchitecture</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="GCCEValidation20261009.html">GCCEValidation20261009</a></td><td>scene</td><td>document references</td><td>4</td></tr><tr><td><a href="GitHubIssueRemediation20261008.html">GitHubIssueRemediation20261008</a></td><td>core</td><td>document references</td><td>8</td></tr><tr><td><a href="GpuDrivenGeometryStaticReview.html">GpuDrivenGeometryStaticReview</a></td><td>graph</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="GpuDrivenMaterialCoverage.html">GpuDrivenMaterialCoverage</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="GpuDrivenRenderGraphTransition.html">GpuDrivenRenderGraphTransition</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="GraphDeclarationReuse20261020.html">GraphDeclarationReuse20261020</a></td><td>graph</td><td>document references</td><td>4</td></tr><tr><td><a href="GraphOnlyMaterialCleanup20261008.html">GraphOnlyMaterialCleanup20261008</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="GraphOnlyMaterialPasses20261007.html">GraphOnlyMaterialPasses20261007</a></td><td>material</td><td>document references</td><td>3</td></tr><tr><td><a href="GraphRecoveryRgV20261007.html">GraphRecoveryRgV20261007</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="HierarchyOrder20261008.html">HierarchyOrder20261008</a></td><td>scene</td><td>document references</td><td>6</td></tr><tr><td><a href="JobSystemFeasibilityAnalysis.html">JobSystemFeasibilityAnalysis</a></td><td>core</td><td>document references</td><td>8</td></tr><tr><td><a href="LatticeGeometryIntegration20261009.html">LatticeGeometryIntegration20261009</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="LatticeMeshletRendering20261009.html">LatticeMeshletRendering20261009</a></td><td>material</td><td>document references</td><td>3</td></tr><tr><td><a href="LxHdrCutover20261012.html">LxHdrCutover20261012</a></td><td>material</td><td>document references</td><td>3</td></tr><tr><td><a href="LxMeshletGeometryContract20261012.html">LxMeshletGeometryContract20261012</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="LxSceneBigBangCutover20261012.html">LxSceneBigBangCutover20261012</a></td><td>material</td><td>document references</td><td>7</td></tr><tr><td><a href="LxShadowBaseline20261011.html">LxShadowBaseline20261011</a></td><td>material</td><td>document references</td><td>5</td></tr><tr><td><a href="LxShadowCases20261012.html">LxShadowCases20261012</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="LxShadowComputeCulling20261012.html">LxShadowComputeCulling20261012</a></td><td>material</td><td>document references</td><td>1</td></tr><tr><td><a href="LxShadowEquivalence20261012.html">LxShadowEquivalence20261012</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="LxShadowMeshletOmission20261012.html">LxShadowMeshletOmission20261012</a></td><td>material</td><td>document references</td><td>7</td></tr><tr><td><a href="LxShadowRepeatedPerformance20261012.html">LxShadowRepeatedPerformance20261012</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="LxTransformDispatch20261012.html">LxTransformDispatch20261012</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="LxTransformResidency20261012.html">LxTransformResidency20261012</a></td><td>material</td><td>document references</td><td>1</td></tr><tr><td><a href="MAT7CodeToLXRuntime.html">MAT7CodeToLXRuntime</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT7CommonForwardBlend.html">MAT7CommonForwardBlend</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="MAT7CommonMaterialConsumption.html">MAT7CommonMaterialConsumption</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT7ComputePipelineOwnership.html">MAT7ComputePipelineOwnership</a></td><td>material</td><td>document references</td><td>3</td></tr><tr><td><a href="MAT7ForwardTransportComposition.html">MAT7ForwardTransportComposition</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="MAT7GraphicsPipelineOwnership.html">MAT7GraphicsPipelineOwnership</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="MAT7ProductEditingRecovery.html">MAT7ProductEditingRecovery</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT7ShaderMetaAdapter.html">MAT7ShaderMetaAdapter</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT9BlenderImageComparison.html">MAT9BlenderImageComparison</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="MAT9GgxClosureComparison.html">MAT9GgxClosureComparison</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="MAT9HdriConvergence.html">MAT9HdriConvergence</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="MAT9HdriImageComparison.html">MAT9HdriImageComparison</a></td><td>material</td><td>document references</td><td>5</td></tr><tr><td><a href="MAT9HdriMis.html">MAT9HdriMis</a></td><td>material</td><td>document references</td><td>2</td></tr><tr><td><a href="MAT9HdriRange.html">MAT9HdriRange</a></td><td>material</td><td>document references</td><td>5</td></tr><tr><td><a href="MAT9IntegrationCheckpoint20261001.html">MAT9IntegrationCheckpoint20261001</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT9MaterialScenePerformance.html">MAT9MaterialScenePerformance</a></td><td>material</td><td>document references</td><td>6</td></tr><tr><td><a href="MAT9MirrorSampling.html">MAT9MirrorSampling</a></td><td>material</td><td>document references</td><td>5</td></tr><tr><td><a href="MAT9NearCameraPerformance.html">MAT9NearCameraPerformance</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT9NodeEditorPerformance.html">MAT9NodeEditorPerformance</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MAT9SpecialProfileCorrection.html">MAT9SpecialProfileCorrection</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="MAT9SpecialTransportComparison.html">MAT9SpecialTransportComparison</a></td><td>material</td><td>document references</td><td>7</td></tr><tr><td><a href="MAT9SplitSumLiveLookupDifference.html">MAT9SplitSumLiveLookupDifference</a></td><td>material</td><td>document references</td><td>3</td></tr><tr><td><a href="MAT9ThinFilmAcceptance.html">MAT9ThinFilmAcceptance</a></td><td>material</td><td>document references</td><td>1</td></tr><tr><td><a href="MAT9ThinFilmAndEnvironment.html">MAT9ThinFilmAndEnvironment</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="MaterialGraphScenePrepare20261019.html">MaterialGraphScenePrepare20261019</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="measurements/20261019-remeasure-10/README.html">README</a></td><td>profile</td><td>document references</td><td>2</td></tr><tr><td><a href="MergedPrReview20261007.html">MergedPrReview20261007</a></td><td>build</td><td>document references</td><td>8</td></tr><tr><td><a href="MeteorCameraMeshletCulling20261013.html">MeteorCameraMeshletCulling20261013</a></td><td>graph</td><td>document references</td><td>5</td></tr><tr><td><a href="Phase14_5Closure.html">Phase14_5Closure</a></td><td>ui</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase14_5ManualGuiChecklist.html">Phase14_5ManualGuiChecklist</a></td><td>ui</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase14_5MergePreparation.html">Phase14_5MergePreparation</a></td><td>ui</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase22AudioCloudValidation.html">Phase22AudioCloudValidation</a></td><td>audio</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase22AudioPreflight.html">Phase22AudioPreflight</a></td><td>audio</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase22AudioWindowsAcceptance20261007.html">Phase22AudioWindowsAcceptance20261007</a></td><td>audio</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase23LauncherReadiness.html">Phase23LauncherReadiness</a></td><td>build</td><td>document references</td><td>8</td></tr><tr><td><a href="Phase475AxisClassification.html">Phase475AxisClassification</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="PhysicsCutoverAudit.html">PhysicsCutoverAudit</a></td><td>physics</td><td>document references</td><td>8</td></tr><tr><td><a href="PlayerModuleBoundaryAnalysis.html">PlayerModuleBoundaryAnalysis</a></td><td>build</td><td>document references</td><td>8</td></tr><tr><td><a href="PPLContainerMigrationAnalysis.html">PPLContainerMigrationAnalysis</a></td><td>core</td><td>document references</td><td>8</td></tr><tr><td><a href="reac-20261019/baseline/provenance/README.html">README</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="REACPipelineImplementation20261019.html">REACPipelineImplementation20261019</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="ReflectionSystemAnalysis.html">ReflectionSystemAnalysis</a></td><td>serialize</td><td>document references</td><td>8</td></tr><tr><td><a href="ReflgenPhase425Integration.html">ReflgenPhase425Integration</a></td><td>serialize</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderBase0Baseline.html">RenderBase0Baseline</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderGraphDeclareParallel20261019.html">RenderGraphDeclareParallel20261019</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderingPipelineMermaid20261016.html">RenderingPipelineMermaid20261016</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderPipelineFlow.html">RenderPipelineFlow</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderProfileAutomaticSaveConflictValidation20261010.html">RenderProfileAutomaticSaveConflictValidation20261010</a></td><td>profile</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg1Scheduling.html">RenderRg1Scheduling</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg2Versions.html">RenderRg2Versions</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg3LifetimeBarriers.html">RenderRg3LifetimeBarriers</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg4RecordingWaves.html">RenderRg4RecordingWaves</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5Closure20261007.html">RenderRg5Closure20261007</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderRg5ConsumerMigration.html">RenderRg5ConsumerMigration</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5DecalMigration.html">RenderRg5DecalMigration</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="RenderRg5FinalAcceptance20261007.html">RenderRg5FinalAcceptance20261007</a></td><td>graph</td><td>document references</td><td>4</td></tr><tr><td><a href="RenderRg5ForwardCodeMigration.html">RenderRg5ForwardCodeMigration</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5IndirectMigration.html">RenderRg5IndirectMigration</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5IntegrationBaseline.html">RenderRg5IntegrationBaseline</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5LookupMigration.html">RenderRg5LookupMigration</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5MixedGpuAcceptance.html">RenderRg5MixedGpuAcceptance</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="RenderRg5OrderPolicy.html">RenderRg5OrderPolicy</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5ProducerMigration.html">RenderRg5ProducerMigration</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5ReferenceMigration20261007.html">RenderRg5ReferenceMigration20261007</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="RenderRg5ScreenMigration.html">RenderRg5ScreenMigration</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg5SpecialMigration.html">RenderRg5SpecialMigration</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg5SpriteMigration.html">RenderRg5SpriteMigration</a></td><td>graph</td><td>document references</td><td>5</td></tr><tr><td><a href="RenderRg5SurfaceMigration.html">RenderRg5SurfaceMigration</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg6Acceptance20261007.html">RenderRg6Acceptance20261007</a></td><td>graph</td><td>document references</td><td>4</td></tr><tr><td><a href="RenderRg7Closure20261008.html">RenderRg7Closure20261008</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="RenderRg7Implementation20261008.html">RenderRg7Implementation20261008</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderRg7Rg8StructuralAudit20261009.html">RenderRg7Rg8StructuralAudit20261009</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderRg8Barriers20261009.html">RenderRg8Barriers20261009</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg8Batching20261009.html">RenderRg8Batching20261009</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg8Closure20261009.html">RenderRg8Closure20261009</a></td><td>graph</td><td>document references</td><td>5</td></tr><tr><td><a href="RenderRg8GraphicsRetention20261009.html">RenderRg8GraphicsRetention20261009</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg8HistoryFix20261009.html">RenderRg8HistoryFix20261009</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg8OrderSearch20261009.html">RenderRg8OrderSearch20261009</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RenderRg8Pr167Followup20261009.html">RenderRg8Pr167Followup20261009</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RenderRg8Pr168Measurement20261009.html">RenderRg8Pr168Measurement20261009</a></td><td>graph</td><td>document references</td><td>3</td></tr><tr><td><a href="RenderRg8QueueExecution20261009.html">RenderRg8QueueExecution20261009</a></td><td>graph</td><td>document references</td><td>6</td></tr><tr><td><a href="RenderRg8QueueSchedule20261008.html">RenderRg8QueueSchedule20261008</a></td><td>graph</td><td>document references</td><td>4</td></tr><tr><td><a href="RenderRg8SchedulerCost20261009.html">RenderRg8SchedulerCost20261009</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="RenderRg8UnifiedExecution20261009.html">RenderRg8UnifiedExecution20261009</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="RhiQueueContractQ0_20261008.html">RhiQueueContractQ0_20261008</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="RhiSoftwareArenaOptimization20261020.html">RhiSoftwareArenaOptimization20261020</a></td><td>graph</td><td>document references</td><td>6</td></tr><tr><td><a href="RhiSoftwareFollowup20261020.html">RhiSoftwareFollowup20261020</a></td><td>graph</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="ScriptBinderSplitAnalysis.html">ScriptBinderSplitAnalysis</a></td><td>script</td><td>document references</td><td>8</td></tr><tr><td><a href="SharedRuntimeDistributionValidation.html">SharedRuntimeDistributionValidation</a></td><td>build</td><td>document references</td><td>8</td></tr><tr><td><a href="SharedVisibilityInputs20261020.html">SharedVisibilityInputs20261020</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="TemporalBalancedHierarchyRace20261011.html">TemporalBalancedHierarchyRace20261011</a></td><td>temporal</td><td>document references</td><td>6</td></tr><tr><td><a href="TemporalBase0ConsumerWorkload20261011.html">TemporalBase0ConsumerWorkload20261011</a></td><td>temporal</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="TemporalClosureCheckpoint20261010.html">TemporalClosureCheckpoint20261010</a></td><td>temporal</td><td>document references</td><td>3</td></tr><tr><td><a href="TemporalDlssDisocclusion20261011.html">TemporalDlssDisocclusion20261011</a></td><td>temporal</td><td>document references</td><td>2</td></tr><tr><td><a href="TemporalDlssFinalBuild20261011.html">TemporalDlssFinalBuild20261011</a></td><td>temporal</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="TemporalDlssLens20261011.html">TemporalDlssLens20261011</a></td><td>temporal</td><td>document references</td><td>2</td></tr><tr><td><a href="TemporalDlssNativeAA20261011.html">TemporalDlssNativeAA20261011</a></td><td>temporal</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="TemporalDlssPerformance20261011.html">TemporalDlssPerformance20261011</a></td><td>temporal</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="TemporalDlssStartup20261011.html">TemporalDlssStartup20261011</a></td><td>temporal</td><td>document references</td><td>1</td></tr><tr><td><a href="TemporalDlssTransitions20261011.html">TemporalDlssTransitions20261011</a></td><td>temporal</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="TemporalMeasurementCheckpoint20261010.html">TemporalMeasurementCheckpoint20261010</a></td><td>temporal</td><td>document references</td><td>4</td></tr><tr><td><a href="TemporalMeasurementConsumers20261010.html">TemporalMeasurementConsumers20261010</a></td><td>temporal</td><td>document references</td><td>8</td></tr><tr><td><a href="TemporalMeasurementSurfaces20261011.html">TemporalMeasurementSurfaces20261011</a></td><td>temporal</td><td>document references</td><td>3</td></tr><tr><td><a href="TemporalPhase45Closure20261011.html">TemporalPhase45Closure20261011</a></td><td>temporal</td><td>document references</td><td>1</td></tr><tr><td><a href="TemporalRg6ABAcceptance20261011.html">TemporalRg6ABAcceptance20261011</a></td><td>temporal</td><td>document references</td><td>3</td></tr><tr><td><a href="TemporalRg6CpuRecording20261011.html">TemporalRg6CpuRecording20261011</a></td><td>temporal</td><td>document references</td><td>2</td></tr><tr><td><a href="TemporalRg6CpuRecordingTail20261011.html">TemporalRg6CpuRecordingTail20261011</a></td><td>temporal</td><td>related runtime boundary</td><td>3</td></tr><tr><td><a href="TextureActualInspectorShutdownRepeatValidation20261010.html">TextureActualInspectorShutdownRepeatValidation20261010</a></td><td>asset</td><td>document references</td><td>2</td></tr><tr><td><a href="TextureAutomaticInspectorConflictValidation20261010.html">TextureAutomaticInspectorConflictValidation20261010</a></td><td>asset</td><td>document references</td><td>7</td></tr><tr><td><a href="TextureAutomaticInspectorDebugFailureValidation20261010.html">TextureAutomaticInspectorDebugFailureValidation20261010</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="TextureAutomaticInspectorReleaseValidation20261010.html">TextureAutomaticInspectorReleaseValidation20261010</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="TextureAutomaticInspectorUiValidation20261010.html">TextureAutomaticInspectorUiValidation20261010</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="TextureAutomaticSaveSoakValidation20261010.html">TextureAutomaticSaveSoakValidation20261010</a></td><td>asset</td><td>document references</td><td>2</td></tr><tr><td><a href="TextureCookedGpuValidation20261010.html">TextureCookedGpuValidation20261010</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="TextureCookedVulkanValidation20261010.html">TextureCookedVulkanValidation20261010</a></td><td>asset</td><td>document references</td><td>3</td></tr><tr><td><a href="TextureImportLifecycleValidation20261010.html">TextureImportLifecycleValidation20261010</a></td><td>scene</td><td>document references</td><td>8</td></tr><tr><td><a href="TextureInspectorScaleDockValidation20261010.html">TextureInspectorScaleDockValidation20261010</a></td><td>asset</td><td>document references</td><td>3</td></tr><tr><td><a href="TextureInspectorUiValidation20261010.html">TextureInspectorUiValidation20261010</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="TexturePendingMetadataShutdownValidation20261010.html">TexturePendingMetadataShutdownValidation20261010</a></td><td>asset</td><td>document references</td><td>2</td></tr><tr><td><a href="TexturePendingMetadataValidation20261010.html">TexturePendingMetadataValidation20261010</a></td><td>asset</td><td>document references</td><td>1</td></tr><tr><td><a href="TexturePendingNativeCloseValidation20261010.html">TexturePendingNativeCloseValidation20261010</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="TexturePipelineValidation20261009.html">TexturePipelineValidation20261009</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="TextureReimportSceneValidation20261010.html">TextureReimportSceneValidation20261010</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="TextureSceneReloadValidation20261010.html">TextureSceneReloadValidation20261010</a></td><td>asset</td><td>document references</td><td>4</td></tr><tr><td><a href="TextureShippingArtifactFailureValidation20261010.html">TextureShippingArtifactFailureValidation20261010</a></td><td>asset</td><td>document references</td><td>2</td></tr><tr><td><a href="TextureShippingCoreValidation20261010.html">TextureShippingCoreValidation20261010</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="TextureSidecarDiagnosticsValidation20261010.html">TextureSidecarDiagnosticsValidation20261010</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="TextureSpriteReimportValidation20261010.html">TextureSpriteReimportValidation20261010</a></td><td>asset</td><td>document references</td><td>4</td></tr><tr><td><a href="TextureStagedPublishConflictValidation20261010.html">TextureStagedPublishConflictValidation20261010</a></td><td>asset</td><td>document references</td><td>3</td></tr><tr><td><a href="../design/ArtifactStoreLeaseProtocol.html">ArtifactStoreLeaseProtocol</a></td><td>asset</td><td>document references</td><td>6</td></tr><tr><td><a href="../design/AssetSetImportReceipts.html">AssetSetImportReceipts</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/AsyncAssetPreparation.html">AsyncAssetPreparation</a></td><td>asset</td><td>document references</td><td>6</td></tr><tr><td><a href="../design/CodeMaterialAssetSet.html">CodeMaterialAssetSet</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/CodingConventions.html">CodingConventions</a></td><td>core</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/ContainerLibraryDesign.html">ContainerLibraryDesign</a></td><td>core</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/Dx12DeepCapture.html">Dx12DeepCapture</a></td><td>profile</td><td>document references</td><td>3</td></tr><tr><td><a href="../design/EngineVersionPolicy.html">EngineVersionPolicy</a></td><td>build</td><td>document references</td><td>7</td></tr><tr><td><a href="../design/FoliageAssetDepot.html">FoliageAssetDepot</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/GCCEIntegration.html">GCCEIntegration</a></td><td>scene</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/GpuDrivenMeshletDxrWiring.html">GpuDrivenMeshletDxrWiring</a></td><td>graph</td><td>document references</td><td>7</td></tr><tr><td><a href="../design/JobSchedulerDesign.html">JobSchedulerDesign</a></td><td>core</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/LatticeMaterialBlenderParity.html">LatticeMaterialBlenderParity</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/LatticeNodeSystem.html">LatticeNodeSystem</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialAssetAuthoring.html">MaterialAssetAuthoring</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphMeshSurface.html">MaterialGraphMeshSurface</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphPassRecording.html">MaterialGraphPassRecording</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphProduct.html">MaterialGraphProduct</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphProductIntegration.html">MaterialGraphProductIntegration</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphRasterSurface.html">MaterialGraphRasterSurface</a></td><td>material</td><td>document references</td><td>6</td></tr><tr><td><a href="../design/MaterialGraphSceneCook.html">MaterialGraphSceneCook</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneGeneration.html">MaterialGraphSceneGeneration</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneHost.html">MaterialGraphSceneHost</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneInput.html">MaterialGraphSceneInput</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneLookup.html">MaterialGraphSceneLookup</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="../design/MaterialGraphScenePacket.html">MaterialGraphScenePacket</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneRefraction.html">MaterialGraphSceneRefraction</a></td><td>material</td><td>document references</td><td>4</td></tr><tr><td><a href="../design/MaterialGraphSceneShadowDecal.html">MaterialGraphSceneShadowDecal</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneSubsurface.html">MaterialGraphSceneSubsurface</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSceneVolume.html">MaterialGraphSceneVolume</a></td><td>material</td><td>document references</td><td>6</td></tr><tr><td><a href="../design/MaterialGraphSchema.html">MaterialGraphSchema</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSharedDepth.html">MaterialGraphSharedDepth</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphSurfaceBatch.html">MaterialGraphSurfaceBatch</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialGraphTextureFootprints.html">MaterialGraphTextureFootprints</a></td><td>asset</td><td>document references</td><td>5</td></tr><tr><td><a href="../design/MaterialNodeEditor.html">MaterialNodeEditor</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/MaterialSlangCodegen.html">MaterialSlangCodegen</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/ModelAnimationStorageSharing.html">ModelAnimationStorageSharing</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/OwnedBoundedPresentation.html">OwnedBoundedPresentation</a></td><td>graph</td><td>document references</td><td>2</td></tr><tr><td><a href="../design/PhysicsAPIContract.html">PhysicsAPIContract</a></td><td>physics</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/PhysicsComponentDesign.html">PhysicsComponentDesign</a></td><td>physics</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/PhysicsContactExecutionContract.html">PhysicsContactExecutionContract</a></td><td>physics</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/PlayerNativePresentation.html">PlayerNativePresentation</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/PrincipledCoreSemantics.html">PrincipledCoreSemantics</a></td><td>material</td><td>document references</td><td>6</td></tr><tr><td><a href="../design/PrincipledIblBake.html">PrincipledIblBake</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/PrincipledLayeredSemantics.html">PrincipledLayeredSemantics</a></td><td>material</td><td>document references</td><td>6</td></tr><tr><td><a href="../design/PrincipledMaterialAbi.html">PrincipledMaterialAbi</a></td><td>material</td><td>document references</td><td>3</td></tr><tr><td><a href="../design/PrincipledSpecialSemantics.html">PrincipledSpecialSemantics</a></td><td>material</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/ProfilerContinuousRecording.html">ProfilerContinuousRecording</a></td><td>profile</td><td>document references</td><td>2</td></tr><tr><td><a href="../design/ProfilerViewerProcess.html">ProfilerViewerProcess</a></td><td>profile</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/ReflectionDesign.html">ReflectionDesign</a></td><td>serialize</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/ReflectionRetentionDecision.html">ReflectionRetentionDecision</a></td><td>serialize</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/RenderPipelineTargetArchitecture.html">RenderPipelineTargetArchitecture</a></td><td>graph</td><td>document references</td><td>1</td></tr><tr><td><a href="../design/RhiGpuMemoryLifetimeDesign.html">RhiGpuMemoryLifetimeDesign</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/RHISoftwareCommandListSpecification.html">RHISoftwareCommandListSpecification</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/SdfTextRendering.html">SdfTextRendering</a></td><td>ui</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/SourceFreeAssetSetPackaging.html">SourceFreeAssetSetPackaging</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../design/TextureCodecBoundaryDesign.html">TextureCodecBoundaryDesign</a></td><td>asset</td><td>document references</td><td>8</td></tr><tr><td><a href="../README.html">README</a></td><td>build</td><td>document references</td><td>4</td></tr><tr><td><a href="../TechnicalGuide.html">TechnicalGuide</a></td><td>graph</td><td>document references</td><td>8</td></tr><tr><td><a href="../WEBSITE.html">WEBSITE</a></td><td>build</td><td>document references</td><td>5</td></tr></tbody></table></div></section><section><h2>기존 독립 시각화와 측정 자료</h2><ul><li><a href="CreatorEngine_REAC2025_Rendering_Comparison_20261019.html">docs/analysis/CreatorEngine_REAC2025_Rendering_Comparison_20261019.html</a></li><li><a href="EngineStructureAnalysis.html">docs/analysis/EngineStructureAnalysis.html</a></li><li><a href="EngineWiringAudit20261020.html">docs/analysis/EngineWiringAudit20261020.html</a></li><li><a href="FrameLifecycle.html">docs/analysis/FrameLifecycle.html</a></li><li><a href="LiveRenderWiring20261012.html">docs/analysis/LiveRenderWiring20261012.html</a></li><li><a href="MasterStructureReduction20261020.html">docs/analysis/MasterStructureReduction20261020.html</a></li><li><a href="measurements/20261019-remeasure-10/declare-analysis/index.html">docs/analysis/measurements/20261019-remeasure-10/declare-analysis/index.html</a></li><li><a href="measurements/20261019-remeasure-10/report.html">docs/analysis/measurements/20261019-remeasure-10/report.html</a></li><li><a href="RectTransformAnalysis.html">docs/analysis/RectTransformAnalysis.html</a></li><li><a href="ReEngineMeshletComparison20261011.html">docs/analysis/ReEngineMeshletComparison20261011.html</a></li><li><a href="ReEngineMeshletGraphFeasibility20261011.html">docs/analysis/ReEngineMeshletGraphFeasibility20261011.html</a></li><li><a href="RendererPortingLog.html">docs/analysis/RendererPortingLog.html</a></li><li><a href="RenderGraphDeclaration20261020.html">docs/analysis/RenderGraphDeclaration20261020.html</a></li><li><a href="../design/ResourceOwnershipDesign.html">docs/design/ResourceOwnershipDesign.html</a></li></ul></section><section class="sources"><p>visual-explainer kit의 Instrument 양식으로 생성했다. 이 원장은 소스·문서·링크 검증이며 엔진/GPU/SDK 실행 결과를 새로 주장하지 않는다.</p></section></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
+
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
+</script>
+</body></html>

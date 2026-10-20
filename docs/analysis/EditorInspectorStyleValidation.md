@@ -1,5 +1,45 @@
 # Inspector S&Box 스타일 적용 및 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/EditorEngineDistribution.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorEngineDistribution.h#L21) — `if (std::filesystem::is_regular_file(candidate / L"engine.info")) break;`
+- [Editor/EngineEntry/EditorEngineDistribution.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorEngineDistribution.h#L24) — `if (!std::filesystem::is_regular_file(candidate / L"engine.info"))`
+- [Editor/EngineEntry/EditorEngineDistribution.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorEngineDistribution.h#L28) — `if (preferRelease && std::filesystem::is_regular_file(release)) pointer = release;`
+- [Editor/EditorWindow/Windows/EditorStandardWindows.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.h#L58) — `struct editor_panel_windows`
+- [Editor/EditorWindow/Windows/EditorStandardWindows.h:116](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EditorWindow/Windows/EditorStandardWindows.h#L116) — `struct editor_tool_windows`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [ScriptCore/SerializeField.cs:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SerializeField.cs#L11) — `[AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]`
+- [ScriptCore/SerializeField.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SerializeField.cs#L12) — `public sealed class SerializeFieldAttribute : Attribute`
+- [ScriptCore/SerializeField.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SerializeField.cs#L15) — `public string? DisplayName { get; init; }`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/LogSink.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogSink.h#L7) — `class LogSink : public spdlog::sinks::base_sink<std::mutex>`
+- [Engine/Utility_Framework/LogSink.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogSink.h#L10) — `explicit LogSink(std::shared_ptr<LogStore> store) : m_store(std::move(store))`
+- [Engine/Utility_Framework/LogSink.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogSink.h#L12) — `if (!m_store) throw std::invalid_argument("LogSink requires a LogStore");`
+- [Editor/ImGuiHelper/EditorPropertyRow.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/EditorPropertyRow.h#L58) — `struct property_row_request`
+- [Editor/ImGuiHelper/EditorPropertyRow.h:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/EditorPropertyRow.h#L97) — `enum class property_layout_mode`
+- [Editor/ImGuiHelper/EditorPropertyRow.h:105](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/EditorPropertyRow.h#L105) — `struct property_layout_state`
+- [Editor/EngineGUIWindow/EditorChromeProbe.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorChromeProbe.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 날짜: 2026-09-12
 - 범위: PHASE 21 W2/W2-I의 Inspector 시각 스타일 후속 슬라이스
 - 기준: 사용자가 제공한 CreatorEngine / S&Box Inspector 스크린샷
@@ -64,8 +104,8 @@ Rotation은 이전 값을 매 프레임 덮어쓰고 있었다. 직접 입력 0�
   Inspector 본문을 그린 뒤 전역 테마가 복원되는 경로까지 확인했다.
 - 샘플 씬 편집은 저장하지 않았으며 설정/ini는 검증 전 원본과 바이트 단위로 동일하게 복원했다.
 
-화면: [기본 폭](../../Artifacts/phase21-inspector-style/inspector-normal.png),
-[좁은 폭](../../Artifacts/phase21-inspector-style/inspector-narrow.png).
+화면: 기본 폭 (`../../Artifacts/phase21-inspector-style/inspector-normal.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+좁은 폭 (`../../Artifacts/phase21-inspector-style/inspector-narrow.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 입력/Undo JSON 및 빌드 로그: `Artifacts/phase21-inspector-style/`.
 
 W2/W2-I 전체 완료 판정은 하지 않는다. 전용 드로어 전수, 모든 속성 타입·상호작용 상태,
@@ -84,7 +124,7 @@ Transform과 SerializeField Float3이 같은 기준을 소비한다.
 
 사용자 배율 150%의 현재 창에서 Position/Rotation/Scale 각각의 XYZ 가로 배치를 실제 화면으로
 확인했고, 사용자도 수정 결과를 확인했다.
-[확인 화면](../../Artifacts/phase21-float3-fit/transform-inline-confirmed.png).
+확인 화면 (`../../Artifacts/phase21-float3-fit/transform-inline-confirmed.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 Float3 수정의 Editor 라이브러리 빌드 및 수정이 포함된 runtime DLL/launcher 링크는 완료됐다.
 전체 통합 빌드 성공과는 구분한다. 동시 작업의 LogSink fmt 호환 오류 두 곳을 `size() != 0`으로
 수정했고 런처 후처리는 출력 파이프로 종료를 기다리도록 수정했다. 이후 통합 빌드는 새
@@ -92,3 +132,5 @@ Float3 수정의 Editor 라이브러리 빌드 및 수정이 포함된 runtime D
 추가 selftest는 작성·컴파일했지만 이번 회차에서 실행 통과로 계산하지 않는다.
 격리 DX12 배율 gate도 다시 열린 사용자 Editor를 감지해 시작 전에 중단됐으며,
 사용자 화면과 설정은 변경하지 않았다. 근거 로그는 `Artifacts/phase21-float3-fit/`에 둔다.
+
+</details>

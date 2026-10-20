@@ -1,5 +1,48 @@
 # PHASE 21 W1 — 테마·폰트·DPI 구현과 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineGUIWindow/EditorTheme.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L5) — `struct ImGuiStyle;`
+- [Editor/EngineGUIWindow/EditorTheme.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L18) — `struct EditorThemeTokens`
+- [Editor/EngineGUIWindow/EditorTheme.h:128](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L128) — `void ApplyEditorTheme(ImGuiStyle& style, float userScale, float dpiScale) noexcept;`
+- [Tools/regression/verify-editor-theme.ps1:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L29) — `Assert (Test-Path -LiteralPath $Exe) "Editor executable not found: $Exe"`
+- [Tools/regression/verify-editor-theme.ps1:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L95) — `Assert ($theme.perMonitorDpiAware -eq $true) "$case executable did not enable PerMonitorV2 DPI awareness."`
+- [Tools/regression/verify-editor-theme.ps1:100](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L100) — `$iconSpec = Get-Content -LiteralPath (Join-Path $repoRoot 'Resources/Editor/Fonts/MaterialSymbols.json') -Raw | ConvertFrom-Json`
+- [Tools/regression/verify-imgui-obsolete-surface.ps1:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-imgui-obsolete-surface.ps1#L38) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-imgui-obsolete-surface.ps1:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-imgui-obsolete-surface.ps1#L50) — `$withoutBlocks = [regex]::Replace($Text, '(?s)/\*.*?\*/', '')`
+- [Tools/regression/verify-imgui-obsolete-surface.ps1:105](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-imgui-obsolete-surface.ps1#L105) — `Name    = 'io.FontGlobalScale (1.92: style.FontScaleMain 을 쓴다)' },`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/Canvas.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14) — `class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>`
+- [Engine/SceneRuntime/Canvas.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Canvas.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20) — `Component::gc_trace(tracer);`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/Canvas.cpp:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L14) — `Canvas::Canvas()`
+- [Engine/SceneRuntime/Canvas.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L18) — `void Canvas::OnPropertyChanged(`
+- [Engine/SceneRuntime/Canvas.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L34) — `float Canvas::ComputeScaleFactor(const math::rect& screenRect) const`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-11. [정본 계획](../plans/EditorWorkspaceRedesignPlan.md)의 W1 후속 기록.
 
 ## 구현
@@ -87,3 +130,5 @@ Debug/Release의 실제 OS/viewport/font DPI는 모두 1.5이며 사용자 배�
 Release 경고 1건은 기존 `LNK4229 /DELAYLOAD:vulkan-1.dll`이다.
 W0 화면·성능 수치는 이전 스킨과 폰트의 기준선으로 보존하며,
 W1 결과를 W8의 최종 visual golden 또는 성능 회귀 판정으로 대신하지 않는다.
+
+</details>

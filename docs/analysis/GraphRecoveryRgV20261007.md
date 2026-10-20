@@ -1,5 +1,32 @@
 # 그래프 재질 복구·RG-V 수용 — 2026-10-07
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 결과와 계약
 
 Editor 모델 import/load와 씬 재질 로드에서 요청한 그래프의 원본·컴파일·텍스처 바인딩이 실패하면 원본을 보존하고 별도 `Assets/Materials/Recovered_<GUID>.shadergraph`와 identity를 게시한다. 기본 그래프는 **Principled BSDF → Material Output** 두 노드·한 연결이며, 공통 그래프 컴파일·재질 소비 경로에 연결된다. 유효한 모델 geometry는 유지한다. 복구 그래프를 열어 편집·저장·적용할 수 있고 씬 저장·재로드에서도 같은 그래프를 해석한다.
@@ -47,3 +74,5 @@ Artifacts: `Build/Verification/GraphRecoveryRgV20261007/Scene-Debug-final` 및 `
 C# source 표시·IR 연결, RG7~9 확장과 Vulkan runtime은 기존 해당 페이즈에 남는다. CSM depth-content cache를 구현한 작업은 아니다. 계획 공수는 RG-V 기본 viewer 4인일을 회수하여 전체 355인일 중 기성 106 / 잔여 249(+별도 미산정)로 갱신한다. commit/push는 하지 않았다.
 
 대시보드 집계 대조에서 RND-ENV의 명시적 earnedDays가 없어 progress가 자동 5인일 기성으로 계산되던 기존 불일치도 수정했다. 이 행은 잔여 10인일·미수용 상태이므로 earnedDays=0을 명시한다. PHASE 4 계열 데이터 집계는 원장과 동일한 355 / 106 / 249다.
+
+</details>

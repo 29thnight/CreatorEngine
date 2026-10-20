@@ -1,5 +1,52 @@
 # PHASE 21 W1 — DPI·리사이즈 표시 오류 원인 분석과 해결안
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/RHI/ScreenSizedResource.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/ScreenSizedResource.h#L36) — `uint32_t ApplyX(uint32_t screenWidth) const`
+- [Engine/RenderEngine/RHI/ScreenSizedResource.h:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/ScreenSizedResource.h#L42) — `uint32_t ApplyY(uint32_t screenHeight) const`
+- [Engine/RenderEngine/RHI/ScreenSizedResource.h:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/ScreenSizedResource.h#L121) — `class ScreenResizeBus`
+- [Editor/EngineEntry/App.cpp:398](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L398) — `uint32_t Core::App::PublishRenderFrame()`
+- [Editor/EngineEntry/App.cpp:524](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L524) — `const auto progress = RHIShaderCompiler::GetProgress();`
+- [Editor/EngineEntry/App.cpp:570](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L570) — `detail = (progress.recompiling ? std::wstring(L"Recompiling shader (cache miss). ") : std::wstring{}) + widen(progress.phase) + L": " + widen(std::filesystem::path(progress.name).filename().string()) +`
+- [Editor/EngineEntry/EditorMain.cpp:133](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp#L133) — `ScreenResizeBus::Get().SetSize(`
+- [Editor/EngineEntry/EditorMain.cpp:148](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp#L148) — `EnhancedSceneRenderer::SetDisplayPresentationSink(`
+- [Editor/EngineEntry/EditorMain.cpp:356](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp#L356) — `EditorAssetPresentation::Get().Initialize();`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L45) — `const float denom = math::dot(planeNormal, ray.direction);`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L47) — `if (std::fabs(denom) < 1e-6f)`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:211](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L211) — `m_editorCameraRig->PublishPresentationDiagnostics(displayed,`
+- [Editor/EngineGUIWindow/EditorWindowChrome.cpp:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.cpp#L40) — `WidenUtf8(EditorSettingsStore::Get().Build().GetProjectName());`
+- [Editor/EngineGUIWindow/EditorWindowChrome.cpp:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.cpp#L45) — `EditorWindowChrome& EditorWindowChrome::Get() noexcept`
+- [Editor/EngineGUIWindow/EditorWindowChrome.cpp:62](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.cpp#L62) — `std::optional<LRESULT> EditorWindowChrome::HandleWindowMessage(`
+- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:154](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L154) — `m_renderer->Resize(static_cast<uint32_t>((std::max)(0.0f, newSize.x)),`
+- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:196](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L196) — `if (!m_renderer->RenderAndPresent(presentError, recordCallback) &&`
+- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:238](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L238) — `void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,`
+- [Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp:456](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp#L456) — `bool ImGuiDx12Shell::Initialize(void* windowHandle, uint32_t width, uint32_t height,`
+- [Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp:587](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp#L587) — `void ImGuiDx12Shell::Resize(uint32_t width, uint32_t height)`
+- [Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp:776](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp#L776) — `void ImGuiDx12Shell::SubmitCpuRgbaFrame(uint64_t key, uint32_t width,`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp:115](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp#L115) — `bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp:923](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp#L923) — `bool VulkanDeviceResources::Resize(uint32_t width, uint32_t height, std::string& outError)`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp:1758](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp#L1758) — `bool VulkanDeviceResources::AttachSwapChain(void* windowHandle, uint32_t width,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-12, HEAD `3efbb23f`와 기존 W1 변경이 포함된 작업 트리 기준.
 [정본 W1](../plans/EditorWorkspaceRedesignPlan.md) ·
 [실제 재현·복원 기록](EditorW1InteractiveValidation.md).
@@ -232,3 +279,5 @@ R3의 첫 새 GPU 완료까지 걸리는 시간은 R0에서 계측하고 정상 
 - `Artifacts/phase21-w1-final-visual/render-log-review.json`
 
 위 산출물은 기존 검증의 로컬 증거이며 이번 문서 작성 중 새로 실행해 얻은 결과가 아니다.
+
+</details>

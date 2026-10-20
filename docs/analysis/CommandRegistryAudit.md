@@ -1,3 +1,52 @@
+# CommandRegistryAudit
+
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Scene.h:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L48) — `class MeshRenderer;`
+- [Engine/SceneRuntime/Scene.h:348](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L348) — `Entity* CreateEntity(std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);`
+- [Engine/SceneRuntime/Scene.h:881](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L881) — `void UpdateModelRecursive(Entity::Index entityIndex, math::matrix4x4 model,`
+- [Engine/RenderEngine/Texture.h:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L56) — `class Texture : public meta::polymorphic,`
+- [Engine/RenderEngine/Texture.h:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L75) — `static own::shared_owner<const Texture> LoadFormPath(_In_ const file::path& path, bool isCompress = false);`
+- [Engine/RenderEngine/Texture.h:212](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Texture.h#L212) — `class TextureManager : public Singleton<TextureManager>`
+- [Engine/RenderEngine/DataSystem.h:430](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L430) — `std::size_t BindModelGenerationTextures(Material& material,`
+- [Engine/RenderEngine/DataSystem.h:545](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L545) — `own::shared_owner<const experiment::Material> LoadAuthoredMaterialShared(`
+- [Engine/RenderEngine/DataSystem.h:944](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L944) — `static auto DataSystems = DataSystem::GetInstance();`
+- [Engine/RenderEngine/MeshOptimizer.h:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MeshOptimizer.h#L4) — `class MeshOptimizer`
+- [Engine/RenderEngine/MeshOptimizer.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MeshOptimizer.h#L15) — `static LOD::Optional GenerateLODs(const Mesh& originalMesh, const std::vector<float>& lodThresholds);`
+- [Engine/RenderEngine/MeshOptimizer.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MeshOptimizer.h#L18) — `static void OptimizeMesh(std::vector<Vertex>& vertices, std::vector<uint32>& indices);`
+- [Engine/CommandService/SocketPlatform.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/SocketPlatform.h#L38) — `struct SocketSubsystem`
+- [Engine/CommandService/SocketPlatform.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/SocketPlatform.h#L40) — `SocketSubsystem();`
+- [Engine/CommandService/SocketPlatform.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/SocketPlatform.h#L41) — `~SocketSubsystem();`
+- [Engine/RenderEngine/ShaderMetaReflection.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMetaReflection.h#L8) — `struct ShaderMetaPropertyBinding`
+- [Engine/RenderEngine/ShaderMetaReflection.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMetaReflection.h#L24) — `struct ShaderMetaBindingLayout`
+- [Engine/RenderEngine/ShaderMetaReflection.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMetaReflection.h#L38) — `bool Resolve(const ShaderMeta& meta,`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L13) — `struct DescriptorSeed`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L65) — `const DescriptorSeed* FindDescriptorSeed(std::string_view canonical);`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L67) — `std::size_t DescriptorSeedCount() noexcept;`
+- [Tools/build.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L5) — `[ValidateSet('Debug','Release')][string]$Config = 'Debug',`
+- [Tools/build.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L16) — `[ValidateRange(1,1000000)][int]$SmokeFrames = 120,`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > 2026-09-06 방향 수정: 이 문서는 과거 조사 기록이다. 아래의 "살려서 게이트에 건다",
 > "명령 보존", "남은 probe 이관"은 자동 실행 지침이 아니다. 현재 처분은
 > [CommandSurfaceDisposition.tsv](CommandSurfaceDisposition.tsv), 구현 순서는
@@ -1066,3 +1115,5 @@ probe 로 옮겨져 이미 없다** — 지금 돌리면 `command.unknown` 으�
 **누출되지 않았다.** probe는 실제로 픽스처를 만들었고(`publish=5`) 저장 문서에는
 루트와 `Transform`만 있다. **이 시나리오에서 안 난다는 것만 확인했고, 어떤
 경로로도 안 난다고 증명한 것은 아니다.**
+
+</details>

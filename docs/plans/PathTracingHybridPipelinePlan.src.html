@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 4.85 — Path Tracing·Hybrid RT 렌더 파이프라인</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="PathTracingHybridPipelinePlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/PathTracingHybridPipelinePlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PHASE 4.85 — Path Tracing·Hybrid RT 렌더 파이프라인</h1><p>RTP-0~13: 공통 RT geometry/AS·hit material 계약, Hybrid RT 효과와 progressive/interactive PT, 설정·fallback·수명·제품 회귀를 연결한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>RTP-0&#126;13: 공통 RT geometry/AS·hit material 계약, Hybrid RT 효과와 progressive/interactive PT, 설정·fallback·수명·제품 회귀를 연결한다.</li>
+<li>ReSTIR PT와 tetrahedral cage 연구는 재현·oracle·전체 frame/VRAM 비용 후 채택한다. raster meshlet/GD·REAC의 구현을 RT/PT 제품 완료로 보지 않는다. 중앙 208인일은 과거 추정이며 새 구현 공수로 재확정해야 한다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>material document → compiled program → sealed scene inputs → material graph stages → RHI submission</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RTP-0</code> · PHASE 4.85</td>
+<td>현재 call path·장치 지원·세 모드 계약·baseline/예산·연구/코드 출처 봉인</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-1</code> · PHASE 4.85</td>
+<td>RT RHI·정적 BLAS/TLAS·table·graph AS 의존/수명</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-2</code> · PHASE 4.85</td>
+<td>RT hit material·BSDF/light/environment 공통 evaluator</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-3</code> · PHASE 4.85</td>
+<td>RT/PT accumulation·재투영·denoising 입출력·history</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-4</code> · PHASE 4.85</td>
+<td>Hybrid 첫 directional hard shadow</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-5</code> · PHASE 4.85</td>
+<td>Hybrid 효과별 반사/GI·굴절·volume 경계·fog visibility 평가/통합</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-6</code> · PHASE 4.85</td>
+<td>기본 offscreen progressive Path Tracer·reference</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-7</code> · PHASE 4.85</td>
+<td>interactive PathTracing 제품 graph·Editor Scene/Game·Player</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-8</code> · PHASE 4.85</td>
+<td>ReSTIR PT 기본 reservoir 계약 및 Enhanced 개선 구현/평가</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-9</code> · PHASE 4.85</td>
+<td>tetrahedral cage 자산 전처리·cook/LOD·reference</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-10</code> · PHASE 4.85</td>
+<td>cage RT 변형·ray 변환·수명·두 모드 통합 평가</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-11</code> · PHASE 4.85</td>
+<td>Raster/Hybrid/PathTracing 설정·진단·프로파일</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-12</code> · PHASE 4.85</td>
+<td>세 모드 제품 회귀·스트레스·계측 수용</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>RTP-13</code> · PHASE 4.85</td>
+<td>효과·연구별 채택 판정과 최종 페이즈 감사</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialResolver.cpp#L23">Engine/RenderEngine/Experiment/MaterialResolver.cpp:23</a> — <code>bool NormalizeMaterialKeywordSelections(const Material&amp; material,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/LXMaterialPipeline.h#L18">Engine/RenderEngine/LXMaterialPipeline.h:18</a> — <code>std::string dependencies, sealedProgramIdentity;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L90">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:90</a> — <code>using LiveGraphSnapshot = std::shared_ptr&lt;const EnhancedRenderGraph::DiagnosticSnapshot&gt;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L59">Engine/RenderEngine/RenderScene.h:59</a> — <code>bool BeginProxyFrame(uint64_t sceneEpoch);</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="1-현재-기반과-연결-지점"></span>
+<span id="2-세-모드와-공통-소유권"></span>
+<span id="3-구현연구-슬라이스"></span>
+<span id="4-실행-순서와-기존-id-대응"></span>
+<span id="5-restir-pt-enhanced-적용-계약"></span>
+<span id="6-amd-tetrahedral-cages-적용-계약"></span>
+<span id="7-공통-수용과-공수-확정"></span>
+<span id="8-공수-산정--2026-10-08"></span>
+<span id="sec-1-현재-기반과-연결-지점"></span>
+<span id="sec-2-세-모드와-공통-소유권"></span>
+<span id="sec-3-구현연구-슬라이스"></span>
+<span id="sec-4-실행-순서와-기존-id-대응"></span>
+<span id="sec-5-restir-pt-enhanced-적용-계약"></span>
+<span id="sec-6-amd-tetrahedral-cages-적용-계약"></span>
+<span id="sec-7-공통-수용과-공수-확정"></span>
+<span id="sec-8-공수-산정--2026-10-08"></span>
+<span id="sec-연결-정본"></span>
+<span id="연결-정본"></span></p>
+</details>
+</main></body></html>

@@ -1,5 +1,31 @@
 # DLSS 비 Quality 모드 startup 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-11. Native AA → Balanced → Performance → Ultra Performance의 Debug/Release startup 검증을 완료했다. 판정 근거는 `Artifacts/PR169/dlss-startup-20261011`에 저장한다. 전체 PHASE 4.5 종료 판정과 구분한다.
 
 ## Balanced 수정
@@ -39,3 +65,5 @@ DX12 RTX 2080 Ti, display 760×312, 고정 SDK 60 Hz의 불투명 fixture다. st
 ## 대시보드 정합성
 
 정본 계획서와 HEAD에 존재하지만 작업 대시보드에서 누락된 TU4(XeSS, 진행/기성 0, 3일)를 복원했다. 실제 TASKS 평가 결과 16행/71일이며 meta 산수 불일치 0이다. JavaScript 전체 파싱과 렌더 검사는 통과했다. 기존 전체 검사 스크립트는 별도 PHASE 4.85의 따옴표 키로 작성된 14항목을 인식하지 못해 문자열 140건/모양 14건을 보고하므로 전체 도구 통과로 기록하지 않는다. 근거는 dashboard-check.log 및 phase-total-check.json이다.
+
+</details>

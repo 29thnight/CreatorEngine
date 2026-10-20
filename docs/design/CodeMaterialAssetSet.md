@@ -1,5 +1,52 @@
 # Source-free authored Code materials in AssetSets
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/code_material_runtime_probe.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/code_material_runtime_probe.cpp#L28) — `auto base = own::make_shared<experiment::Material>();`
+- [Tools/regression/code_material_runtime_probe.cpp:188](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/code_material_runtime_probe.cpp#L188) — `const auto existing = std::ranges::find(value.properties, propertyName, &experiment::MaterialProperty::name);`
+- [Tools/regression/code_material_runtime_probe.cpp:197](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/code_material_runtime_probe.cpp#L197) — `Require(experiment::BindPreparedMaterialTextures(value, supplied, error),`
+- [Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp#L136) — `if (!experiment::SerializeMaterialAuthoring(material, source.Root(), failure))`
+- [Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp:279](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp#L279) — `auto material = ck::BuildMaterialAssetSetProduct({CodeId(1), CodeBytes(fixture.materialText),`
+- [Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp:297](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/ExperimentParity/ExperimentCodeMaterialCodecSelfTest.cpp#L297) — `check.Check(!ck::ValidateAuthoredMaterialBinding(document, decoded, failure), "wrong doubleSided raster policy type rejected");`
+- [BuildTool/Metadata.cs:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Metadata.cs#L9) — `internal sealed record FileEntry(string Path, long Bytes, string Sha256);`
+- [BuildTool/Metadata.cs:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Metadata.cs#L11) — `internal static class Metadata`
+- [BuildTool/Metadata.cs:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Metadata.cs#L65) — `if (value.Int("schemaVersion") != 1 || value.Text("productName") != "CreatorEngine 2") throw new BuildException("Unsupported engine product metadata.");`
+- [Engine/RenderEngine/ShaderMeta.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L21) — `struct ShaderMetaAssetOrigin;`
+- [Engine/RenderEngine/ShaderMeta.h:62](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L62) — `struct ShaderMaterialSampler`
+- [Engine/RenderEngine/ShaderMeta.h:174](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L174) — `own::shared_owner<const AssetDepot::ShaderMetaAssetOrigin> assetOrigin{};`
+- [Engine/RenderEngine/Experiment/Model.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L9) — `class ModelLoader;`
+- [Engine/RenderEngine/Experiment/Model.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L52) — `[[nodiscard]] std::span<const Material> Materials() const noexcept;`
+- [Engine/RenderEngine/Experiment/Model.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L58) — `[[nodiscard]] const Material* TryGetMaterial(MaterialIndex index) const noexcept;`
+- [Engine/RenderEngine/AssetDepot/AssetLink.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetLink.h#L9) — `class Material;`
+- [Engine/RenderEngine/AssetDepot/AssetLink.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetLink.h#L10) — `struct ShaderMeta;`
+- [Engine/RenderEngine/AssetDepot/AssetLink.h:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetDepot/AssetLink.h#L54) — `struct AssetTypeTraits<experiment::Material>`
+- [Engine/RenderEngine/Experiment/MaterialInstance.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialInstance.h#L34) — `explicit MaterialInstance(own::shared_owner<const Material> base)`
+- [Engine/RenderEngine/Experiment/MaterialInstance.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialInstance.h#L39) — `[[nodiscard]] const own::shared_owner<const Material>& Base() const noexcept`
+- [Engine/RenderEngine/Experiment/MaterialInstance.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialInstance.h#L87) — `own::shared_owner<const Material> base_{};`
+- [Engine/RenderEngine/ShaderMeta.cpp:571](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L571) — `meta.generatedMaterial = std::move(generated);`
+- [Engine/RenderEngine/ShaderMeta.cpp:610](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L610) — `std::filesystem::path ShaderMeta::ResolveSource(`
+- [Engine/RenderEngine/ShaderMeta.cpp:616](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L616) — `bool ShaderMetaLoader::LoadFile(const std::filesystem::path& path,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 This is the separate authored-Code recipe. Existing Lattice material/program
 representation 1 is unchanged. ShaderMeta remains a CPU descriptor and never
 claims compiled-shader readiness.
@@ -189,3 +236,5 @@ omitted and restored from the program; edited matrices are rejected because the
 existing authored value schema has no matrix variant. Anonymous inline code
 values that carry only a ShaderMeta ID must acquire a stable cooked base Material
 before source-free construction; a program identity is never guessed from metadata.
+
+</details>

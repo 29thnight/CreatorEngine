@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 12 — Inspector 실제 입력 검증</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="TextureInspectorUiValidation20261010.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/TextureInspectorUiValidation20261010.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 12 — Inspector 실제 입력 검증</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L11">Engine/SceneRuntime/SpriteRenderer.h:11</a> — <code>class [[reflgen::reflect]] SpriteRenderer : public meta::identity&lt;SpriteRenderer, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L16">Engine/SceneRuntime/SpriteRenderer.h:16</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L18">Engine/SceneRuntime/SpriteRenderer.h:18</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L14">Engine/SceneRuntime/ImageComponent.h:14</a> — <code>class [[reflgen::reflect]] ImageComponent : public meta::identity&lt;ImageComponent, UIComponent&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L19">Engine/SceneRuntime/ImageComponent.h:19</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L21">Engine/SceneRuntime/ImageComponent.h:21</a> — <code>UIComponent::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.cpp#L9">Engine/SceneRuntime/SpriteRenderer.cpp:9</a> — <code>void SpriteRenderer::OnInitialized()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.cpp#L20">Engine/SceneRuntime/SpriteRenderer.cpp:20</a> — <code>void SpriteRenderer::OnAddedToScene()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.cpp#L31">Engine/SceneRuntime/SpriteRenderer.cpp:31</a> — <code>void SpriteRenderer::OnRemovingFromScene()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L19">Engine/SceneRuntime/ImageComponent.cpp:19</a> — <code>ImageComponent::ImageComponent()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L24">Engine/SceneRuntime/ImageComponent.cpp:24</a> — <code>bool ImageComponent::ReplaceTextureOwner(const Texture* previous,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L25">Engine/SceneRuntime/ImageComponent.cpp:25</a> — <code>const own::shared_owner&lt;const Texture&gt;&amp; replacement)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>기준일: 2026-10-10 KST. 동기화 후 HEAD b2f918c19 및 로컬 후속 수정 상태.
+정본: <a href="../plans/TexturePipelinePlan.html">TexturePipelinePlan</a>.</p>
+<h2>실행 범위</h2>
+<p>현재 Debug Editor를 별도 프로젝트 <code>Build/TUI-Debug-1479b598/Project</code>로 실행했다.
+기존 SpriteRenderer/ImageComponent 저장 fixture와 원본 4×4 PNG를 복사하고
+저장 참조를 격리 프로젝트 경로로 교체했다. 시작 시나리오는 저장 씬 로드,
+미저장 <code>UnsavedTextureGate</code> 생성 및 Inspector 표시만 준비했다.
+수용 대상 버튼·경고·취소·파일 선택은 Windows Computer Use의 실제 마우스 입력으로
+조작했고 매 행동 뒤 화면을 다시 확인했다. 내부 명령으로 클릭을 대체하지 않았다.</p>
+<p>runtime DLL SHA-256: <code>2BBDE3F4CA8459E030B67251408F6FB3A4EF0DB909A310D0A7C20AF3A040C73F</code>.</p>
+<h2>관찰 결과</h2>
+<ol>
+<li>실제 Content Browser 텍스처 클릭으로 Import Settings 표시</li>
+<li>Maximum Dimension의 + 버튼을 두 번 눌러 0→2 변경; Save 전 .meta는 0 유지</li>
+<li>Save and Reimport 클릭 뒤 .meta maxDimension=2, GUID 보존 및 Cooked generation ready 표시</li>
+<li>Reload Saved Scene 클릭으로 새 cooked 참조 연결 안내와 미저장 편집 폐기 경고 표시</li>
+<li>경고창 Cancel 클릭 뒤 현재 씬의 TextureGate/UnsavedTextureGate 둘 다 유지</li>
+<li>Choose Scene and Reload로 native 파일 선택창 열기; 파일 선택 취소 뒤 두 엔티티 유지</li>
+<li>다시 선택창에서 SavedFixture.creator 선택·Open 클릭 후 저장 씬 표시,
+TextureGate 유지 및 UnsavedTextureGate 제거, Inspector 설정 2 유지</li>
+</ol>
+<p>실제 입력과 화면 관찰 기준 위 흐름은 통과했다. PNG 원본 hash는 Tiny4.png와 동일하고
+GUID도 유지됐다. 마지막 재로드 화면은 <code>Build/TUI-Debug-1479b598/reloaded-inspector.png</code>,
+receipt는 같은 폴더 <code>result.json</code>, 시작 시나리오와 stdout/stderr도 보존했다.
+GUI 선택창의 기본 폴더가 격리 프로젝트 Assets/Scenes임을 확인했다.
+검증용 Editor 종료와 Finalize 완료를 확인했다. 이번 검사에서 엔진 코드는 변경하지 않았다.
+대시보드 전체 JavaScript 파싱·렌더·유한 진행률 및 문서 whitespace 검사는 통과했다.
+기존 PHASE 4.85 구조 문제는 문자열 140건/항목 모양 14건 그대로 남아 전체 구조
+검사는 실패한다(<code>Build/phase12-inspector-ui-dashboard.log</code>).</p>
+<h2>판정 한계</h2>
+<p>Debug 실제 UI 한 번의 작은 fixture 검증이다. Release의 실제 UI 반복, 여러 창/배율,
+invalid setting·cook 실패 시 UI 상태/disabled gating, 대량 자산 및 입력 경합은 미검증이다.
+문자 붙여넣기 자동화는 입력값을 바꾸지 못해 + 버튼으로 값을 변경했다.
+숫자 키/붙여넣기의 제품 결함으로 확정하지 않으며 키보드 입력 검증은 남긴다.
+sceneId/owner identity는 이번 UI 실행에서 독립 조회하지 않았다. 앞선 API/프레임
+종단 검증과 구분한다. GPU 화면을 관찰했으나 기대 픽셀 oracle이나 압축 품질 검사도 아니다.</p>
+<p>T0/T1a/T2 진행 중 및 earnedDays 0, T1b 대기, T3 중단은 유지한다.
+다음 수용은 UI의 남은 입력/실패 경계와 GPU·모델·Shipping 소비 검증이다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-관찰-결과"></span><span id="sec-실행-범위"></span><span id="sec-판정-한계"></span><span id="관찰-결과"></span><span id="실행-범위"></span><span id="판정-한계"></span></details></main></body></html>

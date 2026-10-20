@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Editor 입력 컨트롤·메뉴 간격 보정 (2026-09-12)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorControlDensityValidation.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorControlDensityValidation.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Editor 입력 컨트롤·메뉴 간격 보정 (2026-09-12)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16">Tools/regression/verify-editor-theme.ps1:16</a> — <code>$Exe = [IO.Path]::GetFullPath($Exe)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17">Tools/regression/verify-editor-theme.ps1:17</a> — <code>$Work = [IO.Path]::GetFullPath($Work)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36">Tools/regression/verify-editor-theme.ps1:36</a> — <code>$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/LightComponent.cs#L4">ScriptCore/LightComponent.cs:4</a> — <code>public enum LightType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/LightComponent.cs#L17">ScriptCore/LightComponent.cs:17</a> — <code>public enum LightStatus</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/LightComponent.cs#L40">ScriptCore/LightComponent.cs:40</a> — <code>public sealed class LightComponent : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L19">Engine/SceneRuntime/LightComponent.h:19</a> — <code>class [[reflgen::reflect]] LightComponent : public meta::identity&lt;LightComponent, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L23">Engine/SceneRuntime/LightComponent.h:23</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L25">Engine/SceneRuntime/LightComponent.h:25</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.cpp#L5">Engine/SceneRuntime/LightComponent.cpp:5</a> — <code>void LightComponent::OnInitialized()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.cpp#L36">Engine/SceneRuntime/LightComponent.cpp:36</a> — <code>void LightComponent::OnAddedToScene()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.cpp#L50">Engine/SceneRuntime/LightComponent.cpp:50</a> — <code>void LightComponent::OnRemovingFromScene()</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>원인과 수정</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>증상</th>
+<th>원인</th>
+<th>수정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>체크박스·드롭다운·float 입력이 큼</td>
+<td>글꼴 16px에 상하 padding 4px가 더해져 컨트롤 높이 24px. 사용자/모니터 배율이 각각 150%이면 약 54 physical px</td>
+<td>상하 padding 2px, 컨트롤 높이 20 logical px. 일반 행 간격 8→4px, 본문 글꼴 16px 유지</td>
+</tr>
+<tr>
+<td>탭 핸들 크기 유지</td>
+<td>ImGui 탭과 입력칸이 FramePadding을 공유해 함께 축소됨</td>
+<td>TabStyleScope로 NewFrame의 floating dock, DockSpace, 창 Begin, Animator의 명시적 탭에 기존 4px padding 적용. 본문은 2px로 복원하며 탭 높이는 기존 24px 유지</td>
+</tr>
+<tr>
+<td>컴포넌트 활성 체크박스가 제목보다 큼</td>
+<td>ImGui Checkbox가 GetFrameHeight() 전체를 사각형 크기로 사용</td>
+<td>해당 체크박스에만 padding.y=0을 적용해 16px. 예약 칸도 16px, 제목과 간격 6px로 조정</td>
+</tr>
+<tr>
+<td>Add Component 문구가 잘림</td>
+<td>배율과 문구 길이에 관계없는 고정 물리 폭 180px</td>
+<td>CalcTextSize+실제 padding으로 최소 폭 산정. 내용 영역 안에서 가운데 배치. 부족하면 Add/Component 두 줄 표시</td>
+</tr>
+<tr>
+<td>메뉴 항목이 붙음</td>
+<td>제목 줄에서 사용하는 ItemSpacing.y=0이 열린 팝업까지 상속됨</td>
+<td>메뉴 간격 x=10/y=6px, 팝업 WindowPadding=8×6px. 제목 행 높이 20px 유지</td>
+</tr>
+</tbody></table></div>
+<p>컴포넌트 헤더의 접기 버튼은 체크박스 사각형 위에서 반응하지 않도록 분리했다.
+ImGui Checkbox와 기존 Component::SetEnabled 경로를 계속 사용한다.
+메뉴는 표준 BeginMenu/MenuItem, 입력값 편집은 기존 ImGui 및 Inspector 숫자 위젯을 사용한다.</p>
+<h2>검증</h2>
+<p>증거 디렉터리: <code>Artifacts/phase21-control-density/</code>.</p>
+<ul>
+<li>Debug x64 <code>CreatorEditor.vcxproj /t:Build</code> 통과. 기존 <code>/DELAYLOAD:vulkan-1.dll</code> LNK4229 경고는 남는다.
+도중 커서 모듈의 변경된 호출부와 기존 라이브러리가 달라 LNK2019가 발생했고,
+해당 모듈을 포함한 재빌드로 통과했다. 이 작업에서 커서 소스는 수정하지 않았다.</li>
+<li>최종 실행 파일의 <code>editor.selftest</code>: <strong>916 checks, 0 failures</strong>. <code>editor.theme</code>의
+geometry/theme mapping, DPI, Inter/Material Symbols 검사 모두 통과.</li>
+<li>실제 DX12 화면(사용자 150%, OS DPI 150%)에서 Scene/Game, Hierarchy, Inspector,
+Content Browser 탭이 기존 높이를 유지하고 본문 입력칸은 축소된 것을 확인했다.
+기본 16px 글꼴은 그대로이며 배율을 적용한 탭은 54 physical px,
+입력칸은 ImGui padding 절삭을 포함해 44 physical px이다.</li>
+<li>Main Camera의 Transform float3, Camera float4/float1, Tag/Layer 콤보와 체크박스 표시 확인.
+float2 전용 화면 및 모든 전용 드로어를 전수 조작한 결과는 아니다.</li>
+<li>LightComponent 체크박스 끄기/켜기와 헤더 접기를 각각 조작했다.
+체크박스 클릭으로 본문이 함께 접히지 않았고, 마지막에 활성 상태를 복원했다.</li>
+<li>Add Component 전체 문구 표시와 기존 컴포넌트 선택 팝업 열기 확인.
+창을 2880×1665 → 850×1245 → 720×1245 → 2880×1665로 변경하면서,
+마지막 좁은 폭에서 Add/Component 두 줄 표시를 확인했다. 컴포넌트 추가/씬 저장은 하지 않았다.</li>
+<li>Edit 드롭다운의 행 간격과 팝업 가장자리 여백을 실제 화면에서 확인했다.</li>
+<li><code>verify-editor-theme.ps1 -Backends dx12</code>: <strong>3회 기동, 64 checks 통과</strong>.
+사용자 배율 100→150→100% 왕복이며 실제 OS DPI는 150%였다.
+물리 모니터 간 이동 검증은 포함하지 않는다.</li>
+<li>검증용 Editor 종료 후 EngineSettings.asset와 imgui.ini를 시작 전 바이트로 복원했다.
+변경 파일 <code>git diff --check</code> 및 대시보드 JavaScript 구문 검사 통과.</li>
+</ul>
+<p>최종 탭/숫자 입력 화면: tabs-restored-camera.png (<code>../../Artifacts/phase21-control-density/tabs-restored-camera.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+좁은 패널: add-component-wrapped.png (<code>../../Artifacts/phase21-control-density/add-component-wrapped.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+메뉴 간격: edit-menu.png (<code>../../Artifacts/phase21-control-density/edit-menu.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+메뉴/LightComponent 동작 캡처는 탭 높이 복원 전 중간 빌드의 증거이며,
+최종 빌드의 탭과 입력칸 크기는 <code>tabs-restored-camera.png</code>를 기준으로 한다.</p>
+<p>Vulkan은 사용자 결정에 따라 보류한다. 이 작업은 W2-I 전체나 비동기 썸네일 W7의 완료를 의미하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증"></span><span id="sec-원인과-수정"></span><span id="검증"></span><span id="원인과-수정"></span></details></main></body></html>

@@ -1,5 +1,52 @@
 # LX Scene shadow caster와 Decal
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-scene-shadow-decal.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-shadow-decal.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-scene-shadow-decal.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-shadow-decal.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-scene-shadow-decal.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-shadow-decal.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17) — `struct SceneVolumeTriangle`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L19) — `math::vector4 a, b, c;`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31) — `own::shared_owner<const RenderBindings> material;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31) — `enum class EnhancedLiveDisplayTarget : uint8_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39) — `enum class EnhancedLiveViewFlags : uint32_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h:61](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h#L61) — `class EnhancedDecalPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h:119](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h#L119) — `own::shared_owner<TextureFramePins> texturePins = {})`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h:122](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h#L122) — `m_texturePins = std::move(texturePins);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.cpp:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L32) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.cpp:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L41) — `assets::Has(geometry.vertexAttributeMask, assets::VertexAttribute::BoneIndices))`
+- [Engine/RenderEngine/MaterialGraphSceneVolume.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.cpp#L46) — `if (!math::try_inverse(source.World()))`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3982](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3982) — `const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8223](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8223) — `EnhancedSceneRenderer::MutableRenderThreadHooks();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8381](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8381) — `const auto& hooks = EnhancedSceneRenderer::MutableRenderThreadHooks();`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp#L98) — `bool EnhancedDecalPass::Initialize(const EnhancedFrameContext& context, std::string& outError)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp#L109) — `bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp:204](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.cpp#L204) — `bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1. 제품 연결
 
 `EnhancedSceneRenderer`의 Shadow 노드는 기존 shadow pass 뒤에
@@ -125,3 +172,5 @@ Core/Layered generation 2개·그림자를 포함한 Ready 응답 18개·native 
 cook/package·Player는 [MaterialGraphSceneCook.md](MaterialGraphSceneCook.md), 실제 Editor
 Scene/Game·native Vulkan 전체 Scene은 [MaterialGraphProductIntegration.md](MaterialGraphProductIntegration.md)의
 후속 실행으로 완료했다. native shader/PSO 준비와 실제 Editor 상태·픽셀 검증은 구분한다.
+
+</details>

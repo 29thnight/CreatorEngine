@@ -1,5 +1,53 @@
 # Lattice (LX) — 공통 노드 저작 계층과 편집 UI
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+- 구 SRP 및 C# pipeline 저작 전환 제안은 취소됐다. 필요한 Pass는 현재 C++ 계약으로 작성하며, 별도 저작 체계는 실제 요구가 생기면 새 미래 계획으로 검토한다. 아래 원래 제안은 활성 계획이 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/ImGuiHelper/PinHelper.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L9) — `enum class PinType`
+- [Editor/ImGuiHelper/PinHelper.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L21) — `enum class PinKind`
+- [Editor/ImGuiHelper/PinHelper.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L71) — `ax::Widgets::Icon(ImVec2(static_cast<float>(m_PinIconSize), static_cast<float>(m_PinIconSize)), iconType, connected, color, ImColor(32, 32, 32, alpha));`
+- [Editor/ImGuiHelper/NodeEditor.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/NodeEditor.h#L29) — `class NodeEditor`
+- [Editor/ImGuiHelper/NodeEditor.h:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/NodeEditor.h#L32) — `NodeEditor() = default;`
+- [Editor/ImGuiHelper/NodeEditor.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/NodeEditor.h#L33) — `~NodeEditor() = default;`
+- [Engine/SceneRuntime/BTBuildGraph.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BTBuildGraph.h#L26) — `rootNode.Position = math::vector2(0, 0); // 초기 위치 설정`
+- [Engine/SceneRuntime/BTBuildGraph.h:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BTBuildGraph.h#L44) — `node.Name = std::string(name);`
+- [Engine/SceneRuntime/BTBuildGraph.h:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BTBuildGraph.h#L64) — `if (BT::IsDecoratorNode(selectedNodeType) && 0 < selectedNodeChildContainer.size()) return; // Decorator 노드는 자식이 최대 1개만 허용됨`
+- [Editor/ImGuiHelper/BlueprintBuilder.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/BlueprintBuilder.h#L6) — `struct BlueprintNodeBuilder`
+- [Editor/ImGuiHelper/BlueprintBuilder.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/BlueprintBuilder.h#L8) — `BlueprintNodeBuilder(ImTextureID texture = 0, int textureWidth = 0, int textureHeight = 0);`
+- [Editor/ImGuiHelper/BlueprintBuilder.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/BlueprintBuilder.h#L10) — `void Begin(NodeId id);`
+- [Editor/EngineGUIWindow/BTEditorBridge.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BTEditorBridge.h#L17) — `inline ed::PinId InputPin(const HashedGuid& id)`
+- [Editor/EngineGUIWindow/BTEditorBridge.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BTEditorBridge.h#L22) — `inline ed::PinId OutputPin(const HashedGuid& id)`
+- [Editor/EngineGUIWindow/BTEditorBridge.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BTEditorBridge.h#L27) — `inline ed::NodeId GetTreeNodeIdFromPin(ed::PinId pin)`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:286](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L286) — `ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuGapX),`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:287](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L287) — `editor::ThemePixels(editor::EditorThemeTokens::MenuGapY)));`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:289](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L289) — `ImVec2(editor::ThemePixels(editor::EditorThemeTokens::MenuPaddingX),`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:429](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L429) — `const float gap = editor::ThemePixels(7.f);`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:569](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L569) — `ImVec2(ImMin(editor::ThemePixels(requested) + ImGui::GetStyle().ScrollbarSize,`
+- [Editor/EngineGUIWindow/InspectorWindow.cpp:2730](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.cpp#L2730) — `ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::PropertyGapX), editor::ThemePixels(editor::EditorThemeTokens::ItemGapY)));`
+- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp#L19) — `if (!EditorAssetDatabase::IsTextureSource(source))`
+- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp:212](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp#L212) — `DrawYamlNodeEditor(node, label);`
+- [Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp:225](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp#L225) — `void DrawYamlNodeEditor(Authoring::WriteNode node, const std::string& label)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-09-24 Material 우선 범위 수정 · 독립 예제 구현 진행.** 공식 제품 명칭은 **Lattice**, 내부 접두어는 **LX**
 (`Lattice eXecution`)다. `imgui-node-editor`는 LX 편집 계층과 기존 소비자 이관이
 끝나면 제거한다는 사용자 요구를 확정 조건으로 둔다. 아래의 타입 경계와 UI 세부는
@@ -15,7 +63,7 @@
 | Behavior Tree | [`BTBuildGraph.h`](../../Engine/SceneRuntime/BTBuildGraph.h)의 `.bt` 노드/자식, [`BTEditorBridge.h`](../../Editor/EngineGUIWindow/BTEditorBridge.h)와 [`MenuBarWindow.cpp`](../../Editor/EngineGUIWindow/MenuBarWindow.cpp)의 직접 `ax::NodeEditor` 호출 | 이후 BT 자산·창을 재작성할 때 LX를 사용. 기존 `.bt` 변환 없음 |
 | Animator state graph | [`AnimatorEditorWindows.cpp`](../../Editor/EngineGUIWindow/AnimatorEditorWindows.cpp)의 `NodeEditor`와 `Assets/NodeEditor/*.json` 위치 sidecar | 독립 예제에서 상태 이름만 보이는 제목 전용 노드와 방향 화살표 전이 스타일을 검증. 이후 controller·창을 재작성할 때 LX를 사용. 기존 위치 JSON 변환 없음 |
 | `NodeEditor` / `BlueprintBuilder` | [`NodeEditor.h`](../../Editor/ImGuiHelper/NodeEditor.h)는 프레임마다 노드를 만들고 이름으로 연결한다. [`BlueprintBuilder.h`](../../Editor/ImGuiHelper/BlueprintBuilder.h)는 node-editor 그리기 보조 | 공통 저작 모델로 승격하지 않고 소비자를 옮긴 뒤 은퇴 |
-| 렌더 파이프라인 | [현재 C# Pipeline IR 정본](RenderPipelineTargetArchitecture.md)은 C# 저작 → native IR → RenderGraph 실행 | 향후 시각화/저작 요구가 생기면 같은 IR을 투영하거나 생성. 별도 실행 그래프는 만들지 않음 |
+| 렌더 파이프라인 | [기존 C++ Pass 실행 경계](RenderPipelineTargetArchitecture.md)를 유지. 2026-10-20 별도 SRP/C# 저작 전환 취소 | 현재 LX 저작 범위에서 제외. 구체적인 필요가 생기면 미래 계획으로 재검토 |
 
 현재 `imgui-node-editor`는 [`vcpkg.json`](../../vcpkg.json)의 직접 의존이다. BT와
 Animator가 실제 UI 소비자이므로 Material Graph 창만 LX로 그려서는 의존성을
@@ -298,3 +346,5 @@ Blender형 기본 스타일·외부 스타일 파일과 `.shadergraph` 저장을
 문서·revision을 검증하는 인증 HTTP도 같은 LXDocument에 연결된다.
 Scene 자원 게시와 Player cooked 실행은 기존 MAT 제품 경로가 소유한다.
 BT/Animator 교체나 `imgui-node-editor` 전체 제거를 이 연결의 완료로 세지 않는다.
+
+</details>

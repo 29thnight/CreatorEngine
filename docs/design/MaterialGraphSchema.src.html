@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-2 Material 문서와 typed IR</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSchema.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSchema.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-2 Material 문서와 typed IR</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialIR.h#L10">Lattice/Material/LXMaterialIR.h:10</a> — <code>struct LXMaterialIRSocket</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialIR.h#L24">Lattice/Material/LXMaterialIR.h:24</a> — <code>struct LXMaterialIRNode</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialIR.h#L67">Lattice/Material/LXMaterialIR.h:67</a> — <code>std::optional&lt;LXMaterialIR&gt; BuildMaterialIR(const LXMaterialAsset&amp; asset, std::vector&lt;Issue&gt;* issues = nullptr);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialGraph.h#L72">Lattice/Material/LXMaterialGraph.h:72</a> — <code>class LXMaterialAsset</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialGraph.h#L75">Lattice/Material/LXMaterialGraph.h:75</a> — <code>explicit LXMaterialAsset(LXMaterialDefinitions definitions = CreateMaterialDefinitions());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialGraph.h#L90">Lattice/Material/LXMaterialGraph.h:90</a> — <code>bool Equals(const LXMaterialAsset&amp; other) const;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialNodes.cpp#L15">Lattice/Material/LXMaterialNodes.cpp:15</a> — <code>if (!registry.Register({&quot;material&quot;, std::move(spec)}, &amp;error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialNodes.cpp#L17">Lattice/Material/LXMaterialNodes.cpp:17</a> — <code>throw std::logic_error(error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialNodes.cpp#L64">Lattice/Material/LXMaterialNodes.cpp:64</a> — <code>schema.enumProperties = {{&quot;colorSpace&quot;, {&quot;data&quot;, &quot;linear&quot;, &quot;srgb&quot;}},</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L51">Tools/regression/verify-plan-dashboard.ps1:51</a> — <code>$text = [IO.File]::ReadAllText($Dashboard)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L226">Tools/regression/verify-plan-dashboard.ps1:226</a> — <code>$tableMatches = [regex]::Matches($text, &#39;&lt;table class=&quot;tasks&quot; data-phase=&quot;([\d.]+)&quot;&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L318">Tools/regression/verify-plan-dashboard.ps1:318</a> — <code>const tables = [...html.matchAll(/&lt;table class=&quot;tasks&quot; data-phase=&quot;([\d.]+)&quot;/g)].map(match =&gt; {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-lx-material-schema.ps1#L33">Tools/blender/export-lx-material-schema.ps1:33</a> — <code>if (!registry.Register({&quot;material&quot;, std::move(spec)}, &amp;error))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-lx-material-schema.ps1#L103">Tools/blender/export-lx-material-schema.ps1:103</a> — <code>[void]$source.AppendLine(&#39;        spec.properties = {{&quot;image&quot;, &quot;&quot;}, {&quot;colorSpace&quot;, &quot;srgb&quot;}, {&quot;interpolation&quot;, &quot;Linear&quot;}, {&quot;extension&quot;, &quot;REPEAT&quot;}, {&quot;projection&quot;, &quot;FLAT&quot;}};&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-lx-material-schema.ps1#L104">Tools/blender/export-lx-material-schema.ps1:104</a> — <code>[void]$source.AppendLine(&#39;        schema.enumProperties = {{&quot;colorSpace&quot;, {&quot;data&quot;, &quot;linear&quot;, &quot;srgb&quot;}}, {&quot;interpolation&quot;, {&quot;Linear&quot;, &quot;Closest&quot;, &quot;Cubic&quot;, &quot;Smart&quot;}}, {&quot;extension&quot;, {&quot;REPEAT&quot;, &quot;EXTEND&quot;, &quot;CLIP&quot;, &quot;MIRROR&quot;}}, {&quot;projection&quot;, {&quot;FLAT&quot;, &quot;BOX&quot;, &quot;SPHERE&quot;, &quot;TUBE&quot;}}};&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L119">Lattice/Core/LXGraph.h:119</a> — <code>class LXGraph;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L189">Lattice/Core/LXGraph.h:189</a> — <code>class LXGraph</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L192">Lattice/Core/LXGraph.h:192</a> — <code>explicit LXGraph(std::string domain = &quot;material&quot;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4">ScriptCore/BlackBoard.cs:4</a> — <code>public enum BlackBoardType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28">ScriptCore/BlackBoard.cs:28</a> — <code>public sealed class BlackBoard</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30">ScriptCore/BlackBoard.cs:30</a> — <code>private readonly struct Value(BlackBoardType type, object boxed)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>2026-09-28 · 독립 예제 Debug/Release 검증 완료.</strong> Editor 창 연결은 LX-3,
+Slang 생성은 MAT-6, 자산 등록·cook·runtime generation 연결은 MAT-7에서 진행한다.
+이 문서의 generation은 마지막 정상 <strong>IR</strong>이다. GPU shader generation은 아직 생성하지 않는다.</p>
+<h2>소유권과 API</h2>
+<ul>
+<li><code>Lattice/Material/LXMaterialGraph.h/.cpp</code>: <code>LXMaterialAsset</code>, 소켓/노드 메타데이터,
+Blackboard와 <code>.shadergraph</code> archive.</li>
+<li><code>LXMaterialNodes.cpp</code>: 고정 Blender 5.1.1 소켓 자료에서 생성한 초기 정의.
+<code>Tools/blender/export-lx-material-schema.ps1</code>로 재생성하며 저장소 <code>.clang-format</code>을 적용한다.</li>
+<li><code>LXMaterialIR.h/.cpp</code>: 검증된 asset → 값 스냅샷 <code>LXMaterialIR</code>,
+마지막 정상 IR 게시, Material asset 전체의 편집·Undo/Redo.</li>
+<li>Core의 <code>LXGraph</code>, 정의 레지스트리, 그룹·연결·배치 검증을 재사용한다.
+ImGui·Engine·Editor 타입이나 RHI handle은 Material 계층에 포함하지 않는다.</li>
+</ul>
+<p>Material host는 <code>LXMaterialDocument::Edit</code>에서 asset 전체를 변경하고
+<code>LXMaterialAsset::CollapseToGroup</code>을 사용한다. 그룹 생성 시 Core가 제공하는
+이전 ID → 새 ID 대응으로 노드 revision과 소켓 색 공간·표시 상태도 이동한다.
+Material의 Undo/Redo는 Blackboard와 이 메타데이터까지 함께 복원한다.
+Core <code>graph.Undo()</code>만 사용하면 Material의 부가 상태를 되돌릴 수 없으므로
+LX-3의 Canvas/명령 adapter는 이 Material transaction에 연결해야 한다.</p>
+<h2><code>.shadergraph</code> schema 1</h2>
+<p>UTF-8 JSON으로 저장하고, 기존 pinned rapidyaml로 읽는다. C++ 독립 예제에는
+기존 <code>ryml.lib</code>·<code>c4core.lib</code>를 연결했다. 파서 오류는 객체별 예외 callback으로
+처리하며 전역 callback이나 <code>abort()</code>를 사용하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>레코드</th>
+<th>보존 내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>문서</td>
+<td><code>kind=LatticeMaterial</code>, <code>schemaVersion=1</code>, <code>domain=material</code>, <code>graphId</code>, <code>activeOutput</code></td>
+</tr>
+<tr>
+<td>Blackboard</td>
+<td>안정 ID·identifier·이름·타입·typed default·색 공간·노출 여부</td>
+</tr>
+<tr>
+<td>graph</td>
+<td>domain·ID allocator·node·link·group</td>
+</tr>
+<tr>
+<td>node</td>
+<td>안정 ID·definition ID·schema revision·제목·group 참조·순서 있는 socket·속성·동적 핀 규칙</td>
+</tr>
+<tr>
+<td>socket</td>
+<td>ID·identifier·이름·방향·타입·복수 연결·동적 여부·interface ID·default·활성/숨김/값 숨김·색 공간</td>
+</tr>
+<tr>
+<td>group</td>
+<td>안정 definition ID·이름·순서 있는 interface·내부 graph. 복사본은 같은 ID와 내용을 공유</td>
+</tr>
+<tr>
+<td>layout</td>
+<td>node 위치·접힘·frame 소속, frame 제목/좌표/크기, view 중심/zoom</td>
+</tr>
+</tbody></table></div>
+<p>ID는 문서/그룹 scope 내 <code>uint64_t</code>다. 문서의 root graph ID와 그룹 ID를 IR의
+source scope로 유지한다. 제품 자산 GUID와 cook identity는 MAT-7에서 연결한다.
+값은 bool/int64/double/vector3/color4/string/none으로 태그를 붙인다.
+double과 float 배치는 충분한 round-trip 정밀도로 저장한다. Texture는 자산 참조,
+Sampler는 sampler 기술의 참조 문자열이며, Surface/Closure는 literal을 받지 않는다.
+<code>data</code>·<code>linear</code>·<code>srgb</code> intent를 보존한다. 실제 색 변환과 resource binding은 MAT-6 이후의 책임이다.</p>
+<p>새 <code>Sampler</code>·<code>Closure</code> 핀은 기존 Core enum의 마지막에 추가했다. 예제 저장 형식은
+<code>LXG 9</code>로 올라갔고 LXG 1&#126;8 읽기를 유지한다. <code>.lxg</code>에는 Material 메타데이터를
+담지 않으므로 <code>.shadergraph</code>를 대신하지 못한다.</p>
+<h2>정의와 IR 검증</h2>
+<p>초기 Blender 정의는 RGB, Value, Image Texture, Normal Map, Principled BSDF,
+Material Output 여섯 개다. 입력/출력의 순서·identifier·표시 이름·default·표시
+상태는 고정 <code>blender-5.1.1-shader-nodes.json</code>에서 생성한다. Principled는
+31개 입력과 BSDF Closure 출력을 갖는다. 여기에 엔진 전용 typed Parameter와
+Reroute 기본형을 제공한다. Blender 전체 노드나 모든 enum 조합의 지원 완료를 뜻하지 않는다.</p>
+<p>IR 전에 domain, 등록 정의와 revision, socket schema/default, color intent,
+enum 속성, 파라미터 참조·타입, 연결 방향·타입·fan-in·cycle, 활성 socket,
+group interface·공유 복사본·참조 순환을 검사한다. 정상 Output 노드가 선택되어야 한다.
+group 최대 깊이는 16이다. archive는 16 MiB·100,000 tree entry 상한,
+중복 필드·태그·alias·비유한 수·알 수 없는 필드 거부를 적용한다.</p>
+<p>IR의 node 순서는 의존성이 먼저 나오며 동률은 안정 ID로 정한다. link와
+Blackboard, group scope도 안정 ID로 정렬한다. 소켓과 group interface 순서는
+저장된 정의 순서를 유지한다. root와 공유 group을 각각 한 번 내린다.
+IR에는 node/socket/link/interface ID, 타입·값·색 공간·속성·parameter/group
+참조가 있고 위치·제목·접힘·Frame·view는 없다. 배치만 바뀌면 같은 IR generation을 사용한다.
+Slang opcode·resource table·feature 추출·semantic cache identity는 MAT-6에서 추가한다.</p>
+<h2>migration과 실패 복구</h2>
+<ul>
+<li>검사 입력 schema 0은 revision/소켓 identifier/color-space 필드가 없던 경우다.
+등록된 정의의 순서에서 identifier를 복원하고 revision 1, Color=<code>linear</code>,
+나머지=<code>data</code>로 명시적으로 승격한다. 모르는 schema 0 정의는 자동 추측하지 않는다.</li>
+<li>미래 문서 버전·잘못된 domain·등록 정의의 revision/schema/enum 불일치는
+재개방을 거부한다. 정상 <code>.bak</code>가 있어도 호환성 오류를 과거 파일로 숨기지 않는다.
+실패한 Reload는 열린 asset과 마지막 정상 IR을 모두 유지한다.</li>
+<li>미등록 node는 전체 archive record와 extension 필드를 정규화된 JSON payload로
+보존한다. 데이터 편집을 막고 저장·재개방은 허용한다. payload의 값과
+타입을 보존하며 whitespace까지 byte 단위로 보존하는 계약은 아니다.
+모르는 socket 타입 자체는 호환성 오류다. 미등록 node가 있으면 IR 게시를 거부한다.</li>
+<li>Save는 별도 파일 쓰기 → flush/닫기 → 엄격 재개방 → 전체 asset 동등성 비교 →
+유효한 기존 primary 백업 → Windows 원자 교체 순서다. 검증/교체 실패 시 primary를 유지한다.
+잘린 primary를 복구할 때 기존 유효 backup을 손상 primary로 덮지 않는다.</li>
+<li>파일 손상은 유효 <code>.bak</code>로 복구할 수 있다. IR 생성 실패는 generation과
+마지막 정상 IR을 바꾸지 않는다. Shader/GPU 교체 복구는 MAT-6/MAT-7에서 이어받는다.</li>
+</ul>
+<h2>검증 결과</h2>
+<p>VS18/v145 x64 Debug/Release에서 독립 예제를 빌드하고 모두
+<code>LX_MATERIAL_TEST_OK checks=95</code>, <code>LX_SELF_TEST_OK</code>를 확인했다.</p>
+<p>검사는 정확한 숫자·한국어/escape·배치·접힘·Blackboard·이미지/normal/resource·
+group 재사용/중첩/ID 이동/Undo/Redo 왕복, IR 결정성·배치와 IR 분리,
+future schema·node revision·unknown node·잘린 파일·교체 잠금 실패와
+이전 문서/IR 유지, 타입/활성 socket/enum/parameter 오류를 포함한다.
+기존 LX 도메인·조작·저장과 숨긴 ImGui 검사도 함께 통과했다.</p>
+<p>증거는 <code>Build/LatticeExample/mat2-{debug,release}-{build,tests}.log</code>다.
+고정 <code>.shadergraph</code> 예시는 <code>Tools/LatticeExample/fixtures/material/</code>에 있다.
+실제 Editor의 <code>.shadergraph</code> 조작, DX12/Vulkan Canvas 결속과 실시간 HTTP CLI는
+LX-3/LX-3H에 남는다.</p>
+<p>MAT-6은 이 typed IR을 <a href="MaterialSlangCodegen.html">결정적 Slang/metadata</a>와 실제
+node/socket compiler 진단으로 낮춘다. Material 그룹 생성 시 unlinked disabled/implicit
+입력은 내부 기본값으로 남겨 의미를 보존한다. 마지막 정상 CPU program과 compiled artifact를
+함께 유지하며, 실제 RHI/PSO/Scene 자원 교체는 MAT-7이다.</p>
+<p>대시보드 JavaScript 전체 파싱은 <code>broken=0</code>이고 MAT-2 완료·Material 공수
+10/34를 별도로 확인했다. 기존 <code>verify-plan-dashboard.ps1</code>은 <code>days:null</code> 행
+24건과 PHASE 4.6 metadata 한 건을 오류로 판정한다. HEAD 기준 파일에서도
+같은 결과를 재현했으므로 전체 검사 통과로 기록하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="migration과-실패-복구"></span><span id="sec-migration과-실패-복구"></span><span id="sec-shadergraph-schema-1"></span><span id="sec-검증-결과"></span><span id="sec-소유권과-api"></span><span id="sec-정의와-ir-검증"></span><span id="shadergraph-schema-1"></span><span id="검증-결과"></span><span id="소유권과-api"></span><span id="정의와-ir-검증"></span></details></main></body></html>

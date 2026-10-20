@@ -25,7 +25,10 @@ export default defineConfig({
           cpSync(resolve(docsRoot, entry), resolve(dist, entry), {
             recursive: true,
             force: false,
-            filter: (source) => relative(docsRoot, source).replace(/\\/g, '/') !== generatedInside
+            filter: (source) => {
+              const name = relative(docsRoot, source).replace(/\\/g, '/');
+              return name !== generatedInside && !/\.sheet(?:-\d+)?\.png$|\.html\.\d+\.tmp$/.test(name);
+            }
           });
         }
       }

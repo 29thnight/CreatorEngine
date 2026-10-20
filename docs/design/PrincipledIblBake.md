@@ -1,5 +1,52 @@
 # Core/Layered evaluated-point IBL bake
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang#L16) — `[shader("compute")][numthreads(32, 1, 1)] void CSMain(uint3 id : SV_DispatchThreadID) {`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang#L22) — `if (!IsValidPrincipledIblBakePoint(point))`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang#L29) — `const PrincipledSurface material = EvaluateIblBakePoint(point);`
+- [Engine/RenderEngine/MaterialGraphIblBake.h:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.h#L83) — `bool RecordCommands(RHIEncoder& encoder, std::string& error) const;`
+- [Engine/RenderEngine/MaterialGraphIblBake.h:120](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.h#L120) — `bool Record(IRenderDeviceServices& device, const IblEnvironment& environment, std::span<const IblBakePoint> points,`
+- [Engine/RenderEngine/MaterialGraphIblBake.h:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.h#L127) — `bool RecordGpu(IRenderDeviceServices& device, const IblEnvironment& environment,`
+- [Tools/regression/verify-material-ibl-bake.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-ibl-bake.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-ibl-bake.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-ibl-bake.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-ibl-bake.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-ibl-bake.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Tools/regression/verify-principled-layered.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-layered.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-principled-layered.ps1:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-layered.ps1#L39) — `if ([Math]::Abs($actual[$index] - $expected[$index]) -gt 0.0000001) {`
+- [Tools/regression/verify-principled-layered.ps1:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-layered.ps1#L46) — `$tableText = [IO.File]::ReadAllText($tablePath).Replace("rn", "n")`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang#L8) — `struct PrincipledIblBakePoint`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang#L23) — `struct PrincipledIblBakeSample`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang#L36) — `bool PrincipledValidBakeVector(float4 value)`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L82) — `virtual uint64_t GetCurrentUploadRecordingId() const = 0;`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:428](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L428) — `!assets::IsSupportedModelVertexLayout(vertexAttributeMask) ||`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:429](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L429) — `vertexStride != assets::StrideOf(vertexAttributeMask) ||`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:140](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L140) — `bool Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:144](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L144) — `bool RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.h:154](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.h#L154) — `bool RecordInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,`
+- [Engine/RenderEngine/RHI/DX12/EnhancedIBLGenerator.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedIBLGenerator.h#L36) — `class EnhancedIBLGenerator : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/RHI/DX12/EnhancedIBLGenerator.h:69](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedIBLGenerator.h#L69) — `EnhancedIBLGenerator() = default;`
+- [Engine/RenderEngine/RHI/DX12/EnhancedIBLGenerator.h:70](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/EnhancedIBLGenerator.h#L70) — `EnhancedIBLGenerator(const EnhancedIBLGenerator&) = delete;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1. 완료한 범위
 
 `MaterialGraphIblBake.h/.cpp`는 엔진 중립 RHI를 사용하는 GPU compute bake다.
@@ -120,3 +167,5 @@ actual GPU runtime은 D3D12다. SPIR-V 컴파일은 Vulkan runtime 검증을 뜻
 Blender rendered parity와 Standard 성능 수용은 MAT-9, Editor canvas는 LX-3이다.
 
 동일 RenderGraph의 준비/선언/순차·병렬 기록과 GPU owner retirement는 [MaterialGraphPassRecording.md](MaterialGraphPassRecording.md)에 구현·검증했다. 위 실제 Scene 설치·환경 수렴·실시간 예산 항목은 계속 남는다.
+
+</details>

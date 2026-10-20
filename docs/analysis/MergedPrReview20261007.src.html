@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>최근 4일 PR 적용 감사 — 2026-10-07</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MergedPrReview20261007.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MergedPrReview20261007.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>최근 4일 PR 적용 감사 — 2026-10-07</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Settings</ve-node><ve-node id="n1" at="2 1">Build</ve-node><ve-node id="n2" at="3 1" key>Cook</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Bootstrap</ve-node><ve-node id="n5" at="1 2">Player</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.</li>
+<li>로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp#L20">Player/PlayerDX12Presentation.cpp:20</a> — <code>class DX12Presentation final : public Presentation</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp#L234">Player/PlayerDX12Presentation.cpp:234</a> — <code>std::to_string(static_cast&lt;long&gt;(result));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp#L261">Player/PlayerDX12Presentation.cpp:261</a> — <code>m_pendingUse = {std::move(consumerLease), cached-&gt;resource};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp#L19">Player/PlayerVulkanPresentation.cpp:19</a> — <code>outError = std::string(&quot;Player Vulkan &quot;) + operation + &quot;: &quot; + VulkanApi::ResultToString(result);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp#L33">Player/PlayerVulkanPresentation.cpp:33</a> — <code>std::memcpy(words.data(), blob.Data(), blob.Size());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp#L59">Player/PlayerVulkanPresentation.cpp:59</a> — <code>const auto* end = static_cast&lt;const char*&gt;(std::memchr(begin, 0, (length - 3) * sizeof(uint32_t)));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp#L30">Editor/ImGuiHelper/ProfilerLauncher.cpp:30</a> — <code>install_profiler_live_diagnostics(ce::profiler_viewer::viewer_process());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp#L35">Editor/ImGuiHelper/ProfilerLauncher.cpp:35</a> — <code>auto&amp; process = ce::profiler_viewer::viewer_process();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp#L37">Editor/ImGuiHelper/ProfilerLauncher.cpp:37</a> — <code>const float scale = ImGui::GetStyle().FontScaleMain;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L80">Editor/EngineGUIWindow/MenuBarWindow.cpp:80</a> — <code>ImGuiWindow* const window = ImGui::GetCurrentWindow();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L85">Editor/EngineGUIWindow/MenuBarWindow.cpp:85</a> — <code>const ImVec2 origin = ImGui::GetCursorScreenPos();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L88">Editor/EngineGUIWindow/MenuBarWindow.cpp:88</a> — <code>ImGui::ItemSize(bounds);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L51">Tools/regression/verify-plan-dashboard.ps1:51</a> — <code>$text = [IO.File]::ReadAllText($Dashboard)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L96">Tools/regression/verify-plan-dashboard.ps1:96</a> — <code>while ($j -lt $total -and [char]::IsWhiteSpace($chars[$j])) { $j++ }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L135">Tools/regression/verify-plan-dashboard.ps1:135</a> — <code>while ($j -ge $open -and [char]::IsWhiteSpace($chars[$j])) { $j-- }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp#L75">Engine/EngineDiagnostics/ProfilerViewerProcess.cpp:75</a> — <code>environment.data(), security::directory(executable).c_str(),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp#L82">Engine/EngineDiagnostics/ProfilerViewerProcess.cpp:82</a> — <code>if (!security::logon_sid(GetCurrentProcess(), sid))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp#L92">Engine/EngineDiagnostics/ProfilerViewerProcess.cpp:92</a> — <code>const std::wstring descriptor_text = L&quot;D:P(A;;0x0012019b;;;&quot; + std::wstring(text) + L&quot;)&quot;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp#L167">Editor/EngineEntry/Commands/SceneObjectCommands.cpp:167</a> — <code>const auto parsed = std::from_chars(text.data(), text.data() + text.size(), id);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp#L187">Editor/EngineEntry/Commands/SceneObjectCommands.cpp:187</a> — <code>auto data = CommandData::Object();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp#L188">Editor/EngineEntry/Commands/SceneObjectCommands.cpp:188</a> — <code>data.Set(&quot;requestId&quot;, CommandData::String(std::to_string(id)));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp#L295">Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:295</a> — <code>std::memcpy(s.stack, stack, sizeof(void*) * depth);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp#L423">Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:423</a> — <code>const file::path assetRoot = PathFinder::Relative();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp#L435">Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:435</a> — <code>std::sort(metaPaths.begin(), metaPaths.end());</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>기준과 판정</h2>
+<ul>
+<li>기간: <strong>2026-10-04 00:00 KST부터 2026-10-07 조회 시점까지</strong>(오늘 포함 4개 달력 날짜). UTC 시작은 2026-10-03 15:00이다.</li>
+<li>GitHub mergedAt으로 조회한 병합 PR <strong>11개</strong>. 로컬 HEAD와 원격 master는 <code>3afe1daaee7b75f644ac10b12d96fb684a0e74c8</code>로 일치하고, 모든 merge SHA가 HEAD의 조상임을 확인했다.</li>
+<li>PR 본문은 작성 당시의 범위·검증 선언으로 읽는다. 본문의 Draft/미병합 표현보다 현재 GitHub 병합 메타데이터와 Git 조상 관계가 적용 여부의 근거다.</li>
+<li>이번 감사는 PR 본문·병합 이력·현재 소스 배선·기존 계획/분석 기록을 대조한 문서 작업이다. 엔진 빌드·테스트·실행·GPU 측정을 새로 수행하지 않았다.</li>
+<li>작업 시작 전 존재한 GPU/RenderGraph 계획·대시보드 변경과 로컬 캡처 파일은 보존했다. 아래 제한된 실행 수치는 기존 로컬 기록에서 인용했으며 원시 실행 산출물을 새로 재검증한 결과가 아니다.</li>
+</ul>
+<h2>병합별 영향과 남은 완료 조건</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>PR · 병합일(KST) · merge</th>
+<th>적용 내용</th>
+<th>계획 소유자</th>
+<th>검증 경계·다음 gate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/117">#117</a> · 10-04 17:07 · <code>2ee83fcd</code></td>
+<td>표시 이미지와 카메라 신원, 비동기 집계, CEPROF v3 전체 세션 spool</td>
+<td>PHASE 14 · 14-REC / PHASE 21 W8</td>
+<td>장시간 녹화·복구·입력 일치. 본문 미실행 선언과 checked checklist가 상충하므로 재현 산출물 없이 통과로 세지 않음</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/118">#118</a> · 10-05 09:37 · <code>da81c281</code></td>
+<td>consumer lease·GPU 완료까지 이미지 보유, 최신 packet 및 Host GPU 진입 제한</td>
+<td>PHASE 4.5 FG 기반 / PHASE 21 W8</td>
+<td>DX12 lease·resize·실패·종료와 지연 실측; FG 자체 미구현</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/120">#120</a> · 10-05 17:53 · <code>41f9dd0a</code></td>
+<td>Player native DX12/Vulkan Present, Editor DX12 고정, Development/Shipping·명령 경계</td>
+<td>EngineLayerSeparation / BuildPipeline</td>
+<td>Windows 구성별 빌드·package·Present·입력·device loss; Vulkan은 CPU bridge 유지</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/121">#121</a> · 10-05 20:37 · <code>c31ccb1c</code></td>
+<td>miniaudio·PlaybackHandle·SoundGraph·native/C# 소비 및 FMOD 제거</td>
+<td>PHASE 22 AU0&#126;AU9</td>
+<td>과거 cloud 각 3,825단정·retirement 1,732점검; Windows/CLR/실장치/PE·package/soak 잔여</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/122">#122</a> · 10-06 12:17 · <code>33f44d6c</code></td>
+<td>indexed indirect, versioned graph 제품 전환·viewer, split-sum·특수 재질 타일</td>
+<td>PHASE 4.3 RG5/RG6/RG-V · MAT-9</td>
+<td>병합 당시 정적 검토; 후속 로컬 기록의 제한된 실행과 구분. 전체 제품 수용 미완료</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/123">#123</a> · 10-06 18:15 · <code>5ca4e82a</code></td>
+<td>meshlet/static LOD/HZB·light-space shadow·재질 보존 indirect, CEMC v11</td>
+<td>PHASE 4.8 GD0&#126;GD3/HY1 · MAT-9</td>
+<td>기존 로컬 기록: codec 466/466, 단일 DX12 장면 비교; decal/rendergraph 예외·제품 parity/성능 잔여</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/125">#125</a> · 10-06 22:40 · <code>94e2e911</code></td>
+<td>scene.open_async·모델 공유 준비·환경 CPU 준비, 하단 진행 표시</td>
+<td>PHASE 21 W2/W7/W8 · CLI</td>
+<td>취소·stale 완료·작은 worker 풀·owner 게시와 UI 회귀. CPU 준비/applied는 GPU 완료가 아님</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/126">#126</a> · 10-07 09:10 · <code>865a4e5d</code></td>
+<td>CPU scope publication·Stop 경계, DX12 GPU tail drain·incomplete 진단</td>
+<td>PHASE 14 · 14-REC</td>
+<td>Windows D/R·반복 녹화·실제 fence·오류·종료·69 supported mutations 실행 잔여</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/127">#127</a> · 10-07 09:10 · <code>1c839113</code></td>
+<td>별도 ProfilerViewer·ETW helper·인증 IPC·.cedx·profile.deep 제어</td>
+<td>PHASE 14 · 14-VIEW/14-DX · CLI</td>
+<td>빌드/fixture/ETW/실행 미검증, ordinary privilege·SDK opt-in·helper 종료/ETW 정리 확인</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/128">#128</a> · 10-07 10:14 · <code>605e8d3e</code></td>
+<td>45 물리 px 제목 행·15페이지 셸·정보 패널·소유 viewer job 수명</td>
+<td>PHASE 14 · 14-VIEW / PHASE 21 W8</td>
+<td>DPI·입력·좁은 창·정상/비정상 종료·독립 offline viewer 수명 검증</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/pull/129">#129</a> · 10-07 11:40 · <code>3afe1daa</code></td>
+<td>명시적 Profiler 열기만 실행·전용 아이콘·조밀한 레일·하단 Cmd 입력 UI</td>
+<td>PHASE 14 · 14-VIEW / PHASE 21 W2/W8</td>
+<td>명시적 열기/설정 복원 무실행·UI/DPI 회귀; Cmd 실행과 Revision Control 연결은 미구현</td>
+</tr>
+</tbody></table></div>
+<p>#123의 GitHub mergeCommit 필드는 <code>be0688d3</code>를 반환했으나, 실제 master의 first-parent 병합은 <code>5ca4e82a</code>다. 두 부모는 <code>ef829373</code>/<code>bf3fe4f3</code>이며 <code>be0688d3</code>도 HEAD의 조상이다. 표에는 실제 통합 커밋을 사용했다. 병합 시각은 모든 행에서 GitHub mergedAt을 KST로 변환했다.</p>
+<h2>현재 소스와 계획 연결</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>소비 경로</th>
+<th>확인한 소스/계약</th>
+<th>정본</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene graph 실행 → compiled viewer</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">EnhancedSceneRenderer.cpp</a>의 ExplicitVersioned/DependencyOrder → <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EnhancedRenderDebugWindow.cpp">EnhancedRenderDebugWindow.cpp</a> snapshot 표시</td>
+<td><a href="../plans/RenderGraphDependencySchedulingPlan.html">RG5/RG6/RG-V</a></td>
+</tr>
+<tr>
+<td>Profiler 명시적 열기 → 소유 child</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ProfilerLauncher.cpp">ProfilerLauncher.cpp</a> → <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerProcess.cpp">ProfilerViewerProcess.cpp</a>, kill-on-close job 및 1.5초 close 유예/2.5초 owner wait</td>
+<td><a href="../plans/ProfilingCapturePlan.html">14-REC/14-VIEW/14-DX</a></td>
+</tr>
+<tr>
+<td>Scene Open → 비동기 명령</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp">MenuBarWindow.cpp</a> → <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/SceneObjectCommands.cpp">SceneObjectCommands.cpp</a>의 scene.open_async 등록</td>
+<td><a href="../plans/EditorWorkspaceRedesignPlan.html">PHASE 21</a>, <a href="../design/AsyncAssetPreparation.html">비동기 준비 계약</a></td>
+</tr>
+<tr>
+<td>심층 수집 명령 → 엔진 서비스</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Commands/DiagnosticsCommands.cpp">DiagnosticsCommands.cpp</a>와 <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp">descriptor</a>의 profile.deep.start/status/stop</td>
+<td><a href="../plans/EditorAutomationCLIPlan.html">CLI</a>, <a href="../design/Dx12DeepCapture.html">DX12 계약</a></td>
+</tr>
+<tr>
+<td>Player native 출력·consumer 소유</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerDX12Presentation.cpp">PlayerDX12Presentation.cpp</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerVulkanPresentation.cpp">PlayerVulkanPresentation.cpp</a>, <a href="../design/OwnedBoundedPresentation.html">소유권 계약</a></td>
+<td><a href="../plans/EngineLayerSeparationPlan.html">레이어</a>, <a href="../plans/BuildPipelinePlan.html">빌드</a>, <a href="../plans/TemporalReconstructionPlan.html">FG 기반</a></td>
+</tr>
+<tr>
+<td>오디오 소비·FMOD 철거</td>
+<td><a href="Phase22AudioCloudValidation.html">cloud 검증 보고서</a>의 source/build provenance와 acceptance 구분</td>
+<td><a href="../plans/AudioBackendModernizationPlan.html">AU0&#126;AU9</a></td>
+</tr>
+</tbody></table></div>
+<h2>PR 밖의 같은 기간 변경</h2>
+<p>PR만으로 현재 HEAD를 설명하지 않는다. first-parent 이력에서 <code>7d81da38</code> RG5 혼합 수용/Decal·Sprite·SSS·SSR, <code>c8eeaddc</code> Physics M1/affine/export, 재질·Slang 캐시/선컴파일, <code>58f31856</code> render fence 대기, <code>d7e37857</code> transient 풀 잠금, <code>90649f07</code> scene 해체, <code>ef829373</code> 단일-worker wave 묶기, <code>25fac974</code> viewer 자료형/변수 수정도 확인했다. 이들은 병합 PR 11개 수에 넣지 않는다. Physics M1 등 기존 상세 계획의 진행 판정을 임의로 완료로 올리지 않는다.</p>
+<h2>2026-10-07 후속 검사</h2>
+<p><a href="RenderRg5Closure20261007.html">RG5 종결 검사</a>에서 visibility 준비 누락·구식 pass-count 검사를 보완했고 Debug/Release rendergraph/decal 명령이 정상 종료·GPU validation 0으로 통과했다. <a href="RenderRg5ReferenceMigration20261007.html">reference API 후속 이관</a>도 D/R 3정책·일반 63 frames·공유 depth 72 frames·validation 0으로 수용했다. <a href="RenderRg5FinalAcceptance20261007.html">최종 소비자·capture/fixture 수용</a>은 D/R 각각 129 frames·9단계 및 독립 4프로세스/8캡처·16개 이미지 오차 0·validation 0·현재 해시 계약으로 RG5 완료/기성 10인일을 회수했다. PR 감사 당시의 예외/우선순위/공수 기록은 아래 역사로 보존한다. 현행 PHASE 4 계열은 총 355/기성 98/잔여 257(+미산정)이며 RG6 전환 전후 픽셀·비용 수용과 RG-V UI 수용은 남는다.</p>
+<h2>우선순위와 회계</h2>
+<ol>
+<li>RG5/RG6 수용 전에 기존 로컬 기록의 <code>dx12.decal</code>·<code>dx12.rendergraph</code> 예외를 재현하고 fixture의 GPU visibility 준비를 보완한다. GD2/GD3 visible-set/overflow/cut/resize 및 재질 route parity를 이어서 확인한다.</li>
+<li>PHASE 14의 연속 파일/Stop tail, 별도 viewer, deep capture를 아래 세 후속 행에서 닫는다. 엔진 빌드와 source fixture 작성, 실제 Windows 실행 성공은 서로 다른 증거다.</li>
+<li>W8에서 45 물리 px·하단 바·명시적 viewer 실행·비동기 준비의 취소/실패를 현재 화면 기준으로 검증한다. PR #125의 45 logical px 설명은 #128의 배율 적용 후 45 physical px로 대체됐다.</li>
+<li>Player 구성별 native Present·Shipping 격리/배포, AU Windows/CLR·WASAPI/장치/soak를 각 정본에서 수용한다. Viewer의 D3D11 UI 호스트는 Editor DX12 정책이나 Vulkan 심층 수집 지원을 바꾸지 않는다.</li>
+</ol>
+<p>RG6·RG-V는 소스가 병합됐으므로 dashboard의 todo를 progress로 정정하고 <strong>earnedDays=0</strong>을 명시한다. 기존 완료 기반은 유지한다. PHASE 4 계열 355인일/기성 88/잔여 267(+미산정)은 그대로다. PHASE 14 신규 후속 3행은 days=null, earnedDays=0으로 두며 임의의 구현률·공수·납기를 만들지 않는다. AU0&#126;AU9는 progress를 유지한다.</p>
+<p>문서 검증 결과: <code>verify-plan-dashboard.ps1 -RequireFullParse</code> 통과(TASKS 442개, 문자열/구조 오류 0, 전체 JavaScript 파싱·렌더 실행 성공, 진행률 유한값). 신규 상대 링크 37개가 존재하며, 439→442행의 차이는 14-REC/14-VIEW/14-DX 세 행뿐이다. 기존 행의 추정 공수 및 전체 기성 합계가 작업 전과 동일하고, RG6/RG-V와 신규 행의 상태·기성 0을 확인했다. <code>git diff --check</code>도 통과했다. 이 항목은 문서 검사이며 엔진 실행 수용이 아니다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="2026-10-07-후속-검사"></span><span id="pr-밖의-같은-기간-변경"></span><span id="sec-2026-10-07-후속-검사"></span><span id="sec-pr-밖의-같은-기간-변경"></span><span id="sec-기준과-판정"></span><span id="sec-병합별-영향과-남은-완료-조건"></span><span id="sec-우선순위와-회계"></span><span id="sec-현재-소스와-계획-연결"></span><span id="기준과-판정"></span><span id="병합별-영향과-남은-완료-조건"></span><span id="우선순위와-회계"></span><span id="현재-소스와-계획-연결"></span></details></main></body></html>

@@ -289,9 +289,30 @@ function main() {
   const args = process.argv.slice(2).map(a => toPosix(relative(ROOT, resolve(a))));
   const targets = args.length ? args : all;
   const dates = lastCommitDates();
+  const auditManifest = join(ROOT, 'docs/plans/MasterPlanAudit20261020.json');
+  const auditOwned = existsSync(auditManifest)
+    ? new Set(JSON.parse(readFileSync(auditManifest, 'utf8')).documents.map(d => d.path))
+    : new Set();
+  const fullManifest = join(ROOT, 'docs/analysis/MasterDocumentationAudit20261020.json');
+  const fullOwned = existsSync(fullManifest)
+    ? new Set(JSON.parse(readFileSync(fullManifest, 'utf8')).documents.map(d => d.path)) : new Set();
+  if (targets.some(file => auditOwned.has(file))) {
+    execFileSync(process.execPath, [join(ROOT, 'Tools/docs/render-master-plan-audit.mjs'), '--check'], { cwd: ROOT, stdio: 'inherit' });
+  }
+  if (targets.some(file => fullOwned.has(file))) {
+    execFileSync(process.execPath, [join(ROOT, 'Tools/docs/render-master-plan-audit.mjs'), '--full-docs', '--check'], { cwd: ROOT, stdio: 'inherit' });
+  }
   let written = 0;
   for (const file of targets) {
     if (!markdownSet.has(file)) { console.error(`Markdown 목록에 없다: ${file}`); process.exitCode = 1; continue; }
+    // These pages use the upstream visual-explainer kit and its visual checks.
+    // Refuse stale sources rather than silently replacing their diagrams/layout.
+    if (auditOwned.has(file) || fullOwned.has(file)) {
+      if (!existsSync(join(ROOT, file.replace(/\.md$/, '.src.html')))) {
+        throw new Error(`Run node Tools/docs/render-master-plan-audit.mjs --render: ${file}`);
+      }
+      continue;
+    }
     // 원본의 줄바꿈이 섞여 있어도 결과는 LF 로 만든다.
     const source = readFileSync(join(ROOT, file), 'utf8').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
     const doc = renderDocument(source, file, markdownSet);

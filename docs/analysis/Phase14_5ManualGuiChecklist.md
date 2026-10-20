@@ -1,5 +1,52 @@
 # PHASE 14.5 조건 ② — GUI 수동 조작 체크리스트
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.
+- scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp:345](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp#L345) — `std::is_sorted(std::begin(kSeeds), std::end(kSeeds),`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp:350](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp#L350) — `std::adjacent_find(std::begin(kSeeds), std::end(kSeeds),`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp:357](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp#L357) — `const auto found = std::lower_bound(`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [Engine/SceneRuntime/Animator.h:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L49) — `struct [[reflgen::reflect]] BoneTransformConstraint final`
+- [Engine/SceneRuntime/Animator.h:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L136) — `void CreateController(std::string name);`
+- [Engine/SceneRuntime/Animator.h:137](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L137) — `std::shared_ptr<AnimationController> CreateController_UI();`
+- [Editor/EngineGUIWindow/InspectorWindow.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.h#L11) — `class Entity;`
+- [Editor/EngineGUIWindow/InspectorWindow.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.h#L19) — `void DrawAddComponent(Entity* entity);`
+- [Editor/EngineGUIWindow/InspectorWindow.h:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/InspectorWindow.h#L48) — `void ImGuiDrawHelperTransformComponent(Entity* gameObject);`
+- [Editor/EngineGUIWindow/HierarchyWindow.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L6) — `class Entity;`
+- [Editor/EngineGUIWindow/HierarchyWindow.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L7) — `class HierarchyWindow`
+- [Editor/EngineGUIWindow/HierarchyWindow.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L9) — `public:`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L38) — `const std::vector<gc::trace_ref<Entity>>& slots);`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L42) — `const Ray& ray, const std::vector<gc::trace_ref<Entity>>& slots);`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L71) — `Ray CreateRayFromCamera(const FrameCameraSnapshot& camera, const ImVec2& mousePos);`
+- [Editor/EngineEntry/EditorObjectOperations.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L33) — `CommandCore::CommandResult Rename(EntityHandle target, const std::string& name);`
+- [Editor/EngineEntry/EditorObjectOperations.h:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L82) — `CommandCore::CommandResult NavigateSelection(Scene* scene, int direction);`
+- [Editor/EngineEntry/EditorObjectOperations.h:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L85) — `CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L13) — `struct DescriptorSeed`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L65) — `const DescriptorSeed* FindDescriptorSeed(std::string_view canonical);`
+- [Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.h#L67) — `std::size_t DescriptorSeedCount() noexcept;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 [종결 검토](Phase14_5Closure.md)의 재정의가 남긴 마지막 조건이다. 자동 게이트는 **HTTP 경로로** 공통
 편집 API 를 때려 실제 상태 복원을 확인했다. 그것이 **위젯 조작을 대신했다고 주장하지 않는다** — 같은
 서비스라도 GUI 는 자기 입력 확정·선택 상태·다중 선택 묶음을 거쳐 들어가고, 그 구간은 자동 게이트 밖이다.
@@ -84,3 +131,5 @@
 확인이 끝나면 결과를 이 문서에 그대로 남기고 [종결 검토](Phase14_5Closure.md)의 조건 ② 를 닫는다.
 **통과한 것만 적지 않는다** — 실패와 미확인도 같은 표에 남긴다. 이 저장소는 "검사 0 건·빈 집합을
 성공으로 접지 않는다" 를 관례로 삼는다.
+
+</details>

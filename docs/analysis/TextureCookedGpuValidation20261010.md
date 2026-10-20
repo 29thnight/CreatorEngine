@@ -1,5 +1,50 @@
 # PHASE 12 CECT typed acquisition·DX12 sampling — 2026-10-10
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-texture-cooked-gpu.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-cooked-gpu.ps1#L4) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-cooked-gpu.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-cooked-gpu.ps1#L5) — `$root = Join-Path $repo ('Build/Obj/TextureCookedGpu/' + [Guid]::NewGuid().ToString('N'))`
+- [Tools/regression/verify-texture-cooked-gpu.ps1:57](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-cooked-gpu.ps1#L57) — `[regex]::Matches($log, 'TEXTURE_PREPARED_BINDING_OK cases=6 unmountedOwner=1').Count -ne 3) {`
+- [Engine/RenderEngine/DataSystem.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30) — `own::shared_owner<const Texture> descriptor;`
+- [Engine/RenderEngine/DataSystem.h:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L44) — `std::vector<own::shared_owner<const Material>> materials;`
+- [Engine/RenderEngine/DataSystem.h:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45) — `std::vector<own::shared_owner<const Texture>> textures;`
+- [Player/ForbiddenIncludes/DirectXTex.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/DirectXTex.h#L1) — `#pragma once`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L30) — `class Texture;`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L58) — `class DX12TextureCache : public IRenderTextureCache, public IRHIUploadTransactionListener`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.h:120](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.h#L120) — `const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) override;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/DataSystem.cpp:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L55) — `for (const auto& entry : file::directory_iterator(directory))`
+- [Engine/RenderEngine/DataSystem.cpp:129](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L129) — `throw std::runtime_error("Asset image decoder apartment initialization failed.");`
+- [Engine/RenderEngine/DataSystem.cpp:139](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L139) — `std::ranges::transform(value, value.begin(), [](unsigned char character)`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp#L15) — `uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue, RHIAssetEvictionPass* evictionPass)`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp#L46) — `m_retireQueue.Enqueue(RHICompletionPoint{fenceValue}, RetiredResource{std::move(it->second.allocation)}, bytes);`
+- [Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12TextureCache.cpp#L84) — `uint64_t DX12TextureCache::SweepGraveyard(uint64_t completedFenceValue)`
+- [Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp#L81) — `if (FAILED(DirectX::ComputePitch(metadata.format, (std::max)(std::size_t{ 1 }, metadata.width >> mip),`
+- [Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp:111](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp#L111) — `result = DirectX::GetMetadataFromDDSMemory(data, bytes.size(), DirectX::DDS_FLAGS_NONE, metadata);`
+- [Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp:116](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp#L116) — `result = DirectX::GetMetadataFromHDRMemory(data, bytes.size(), metadata);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정과 실제 경로
 
 최신 Release RenderEngine 라이브러리와 새 검증 실행 파일에서 BC5Unorm·BC7Unorm·BC7UnormSrgb의 **CECT2 typed acquisition→정확한 image 취득→제품 DX12TextureCache 업로드→SampleLevel→GPU readback**을 한정 수용한다. 각8×8·4개 mip(8/4/2/1)의85 texel×4성분=340개, 총1020개를 비교했다. 이 실행의 이미지 입력은 offline cooker가 출력한 실제 압축 CECT payload이며 runtime에 PNG/DDS 원본을 넘기지 않는다.
@@ -35,3 +80,5 @@ BC5만 블록 endpoint span에 따른 `1/65535 + 0.03*span`을 적용하며 endp
 메모리 cooked AssetSet의 standalone2D 경계다. Shipping PAK에서 같은 BC 형식의 typed acquisition/sampling, Vulkan·Debug, cube/array·다른 dimensions/포맷·전체 모델 역할/소비자·BC5 normal Z 재질 결합은 이 실행에 포함하지 않는다. 기존 §34~35 Shipping 원본 부재/누락·잘림 증거와 구분한다. 별도 oracle는 압축 전 저작 이미지의 시각 품질이 아니라 **압축 artifact의 CPU decode와 GPU 소비 비교**다.
 
 새 제품 수정은 없다. 검증 실행 파일2개·shader·프로젝트2개·실행기를 추가했다. T2 전체 잔여 gate는 계속 열려 있으며 추가 가중치 없이66.25%, T1b 대기·T3 중단을 유지한다. 다음은 동일 fixture의 Vulkan sampling 및 실제 제품 소비자/Shipping PAK 연결이다.
+
+</details>

@@ -1,5 +1,50 @@
 # Principled Special 재질 — MAT-5
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Lattice/Material/LXMaterialExecution.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialExecution.h#L7) — `enum class LXMaterialExecutionRoute : uint8_t`
+- [Lattice/Material/LXMaterialExecution.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialExecution.h#L13) — `enum class LXMaterialExecutionError : uint8_t`
+- [Lattice/Material/LXMaterialExecution.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialExecution.h#L24) — `struct LXMaterialExecutionRequirements`
+- [Tools/regression/verify-principled-special.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-special.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-principled-special.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-special.ps1#L10) — `$text = [IO.File]::ReadAllText($path).Replace("rn", "n")`
+- [Tools/regression/verify-principled-special.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-principled-special.ps1#L11) — `$sha = [Security.Cryptography.SHA256]::Create()`
+- [Tools/blender/fixtures/principled-special-5.1.1/volume-defaults.json:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/fixtures/principled-special-5.1.1/volume-defaults.json#L1) — `{`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang#L6) — `struct VolumeInputs`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang:59](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang#L59) — `float VolumePhase(float cosine, float anisotropy)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang#L75) — `VolumeSegment IntegrateVolumeSegment(PrincipledVolume volume, float distance, float3 incidentSource)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L55) — `bool HasMaterialFeature(MaterialFeatureMask mask, MaterialFeatureMask feature)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L60) — `struct MaterialInputs`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L97) — `struct PrincipledSurface`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang#L7) — `struct PrincipledSubsurfaceProfile`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang#L16) — `PrincipledSubsurfaceProfile BuildSubsurfaceProfile(PrincipledSurface material)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang#L41) — `PrincipledSubsurfaceProfile BuildSceneSubsurfaceProfile(PrincipledSurface material)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang:99](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang#L99) — `SpecialForwardIntegral IntegrateSpecialForward(PrincipledSurface material, float3 view)`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang:138](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang#L138) — `SpecialForwardSurface BuildSpecialForwardSurface(PrincipledSurface material, float3 view,`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang:274](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang#L274) — `SpecialForwardAmbient EvaluateSpecialIbl(SpecialForwardSurface surface, SpecialForwardEnvironment environment)`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSSPass.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSSPass.h#L34) — `class EnhancedSSSPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSSPass.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSSPass.h#L36) — `public:`
+- [Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSSPass.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSSPass.h#L40) — `struct Tuning`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-09-28 · Transmission / Subsurface / Volume 공용 평가와 Forward 실행 계약**
 
 MAT-5는 Special closure의 값·조명·합성과 실행 요구 조건을 구현한다.
@@ -201,3 +246,5 @@ finite/tier/nonzero view를 유지하고, standalone directional bake는 기존 
 3. Requirement 분석 결과로 Special Forward를 자동 선택하고, 자원 준비 실패 시 마지막 정상 material generation을 유지한다.
 4. Scene/Game의 refraction·material별 SSS·Volume geometry path를 연결하고, preview도 같은 generation을 소비한다.
 5. MAT-9에서 Blender rendered grid와 근사 수용·제품 transport·성능을 확인한다.
+
+</details>

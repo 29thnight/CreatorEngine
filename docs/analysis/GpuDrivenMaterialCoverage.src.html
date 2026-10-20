@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>GPU-driven material coverage extension</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="GpuDrivenMaterialCoverage.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/GpuDrivenMaterialCoverage.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>GPU-driven material coverage extension</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28">Engine/RenderEngine/ShaderMeta.cpp:28</a> — <code>outError = std::string(context) + &quot;: &quot; + std::string(detail);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65">Engine/RenderEngine/ShaderMeta.cpp:65</a> — <code>const bool known = std::any_of(allowed.begin(), allowed.end(),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102">Engine/RenderEngine/ShaderMeta.cpp:102</a> — <code>else return Fail(context, std::string(&quot;&#39;&quot;) + key + &quot;&#39;는 true|false여야 한다&quot;, outError);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>This source checkpoint extends the GPU geometry milestone without replacing material
+programs, disabling effects, or changing the globally merged Code/Graph depth order.
+Merged in PR #123. The merge-time DX12 checks covered the opaque meshlet/HZB path only
+(see the <a href="../plans/GpuDrivenGeometryImplementationPlan.html#merge-and-first-execution-2026-10-06">implementation plan</a>);
+the material routes below still have no executed parity check.</p>
+<h2>Supported geometry routing</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Existing route</th>
+<th>GPU-produced submission on capable devices</th>
+<th>Preserved semantics</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Native opaque/masked GBuffer</td>
+<td>Indexed indirect; eligible standard geometry may use mesh dispatch</td>
+<td>Original shaders, topology and material bindings</td>
+</tr>
+<tr>
+<td>Native custom GBuffer</td>
+<td>Indexed indirect, zero or complete original instance count</td>
+<td>Raw instance IDs, original instance stream and custom identity-buffer extent</td>
+</tr>
+<tr>
+<td>Native Forward, including transparent/custom/skinned</td>
+<td>One indexed indirect command per original merged segment/batch intersection</td>
+<td>Original CPU depth order, instance ordinals, PSOs, flow and palette data</td>
+</tr>
+<tr>
+<td>LX GBuffer/ordered surface/color</td>
+<td>One zero-or-one indexed command per owner</td>
+<td>Original owner ID and program</td>
+</tr>
+<tr>
+<td>LX refraction/lookup/SSS/runtime-special captures</td>
+<td>The same zero-or-one command at every raster consumer</td>
+<td>Per-draw background snapshots, capture clears, effects and final color coverage</td>
+</tr>
+<tr>
+<td>Native/LX shadow geometry</td>
+<td>Independent per-cascade indexed indirect</td>
+<td>Existing caster domain, alpha/sidedness and shadow topology; no camera HZB</td>
+</tr>
+<tr>
+<td>Native indexed occluder prepass</td>
+<td>Independent frustum-only indirect arguments</td>
+<td>No dependency cycle with main HZB arguments</td>
+</tr>
+<tr>
+<td>Decals and simple world sprites</td>
+<td>Nonindexed indirect</td>
+<td>Adjacent blend/canvas order and procedural vertex IDs; explicit shader instance base</td>
+</tr>
+</tbody></table></div>
+<p>Unknown native position semantics conservatively retain the complete draw. The GPU still
+writes its executable count, but this does not imply useful culling for that shader.
+Preserved bins write the complete identity sequence and emit only zero or the original
+count. They never compact/reorder an arbitrary custom instance stream.</p>
+<p>CPU ordering, PSO/material binding, and command submission remain intentional. GPU sorting
+alone cannot change arbitrary PSOs, and no CPU readback or claim of GPU-only submission is
+introduced. Per-turn refraction background captures remain at their original positions.</p>
+<h2>Availability versus material fallback</h2>
+<p>Direct geometry compatibility remains for unavailable indexed/nonindexed indirect
+capabilities. A missing prepared bin on a capable device is an error, not permission to
+silently switch a material to another shader or disable its effects. Mesh shaders/LOD are
+still optional optimizations; an accepted material can remain indexed GPU-driven.</p>
+<p>Fullscreen and compute operations, including volume integration/composite, lookup bakes,
+SSS filters and runtime depth copies, are algorithms rather than CPU-direct material
+fallbacks. Their existing work is not forced through geometry indirect commands.</p>
+<p>Pre-existing unsupported features stay explicit: ShaderMeta material pipelines do not
+expose hull/domain/geometry stages, and scene media require the existing static closed
+boundary contract/budgets. This extension does not claim new tessellation or skinned media.</p>
+<h2>Included standard skinning shader contract</h2>
+<p>The standard GBuffer shader and source wrappers that include it expose the optional
+<code>GBufferSkinPaletteExtentV1</code> constant buffer at b4/space0. Its reflected 16-byte layout is
+four uint32 fields: matrix count, version, and two reserved zero fields. The renderer
+accepts the exact field names/types/offsets and retains the optional root index with the
+immutable shader generation. It supplies version 1 and the actual sealed matrix count,
+not upload-allocation padding. Programs without this contract retain their prior layout.</p>
+<p>This uniform preserves standard skinning in non-compacted include wrappers without
+rewriting arbitrary custom instance padding or inferring semantics from filenames.
+Explicit instance bone counts are clamped to the available palette extent; legacy wrappers
+use the remaining extent. Active indices are checked before any matrix fetch. Declaring
+this storage-safety contract does not establish safe deformation bounds or enable culling.</p>
+<h2>Diagnostics and static review</h2>
+<p>The debug view separately reports backend indirect capabilities, prepared compaction bins,
+preserved-stream bins, and conservative keep-visible inputs. These are preparation categories,
+not GPU-visible counts, culling rates or performance measurements.</p>
+<p>Independent source reviews covered native instance identity and range preservation,
+Code/Graph ordering, empty special-effect captures, sealed skin inputs, procedural command
+ABI, graph dependencies and recording ownership. The nonindexed 16-byte command deliberately
+uses the compatible prefix of GPU-written 20-byte records with zero vertex/base-instance
+fields, one command per call and its original 20-byte record offset.</p>
+<p>No builds, tests, shader compilation, renderer execution, image comparisons or GPU timings
+were run. Runtime correctness, effect parity and performance acceptance remain unrun.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="availability-versus-material-fallback"></span><span id="diagnostics-and-static-review"></span><span id="included-standard-skinning-shader-contract"></span><span id="sec-availability-versus-material-fallback"></span><span id="sec-diagnostics-and-static-review"></span><span id="sec-included-standard-skinning-shader-contract"></span><span id="sec-supported-geometry-routing"></span><span id="supported-geometry-routing"></span></details></main></body></html>

@@ -1,5 +1,52 @@
 # Commandlet 정리 결과 — 2026-09-06
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-editor-command-surface.ps1:69](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L69) — `Assert (-not ($results[0].data.names -contains 'object.rename')) 'Product editing leaked into Commandlet discovery'`
+- [Tools/regression/verify-editor-command-surface.ps1:184](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L184) — `Assert ((Invoke-Cmd 'undo.state').data.editUndo -eq $depth+1) 'Rename must create one undo record'`
+- [Tools/regression/verify-editor-command-surface.ps1:188](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L188) — `Assert ((Read-Object $id).data.name -eq 'After name') 'Redo did not restore the edit'`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86) — `own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};`
+- [Engine/SceneRuntime/Animator.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};`
+- [Editor/EngineEntry/EditorDiagnostics.h:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.h#L3) — `class Scene;`
+- [Editor/EngineEntry/EditorDiagnostics.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.h#L6) — `CommandCore::CommandResult ValidateHierarchy(Scene* scene);`
+- [Editor/EngineEntry/EditorDiagnostics.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.h#L7) — `CommandCore::CommandResult AnimatorStatus(Scene* scene);`
+- [Editor/EngineEntry/EditorProjectOperations.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.h#L8) — `CommandCore::CommandResult Layers();`
+- [Editor/EngineEntry/EditorProjectOperations.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.h#L9) — `CommandCore::CommandResult AddLayer(const std::string& name);`
+- [Editor/EngineEntry/EditorProjectOperations.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.h#L10) — `CommandCore::CommandResult RenameLayer(const std::string& name, const std::string& replacement);`
+- [Engine/SceneRuntime/Animator.cpp:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L26) — `Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}`
+- [Engine/SceneRuntime/Animator.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L28) — `AnimInstance& Animator::GetInstance() noexcept`
+- [Engine/SceneRuntime/Animator.cpp:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L31) — `::ce::contracts::assert_that(`
+- [Editor/EngineEntry/EditorDiagnostics.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.cpp#L29) — `std::printf("[CLI] 활성 씬 없음\n");`
+- [Editor/EngineEntry/EditorDiagnostics.cpp:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.cpp#L85) — `if (Entity::IsInvalidIndex(obj->GetParentIndex())) ++topLevelInvalid;`
+- [Editor/EngineEntry/EditorDiagnostics.cpp:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.cpp#L98) — `std::printf("[scene.hierarchycheck] 오브젝트 %zu · 최상위(0표기) %zu · 최상위(-1표기) %zu"`
+- [Editor/EngineEntry/EditorProjectOperations.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.cpp#L17) — `class TagDefinitionsCommand final : public Meta::IUndoableCommand`
+- [Editor/EngineEntry/EditorProjectOperations.cpp:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.cpp#L21) — `: m_before(std::move(before)), m_after(std::move(after))`
+- [Editor/EngineEntry/EditorProjectOperations.cpp:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.cpp#L35) — `throw std::runtime_error("Cannot persist project tags");`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > master 병합 후보: `6b9c2b79`의 `light.proxy` 제품 조회와 텍스처 Commandlet 4개를 보존했다. 통합 검증 및 원본 작업 보존은 [병합 준비 기록](Phase14_5MergePreparation.md)을 따른다.
 
 기준 HEAD `55374f16`의 미커밋 작업 트리에 적용했다. 현재 런타임 discovery는
@@ -102,3 +149,5 @@ embedded texture 수를 추가로 대조한다. 특정 그림의 coverage·pose 
 `debug-gates/render/verdicts.csv`, `vulkan-post/results.jsonl`,
 `debug-selftest-diagnostics/dx12.selftest.result.jsonl`,
 `material-input-debug.log`/`material-input-release.log`로 판정 근거를 확인할 수 있다.
+
+</details>

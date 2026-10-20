@@ -1,5 +1,50 @@
 # W2 승계 결정표 — 확정본
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/ImGuiHelper/PinHelper.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L9) — `enum class PinType`
+- [Editor/ImGuiHelper/PinHelper.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L52) — `void DrawPinIcon(const PinType& pintype, bool connected, int alpha)`
+- [Editor/ImGuiHelper/PinHelper.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/PinHelper.h#L71) — `ax::Widgets::Icon(ImVec2(static_cast<float>(m_PinIconSize), static_cast<float>(m_PinIconSize)), iconType, connected, color, ImColor(32, 32, 32, alpha));`
+- [Editor/EngineEntry/EditorMain.h:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L2) — `class ProjectLayerSettings;`
+- [Editor/EngineEntry/EditorMain.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L5) — `class AudioHost;`
+- [Editor/EngineEntry/EditorMain.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L6) — `class PlaybackService;`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Editor/EngineGUIWindow/EditorTheme.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L5) — `struct ImGuiStyle;`
+- [Editor/EngineGUIWindow/EditorTheme.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L18) — `struct EditorThemeTokens`
+- [Editor/EngineGUIWindow/EditorTheme.h:128](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L128) — `void ApplyEditorTheme(ImGuiStyle& style, float userScale, float dpiScale) noexcept;`
+- [Editor/ImGuiHelper/HorizontalLayout.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/HorizontalLayout.h#L26) — `ImGui::PushID(id);`
+- [Editor/ImGuiHelper/HorizontalLayout.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/HorizontalLayout.h#L46) — `ImGui::SameLine();`
+- [Editor/ImGuiHelper/HorizontalLayout.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/HorizontalLayout.h#L65) — `ImGui::PushID(id);`
+- [Engine/SceneRuntime/RectTransformComponent.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RectTransformComponent.h#L30) — `math::vector2 anchorMin;`
+- [Engine/SceneRuntime/RectTransformComponent.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RectTransformComponent.h#L31) — `math::vector2 anchorMax;`
+- [Engine/SceneRuntime/RectTransformComponent.h:88](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RectTransformComponent.h#L88) — `bool DriveAsCanvasRoot(const math::rect& screenRootRect, float scale);`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:352](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L352) — `ImGui::TextDisabled("%zu", value.m_ID_Data);`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:370](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L370) — `ImGui::TextDisabled("[no widget]");`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:853](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L853) — `ImGui::TextDisabled("[%d] [no widget]", index);`
+- [Editor/ImGuiHelper/widgets.cpp:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/widgets.cpp#L5) — `void ax::Widgets::Icon(const ImVec2& size, IconType type, bool filled, const ImVec4& color/* = ImVec4(1, 1, 1, 1)*/, const ImVec4& innerColor/* = ImVec4(0, 0, 0, 0)*/)`
+- [Editor/ImGuiHelper/widgets.cpp:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/widgets.cpp#L7) — `if (ImGui::IsRectVisible(size))`
+- [Editor/ImGuiHelper/widgets.cpp:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/widgets.cpp#L11) — `ax::Drawing::DrawIcon(drawList, cursorPos, cursorPos + size, type, filled, ImColor(color), ImColor(innerColor));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 작성: 2026-09-11
 - 대상: `docs/plans/EditorWorkspaceRedesignPlan.md` §7.1 의 초기 판정표
 - 범위: `Editor/ImGuiHelper/` 의 기존 자산과 W2 가 세울 네 family 의 관계
@@ -377,3 +422,5 @@ W2 목록의 "`ImGuiContext.h` 의 죽은 `imgui_impl_dx11.h` include 를 걷는
 `EditorThemeTokens`(RowHeight·ControlRadius 등)를 읽어야 하는데, 이 글을 쓰는 시점에 그 파일은
 다른 세션이 미커밋으로 들고 있다. 치수를 `ImGuiStyle` 에서만 뽑으면 두 번 고치게 되므로
 구현은 그 커밋 뒤로 미뤘다.
+
+</details>

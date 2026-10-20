@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>SDF 텍스트 경로</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="SdfTextRendering.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/SdfTextRendering.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>SDF 텍스트 경로</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">UI component</ve-node><ve-node id="n1" at="2 1">UIManager</ve-node><ve-node id="n2" at="3 1" key>Canvas</ve-node><ve-node id="n3" at="3 2">Prepared data</ve-node><ve-node id="n4" at="2 2">UI pass</ve-node><ve-node id="n5" at="1 2">Submission</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.</li>
+<li>scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang#L1">Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang:1</a> — <code>struct RectInstance</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang#L19">Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang:19</a> — <code>struct VSOut</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang#L55">Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang:55</a> — <code>const float4 sampled = gTexture.Sample(gSampler, input.uv);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L1">Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:1</a> — <code>struct SpriteInstance</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L25">Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:25</a> — <code>struct VSOut</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L53">Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:53</a> — <code>const float4 sampled = gTexture.Sample(gSampler, uv);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14">Engine/SceneRuntime/Canvas.h:14</a> — <code>class [[reflgen::reflect]] Canvas : public meta::identity&lt;Canvas, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18">Engine/SceneRuntime/Canvas.h:18</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20">Engine/SceneRuntime/Canvas.h:20</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FontAsset.h#L16">Engine/RenderEngine/FontAsset.h:16</a> — <code>own::shared_owner&lt;const Texture&gt; GetTexture() const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FontAsset.h#L24">Engine/RenderEngine/FontAsset.h:24</a> — <code>void Publish(own::shared_owner&lt;const Texture&gt; texture)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FontAsset.h#L31">Engine/RenderEngine/FontAsset.h:31</a> — <code>own::shared_owner&lt;const Texture&gt; m_texture;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30">Engine/RenderEngine/DataSystem.h:30</a> — <code>own::shared_owner&lt;const Texture&gt; descriptor;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45">Engine/RenderEngine/DataSystem.h:45</a> — <code>std::vector&lt;own::shared_owner&lt;const Texture&gt;&gt; textures;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L47">Engine/RenderEngine/DataSystem.h:47</a> — <code>own::shared_owner&lt;TextureFramePins&gt; textureImages;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TextComponent.h#L14">Engine/SceneRuntime/TextComponent.h:14</a> — <code>class FontAsset;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TextComponent.h#L15">Engine/SceneRuntime/TextComponent.h:15</a> — <code>struct TextLayout;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TextComponent.h#L17">Engine/SceneRuntime/TextComponent.h:17</a> — <code>class [[reflgen::reflect]] TextComponent : public meta::identity&lt;TextComponent, UIComponent&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L63">Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:63</a> — <code>class EnhancedUIPass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L114">Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:114</a> — <code>own::shared_owner&lt;TextureFramePins&gt; texturePins = {})</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L184">Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:184</a> — <code>own::shared_owner&lt;TextureFramePins&gt; m_texturePins;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h#L14">Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h:14</a> — <code>class EnhancedSpritePass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h#L68">Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h:68</a> — <code>own::shared_owner&lt;TextureFramePins&gt; texturePins = {})</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h#L118">Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h:118</a> — <code>own::shared_owner&lt;TextureFramePins&gt; m_texturePins;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-10-08, 기준 master <code>3afe1daaee7b75f644ac10b12d96fb684a0e74c8</code>.</p>
+<p>이 변경은 <a href="../plans/UISystemRedesignPlan.html">PHASE 16 트랙 T</a>의 소스 연결이다.
+빌드, 셰이더 컴파일, 엔진 실행, 테스트 실행, 화면·성능 검증은 <strong>실행하지 않았다</strong>.
+아래 구현 목록은 런타임 수용 완료를 뜻하지 않는다.</p>
+<h2>연결한 경로</h2>
+<ol>
+<li><code>DataSystem::LoadFontShared</code>가 등록된 TTF/OTF 또는 배포된 기본 폰트를 읽는다.
+자산 GUID와 정규화된 전체 경로로 캐시하며 같은 파일명을 합치지 않는다.
+기존 번들의 <code>ManagedAssetType::SpriteFont = 3</code>은 보존한다. 구 DirectXTK
+<code>.spritefont</code> 바이너리를 SDF 폰트로 잘못 읽지 않고 오류로 보고한다.</li>
+<li><code>FontAsset</code>가 기존 <code>stb</code> 의존성의 <code>stb_truetype</code>으로 필요한 글리프만 SDF로 만든다.
+별도 폰트 라이브러리, MSDF 생성기, 스레드 풀은 추가하지 않는다.</li>
+<li><code>TextComponent</code>가 GT에서 문자열·폰트·픽셀 크기·폭·정렬이 바뀌었을 때 레이아웃을 만든다.
+기존 프록시 dirty 경계로 전달하며 색·알파만 바뀌면 재래스터화하지 않는다.
+생성과 갱신 양쪽에 <code>fontSize * layoutScale</code>, flip, 활성 상태, Canvas 정보를 보존한다.</li>
+<li><code>EnhancedUIPass::AppendTextRects</code>가 하나의 텍스트를 N개 글리프 사각형으로 펼친다.
+Game View와 Player Overlay는 <code>EnhancedUIPass</code>, Editor Scene View 미리보기와
+Camera/World Canvas는 기존 <code>EnhancedSpritePass</code>의 평면 배치를 사용한다.
+두 경로가 같은 앵커·정렬·flip 계산을 공유한다.</li>
+<li>기존 중립 <code>Texture</code> → DX12/Vulkan texture cache → RenderGraph 경로로 업로드한다.
+업로드는 렌더 패스 진입 전에 이루어지고, 아틀라스는 명시적 shader-read 자원으로 선언된다.
+<code>UI.slang</code>과 <code>WorldSprite.slang</code>은 SDF의 red 채널을 읽어 derivative 기반 coverage를
+계산하고 straight alpha로 합성한다. 일반 이미지 샘플링은 유지한다.</li>
+</ol>
+<h2>글리프와 수명</h2>
+<ul>
+<li>UTF-8의 과잉 인코딩, surrogate, 잘못된 continuation, 범위 밖 scalar는 대체 문자로 처리한다</li>
+<li>CRLF/LF/CR, 탭, 같은 face 안의 커닝, 문자 단위 자동 줄바꿈, Left/Center/Right를 지원한다</li>
+<li>가로 정렬은 각 줄을 같은 layout 폭 안에 놓고, 블록의 세로 앵커는 기존처럼 중앙이다</li>
+<li>새 컴포넌트의 기본 크기는 32픽셀이다. 기존에 저장한 숫자는 자동 변환하지 않는다</li>
+<li><code>RelativePosition</code>은 Canvas 배율이 적용된 레이아웃 오프셋이다</li>
+<li>비정상적인 숫자는 레이아웃/그리기 경계에서 걸러 GPU instance에 전달하지 않는다</li>
+</ul>
+<p>아틀라스 페이지의 글리프 좌표는 추가 후 이동하거나 덮어쓰지 않는다. 불변 <code>TextLayout</code>은
+이 페이지의 안정된 소유자를 참조하며, 페이지는 새 <strong>불변 Texture</strong>를 원자적으로 게시한다.
+화면/평면 사각형으로 밀봉하는 시점에 실제 Texture를 잡고 Rect/Item/Batch가 보존한다.
+따라서 새 문자열의 글리프 추가가 이전 프레임의 픽셀을 바꾸지 않으며, 오래된 정적 라벨
+하나마다 4 MiB짜리 옛 아틀라스가 영구히 남는 구조도 피한다.</p>
+<p>폰트 파일당 32 MiB, primary+fallback 2 face, 캐시 4,096 glyph, 1,024² 페이지 8장,
+살아 있는 RGBA8 스냅샷 16장, 입력 1 MiB/레이아웃 16,384 scalar의 상한을 둔다.
+RGBA8은 기존 RHI 포맷을 그대로 사용하기 위한 선택이다. SDF는 red 채널만 필요하지만
+새 R8 포맷을 모든 백엔드에 추가하지 않았으므로 스냅샷 상한은 64 MiB다.
+R8 CPU staging 최대 8 MiB와 게시 중 임시 변환 메모리는 별도다.
+이 값은 CPU Texture 스냅샷 상한이다. GPU 사본은 기존 texture cache의 미사용 프레임·
+메모리 압박 은퇴 정책을 따르므로, 이전 버전이 GPU에 남는 동안 총 VRAM은 이보다 클 수 있다.
+한계를 넘으면 이미 준비한 대체 글리프를 사용하거나 문자열을 잘라내고 진단에 표시한다.
+프레임이 옛 아틀라스를 붙든 일시적 압박은 별도로 표시하고, 여유가 생기면 같은 문자열도
+GT에서 재시도한다. 영구적인 글리프/문자 수 상한은 매 프레임 재시도하지 않는다.</p>
+<h2>폰트와 패키지</h2>
+<ul>
+<li>기본 Latin은 저장소에 있던 Inter Regular를 그대로 재사용한다</li>
+<li>한글은 공식 Google Fonts에서 고정한 Nanum Gothic Regular를 fallback으로 쓴다</li>
+<li>두 폰트는 변환·서브셋 생성 없이 원본 바이트를 사용한다</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Resources/Fonts/Runtime/README.md">폰트 출처·라이선스</a>와 SHA-256/Git blob 신원을 함께 저장한다</li>
+<li>Editor/Player 출력과 게임 패키지에 <code>Resources/Fonts/Runtime</code> 전체를 배포하고 해시 manifest에 포함한다</li>
+<li>프로젝트 폰트는 <code>.meta</code> GUID가 필요한 raw source 자산이다. cooker가 씬·프리팹·override·번들 참조를
+등록된 폰트 GUID로 바꾸며, 미해결/다른 자산 타입/Assets 밖의 참조는 실패시킨다</li>
+<li>기본 폰트는 고정 engine resource 경로로 해석하므로 현재 작업 폴더나 개발 PC의 시스템 폰트에 의존하지 않는다</li>
+</ul>
+<p>최신 <code>PrebuiltAssetSets</code>의 source-free bootstrap은 프로젝트 raw <code>.ttf</code>/<code>.otf</code>를 허용하지 않고,
+AssetSet에도 Font kind가 아직 없다. 따라서 프로젝트 폰트 패키징은 기존 프로젝트 소스 포함
+경로에 한정한다. source-free bootstrap의 프로젝트 폰트 참조는 허용 범위를 넓히지 않고
+cooker/입력 경계에서 실패시킨다. 번들 Inter/Nanum runtime resource 배포는 그대로 지원한다.</p>
+<p>이 단계에서 atlas/metrics를 디스크에 미리 굽는 별도 cooked-font 형식은 만들지 않았다.
+Player는 패키지의 원본 TTF/OTF를 읽고 첫 사용 시 직렬로 SDF를 만든다.
+<code>stb_truetype</code>는 보안 경계용 폰트 파서가 아니다. 파일/테이블 범위 검사는 포함하지만,
+임의의 신뢰할 수 없는 네트워크 폰트를 안전하게 처리한다고 주장하지 않는다.</p>
+<h2>진단과 아직 실행하지 않은 수용</h2>
+<p><code>ui.drawitems</code>는 RT 프록시 자료를 잠금 안에서 값으로 복사한 뒤 읽는다. 명령이 씬을 tick하거나
+프록시 큐를 소비하지 않는다. Text 수, 유효 glyph Rect 수와 Canvas 모드, 누락/빈 레이아웃,
+대체 glyph·잘못된 UTF-8·예산 초과를 보고한다. 이것은 <strong>CPU 그리기 후보</strong>이며 GPU 제출/화면 성공의 증거가 아니다.</p>
+<p>준비한 회귀 자료:</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/sdf_text_regression.txt">CLI 저작 시나리오</a>: Latin/한글/좁은 폭/세 정렬,
+색·문자열·크기 변경, Play/Stop 뒤 <code>ui.drawitems</code>; 마지막 씬을 열어 두어 화면을 비교한다</li>
+<li>기존 paired DX12/Vulkan <code>vk.ui</code> 소스: 합성 SDF contour/반투명 색/일반 이미지의 혼합,
+위치·flip·잘못된 값·CPU owner 수명 단정</li>
+<li>CPU 폰트 probe 소스: Unicode/커닝/줄바꿈/정렬/한글, append-only 페이지와 이전 Texture 보존</li>
+<li>BuildTool/cooker probe 소스: 폰트·라이선스 누락, runtime 복사, GUID/경로/override 변환과 거부</li>
+</ul>
+<p>아직 필요한 실행:</p>
+<ol>
+<li>Windows Editor/Player Debug·Release 빌드, reflgen 생성, 두 Slang target 컴파일</li>
+<li>CPU/cooker/BuildTool probe와 paired DX12/Vulkan UI 진단 실행</li>
+<li>Game/Scene View의 Latin·한글, Camera/World Canvas·깊이 가림·mixed Image/Text 순서 확인</li>
+<li>resize/CanvasScaler/폰트 크기 12·24·48·96, 줄바꿈·색·알파·정렬·flip 화면 비교</li>
+<li>텍스트·Canvas enable/disable, 재부모화, 씬 왕복, Play/Stop, 폰트 reload·실패 복구</li>
+<li>16개를 넘는 서로 다른 라벨, frames-in-flight, atlas/GPU cache 은퇴와 메모리 상한 확인</li>
+<li>소스 checkout이 없는 패키지에서 기본/프로젝트 폰트와 라이선스 포함, DX12/Vulkan Player 실행</li>
+</ol>
+<p>아직 포함하지 않는 것: MSDF 품질 비교, shaping/ligature/BiDi, grapheme 단위 줄바꿈,
+컬러 emoji, 세로 텍스트, rich text, 말줄임·부모 마스크/height clipping, PHASE 16의 나머지 위젯·UI 소유권 재설계.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-글리프와-수명"></span><span id="sec-연결한-경로"></span><span id="sec-진단과-아직-실행하지-않은-수용"></span><span id="sec-폰트와-패키지"></span><span id="글리프와-수명"></span><span id="연결한-경로"></span><span id="진단과-아직-실행하지-않은-수용"></span><span id="폰트와-패키지"></span></details></main></body></html>

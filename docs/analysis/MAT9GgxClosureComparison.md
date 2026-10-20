@@ -1,5 +1,40 @@
 # MAT-9 공통 GGX 반사·레이어 감쇠 대조 — 2026-10-01
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/blender/export-ggx-energy-tables.py:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-ggx-energy-tables.py#L8) — `ROOT = Path(__file__).resolve().parents[2]`
+- [Tools/blender/export-ggx-energy-tables.py:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-ggx-energy-tables.py#L15) — `parser = argparse.ArgumentParser()`
+- [Tools/blender/export-ggx-energy-tables.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-ggx-energy-tables.py#L20) — `raise ValueError("Source must be the unmodified Blender v5.1.1 shader.tables")`
+- [Tools/regression/assess-thin-film-images.py:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-thin-film-images.py#L15) — `sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'blender'))`
+- [Tools/regression/assess-thin-film-images.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-thin-film-images.py#L20) — `SPEC = importlib.util.spec_from_file_location('images', Path(__file__).with_name('compare-material-blender-images.py'))`
+- [Tools/regression/assess-thin-film-images.py:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-thin-film-images.py#L26) — `parser = argparse.ArgumentParser(description=__doc__)`
+- [Tools/regression/measure-material-blender-images.ps1:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/measure-material-blender-images.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15) — `$Reference=[IO.Path]::GetFullPath($Reference)`
+- [Tools/regression/measure-material-blender-images.ps1:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49) — `if($ReferenceRepeat) { $comparisonArguments+=@('--reference-repeat',[IO.Path]::GetFullPath($ReferenceRepeat)) }`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정
 
 **고정 박막 on/off 32조건이 기존 이미지 목표를 모두 통과했다.** 박막 8종 × 두 조명과
@@ -107,3 +142,5 @@ C:/Python313/python.exe Tools/regression/assess-thin-film-images.py `
 현재 shader를 포함한 실제 Scene 이동 카메라·cold/warm·tier 성능은 이번 이미지 검증으로
 수용하지 않는다. 원래 grid의 area-light/HDRI 조건, Special transport와 texture/normal-map 대조,
 Deferred/Forward route parity 및 실제 Scene 성능 판정이 남는다.
+
+</details>

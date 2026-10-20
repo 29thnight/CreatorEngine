@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Microsoft Fluent Emoji 이미지 적용 검증</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorFluentEmojiValidation.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorFluentEmojiValidation.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Microsoft Fluent Emoji 이미지 적용 검증</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/icons/Fetch-FluentEmoji.ps1#L2">Tools/icons/Fetch-FluentEmoji.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/icons/Fetch-FluentEmoji.ps1#L5">Tools/icons/Fetch-FluentEmoji.ps1:5</a> — <code>$iconRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../../Resources/Editor/Icons&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/icons/Fetch-FluentEmoji.ps1#L11">Tools/icons/Fetch-FluentEmoji.ps1:11</a> — <code>$temp = [IO.Path]::GetTempFileName()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L8">ScriptCore/Audio.cs:8</a> — <code>public readonly struct AudioAssetId : IEquatable&lt;AudioAssetId&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L46">ScriptCore/Audio.cs:46</a> — <code>public readonly struct AudioParameter</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L83">ScriptCore/Audio.cs:83</a> — <code>public struct AudioPlaySettings</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10">ScriptCore/Prefab.cs:10</a> — <code>public readonly struct Prefab</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12">ScriptCore/Prefab.cs:12</a> — <code>private readonly string? _name;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14">ScriptCore/Prefab.cs:14</a> — <code>private Prefab(string name) =&gt; _name = name;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L10">Engine/SceneRuntime/Prefab.h:10</a> — <code>class [[reflgen::reflect]] Prefab : public Object</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L12">Engine/SceneRuntime/Prefab.h:12</a> — <code>friend struct reflgen::access;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L13">Engine/SceneRuntime/Prefab.h:13</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L16">Engine/SceneRuntime/Terrain.h:16</a> — <code>class [[reflgen::reflect]] TerrainComponent : public meta::identity&lt;TerrainComponent, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L20">Engine/SceneRuntime/Terrain.h:20</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L22">Engine/SceneRuntime/Terrain.h:22</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L9">Engine/RenderEngine/Experiment/Model.h:9</a> — <code>class ModelLoader;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L13">Engine/RenderEngine/Experiment/Model.h:13</a> — <code>class Model final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Model.h#L15">Engine/RenderEngine/Experiment/Model.h:15</a> — <code>public:</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-09-13. 사용자 요청에 따른 엔티티 및 Content Browser 이미지 교체.</p>
+<h2>적용</h2>
+<ul>
+<li>기본 엔티티는 <strong>Package(상자)</strong>. Inspector 헤더, 선택 팝업, Hierarchy가 같은 이미지를 쓴다.</li>
+<li>기존 9개 프리셋 ID를 유지하고 이미지만 교체했다. 저장된 선택·잠금·Undo 데이터는 그대로 사용한다.</li>
+<li>Content Browser의 프로젝트 머리행, 폴더 트리/도구 버튼/타일/목록, 파일 유형 타일/목록에
+Fluent Emoji PNG를 연결했다. 검색·탐색·보기 전환 등 기능 글리프는 Material Symbols다.</li>
+<li>EditorAssetPresentation이 이미지 수명을 소유하며 그리기 중 디스크 로드를 하지 않는다.
+파일 분류를 공유해 필터와 아이콘의 확장자 판정을 일치시킨다.
+미분류 파일은 Page facing up 이미지와 Unknown 이름으로 표시한다.</li>
+<li>이미지 바인딩 실패 시 기존 유형 글리프로 대체한다. ImGui 항목의 클릭·선택·드롭 영역은 유지한다.</li>
+<li>현재 자산 표시 경로는 유형 이미지다. 비동기 자산 썸네일 요청·생성·완료 게시·타일 교체는
+기존 W7 후속 범위이며 이번 교체의 완료 실적으로 포함하지 않는다.</li>
+</ul>
+<h2>원본 및 재현</h2>
+<ul>
+<li>공식 원본: <a href="https://github.com/microsoft/fluentui-emoji">Microsoft Fluent Emoji</a>, <strong>3D</strong> PNG.</li>
+<li>고정 revision: <code>1ffb34c752ecf5d402f04cfb4b392c77f57c54bc</code>.</li>
+<li>21개 원본을 24개 리소스 파일명에 대응한다. 원본 PNG 바이트를 수정하지 않고 UI에서 축소한다.</li>
+<li><code>Resources/Editor/Icons/FluentEmoji.provenance.json</code>: 원본 경로·revision URL·SHA-256.</li>
+<li><code>Resources/Editor/Icons/LICENSE-FluentEmoji-MIT.txt</code>: Microsoft MIT 고지문 원문.</li>
+<li><code>Tools/icons/Fetch-FluentEmoji.ps1</code>: 고정 원본/고지문 복원 및 해시 검증.</li>
+<li>실행 배포 위치: <code>Bin/x64-Debug/Resources/Icons</code>. 이전 @icons 변환 도구와 원본은 은퇴한다.</li>
+</ul>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>Emoji</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Entity / Model</td>
+<td>Package</td>
+</tr>
+<tr>
+<td>Game Manager / Camera / Light</td>
+<td>Gear / Movie camera / Light bulb</td>
+</tr>
+<tr>
+<td>Audio / Player / Trigger</td>
+<td>Speaker high volume / Bust in silhouette / High voltage</td>
+</tr>
+<tr>
+<td>Script / Prefab</td>
+<td>Scroll / Puzzle piece</td>
+</tr>
+<tr>
+<td>프로젝트 / 폴더 닫힘·열림</td>
+<td>Video game / File folder · Open file folder</td>
+</tr>
+<tr>
+<td>Texture / Material / Terrain</td>
+<td>Framed picture / Artist palette / National park</td>
+</tr>
+<tr>
+<td>Shader / Code / Sound</td>
+<td>Sparkles / Scroll / Musical notes</td>
+</tr>
+<tr>
+<td>HDR / Volume Profile / Font</td>
+<td>Sunrise over mountains / Control knobs / Input latin letters</td>
+</tr>
+<tr>
+<td>Unknown</td>
+<td>Page facing up</td>
+</tr>
+</tbody></table></div>
+<h2>검증</h2>
+<ul>
+<li>VS18/v145 Debug Editor 빌드 통과(오류 0). 기존 <code>LNK4229 /DELAYLOAD:vulkan-1.dll</code> 경고 1개.
+로그: <code>Artifacts/phase21-fluent-emoji/build-debug.log</code>.</li>
+<li>원본 24개와 배포 24개의 SHA-256 일치, 원본/배포 MIT 고지문 해시 일치.</li>
+<li>DX12 theme 게이트: 시작 배율 100→150→100%, <strong>3회 기동 / 64 checks 통과</strong>.
+각 <code>editor.selftest</code>는 <strong>937 checks / 0 failures</strong>, 창·메뉴·theme 통과.
+현재 OS DPI 150% 관측이며 실제 모니터 간 DPI 이동 검사는 이번에 하지 않았다.
+설정과 imgui.ini는 게이트 전후 바이트 단위 복원.</li>
+<li>실제 UI: 기본 상자의 Inspector/Hierarchy 표시, 프리셋 9개와 현재 선택 체크,
+폴더 트리와 타일/목록 이미지, 폴더 이동/경로 바 이동, 미분류 파일 타일/목록 전환 확인.
+대표 표시를 확인했으며 모든 파일 확장자의 개별 화면을 전수 검사한 것은 아니다.
+검증용 에디터를 닫은 뒤 설정과 imgui.ini를 시작 전 바이트로 복원했다.</li>
+<li>아이콘/잠금 저장·복제·Undo 기능의 이전 검증은
+<a href="EditorEntityNavigationValidation.html">EditorEntityNavigationValidation.md</a>에 유지한다.
+이번에는 해당 상태 경로를 바꾸지 않았고 163개 전체 행렬을 재실행하지 않았다.</li>
+</ul>
+<p>화면: 기본 상자와 폴더 (<code>../../Artifacts/phase21-fluent-emoji/entity-package-and-folders.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+프리셋 선택 (<code>../../Artifacts/phase21-fluent-emoji/entity-presets.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+파일 목록 (<code>../../Artifacts/phase21-fluent-emoji/file-list.png</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+<p>W2-I/W2-B 전체 상태와 공수는 유지한다. Vulkan 검증은 사용자 결정에 따라 보류한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증"></span><span id="sec-원본-및-재현"></span><span id="sec-적용"></span><span id="검증"></span><span id="원본-및-재현"></span><span id="적용"></span></details></main></body></html>

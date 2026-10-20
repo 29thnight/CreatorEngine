@@ -1,5 +1,51 @@
 # TR0 — 계측 소비자·예산·Player 기록 체크포인트
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/base0_artifacts.py:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L13) — `import struct`
+- [Tools/regression/base0_artifacts.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L20) — `raise ValueError(message)`
+- [Tools/regression/base0_artifacts.py:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L44) — `expected_order = [i for i, p in enumerate(passes) if not truth(p["culled"])]`
+- [Tools/regression/audit-rg8-adoption.py:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L25) — `raise ValueError(message)`
+- [Tools/regression/audit-rg8-adoption.py:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L56) — `"skybox": Path(manifest["skyBoxPath"]).name}`
+- [Tools/regression/audit-rg8-adoption.py:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L121) — `assignment = {p: (i, b["queue"]) for i, b in enumerate(batches) for p in b["passes"]}`
+- [Tools/regression/measure-rg8-adoption.ps1:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L32) — `$estimatedTelemetryGiB=if($TimingOnly){[math]::Max(1,$NormalCandidates/64.0)}else{1}`
+- [Tools/regression/measure-rg8-adoption.ps1:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L34) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/measure-rg8-adoption.ps1:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-rg8-adoption.ps1#L35) — `$out=[IO.Path]::GetFullPath($OutputDirectory)`
+- [Engine/EngineDiagnostics/ProfileService.cpp:80](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileService.cpp#L80) — `static std::mutex* lock = new std::mutex();`
+- [Engine/EngineDiagnostics/ProfileService.cpp:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileService.cpp#L95) — `profiler_service::profiler_service()`
+- [Engine/EngineDiagnostics/ProfileService.cpp:107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileService.cpp#L107) — `profile_tick profiler_service::ticks_per_second()`
+- [Tools/regression/native_real_measurement.py:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/native_real_measurement.py#L5) — `raise ValueError(message)`
+- [Tools/regression/native_real_measurement.py:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/native_real_measurement.py#L17) — `for field in ('realFrameId', 'publicationFrameId', 'viewId', 'sceneEpoch',`
+- [Tools/regression/native_real_measurement.py:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/native_real_measurement.py#L29) — `check(int(p['publicationFrameId']) == row['gpu']['frame'] and int(p['viewId']) == row['gpu']['viewId'] and`
+- [Tools/regression/summarize-material-profile.py:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/summarize-material-profile.py#L15) — `import struct`
+- [Tools/regression/summarize-material-profile.py:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/summarize-material-profile.py#L21) — `raise ValueError(message)`
+- [Tools/regression/summarize-material-profile.py:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/summarize-material-profile.py#L24) — `class Reader:`
+- [Tools/regression/NativeRealMeasurementGate.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/NativeRealMeasurementGate.ps1#L2) — `function Assert-NativeRealMeasurement($Snapshot) {`
+- [Tools/regression/NativeRealMeasurementGate.ps1:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/NativeRealMeasurementGate.ps1#L6) — `foreach($field in @('schemaVersion','valid','frameKind','realFrameId','publicationFrameId',`
+- [Tools/regression/NativeRealMeasurementGate.ps1:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/NativeRealMeasurementGate.ps1#L19) — `if(![uint64]::TryParse([string]$p.$field,[ref]$value) -or $value -eq 0){throw "Invalid native-real identity/extent: $name.$field"}`
+- [Tools/regression/audit-material-measurement.py:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-material-measurement.py#L15) — `spec = importlib.util.spec_from_file_location('material_profile', Path(__file__).with_name('summarize-material-profile.py'))`
+- [Tools/regression/audit-material-measurement.py:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-material-measurement.py#L92) — `parser = argparse.ArgumentParser(description=__doc__)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 현재 판정
 
 golden/profiler에 이어 명시적 CPU render-submit 예산 소비자와 실제 Development Player의 연속 presenter 기록을 검증했다. **TR0는 progress·기성 0, PHASE 4.5는 12/71(17%) 유지**다. 프로젝트의 성능 목표 수치, 전체 기존 소비자/진단 UI 수용, actual generated 출력 신원은 아직 완료하지 않았다.
@@ -74,3 +120,5 @@ SDK 활성 Debug/Release 검증과 측정 표면·기존 소비자 변경은 [Te
 
 
 2026-10-11 후속: 현재 바이너리의 BASE-0 실제 population 및 용량 정리는 [TemporalBase0ConsumerWorkload20261011](TemporalBase0ConsumerWorkload20261011.md)과 tr0-base0-workload-20261011/checkpoint.json이 정본이다. SDK D/R 빌드·400표본·204캡처 수용, raw 대표 성공 2/필요 실패 2 및 로그 보존, 여유 93.21GiB. 이전 runtime 해시의 검증은 당시 실행 증거로 유지한다. TR0 progress·기성 0/PHASE 4.5 12/71 유지.
+
+</details>

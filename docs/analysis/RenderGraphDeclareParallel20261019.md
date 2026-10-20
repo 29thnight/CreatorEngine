@@ -1,5 +1,53 @@
 # RenderGraphDeclare: 선언 CPU 비용과 병렬 실행 단위
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/ThreadPool.cpp:385](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L385) — `for (auto& task : std::span(nodes_.data(), nodes_.size()))`
+- [Engine/Utility_Framework/ThreadPool.cpp:654](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L654) — `done_.wait_for(lock, std::chrono::microseconds(100), ready);`
+- [Engine/Utility_Framework/ThreadPool.cpp:753](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L753) — `void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,`
+- [Tools/regression/verify-render-base0.ps1:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L95) — `estimatedArtifactGiB=$estimatedGiB; startFreeGiB=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($output)).AvailableFreeSpace/1GB`
+- [Tools/regression/verify-render-base0.ps1:189](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L189) — `$proc=[Diagnostics.Process]::Start($start)`
+- [Tools/regression/verify-render-base0.ps1:471](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L471) — `[IO.File]::WriteAllText("$case/editor.stdout.log",$stdout.GetAwaiter().GetResult())`
+- [Engine/Utility_Framework/JobScheduler.cpp:207](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L207) — `void job_handle::wait_assisting() const`
+- [Engine/Utility_Framework/JobScheduler.cpp:318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L318) — `job_handle job_scheduler::submit_indexed(std::size_t count, std::function<void(std::size_t)> task)`
+- [Engine/Utility_Framework/JobScheduler.cpp:344](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L344) — `job_handle job_scheduler::submit_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:1427](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1427) — `void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& graph,`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:1477](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1477) — `DeclareMeshletBatch(graph, frames.subspan(first, index - first), prefix.c_str());`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:1484](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L1484) — `DeclareMeshletBatch(graph, frames.subspan(first), prefix.c_str());`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:1864](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L1864) — `bool MeshSurfaceBatch::PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:1975](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L1975) — `bool MeshSurfaceBatch::PrepareDeclarationDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:2165](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L2165) — `bool MeshSurfaceBatch::DeclareBatch(EnhancedRenderGraph& graph, std::span<const MeshSurfaceBatch* const> batches,`
+- [Tools/regression/verify-material-mesh-surface.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-mesh-surface.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-mesh-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-mesh-surface.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-mesh-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-mesh-surface.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Tools/regression/verify-meshlet-declaration-cpu.py:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-meshlet-declaration-cpu.py#L97) — `('struct GpuGeometryVisibility::BufferPool', True),`
+- [Tools/regression/verify-meshlet-declaration-cpu.py:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-meshlet-declaration-cpu.py#L102) — `access_start = access.index('    inline void NormalizeSceneReads(')`
+- [Tools/regression/verify-meshlet-declaration-cpu.py:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-meshlet-declaration-cpu.py#L109) — `'void GpuGeometryVisibility::Frame::DeclareMeshletBatch(',`
+- [Tools/regression/verify-mesh-dispatch-declaration.py:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-mesh-dispatch-declaration.py#L63) — `'struct MeshSurfaceBufferPool'):`
+- [Tools/regression/verify-mesh-dispatch-declaration.py:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-mesh-dispatch-declaration.py#L66) — `for anchor in ('bool MeshSurfaceBatch::IsPreparedForGraph(', 'bool MeshSurfaceBatch::PrepareDispatch(',`
+- [Tools/regression/verify-mesh-dispatch-declaration.py:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-mesh-dispatch-declaration.py#L67) — `'bool MeshSurfaceBatch::PrepareDeclarationDispatch('):`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준 커밋: `4d5cbfa2f1389dee1c77a5bf53575b969f566467` (`master`, 2026-10-19).
 
 ## 범위와 판정
@@ -322,3 +370,5 @@ Release CreatorEditor를 offscreen/DX12로 실행하고 validation을 끄는 성
 `RenderGraphDeclareMeshFill`, `RenderGraphDeclareJoin`을 확인한다.
 전체 프레임과 독립 leaf scope, 같은 조건의 p50/p95 및 실패·손실 여부를 함께 남긴다.
 새 세부 scope의 켜짐/꺼짐이 다른 수집을 순수 최적화 효과로 비교하지 않는다.
+
+</details>
