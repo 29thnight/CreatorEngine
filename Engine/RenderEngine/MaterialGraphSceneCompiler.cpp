@@ -1,4 +1,4 @@
-#include "MaterialGraphSceneCompiler.h"
+﻿#include "MaterialGraphSceneCompiler.h"
 #include "MaterialGraphShaderMeta.h"
 
 #include "../Utility_Framework/StandardLibrary.h"
@@ -82,14 +82,17 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
     graphics("Forward", "LXSceneVS", "LXSceneColorPS", ShaderPassQueue::Transparent);
     passes.back().state.blendMode = ShaderBlendMode::Alpha;
-    graphics("LXSceneLookup0", "LXSceneVS", "LXSceneLookup0PS");
-    graphics("LXSceneLookup1", "LXSceneVS", "LXSceneLookup1PS");
+    if (!IsEditorPreviewProgram(program))
+    {
+        graphics("LXSceneLookup0", "LXSceneVS", "LXSceneLookup0PS");
+        graphics("LXSceneLookup1", "LXSceneVS", "LXSceneLookup1PS");
+    }
     if ((program.features & 0x1800u) != 0)
     {
         graphics("LXSceneRuntimeEffects0", "LXSceneVS", "LXSceneRuntimeEffects0PS");
         graphics("LXSceneRuntimeEffects1", "LXSceneVS", "LXSceneRuntimeEffects1PS");
     }
-    if (program.surface)
+    if (program.surface && !IsEditorPreviewProgram(program))
         graphics("Shadow", "LXSceneShadowVS", "LXSceneShadowPS", ShaderPassQueue::Shadow, true);
     if ((program.features & 0x1000u) != 0)
         graphics("Subsurface", "LXSceneVS", "LXSceneSubsurfacePS");
@@ -126,9 +129,10 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
         for (const auto entry :
              {"LXSceneGBufferPS", "LXSceneVisibilityPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
+            if (IsEditorPreviewProgram(program) && (std::string_view(entry) == "LXSceneLookup0PS" || std::string_view(entry) == "LXSceneLookup1PS")) continue;
             targets.push_back({backend, entry, "ps_6_0"});
         }
-        if (program.surface)
+        if (program.surface && !IsEditorPreviewProgram(program))
         {
             targets.push_back({backend, "LXSceneShadowVS", "vs_6_0"});
             targets.push_back({backend, "LXSceneShadowMS", "ms_6_5"});
@@ -158,7 +162,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
 
 bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& shaderDirectory,
                          const std::filesystem::path& sourceFile, const Budget& budget, VerifiedProduct& result,
-                         std::string& error, FileGuid graphGuid, std::optional<RHIShaderBinary> backend)
+                          std::string& error, FileGuid graphGuid, std::optional<RHIShaderBinary> backend, bool fastPreview)
 {
     if (program.volume && program.slang.find("#define LX_MATERIAL_VOLUME_HOMOGENEOUS 1\n") == std::string::npos)
     {
@@ -178,6 +182,11 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
         return Fail(error, "METEOR Scene shader cache directory failed: " + ioError.message());
     }
     auto sceneProgram = program;
+    if (fastPreview)
+    {
+        sceneProgram.slang.insert(0, "#define CE_EDITOR_MINIMAL_PREVIEW 1\n");
+        sceneProgram.semanticKey += "|editor-minimal-preview:2|";
+    }
     if (!sceneProgram.semanticKey.ends_with(SceneHostIdentity))
         sceneProgram.semanticKey += SceneHostIdentity;
     const auto hostStampOffset = sceneProgram.semanticKey.size() - SceneHostIdentity.size();
@@ -195,6 +204,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
         return false;
     }
     RHIShaderCompileOptions options;
+    options.fastPreview = fastPreview;
     options.strictMath = true;
     options.fineDerivatives = true;
     options.quadOperations = true;
@@ -230,7 +240,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
             return Fail(error, "Generated Scene source changed during verification.");
         }
         GeneratedMaterialShader generated;
-        if (!PublishMaterialShaderMeta(candidate.program, graphGuid, hostSource, SceneMetaPasses(program), reflections,
+        if (!PublishMaterialShaderMeta(candidate.program, graphGuid, hostSource, SceneMetaPasses(sceneProgram), reflections,
                                        sourceFile.parent_path() / (sourceFile.stem().string() + ".generated"),
                                        generated, error))
         {

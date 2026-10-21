@@ -77,6 +77,8 @@ internal static class EnginePublisher
                 }
                 Copy(recordPath, Paths.Child(binaryTarget, $"Runtime/Manifests/{name}.json")); hosts[name] = abi.DeepClone();
             }
+            foreach (var entry in EditorPreviewPackage.Entries(binarySource))
+                Copy(Paths.Child(binarySource, entry.Path), Paths.Child(binaryTarget, entry.Path));
             var content = ContentCompatibility.Read(hosts["Player"]!, "Player native build record");
             foreach (var host in hosts)
             {

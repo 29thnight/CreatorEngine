@@ -29,7 +29,7 @@ namespace material_graph
     // 39: authenticated thin geometry metadata and paged GPU connectivity.
     // 40: record-addressed GPU bucket packets and shared scene/material tables.
     // 41: opt-in primitive cache의 별도 GBuffer/Temporal cooked entry와 t174/t175 계약.
-    inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:41";
+    inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:42";
     struct GeneratedMaterialShader;
     enum class Tier : std::uint8_t
     {

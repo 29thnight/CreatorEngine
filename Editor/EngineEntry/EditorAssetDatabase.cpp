@@ -6,6 +6,7 @@
 #include "ConditionalAssetPublish.h"
 #include "EditorScriptAuthoring.h"
 #include "TextureSourceProcessing.h"
+#include "TextureGenerationHash.h"
 #include "Assets/ModelMaterialGraph.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
@@ -1735,6 +1736,19 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         return "Cooked texture preparation failed: " + request.message;
     }
 
+    bool HasPendingTexturePublications()
+    {
+        std::lock_guard lock(m_authoringMutex);
+        for (const auto& [path, work] : m_textureImports)
+        {
+            // Failed dispatch/imports are terminal and must not hold admission.
+            if (work.dispatchFailed->load(std::memory_order_acquire) || !work.failure.empty()) continue;
+            if (work.cooking || (work.publication && work.publication->state.load(
+                std::memory_order_acquire) == RuntimeTexturePublication::State::Queued)) return true;
+        }
+        return false;
+    }
+
     bool TextureImportReady(const file::path& source)
     {
         std::lock_guard lock(m_authoringMutex);
@@ -1841,7 +1855,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             failure = "Texture source cannot be read";
             return false;
         }
-        Hash::Sha256 hash;
+        TextureGenerationHash hash;
         const auto add = [&](std::string_view text)
         {
             const std::uint64_t size = text.size();
@@ -1865,7 +1879,9 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             return false;
         }
         // Half the digest keeps the generation path short (Windows path limits).
-        key = Hash::ToHex(hash.Finish()).substr(0, 32);
+        Hash::Sha256Digest digest;
+        if (!hash.Finish(digest, failure)) return false;
+        key = Hash::ToHex(digest).substr(0, 32);
         return true;
     }
 
@@ -1916,7 +1932,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         {
             return false;
         }
-        Hash::Sha256 hash;
+        TextureGenerationHash hash;
         std::uint64_t read = 0;
         std::array<char, 65536> chunk;
         while (artifact)
@@ -1926,7 +1942,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             hash.Update(chunk.data(), count);
             read += count;
         }
-        candidate.contentSha256 = hash.Finish();
+        std::string hashFailure;
+        if (!hash.Finish(candidate.contentSha256, hashFailure)) return false;
         if (!artifact.eof() || read != candidate.byteSize || Hash::ToHex(candidate.contentSha256) != digest)
         {
             return false;
@@ -1971,6 +1988,9 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     void CookTextureGeneration(const file::path& source,
         const std::array<ModelSourceStamp, 2>& stamps, std::uint64_t revision)
     {
+        const auto timingStart = std::chrono::steady_clock::now();
+        auto keyFinished = timingStart, recordFinished = timingStart;
+        bool reusedGeneration = false;
         namespace cooked = experiment::cooked;
         {
             std::lock_guard lock(m_authoringMutex);
@@ -1992,7 +2012,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         TextureGenerationRecord record;
         if (const auto keyed = TextureGenerationKey(source, key, failure); keyed)
         {
-            if (!ReadTextureGenerationRecord(generations / key, record))
+            keyFinished = std::chrono::steady_clock::now();
+            reusedGeneration = ReadTextureGenerationRecord(generations / key, record);
+            recordFinished = std::chrono::steady_clock::now();
+            if (!reusedGeneration)
             {
                 auto result = cooked::BuildTextureCookProduct({ source, m_root });
                 if (!result.Succeeded())
@@ -2108,6 +2131,14 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                     publication.reset();
                 }
             }
+        }
+        if (std::getenv("CE_TRACE_TEXTURE_STARTUP"))
+        {
+            const auto end = std::chrono::steady_clock::now();
+            const auto ms = [](auto from, auto to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
+            std::printf("[texture.startup] path=%s reused=%d bytes=%llu keyMs=%.3f recordMs=%.3f publishPrepareMs=%.3f totalMs=%.3f\n",
+                source.string().c_str(), int(reusedGeneration), static_cast<unsigned long long>(record.byteSize),
+                ms(timingStart, keyFinished), ms(keyFinished, recordFinished), ms(recordFinished, end), ms(timingStart, end));
         }
         const std::array after{ ReadModelSourceStamp(source),
             ReadModelSourceStamp(source.string() + ".meta") };
@@ -4877,4 +4908,9 @@ bool EditorAssetDatabase::SetModelMeshletsAndReimport(const file::path& source, 
 bool EditorAssetDatabase::SetModelLodsAndReimport(const file::path& source, std::uint32_t levels)
 {
 	return m_impl && m_impl->SetModelLodsAndReimport(source, levels);
+}
+
+bool EditorAssetDatabase::HasPendingTexturePublications() const
+{
+    return m_impl && m_impl->HasPendingTexturePublications();
 }

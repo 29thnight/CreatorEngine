@@ -19,19 +19,28 @@ inline std::uint32_t Word(std::span<const std::byte> bytes, std::size_t offset)
 {
     Require(offset <= bytes.size() && bytes.size() - offset >= 4, "Truncated quantized word");
     std::uint32_t value{};
-    for (unsigned i = 0; i < 4; ++i)
+    if constexpr (std::endian::native == std::endian::little)
     {
-        value |= std::uint32_t(std::to_integer<unsigned char>(bytes[offset + i])) << (i * 8);
+        // memcpy permits unaligned packet words; retain the extent check above.
+        std::memcpy(&value, bytes.data() + offset, sizeof(value));
+    }
+    else
+    {
+        for (unsigned i = 0; i < 4; ++i)
+        {
+            value |= std::uint32_t(std::to_integer<unsigned char>(bytes[offset + i])) << (i * 8);
+        }
     }
     return value;
 }
 inline void Put(std::vector<std::byte>& bytes, std::size_t offset, std::uint32_t value)
 {
     Require(offset <= bytes.size() && bytes.size() - offset >= 4, "Quantized write range");
-    for (unsigned i = 0; i < 4; ++i)
-    {
-        bytes[offset + i] = std::byte((value >> (i * 8)) & 255u);
-    }
+    if constexpr (std::endian::native == std::endian::little)
+        std::memcpy(bytes.data() + offset, &value, sizeof(value));
+    else
+        for (unsigned i = 0; i < 4; ++i)
+            bytes[offset + i] = std::byte((value >> (i * 8)) & 255u);
 }
 inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std::byte> raw, std::vector<std::byte>& out,
                    std::string& error)
@@ -45,11 +54,15 @@ inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std:
                 "Invalid quantized geometry layout/count");
         const auto channels = stride / 4;
         std::vector<std::byte> packet(HeaderBytes + channels * DescriptorBytes);
+        // Reuse channel scratch during canonical validation of every meshlet.
+        std::vector<std::uint32_t> values(count), codes;
+        codes.reserve(count);
         for (unsigned channel = 0; channel < channels; ++channel)
         {
             bool integer =
                 Has(mask, VertexAttribute::BoneIndices) && channel * 4 == OffsetOf(mask, VertexAttribute::BoneIndices);
-            std::vector<std::uint32_t> values(count);
+            values.resize(count);
+            codes.clear();
             bool constant = true;
             float minimum = std::numeric_limits<float>::max(), maximum = -minimum;
             int exponent = 128;
@@ -74,7 +87,6 @@ inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std:
             }
             unsigned mode = constant ? 0 : 2, width = constant ? 0 : 32;
             float scale{};
-            std::vector<std::uint32_t> codes;
             if (!constant && !integer && exponent >= -126 && exponent <= 127 &&
                 (minimum == 0 || std::abs(minimum) >= std::numeric_limits<float>::min()))
             {
@@ -112,7 +124,7 @@ inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std:
             if (mode == 2)
             {
                 width = 32;
-                codes = std::move(values);
+                codes.assign(values.begin(), values.end());
             }
             const auto descriptor = HeaderBytes + channel * DescriptorBytes;
             Put(packet, descriptor, mode);
@@ -132,7 +144,8 @@ inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std:
                     const auto bit = std::uint64_t(vertex) * width;
                     const auto word = offset + (bit / 32) * 4;
                     const auto shift = unsigned(bit % 32);
-                    Put(packet, word, Word(packet, word) | (codes[vertex] << shift));
+                    // Full words have no neighbouring packed bits to preserve.
+                    Put(packet, word, width == 32 ? codes[vertex] : Word(packet, word) | (codes[vertex] << shift));
                     if (shift + width > 32)
                     {
                         Put(packet, word + 4, Word(packet, word + 4) | (codes[vertex] >> (32 - shift)));
@@ -205,6 +218,7 @@ inline bool Decode(std::span<const std::byte> packet, std::uint32_t mask, std::u
                                 std::uint64_t(offset) + std::uint64_t(words) * 4 <= packet.size(),
                             "Invalid quantized stream range");
                 }
+                const float scale = mode == 1 ? std::bit_cast<float>(Word(packet, d + 12)) : 0.f;
                 for (unsigned vertex = 0; vertex < count; ++vertex)
                 {
                     auto bits = origin;
@@ -225,7 +239,7 @@ inline bool Decode(std::span<const std::byte> packet, std::uint32_t mask, std::u
                         bits = q;
                         if (mode == 1)
                         {
-                            const float product = float(q) * std::bit_cast<float>(Word(packet, d + 12));
+                            const float product = float(q) * scale;
                             bits = std::bit_cast<std::uint32_t>(std::bit_cast<float>(origin) + product);
                         }
                     }

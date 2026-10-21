@@ -1,8 +1,9 @@
-#include "DX12PipelineLayoutTranslate.h"
+﻿#include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
 #include "PathFinder.h"
 #include "../RHIGraphicsPipelineRequest.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <limits.h>
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -10,9 +11,13 @@
 struct DX12PSOManager::PendingCompile
 {
     RHIGraphicsPipelineRequest m_input;
+    RHIMeshPipelineDesc m_meshInput;
+    std::vector<std::byte> m_meshBytes, m_pixelBytes;
+    std::string m_error;
     ComPtr<ID3D12RootSignature> m_signature;
     ComPtr<ID3D12PipelineState> m_result;
     job_handle m_completion;
+    std::chrono::steady_clock::time_point m_finished;
 };
 
 namespace
@@ -209,6 +214,10 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
 
     m_resources = resources;
     std::filesystem::path resolvedCachePath(cacheFilePath);
+    wchar_t isolatedCacheRoot[32768]{};
+    const auto isolatedLength=GetEnvironmentVariableW(L"CE_PSO_CACHE_ROOT",isolatedCacheRoot,std::size(isolatedCacheRoot));
+    if (isolatedLength && isolatedLength<std::size(isolatedCacheRoot))
+        resolvedCachePath=std::filesystem::path(isolatedCacheRoot)/resolvedCachePath.filename();
     if (resolvedCachePath.is_relative())
     {
         resolvedCachePath = PathFinder::CachePath("RHI/DX12") / resolvedCachePath;
@@ -344,6 +353,21 @@ void DX12PSOManager::Shutdown()
     inFlight.clear();
 
     std::lock_guard<std::mutex> guard(m_mutex);
+    // Serialize only after accepted workers have finished StorePipeline. The live
+    // renderer previously loaded this library but never saved it before reset.
+    if (m_library && !m_cachePath.empty())
+    {
+        try {
+            std::string error;
+            const bool saved=SaveCache(error);
+            if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE",nullptr,0))
+                std::printf("[pso.cache] phase=save success=%u error=%s\n",saved?1u:0u,error.c_str());
+        } catch (...) {
+            // A performance cache cannot make an otherwise clean shutdown fail.
+            if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE",nullptr,0))
+                std::printf("[pso.cache] phase=save success=0 error=exception\n");
+        }
+    }
     RetireCachedPipelinesLocked({});
     m_retiredPipelines.Drain([](ComPtr<ID3D12PipelineState>& pipeline)
     {
@@ -359,6 +383,23 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     const RHIGraphicsPipelineDesc& desc, uint64_t hash, std::string& outError,
     ID3D12RootSignature* ownedSignature)
 {
+    struct GraphicsTrace {
+        std::chrono::steady_clock::time_point started{std::chrono::steady_clock::now()};
+        uint64_t hash, pixelHash;
+        double libraryMs{}, nativeMs{}, storeMs{};
+        bool libraryHit{};
+        ~GraphicsTrace() {
+            if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
+                std::printf("[pso.graphics] phase=create hash=%llu ps=%llu startMs=%.3f libraryHit=%u libraryMs=%.3f nativeMs=%.3f storeMs=%.3f totalMs=%.3f worker=%u\n",
+                    static_cast<unsigned long long>(hash), static_cast<unsigned long long>(pixelHash),
+                    std::chrono::duration<double,std::milli>(started.time_since_epoch()).count(),
+                    libraryHit?1u:0u,libraryMs,nativeMs,storeMs,
+                    std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count(),
+                    thread_pool::is_worker_thread()?1u:0u);
+        }
+    } trace{{std::chrono::steady_clock::now()},hash,
+        desc.psBytecode && GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE",nullptr,0)
+            ? HashPsoBytes(desc.psBytecode,desc.psSize) : 0};
     D3D12_GRAPHICS_PIPELINE_STATE_DESC d3dDesc{};
     d3dDesc.pRootSignature = ownedSignature ? ownedSignature : ResolveSignature(desc.layout);
     if (nullptr == d3dDesc.pRootSignature)
@@ -451,8 +492,10 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     {
         const HRESULT hr = m_library->LoadGraphicsPipeline(name.c_str(), &d3dDesc,
             IID_PPV_ARGS(&pso));
+        trace.libraryMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-trace.started).count();
         if (SUCCEEDED(hr))
         {
+            trace.libraryHit=true;
             std::lock_guard<std::mutex> guard(m_mutex);
             ++m_stats.libraryHits;
             return pso;
@@ -467,7 +510,9 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
         return nullptr;
     }
 
+    const auto nativeStart=std::chrono::steady_clock::now();
     const HRESULT hr = m_device->CreateGraphicsPipelineState(&d3dDesc, IID_PPV_ARGS(&pso));
+    trace.nativeMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-nativeStart).count();
     if (FAILED(hr))
     {
         outError = "PSO 생성 실패 " + PsoHrToString(hr);
@@ -484,7 +529,9 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     // 3) 라이브러리에 등록 — 다음 실행에서 복원된다.
     if (m_library)
     {
+        const auto storeStart=std::chrono::steady_clock::now();
         m_library->StorePipeline(name.c_str(), pso.Get());
+        trace.storeMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-storeStart).count();
     }
 
     return pso;
@@ -550,6 +597,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
 RHIPipelineHandle DX12PSOManager::GetOrCreateCompute(const RHIComputePipelineDesc& desc,
     std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"DX12.ComputePipelinePrepare">()};
     const uint64_t hash = ComputeHash(desc);
 
     {
@@ -569,9 +617,48 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateCompute(const RHIComputePipelineDes
     return Publish(hash, pso, ResolveSignature(desc.layout), outError, false, true);
 }
 
-RHIPipelineHandle DX12PSOManager::GetOrCreateMesh(const RHIMeshPipelineDesc& desc,
+uint64_t DX12PSOManager::ComputeMeshHash(const RHIMeshPipelineDesc& desc) const
+{
+    constexpr uint64_t kMeshTag = 0x4d45534850534f31ull; // MESHPSO1
+    uint64_t hash = HashValue(kMeshTag, ComputeHash(desc.RasterState()));
+    hash = HashValue(desc.msSize, hash);
+    hash = HashPsoBytes(desc.msBytecode, desc.msSize, hash);
+    hash = HashValue(desc.psSize, hash);
+    return hash;
+}
+
+RHIPipelineHandle DX12PSOManager::GetOrCreateMesh(const RHIMeshPipelineDesc& desc, std::string& outError)
+{
+    if (!desc.msBytecode || !desc.msSize || (desc.psSize && !desc.psBytecode)) {
+        outError="Invalid mesh pipeline bytecode."; return {};
+    }
+    const auto hash = ComputeMeshHash(desc);
+    {
+        std::lock_guard guard(m_mutex);
+        if (!m_acceptingRequests) { outError = "Pipeline cache is shutting down."; return {}; }
+        if (const auto found=m_cache.find(hash); found!=m_cache.end()) { ++m_stats.memoryHits; return found->second.handle; }
+    }
+    auto pipeline = CreateOneMesh(desc, hash, outError);
+    if (!pipeline) return {};
+    std::lock_guard guard(m_mutex);
+    return Publish(hash, std::move(pipeline), ResolveSignature(desc.layout), outError, true);
+}
+
+Microsoft::WRL::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneMesh(const RHIMeshPipelineDesc& desc,
+    uint64_t hash,
     std::string& outError)
 {
+    const auto started = std::chrono::steady_clock::now();
+    struct Trace {
+        std::chrono::steady_clock::time_point started;
+        uint64_t hash;
+        ~Trace() {
+            if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
+                std::printf("[pso.mesh] hash=%llu worker=%u totalMs=%.3f\n", static_cast<unsigned long long>(hash),
+                    thread_pool::is_worker_thread() ? 1u : 0u,
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()-started).count());
+        }
+    } trace{started,hash};
     outError.clear();
     if (!m_resources || !m_device || !m_resources->GetMeshShaderCapabilities().meshShader)
     {
@@ -585,25 +672,6 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateMesh(const RHIMeshPipelineDesc& des
         outError = "Invalid DX12 mesh pipeline bytecode, raster state, or mesh-only layout.";
         return {};
     }
-    constexpr uint64_t kMeshTag = 0x4d45534850534f31ull; // MESHPSO1
-    uint64_t hash = HashValue(kMeshTag, ComputeHash(desc.RasterState()));
-    hash = HashValue(desc.msSize, hash);
-    hash = HashPsoBytes(desc.msBytecode, desc.msSize, hash);
-    hash = HashValue(desc.psSize, hash);
-    {
-        std::lock_guard guard(m_mutex);
-        if (!m_acceptingRequests)
-        {
-            outError = "DX12 pipeline cache is not accepting requests.";
-            return {};
-        }
-        if (const auto found = m_cache.find(hash); found != m_cache.end())
-        {
-            ++m_stats.memoryHits;
-            return found->second.handle;
-        }
-    }
-
     MeshPipelineStream stream;
     stream.root.value = layout.signature;
     stream.mesh.value = { desc.msBytecode, desc.msSize };
@@ -676,8 +744,52 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateMesh(const RHIMeshPipelineDesc& des
             m_library->StorePipeline(name.c_str(), pipeline.Get());
         }
     }
+    return pipeline;
+}
+
+RHIPipelineRequestState DX12PSOManager::RequestMesh(const RHIMeshPipelineDesc& desc,
+    RHIPipelineHandle& result, std::string& error)
+{
+    result = {}; error.clear();
+    if (!desc.msBytecode || !desc.msSize || (desc.psSize && !desc.psBytecode)) {
+        error = "Invalid mesh pipeline bytecode."; return RHIPipelineRequestState::Failed;
+    }
+    const auto hash=ComputeMeshHash(desc);
     std::lock_guard guard(m_mutex);
-    return Publish(hash, std::move(pipeline), layout.signature, outError, true);
+    if (!m_acceptingRequests) { error="Pipeline cache is shutting down."; return RHIPipelineRequestState::Failed; }
+    if (const auto found=m_cache.find(hash); found!=m_cache.end()) {
+        ++m_stats.memoryHits; result=found->second.handle; return RHIPipelineRequestState::Ready;
+    }
+    if (const auto found=m_pending.find(hash); found!=m_pending.end()) {
+        if (!found->second->m_completion.is_complete()) return RHIPipelineRequestState::Pending;
+        auto compile=std::move(found->second); m_pending.erase(found);
+        try { compile->m_completion.wait(); }
+        catch (const std::exception& failure) { error=failure.what(); return RHIPipelineRequestState::Failed; }
+        if (!compile->m_result) { error=compile->m_error; return RHIPipelineRequestState::Failed; }
+        result=Publish(hash, std::move(compile->m_result), compile->m_signature.Get(), error, true);
+        return result.IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed;
+    }
+    try {
+        auto compile=std::make_shared<PendingCompile>();
+        compile->m_meshBytes.resize(desc.msSize);
+        std::memcpy(compile->m_meshBytes.data(),desc.msBytecode,desc.msSize);
+        compile->m_pixelBytes.resize(desc.psSize);
+        if (desc.psSize) std::memcpy(compile->m_pixelBytes.data(),desc.psBytecode,desc.psSize);
+        compile->m_meshInput=desc;
+        compile->m_meshInput.msBytecode=compile->m_meshBytes.data();
+        compile->m_meshInput.psBytecode=desc.psSize ? compile->m_pixelBytes.data() : nullptr;
+        compile->m_signature=ResolveSignature(desc.layout);
+        if (!compile->m_signature) { error="Invalid mesh layout."; return RHIPipelineRequestState::Failed; }
+        m_pending.emplace(hash,compile);
+        compile->m_completion=m_scheduler.submit([this,compile,hash] {
+            { std::lock_guard lock(m_mutex); if (thread_pool::is_worker_thread()) ++m_stats.m_asyncWorkerExecutions; }
+            compile->m_result=CreateOneMesh(compile->m_meshInput,hash,compile->m_error);
+        });
+        ++m_stats.m_asyncSubmissions;
+    } catch (const std::exception& failure) {
+        m_pending.erase(hash); error=failure.what(); ++m_stats.failures; return RHIPipelineRequestState::Failed;
+    }
+    return RHIPipelineRequestState::Pending;
 }
 
 bool DX12PSOManager::SetFallback(const RHIGraphicsPipelineDesc& desc, std::string& outError)
@@ -892,6 +1004,9 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
         std::string ignored;
         if (!Publish(hash, compile->m_result, compile->m_signature.Get(), ignored).IsValid())
             return RequestState::Failed;
+        if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
+            std::printf("[pso.graphics] phase=publish hash=%llu lagMs=%.3f\n",static_cast<unsigned long long>(hash),
+                std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-compile->m_finished).count());
         if (outPso) *outPso = m_cache.find(hash)->second.pso.Get();
         return RequestState::Ready;
     }
@@ -913,14 +1028,19 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
             return RequestState::Failed;
         }
         m_pending.emplace(hash, compile);
-        compile->m_completion = m_scheduler.submit([this, compile, hash]
+        const auto queued=std::chrono::steady_clock::now();
+        compile->m_completion = m_scheduler.submit([this, compile, hash, queued]
         {
+            if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
+                std::printf("[pso.graphics] phase=begin hash=%llu queueMs=%.3f\n",static_cast<unsigned long long>(hash),
+                    std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-queued).count());
             {
                 std::lock_guard guard(m_mutex);
                 if (thread_pool::is_worker_thread()) ++m_stats.m_asyncWorkerExecutions;
             }
             std::string error;
             compile->m_result = CreateOne(compile->m_input.GetDesc(), hash, error, compile->m_signature.Get());
+            compile->m_finished=std::chrono::steady_clock::now();
         });
         ++m_stats.m_asyncSubmissions;
     }
@@ -970,12 +1090,23 @@ bool DX12PSOManager::SaveCache(std::string& outError)
     const HRESULT hr = m_library->Serialize(blob.data(), size);
     if (FAILED(hr)) { outError = "직렬화 실패 " + PsoHrToString(hr); return false; }
 
-    std::ofstream file(m_cachePath, std::ios::binary | std::ios::trunc);
+    const std::filesystem::path accepted(m_cachePath);
+    static std::atomic<uint64_t> serial{};
+    const auto staging=accepted.wstring()+L"."+std::to_wstring(GetCurrentProcessId())+L"."+std::to_wstring(++serial)+L".tmp";
+    std::ofstream file(staging, std::ios::binary | std::ios::trunc);
     if (!file) { outError = "캐시 파일 열기 실패"; return false; }
 
     const PsoCacheHeader header = MakePsoCacheHeader();
     file.write(reinterpret_cast<const char*>(&header), sizeof(header));
     file.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(size));
+    file.close();
+    if (!file || !MoveFileExW(staging.c_str(),m_cachePath.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))
+    {
+        std::error_code ignored;
+        std::filesystem::remove(staging,ignored);
+        outError="PSO cache atomic publication failed";
+        return false;
+    }
     return true;
 }
 

@@ -1,4 +1,4 @@
-#include "Assets/ModelCpuGeometryPayload.h"
+﻿#include "Assets/ModelCpuGeometryPayload.h"
 #include "../Utility_Framework/WindowsApartment.h"
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
@@ -68,6 +68,11 @@ bool HasImageFile(const file::path& directory)
 
 namespace
 {
+    bool TraceAssetInvalidation()
+    {
+        static const bool enabled = std::getenv("CE_TRACE_ASSET_INVALIDATION") != nullptr;
+        return enabled;
+    }
     using asset_cache_detail::LegacyTextureRetainedBytes;
     using asset_cache_detail::LegacyMaterialRetainedBytes;
     using asset_cache_detail::LegacyAuthoredMaterialRetainedBytes;
@@ -1335,9 +1340,23 @@ assets::ModelAssetGeneration::Shared DataSystem::ReadPreparedModel(
 bool DataSystem::IsModelPreparationInvalidated(const ModelPreparation& preparation) const
 {
     std::lock_guard lock(m_assetPreparationMutex);
-    return preparation && (preparation->cancelled.load(std::memory_order_acquire)
+    const bool invalidated = preparation && (preparation->cancelled.load(std::memory_order_acquire)
         || preparation->epoch != m_assetPreparationEpoch
         || preparation->resolverRevision != m_assetDepotRevision);
+    if (invalidated && TraceAssetInvalidation())
+    {
+        static thread_local const void* previous{};
+        static thread_local std::uint64_t epoch{}, revision{};
+        const auto pointer = preparation.borrow().unsafe_get();
+        if (previous != pointer || epoch != m_assetPreparationEpoch || revision != m_assetDepotRevision)
+        {
+            std::printf("[asset.invalidate] ticket guid=%s epoch=%llu->%llu resolver=%llu->%llu cancelled=%d\n",
+                preparation->guid.ToString().c_str(), preparation->epoch, m_assetPreparationEpoch,
+                preparation->resolverRevision, m_assetDepotRevision, int(preparation->cancelled.load()));
+            previous = pointer; epoch = m_assetPreparationEpoch; revision = m_assetDepotRevision;
+        }
+    }
+    return invalidated;
 }
 
 bool DataSystem::PublishPreparedModel(const ModelPreparation& preparation, std::string& error)
@@ -3957,6 +3976,14 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
         document.blendMode = material.m_renderingMode == MaterialRenderingMode::Transparent ? "transparent" :
             material.m_renderingMode == MaterialRenderingMode::Masked ? "masked" : "opaque";
         document.description = instance->description;
+        if (instance->editorPreview && instance->editorPreviewSourceGraph.IsValid())
+        {
+            // Saving while compilation runs must reference the source graph,
+            // never persist the transient preview graph or its parameters.
+            document.description = {};
+            document.description.graphId = instance->editorPreviewSourceGraph;
+            document.blendMode = instance->editorPreviewSourceBlend;
+        }
         std::string error;
         if (material_graph::WriteInstanceDocument(document, outNode, error))
             return true;
@@ -4091,7 +4118,7 @@ constexpr std::array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','
 constexpr std::uint32_t kMaterialGraphCacheMaxDependencies = 4096;
 
 std::string MaterialGraphCacheHeader(std::string_view sourceKey, const file::path& shaderDirectory,
-                                    std::optional<RHIShaderBinary> backend, std::string& error)
+                                    std::optional<RHIShaderBinary> backend, std::string& error, bool fastPreview = false)
 {
     error.clear();
     std::ifstream host(shaderDirectory / "Includes/MaterialGraphSceneHost.slang", std::ios::binary);
@@ -4121,6 +4148,7 @@ std::string MaterialGraphCacheHeader(std::string_view sourceKey, const file::pat
     // CompileSceneProduct의 고정 정책을 상위 캐시에도 보관한다. 정책 변경 때 이 버전도 올린다.
     append("scene-options-v1:strictMath,fineDerivatives,quadOperations,bufferInt64Atomics,pixelFootprint");
     append(hostText);
+    if (fastPreview) append("editor-preview-minimal-checker-v3");
     return header;
 }
 
@@ -4236,16 +4264,21 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, 
                             const file::path& shaderDirectory, const file::path& sourceDirectory,
                             material_graph::CookedProgram& result)
 {
+    const bool package = path.parent_path().filename() == "Preview" && path.parent_path().parent_path().filename() == "EditorResources";
+    const auto miss = [&](const char* reason) {
+        if (package) std::printf("[preview.package] miss reason=%s path=%s\n", reason, path.string().c_str());
+        return false;
+    };
     std::ifstream file(path, std::ios::binary);
-    if (!file) return false;
+    if (!file) return miss("file");
     std::array<char, 8> magic{};
     std::uint64_t headerSize{};
     file.read(magic.data(), magic.size());
     file.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
-    if (!file || magic != kMaterialGraphCacheMagic || headerSize != header.size()) return false;
+    if (!file || magic != kMaterialGraphCacheMagic || headerSize != header.size()) return miss("header-size");
     std::string recorded(header.size(), '\0');
     file.read(recorded.data(), static_cast<std::streamsize>(recorded.size()));
-    if (!file || recorded != header) return false;
+    if (!file || recorded != header) return miss("header");
 
     std::uint32_t dependencyCount{};
     file.read(reinterpret_cast<char*>(&dependencyCount), sizeof(dependencyCount));
@@ -4263,22 +4296,22 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, 
         Hash::Sha256Digest expected{};
         file.read(key.data(), static_cast<std::streamsize>(key.size()));
         file.read(reinterpret_cast<char*>(expected.data()), static_cast<std::streamsize>(expected.size()));
-        if (!file) return false;
+        if (!file) return miss("file");
         const file::path stored(key);
         Hash::Sha256Digest actual{};
         if (!HashMaterialGraphDependency(stored.is_absolute() ? stored : shaderDirectory / stored, actual) ||
             actual != expected)
-            return false;
+            return miss("dependency");
         if (!dependencies.empty() && dependencies.back().first >= key)
         {
-            return false;
+            return miss("dependency");
         }
         dependencies.emplace_back(key, expected);
         paths.push_back(stored.is_absolute() ? stored : shaderDirectory / stored);
     }
     if (!MaterialGraphDependenciesResolve(paths, shaderDirectory, sourceDirectory))
     {
-        return false;
+        return miss("dependency-resolution");
     }
 
     std::uint64_t productSize{};
@@ -4291,7 +4324,8 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, 
     material_graph::CookedProgram candidate;
     if (!material_graph::ReadCookedProgram(bytes, {}, candidate, validation))
     {
-        return false;
+        if (package) std::printf("[preview.package] validation=%s\n", validation.c_str());
+        return miss("cooked-program");
     }
     // 원본 증명은 이 캐시의 입력·환경 검증 뒤에만 복구한다. 일반 cooked loader에는 남기지 않는다.
     candidate.product.dependencies = std::move(paths);
@@ -4353,11 +4387,19 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view header,
 // and compiler recipe before source generation.
 bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
                               std::string& error, const file::path& shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader"),
-                              const file::path& cacheDirectory = PathFinder::CachePath("Lattice"),
-                              const file::path& scratchDirectory = {})
+                              const file::path& requestedCacheDirectory = PathFinder::CachePath("Lattice"),
+                              const file::path& scratchDirectory = {}, bool fastPreview = false, bool packageBuild = false)
 {
     ce::profile_scope profile{ ce::marker<"Material.CompileAuthoring">() };
     error.clear();
+    // Profiling may isolate material products as well as RHI bytecode without
+    // moving/deleting the user's normal derived caches.
+    char* isolatedRoot{};
+    std::size_t isolatedLength{};
+    _dupenv_s(&isolatedRoot, &isolatedLength, "CE_MATERIAL_CACHE_ROOT");
+    const file::path cacheDirectory = !packageBuild && isolatedRoot && *isolatedRoot
+        ? file::path(isolatedRoot) / (fastPreview ? "Preview" : "Source") : requestedCacheDirectory;
+    std::free(isolatedRoot);
     std::string sourceKey;
     std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"Material.SourceKey">() };
     if (!LX::ComputeMaterialSourceKey(asset, sourceKey, error))
@@ -4366,7 +4408,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     }
     step.reset();
     const auto backend = material_graph::AuthoringSceneBackend();
-    const std::string cacheHeader = MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error);
+    const std::string cacheHeader = MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error, fastPreview);
     if (cacheHeader.empty())
     {
         return false;
@@ -4389,6 +4431,23 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
                              material_graph::HasSceneBackend(product, RHIShaderBinary::SpirV);
     };
     const auto cachePath = cacheDirectory / (guid.ToString() + ".slang.scene-cache");
+    if (fastPreview && !packageBuild)
+    {
+        wchar_t executable[32768]{};
+        const auto length = GetModuleFileNameW(nullptr, executable, static_cast<DWORD>(std::size(executable)));
+        const file::path packageDirectory = length && length < std::size(executable)
+            ? file::path(executable).parent_path() / "EditorResources/Preview" : file::path{};
+        if (!packageDirectory.empty() &&
+            ReadMaterialGraphCache(packageDirectory / (guid.ToString() + ".slang.scene-cache"),
+                sourceKey, cacheHeader, shaderDirectory, packageDirectory, result) &&
+            result.product.materialShader && result.product.materialShader->meta.guid == guid &&
+            material_graph::IsEditorPreviewProgram(result.product.program) && carriesWanted(result.product))
+        {
+            std::printf("[preview.package] hit stages=%zu\n", result.product.targets.size());
+            return true;
+        }
+    }
+
     step.emplace(ce::marker<"Material.CacheRead">());
     if (ReadMaterialGraphCache(cachePath, sourceKey, cacheHeader, shaderDirectory, source.parent_path(), result) &&
         result.product.materialShader &&
@@ -4414,7 +4473,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     step.emplace(ce::marker<"Material.CompileSceneProduct">());
     result = {};
     if (!material_graph::CompileSceneProduct(*program, shaderDirectory, source, {},
-                                             result.product, error, guid, backend))
+                                             result.product, error, guid, backend, fastPreview))
     {
         return false;
     }
@@ -4422,7 +4481,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     result.boundSource = material_graph::BuildBoundSource(result.product.program);
     step.reset();
     step.emplace(ce::marker<"Material.CacheWrite">());
-    if (MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error) != cacheHeader)
+    if (MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error, fastPreview) != cacheHeader)
     {
         error = "Material compile environment changed while preparing the candidate. Compile again.";
         return false;
@@ -4499,90 +4558,119 @@ own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialG
         }, error);
 }
 
+own::shared_owner<const material_graph::Generation> DataSystem::CompileEditorPreviewMaterial(
+    const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
+    const file::path& cacheDirectory, std::string& error, bool packageBuild)
+{
+    // A fixed stand-in has no editable draft or catalog publication. Serialize
+    // its producer so simultaneous placements share a stable verified disk product.
+    static std::mutex producerMutex;
+    std::lock_guard lock(producerMutex);
+    return material_graph::PrepareGeneration(experiment::AssetId{graphGuid.m_guid},
+        [&](material_graph::CookedProgram& result, std::string& failure) {
+            return CompileAuthoringMaterial(asset, graphGuid, result, failure, shaderDirectory, cacheDirectory, {}, true, packageBuild);
+        }, error);
+}
+
 own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGraphGeneration(FileGuid guid,
                                                                                           std::string& error,
-                                                                                          bool reload)
+                                                                                          bool reload, bool* invalidated)
 {
-    if (!reload && PathFinder::IsAssetAuthoringEnabled())
+    if (invalidated) *invalidated = false;
+    // A graph-specific catalog refresh can supersede its ticket without
+    // invalidating the enclosing model. Rejoin the new graph request locally.
+    for (unsigned attempt = 0; attempt != 3; ++attempt)
     {
-        std::lock_guard admissionLock(m_assetPreparationMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+        if (!reload && PathFinder::IsAssetAuthoringEnabled())
         {
-            error = "Material graph loading is shutting down or invalidated.";
+            std::lock_guard admissionLock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+            {
+                error = "Material graph loading is shutting down or invalidated.";
+                if (invalidated) *invalidated = true;
+                return {};
+            }
+            if (auto accepted = m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid}))
+            {
+                error.clear();
+                return accepted;
+            }
+        }
+        const AssetDepot::AssetLink<material_graph::Generation> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+        const auto catalog = GetCookedCatalog();
+        experiment::cooked::ResolvedAssetEntry resolved;
+        const auto lookup = catalog ? catalog->Find(link.ToReference(), resolved)
+            : experiment::cooked::AssetLookupStatus::NotMounted;
+        if (lookup != experiment::cooked::AssetLookupStatus::NotMounted)
+        {
+            auto owner = lookup == experiment::cooked::AssetLookupStatus::Found ? TryAcquire(link) : nullptr;
+            if (!owner)
+            {
+                error = "Mounted graph requires its typed asynchronous program preparation.";
+            }
+            return owner;
+        }
+        ce::profile_scope profile{ ce::marker<"Material.GraphGeneration">() };
+        const experiment::AssetId id{guid.m_guid};
+        std::uint64_t loadEpoch;
+        material_graph::GenerationPreparationRequest request;
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping)
+            {
+                error = "Material graph loading is shutting down.";
+                if (invalidated) *invalidated = true;
+                return {};
+            }
+            loadEpoch = m_assetPreparationEpoch;
+            request = m_materialGraphGenerations.BeginPreparation(id, reload, error);
+        }
+        if (!request)
+        {
             return {};
         }
-        if (auto accepted = m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid}))
-        {
-            error.clear();
-            return accepted;
-        }
-    }
-    const AssetDepot::AssetLink<material_graph::Generation> link{ { experiment::AssetId{ guid.m_guid }, {} } };
-    const auto catalog = GetCookedCatalog();
-    experiment::cooked::ResolvedAssetEntry resolved;
-    const auto lookup = catalog ? catalog->Find(link.ToReference(), resolved)
-        : experiment::cooked::AssetLookupStatus::NotMounted;
-    if (lookup != experiment::cooked::AssetLookupStatus::NotMounted)
-    {
-        auto owner = lookup == experiment::cooked::AssetLookupStatus::Found ? TryAcquire(link) : nullptr;
-        if (!owner)
-        {
-            error = "Mounted graph requires its typed asynchronous program preparation.";
-        }
-        return owner;
-    }
-    ce::profile_scope profile{ ce::marker<"Material.GraphGeneration">() };
-    const experiment::AssetId id{guid.m_guid};
-    std::uint64_t loadEpoch;
-    material_graph::GenerationPreparationRequest request;
-    {
-        std::lock_guard lock(m_assetPreparationMutex);
-        if (m_assetPreparationStopping)
-        {
-            error = "Material graph loading is shutting down.";
-            return {};
-        }
-        loadEpoch = m_assetPreparationEpoch;
-        request = m_materialGraphGenerations.BeginPreparation(id, reload, error);
-    }
-    if (!request)
-    {
-        return {};
-    }
-    // 이미 세대가 있는 그래프도 남긴다. 그래야 다음 열기에 세대가 비어 있을 때 선적재된다.
-    // 경로 해석은 다른 잠금을 잡으므로 기록 잠금 밖에서 한다.
-    bool recording = false;
-    {
-        std::lock_guard lock(m_sceneMaterialMutex);
-        recording = m_recordingSceneMaterials;
-    }
-    if (recording)
-    {
-        if (file::path sourcePath = GetMaterialGraphSourcePath(guid); !sourcePath.empty())
+        // 이미 세대가 있는 그래프도 남긴다. 그래야 다음 열기에 세대가 비어 있을 때 선적재된다.
+        // 경로 해석은 다른 잠금을 잡으므로 기록 잠금 밖에서 한다.
+        bool recording = false;
         {
             std::lock_guard lock(m_sceneMaterialMutex);
-            if (m_recordingSceneMaterials) m_sceneMaterials.emplace_back(guid, std::move(sourcePath));
+            recording = m_recordingSceneMaterials;
         }
+        if (recording)
+        {
+            if (file::path sourcePath = GetMaterialGraphSourcePath(guid); !sourcePath.empty())
+            {
+                std::lock_guard lock(m_sceneMaterialMutex);
+                if (m_recordingSceneMaterials) m_sceneMaterials.emplace_back(guid, std::move(sourcePath));
+            }
+        }
+        const auto prepared = material_graph::GenerationStore::Prepare(
+            request,
+            [this, guid](material_graph::CookedProgram& result, std::string& failure) {
+                const file::path sourcePath =
+                    PathFinder::IsAssetAuthoringEnabled() ? GetMaterialGraphSourcePath(guid) : file::path{};
+                return LoadMaterialGraphProgram(guid, sourcePath, result, failure);
+            },
+            error);
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || loadEpoch != m_assetPreparationEpoch)
+        {
+            error = "Material graph loading was cancelled or invalidated.";
+            if (invalidated) *invalidated = true;
+            return {};
+        }
+        if (!prepared) return {};
+        bool publicationInvalidated = false;
+        auto owner = m_materialGraphGenerations.Publish(*prepared, error, &publicationInvalidated);
+        if (!owner && publicationInvalidated && attempt + 1 < 3)
+        {
+            ce::profile_instant(ce::marker<"Material.PreparationRetry">());
+            continue;
+        }
+        if (invalidated) *invalidated = publicationInvalidated;
+        return owner;
     }
-    const auto prepared = material_graph::GenerationStore::Prepare(
-        request,
-        [this, guid](material_graph::CookedProgram& result, std::string& failure) {
-            const file::path sourcePath =
-                PathFinder::IsAssetAuthoringEnabled() ? GetMaterialGraphSourcePath(guid) : file::path{};
-            return LoadMaterialGraphProgram(guid, sourcePath, result, failure);
-        },
-        error);
-    if (!prepared)
-    {
-        return {};
-    }
-    std::lock_guard lock(m_assetPreparationMutex);
-    if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
-    {
-        error = "Material graph loading was cancelled or invalidated.";
-        return {};
-    }
-    return m_materialGraphGenerations.Publish(*prepared, error);
+    return {};
 }
 
 bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath,
@@ -4851,13 +4939,36 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
 {
     if (material.HasMaterialGraph())
         return true;
-    material_graph::InstanceDescription description;
-    description.graphId.value = assets::ModelMaterialGraphId(source.materialId);
-    const auto generation = LoadMaterialGraphGeneration(FileGuid(description.graphId.value), error);
-    if (!generation)
+    std::uint64_t epoch{}, resolverRevision{};
     {
+        std::lock_guard lock(m_assetPreparationMutex);
+        epoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+    }
+    bool invalidated = false;
+    const auto recover = [&]()
+    {
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            if (invalidated || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
+                epoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+            {
+                // A rejected snapshot is not a broken graph. The placement owner
+                // retries its invalidated ticket; recovery would create a new
+                // random graph and compile it while that retry is still pending.
+                ce::profile_instant(ce::marker<"Material.RecoveryDeferred">());
+                return false;
+            }
+        }
         const std::string cause = error;
         return ConfigureEditableDefaultMaterialGraph(material, cause, error);
+    };
+    material_graph::InstanceDescription description;
+    description.graphId.value = assets::ModelMaterialGraphId(source.materialId);
+    const auto generation = LoadMaterialGraphGeneration(FileGuid(description.graphId.value), error, false, &invalidated);
+    if (!generation)
+    {
+        return recover();
     }
     experiment::Material imported;
     ExperimentMaterialMigration::ConvertModelMaterialAsset(source, model, imported);
@@ -4903,10 +5014,9 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
                  !std::equal(before.begin(), before.begin() + 3, after.begin()))
             description.parameters.push_back({parameter.id, std::array<double, 4>{after[0], after[1], after[2], 1}});
     }
-    if (!ConfigureMaterialGraph(material, description, error, false, &model))
+    if (!ConfigureMaterialGraph(material, generation, description, error, &model))
     {
-        const std::string cause = error;
-        return ConfigureEditableDefaultMaterialGraph(material, cause, error);
+        return recover();
     }
     material.m_fileGuid = FileGuid(source.materialId);
     return true;
@@ -6271,6 +6381,9 @@ std::size_t DataSystem::DrainQueuedAssetChanges()
 
 bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 {
+    if (TraceAssetInvalidation())
+        std::printf("[asset.invalidate] apply kind=%u type=%u guid=%s path=%s\n",
+            unsigned(change.kind), unsigned(change.assetType), change.guid.ToString().c_str(), change.path.string().c_str());
     if (change.texturePublication)
     {
         return PublishAuthoredTexture(change);
@@ -6435,6 +6548,9 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         StageMaterialAssetRetirementLocked(retiredMaterials);
         ++m_assetPreparationEpoch;
         InvalidateTextureAssetsLocked(retiredTextures);
+        if (TraceAssetInvalidation())
+            std::printf("[asset.invalidate] epoch=%llu resolver=%llu cause=%s\n",
+                m_assetPreparationEpoch, m_assetDepotRevision, change.path.string().c_str());
         InvalidateModelAssetsLocked(retiredModels);
         InvalidateMaterialAssetsLocked(retiredMaterials);
         std::erase_if(m_retiredAssetPreparations, [](const auto& asset)

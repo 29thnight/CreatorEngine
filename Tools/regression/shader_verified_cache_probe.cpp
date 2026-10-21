@@ -56,6 +56,10 @@ RWStructuredBuffer<float4> Output : register(u5,space0);
   Write(root/"CacheLeaf.hlsli","float LeafValue(){return 0.9;}\n");auto shadow=Verify(options);Check(shadow.dependencyIdentity!=nested.dependencyIdentity,"new higher priority include invalidates");
   Verified profile;std::string profileError;Check(RHIShaderCompiler::VerifyFile("CacheProbe.slang","CSMain","cs_6_1",RHIShaderBinary::Dxil,{},profile,profileError,options)&&profile.dependencyIdentity!=shadow.dependencyIdentity,"target profile invalidates");
   auto strict=options;strict.strictMath=true;Check(Verify(strict).dependencyIdentity!=shadow.dependencyIdentity,"effective strict math invalidates");
+  auto preview=options;preview.fastPreview=true;auto quick=Verify(preview);
+  Check(quick.dependencyIdentity!=shadow.dependencyIdentity,"temporary preview optimization has a distinct cache identity");
+  std::string previewError;Check(AreShaderReflectionsEquivalent(quick.reflection,shadow.reflection,previewError),"preview optimization preserves the probe binding contract");
+  Check(Same(shadow,Verify(options)),"preview compilation cannot replace optimized source cache entries");
   RHIShaderPermutation permutation;std::string error;Check(permutation.Set("PROBE_SCALE","2",error),"permutation set");Check(Verify(options,RHIShaderBinary::Dxil,permutation).dependencyIdentity!=shadow.dependencyIdentity,"permutation invalidates");
   auto previous=shadow;Write(root/"CacheProbe.slang","this is not shader syntax");Check(!RHIShaderCompiler::VerifyFile("CacheProbe.slang","CSMain","cs_6_0",RHIShaderBinary::Dxil,{},previous,error,options)&&Same(previous,shadow),"compile failure preserves previous verified pair");Write(root/"CacheProbe.slang",source);
  }

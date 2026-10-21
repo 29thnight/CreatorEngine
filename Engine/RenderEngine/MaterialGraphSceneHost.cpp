@@ -1,5 +1,6 @@
-#include "MaterialGraphSceneHost.h"
+﻿#include "MaterialGraphSceneHost.h"
 #include "MaterialGraphGeometryContract.h"
+#include "MaterialGraphNativeAdmission.h"
 #include "Render/Graph/ShadowMath.h"
 #include "MaterialGraphSceneAccess.h"
 #include "MaterialGraphSceneCompiler.h"
@@ -510,6 +511,7 @@ namespace material_graph
         PacketRoots packetRoots, shadowPacketRoots;
         bool meshEnabled{};
         bool hasSurface{}, hasVolume{};
+        bool editorPreview{};
         bool hasSubsurface{}, hasTransmission{}, hasSpecial{};
     };
 
@@ -972,6 +974,9 @@ namespace material_graph
         own::shared_owner<Program> program;
         std::string error;
         bool checked{};
+        std::chrono::steady_clock::time_point started{std::chrono::steady_clock::now()};
+        bool nativeLogged{};
+        detail::NativeAdmission nativeAdmission;
     };
 
     struct SceneHost::Slot
@@ -979,6 +984,7 @@ namespace material_graph
         own::shared_owner<const Instance> requested, active;
         EnhancedMaterialCoverage requestedCoverage, activeCoverage;
         std::uint64_t revision{};
+        std::uint64_t selectedRepresentation{};
     };
 
     SceneHost::SceneHost(job_scheduler& scheduler) : scheduler_(scheduler) {}
@@ -1132,6 +1138,9 @@ namespace material_graph
         // queues the DX12 work asynchronously; one request per frame made a model's
         // many material slots appear over a long series of frames.
         unsigned pollsRemaining = 8;
+        char legacyAdmission[4]{};
+        const bool nonblockingAdmission = RHIShaderCompiler::GetOutput()==RHIShaderBinary::Dxil &&
+            !(GetEnvironmentVariableA("CE_LEGACY_PSO_ADMISSION",legacyAdmission,sizeof(legacyAdmission))==1 && legacyAdmission[0]=='1');
         for (const auto& preparation : preparations_)
         {
             const bool cooked = preparation->work && preparation->work->cooked;
@@ -1207,6 +1216,7 @@ namespace material_graph
                         return DescribeGraphicsShader(product, backend, vs, ps, shader, error) &&
                                request.Prepare(desc, std::move(shader), error);
                     };
+                    candidate->editorPreview = IsEditorPreviewProgram(product.program);
                     candidate->hasSurface = candidate->generation->cooked.product.program.surface;
                     candidate->hasVolume = candidate->generation->cooked.product.program.volume;
                     candidate->hasSubsurface = (candidate->generation->cooked.product.program.features & 0x1000u) != 0;
@@ -1289,7 +1299,7 @@ namespace material_graph
                     {
                         return false;
                     }
-                    if (candidate->hasSurface)
+                    if (candidate->hasSurface && !candidate->editorPreview)
                     {
                         std::vector<RHIPipelineLayoutParam> shadowHost{RHILayout::Cbv(4),
                                                                        RHILayout::Srv(0, RHIShaderVisibility::All),
@@ -1401,7 +1411,7 @@ namespace material_graph
                         {
                             return false;
                         }
-                        if (candidate->hasSurface)
+                        if (candidate->hasSurface && !candidate->editorPreview)
                         {
                             desc.depthFunc = RHICompareOp::LessEqual;
                             desc.blendEnable = true;
@@ -1435,7 +1445,7 @@ namespace material_graph
                                 return false;
                             }
                         }
-                        for (unsigned part = 0; part < 2; ++part)
+                        for (unsigned part = 0; part < (candidate->editorPreview ? 0u : 2u); ++part)
                         {
                             const auto& shader = part ? lookup1 : lookup0;
                             desc.psBytecode = shader.bytecode.Data();
@@ -1493,7 +1503,7 @@ namespace material_graph
                 }
                 preparation->work.reset();
             }
-            if (!pollsRemaining)
+            if (!pollsRemaining && !nonblockingAdmission)
             {
                 continue;
             }
@@ -1505,12 +1515,10 @@ namespace material_graph
                                                                  &program.gbuffer[0],
                                                                  &program.gbuffer[1],
                                                                  &program.color[0],
-                                                                 &program.color[1],
-                                                                 &program.lookup[0][0],
-                                                                 &program.lookup[0][1],
-                                                                 &program.lookup[1][0],
-                                                                 &program.lookup[1][1]};
-            if (program.hasSurface)
+                                                                 &program.color[1]};
+            if (!program.editorPreview)
+                for (auto& part : program.lookup) for (auto& side : part) requests.push_back(&side);
+            if (program.hasSurface && !program.editorPreview)
             {
                 for (unsigned side = 0; side < 2; ++side)
                 {
@@ -1521,7 +1529,7 @@ namespace material_graph
                     }
                 }
             }
-            if (program.hasSurface)
+            if (program.hasSurface && !program.editorPreview)
             {
                 requests.push_back(&program.shadow);
             }
@@ -1548,11 +1556,11 @@ namespace material_graph
             {
                 if (!request->IsValid())
                 {
-                    if (!pollsRemaining)
+                    if (!preparation->nativeAdmission.CanPoll(request,pollsRemaining,nonblockingAdmission))
                     {
-                        break;
+                        if (!nonblockingAdmission) break;
+                        continue;
                     }
-                    --pollsRemaining;
                     if (request->Poll(*context.psoManager, error) == RHIPipelineRequestState::Failed)
                     {
                         reject(error.empty() ? "METEOR Scene native PSO preparation failed." : error);
@@ -1560,17 +1568,26 @@ namespace material_graph
                     }
                 }
             }
-            if (preparation->program &&
-                std::ranges::all_of(requests, [](const auto* request) { return request->IsValid(); }))
+            const bool indexedReady=preparation->program &&
+                std::ranges::all_of(requests, [](const auto* request) { return request->IsValid(); });
+            if (preparation->program && (indexedReady || nonblockingAdmission))
             {
+                if (indexedReady && !preparation->nativeLogged && GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0)) {
+                    preparation->nativeLogged=true;
+                    std::printf("[material.prepare] graph=%s phase=indexed-ready elapsedMs=%.3f\n",
+                        Uuid::ToString(preparation->generation->assetId.value).c_str(),
+                        std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-preparation->started).count());
+                }
                 if (program.meshEnabled)
                 {
                     for (const auto* request : requests)
                     {
+                        if (!request->IsValid()) continue;
                         const bool temporal = request == &program.temporal[0] || request == &program.temporal[1];
+                        const bool reconstruct = request != &program.shadow && request != &program.visibilitySurface[0] && request != &program.visibilitySurface[1];
                         const auto indexed = request->GetHandle();
                         if (program.meshPipelines.contains(indexed.id) &&
-                            (!temporal || program.reconstructionPipelines.contains(indexed.id)))
+                            (!reconstruct || program.reconstructionPipelines.contains(indexed.id)))
                         {
                             continue;
                         }
@@ -1601,13 +1618,22 @@ namespace material_graph
                             desc.renderTargetBlend[i] = raster.renderTargetBlend[i];
                             desc.rtvFormats[i] = raster.rtvFormats[i];
                         }
-                        const auto pipeline = context.psoManager->GetOrCreateMesh(desc, error);
-                        if (!pipeline.IsValid())
+                        RHIPipelineHandle pipeline;
+                        char synchronous[4]{};
+                        const bool sync=RHIShaderCompiler::GetOutput()!=RHIShaderBinary::Dxil || (GetEnvironmentVariableA("CE_SYNC_MESH_PSO",synchronous,sizeof(synchronous))==1 && synchronous[0]=='1');
+                        auto state=RHIPipelineRequestState::Ready;
+                        if (const auto accepted=program.meshPipelines.find(indexed.id); accepted!=program.meshPipelines.end())
+                            pipeline=accepted->second;
+                        else state=sync
+                            ? ((pipeline=context.psoManager->GetOrCreateMesh(desc,error)).IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed)
+                            : context.psoManager->RequestMesh(desc,pipeline,error);
+                        if (state==RHIPipelineRequestState::Failed)
                         {
                             reject("METEOR Scene meshlet PSO creation failed: " + error);
                             break;
                         }
-                        program.meshPipelines.emplace(indexed.id, pipeline);
+                        if (state==RHIPipelineRequestState::Ready)
+                            program.meshPipelines.emplace(indexed.id, pipeline);
                         if (request != &program.shadow && request != &program.visibilitySurface[0] &&
                             request != &program.visibilitySurface[1])
                         {
@@ -1620,36 +1646,47 @@ namespace material_graph
                                 desc.depthFunc = RHICompareOp::Always;
                             }
                             desc.cullMode = RHICullMode::None;
-                            const auto reconstructed = context.psoManager->GetOrCreateMesh(desc, error);
-                            if (!reconstructed.IsValid())
+                            RHIPipelineHandle reconstructed;
+                            const auto reconstructedState=sync
+                                ? ((reconstructed=context.psoManager->GetOrCreateMesh(desc,error)).IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed)
+                                : context.psoManager->RequestMesh(desc,reconstructed,error);
+                            if (reconstructedState==RHIPipelineRequestState::Pending) continue;
+                            if (reconstructedState==RHIPipelineRequestState::Failed)
                             {
                                 reject("METEOR reconstruction PSO failed: " + error);
                                 break;
                             }
                             program.reconstructionPipelines.emplace(indexed.id, reconstructed);
                         }
-                        // Budget synchronous mesh PSO creation across preparation ticks.
-                        break;
+                        // The compatibility path budgets blocking backend calls; DX12 requests own their inputs.
+                        if (sync) break;
                     }
                     if (!preparation->program ||
                         !std::ranges::all_of(
                             requests,
                             [&](const auto* request)
                             {
-                                return (request == &program.temporal[0] || request == &program.temporal[1])
-                                           ? program.reconstructionPipelines.contains(request->GetHandle().id)
-                                           : program.meshPipelines.contains(request->GetHandle().id);
+                                if (!request->IsValid()) return false;
+                                const bool reconstruct = request != &program.shadow && request != &program.visibilitySurface[0] && request != &program.visibilitySurface[1];
+                                return program.meshPipelines.contains(request->GetHandle().id) &&
+                                    (!reconstruct || program.reconstructionPipelines.contains(request->GetHandle().id));
                             }))
                     {
                         continue;
                     }
                 }
+                if (!indexedReady) continue;
                 // Allocate before the converting move. If growth fails, the
                 // checked preparation still owns its ready Program for a retry.
                 if (programs_.size() == programs_.capacity())
                 {
                     programs_.reserve((std::max)(programs_.size() + 1, programs_.capacity() * 2));
                 }
+                if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
+                    std::printf("[material.prepare] graph=%s phase=ready elapsedMs=%.3f mesh=%zu reconstruction=%zu\n",
+                        Uuid::ToString(preparation->generation->assetId.value).c_str(),
+                        std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-preparation->started).count(),
+                        program.meshPipelines.size(), program.reconstructionPipelines.size());
                 programs_.push_back(std::move(preparation->program));
                 if (!PathFinder::IsAssetAuthoringEnabled())
                 {
@@ -1762,12 +1799,15 @@ namespace material_graph
         }
         PollPrograms(context);
         const auto backend = RHIShaderCompiler::GetOutput();
-        // Every pass consumes the exact requested graph instance. Preparation
-        // may defer a frame, but must never substitute a previous or native material.
+        // Only an explicitly marked Editor placement preview may survive while
+        // its source program prepares. Other material failures retain strict semantics.
         for (const auto& draw : requested->Draws())
         {
             if (!IsProgramReady(draw.material->generation, backend))
             {
+                const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
+                if (slot->active && slot->active->editorPreview &&
+                    IsProgramReady(slot->active->generation, backend)) continue;
                 const auto failed =
                     std::ranges::find_if(preparations_,
                                          [&](const auto& item)
@@ -1805,6 +1845,18 @@ namespace material_graph
         for (auto& draw : selected->draws_)
         {
             const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
+            if (!IsProgramReady(draw.material->generation, backend))
+            {
+                draw.materialPinIndex = selected->materialPins_->Retain(slot->active);
+                draw.material = selected->materialPins_->Borrow(draw.materialPinIndex);
+                draw.coverage = slot->activeCoverage;
+                if (!ClassifySceneCoverage(draw.coverage, draw.queue, error)) return false;
+            }
+            if (slot->selectedRepresentation != draw.material->representationId)
+            {
+                slot->selectedRepresentation = draw.material->representationId;
+                slot->revision = ++selectionSerial_;
+            }
             draw.selectionRevision = slot->revision;
         }
         // Only the cache's CPU record is pruned. Shared native handles stay in the
@@ -1949,7 +2001,9 @@ namespace material_graph
         {
             return Fail(error, "METEOR empty layer visibility binding failed.");
         }
-        candidate->shadow = shadow.enabled;
+        const bool previewOnly = !candidate->input->Draws().empty() && std::ranges::all_of(
+            candidate->input->Draws(), [](const auto& draw) { return IsEditorPreviewProgram(draw.material->generation->cooked.product.program); });
+        candidate->shadow = shadow.enabled && !previewOnly;
         candidate->shadowExtent = shadow.mapResolution ? shadow.mapResolution : context.width;
         const std::array<std::byte, SceneVolumeConstantsBytes> emptyMedium{};
         candidate->effectStage.volume.constants = device_->UploadConstants(emptyMedium.data(), emptyMedium.size());
@@ -1976,8 +2030,8 @@ namespace material_graph
                                                   });
         if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
                              environmentGeneration, budget.lookupBytes, candidate->effectStage.lookup.opaque, error,
-                             importance, source, false, budget.lookupApproximate, false,
-                             budget.lookupRuntimeEvaluation))
+                             importance, source, false, previewOnly || budget.lookupApproximate, false,
+                             previewOnly || budget.lookupRuntimeEvaluation))
         {
             return false;
         }
@@ -2256,7 +2310,7 @@ namespace material_graph
                         }
                         bool shadowEnabled{};
                         std::array<RHIBufferSlice, 3> shadowConstants;
-                        if (program->hasSurface && shadow.enabled && draw.queue != SceneCoverage::Blended)
+                        if (program->hasSurface && !program->editorPreview && shadow.enabled && draw.queue != SceneCoverage::Blended)
                         {
                             if (!RenderBindingCache::ValidatePass(*device_, *bindings, program->shadowLayout, error))
                             {
@@ -2292,7 +2346,7 @@ namespace material_graph
                 item.inputIndex = inputIndex;
                 item.geometryRecord = static_cast<std::uint32_t>(1 + outputIndex);
                 item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
-                item.shadowEnabled = program->hasSurface && shadow.enabled && draw.queue != SceneCoverage::Blended;
+                item.shadowEnabled = program->hasSurface && !program->editorPreview && shadow.enabled && draw.queue != SceneCoverage::Blended;
                 if (!prepareGeometry(chunk.input, item.geometry))
                 {
                     return false;
@@ -4662,6 +4716,38 @@ namespace material_graph
             }
         }
         sceneResidentBuffers_.ConfirmSubmitted(frame->recording, completion);
+        for (const auto& draw : frame->input->Draws())
+            if (draw.material->editorPreview && draw.material->editorPreviewSubmitted)
+                draw.material->editorPreviewSubmitted->store(true, std::memory_order_release);
+        static const bool tracePlacement = [] {
+            char* value{};
+            std::size_t length{};
+            _dupenv_s(&value, &length, "CE_TRACE_SHADER_COMPILE");
+            const bool enabled = value && *value;
+            std::free(value);
+            return enabled;
+        }();
+        if (tracePlacement)
+        {
+            std::map<std::uint64_t, std::pair<bool, double>> placements;
+            for (const auto& draw : frame->input->Draws())
+            {
+                if (!draw.material->editorPlacementId) continue;
+                auto& phase = placements[draw.material->editorPlacementId];
+                phase.first |= draw.material->editorPreview;
+                phase.second = draw.material->editorPlacementStartMs;
+            }
+            for (const auto& [id, phase] : placements)
+                if (loggedPlacementPhases_.insert({id, phase.first}).second)
+                {
+                    const auto now = std::chrono::duration<double, std::milli>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                    std::printf("[model.display] request=%llu phase=%s submittedMs=%.3f frame=%llu\n",
+                        static_cast<unsigned long long>(id), phase.first ? "preview" : "original", now - phase.second,
+                        static_cast<unsigned long long>(frame->input->View().frameId));
+                    std::fflush(stdout);
+                }
+        }
         error.clear();
         return true;
     }
@@ -4807,6 +4893,7 @@ namespace material_graph
         }
         stats_ = {};
         selectionSerial_ = 0;
+        loggedPlacementPhases_.clear();
         selectionDeferred_ = false;
     }
 

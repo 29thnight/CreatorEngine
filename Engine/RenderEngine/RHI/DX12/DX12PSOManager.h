@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIPipelineState.h"
 #include "../IRenderPipelineCache.h"
@@ -120,7 +120,13 @@ public:
     Stats GetStats() const;
     bool  IsLibraryLoaded() const { return m_libraryLoadedFromDisk; }
 
+    RHIPipelineRequestState RequestMesh(const RHIMeshPipelineDesc& desc,
+        RHIPipelineHandle& result, std::string& outError) override;
+
 private:
+    uint64_t ComputeMeshHash(const RHIMeshPipelineDesc& desc) const;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> CreateOneMesh(const RHIMeshPipelineDesc& desc,
+        uint64_t hash, std::string& outError);
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     // 라이브러리 이름은 해시에서 유도한다 — 실행 간 안정적이어야 복원이 된다.

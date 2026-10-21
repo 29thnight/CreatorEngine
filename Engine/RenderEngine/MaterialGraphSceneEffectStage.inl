@@ -468,7 +468,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                 RHIBindingTable reconstructionVisibility;
                 for (const auto& draw : frame->RasterDrawsFor(blended))
                 {
-                    if (!draw.program->hasSurface || !selected(draw))
+                    if (!draw.program->hasSurface || draw.program->editorPreview || !selected(draw))
                     {
                         continue;
                     }

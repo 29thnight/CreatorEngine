@@ -11,6 +11,7 @@
 #include "DumpHandler.h"
 #include "WindowsCoreWindow.h"
 #include "DataSystem.h"
+#include "MaterialGraphCommonWarmup.h"
 #include "Material.h"
 #include "MaterialGraphWindow.h"
 #include "SceneViewportOverlay.h"
@@ -609,6 +610,17 @@ void Core::App::Run(CoreWindow& window)
 		//   기다릴 것도 없으므로 즉시 빠진다. 하네스 실행은 예열하지
 		//   않는다 — 명령 하나 돌리고 끝내는 실행에 16초를 물리면 게이트
 		//   타임아웃이 통째로 흔들린다.
+        char skipWarmup[4]{};
+        if (!EditorSmokeOffscreen() && !(GetEnvironmentVariableA("CE_SKIP_MODEL_SHADER_WARMUP", skipWarmup, sizeof(skipWarmup))==1 && skipWarmup[0]=='1'))
+        {
+            BootProgress::Step(L"Preparing model rendering", L"Preparing shared model shaders before opening the editor");
+            std::string error;
+            if (!material_graph::WarmupModelShaders(error))
+            {
+                Debug::PrintLog(spdlog::level::err, "Model shader warmup failed: " + error);
+                g_progressWindow->Close(); m_windowClosed=true; PostQuitMessage(0); return;
+            }
+        }
         if (!WarmUpFirstRenderedFrame())
         {
             g_progressWindow->Close();

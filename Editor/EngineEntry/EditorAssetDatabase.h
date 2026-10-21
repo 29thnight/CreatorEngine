@@ -95,6 +95,8 @@ public:
         const experiment::cooked::TextureImportSettings& settings, std::string& error);
     [[nodiscard]] std::string TextureImportStatus(const file::path& source) const;
     [[nodiscard]] bool TextureImportReady(const file::path& source) const;
+    // Pending cooks or queued resolver publications; excludes texture GPU loading.
+    [[nodiscard]] bool HasPendingTexturePublications() const;
 	struct ModelRecoveryStats
 	{
 		std::uint64_t attempts{}, succeeded{}, suppressed{}, declined{}, sourceReloads{};

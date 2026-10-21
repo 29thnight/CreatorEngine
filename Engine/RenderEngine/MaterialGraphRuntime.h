@@ -145,7 +145,8 @@ namespace material_graph
                                                                  const GenerationLoader& loader, std::string& error);
         // Call on the owning publication boundary. Removal, Clear or a newer
         // reload invalidates old tickets; identical payloads retain their owner.
-        own::shared_owner<const Generation> Publish(const PreparedGeneration& prepared, std::string& error);
+        own::shared_owner<const Generation> Publish(const PreparedGeneration& prepared, std::string& error,
+                                                    bool* invalidated = nullptr);
         // Apply a verified isolated candidate only while the expected accepted
         // generation is current. Success invalidates outstanding store tickets.
         bool Publish(own::shared_owner<const Generation> candidate,
@@ -213,6 +214,13 @@ namespace material_graph
 
     struct Instance : LX::Runtime::Instance
     {
+        // Transient Editor placement only. Never serialized or used by Player.
+        bool editorPreview{};
+        experiment::AssetId editorPreviewSourceGraph;
+        std::string editorPreviewSourceBlend{"opaque"};
+        std::uint64_t editorPlacementId{};
+        double editorPlacementStartMs{};
+        std::shared_ptr<std::atomic<bool>> editorPreviewSubmitted;
         own::shared_owner<const Generation> generation;
         InstanceDescription description;
         std::vector<InstanceTexture> textures;

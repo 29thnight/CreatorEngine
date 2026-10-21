@@ -569,8 +569,9 @@ public:
     std::size_t ShaderMetaRetainedBytes() const;
     std::size_t ShaderMetaRetainedBudgetBytes() const;
 
+    // Publication invalidation is retryable, not evidence of a damaged source graph.
     own::shared_owner<const material_graph::Generation> LoadMaterialGraphGeneration(FileGuid guid, std::string& error,
-                                                                                  bool reload = false);
+                                                                                 bool reload = false, bool* invalidated = nullptr);
     own::shared_owner<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
     file::path GetMaterialGraphSourcePath(FileGuid guid) const;
     // Explicit synchronous warm-up retains verified graph generations, so later
@@ -600,6 +601,9 @@ public:
     static own::shared_owner<const material_graph::Generation> CompileMaterialGraphAuthoring(
         const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
         const file::path& cacheDirectory, std::string& error);
+    static own::shared_owner<const material_graph::Generation> CompileEditorPreviewMaterial(
+        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
+        const file::path& cacheDirectory, std::string& error, bool packageBuild = false);
     // 명시적 요청의 작업 스레드에서만 호출한다. 원본뿐 아니라 현재 도구·include 내용도 다시 확인한다.
     // 다음 요청의 scratch 부모도 검사한다. 빈 cacheDirectory는 기본 Lattice 캐시를 뜻한다.
     static bool CanReuseMaterialGraphAuthoring(const material_graph::Generation& generation,

@@ -418,6 +418,14 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
     if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
     {
         DrawMaterialAssetSelector(*meshRenderer);
+        const auto instance = meshRenderer->m_Material ? meshRenderer->m_Material->GetMaterialGraphInstance()
+                                                      : own::shared_owner<const material_graph::Instance>{};
+        if (instance && instance->editorPreview)
+        {
+            ImGui::TextWrapped("Preparing the source material. The model can be moved and edited.");
+        }
+        else
+        {
         if (ImGui::Button("Open Node Editor", ImVec2{-1.f, 0.f}))
         {
             std::string error;
@@ -436,6 +444,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         if (meshRenderer->m_Material && meshRenderer->m_Material->HasMaterialGraph())
         {
             DrawGraphSurface(*meshRenderer, sheet);
+        }
         }
     }
     const bool latticeMaterial = meshRenderer->m_Material && meshRenderer->m_Material->HasMaterialGraph();

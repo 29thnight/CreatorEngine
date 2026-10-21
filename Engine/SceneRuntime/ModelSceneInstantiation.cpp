@@ -5,6 +5,7 @@
 #include "BoneComponent.h"
 #include "DataSystem.h"
 #include "../RenderEngine/Assets/ModelCpuGeometryPayload.h"
+#include "../RenderEngine/Assets/ModelMaterialGraph.h"
 #include "Entity.h"
 #include "ExperimentMaterialMigration.h"
 #include "Material.h"
@@ -39,6 +40,7 @@ namespace ModelSceneInstantiation
         Options options;
         std::vector<ObjectRecipe> objects;
         std::vector<own::shared_owner<Material>> materials;
+        std::vector<own::shared_owner<const material_graph::Instance>> previewInstances;
         std::vector<own::shared_owner<const experiment::Material>> authored;
         std::vector<std::uint32_t> meshMaterials;
         std::vector<EntityHandle> handles;
@@ -55,6 +57,46 @@ namespace ModelSceneInstantiation
 
     PendingInstance::PendingInstance(ConstructionKey, own::unique_owner<Impl> impl) : m_impl(std::move(impl)) {}
     PendingInstance::~PendingInstance() = default;
+
+    own::shared_owner<Material> PendingInstance::PrepareMaterial(
+        const assets::ModelAssetGeneration::Shared& generation, std::size_t index, std::string& error)
+    {
+        if (!generation || index >= generation->Materials().size()) return {};
+        experiment::Material converted;
+        const auto& source = generation->Materials()[index];
+        ExperimentMaterialMigration::ConvertModelMaterialAsset(source, *generation, converted);
+        auto material = own::make_shared<Material>();
+        if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(converted, nullptr, *material, error)) return {};
+        DataSystems->FinalizeMaterialRuntime(*material);
+        DataSystems->BindModelGenerationTextures(*material, *generation);
+        if (!DataSystems->ConfigureModelMaterialGraph(*material, *generation, source, error)) return {};
+        return material;
+    }
+
+    bool PendingInstance::ApplyMaterials(Scene& scene, std::span<const own::shared_owner<Material>> materials)
+    {
+        auto& state = *m_impl;
+        if (state.status != Status::Complete || !scene.Resolve(Root()) ||
+            scene.Resolve(Root())->IsDestroyMark() || materials.size() != state.materials.size()) return false;
+        for (const auto objectIndex : state.renderers)
+        {
+            auto* object = scene.Resolve(state.handles[objectIndex]);
+            if (!object || object->IsDestroyMark()) continue;
+            auto* renderer = object->GetComponent<MeshRenderer>();
+            const auto index = state.meshMaterials[state.objects[objectIndex].mesh];
+            if (!renderer || index >= materials.size() || !materials[index]) continue;
+            // Material replacement/editing during preparation wins over a late result.
+            if (!renderer->m_Material || &*renderer->m_Material != &*state.materials[index]) continue;
+            const auto current = renderer->m_Material->GetMaterialGraphInstance();
+            if (!current || &*current != &*state.previewInstances[index]) continue;
+            if (renderer->m_Material->m_doubleSided || renderer->m_Material->m_renderingMode != MaterialRenderingMode::Opaque) continue;
+            materials[index]->m_materialGuid = state.materials[index]->m_materialGuid;
+            renderer->SetMaterial(materials[index]);
+            renderer->SetExperimentMaterialBase(nullptr);
+        }
+        state.materials.assign(materials.begin(), materials.end());
+        return true;
+    }
 
     own::unique_owner<PendingInstance> PendingInstance::Prepare(
         assets::ModelAssetGeneration::Shared generation, const Options& options)
@@ -192,24 +234,29 @@ namespace ModelSceneInstantiation
         // 재질 변환, 외부 이미지 디코드/압축, embedded 이미지 owner 생성을 모두
         // 씬 생성 전에 끝낸다. mutable Material은 이 인스턴스만 소유한다.
         impl->materials.resize(materials.size());
+        impl->previewInstances.resize(materials.size());
         impl->authored.resize(materials.size());
         for (const std::size_t objectIndex : impl->renderers)
         {
             const auto index = impl->meshMaterials[impl->objects[objectIndex].mesh];
             if (index >= materials.size() || impl->materials[index]) continue;
-            auto converted = own::make_shared<experiment::Material>();
-            ExperimentMaterialMigration::ConvertModelMaterialAsset(materials[index], *impl->generation, *converted);
-            auto material = own::make_shared<Material>();
             std::string error;
-            if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(*converted, nullptr, *material, error))
-                return reject();
-            DataSystems->FinalizeMaterialRuntime(*material);
-            DataSystems->BindModelGenerationTextures(*material, *impl->generation);
-            if (!DataSystems->ConfigureModelMaterialGraph(*material, *impl->generation, materials[index], error))
+            auto material = options.previewMaterial ? own::make_shared<Material>(*options.previewMaterial)
+                                                    : PrepareMaterial(impl->generation, index, error);
+            if (!material)
             {
                 Debug::PrintLog(spdlog::level::err, "Model material graph could not be prepared: " + error);
                 return reject();
             }
+            if (options.previewMaterial)
+            {
+                material->m_fileGuid = FileGuid(materials[index].materialId);
+                material->m_name = materials[index].name;
+                material->MarkEditorPreview(experiment::AssetId{assets::ModelMaterialGraphId(materials[index].materialId)},
+                    materials[index].transparent ? "transparent" : materials[index].masked ? "masked" : "opaque");
+            }
+            material->TagEditorPlacement(options.editorPlacementId, options.editorPlacementStartMs, options.editorPreviewSubmitted);
+            if (options.previewMaterial) impl->previewInstances[index] = material->GetMaterialGraphInstance();
             impl->materials[index] = std::move(material);
         }
         impl->handles.resize(impl->objects.size());

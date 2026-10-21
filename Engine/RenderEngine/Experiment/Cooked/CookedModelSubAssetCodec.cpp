@@ -1,3 +1,4 @@
+#include "../../Assets/PreparedClusterPages.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "CookedModelSubAssetCodec.h"
 #include "CookedAssetCatalog.h"
