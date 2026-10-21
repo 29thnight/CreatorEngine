@@ -1,0 +1,319 @@
+<!doctype html><html lang="ko" data-register="blueprint"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>데디케이티드 서버 인계 설계 · Creator Engine</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>
+body{font-family:'IBM Plex Sans','Malgun Gothic',sans-serif}main{max-width:1160px}h1{font-size:clamp(2rem,4vw,3.8rem);line-height:1.18}section{scroll-margin-top:var(--s-8)}nav{display:flex;flex-wrap:wrap;gap:var(--s-3);padding:var(--s-4) 0;border-block:1px solid var(--border)}nav a{font-size:var(--t-small)}.diagram{overflow-x:auto;background:var(--surface);border:1px dashed var(--border-bright);border-radius:var(--r-2)}.diagram svg{min-width:900px;width:100%;display:block}.diagram text{font-size:18px}.diagram .ve-el{font-size:16px}details{border-top:1px solid var(--border);padding:var(--s-4) 0}summary{cursor:pointer;font-weight:600}.contract{padding-top:var(--s-4);overflow-x:auto}.contract p,.contract li{max-width:75ch}.contract table{min-width:720px}.contract code{overflow-wrap:anywhere}.sources a{overflow-wrap:anywhere}.status{display:flex;gap:var(--s-3);flex-wrap:wrap;margin:var(--s-4) 0}.handoff{display:grid;grid-template-columns:1fr 1fr;border:1px dashed var(--border-bright);margin:var(--s-4) 0}.handoff>div{padding:var(--s-4)}.handoff>div+div{border-left:1px dashed var(--border-bright)}.handoff strong{display:block;margin-bottom:var(--s-3)}@media(max-width:600px){.handoff{grid-template-columns:1fr}.handoff>div+div{border-left:0;border-top:1px dashed var(--border-bright)}}
+</style></head><body><main><header><a href="../index.html">Creator Engine docs</a><p class="eyebrow">PHASE 20 · ENGINEERING HANDOFF · 2026-10-21</p><h1>엔진 경계를 먼저 세우고,<br>서버 구현을 넘깁니다.</h1><p class="lead">공유 simulation 위에 네트워크와 headless host를 연결하는 인계 설계.</p><div class="status"><span class="chip warn">설계안 · 구현 전</span><span class="chip info">N9 서버 host 포함</span></div><figure><div class="handoff"><div><strong>엔진 담당이 제공</strong>고정 tick · 엔티티 수명 · 필드 쓰기 통지<br>Runtime services · cooked content · 계약 게이트</div><div><strong>서버 담당이 구현</strong>Registry · replication · transport<br>Console host · 계측 · 통합 검증</div></div><figcaption>엔진은 실행 경계를 제공하고 서버 담당자는 그 경계 뒤의 구현을 소유합니다.</figcaption></figure></header><nav aria-label="문서 목차"><a href="#section-1">현재 구조</a><a href="#section-2">착수 순서</a><a href="#section-3">모듈 경계</a><a href="#section-4">인터페이스</a><a href="#section-5">엔진 확장점</a><a href="#section-6">큐와 소유권</a><a href="#section-7">Headless host</a><a href="#section-8">인수 조건</a></nav><section id="section-1"><div class="sec-head"><span class="ve-label">현재 구조</span><h2>현재 코드와 인계 목표</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="현재 프레임 루프에서 고정 tick 경계로"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-1"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">현재 · 가변 delta</text></g><g class="ve-n is-key" data-ref="section-1"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">고정 tick driver</text></g><g class="ve-n " data-ref="section-1"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">시작 / 완료 observer</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">분리한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">호출한다</text></svg></div><figcaption>현재 프레임 루프에서 고정 tick 경계로.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>현재 <code>Engine/SceneRuntime/RuntimeFrame.cpp</code>의 <code>Runtime::TickSimulationFrame</code>은
+Initialization → InputEvents → 관리 PrePhysics → Physics → GameLogic → 관리 PostPhysics를
+전달받은 delta로 프레임당 한 번 실행한다. pause이면 Pausing 뒤 반환한다.
+고정 tick 누산, tick 시작 입력 적용, tick 완료 observer 호출은 없다.</p>
+<p><code>Engine/RuntimeHost/EngineBootstrap.h</code>의 InitializeRuntime은 렌더 스레드 훅을 등록하고,
+Run은 WindowsCoreWindow를 생성한다. <code>EngineLaunchConfig.h</code>도 WindowsWindow와
+RuntimeSettings를 포함한다. 현재 공통 bootstrap을 그대로 서버 진입점으로 쓰면
+윈도우와 렌더 관련 코드가 서버에 들어간다.</p>
+<p><code>Component.cpp::OnPropertyChanged</code>는 이름으로 ProxyDirty를 분류해 렌더 dirty를 발행한다.
+이 함수는 범용 복제 변경 스트림을 제공하지 않는다. <code>SceneRuntime.vcxproj</code>는 렌더 include
+경로를 가진 static library다. 프로젝트 참조 목록만으로 최종 서버의 렌더 링크 제거를
+판정하지 않고 실제 참조 심볼과 최종 링크 산출물로 닫는다.</p>
+<p>인계 목표는 담당자가 NetCore / NetReplication / Transport / ServerHost를 소유하고,
+엔진 담당자가 제공한 simulation·scene·content 경계만 사용해 서버를 완성하는 것이다.
+현재 파일에는 이 설계의 구현을 추가하지 않는다.</p>
+</div></details></section>
+<section id="section-2"><div class="sec-head"><span class="ve-label">착수 순서</span><h2>작업 소유권과 순서</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="엔진 선행 작업이 담당자의 작업을 연다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-2"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">ND-a · 계약</text></g><g class="ve-n is-key" data-ref="section-2"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">N3-b · 고정 tick</text></g><g class="ve-n " data-ref="section-2"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">ND-b · 수명 / 쓰기</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">Loopback을 연다</text><text class="ve-el" x="630" y="135" text-anchor="middle">복제를 연다</text></svg></div><figcaption>엔진 선행 작업이 담당자의 작업을 연다.</figcaption></figure><details open><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>엔진 담당 선행 작업</th>
+<th>완료 산출물</th>
+<th>이후 서버 담당 작업</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>ND-a: ID·transport·codec·telemetry·registry 계약</td>
+<td>독립 include 가능한 계약, wire 경계 게이트와 금지 타입 canary</td>
+<td>N0 계측, N4 Loopback</td>
+</tr>
+<tr>
+<td>2</td>
+<td>W8 → N3-b: 고정 simulation driver, 관리 OnSimulationTick</td>
+<td>Editor/Player 공통 driver, 시작/완료 확장점, pause/catch-up 정책</td>
+<td>N5 spawn/full snapshot</td>
+</tr>
+<tr>
+<td>3</td>
+<td>W4 → ND-b: 수명·필드 쓰기 통지</td>
+<td>scene 이동·파괴·비렌더 필드 변경의 호출 경로</td>
+<td>N2 registry/schema, N6 delta/interest</td>
+</tr>
+<tr>
+<td>4</td>
+<td>runtime bootstrap에서 window/presentation 분리, cooked content 경계</td>
+<td>렌더 없는 최소 host 링크·기동 증거</td>
+<td>N9 DedicatedServer host와 운영 루프</td>
+</tr>
+<tr>
+<td>5</td>
+<td>N0 결과로 snapshot·queue budget 계약 확정</td>
+<td>명시적 용량·초과 정책·schema manifest</td>
+<td>N7 실제 transport, N10 통합 검증</td>
+</tr>
+</tbody></table>
+<p>기존 계획의 ND-a 2일, N3-b 4일, ND-b 2.5일은 기존 추정치다. W8/W4와 bootstrap·
+headless 링크 분리를 포함한 전체 서버 준비 공수로 합산하지 않는다.
+이번 인계에서는 기존 계획상 선택 항목이었던 N9를 인계 범위에 포함한다.</p>
+</div></details></section>
+<section id="section-3"><div class="sec-head"><span class="ve-label">모듈 경계</span><h2>모듈과 의존 방향</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="서버와 플레이어는 simulation 기반을 공유한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-3"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">Server / Player host</text></g><g class="ve-n is-key" data-ref="section-3"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Simulation / Scene</text></g><g class="ve-n " data-ref="section-3"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">Replication / Transport</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">구동한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">값을 교환한다</text></svg></div><figcaption>서버와 플레이어는 simulation 기반을 공유한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><pre><code class="language-text">DedicatedServer host
+  ├─ Simulation driver / Runtime services / Cooked content loader
+  ├─ SceneRuntime / Physics / managed gameplay
+  └─ NetReplication → NetCore + Transport interface
+                                  ├─ Loopback
+                                  └─ 실제 transport adapter
+
+Editor / Player → 같은 Simulation driver + 각 host의 presentation
+</code></pre>
+<p>계약은 네트워크 wire 계약과 프로세스 내부 engine adapter 계약으로 구분한다.
+wire에는 EntityHandle·포인터·size_t·STL 객체 메모리 표현을 쓰지 않는다.
+engine adapter는 simulation thread 안에서 로컬 EntityHandle을 사용할 수 있다.
+span과 callback context pointer도 프로세스 내부 호출에만 사용하고 wire로 복사하지 않는다.
+wire gate는 wire schema와 codec을 검사하며 로컬 adapter까지 일괄 금지하지 않는다.</p>
+</div></details></section>
+<section id="section-4"><div class="sec-head"><span class="ve-label">인터페이스</span><h2>동결할 인터페이스</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="wire와 로컬 adapter를 구분한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-4"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">로컬 EntityHandle</text></g><g class="ve-n is-key" data-ref="section-4"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Registry / schema</text></g><g class="ve-n " data-ref="section-4"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">고정폭 wire ID</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">해석한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">변환한다</text></svg></div><figcaption>wire와 로컬 adapter를 구분한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>아래 표의 연산은 계약 표기이며 C++ 선언 확정 전이다. 실제 헤더는
+NetworkFrameworkPlan §6.4의 11종을 기준으로 배치한다. 추가 engine adapter는
+SceneRuntime/RuntimeHost가 소유한다.</p>
+<table>
+<thead>
+<tr>
+<th>계약</th>
+<th>주요 연산·데이터</th>
+<th>소유권·실패 규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NetWireIds</td>
+<td>NetworkObjectId u64, PeerId u32, component/message/field ID 고정폭</td>
+<td>0 invalid, 서버 세션 내 object ID 재사용 금지. 폭·예약 범위는 manifest에 고정</td>
+</tr>
+<tr>
+<td>SimulationTick</td>
+<td>별도 강타입 u64 tick, session epoch, fixedDelta</td>
+<td>frame 번호와 혼용 금지. tick은 세션 내 단조 증가</td>
+</tr>
+<tr>
+<td>INetworkTransport</td>
+<td>Start, Poll, TrySend, RequestDisconnect, Stop</td>
+<td>network thread 단일 소유. Poll 수신 view는 다음 Poll까지 유효. TrySend는 반환 전 복사하거나 실패</td>
+</tr>
+<tr>
+<td>NetProtocolHeader / codec</td>
+<td>version, message ID, compatibility ID, epoch, tick, baseline, payload bit count</td>
+<td>little endian 명시적 encode/decode. struct memcpy 금지. 길이·정수 overflow 검사 후 payload 접근</td>
+</tr>
+<tr>
+<td>INetChannelPolicy</td>
+<td>message 의미 → reliability, ordering lane, priority</td>
+<td>spawn/despawn/확정 사건 reliable, 상태 latest-wins. lane 간 도착 순서는 별도로 보장하지 않음</td>
+</tr>
+<tr>
+<td>INetTelemetrySink</td>
+<td>값 counters와 queue high-water snapshot</td>
+<td>hot path 문자열 구성·동기 로깅 금지. overflow 원인별 계수</td>
+</tr>
+<tr>
+<td>INetworkEntityRegistry</td>
+<td>Bind, Rebind, Unbind, TryResolve</td>
+<td>simulation thread 전용. 중복 Bind 실패, 미등록 resolve 실패. transport 호출 금지</td>
+</tr>
+<tr>
+<td>INetAuthorityPolicy</td>
+<td>Evaluate(peer, object ID, command ID, tick)</td>
+<td>allow/deny와 사유 값 반환. spawn/RPC 명시 allowlist</td>
+</tr>
+<tr>
+<td>INetCommandSink</td>
+<td>TryEnqueue(command envelope, payload lease)</td>
+<td>성공하면 소유권 이전, 실패하면 호출자 유지. Full/TooLarge/Closed 구분</td>
+</tr>
+<tr>
+<td>ReplicationSnapshot</td>
+<td>epoch, tick, schema ID, object records, immutable payload lease</td>
+<td>소비 완료까지 소유 buffer 유지. latest-wins 대상은 상태만</td>
+</tr>
+<tr>
+<td>NetReplicationPolicy</td>
+<td>조건·quantizer·validation·보간 정책</td>
+<td>값 입력/출력. reflgen opt-in, bounds 없는 가변 필드 거절</td>
+</tr>
+</tbody></table>
+<p>PayloadBitCount와 실제 수신 byte 수를 교차 검사하고, 알 수 없는 message ID·예약 비트·
+NaN/Inf·미래 tick·상한 초과 container는 world 변경 전에 거절한다.
+TrySend 실패 시 reliable 메시지는 bounded pending에 유지하고 재시도한다.
+pending 상한 초과는 해당 peer를 종료한다. unreliable 상태는 폐기하고 계수한다.
+transport 자체의 ACK·분할 기능은 adapter 뒤에서 사용한다.</p>
+</div></details></section>
+<section id="section-5"><div class="sec-head"><span class="ve-label">엔진 확장점</span><h2>엔진이 제공할 호출 경계</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="완료된 tick만 snapshot으로 공개한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-5"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">OnTickStarting</text></g><g class="ve-n is-key" data-ref="section-5"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Physics / gameplay</text></g><g class="ve-n " data-ref="section-5"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">OnTickCommitted</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">명령을 적용한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">결과를 확정한다</text></svg></div><figcaption>완료된 tick만 snapshot으로 공개한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><h3>5.1 tick 시작과 완료</h3>
+<p><code>OnTickCommitted</code>만으로는 inbound 명령을 물리 전에 적용할 수 없다.
+N3-b에 다음 두 경계를 함께 제공한다.</p>
+<ol>
+<li><code>OnTickStarting(TickContext)</code>: session/scene 구조 변경 반영 뒤, 해당 tick의 gameplay·
+physics 실행 전 호출한다. bounded 입력을 drain하고 NetId 해석·권한 검사 후 적용한다.</li>
+<li><code>OnTickCommitted(TickContext)</code>: 물리 작업 join, 해당 tick의 권한 gameplay와 구조 변경
+commit을 마친 뒤 호출한다. 이 경계에서 불변 snapshot을 만든다.</li>
+</ol>
+<p>둘 모두 simulation thread에서 동기 호출한다. callback은 I/O 대기나 scene 재진입을
+하지 않는다. observer 등록·해제는 tick 밖에서만 허용하며 해제 반환 뒤 callback은 없다.
+네트워크 상태는 완료 tick 값만 공개한다.</p>
+<p>프레임 축 Initialization/InputEvents와 기존 관리 PrePhysics/PostPhysics/GameLogic을
+tick마다 반복하지 않는다. 권한 gameplay·root motion·AI·충돌 사건을 고정 축으로
+옮길 소비자 목록을 N3-b에서 확정한다. GameLogic은 표시 데이터 갱신을 포함하므로
+전체 함수를 누산 루프에 넣지 않는다. OnSimulationTick은 생명주기 enum에 추가하지
+않고 ClrHost 전용 진입점으로 배선한다.</p>
+<p>tick rate·최대 catch-up 횟수·frame delta 상한은 세션 시작 설정으로 고정한다.
+서버는 실행하지 않은 tick을 완료 처리하지 않는다. 누적 지연은 backlog와 overrun으로
+계수하고 tick budget 소진 시 다음 host 반복에서 계속 실행한다.
+pause는 simulation tick을 멈추지만 transport poll·disconnect·종료 처리는 계속 실행한다.
+새 세션은 epoch를 바꾸고 이전 명령·snapshot·baseline을 무효화한다.</p>
+<h3>5.2 엔티티 수명</h3>
+<p><code>Scene::AllocateSlot</code>/<code>ReleaseSlot</code>은 슬롯 경계다. snapshot 공개 가능한 spawn 완료
+경계와 같다고 취급하지 않는다. 다음 의미를 엔진이 보장해야 한다.</p>
+<table>
+<thead>
+<tr>
+<th>통지</th>
+<th>시점</th>
+<th>데이터</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bound</td>
+<td>초기 component/state 적용과 spawn commit 뒤</td>
+<td>local handle, local lifetime token, prefab asset identity</td>
+</tr>
+<tr>
+<td>Rebound</td>
+<td>DDOL/scene transfer의 새 handle 확정 뒤</td>
+<td>lifetime token, old/new handle</td>
+</tr>
+<tr>
+<td>Unbound</td>
+<td>최종 파괴 시 resolve가 닫히는 commit</td>
+<td>lifetime token, old handle, destroy 사유</td>
+</tr>
+</tbody></table>
+<p>이송 중 슬롯 해제를 최종 despawn으로 전달하지 않는다. detach와 attach 사이에는
+resolve 실패 상태를 유지하고 동일 lifetime token으로 Rebind한다. 기존 NetId는 유지한다.
+실패한 이송의 최종 파괴는 Unbound 한 번으로 끝낸다. raw Entity*를 identity로 보관하지 않는다.
+local lifetime token 발급과 transfer 상관관계는 엔진 소유, NetId 발급은 서버 담당 소유다.</p>
+<h3>5.3 쓰기 변경</h3>
+<p><code>OnComponentFieldWritten(local handle, component identity, field key, source, revision)</code>을
+게임 스레드 commit 경계에서 발행한다. engine field key는 wire NetFieldId와 분리하고
+복제 schema adapter가 변환한다. 렌더 ProxyDirty를 네트워크 dirty로 해석하지 않는다.</p>
+<p>Inspector/Undo·직렬화 load·native setter·managed setter·physics writeback·animation
+writeback 경로별로 호출 지점을 확인한다. virtual OnPropertyChanged override의 base 호출
+유무에 관측이 좌우되지 않도록 공통 writer가 통지를 소유한다. 직접 필드 쓰기는
+writer 경계로 옮기거나 명시적 component revision 갱신을 붙인다.
+같은 tick의 반복 쓰기는 component/field 단위로 합친다. 초기 spawn state는 full snapshot에
+포함한다. 클라이언트 수신 적용 source는 echo 재발행을 막되 서버 권한 상태 변경은 기록한다.</p>
+</div></details></section>
+<section id="section-6"><div class="sec-head"><span class="ve-label">큐와 소유권</span><h2>버퍼와 스레드 계약</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="큐에서 소유권을 넘기고 소비 후 반환한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-6"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">Network thread</text></g><g class="ve-n is-key" data-ref="section-6"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Bounded queue / lease</text></g><g class="ve-n " data-ref="section-6"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">Simulation thread</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">값을 전달한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">소비 후 반환한다</text></svg></div><figcaption>큐에서 소유권을 넘기고 소비 후 반환한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>network thread와 simulation thread 사이에는 각각 하나의 명령/상태 소비자를 둔다.
+producer가 하나면 bounded SPSC, 여러 producer가 필요한 경로만 bounded MPSC를 쓴다.
+큐 메모리와 payload pool은 시작 시 예약하고 tick마다 임시 vector를 만들지 않는다.
+pool slot은 index와 generation을 가진 lease로 전달하고 소비 종료 시 반환한다.</p>
+<table>
+<thead>
+<tr>
+<th>통로</th>
+<th>포화 처리</th>
+<th>반드시 보존할 정보</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>입력 상태</td>
+<td>peer/input sequence별 최신값과 중복 window 정책</td>
+<td>마지막 적용 sequence, stale/duplicate/drop 수</td>
+</tr>
+<tr>
+<td>reliable 명령·spawn/despawn·사건</td>
+<td>bounded pending → backpressure → peer 종료</td>
+<td>적용 전까지 payload 소유권과 사건 순서</td>
+</tr>
+<tr>
+<td>상태 snapshot</td>
+<td>미소비 최신 상태로 교체</td>
+<td>superseded 수, tick/epoch, 독립 reliable 사건 stream</td>
+</tr>
+</tbody></table>
+<p>상태가 spawn보다 먼저 도착하면 아직 알려지지 않은 object 상태를 bounded 보류하거나
+폐기한다. reliable spawn 적용과 baseline 확보 뒤 복제를 재개한다. 서로 다른 lane의
+전송 순서만으로 spawn-before-state를 보장하지 않는다.
+delta baseline은 수신측 적용 확인된 tick만 사용한다. baseline 유실은 full snapshot으로
+복구한다. latest-wins 교체로 사라진 snapshot을 baseline으로 삼지 않는다.</p>
+</div></details></section>
+<section id="section-7"><div class="sec-head"><span class="ve-label">Headless host</span><h2>서버 host와 content 경계</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="서버는 window와 GPU 생성 없이 시작한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-7"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">Cooked content</text></g><g class="ve-n is-key" data-ref="section-7"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Runtime services</text></g><g class="ve-n " data-ref="section-7"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">Console server host</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">scene을 제공한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">고정 tick을 구동한다</text></svg></div><figcaption>서버는 window와 GPU 생성 없이 시작한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>엔진 담당자는 window/presentation 초기화를 Runtime services 초기화에서 분리한다.
+<code>ServerLaunchConfig</code>는 content root, scene/prefab manifest, tick 설정, log 경로만
+소유하고 WindowsWindowDesc나 render backend를 요구하지 않는다.</p>
+<p>공통 bootstrap은 diagnostics·jobs·scene·physics·managed runtime의 시작/종료를 제공한다.
+서버 담당자는 console host, monotonic clock 기반 deadline 대기, transport poll,
+graceful stop 요청, 실행 옵션·종료 코드를 구현한다.</p>
+<p>content loader는 cooked scene/prefab 식별자와 결과 코드만 받는다. 서버 패키지는
+게임플레이·충돌·script에 필요한 자산을 포함하고 GPU upload·material 생성 없이 읽힌다.
+authoring Document를 보관하는 경로를 서버 load가 타지 않도록 분리한다.
+managed gameplay assembly의 presentation 의존도 같은 기준으로 제거한다.</p>
+<p>종료 순서는 새 입력 차단 → transport poll/send 중단 및 thread join →
+남은 명령·snapshot drain/discard 계수와 lease 반환 → observer 해제 → replication/registry
+해제 → Scene/managed/physics 해제 → jobs/diagnostics 해제다.
+서버 simulation이 멈춘 후에도 살아 있는 network callback을 남기지 않는다.</p>
+</div></details></section>
+<section id="section-8"><div class="sec-head"><span class="ve-label">인수 조건</span><h2>인계 완료 판정과 전달 묶음</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="계약부터 두 클라이언트 통합까지 인수한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-8"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">계약 / tick / 수명</text></g><g class="ve-n is-key" data-ref="section-8"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">포화 / 복구 / headless</text></g><g class="ve-n " data-ref="section-8"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">서버 + 두 client</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">경계를 검증한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">통합을 검증한다</text></svg></div><figcaption>계약부터 두 클라이언트 통합까지 인수한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><table>
+<thead>
+<tr>
+<th>게이트</th>
+<th>실행 내용</th>
+<th>통과 조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>계약</td>
+<td>헤더 단독 compile, wire 금지 타입 변이 canary</td>
+<td>정상 계약 통과·금지 계약 실패, run-all 배선</td>
+</tr>
+<tr>
+<td>고정 tick</td>
+<td>동일 입력을 서로 다른 render FPS, pause, 긴 frame으로 재생</td>
+<td>같은 완료 tick/input/physics step 결과, catch-up 정책 일치</td>
+</tr>
+<tr>
+<td>수명</td>
+<td>spawn·deferred/immediate destroy·DDOL·실패한 transfer</td>
+<td>Bind/Rebind/Unbind 순서와 stale resolve 거절</td>
+</tr>
+<tr>
+<td>변경</td>
+<td>비렌더 component 포함 각 writer 경로</td>
+<td>변경 누락 0, 중복 합침, 수신 echo 차단</td>
+</tr>
+<tr>
+<td>큐</td>
+<td>모든 queue/pool을 작은 용량으로 포화</td>
+<td>무한 증가·lease 누수 0, 사유별 계수 일치</td>
+</tr>
+<tr>
+<td>복제</td>
+<td>loss/reorder/duplicate, state-before-spawn, baseline 유실</td>
+<td>잘못된 object 적용 0, full 복구, reliable 사건 보존</td>
+</tr>
+<tr>
+<td>headless</td>
+<td>렌더 소스 membership·링크 map·PE import 및 실제 기동 검사</td>
+<td>Editor/ImGui/RenderEngine/authoring parser 의존 0, 창·GPU device 생성 0</td>
+</tr>
+<tr>
+<td>통합</td>
+<td>서버와 두 client의 접속→spawn→입력→상태→despawn→종료</td>
+<td>권한 거절·정상 동기화·자원 원복</td>
+</tr>
+</tbody></table>
+<p>담당자에게 전달할 묶음은 계약 헤더, schema/ID/tombstone manifest, 엔진 adapter 예제,
+경계 회귀 명령, cooked 테스트 scene, 위 게이트 결과, 모듈별 파일 소유권 표다.
+계약 변경 요청에는 영향 소비자·wire compatibility·회귀 변경을 함께 적는다.
+새 wire ID와 tombstone 변경은 정본 NetworkFrameworkPlan에 기록한다.</p>
+<p>현재 완료된 산출물은 이 설계 문서다. 계약 헤더 구현·엔진 확장점 배선·빌드·실행
+게이트는 위 순서대로 수행할 후속 작업이다.</p>
+</div></details></section><section class="sources"><h2>근거와 원문</h2><p><a href="DedicatedServerHandoff.md">전체 Markdown 설계</a> · <a href="../plans/NetworkFrameworkPlan.html">PHASE 20 정본 계획</a> · <a href="https://github.com/nicobailon/visual-explainer">visual-explainer</a></p><p>코드 기준: <code>RuntimeFrame.cpp</code> · <code>EngineBootstrap.h</code> · <code>EngineLaunchConfig.h</code> · <code>Component.cpp</code> · <code>SceneRuntime.vcxproj</code></p></section></main></body></html>

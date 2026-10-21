@@ -1,0 +1,943 @@
+<!doctype html><html lang="ko" data-register="blueprint"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>데디케이티드 서버 인계 설계 · Creator Engine</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
+
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. */
+.ve-svg { width: 100%; min-width: 700px; height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
+
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
+
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
+
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
+
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
+
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
+
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
+
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>
+body{font-family:'IBM Plex Sans','Malgun Gothic',sans-serif}main{max-width:1160px}h1{font-size:clamp(2rem,4vw,3.8rem);line-height:1.18}section{scroll-margin-top:var(--s-8)}nav{display:flex;flex-wrap:wrap;gap:var(--s-3);padding:var(--s-4) 0;border-block:1px solid var(--border)}nav a{font-size:var(--t-small)}.diagram{overflow-x:auto;background:var(--surface);border:1px dashed var(--border-bright);border-radius:var(--r-2)}.diagram svg{min-width:900px;width:100%;display:block}.diagram text{font-size:18px}.diagram .ve-el{font-size:16px}details{border-top:1px solid var(--border);padding:var(--s-4) 0}summary{cursor:pointer;font-weight:600}.contract{padding-top:var(--s-4);overflow-x:auto}.contract p,.contract li{max-width:75ch}.contract table{min-width:720px}.contract code{overflow-wrap:anywhere}.sources a{overflow-wrap:anywhere}.status{display:flex;gap:var(--s-3);flex-wrap:wrap;margin:var(--s-4) 0}.handoff{display:grid;grid-template-columns:1fr 1fr;border:1px dashed var(--border-bright);margin:var(--s-4) 0}.handoff>div{padding:var(--s-4)}.handoff>div+div{border-left:1px dashed var(--border-bright)}.handoff strong{display:block;margin-bottom:var(--s-3)}@media(max-width:600px){.handoff{grid-template-columns:1fr}.handoff>div+div{border-left:0;border-top:1px dashed var(--border-bright)}}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><header><a href="../index.html">Creator Engine docs</a><p class="eyebrow">PHASE 20 · ENGINEERING HANDOFF · 2026-10-21</p><h1>엔진 경계를 먼저 세우고,<br>서버 구현을 넘깁니다.</h1><p class="lead">공유 simulation 위에 네트워크와 headless host를 연결하는 인계 설계.</p><div class="status"><span class="chip warn">설계안 · 구현 전</span><span class="chip info">N9 서버 host 포함</span></div><figure><div class="handoff"><div><strong>엔진 담당이 제공</strong>고정 tick · 엔티티 수명 · 필드 쓰기 통지<br>Runtime services · cooked content · 계약 게이트</div><div><strong>서버 담당이 구현</strong>Registry · replication · transport<br>Console host · 계측 · 통합 검증</div></div><figcaption>엔진은 실행 경계를 제공하고 서버 담당자는 그 경계 뒤의 구현을 소유합니다.</figcaption></figure></header><nav aria-label="문서 목차"><a href="#section-1">현재 구조</a><a href="#section-2">착수 순서</a><a href="#section-3">모듈 경계</a><a href="#section-4">인터페이스</a><a href="#section-5">엔진 확장점</a><a href="#section-6">큐와 소유권</a><a href="#section-7">Headless host</a><a href="#section-8">인수 조건</a></nav><section id="section-1"><div class="sec-head"><span class="ve-label">현재 구조</span><h2>현재 코드와 인계 목표</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="현재 프레임 루프에서 고정 tick 경계로"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-1"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">현재 · 가변 delta</text></g><g class="ve-n is-key" data-ref="section-1"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">고정 tick driver</text></g><g class="ve-n " data-ref="section-1"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">시작 / 완료 observer</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">분리한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">호출한다</text></svg></div><figcaption>현재 프레임 루프에서 고정 tick 경계로.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>현재 <code>Engine/SceneRuntime/RuntimeFrame.cpp</code>의 <code>Runtime::TickSimulationFrame</code>은
+Initialization → InputEvents → 관리 PrePhysics → Physics → GameLogic → 관리 PostPhysics를
+전달받은 delta로 프레임당 한 번 실행한다. pause이면 Pausing 뒤 반환한다.
+고정 tick 누산, tick 시작 입력 적용, tick 완료 observer 호출은 없다.</p>
+<p><code>Engine/RuntimeHost/EngineBootstrap.h</code>의 InitializeRuntime은 렌더 스레드 훅을 등록하고,
+Run은 WindowsCoreWindow를 생성한다. <code>EngineLaunchConfig.h</code>도 WindowsWindow와
+RuntimeSettings를 포함한다. 현재 공통 bootstrap을 그대로 서버 진입점으로 쓰면
+윈도우와 렌더 관련 코드가 서버에 들어간다.</p>
+<p><code>Component.cpp::OnPropertyChanged</code>는 이름으로 ProxyDirty를 분류해 렌더 dirty를 발행한다.
+이 함수는 범용 복제 변경 스트림을 제공하지 않는다. <code>SceneRuntime.vcxproj</code>는 렌더 include
+경로를 가진 static library다. 프로젝트 참조 목록만으로 최종 서버의 렌더 링크 제거를
+판정하지 않고 실제 참조 심볼과 최종 링크 산출물로 닫는다.</p>
+<p>인계 목표는 담당자가 NetCore / NetReplication / Transport / ServerHost를 소유하고,
+엔진 담당자가 제공한 simulation·scene·content 경계만 사용해 서버를 완성하는 것이다.
+현재 파일에는 이 설계의 구현을 추가하지 않는다.</p>
+</div></details></section>
+<section id="section-2"><div class="sec-head"><span class="ve-label">착수 순서</span><h2>작업 소유권과 순서</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="엔진 선행 작업이 담당자의 작업을 연다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-2"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">ND-a · 계약</text></g><g class="ve-n is-key" data-ref="section-2"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">N3-b · 고정 tick</text></g><g class="ve-n " data-ref="section-2"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">ND-b · 수명 / 쓰기</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">Loopback을 연다</text><text class="ve-el" x="630" y="135" text-anchor="middle">복제를 연다</text></svg></div><figcaption>엔진 선행 작업이 담당자의 작업을 연다.</figcaption></figure><details open><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>엔진 담당 선행 작업</th>
+<th>완료 산출물</th>
+<th>이후 서버 담당 작업</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>ND-a: ID·transport·codec·telemetry·registry 계약</td>
+<td>독립 include 가능한 계약, wire 경계 게이트와 금지 타입 canary</td>
+<td>N0 계측, N4 Loopback</td>
+</tr>
+<tr>
+<td>2</td>
+<td>W8 → N3-b: 고정 simulation driver, 관리 OnSimulationTick</td>
+<td>Editor/Player 공통 driver, 시작/완료 확장점, pause/catch-up 정책</td>
+<td>N5 spawn/full snapshot</td>
+</tr>
+<tr>
+<td>3</td>
+<td>W4 → ND-b: 수명·필드 쓰기 통지</td>
+<td>scene 이동·파괴·비렌더 필드 변경의 호출 경로</td>
+<td>N2 registry/schema, N6 delta/interest</td>
+</tr>
+<tr>
+<td>4</td>
+<td>runtime bootstrap에서 window/presentation 분리, cooked content 경계</td>
+<td>렌더 없는 최소 host 링크·기동 증거</td>
+<td>N9 DedicatedServer host와 운영 루프</td>
+</tr>
+<tr>
+<td>5</td>
+<td>N0 결과로 snapshot·queue budget 계약 확정</td>
+<td>명시적 용량·초과 정책·schema manifest</td>
+<td>N7 실제 transport, N10 통합 검증</td>
+</tr>
+</tbody></table>
+<p>기존 계획의 ND-a 2일, N3-b 4일, ND-b 2.5일은 기존 추정치다. W8/W4와 bootstrap·
+headless 링크 분리를 포함한 전체 서버 준비 공수로 합산하지 않는다.
+이번 인계에서는 기존 계획상 선택 항목이었던 N9를 인계 범위에 포함한다.</p>
+</div></details></section>
+<section id="section-3"><div class="sec-head"><span class="ve-label">모듈 경계</span><h2>모듈과 의존 방향</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="서버와 플레이어는 simulation 기반을 공유한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-3"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">Server / Player host</text></g><g class="ve-n is-key" data-ref="section-3"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Simulation / Scene</text></g><g class="ve-n " data-ref="section-3"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">Replication / Transport</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">구동한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">값을 교환한다</text></svg></div><figcaption>서버와 플레이어는 simulation 기반을 공유한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><pre><code class="language-text">DedicatedServer host
+  ├─ Simulation driver / Runtime services / Cooked content loader
+  ├─ SceneRuntime / Physics / managed gameplay
+  └─ NetReplication → NetCore + Transport interface
+                                  ├─ Loopback
+                                  └─ 실제 transport adapter
+
+Editor / Player → 같은 Simulation driver + 각 host의 presentation
+</code></pre>
+<p>계약은 네트워크 wire 계약과 프로세스 내부 engine adapter 계약으로 구분한다.
+wire에는 EntityHandle·포인터·size_t·STL 객체 메모리 표현을 쓰지 않는다.
+engine adapter는 simulation thread 안에서 로컬 EntityHandle을 사용할 수 있다.
+span과 callback context pointer도 프로세스 내부 호출에만 사용하고 wire로 복사하지 않는다.
+wire gate는 wire schema와 codec을 검사하며 로컬 adapter까지 일괄 금지하지 않는다.</p>
+</div></details></section>
+<section id="section-4"><div class="sec-head"><span class="ve-label">인터페이스</span><h2>동결할 인터페이스</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="wire와 로컬 adapter를 구분한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-4"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">로컬 EntityHandle</text></g><g class="ve-n is-key" data-ref="section-4"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Registry / schema</text></g><g class="ve-n " data-ref="section-4"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">고정폭 wire ID</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">해석한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">변환한다</text></svg></div><figcaption>wire와 로컬 adapter를 구분한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>아래 표의 연산은 계약 표기이며 C++ 선언 확정 전이다. 실제 헤더는
+NetworkFrameworkPlan §6.4의 11종을 기준으로 배치한다. 추가 engine adapter는
+SceneRuntime/RuntimeHost가 소유한다.</p>
+<table>
+<thead>
+<tr>
+<th>계약</th>
+<th>주요 연산·데이터</th>
+<th>소유권·실패 규칙</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NetWireIds</td>
+<td>NetworkObjectId u64, PeerId u32, component/message/field ID 고정폭</td>
+<td>0 invalid, 서버 세션 내 object ID 재사용 금지. 폭·예약 범위는 manifest에 고정</td>
+</tr>
+<tr>
+<td>SimulationTick</td>
+<td>별도 강타입 u64 tick, session epoch, fixedDelta</td>
+<td>frame 번호와 혼용 금지. tick은 세션 내 단조 증가</td>
+</tr>
+<tr>
+<td>INetworkTransport</td>
+<td>Start, Poll, TrySend, RequestDisconnect, Stop</td>
+<td>network thread 단일 소유. Poll 수신 view는 다음 Poll까지 유효. TrySend는 반환 전 복사하거나 실패</td>
+</tr>
+<tr>
+<td>NetProtocolHeader / codec</td>
+<td>version, message ID, compatibility ID, epoch, tick, baseline, payload bit count</td>
+<td>little endian 명시적 encode/decode. struct memcpy 금지. 길이·정수 overflow 검사 후 payload 접근</td>
+</tr>
+<tr>
+<td>INetChannelPolicy</td>
+<td>message 의미 → reliability, ordering lane, priority</td>
+<td>spawn/despawn/확정 사건 reliable, 상태 latest-wins. lane 간 도착 순서는 별도로 보장하지 않음</td>
+</tr>
+<tr>
+<td>INetTelemetrySink</td>
+<td>값 counters와 queue high-water snapshot</td>
+<td>hot path 문자열 구성·동기 로깅 금지. overflow 원인별 계수</td>
+</tr>
+<tr>
+<td>INetworkEntityRegistry</td>
+<td>Bind, Rebind, Unbind, TryResolve</td>
+<td>simulation thread 전용. 중복 Bind 실패, 미등록 resolve 실패. transport 호출 금지</td>
+</tr>
+<tr>
+<td>INetAuthorityPolicy</td>
+<td>Evaluate(peer, object ID, command ID, tick)</td>
+<td>allow/deny와 사유 값 반환. spawn/RPC 명시 allowlist</td>
+</tr>
+<tr>
+<td>INetCommandSink</td>
+<td>TryEnqueue(command envelope, payload lease)</td>
+<td>성공하면 소유권 이전, 실패하면 호출자 유지. Full/TooLarge/Closed 구분</td>
+</tr>
+<tr>
+<td>ReplicationSnapshot</td>
+<td>epoch, tick, schema ID, object records, immutable payload lease</td>
+<td>소비 완료까지 소유 buffer 유지. latest-wins 대상은 상태만</td>
+</tr>
+<tr>
+<td>NetReplicationPolicy</td>
+<td>조건·quantizer·validation·보간 정책</td>
+<td>값 입력/출력. reflgen opt-in, bounds 없는 가변 필드 거절</td>
+</tr>
+</tbody></table>
+<p>PayloadBitCount와 실제 수신 byte 수를 교차 검사하고, 알 수 없는 message ID·예약 비트·
+NaN/Inf·미래 tick·상한 초과 container는 world 변경 전에 거절한다.
+TrySend 실패 시 reliable 메시지는 bounded pending에 유지하고 재시도한다.
+pending 상한 초과는 해당 peer를 종료한다. unreliable 상태는 폐기하고 계수한다.
+transport 자체의 ACK·분할 기능은 adapter 뒤에서 사용한다.</p>
+</div></details></section>
+<section id="section-5"><div class="sec-head"><span class="ve-label">엔진 확장점</span><h2>엔진이 제공할 호출 경계</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="완료된 tick만 snapshot으로 공개한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-5"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">OnTickStarting</text></g><g class="ve-n is-key" data-ref="section-5"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Physics / gameplay</text></g><g class="ve-n " data-ref="section-5"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">OnTickCommitted</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">명령을 적용한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">결과를 확정한다</text></svg></div><figcaption>완료된 tick만 snapshot으로 공개한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><h3>5.1 tick 시작과 완료</h3>
+<p><code>OnTickCommitted</code>만으로는 inbound 명령을 물리 전에 적용할 수 없다.
+N3-b에 다음 두 경계를 함께 제공한다.</p>
+<ol>
+<li><code>OnTickStarting(TickContext)</code>: session/scene 구조 변경 반영 뒤, 해당 tick의 gameplay·
+physics 실행 전 호출한다. bounded 입력을 drain하고 NetId 해석·권한 검사 후 적용한다.</li>
+<li><code>OnTickCommitted(TickContext)</code>: 물리 작업 join, 해당 tick의 권한 gameplay와 구조 변경
+commit을 마친 뒤 호출한다. 이 경계에서 불변 snapshot을 만든다.</li>
+</ol>
+<p>둘 모두 simulation thread에서 동기 호출한다. callback은 I/O 대기나 scene 재진입을
+하지 않는다. observer 등록·해제는 tick 밖에서만 허용하며 해제 반환 뒤 callback은 없다.
+네트워크 상태는 완료 tick 값만 공개한다.</p>
+<p>프레임 축 Initialization/InputEvents와 기존 관리 PrePhysics/PostPhysics/GameLogic을
+tick마다 반복하지 않는다. 권한 gameplay·root motion·AI·충돌 사건을 고정 축으로
+옮길 소비자 목록을 N3-b에서 확정한다. GameLogic은 표시 데이터 갱신을 포함하므로
+전체 함수를 누산 루프에 넣지 않는다. OnSimulationTick은 생명주기 enum에 추가하지
+않고 ClrHost 전용 진입점으로 배선한다.</p>
+<p>tick rate·최대 catch-up 횟수·frame delta 상한은 세션 시작 설정으로 고정한다.
+서버는 실행하지 않은 tick을 완료 처리하지 않는다. 누적 지연은 backlog와 overrun으로
+계수하고 tick budget 소진 시 다음 host 반복에서 계속 실행한다.
+pause는 simulation tick을 멈추지만 transport poll·disconnect·종료 처리는 계속 실행한다.
+새 세션은 epoch를 바꾸고 이전 명령·snapshot·baseline을 무효화한다.</p>
+<h3>5.2 엔티티 수명</h3>
+<p><code>Scene::AllocateSlot</code>/<code>ReleaseSlot</code>은 슬롯 경계다. snapshot 공개 가능한 spawn 완료
+경계와 같다고 취급하지 않는다. 다음 의미를 엔진이 보장해야 한다.</p>
+<table>
+<thead>
+<tr>
+<th>통지</th>
+<th>시점</th>
+<th>데이터</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bound</td>
+<td>초기 component/state 적용과 spawn commit 뒤</td>
+<td>local handle, local lifetime token, prefab asset identity</td>
+</tr>
+<tr>
+<td>Rebound</td>
+<td>DDOL/scene transfer의 새 handle 확정 뒤</td>
+<td>lifetime token, old/new handle</td>
+</tr>
+<tr>
+<td>Unbound</td>
+<td>최종 파괴 시 resolve가 닫히는 commit</td>
+<td>lifetime token, old handle, destroy 사유</td>
+</tr>
+</tbody></table>
+<p>이송 중 슬롯 해제를 최종 despawn으로 전달하지 않는다. detach와 attach 사이에는
+resolve 실패 상태를 유지하고 동일 lifetime token으로 Rebind한다. 기존 NetId는 유지한다.
+실패한 이송의 최종 파괴는 Unbound 한 번으로 끝낸다. raw Entity*를 identity로 보관하지 않는다.
+local lifetime token 발급과 transfer 상관관계는 엔진 소유, NetId 발급은 서버 담당 소유다.</p>
+<h3>5.3 쓰기 변경</h3>
+<p><code>OnComponentFieldWritten(local handle, component identity, field key, source, revision)</code>을
+게임 스레드 commit 경계에서 발행한다. engine field key는 wire NetFieldId와 분리하고
+복제 schema adapter가 변환한다. 렌더 ProxyDirty를 네트워크 dirty로 해석하지 않는다.</p>
+<p>Inspector/Undo·직렬화 load·native setter·managed setter·physics writeback·animation
+writeback 경로별로 호출 지점을 확인한다. virtual OnPropertyChanged override의 base 호출
+유무에 관측이 좌우되지 않도록 공통 writer가 통지를 소유한다. 직접 필드 쓰기는
+writer 경계로 옮기거나 명시적 component revision 갱신을 붙인다.
+같은 tick의 반복 쓰기는 component/field 단위로 합친다. 초기 spawn state는 full snapshot에
+포함한다. 클라이언트 수신 적용 source는 echo 재발행을 막되 서버 권한 상태 변경은 기록한다.</p>
+</div></details></section>
+<section id="section-6"><div class="sec-head"><span class="ve-label">큐와 소유권</span><h2>버퍼와 스레드 계약</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="큐에서 소유권을 넘기고 소비 후 반환한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-6"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">Network thread</text></g><g class="ve-n is-key" data-ref="section-6"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Bounded queue / lease</text></g><g class="ve-n " data-ref="section-6"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">Simulation thread</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">값을 전달한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">소비 후 반환한다</text></svg></div><figcaption>큐에서 소유권을 넘기고 소비 후 반환한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>network thread와 simulation thread 사이에는 각각 하나의 명령/상태 소비자를 둔다.
+producer가 하나면 bounded SPSC, 여러 producer가 필요한 경로만 bounded MPSC를 쓴다.
+큐 메모리와 payload pool은 시작 시 예약하고 tick마다 임시 vector를 만들지 않는다.
+pool slot은 index와 generation을 가진 lease로 전달하고 소비 종료 시 반환한다.</p>
+<table>
+<thead>
+<tr>
+<th>통로</th>
+<th>포화 처리</th>
+<th>반드시 보존할 정보</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>입력 상태</td>
+<td>peer/input sequence별 최신값과 중복 window 정책</td>
+<td>마지막 적용 sequence, stale/duplicate/drop 수</td>
+</tr>
+<tr>
+<td>reliable 명령·spawn/despawn·사건</td>
+<td>bounded pending → backpressure → peer 종료</td>
+<td>적용 전까지 payload 소유권과 사건 순서</td>
+</tr>
+<tr>
+<td>상태 snapshot</td>
+<td>미소비 최신 상태로 교체</td>
+<td>superseded 수, tick/epoch, 독립 reliable 사건 stream</td>
+</tr>
+</tbody></table>
+<p>상태가 spawn보다 먼저 도착하면 아직 알려지지 않은 object 상태를 bounded 보류하거나
+폐기한다. reliable spawn 적용과 baseline 확보 뒤 복제를 재개한다. 서로 다른 lane의
+전송 순서만으로 spawn-before-state를 보장하지 않는다.
+delta baseline은 수신측 적용 확인된 tick만 사용한다. baseline 유실은 full snapshot으로
+복구한다. latest-wins 교체로 사라진 snapshot을 baseline으로 삼지 않는다.</p>
+</div></details></section>
+<section id="section-7"><div class="sec-head"><span class="ve-label">Headless host</span><h2>서버 host와 content 경계</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="서버는 window와 GPU 생성 없이 시작한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-7"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">Cooked content</text></g><g class="ve-n is-key" data-ref="section-7"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">Runtime services</text></g><g class="ve-n " data-ref="section-7"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">Console server host</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">scene을 제공한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">고정 tick을 구동한다</text></svg></div><figcaption>서버는 window와 GPU 생성 없이 시작한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><p>엔진 담당자는 window/presentation 초기화를 Runtime services 초기화에서 분리한다.
+<code>ServerLaunchConfig</code>는 content root, scene/prefab manifest, tick 설정, log 경로만
+소유하고 WindowsWindowDesc나 render backend를 요구하지 않는다.</p>
+<p>공통 bootstrap은 diagnostics·jobs·scene·physics·managed runtime의 시작/종료를 제공한다.
+서버 담당자는 console host, monotonic clock 기반 deadline 대기, transport poll,
+graceful stop 요청, 실행 옵션·종료 코드를 구현한다.</p>
+<p>content loader는 cooked scene/prefab 식별자와 결과 코드만 받는다. 서버 패키지는
+게임플레이·충돌·script에 필요한 자산을 포함하고 GPU upload·material 생성 없이 읽힌다.
+authoring Document를 보관하는 경로를 서버 load가 타지 않도록 분리한다.
+managed gameplay assembly의 presentation 의존도 같은 기준으로 제거한다.</p>
+<p>종료 순서는 새 입력 차단 → transport poll/send 중단 및 thread join →
+남은 명령·snapshot drain/discard 계수와 lease 반환 → observer 해제 → replication/registry
+해제 → Scene/managed/physics 해제 → jobs/diagnostics 해제다.
+서버 simulation이 멈춘 후에도 살아 있는 network callback을 남기지 않는다.</p>
+</div></details></section>
+<section id="section-8"><div class="sec-head"><span class="ve-label">인수 조건</span><h2>인계 완료 판정과 전달 묶음</h2></div><figure><div class="diagram"><svg class="ve-svg" viewBox="0 0 960 170" role="img" aria-label="계약부터 두 클라이언트 통합까지 인수한다"><path class="ve-e" d="M280 74 H340"/><path class="ve-e" d="M600 74 H660"/><g class="ve-n " data-ref="section-8"><rect class="sh" x="20" y="44" width="260" height="62" rx="4"/><text x="150" y="81" text-anchor="middle">계약 / tick / 수명</text></g><g class="ve-n is-key" data-ref="section-8"><rect class="sh" x="340" y="44" width="260" height="62" rx="4"/><text x="470" y="81" text-anchor="middle">포화 / 복구 / headless</text></g><g class="ve-n " data-ref="section-8"><rect class="sh" x="660" y="44" width="260" height="62" rx="4"/><text x="790" y="81" text-anchor="middle">서버 + 두 client</text></g><text class="ve-el" x="310" y="135" text-anchor="middle">경계를 검증한다</text><text class="ve-el" x="630" y="135" text-anchor="middle">통합을 검증한다</text></svg></div><figcaption>계약부터 두 클라이언트 통합까지 인수한다.</figcaption></figure><details><summary>상세 계약과 작업 항목 읽기</summary><div class="contract"><table>
+<thead>
+<tr>
+<th>게이트</th>
+<th>실행 내용</th>
+<th>통과 조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>계약</td>
+<td>헤더 단독 compile, wire 금지 타입 변이 canary</td>
+<td>정상 계약 통과·금지 계약 실패, run-all 배선</td>
+</tr>
+<tr>
+<td>고정 tick</td>
+<td>동일 입력을 서로 다른 render FPS, pause, 긴 frame으로 재생</td>
+<td>같은 완료 tick/input/physics step 결과, catch-up 정책 일치</td>
+</tr>
+<tr>
+<td>수명</td>
+<td>spawn·deferred/immediate destroy·DDOL·실패한 transfer</td>
+<td>Bind/Rebind/Unbind 순서와 stale resolve 거절</td>
+</tr>
+<tr>
+<td>변경</td>
+<td>비렌더 component 포함 각 writer 경로</td>
+<td>변경 누락 0, 중복 합침, 수신 echo 차단</td>
+</tr>
+<tr>
+<td>큐</td>
+<td>모든 queue/pool을 작은 용량으로 포화</td>
+<td>무한 증가·lease 누수 0, 사유별 계수 일치</td>
+</tr>
+<tr>
+<td>복제</td>
+<td>loss/reorder/duplicate, state-before-spawn, baseline 유실</td>
+<td>잘못된 object 적용 0, full 복구, reliable 사건 보존</td>
+</tr>
+<tr>
+<td>headless</td>
+<td>렌더 소스 membership·링크 map·PE import 및 실제 기동 검사</td>
+<td>Editor/ImGui/RenderEngine/authoring parser 의존 0, 창·GPU device 생성 0</td>
+</tr>
+<tr>
+<td>통합</td>
+<td>서버와 두 client의 접속→spawn→입력→상태→despawn→종료</td>
+<td>권한 거절·정상 동기화·자원 원복</td>
+</tr>
+</tbody></table>
+<p>담당자에게 전달할 묶음은 계약 헤더, schema/ID/tombstone manifest, 엔진 adapter 예제,
+경계 회귀 명령, cooked 테스트 scene, 위 게이트 결과, 모듈별 파일 소유권 표다.
+계약 변경 요청에는 영향 소비자·wire compatibility·회귀 변경을 함께 적는다.
+새 wire ID와 tombstone 변경은 정본 NetworkFrameworkPlan에 기록한다.</p>
+<p>현재 완료된 산출물은 이 설계 문서다. 계약 헤더 구현·엔진 확장점 배선·빌드·실행
+게이트는 위 순서대로 수행할 후속 작업이다.</p>
+</div></details></section><section class="sources"><h2>근거와 원문</h2><p><a href="DedicatedServerHandoff.md">전체 Markdown 설계</a> · <a href="../plans/NetworkFrameworkPlan.html">PHASE 20 정본 계획</a> · <a href="https://github.com/nicobailon/visual-explainer">visual-explainer</a></p><p>코드 기준: <code>RuntimeFrame.cpp</code> · <code>EngineBootstrap.h</code> · <code>EngineLaunchConfig.h</code> · <code>Component.cpp</code> · <code>SceneRuntime.vcxproj</code></p></section></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
+
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/check.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
+</script>
+</body></html>

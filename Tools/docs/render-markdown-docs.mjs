@@ -310,6 +310,8 @@ function main() {
   }
   let written = 0;
   for (const file of targets) {
+    // 전용 visual-explainer 도식 생성기가 소유하는 문서는 일반 템플릿으로 덮어쓰지 않는다.
+    if (file === 'docs/design/DedicatedServerHandoff.md') { continue; }
     if (!markdownSet.has(file)) { console.error(`Markdown 목록에 없다: ${file}`); process.exitCode = 1; continue; }
     // These pages use the upstream visual-explainer kit and its visual checks.
     // Refuse stale sources rather than silently replacing their diagrams/layout.
