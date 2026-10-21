@@ -352,6 +352,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     mutable std::mutex recordingMutex_;
     std::uint64_t completed_{}, selectionSerial_{};
     SceneProgramStats stats_;
+    std::set<std::pair<std::uint64_t, bool>> loggedPlacementPhases_;
     bool CommitSubmittedFrame(const own::shared_owner<const Frame>& frame, RHICompletionPoint completion,
                               std::string& error);
     void PollSubmittedFrames();

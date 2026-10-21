@@ -7,6 +7,11 @@
 
 namespace material_graph
 {
+inline bool IsEditorPreviewProgram(const LX::LXMaterialProgram& program)
+{
+    return program.semanticKey.find("|editor-minimal-preview:2|") != std::string::npos;
+}
+
 struct SceneShaderSet
 {
     BindingLayout layout;
@@ -27,7 +32,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
 bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& shaderDirectory,
                          const std::filesystem::path& sourceFile, const Budget& budget, VerifiedProduct& result,
                          std::string& error, FileGuid graphGuid = {},
-                         std::optional<RHIShaderBinary> backend = std::nullopt);
+                         std::optional<RHIShaderBinary> backend = std::nullopt, bool fastPreview = false);
 
 // The backend the editor renderer was started with. Empty until the renderer
 // starts (and in headless tools), which keeps authoring compiles on both.

@@ -686,9 +686,11 @@ namespace material_graph
             request.m_state, state.m_owner, state.m_digest, request.m_requestGeneration);
     }
 
-    own::shared_owner<const Generation> GenerationStore::Publish(const PreparedGeneration& prepared, std::string& error)
+    own::shared_owner<const Generation> GenerationStore::Publish(const PreparedGeneration& prepared, std::string& error,
+                                                                bool* invalidated)
     {
         error.clear();
+        if (invalidated) *invalidated = false;
         std::vector<own::shared_owner<const Generation>> released;
         own::shared_owner<const Generation> result;
         own::shared_owner<const Generation> current;
@@ -698,6 +700,11 @@ namespace material_graph
             if (found == entries_.end() || found->second.requestGeneration != prepared.m_requestGeneration)
             {
                 error = "Material generation preparation was superseded or invalidated before publication.";
+                if (std::getenv("CE_TRACE_ASSET_INVALIDATION"))
+                    std::printf("[asset.invalidate] graph-publish guid=%s ticket=%llu current=%llu\n",
+                        Uuid::ToString(prepared.m_owner->assetId.value).c_str(), prepared.m_requestGeneration,
+                        found == entries_.end() ? 0ull : found->second.requestGeneration);
+                if (invalidated) *invalidated = true;
                 return {};
             }
             // Publication below is non-allocating. Allocation failure must not

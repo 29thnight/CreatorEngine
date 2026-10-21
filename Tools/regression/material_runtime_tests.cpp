@@ -304,11 +304,13 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     const auto invalidatedRequest = staged.BeginPreparation(graphId, true, error);
     staged.InvalidatePreparation(graphId);
     const auto invalidatedPrepared = GenerationStore::Prepare(invalidatedRequest, originalSnapshot, error);
-    check(!staged.Publish(*cachedPrepared, error) && !error.empty(),
+    bool publicationInvalidated = false;
+    check(!staged.Publish(*cachedPrepared, error, &publicationInvalidated) && !error.empty() && publicationInvalidated,
           "A superseded cached preparation cannot revive an older accepted generation");
     check(invalidatedPrepared && material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Invalidated work can finish privately while the accepted owner remains usable");
-    check(!staged.Publish(*invalidatedPrepared, error) && !error.empty() &&
+    publicationInvalidated = false;
+    check(!staged.Publish(*invalidatedPrepared, error, &publicationInvalidated) && !error.empty() && publicationInvalidated &&
               material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Completion after invalidation cannot publish or replace Current");
 
@@ -334,8 +336,9 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     const auto sharedRetryPrepared = GenerationStore::Prepare(sharedRetryRequest, retrySnapshot, error);
     check(retryPrepared && sharedRetryPrepared && retryLoads == 1 && material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Failed dirty preparation permits a fresh shared retry without early publication: " + error);
-    const auto retryOwner = staged.Publish(*retryPrepared, error);
-    check(retryOwner && !material_graph_test::SamePinnedObject(retryOwner, replacementOwner) && retryOwner->generation > replacementOwner->generation &&
+    publicationInvalidated = true;
+    const auto retryOwner = staged.Publish(*retryPrepared, error, &publicationInvalidated);
+    check(retryOwner && !publicationInvalidated && !material_graph_test::SamePinnedObject(retryOwner, replacementOwner) && retryOwner->generation > replacementOwner->generation &&
               material_graph_test::SamePinnedObject(staged.Publish(*sharedRetryPrepared, error), retryOwner),
           "Successful dirty retry accepts one new owner: " + error);
     check(material_graph_test::SamePinnedObject(staged.Load(graphId, failedSnapshot, false, error), retryOwner) && failedLoads == 1 && error.empty(),

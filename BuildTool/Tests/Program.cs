@@ -25,6 +25,29 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
+    var previewBinary = Path.Combine(root, "preview-binary");
+    Directory.CreateDirectory(Path.Combine(previewBinary, "Editor/EditorResources/Preview"));
+    Check(EditorPreviewPackage.Entries(previewBinary).Length == 0, "Optional preview package became mandatory");
+    var previewRuntime = Path.Combine(previewBinary, "Editor/CreatorEditor.runtime.dll");
+    File.WriteAllText(previewRuntime, "runtime");
+    var previewProductName = "a5033a2b-a423-8a02-9245-8b968e8e707b.slang.scene-cache";
+    var previewProduct = Path.Combine(previewBinary, "Editor/EditorResources/Preview", previewProductName);
+    File.WriteAllText(previewProduct, "sealed-product");
+    var previewManifest = Path.Combine(previewBinary, "Editor/EditorResources/Preview/package.json");
+    var previewDescription = Metadata.Object(new { schemaVersion = 1, backend = "dxil", recipe = "editor-preview-minimal-checker-v3",
+        file = previewProductName, bytes = new FileInfo(previewProduct).Length, sha256 = Metadata.Hash(previewProduct), runtimeSha256 = Metadata.Hash(previewRuntime) });
+    File.WriteAllText(previewManifest, previewDescription.ToJsonString());
+    Check(EditorPreviewPackage.Entries(previewBinary).Length == 2, "Preview publication lost its product or manifest");
+    File.AppendAllText(previewProduct, "damage");
+    Reject(() => EditorPreviewPackage.Entries(previewBinary), "Damaged preview package accepted");
+    File.WriteAllText(previewProduct, "sealed-product");
+    File.AppendAllText(previewRuntime, "changed");
+    Reject(() => EditorPreviewPackage.Entries(previewBinary), "Stale preview runtime accepted");
+    File.WriteAllText(previewRuntime, "runtime");
+    previewDescription["file"] = "../../escape";
+    File.WriteAllText(previewManifest, previewDescription.ToJsonString());
+    Reject(() => EditorPreviewPackage.Entries(previewBinary), "Preview package path escape accepted");
+
     // Source-authored regression coverage for portable render-feature projection.
     // These checks are not executed by the source-only implementation task.
     var renderSettingsPath = Path.Combine(root, "EngineSettings.asset");

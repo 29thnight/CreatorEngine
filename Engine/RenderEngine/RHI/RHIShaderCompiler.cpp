@@ -1,6 +1,9 @@
 #include "EngineRuntimePaths.h"
 #include "RHIShaderCompiler.h"
 #include "RHIShaderVerifiedCache.h"
+#if CE_DEVELOPMENT
+#include "../../EngineDiagnostics/ProfileScope.h"
+#endif
 
 #include "RHIShaderSource.h"
 #include "Vulkan/VulkanBindingModel.h"
@@ -207,6 +210,42 @@ namespace
     std::atomic<std::uint64_t> g_compiles{};
     std::atomic<std::uint64_t> g_failures{};
 
+    // Opt-in diagnostics, shared by interactive drops and automated commands.
+    // Per-request outcomes are thread-local: concurrent compiles cannot be
+    // misattributed by subtracting process-wide counters.
+    struct ShaderRequestTrace;
+    thread_local ShaderRequestTrace* t_shaderTrace{};
+    struct ShaderRequestTrace
+    {
+        const RHIShaderCompileRequest& request;
+        const std::string& error;
+        ShaderRequestTrace* previous = t_shaderTrace;
+        std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        double waitMs{}, queueMs{}, frontMs{}, codeMs{};
+        unsigned memory{}, disk{}, compiled{};
+        bool enabled = GetEnvironmentVariableW(L"CE_TRACE_SHADER_COMPILE", nullptr, 0) != 0;
+        ShaderRequestTrace(const RHIShaderCompileRequest& value, const std::string& failure) : request(value), error(failure)
+        { t_shaderTrace = this; }
+        ~ShaderRequestTrace()
+        {
+            t_shaderTrace = previous;
+            if (!enabled) return;
+            const auto now = std::chrono::steady_clock::now();
+            std::ostringstream line;
+            line << std::fixed << std::setprecision(3)
+                 << "[shader.trace] startMs=" << std::chrono::duration<double, std::milli>(start.time_since_epoch()).count()
+                 << " totalMs=" << std::chrono::duration<double, std::milli>(now-start).count()
+                 << " waitMs=" << waitMs << " queueMs=" << queueMs << " frontMs=" << frontMs << " codeMs=" << codeMs
+                 << " memory=" << memory << " disk=" << disk << " compiled=" << compiled
+                 << " failed=" << !error.empty() << " thread=" << GetCurrentThreadId()
+                 << " backend=" << (request.output == RHIShaderBinary::Dxil ? "dxil" : "spirv")
+                 << " entry=" << std::quoted(std::string(request.entryPoint))
+                 << " source=" << std::quoted(std::string(request.name)) << '\n';
+            const auto text = line.str();
+            std::fwrite(text.data(), 1, text.size(), stderr);
+        }
+    };
+
     using CreateSlangGlobalSessionProc = SlangResult (*)(
         const SlangGlobalSessionDesc*, slang::IGlobalSession**);
 
@@ -357,7 +396,10 @@ namespace
                 }
                 return SlotLease(runtime, slot);
             }
+            const auto queueStart = std::chrono::steady_clock::now();
             runtime.slotFreed.wait(lock);
+            if (t_shaderTrace) t_shaderTrace->queueMs += std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now()-queueStart).count();
         }
     }
 
@@ -724,17 +766,24 @@ namespace
     bool ReadSourceFile(const std::filesystem::path& path, std::string& outText,
         std::string& outError)
     {
-        std::ifstream file(path, std::ios::binary);
+#if CE_DEVELOPMENT
+        ce::profile_scope profile{ce::marker<"ShaderCache.ReadSource">()};
+#endif
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
         if (!file)
         {
             outError = "셰이더 소스를 열 수 없다: " + path.string();
             return false;
         }
-        std::ostringstream buffer;
-        buffer << file.rdbuf();
-        outText = buffer.str();
-        if (!outText.empty()) return true;
-        outError = "셰이더 소스가 비었다: " + path.string();
+        const auto size = file.tellg();
+        if (size > 0)
+        {
+            outText.resize(static_cast<std::size_t>(size));
+            file.seekg(0);
+            if (file.read(outText.data(), static_cast<std::streamsize>(size))) return true;
+        }
+        outText.clear();
+        outError = "셰이더 소스가 비었거나 읽기에 실패했다: " + path.string();
         return false;
     }
 
@@ -853,6 +902,7 @@ namespace
             {
                 outBlob.Assign(found->second.data(), found->second.size());
                 ++g_memoryHits;
+                if (t_shaderTrace) ++t_shaderTrace->memory;
                 return true;
             }
         }
@@ -879,6 +929,7 @@ namespace
             g_memoryCache.emplace(key, std::move(bytes));
         }
         ++g_diskHits;
+        if (t_shaderTrace) ++t_shaderTrace->disk;
         return true;
     }
 
@@ -941,6 +992,7 @@ namespace
                 if (outBlob) *outBlob = found->second.bytecode;
                 outReflection = found->second.reflection;
                 ++g_memoryHits;
+                if (t_shaderTrace) ++t_shaderTrace->memory;
                 return true;
             }
         }
@@ -971,6 +1023,7 @@ namespace
             g_verifiedCache.emplace(key, std::move(candidate));
         }
         ++g_diskHits;
+        if (t_shaderTrace) ++t_shaderTrace->disk;
         return true;
     }
 
@@ -1019,6 +1072,9 @@ namespace
     std::string BuildCacheKey(const RHIShaderCompileRequest& request,
         const std::vector<SourceUnit>& units, std::string_view compilerIdentity)
     {
+#if CE_DEVELOPMENT
+        ce::profile_scope profile{ce::marker<"ShaderCache.BuildKey">()};
+#endif
         Hash128 hash;
         hash.Add(kCompilerCacheIdentity);
         hash.Add(compilerIdentity);
@@ -1038,6 +1094,7 @@ namespace
         }
         hash.Add(&request.options.bufferInt64Atomics, sizeof(request.options.bufferInt64Atomics));
         hash.Add(&request.options.strictMath, sizeof(request.options.strictMath));
+        if (request.options.fastPreview) hash.Add("editor-preview-O1-v1");
         hash.Add(&request.options.fineDerivatives, sizeof(request.options.fineDerivatives));
         if (request.output == RHIShaderBinary::SpirV && request.options.quadOperations)
             hash.Add("spvGroupNonUniformQuad");
@@ -1120,6 +1177,9 @@ namespace
     // 표기는 파일 이름과 폴더 하나를 붙인 이름("Includes/X.slang")까지 본다.
     bool HasShadowCandidate(const std::vector<SourceUnit>& units, const RHIShaderCompileRequest& request)
     {
+#if CE_DEVELOPMENT
+        ce::profile_scope profile{ce::marker<"ShaderCache.CheckShadowCandidates">()};
+#endif
         std::vector<std::filesystem::path> locations;
         const auto addLocation = [&locations](const std::filesystem::path& directory)
         {
@@ -1519,6 +1579,9 @@ namespace
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection, std::string& outError,
             std::string* outIdentity, std::vector<std::filesystem::path>* outDependencies, CompileProgress& progress)
         {
+#if CE_DEVELOPMENT
+            ce::profile_scope profile{ce::marker<"ShaderCache.CheckDependencies">()};
+#endif
             std::vector<SourceUnit> units;
             units.reserve(recordedDependencies.size() + 1);
             units.push_back({ NormalizePath(sourcePath), sourceText });
@@ -1554,7 +1617,11 @@ namespace
             std::string& outError, std::string* outIdentity = nullptr,
             std::vector<std::filesystem::path>* outDependencies = nullptr)
         {
+#if CE_DEVELOPMENT
+            ce::profile_scope profile{ce::marker<"ShaderCompiler.Process">()};
+#endif
             outError.clear();
+            ShaderRequestTrace trace(request, outError);
             CompileProgress progress(request, outError);
             if (!EnsureSlang(outError)) return false;
 
@@ -1578,8 +1645,10 @@ namespace
             RHIShaderCompiler::ModuleReuseState* const reuse = t_moduleReuse;
             SlotLease ownLease;
             progress.Phase("Waiting for shader compiler slot");
+            const auto waitStart = std::chrono::steady_clock::now();
             if (nullptr == reuse) ownLease = AcquireSlot(runtime, outError);
             else if (nullptr == reuse->lease.Slot()) reuse->lease = AcquireSlot(runtime, outError);
+            trace.waitMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()-waitStart).count();
             SlangSlot* const slot = nullptr == reuse ? ownLease.Slot() : reuse->lease.Slot();
             if (nullptr == slot)
             {
@@ -1629,7 +1698,7 @@ namespace
             addArgument("-lang");
             addArgument(IsSlangSource(sourcePath) ? "slang" : "hlsl");
             addArgument("-matrix-layout-column-major");
-            addArgument("-O3");
+            addArgument(request.options.fastPreview ? "-O1" : "-O3");
             addArgument("-warnings-as-errors");
             addArgument("all");
             addArgument("-I");
@@ -1696,6 +1765,7 @@ namespace
             Slang::ComPtr<slang::IModule> shaderModule;
             Slang::ComPtr<slang::IBlob> diagnostics;
             const ReusedModule* reused = nullptr;
+            const auto frontStart = std::chrono::steady_clock::now();
             if (nullptr != reuse)
             {
                 const auto found = std::ranges::find(reuse->modules, reuseKey, &ReusedModule::key);
@@ -1768,6 +1838,7 @@ namespace
                 if (nullptr != reuse) reuse->modules.push_back({std::move(reuseKey), session, shaderModule});
             }
 
+            trace.frontMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()-frontStart).count();
             std::vector<SourceUnit> units;
             if (!CollectSlangDependencies(*shaderModule, sourcePath, sourceText,
                 units, outError))
@@ -1856,6 +1927,7 @@ namespace
             diagnostics.setNull();
             Slang::ComPtr<slang::IBlob> code;
             progress.Phase("Generating shader code", true);
+            const auto codeStart = std::chrono::steady_clock::now();
             if (SLANG_FAILED(linked->getEntryPointCode(
                 0, 0, code.writeRef(), diagnostics.writeRef()))
                 || !code || 0 == code->getBufferSize())
@@ -1871,6 +1943,8 @@ namespace
             }
 
             outBlob->Assign(code->getBufferPointer(), code->getBufferSize());
+            trace.codeMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()-codeStart).count();
+            ++trace.compiled;
             ++g_compiles;
             {
                 std::vector<std::uint8_t> bytes(outBlob->Size());

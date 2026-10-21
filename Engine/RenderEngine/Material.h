@@ -52,6 +52,24 @@ public:
         return m_materialGraphInstance;
     }
     bool HasMaterialGraph() const { return !!m_materialGraphInstance; }
+    void TagEditorPlacement(std::uint64_t id, double startMs, std::shared_ptr<std::atomic<bool>> previewSubmitted = {})
+    {
+        if (!m_materialGraphInstance || !id) return;
+        auto instance = own::make_shared<material_graph::Instance>(*m_materialGraphInstance);
+        instance->editorPlacementId = id;
+        instance->editorPlacementStartMs = startMs;
+        instance->editorPreviewSubmitted = std::move(previewSubmitted);
+        m_materialGraphInstance = std::move(instance);
+    }
+    void MarkEditorPreview(experiment::AssetId sourceGraph = {}, std::string sourceBlend = "opaque")
+    {
+        if (!m_materialGraphInstance) return;
+        auto instance = own::make_shared<material_graph::Instance>(*m_materialGraphInstance);
+        instance->editorPreview = true;
+        instance->editorPreviewSourceGraph = sourceGraph;
+        instance->editorPreviewSourceBlend = std::move(sourceBlend);
+        m_materialGraphInstance = std::move(instance);
+    }
     const own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin>& GetAssetOrigin() const noexcept
     {
         return m_assetOrigin;

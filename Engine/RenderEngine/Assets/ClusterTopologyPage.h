@@ -103,34 +103,49 @@ inline void ValidateTopologyPageAttributes(std::span<const std::byte> packet, ui
     std::string error;
     Require(Decode(view.attributes, raw, error), "QMC2 malformed attribute payload");
     const auto stride = StrideOf(mask);
+    // Layout and authenticated bounds are constant for every vertex in this page.
+    std::array<uint32_t, kVertexAttributeTable.size() * 4> scalarOffsets{};
+    std::size_t scalarCount{};
+    for (const auto& attribute : kVertexAttributeTable)
+    {
+        if (!Has(mask, attribute.attribute) || attribute.attribute == VertexAttribute::BoneIndices) continue;
+        const auto base = OffsetOf(mask, attribute.attribute);
+        for (uint32_t offset = 0; offset < SizeOf(attribute.format); offset += 4)
+        {
+            Require(scalarCount < scalarOffsets.size(), "QMC2 scalar layout capacity");
+            scalarOffsets[scalarCount++] = base + offset;
+        }
+    }
+    const auto normal = OffsetOf(mask, VertexAttribute::Normal);
+    const auto tangentSign = OffsetOf(mask, VertexAttribute::Tangent) + 12;
+    const bool skinned = Has(mask, VertexAttribute::BoneIndices);
+    const auto boneIndices = OffsetOf(mask, VertexAttribute::BoneIndices);
+    const auto weights = OffsetOf(mask, VertexAttribute::BoneWeights);
+    Require(skinned ? boneCount != 0 : boneCount == 0,
+            skinned ? "QMC2 missing skin dependency" : "QMC2 unexpected skin dependency");
+    const double radius = descriptor.sphereRadius + double(positionError) * 1.732051 + 1e-5;
+    Require(std::isfinite(radius) && radius >= 0, "QMC2 positions exceed authenticated meshlet bounds");
     for (uint32_t vertex = 0; vertex < view.vertices; ++vertex)
     {
-        const auto scalar = [&](uint32_t offset) { return std::bit_cast<float>(Word(raw, uint64_t(vertex) * stride + offset)); };
-        for (const auto& attribute : kVertexAttributeTable)
+        const auto vertexOffset = uint64_t(vertex) * stride;
+        const auto scalar = [&](uint32_t offset) { return std::bit_cast<float>(Word(raw, vertexOffset + offset)); };
+        for (std::size_t index = 0; index < scalarCount; ++index)
         {
-            if (!Has(mask, attribute.attribute) || attribute.attribute == VertexAttribute::BoneIndices) continue;
-            for (uint32_t offset = 0; offset < SizeOf(attribute.format); offset += 4)
-            {
-                const auto value = scalar(OffsetOf(mask, attribute.attribute) + offset);
-                Require(std::isfinite(value) && std::abs(value) <= 1e6f, "QMC2 nonfinite/out-of-range attribute");
-            }
+            const auto value = scalar(scalarOffsets[index]);
+            Require(std::isfinite(value) && std::abs(value) <= 1e6f, "QMC2 nonfinite/out-of-range attribute");
         }
-        const auto normal = OffsetOf(mask, VertexAttribute::Normal);
         Require(std::hypot(scalar(normal), scalar(normal + 4), scalar(normal + 8)) > 1e-10,
                 "QMC2 zero normal");
-        const auto sign = scalar(OffsetOf(mask, VertexAttribute::Tangent) + 12);
+        const auto sign = scalar(tangentSign);
         Require(sign == -1.f || sign == 1.f, "QMC2 tangent handedness");
         const double x = double(scalar(0)) - descriptor.sphereCenter[0];
         const double y = double(scalar(4)) - descriptor.sphereCenter[1];
         const double z = double(scalar(8)) - descriptor.sphereCenter[2];
-        const double radius = descriptor.sphereRadius + double(positionError) * 1.732051 + 1e-5;
-        Require(std::isfinite(radius) && radius >= 0 && std::sqrt(x*x + y*y + z*z) <= radius,
+        Require(std::sqrt(x*x + y*y + z*z) <= radius,
                 "QMC2 positions exceed authenticated meshlet bounds");
-        if (Has(mask, VertexAttribute::BoneIndices))
+        if (skinned)
         {
-            Require(boneCount != 0, "QMC2 missing skin dependency");
-            const auto indices = Word(raw, uint64_t(vertex) * stride + OffsetOf(mask, VertexAttribute::BoneIndices));
-            const auto weights = OffsetOf(mask, VertexAttribute::BoneWeights);
+            const auto indices = Word(raw, vertexOffset + boneIndices);
             float sum{};
             for (uint32_t influence = 0; influence < 4; ++influence)
             {
@@ -142,7 +157,7 @@ inline void ValidateTopologyPageAttributes(std::span<const std::byte> packet, ui
             // Four independently quantized weights can each differ by 1e-5.
             Require(sum == 0 || std::abs(sum - 1.f) <= 1e-4f, "QMC2 skin weight sum");
         }
-        else Require(boneCount == 0, "QMC2 unexpected skin dependency");
+
     }
 }
 }

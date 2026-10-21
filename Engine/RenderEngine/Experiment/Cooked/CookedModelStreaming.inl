@@ -367,6 +367,8 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved, std::shared_p
             assets::cluster::ValidateTopologyPageAttributes(packet, mask, vertices, counts.at(level).indexCount / 3, bones, descriptor, positionError);
             return packet;
         };
+        archive->pageReader = assets::cluster::PreparedRootPageReader(
+            std::move(archive->pageReader), *archive, value->lods.groups);
         value->archive = std::move(archive); out = std::move(value);
     }, failure);
 }

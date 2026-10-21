@@ -2027,6 +2027,13 @@ namespace ConsoleCmd
         reg.Result({ "model.loadcached" }, &Cmd_model_loadcached);
         reg.Result({ "model.place" }, &Cmd_model_place);
         reg.Result({ "model.async" }, &Cmd_model_async);
+        reg.Result({ "model.preview.bake" }, [](const ConsoleCommandContext& ctx) {
+            if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("model.preview.bake <output-directory>");
+            std::string error;
+            if (!Editor::ModelPlacement::BakePreviewMaterial(ctx.parts[1], error))
+                return CommandCore::Fail("preview.bake.failed", error);
+            return CommandCore::Ok("Verified editor preview package written");
+        });
         reg.Result({ "assets.scenemodel" }, &Cmd_assets_scenemodel);
         reg.Result({ "assets.generation" }, &Cmd_assets_generation);
         reg.Result({ "assets.modeldiag" }, &Cmd_assets_modeldiag);

@@ -25,6 +25,9 @@ struct RHIShaderCompileOptions
     bool fineDerivatives{};
     // Fragment quad broadcast for visibility reconstruction; explicit SPIR-V opt-in.
     bool quadOperations{};
+    // Temporary Editor stand-ins prioritize build latency. Source materials
+    // and packaged/runtime programs keep the default optimized compilation.
+    bool fastPreview{};
 };
 
 struct RHIShaderCompileRequest

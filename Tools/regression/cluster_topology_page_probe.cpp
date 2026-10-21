@@ -1,4 +1,5 @@
 #include "Assets/ClusterTopologyPage.h"
+#include "Assets/PreparedClusterPages.h"
 #include "Assets/ModelCpuGeometry.h"
 #include <stdint.h>
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
@@ -9,6 +10,104 @@ int main()
     try
     {
         const auto check = [](bool valid, const char* message) { if (!valid) throw std::runtime_error(message); };
+        {
+            cluster::Archive archive;
+            archive.packets.resize(4); archive.packetSizes = {4,4,4,4};
+            std::vector<experiment::MeshClusterGroup> groups(2);
+            groups[0].firstMeshlet=0; groups[0].meshletCount=2; groups[0].parentGroup=1;
+            groups[1].firstMeshlet=2; groups[1].meshletCount=2; groups[1].parentGroup=UINT32_MAX;
+            std::array<unsigned,4> reads{};
+            bool fail{};
+            auto read = [&](uint32_t id) {
+                ++reads.at(id);
+                if (fail) throw std::runtime_error("Authenticated page rejected");
+                return std::vector<std::byte>(4,std::byte(id));
+            };
+            archive.pageReader = cluster::PreparedRootPageReader(read,archive,groups);
+            check(reads[2]==0,"Thin metadata eagerly read pages");
+            cluster::PrepareRootPages(archive);
+            check(reads[0]==0 && reads[1]==0 && reads[2]==1 && reads[3]==1,"Prefetch was not root-only");
+            cluster::PrepareRootPages(archive);
+            check(archive.Read(2)==std::vector<std::byte>(4,std::byte(2)) && reads[2]==1,"Prepared root was re-read");
+            (void)archive.Read(0); (void)archive.Read(0);
+            check(reads[0]==2,"Non-root streaming was cached permanently");
+            auto capped=cluster::PreparedRootPageReader(read,archive,groups,4);
+            capped.Prepare(); const auto before=reads;
+            (void)capped(2); (void)capped(3);
+            check(reads[2]==before[2] && reads[3]==before[3]+1,"Root byte limit lost");
+            auto failed=cluster::PreparedRootPageReader(read,archive,groups);
+            fail=true; bool rejected{};
+            try { failed.Prepare(); } catch(const std::exception&) { rejected=true; }
+            check(rejected,"Failed authentication accepted by prefetch");
+            fail=false; failed.Prepare(); const auto accepted=reads;
+            (void)failed(2); check(reads==accepted,"Validated retry was not cached");
+            auto cancelled=cluster::PreparedRootPageReader(read,archive,groups);
+            std::atomic<bool> stop{true}; const auto cancelledBefore=reads;
+            cancelled.Prepare(&stop); check(reads==cancelledBefore,"Cancelled prefetch performed I/O");
+            auto other=cluster::PreparedRootPageReader([](uint32_t){return std::vector<std::byte>(4,std::byte{9});},archive,groups);
+            other.Prepare(); check(other(2)[0]==std::byte{9} && archive.Read(2)[0]==std::byte{2},"Archive generations shared cached bytes");
+            std::cout << "CLUSTER_ROOT_PREPARE_OK lazy=1 rootOnly=1 reuse=1 nonRootStreaming=1 byteLimit=1 authentication=1 cancellation=1 generationIsolation=1\n";
+        }
+        // Packet words may be unaligned, but every extent remains checked.
+        std::array<std::byte, 12> words{};
+        for (uint32_t i = 0; i < words.size(); ++i) words[i] = std::byte(i);
+        for (std::size_t offset = 0; offset <= words.size() - 4; ++offset)
+            check(quantized::Word(words, offset) == uint32_t(offset) + ((offset + 1) << 8) +
+                ((offset + 2) << 16) + ((offset + 3) << 24), "Unaligned LE word changed");
+        for (const auto offset : {std::size_t(9), words.size(), SIZE_MAX})
+        {
+            bool rejected{};
+            try { (void)quantized::Word(words, offset); }
+            catch (const std::exception&) { rejected = true; }
+            check(rejected, "Out-of-range word accepted");
+        }
+        for (std::size_t offset = 0; offset <= words.size() - 4; ++offset)
+        {
+            std::vector<std::byte> bytes(words.size(), std::byte{0x55});
+            quantized::Put(bytes, offset, 0xfedcba98u);
+            check(quantized::Word(bytes, offset) == 0xfedcba98u, "Unaligned LE write changed");
+            for (std::size_t i = 0; i < bytes.size(); ++i)
+                if (i < offset || i >= offset + 4) check(bytes[i] == std::byte{0x55}, "Write changed adjacent byte");
+        }
+        for (const auto offset : {std::size_t(9), words.size(), SIZE_MAX})
+        {
+            std::vector<std::byte> bytes(words.begin(), words.end());
+            bool rejected{};
+            try { quantized::Put(bytes, offset, 0); }
+            catch (const std::exception&) { rejected = true; }
+            check(rejected && std::equal(bytes.begin(), bytes.end(), words.begin()), "Invalid write was not transactional");
+        }
+        std::cout << "QUANTIZED_WRITE_OK unaligned=9 adjacentBytes=1 extentRejections=3\n";
+        unsigned layoutChecks{};
+        for (const auto layout : kModelVertexMasks)
+        {
+            const auto layoutStride = StrideOf(layout);
+            std::vector<std::byte> values(layoutStride);
+            quantized::Put(values, OffsetOf(layout, VertexAttribute::Normal) + 8, std::bit_cast<uint32_t>(1.f));
+            quantized::Put(values, OffsetOf(layout, VertexAttribute::Tangent) + 12, std::bit_cast<uint32_t>(1.f));
+            const bool skin = Has(layout, VertexAttribute::BoneIndices);
+            if (skin) quantized::Put(values, OffsetOf(layout, VertexAttribute::BoneWeights), std::bit_cast<uint32_t>(1.f));
+            cluster::Grid grid; grid.origin.resize(layoutStride / 4); grid.step.resize(layoutStride / 4);
+            experiment::MeshletPayload topology; topology.vertexRemap = {0};
+            topology.triangleIndices = {0,0,0}; topology.primitiveRemap = {0};
+            experiment::MeshletDescriptor descriptor; descriptor.vertexCount = 1; descriptor.triangleCount = 1;
+            descriptor.sphereRadius = 1;
+            const auto validate = [&](const auto& bytes) {
+                const auto page = cluster::EncodeTopologyPage(cluster::Encode(layout, 1, bytes, grid), topology, descriptor, 1, 1);
+                cluster::ValidateTopologyPageAttributes(page, layout, 1, 1, skin ? 1 : 0, descriptor, 0);
+            };
+            validate(values); ++layoutChecks;
+            for (const auto& attribute : kVertexAttributeTable)
+            {
+                if (!Has(layout, attribute.attribute) || attribute.attribute == VertexAttribute::BoneIndices) continue;
+                auto bad = values;
+                quantized::Put(bad, OffsetOf(layout, attribute.attribute), std::bit_cast<uint32_t>(2000000.f));
+                bool rejected{};
+                try { validate(bad); } catch (const std::exception&) { rejected = true; }
+                check(rejected, "Optional layout attribute validation lost"); ++layoutChecks;
+            }
+        }
+        std::cout << "CLUSTER_LAYOUT_VALIDATION_OK layouts=8 checks=" << layoutChecks << " unalignedWords=9 extentRejections=3\n";
         constexpr uint32_t count = 4;
         const auto mask = kCoreVertexAttributes;
         const auto stride = StrideOf(mask);

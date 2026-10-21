@@ -21,6 +21,7 @@
 
 class Entity;
 class Scene;
+class Material;
 namespace assets { class ModelAssetGeneration; }
 
 namespace ModelSceneInstantiation
@@ -35,6 +36,12 @@ namespace ModelSceneInstantiation
             Scene&, std::uint32_t, const ce::physics::triangle_mesh_source&)> collisionGeometry;
         // Source compatibility only; typed inputs already resolve this choice.
         bool useCookedColliderDefault{ true };
+        // Editor-only transient display owner. Source material identity remains
+        // in the model; final owners are prepared separately and applied on GT.
+        own::shared_owner<Material> previewMaterial;
+        std::uint64_t editorPlacementId{};
+        double editorPlacementStartMs{};
+        std::shared_ptr<std::atomic<bool>> editorPreviewSubmitted;
 
     };
 
@@ -61,6 +68,11 @@ namespace ModelSceneInstantiation
         static own::unique_owner<PendingInstance> Prepare(
             assets::ModelSceneAssetInputs inputs, const Options& options);
         ~PendingInstance();
+        static own::shared_owner<Material> PrepareMaterial(
+            const own::shared_owner<const assets::ModelAssetGeneration>& generation,
+            std::size_t index, std::string& error);
+        // Only replaces this placement's still-unedited preview bindings.
+        bool ApplyMaterials(Scene& scene, std::span<const own::shared_owner<Material>> materials);
         Status Advance(Scene& scene, std::size_t maxSteps = 16,
             std::chrono::microseconds budget = std::chrono::milliseconds(2),
             std::size_t maxRendererActivations = 2);

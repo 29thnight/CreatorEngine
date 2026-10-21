@@ -24,6 +24,7 @@ namespace Editor
         bool HasVisible() const;
         void PrintStatus() const;
         bool IsIdle() const;
+        static bool BakePreviewMaterial(const std::string& directory, std::string& error);
 
         struct Progress
         {

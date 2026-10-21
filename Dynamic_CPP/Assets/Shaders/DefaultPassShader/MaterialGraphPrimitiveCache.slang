@@ -1,4 +1,4 @@
-#include "Includes/MaterialGraphPrimitiveCache.slang"
+#include "Includes/MaterialGraphPrimitiveCacheTypes.slang"
 #include "Includes/MeshletGeometryAccess.slang"
 #include "Includes/LxMeshletGpuContract.slang"
 

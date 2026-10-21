@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../../Utility_Framework/StandardLibrary.h"
 
 #include "RHIHandle.h"
@@ -52,6 +52,13 @@ public:
     {
         outError = "Mesh shader pipelines are not supported by this backend.";
         return {};
+    }
+
+    virtual RHIPipelineRequestState RequestMesh(const RHIMeshPipelineDesc& desc,
+        RHIPipelineHandle& result, std::string& outError)
+    {
+        result = GetOrCreateMesh(desc, outError);
+        return result.IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed;
     }
 
     // Call on the render owner. Async implementations copy borrowed inputs and

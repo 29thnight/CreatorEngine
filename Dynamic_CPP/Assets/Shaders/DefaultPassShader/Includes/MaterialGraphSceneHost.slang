@@ -68,7 +68,7 @@ ByteAddressBuffer lx_meshlets : register(t155);
 #include "MeshletGeometryAccess.slang"
 #include "LxMeshletGpuContract.slang"
 #include "MaterialGraphSceneRecord.slang"
-#include "MaterialGraphPrimitiveCache.slang"
+#include "MaterialGraphPrimitiveCacheTypes.slang"
 StructuredBuffer<LXSceneGpuRecord> lx_sceneRecords : register(t170);
 StructuredBuffer<uint2> lx_scenePackets : register(t171);
 StructuredBuffer<uint4> lx_scenePacketRanges : register(t173);
@@ -691,9 +691,31 @@ PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMater
 // a runtime boolean inside a shared function still exposes those resources in SPIR-V.
 PrincipledSurface LXSceneUndecaledMaterial(LXSceneVertex input, bool frontFace)
 {
+#if defined(CE_EDITOR_MINIMAL_PREVIEW)
+    // Model-space procedural checker: no UV/texture/material/IBL evaluation.
+    // Invert the orthogonal TRS basis, retaining non-uniform object scale.
+    const float4x4 world = LXSceneWorld(input.record);
+    const float3 delta = input.position - world[3].xyz;
+    const float3 local = float3(dot(delta, world[0].xyz) / max(dot(world[0].xyz, world[0].xyz), 1e-12),
+        dot(delta, world[1].xyz) / max(dot(world[1].xyz, world[1].xyz), 1e-12),
+        dot(delta, world[2].xyz) / max(dot(world[2].xyz, world[2].xyz), 1e-12));
+    const float3 grid = local * 6.0;
+    const float parity = frac(dot(floor(grid), float3(1, 1, 1)) * 0.5) * 2.0;
+    const float3 footprint = fwidth(grid);
+    const float checker = lerp(0.5, parity, saturate(1.0 - max(footprint.x, max(footprint.y, footprint.z))));
+    PrincipledSurface surface = (PrincipledSurface)0;
+    surface.normal = PrincipledUnitNormal(input.normal, float3(0, 1, 0));
+    const float shade = 0.3 + 0.7 * abs(dot(surface.normal, normalize(float3(0.4, 0.8, -0.5))));
+    surface.emission = lerp(float3(0.12), float3(0.65), checker) * shade;
+    surface.alpha = 1.0;
+    surface.roughness = 1.0;
+    surface.occlusion = 1.0;
+    return surface;
+#else
     const LXMaterialContext context = LXSceneContext(input);
     const LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
     return LXSceneEvaluateMaterial(generated, context, frontFace, input.reconstruction != 0u, input.record);
+#endif
 }
 
 PrincipledSurface LXSceneMaterial(LXSceneVertex input, bool frontFace)
@@ -1293,6 +1315,10 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
 
 float4 LXSceneColorPSEvaluate(LXSceneVertex input, bool frontFace)
 {
+#if defined(CE_EDITOR_MINIMAL_PREVIEW)
+    input = LXScenePixelCenter(input);
+    return float4(LXSceneUndecaledMaterial(input, frontFace).emission, 1);
+#else
     input=LXScenePixelCenter(input);
     PrincipledSurface material = LXSceneMaterial(input, frontFace);
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
@@ -1385,24 +1411,33 @@ float4 LXSceneColorPSEvaluate(LXSceneVertex input, bool frontFace)
     return float4(LXSceneBlended(input.record) != 0u ? LXForwardVolume(input.clip.xy, input.position, color) : color,
                   LXSceneBlended(input.record) == 1u ? material.alpha : 1);
 #endif
+ #endif
 }
 [shader("fragment")]
 float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV_Target
 {
-    if (input.reconstruction == 0u) return LXSceneColorPSEvaluate(input, frontFace);
-    const uint2 own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
-    const uint uniqueLanes = LXSceneUniqueQuadIdentityLanes(own);
+    // One material/lighting evaluation site for both raster replay and reconstruction.
+    // Duplicating this large body makes the downstream optimizer process it twice.
+    // Reconstruction still evaluates every unique quad identity with helper lanes.
+    const bool reconstruct = input.reconstruction != 0u;
+    uint2 own = uint2(0);
+    uint uniqueLanes = 1u;
+    if (reconstruct) {
+        own = LXSceneLoadVisibility(uint2(input.clip.xy), input.record);
+        uniqueLanes = LXSceneUniqueQuadIdentityLanes(own);
+    }
     float4 output = (float4)0;
-    [loop] for (uint lane = 0u; lane < 4u; ++lane) {
+    [loop] for (uint lane = 0u; lane < (reconstruct ? 4u : 1u); ++lane) {
         const uint2 identity = QuadReadLaneAt(own, lane);
-        if ((uniqueLanes & (1u << lane)) != 0u && identity.x == LXSceneIdentity(input.record).x)
+        if (!reconstruct || ((uniqueLanes & (1u << lane)) != 0u && identity.x == LXSceneIdentity(input.record).x))
         {
-            bool face;
-            const LXSceneVertex restored = LXSceneReconstruct(input.clip, identity, face);
+            bool face = frontFace;
+            LXSceneVertex restored = input;
+            if (reconstruct) restored = LXSceneReconstruct(input.clip, identity, face);
             const float4 value = LXSceneColorPSEvaluate(restored, face);
-            if (all(own == identity)) output = value;
+            if (!reconstruct || all(own == identity)) output = value;
         }
     }
-    if (own.x != LXSceneIdentity(input.record).x) discard;
+    if (reconstruct && own.x != LXSceneIdentity(input.record).x) discard;
     return output;
 }
