@@ -349,7 +349,7 @@ namespace material_graph
 
     RGHandle SurfaceBatch::GraphOutput(const EnhancedRenderGraph& graph) const
     {
-        return graph_ == &graph && graphEpoch_ == graph.ResourceEpoch() &&
+        return graph_ == graph.DeclarationGraph() && graphEpoch_ == graph.DeclarationEpoch() &&
                        graph.ResolveBufferHandle(graphOutput_) == buffer_
                    ? graphOutput_
                    : RGHandle{};
@@ -415,8 +415,8 @@ namespace material_graph
         {
             return Fail(error, "Surface packet already belongs to a graph.");
         }
-        graph_ = &graph;
-        graphEpoch_ = graph.ResourceEpoch();
+        graph_ = graph.DeclarationGraph();
+        graphEpoch_ = graph.DeclarationEpoch();
         graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "METEOR.Surface.Evaluated");
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
@@ -435,7 +435,13 @@ namespace material_graph
                 texture =
                     graph.ImportTexture(binding.resource, RHIResourceState::ShaderResource, "METEOR.Surface.Texture");
             }
-            if (std::ranges::none_of(usages, [&](const auto& usage) { return usage.handle.index == texture.index; }))
+            if (std::ranges::none_of(usages, [&](const auto& usage)
+                                     {
+                                         const auto current = graph.CanonicalDeclarationHandle(usage.handle);
+                                         const auto wanted = graph.CanonicalDeclarationHandle(texture);
+                                         return current.index == wanted.index && current.version == wanted.version &&
+                                                current.kind == wanted.kind && current.epoch == wanted.epoch;
+                                     }))
             {
                 usages.push_back({texture, RHIResourceState::ShaderResource, read});
             }

@@ -97,7 +97,7 @@ bool RasterSurfaceBatch::IsCovered(std::uint32_t index) const
 
 RGHandle RasterSurfaceBatch::GraphOutput(const EnhancedRenderGraph& graph) const
 {
-    return graph_ == &graph && graphEpoch_ == graph.ResourceEpoch() &&
+    return graph_ == graph.DeclarationGraph() && graphEpoch_ == graph.DeclarationEpoch() &&
                    graph.ResolveBufferHandle(graphOutput_) == buffer_
                ? graphOutput_
                : RGHandle{};
@@ -229,8 +229,8 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     {
         output = graph.Write(output);
     }
-    graph_ = &graph;
-    graphEpoch_ = graph.ResourceEpoch();
+    graph_ = graph.DeclarationGraph();
+    graphEpoch_ = graph.DeclarationEpoch();
     graphOutput_ = output;
     resolveUsage.push_back({output, RHIResourceState::UnorderedAccess, write});
     graph.AddPass("METEOR.OpaqueRasterCapture", captureUsage, [owner](const auto& context) {

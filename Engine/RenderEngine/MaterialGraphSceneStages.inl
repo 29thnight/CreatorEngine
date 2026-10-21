@@ -211,7 +211,7 @@ struct SceneHost::EffectStage
     struct DecalState
     {
         std::array<RHIBufferSlice, 2> constants;
-        void AddUses(const SceneSurfaceTargets::Outputs& inputs, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+        void AddUses(const SceneSurfaceTargets::Outputs& inputs, auto& uses,
                      bool transmission) const;
         RHIBindingTable Table(const FrameInput& frame, const EnhancedRenderGraph::ExecuteContext& execution,
                               const SceneSurfaceTargets::Outputs& inputs, bool transmission) const;

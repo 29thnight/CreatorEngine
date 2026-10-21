@@ -1,0 +1,5 @@
+{
+  "firstBefore": "Valid serial capture on the earlier binary; excluded from the final same-binary comparison.",
+  "failedSharedScratch": "Rejected before measurement: shared meshlet declaration scratch caused render frame exceptions and temporal acknowledgement timeout.",
+  "correction": "Per-thread retained declaration arena and upload scratch, with copied pass usages and owned completed binding tables."
+}

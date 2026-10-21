@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
 #include "../../Render/Temporal/TemporalReconstruction.h"
@@ -17,11 +17,13 @@
 #include "DX12ResourceTable.h"
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
 #include "../RHISubmissionThread.h"
+#include "DX12PendingCommands.h"
 
 // Captured after recording writers join. Copies CPU descriptors and pins the
 // shader-visible page/upload segments independently of the active recording.
 struct DX12RecordingResources
 {
+    std::shared_ptr<const DX12ResourceTable::RecordingSnapshot> resourceTable;
     uint64_t uploadRecordingId{};
     DX12DescriptorRecycler::RecordingLease descriptors;
     DX12TargetViewHeap::Snapshot renderTargets;
@@ -163,6 +165,33 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     /// 얼로케이터는 되돌리지 않는다 — GPU가 아직 그 메모리를 읽는 중이다.
     /// 리스트만 다시 여는 것은 제출 직후에도 허용된다.
     bool FlushCommandList(std::string& outError) override;
+    void SetDeferredImmediateRecording(bool enabled);
+    bool IsImmediateRecordingActive() const { return m_currentRecordingId != 0; }
+    bool UsesDeferredImmediateRecording() const { return m_deferredImmediate; }
+    template<class Function>
+    void RecordImmediateNative(Function&& function)
+    {
+        if (!m_deferredImmediate)
+        {
+            function(m_commandList.Get());
+            return;
+        }
+        std::string error;
+        if (!SealImmediateSoftware(error) || !m_pendingCommands)
+        {
+            throw std::runtime_error(error.empty() ? "No pending immediate recording" : error);
+        }
+        m_pendingCommands->Add(std::forward<Function>(function));
+    }
+    template<class Value>
+    std::span<const Value> CopyPendingValues(std::span<const Value> values)
+    {
+        if (!m_pendingCommands)
+        {
+            throw std::logic_error("Pending payload copy requires an active deferred recording.");
+        }
+        return m_pendingCommands->Copy(values);
+    }
     // Upload prefix -> owned graph queues -> primary frame retirement.
     // EndFrame requires JoinQueueFrame; AbortFrame drains and revokes the queue
     // service. Queue execution then needs backend reinitialization; legacy frames
@@ -610,6 +639,27 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     /// 만든다 — 인코더가 기억하는 디스크립터 힙 바인딩이 Reset 으로 풀리므로,
     /// 들고 있으면 '걸었다고 기억하는데 안 걸린' 상태가 된다.
     std::unique_ptr<DX12Encoder> m_immediateEncoder;
+    struct DeferredImmediate;
+    struct DeferredNativeFrame;
+    struct PendingViews;
+    std::shared_ptr<PendingViews> m_pendingViews;
+    void FlushPendingViews();
+    void WriteShaderResourceView(ID3D12Resource*, const D3D12_SHADER_RESOURCE_VIEW_DESC*, D3D12_CPU_DESCRIPTOR_HANDLE);
+    void WriteUnorderedAccessView(ID3D12Resource*, ID3D12Resource*, const D3D12_UNORDERED_ACCESS_VIEW_DESC*, D3D12_CPU_DESCRIPTOR_HANDLE);
+    void WriteRenderTargetView(ID3D12Resource*, const D3D12_RENDER_TARGET_VIEW_DESC*, D3D12_CPU_DESCRIPTOR_HANDLE);
+    void WriteDepthStencilView(ID3D12Resource*, const D3D12_DEPTH_STENCIL_VIEW_DESC*, D3D12_CPU_DESCRIPTOR_HANDLE);
+    void CopyNativeDescriptors(UINT, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_DESCRIPTOR_HEAP_TYPE);
+    bool m_deferredImmediate{};
+    ce::RenderArenaPool m_pendingCommandPool;
+    std::shared_ptr<DX12PendingCommands> m_pendingCommands;
+    std::shared_ptr<DeferredImmediate> m_deferred;
+    std::array<std::shared_ptr<DeferredNativeFrame>, kFrameCount> m_deferredFrames;
+    void BeginDeferredImmediate();
+    void BeginPendingImmediate();
+    RHIEncoder& GetDeferredImmediateEncoder();
+    bool SealImmediateSoftware(std::string& error);
+    bool SubmitPendingImmediate(bool preserveRecording, bool endFrame, std::string& error);
+    void AbortPendingImmediate();
 
     ComPtr<ID3D12Fence> m_fence;
     HANDLE m_fenceEvent{nullptr};

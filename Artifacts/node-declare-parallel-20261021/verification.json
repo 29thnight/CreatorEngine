@@ -1,0 +1,206 @@
+{
+  "buildExit": 0,
+  "native": {
+    "passed": true,
+    "exitCode": 0,
+    "gpuValidation": true,
+    "pendingNative": true
+  },
+  "pixels": {
+    "left": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\before\\Matched",
+    "right": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\Matched",
+    "width": 1186,
+    "height": 514,
+    "passed": true,
+    "attachments": [
+      {
+        "name": "baseColor",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "metalRough",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "normal",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "emissive",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "depth",
+        "components": 609604,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "preToneHdr",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "display",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      }
+    ]
+  },
+  "reload": {
+    "left": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\Matched",
+    "right": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\Reload",
+    "width": 1186,
+    "height": 514,
+    "passed": true,
+    "attachments": [
+      {
+        "name": "baseColor",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "metalRough",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "normal",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "emissive",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "depth",
+        "components": 609604,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "preToneHdr",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      },
+      {
+        "name": "display",
+        "components": 2438416,
+        "maxAbs": 0.0,
+        "maxNormalized": 0.0,
+        "meanAbs": 0.0,
+        "rms": 0.0,
+        "nonfinite": 0,
+        "passed": true
+      }
+    ]
+  },
+  "source": {
+    "passed": true,
+    "runtimeUnchanged": true,
+    "sourceUnchanged": true
+  },
+  "captures": {
+    "before": {
+      "foregroundMode": "editor",
+      "workerCountRequested": 8,
+      "passed": true,
+      "foregroundSamplesAccepted": true,
+      "runtimeUnchanged": true,
+      "normalExit": true
+    },
+    "after": {
+      "foregroundMode": "editor",
+      "workerCountRequested": 8,
+      "passed": true,
+      "foregroundSamplesAccepted": true,
+      "runtimeUnchanged": true,
+      "normalExit": true
+    }
+  },
+  "actualParallelNodes": true,
+  "actualParallelAddPass": true,
+  "cpu120BudgetMs": 8.333333333333334,
+  "cpu120BudgetMet": false,
+  "etwRecordingLosses": {
+    "before": {
+      "Buffers": 0,
+      "Events": 0
+    },
+    "after": {
+      "Buffers": 0,
+      "Events": 0
+    }
+  },
+  "correctnessPassed": true,
+  "performanceImproved": false
+}

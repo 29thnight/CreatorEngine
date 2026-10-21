@@ -151,18 +151,20 @@ struct IndirectMaterialBatch
                     if (stage == 4)
                         encoder.SetRootBuffer(RHIBindPoint::Compute, 3, owner->packetWork->plans);
                 });
-            graphOwner = &graph;
-            graphEpoch = graph.ResourceEpoch();
+            graphOwner = graph.DeclarationGraph();
+            graphEpoch = graph.DeclarationEpoch();
             graphOutput = packetWork->graphArguments;
             return;
         }
-        if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
+        if (graphOwner == graph.DeclarationGraph() && graphEpoch == graph.DeclarationEpoch())
+        {
             return;
+        }
         if (graphOwner)
             throw std::runtime_error("METEOR indirect batch cannot cross graph recordings.");
-        graphOwner = &graph;
-        graphEpoch = graph.ResourceEpoch();
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        graphOwner = graph.DeclarationGraph();
+        graphEpoch = graph.DeclarationEpoch();
+        auto uses = graph.CreateDeclarationUsages();
         if (visibility)
             visibility->AddCommandInputRead(graph, uses);
         graphOutput = graph.ImportBuffer(output, RHIResourceState::Common, name.c_str());
@@ -188,8 +190,10 @@ struct IndirectMaterialBatch
     {
         if (!commandCount)
             return {};
-        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
+        if (graphOwner != graph.DeclarationGraph() || graphEpoch != graph.DeclarationEpoch())
+        {
             throw std::runtime_error("METEOR commands require their explicit producer on this graph.");
+        }
         return graphOutput;
     }
     void ValidateInput(const EnhancedRenderGraph& graph, RGHandle input) const
@@ -200,7 +204,7 @@ struct IndirectMaterialBatch
                                  input.kind != expected.kind || input.epoch != expected.epoch)))
             throw std::runtime_error("METEOR command input is not the published buffer version.");
     }
-    void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, RGHandle input) const
+    void AddRead(EnhancedRenderGraph& graph, auto& uses, RGHandle input) const
     {
         ValidateInput(graph, input);
         if (packetWork)

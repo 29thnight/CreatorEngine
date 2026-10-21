@@ -32,15 +32,17 @@ class ResidentBufferFrame final
 
     void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const ResidentBufferFrame> owner) const
     {
-        if (graphOwner_ == &graph && graphEpoch_ == graph.ResourceEpoch())
+        if (graphOwner_ == graph.DeclarationGraph() && graphEpoch_ == graph.DeclarationEpoch())
+        {
             return;
+        }
         if (graphOwner_ || !owner || owner.get() != this ||
             graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned ||
             version_->device->GetCurrentUploadRecordingId() != recording_)
             throw std::runtime_error("METEOR resident table requires its current owned versioned graph.");
 
-        graphOwner_ = &graph;
-        graphEpoch_ = graph.ResourceEpoch();
+        graphOwner_ = graph.DeclarationGraph();
+        graphEpoch_ = graph.DeclarationEpoch();
         const auto import = [&](RHIBufferHandle buffer, const std::string& name) {
             auto handle = graph.FindImportedBuffer(buffer);
             if (!handle.IsValid())
@@ -53,8 +55,8 @@ class ResidentBufferFrame final
             return;
 
         graphBuffer_ = graph.Write(graphBuffer_);
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-            {graphBuffer_, RHIResourceState::CopyDest, RGAccessMode::Write}};
+        auto uses = graph.CreateDeclarationUsages({
+            {graphBuffer_, RHIResourceState::CopyDest, RGAccessMode::Write}});
         if (copyBytes_)
             uses.push_back({import(base_->buffer, name_ + ".Base"), RHIResourceState::CopySource, RGAccessMode::Read});
         const auto pass = graph.AddPass(name_ + ".Upload", std::move(uses), [owner](const auto& execution) {
@@ -81,21 +83,29 @@ class ResidentBufferFrame final
 
     RGHandle GraphBuffer(const EnhancedRenderGraph& graph) const
     {
-        if (graphOwner_ != &graph || graphEpoch_ != graph.ResourceEpoch() || !graphBuffer_.IsValid())
+        if (graphOwner_ != graph.DeclarationGraph() || graphEpoch_ != graph.DeclarationEpoch() ||
+            !graphBuffer_.IsValid())
+        {
             throw std::runtime_error("METEOR resident table requires its published graph version.");
+        }
         return graphBuffer_;
     }
 
-    void AddRead(const EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+    void AddRead(const EnhancedRenderGraph& graph, auto& uses) const
     {
-        const auto handle = GraphBuffer(graph);
+        const auto handle = graph.CanonicalDeclarationHandle(GraphBuffer(graph));
         for (const auto& use : uses)
         {
-            if (use.handle.index != handle.index)
+            const auto current = graph.CanonicalDeclarationHandle(use.handle);
+            if (current.index != handle.index || current.kind != handle.kind || current.epoch != handle.epoch)
+            {
                 continue;
-            if (use.handle.version != handle.version || use.handle.epoch != handle.epoch ||
-                use.state != RHIResourceState::ShaderResource || use.access != RGAccessMode::Read)
+            }
+            if (current.version != handle.version || use.state != RHIResourceState::ShaderResource ||
+                use.access != RGAccessMode::Read)
+            {
                 throw std::runtime_error("METEOR resident table has conflicting graph uses.");
+            }
             return;
         }
         uses.push_back({handle, RHIResourceState::ShaderResource, RGAccessMode::Read});

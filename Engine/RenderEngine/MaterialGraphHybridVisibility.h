@@ -314,7 +314,7 @@ struct SceneHybridVisibility final
             e.SetRootBuffer(RHIBindPoint::Compute, 10, WorkSlice());
         }
     }
-    void GeometryReads(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+    void GeometryReads(EnhancedRenderGraph& graph, auto& uses) const
     {
         uses.push_back({geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
         for (size_t i = 1; i < records.size(); ++i)
@@ -333,8 +333,8 @@ struct SceneHybridVisibility final
     {
         if (graphOwner || graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
             throw std::runtime_error("METEOR raster requires one explicit versioned declaration per frame.");
-        graphOwner = &graph;
-        graphEpoch = graph.ResourceEpoch();
+        graphOwner = graph.DeclarationGraph();
+        graphEpoch = graph.DeclarationEpoch();
         graphKeys = graph.ImportBuffer(keys, RHIResourceState::Common, (name + ".Keys").c_str());
         graphRoutes = graph.ImportBuffer(routes, RHIResourceState::Common, (name + ".Routes").c_str());
         graphWork = graph.ImportBuffer(work, RHIResourceState::Common, (name + ".Work").c_str());
@@ -363,7 +363,7 @@ struct SceneHybridVisibility final
         graphWork = graph.Write(graphWork);
         graphDispatchArguments = graph.Write(graphDispatchArguments);
         // The graph copies usages synchronously; no callback borrows this scratch.
-        static thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        auto uses = graph.CreateDeclarationUsages();
         uses.assign({{graphWork, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
                      {graphDispatchArguments, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
                      {geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}});
@@ -395,16 +395,18 @@ struct SceneHybridVisibility final
                           });
         graph.DeclareRecordingIndependent(classifyPass);
     }
-    void AddRasterUses(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+    void AddRasterUses(EnhancedRenderGraph& graph, auto& uses) const
     {
-        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
+        if (graphOwner != graph.DeclarationGraph() || graphEpoch != graph.DeclarationEpoch())
+        {
             throw std::runtime_error("METEOR raster consumer requires explicit classification.");
+        }
         uses.push_back({graphRoutes, RHIResourceState::ShaderResource, RGAccessMode::Read});
         uses.push_back({graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64});
     }
     void DeclareSoftware(EnhancedRenderGraph& graph, std::shared_ptr<const SceneHybridVisibility> owner) const
     {
-        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
+        if (graphOwner != graph.DeclarationGraph() || graphEpoch != graph.DeclarationEpoch())
         {
             throw std::runtime_error("METEOR software raster requires explicit classification.");
         }
@@ -419,7 +421,7 @@ struct SceneHybridVisibility final
                               x.encoder->Dispatch(1, 1, 1);
                           });
         graph.DeclareRecordingIndependent(preparePass);
-        static thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        auto uses = graph.CreateDeclarationUsages();
         uses.assign({{graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64},
                      {graphWork, RHIResourceState::ShaderResource, RGAccessMode::Read},
                      {graphDispatchArguments, RHIResourceState::IndirectArgument, RGAccessMode::Read}});
@@ -464,8 +466,10 @@ struct SceneHybridVisibility final
     }
     RGHandle ResolvedDepth(const EnhancedRenderGraph& graph) const
     {
-        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch() || !graphDepth.IsValid())
+        if (graphOwner != graph.DeclarationGraph() || graphEpoch != graph.DeclarationEpoch() || !graphDepth.IsValid())
+        {
             throw std::runtime_error("METEOR depth requires its explicit resolve producer.");
+        }
         return graphDepth;
     }
     void DrawResolve(RHIEncoder& e, const RHIRenderTargetBinding& targets) const

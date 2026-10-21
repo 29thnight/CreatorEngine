@@ -1,0 +1,346 @@
+{
+  "passed": true,
+  "variants": {
+    "before": {
+      "files": 1553,
+      "bytes": 8149877892,
+      "nativeCaptures": [
+        {
+          "id": "baseline",
+          "counts": {
+            "frames": 386,
+            "events": 1546085,
+            "gpuEvents": 101864,
+            "counters": 50839,
+            "measurements": 230990
+          },
+          "roundTripEqual": true,
+          "sha256": "288ce2e0e1b2c2afed05716ba7369356f016fbae70943416c05a72fe6a916531"
+        },
+        {
+          "id": "etw",
+          "counts": {
+            "frames": 375,
+            "events": 1442797,
+            "gpuEvents": 93011,
+            "counters": 50118,
+            "measurements": 211066
+          },
+          "roundTripEqual": true,
+          "sha256": "7a1af914f3a3b37864adfa4c6db40cef985b5a10bfa40689b391498fc2a8e7f2"
+        }
+      ],
+      "etwRows": 58151326,
+      "etwByteRoundTrip": true
+    },
+    "after": {
+      "files": 1611,
+      "bytes": 8566882295,
+      "nativeCaptures": [
+        {
+          "id": "baseline",
+          "counts": {
+            "frames": 412,
+            "events": 1702449,
+            "gpuEvents": 72498,
+            "counters": 49047,
+            "measurements": 164492
+          },
+          "roundTripEqual": true,
+          "sha256": "42e7202db4f36c0ecd31b51b0ece9013fb1b7d915f14c42fb5e0afc9ccbafa1c"
+        },
+        {
+          "id": "etw",
+          "counts": {
+            "frames": 385,
+            "events": 1596888,
+            "gpuEvents": 67440,
+            "counters": 47339,
+            "measurements": 153026
+          },
+          "roundTripEqual": true,
+          "sha256": "eb754b80942e958a270d4613118c06cc5e6670b24f6a2796429db4767603bc8d"
+        }
+      ],
+      "etwRows": 60999745,
+      "etwByteRoundTrip": true
+    }
+  },
+  "parallelNodePairs": 1975,
+  "parallelApiPairs": 1131,
+  "verification": {
+    "buildExit": 0,
+    "native": {
+      "passed": true,
+      "exitCode": 0,
+      "gpuValidation": true,
+      "pendingNative": true
+    },
+    "pixels": {
+      "left": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\before\\Matched",
+      "right": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\Matched",
+      "width": 1186,
+      "height": 514,
+      "passed": true,
+      "attachments": [
+        {
+          "name": "baseColor",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "metalRough",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "normal",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "emissive",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "depth",
+          "components": 609604,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "preToneHdr",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "display",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        }
+      ]
+    },
+    "reload": {
+      "left": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\Matched",
+      "right": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\Reload",
+      "width": 1186,
+      "height": 514,
+      "passed": true,
+      "attachments": [
+        {
+          "name": "baseColor",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "metalRough",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "normal",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "emissive",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "depth",
+          "components": 609604,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "preToneHdr",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        },
+        {
+          "name": "display",
+          "components": 2438416,
+          "maxAbs": 0.0,
+          "maxNormalized": 0.0,
+          "meanAbs": 0.0,
+          "rms": 0.0,
+          "nonfinite": 0,
+          "passed": true
+        }
+      ]
+    },
+    "source": {
+      "passed": true,
+      "runtimeUnchanged": true,
+      "sourceUnchanged": true
+    },
+    "captures": {
+      "before": {
+        "foregroundMode": "editor",
+        "workerCountRequested": 8,
+        "passed": true,
+        "foregroundSamplesAccepted": true,
+        "runtimeUnchanged": true,
+        "normalExit": true
+      },
+      "after": {
+        "foregroundMode": "editor",
+        "workerCountRequested": 8,
+        "passed": true,
+        "foregroundSamplesAccepted": true,
+        "runtimeUnchanged": true,
+        "normalExit": true
+      }
+    },
+    "actualParallelNodes": true,
+    "actualParallelAddPass": true,
+    "cpu120BudgetMs": 8.333333333333334,
+    "cpu120BudgetMet": false,
+    "etwRecordingLosses": {
+      "before": {
+        "Buffers": 0,
+        "Events": 0
+      },
+      "after": {
+        "Buffers": 0,
+        "Events": 0
+      }
+    },
+    "correctnessPassed": true,
+    "performanceImproved": false
+  },
+  "html": {
+    "passed": true,
+    "results": [
+      {
+        "width": 1280,
+        "report": {
+          "overflow": false,
+          "figures": 8
+        },
+        "timeline": {
+          "overflow": false,
+          "canvases": 4,
+          "identities": 85106,
+          "range": [
+            3784.2659,
+            3834.3707
+          ],
+          "status": "after-etw · 1,529,448 CPU 스코프 · 뷰 구간 480개 · 135 TID · ETW 상태 있음 · t=0 2026/10/21:05:26:08.7148948 UTC · CPU·GPU QPC 시간축 ms · GPU 67,440 spans"
+        },
+        "switched": [
+          {
+            "id": "before-baseline",
+            "identities": 128401,
+            "status": "before-baseline · 1,444,221 CPU 스코프 · 뷰 구간 725개 · 16 TID · 비추적: OS 상태 없음 · t=0 CEPROF 첫 프레임 · CPU·GPU QPC 시간축 ms · GPU 101,864 spans"
+          },
+          {
+            "id": "before-etw",
+            "identities": 117393,
+            "status": "before-etw · 1,349,786 CPU 스코프 · 뷰 구간 662개 · 144 TID · ETW 상태 있음 · t=0 2026/10/21:05:29:50.3889062 UTC · CPU·GPU QPC 시간축 ms · GPU 93,011 spans"
+          },
+          {
+            "id": "after-baseline",
+            "identities": 91478,
+            "status": "after-baseline · 1,629,951 CPU 스코프 · 뷰 구간 516개 · 16 TID · 비추적: OS 상태 없음 · t=0 CEPROF 첫 프레임 · CPU·GPU QPC 시간축 ms · GPU 72,498 spans"
+          },
+          {
+            "id": "after-etw",
+            "identities": 85106,
+            "status": "after-etw · 1,529,448 CPU 스코프 · 뷰 구간 480개 · 135 TID · ETW 상태 있음 · t=0 2026/10/21:05:26:08.7148948 UTC · CPU·GPU QPC 시간축 ms · GPU 67,440 spans"
+          }
+        ],
+        "errors": []
+      },
+      {
+        "width": 390,
+        "report": {
+          "overflow": false,
+          "figures": 8
+        },
+        "timeline": {
+          "overflow": false,
+          "canvases": 4,
+          "identities": 85106,
+          "range": [
+            3784.2659,
+            3834.3707
+          ],
+          "status": "after-etw · 1,529,448 CPU 스코프 · 뷰 구간 480개 · 135 TID · ETW 상태 있음 · t=0 2026/10/21:05:26:08.7148948 UTC · CPU·GPU QPC 시간축 ms · GPU 67,440 spans"
+        },
+        "switched": [],
+        "errors": []
+      }
+    ]
+  },
+  "source": {
+    "passed": true,
+    "runtimeUnchanged": true,
+    "sourceUnchanged": true
+  }
+}

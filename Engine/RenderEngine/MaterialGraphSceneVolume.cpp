@@ -306,7 +306,7 @@ namespace material_graph
 
     void SceneVolumeFrame::CheckCurrent(const EnhancedRenderGraph& graph) const
     {
-        if (graph_ != &graph || graphEpoch_ != graph.ResourceEpoch() ||
+        if (graph_ != graph.DeclarationGraph() || graphEpoch_ != graph.DeclarationEpoch() ||
             recording_ != device_->GetCurrentUploadRecordingId() ||
             descriptors_ != device_->GetDescriptorVersionToken())
         {
@@ -328,8 +328,8 @@ namespace material_graph
                 throw std::runtime_error("Scene Volume coefficients require retained LX compute owners and bindings.");
             }
         }
-        graph_ = &graph;
-        graphEpoch_ = graph.ResourceEpoch();
+        graph_ = graph.DeclarationGraph();
+        graphEpoch_ = graph.DeclarationEpoch();
         CheckCurrent(graph);
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;

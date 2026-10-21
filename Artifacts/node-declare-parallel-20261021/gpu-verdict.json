@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "datasets": {
+    "before-baseline": {
+      "events": 101864,
+      "matched": 101864,
+      "duplicates": 0
+    },
+    "before-etw": {
+      "events": 93011,
+      "matched": 93011,
+      "duplicates": 0
+    },
+    "after-baseline": {
+      "events": 72498,
+      "matched": 72498,
+      "duplicates": 0
+    },
+    "after-etw": {
+      "events": 67440,
+      "matched": 67440,
+      "duplicates": 0
+    }
+  },
+  "newEngineInstrumentation": false,
+  "newCapture": false
+}

@@ -70,7 +70,7 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
     {
         frame->sceneData->Declare(graph);
     }
-    frame->graph = &graph;
-    frame->graphEpoch = graph.ResourceEpoch();
+    frame->graph = graph.DeclarationGraph();
+    frame->graphEpoch = graph.DeclarationEpoch();
     return this->geometryTable->GraphTable(graph);
 }

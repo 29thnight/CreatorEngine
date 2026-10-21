@@ -1501,6 +1501,109 @@ passes:
     bool ValidateRg5SurfaceDeclarations(DX12DeviceResources& resources, std::string& error)
     {
         using namespace material_graph;
+        {
+            ce::render_arena_resource arena;
+            const auto exercise = [&]()
+            {
+                ce::render_arena_buffer<uint64_t> values{arena};
+                values.assign({1, 2, 3});
+                const auto* first = values.data();
+                for (uint64_t value = 4; value != 130; ++value)
+                {
+                    values.push_back(value);
+                }
+                values.push_back(values[0]);
+                values.pop_back();
+                values.erase_if([](uint64_t value) { return value % 2 == 0; });
+                if (values.size() != 65 || values[0] != 1 || values[64] != 129)
+                {
+                    throw std::runtime_error("Declaration arena growth or compaction lost values.");
+                }
+                return first;
+            };
+            const auto* first = exercise();
+            const auto retained = arena.stats().retainedBytes;
+            arena.reset();
+            if (exercise() != first || arena.stats().retainedBytes != retained)
+            {
+                error = "Declaration arena did not reuse its retained blocks";
+                return false;
+            }
+        }
+        {
+            struct Program
+            {
+                bool hasSurface{true}, hasTransmission{};
+            } program;
+            struct Draw
+            {
+                const Program* program{};
+                const RenderBindings* bindings{};
+                bool blended{}, shadowEnabled{}, staticShadow{};
+            };
+            std::array<RHIBindingDesc, 2> textures{};
+            textures[0].resource.id = 11;
+            textures[1].resource.id = 11;
+            RenderBindings bindings;
+            bindings.resources.textures = textures;
+            std::array<Draw, 2> draws{{{&program, &bindings}, {&program, &bindings}}};
+            std::array<Draw, 2> shadows{{{&program, &bindings, false, true, true},
+                                         {&program, &bindings, false, true, false}}};
+            const PassReadPlan plan(draws, shadows);
+            for (const auto pass : {PassReadPlan::Pass::Surface, PassReadPlan::Pass::StaticShadow,
+                                    PassReadPlan::Pass::DynamicShadow})
+            {
+                const auto& reads = plan.Get(pass);
+                for (size_t variant = 0; variant != 2; ++variant)
+                {
+                    const auto& usages = reads.usageTemplates[variant];
+                    if (usages.size() != reads.geometry.size() * 2 + reads.textures.size())
+                    {
+                        error = "Pass access template does not match its source slots";
+                        return false;
+                    }
+                    for (size_t index = 0; index < usages.size(); ++index)
+                    {
+                        const auto expected = index < reads.geometry.size() * 2 && !variant ?
+                            RHIResourceState::ShaderResource : RHIResourceState::PixelShaderResource;
+                        if (usages[index].handle.IsValid() || usages[index].state != expected ||
+                            usages[index].access != RGAccessMode::Read)
+                        {
+                            error = "Pass access template retained a graph handle or changed its access contract";
+                            return false;
+                        }
+                    }
+                }
+            }
+            if (!plan.Matches(draws, shadows) || plan.Get(PassReadPlan::Pass::Surface).geometry.size() != 2 ||
+                plan.Get(PassReadPlan::Pass::Surface).textures.size() != 1 ||
+                plan.Get(PassReadPlan::Pass::StaticShadow).geometry.size() != 1 ||
+                plan.Get(PassReadPlan::Pass::DynamicShadow).geometry.size() != 1)
+            {
+                error = "Pass read recipe lost shared textures or caster selection";
+                return false;
+            }
+            textures[1].resource.id = 12;
+            if (plan.Matches(draws, shadows))
+            {
+                error = "Pass read recipe accepted a replaced texture";
+                return false;
+            }
+            textures[1].resource.id = 11;
+            draws[0].blended = true;
+            if (plan.Matches(draws, shadows))
+            {
+                error = "Pass read recipe accepted changed pass membership";
+                return false;
+            }
+            draws[0].blended = false;
+            shadows[0].staticShadow = false;
+            if (plan.Matches(draws, shadows) || plan.Matches(std::span(draws).first(1), shadows))
+            {
+                error = "Pass read recipe accepted changed caster membership or draw count";
+                return false;
+            }
+        }
         for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
         {
             EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
@@ -4733,6 +4836,212 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
     {
         outLog += "[1/7] 디바이스 초기화 실패: " + error + "\n";
         return false;
+    }
+
+    {
+        R6bFakeReadbackServices services;
+        EnhancedRenderGraph graph{services, RGSchedulingMode::ExplicitVersioned};
+        const RHIBufferHandle buffer{RHIHandleBits::Encode(1, 1)};
+        const RHITextureHandle texture{RHIHandleBits::Encode(2, 1)};
+        const auto parentBuffer = graph.ImportBuffer(buffer, RHIResourceState::ShaderResource, "Lookup.Buffer");
+        const auto parentTexture = graph.ImportTexture(texture, RHIResourceState::ShaderResource, "Lookup.Texture");
+        auto branch = graph.CreateDeclarationBranch({});
+        const auto localTexture = branch->FindImportedTexture(texture);
+        const auto localBuffer = branch->FindImportedBuffer(buffer);
+        if (!localBuffer.IsValid() || !localTexture.IsValid() ||
+            branch->FindImportedTexture(RHITextureHandle{RHIHandleBits::Encode(3, 1)}).IsValid())
+        {
+            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED missing parent import or accepted absent texture\n";
+            return false;
+        }
+        auto uses = branch->CreateDeclarationUsages({
+            {parentBuffer, RHIResourceState::ShaderResource, RGAccessMode::Read},
+            {localTexture, RHIResourceState::ShaderResource, RGAccessMode::Read},
+            {localBuffer, RHIResourceState::ShaderResource, RGAccessMode::Read}});
+        material_graph::NormalizeSceneReads(*branch, uses);
+        if (uses.size() != 2 || uses[0].handle.kind == uses[1].handle.kind)
+        {
+            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED cross-branch index collision or duplicate read\n";
+            return false;
+        }
+        branch->AddPass("Lookup.Read",
+                        {{localBuffer, RHIResourceState::ShaderResource, RGAccessMode::Read},
+                         {localTexture, RHIResourceState::ShaderResource, RGAccessMode::Read}},
+                        [](const auto&) {}, true);
+        graph.MergeDeclarationBranch(branch);
+        if (graph.CanonicalDeclarationHandle(localBuffer).index != parentBuffer.index ||
+            graph.CanonicalDeclarationHandle(localTexture).index != parentTexture.index || !graph.Compile(error))
+        {
+            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED " + error + "\n";
+            return false;
+        }
+        graph.Reset();
+        if (graph.CanonicalDeclarationHandle(localTexture).IsValid())
+        {
+            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED stale imported alias survived reset\n";
+            return false;
+        }
+        outLog += "RDG_BRANCH_IMPORT_LOOKUP_OK parent-buffer parent-texture cross-branch-normalization absent-rejected reset\n";
+    }
+
+    {
+        EnhancedRenderGraph graph{resources, RGSchedulingMode::ExplicitVersioned};
+        RGBufferDesc description{};
+        description.bytes = 64;
+        description.allowUnorderedAccess = true;
+        description.name = "Setup.Seed";
+        const auto seed = graph.Write(graph.CreateBuffer(description));
+        graph.AddPass(
+            "Setup.Seed", {{seed, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [](const auto&) {}, true);
+        const std::array inputs{seed};
+        auto left = graph.CreateDeclarationBranch(inputs);
+        auto right = graph.CreateDeclarationBranch({});
+        description.name = "Setup.Left";
+        const auto first = left->Write(left->CreateBuffer(description));
+        left->AddPass(
+            "Setup.Left",
+            {{seed, RHIResourceState::ShaderResource, RGAccessMode::Read},
+             {first, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+            [](const auto&) {}, true);
+        description.name = "Setup.Right";
+        const auto second = right->Write(right->CreateBuffer(description));
+        if (left->DeclarationGraph() != &graph || right->DeclarationEpoch() != graph.ResourceEpoch())
+        {
+            outLog += "RDG_DECLARATION_BRANCH_FAILED frame identity differs across branches\n";
+            return false;
+        }
+        right->AddPass(
+            "Setup.Right",
+            {{seed, RHIResourceState::ShaderResource, RGAccessMode::Read},
+             {second, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+            [](const auto&) {}, true);
+        const std::array readUsages{
+            EnhancedRenderGraph::RGPassUsage{seed, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+        const std::array phases{EnhancedRenderGraph::RepeatedPhaseView{"Setup.Repeated.Read", readUsages}};
+        left->AddRepeatedPassView(
+            "Setup.Repeated", readUsages, phases, 2, [](const auto&, uint32_t, uint32_t) {}, true);
+        right->AddSplitPass(
+            "Setup.Split", {{seed, RHIResourceState::ShaderResource, RGAccessMode::Read}},
+            [](const auto&, uint32_t, uint32_t) {}, 2, true);
+        graph.MergeDeclarationBranch(left);
+        graph.MergeDeclarationBranch(right);
+        const auto firstPublished = graph.CanonicalDeclarationHandle(first);
+        const auto secondPublished = graph.CanonicalDeclarationHandle(second);
+        if (firstPublished.index == secondPublished.index || !graph.Compile(error) ||
+            !left->ResolveBufferHandle(first).IsValid() || !right->ResolveBufferHandle(second).IsValid() ||
+            left->ResolveBufferHandle(first) != graph.ResolveBufferHandle(firstPublished) ||
+            right->ResolveBufferHandle(second) != graph.ResolveBufferHandle(secondPublished))
+        {
+            outLog += "RDG_DECLARATION_BRANCH_FAILED " + error + "\n";
+            return false;
+        }
+        graph.Reset();
+        if (graph.CanonicalDeclarationHandle(first).IsValid())
+        {
+            outLog += "RDG_DECLARATION_BRANCH_FAILED stale alias survived Reset\n";
+            return false;
+        }
+        outLog += "RDG_DECLARATION_BRANCH_OK independent-local-ids lazy-hidden-input canonical-versions "
+                  "native-resolution reset\n";
+    }
+
+    {
+        EnhancedRenderGraph graph{resources, RGSchedulingMode::ExplicitVersioned};
+        LivePipelineDesc pipeline;
+        LiveBlackboard board;
+        EnhancedFrameContext context{};
+        LiveFrameBinding binding{};
+        RGBufferDesc description{};
+        description.bytes = 64;
+        description.allowUnorderedAccess = true;
+        std::mutex mutex;
+        std::condition_variable ready;
+        unsigned entered{};
+        std::array<unsigned, 4> calls{};
+        const bool rendezvous = RGParallelSetupEnabled() && ce::get_job_scheduler().worker_count() > 1;
+        const auto meet = [&]
+        {
+            if (!rendezvous)
+            {
+                return;
+            }
+            std::unique_lock lock{mutex};
+            ++entered;
+            ready.notify_all();
+            if (!ready.wait_for(lock, std::chrono::seconds{2}, [&] { return entered == 2; }))
+            {
+                throw std::runtime_error("Node declaration bodies did not overlap.");
+            }
+        };
+        LivePassNode producer;
+        producer.name = "Fork.Producer";
+        producer.writes = {"Fork.A"};
+        producer.declare = [&](auto& blackboard, auto& target, const auto&, const auto&)
+        {
+            ++calls[0];
+            const auto value = target.Write(target.CreateBuffer(description));
+            target.AddPass(
+                "Fork.Producer", {{value, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [](const auto&) {},
+                true);
+            blackboard.Set("Fork.A", value);
+        };
+        pipeline.AddNode(std::move(producer));
+        LivePassNode optional;
+        optional.name = "Fork.Inactive";
+        optional.modifies = {"Fork.A"};
+        optional.active = [] { return false; };
+        optional.declare = [](auto&, auto&, const auto&, const auto&)
+        { throw std::runtime_error("Inactive declaration executed."); };
+        pipeline.AddNode(std::move(optional));
+        const auto addConsumer = [&](const char* name, const char* slot, unsigned index, bool worker)
+        {
+            LivePassNode node;
+            node.name = name;
+            node.reads = {"Fork.A"};
+            node.writes = {slot};
+            node.parallelDeclare = worker;
+            node.setupDependencies = {"Fork.Producer"};
+            node.declare = [&, name, slot, index](auto& blackboard, auto& target, const auto&, const auto&)
+            {
+                ++calls[index];
+                meet();
+                const auto value = target.Write(target.CreateBuffer(description));
+                target.AddPass(
+                    name,
+                    {{blackboard.Get("Fork.A"), RHIResourceState::ShaderResource, RGAccessMode::Read},
+                     {value, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                    [](const auto&) {}, true);
+                blackboard.Set(slot, value);
+            };
+            pipeline.AddNode(std::move(node));
+        };
+        addConsumer("Fork.Owner", "Fork.C", 1, false);
+        addConsumer("Fork.Worker", "Fork.B", 2, true);
+        LivePassNode consumer;
+        consumer.name = "Fork.Consumer";
+        consumer.reads = {"Fork.B", "Fork.C"};
+        consumer.declare = [&](auto& blackboard, auto& target, const auto&, const auto&)
+        {
+            ++calls[3];
+            target.AddPass(
+                "Fork.Consumer",
+                {{blackboard.Get("Fork.B"), RHIResourceState::ShaderResource, RGAccessMode::Read},
+                 {blackboard.Get("Fork.C"), RHIResourceState::ShaderResource, RGAccessMode::Read}},
+                [](const auto&) {}, true);
+        };
+        pipeline.AddNode(std::move(consumer));
+        std::vector<std::string> publication;
+        pipeline.DeclareAll(board, graph, context, binding,
+                            [&](const auto& node, const auto&) { publication.push_back(node.name); });
+        if (calls != std::array<unsigned, 4>{1, 1, 1, 1} || board.Get("Fork.C").index >= board.Get("Fork.B").index ||
+            publication != std::vector<std::string>{"Fork.Producer", "Fork.Owner", "Fork.Worker", "Fork.Consumer"} ||
+            !graph.Compile(error))
+        {
+            outLog += "RDG_NODE_FORKJOIN_FAILED " + error + "\n";
+            return false;
+        }
+        outLog += "RDG_NODE_FORKJOIN_OK inactive=pass-through publication=ordered callbacks=once overlap=" +
+                  std::string(rendezvous ? "true" : "inline") + "\n";
     }
 
     if (!ValidateRg5ConsumerDeclarations(resources, error))

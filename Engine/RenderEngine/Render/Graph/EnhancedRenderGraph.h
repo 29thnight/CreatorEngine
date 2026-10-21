@@ -1,4 +1,5 @@
 #pragma once
+class RGSetupTaskGraph;
 class RHISoftwareRecorder;
 class RHISoftwareBatch;
 struct RHISoftwareBatchDesc;
@@ -462,6 +463,20 @@ public:
         RGOrderPolicy orderPolicy = RGOrderPolicy::DependencyOrder);
     const IRenderDeviceServices& DeviceServices() const { return *m_deviceServices; }
     uint64_t ResourceEpoch() const { return m_resourceEpoch; }
+    const EnhancedRenderGraph* DeclarationGraph() const { return m_branch ? m_branch->parent : this; }
+    uint64_t DeclarationEpoch() const { return DeclarationGraph()->ResourceEpoch(); }
+    // A node builds in private storage. Only the owner merges its declarations;
+    // callbacks keep that storage and resolve their original handles through it.
+    template<class F>
+    void PublishDeclaration(F&& callback)
+    {
+        std::lock_guard lock{m_branchMutex};
+        std::forward<F>(callback)();
+    }
+    RGSetupTaskGraph& SetupTasks();
+    std::shared_ptr<EnhancedRenderGraph> CreateDeclarationBranch(std::span<const RGHandle> inputs);
+    void MergeDeclarationBranch(const std::shared_ptr<EnhancedRenderGraph>& branch);
+    RGHandle CanonicalDeclarationHandle(RGHandle handle) const;
     RGSchedulingMode GetSchedulingMode() const { return m_scheduling; }
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
     RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
@@ -532,6 +547,22 @@ public:
     // 반환 전에 복사를 끝내므로 임시 배열의 참조가 다음 기록까지 남지 않는다.
     RGPassId AddPass(std::string_view name, std::initializer_list<RGPassUsage> usages, ExecuteCallback execute,
                      bool hasSideEffect = false);
+
+    // Declaration scratch belongs to this graph's single writer arena. AddPass
+    // copies the range before returning; Reset rewinds and reuses its blocks.
+    ce::render_arena_buffer<RGPassUsage> CreateDeclarationUsages(std::initializer_list<RGPassUsage> initial = {})
+    {
+        ce::render_arena_buffer<RGPassUsage> result{m_packetArena};
+        result.reserve(initial.size());
+        for (const auto& usage : initial)
+        {
+            result.push_back(usage);
+        }
+        return result;
+    }
+
+    RGPassId AddSplitPass(std::string_view name, std::span<const RGPassUsage> usages, SplitExecuteCallback execute,
+                          uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);
 
     struct RepeatedPhase
     {
@@ -893,6 +924,38 @@ private:
     void OnUploadAccepted(uint64_t recording, RHICompletionPoint) override;
     uint64_t m_recordedRecording{};
     bool m_statesCommitted{};
+    struct DeclarationBranchState
+    {
+        struct Mapping
+        {
+            uint16_t resource{RGHandle::kInvalid};
+            uint16_t baseVersions{};
+            uint16_t appendedStart{};
+        };
+        struct KnownWriter
+        {
+            uint16_t resource{};
+            std::string_view name;
+        };
+        EnhancedRenderGraph* parent{};
+        size_t baseResources{};
+        bool merged{};
+        ce::render_vector<uint16_t> baseVersions;
+        ce::render_vector<uint16_t> parentResources;
+        ce::render_vector<Mapping> mapping;
+        ce::render_vector<KnownWriter> knownWriters;
+    };
+    EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling, RGOrderPolicy orderPolicy,
+                        bool declarationBranch);
+    RGHandle LocalDeclarationHandle(RGHandle handle) const;
+    RGHandle SnapshotDeclarationResource(RGHandle handle);
+    RGHandle MapBranchHandle(RGHandle handle) const;
+    std::unique_ptr<DeclarationBranchState> m_branch;
+    std::unique_ptr<RGSetupTaskGraph> m_setupTasks;
+    mutable std::recursive_mutex m_branchMutex;
+    ce::render_vector<std::shared_ptr<EnhancedRenderGraph>> m_declarationBranches;
+    ce::render_vector<std::shared_ptr<EnhancedRenderGraph>> m_declarationBranchPool;
+    size_t m_nextDeclarationBranch{};
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
 private:

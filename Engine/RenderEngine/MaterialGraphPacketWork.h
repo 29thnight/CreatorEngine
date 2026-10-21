@@ -206,7 +206,7 @@ namespace material_graph
                      const std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6>& pipelines,
                      const std::string& name, bool tileWork, InputUses inputUses, BindInputs bindInputs) const
         {
-            if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
+            if (graphOwner == graph.DeclarationGraph() && graphEpoch == graph.DeclarationEpoch())
             {
                 return;
             }
@@ -214,8 +214,8 @@ namespace material_graph
             {
                 throw std::runtime_error("METEOR packet work requires one ExplicitVersioned recording.");
             }
-            graphOwner = &graph;
-            graphEpoch = graph.ResourceEpoch();
+            graphOwner = graph.DeclarationGraph();
+            graphEpoch = graph.DeclarationEpoch();
             const auto import = [&](RHIBufferHandle buffer, const char* suffix)
             {
                 const auto handle = graph.ImportBuffer(buffer, RHIResourceState::Common, (name + suffix).c_str());
@@ -236,7 +236,7 @@ namespace material_graph
                 graph.RetainDeclaration<Declaration>(std::move(owner), pipelines, std::move(bindInputs));
             // Input-use callbacks only append reads; declaration never yields or
             // recursively enters this packet stage. The graph copies each prefix.
-            static thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+            auto uses = graph.CreateDeclarationUsages();
             const auto add = [&](uint32_t stage, RHIBufferSlice stageConstants, uint32_t items, const char* suffix)
             {
                 if (!uses.empty())
@@ -303,7 +303,7 @@ namespace material_graph
             add(4, constants, values.bucketCount, ".Arguments");
             add(5, constants, values.inputCount, ".Scatter");
         }
-        void AddRead(std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+        void AddRead(auto& uses) const
         {
             uses.push_back({graphPackets, RHIResourceState::ShaderResource, RGAccessMode::Read});
             uses.push_back({graphRanges, RHIResourceState::ShaderResource, RGAccessMode::Read});

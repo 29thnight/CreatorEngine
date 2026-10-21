@@ -119,11 +119,54 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
                                                  std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid,
                                                  const char* passPrefix);
         void DeclareFirstStage(EnhancedRenderGraph& graph, const char* passPrefix = "METEOR.CameraMeshlet.First") const;
-        void AddReadUsages(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
+        void AddReadUsages(EnhancedRenderGraph& graph, auto& usages) const
+        {
+            Declare(graph);
+            const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+                                    ? RGAccessMode::LegacyState
+                                    : RGAccessMode::Read;
+            for (const auto& usage :
+                 {EnhancedRenderGraph::RGPassUsage{m_graphArguments, RHIResourceState::IndirectArgument, access},
+                  EnhancedRenderGraph::RGPassUsage{m_graphVisibleIds, RHIResourceState::ShaderResource, access}})
+            {
+                const auto duplicate =
+                    std::ranges::find_if(usages,
+                                         [&](const auto& existing)
+                                         {
+                                             return existing.handle.index == usage.handle.index &&
+                                                    existing.handle.version == usage.handle.version &&
+                                                    existing.handle.kind == usage.handle.kind &&
+                                                    existing.handle.epoch == usage.handle.epoch;
+                                         });
+                if (duplicate == usages.end())
+                {
+                    usages.push_back(usage);
+                }
+                else if (duplicate->state != usage.state || duplicate->access != usage.access)
+                {
+                    throw std::runtime_error("GPU visibility consumer has conflicting resource usages.");
+                }
+            }
+        }
         // Explicit consumers: producer must already belong to this graph recording.
-        void AddCommandInputRead(EnhancedRenderGraph& graph,
-                                 std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
-        void AddVisibleIdsRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
+        void AddCommandInputRead(EnhancedRenderGraph& graph, auto& usages) const
+        {
+            if (m_graph != graph.DeclarationGraph() || m_graphEpoch != graph.DeclarationEpoch() ||
+                !m_graphArguments.IsValid())
+            {
+                throw std::runtime_error("METEOR commands require an explicitly declared visibility producer.");
+            }
+            usages.push_back({m_graphArguments, RHIResourceState::ShaderResource, RGAccessMode::Read});
+        }
+        void AddVisibleIdsRead(EnhancedRenderGraph& graph, auto& usages) const
+        {
+            if (m_graph != graph.DeclarationGraph() || m_graphEpoch != graph.DeclarationEpoch() ||
+                !m_graphVisibleIds.IsValid())
+            {
+                throw std::runtime_error("METEOR raster requires an explicitly declared visibility producer.");
+            }
+            usages.push_back({m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
+        }
         RHIBufferSlice VisibleIds(std::uint32_t outputOffset, std::uint32_t count) const;
         RHIBufferHandle VisibleIdBuffer() const { return m_visibleIds; }
         // Published list version on this graph (the METEOR stage contract handle).

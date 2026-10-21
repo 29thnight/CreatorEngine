@@ -1,10 +1,11 @@
-#pragma once
+﻿#pragma once
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
 
 #include "../RHIHandle.h"
 #include "DX12ResourceEntries.h"
+#include "../../RenderAllocator.h"
 
 // 핸들 → 리소스 표 (PHASE 3-1 재정의, V2-a / V2-c1).
 //
@@ -31,6 +32,93 @@ class DX12ResourceTable
 {
   public:
     DX12ResourceTable() : m_textures(RHIHandleBits::kMaxSlots), m_buffers(RHIHandleBits::kMaxSlots) {}
+
+    struct RecordingSnapshot
+    {
+        struct Entry
+        {
+            Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+            Microsoft::WRL::ComPtr<ID3D12Heap> heap;
+            std::shared_ptr<const void> allocation;
+            uint32_t generation{};
+            uint64_t address{};
+            uint64_t bytes{};
+            bool indirect{};
+        };
+        ce::render_vector<Entry> textures;
+        ce::render_vector<Entry> buffers;
+        static const Entry* Find(const ce::render_vector<Entry>& entries, uint32_t id)
+        {
+            const auto slot = RHIHandleBits::SlotOf(id);
+            if (!id || slot >= entries.size() || entries[slot].generation != RHIHandleBits::GenerationOf(id))
+            {
+                return nullptr;
+            }
+            return &entries[slot];
+        }
+        ID3D12Resource* Resolve(RHITextureHandle handle) const
+        {
+            const auto* entry = Find(textures, handle.id);
+            return entry ? entry->resource.Get() : nullptr;
+        }
+        ID3D12Resource* Resolve(RHIBufferHandle handle) const
+        {
+            const auto* entry = Find(buffers, handle.id);
+            return entry ? entry->resource.Get() : nullptr;
+        }
+        DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
+        {
+            const auto* entry = Find(buffers, handle.id);
+            return entry ? DX12BufferEntry{entry->resource.Get(), entry->bytes, entry->indirect} : DX12BufferEntry{};
+        }
+        uint64_t ResolveGpuAddress(RHIBufferHandle handle) const
+        {
+            const auto* entry = Find(buffers, handle.id);
+            return entry ? entry->address : 0;
+        }
+    };
+
+    std::shared_ptr<const RecordingSnapshot> CaptureRecordingSnapshot() const
+    {
+        std::scoped_lock lock(m_textureRegistryMutex, m_bufferRegistryMutex);
+        std::shared_ptr<RecordingSnapshot> snapshot;
+        for (const auto& candidate : m_recordingSnapshots)
+        {
+            if (candidate.use_count() == 1)
+            {
+                snapshot = candidate;
+                break;
+            }
+        }
+        if (!snapshot)
+        {
+            snapshot = std::make_shared<RecordingSnapshot>();
+            m_recordingSnapshots.push_back(snapshot);
+        }
+        const auto copy = [](const auto& source, uint32_t count, auto& destination)
+        {
+            destination.resize(count);
+            for (uint32_t index = 0; index < count; ++index)
+            {
+                const auto& slot = source[index];
+                auto& entry = destination[index];
+                entry = {};
+                if (slot.alive)
+                {
+                    entry.resource = slot.Get();
+                    entry.heap = slot.sparseHeap;
+                    entry.allocation = slot.allocationLifetime;
+                    entry.generation = slot.generation;
+                    entry.address = slot.gpuAddress;
+                    entry.bytes = slot.bufferBytes;
+                    entry.indirect = slot.allowIndirectArguments;
+                }
+            }
+        };
+        copy(m_textures, m_textureHighWater.load(std::memory_order_acquire), snapshot->textures);
+        copy(m_buffers, m_bufferHighWater.load(std::memory_order_acquire), snapshot->buffers);
+        return snapshot;
+    }
 
     /// 소유하고 등록한다. 표가 ComPtr을 들고 있으므로 호출부는 핸들만 남긴다.
     RHITextureHandle AddTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
@@ -246,6 +334,7 @@ class DX12ResourceTable
             m_bufferSlotReuses.store(0, std::memory_order_release);
             m_bufferFree.clear();
         }
+        m_recordingSnapshots.clear();
         m_pipelines.clear();
         m_layouts.clear();
         m_pipelineFree.clear();
@@ -541,6 +630,8 @@ class DX12ResourceTable
         target.generation = (target.generation + 1u) & RHIHandleBits::kIndexMask;
         freeList.push_back(slot);
     }
+
+    mutable ce::render_vector<std::shared_ptr<RecordingSnapshot>> m_recordingSnapshots;
 
     // Texture registration can overlap material uploads and shadow history creation.
     std::vector<Slot> m_textures;

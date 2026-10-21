@@ -1,4 +1,4 @@
-#include "DX12TextureCache.h"
+﻿#include "DX12TextureCache.h"
 #include "../../MaterialGraphBindingDiagnostics.h"
 #include "DX12DeviceResources.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -218,38 +218,42 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
         return false;
     }
 
-    auto* commandList = m_resources->GetCommandList();
-    if (allocation.block.requiresAliasingBarrier)
+    m_resources->RecordImmediateNative([target = allocation.resource,
+        source = Microsoft::WRL::ComPtr<ID3D12Resource>(stagingResource), stagingOffset = staging.offset,
+        aliasingRequired = allocation.block.requiresAliasingBarrier](ID3D12GraphicsCommandList* commandList)
     {
-        D3D12_RESOURCE_BARRIER aliasing{};
-        aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-        aliasing.Aliasing.pResourceAfter = allocation.resource.Get();
-        commandList->ResourceBarrier(1, &aliasing);
-    }
+        if (aliasingRequired)
+        {
+            D3D12_RESOURCE_BARRIER aliasing{};
+            aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+            aliasing.Aliasing.pResourceAfter = target.Get();
+            commandList->ResourceBarrier(1, &aliasing);
+        }
 
-    D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = allocation.resource.Get();
-    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        D3D12_TEXTURE_COPY_LOCATION dst{};
+        dst.pResource = target.Get();
+        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
-    D3D12_TEXTURE_COPY_LOCATION src{};
-    src.pResource = stagingResource;
-    src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    src.PlacedFootprint.Offset = staging.offset;
-    src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    src.PlacedFootprint.Footprint.Width = 1;
-    src.PlacedFootprint.Footprint.Height = 1;
-    src.PlacedFootprint.Footprint.Depth = 1;
-    src.PlacedFootprint.Footprint.RowPitch = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+        D3D12_TEXTURE_COPY_LOCATION src{};
+        src.pResource = source.Get();
+        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        src.PlacedFootprint.Offset = stagingOffset;
+        src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        src.PlacedFootprint.Footprint.Width = 1;
+        src.PlacedFootprint.Footprint.Height = 1;
+        src.PlacedFootprint.Footprint.Depth = 1;
+        src.PlacedFootprint.Footprint.RowPitch = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
 
-    commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = allocation.resource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    commandList->ResourceBarrier(1, &barrier);
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = target.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &barrier);
+    });
 
     outEntry.format = RHIFormat::RGBA8Unorm;
     outEntry.width = 1;
@@ -427,40 +431,47 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const 
         return false;
     }
 
-    auto* commandList = m_resources->GetCommandList();
-    if (allocation.block.requiresAliasingBarrier)
+    const auto footprintView = std::span<const D3D12_PLACED_SUBRESOURCE_FOOTPRINT>(footprints.data(), subresourceCount);
+    const auto pendingFootprints = m_resources->UsesDeferredImmediateRecording()
+        ? m_resources->CopyPendingValues(footprintView) : footprintView;
+    m_resources->RecordImmediateNative([target = allocation.resource,
+        source = Microsoft::WRL::ComPtr<ID3D12Resource>(stagingResource), pendingFootprints, subresourceCount, stagingBaseOffset,
+        aliasingRequired = allocation.block.requiresAliasingBarrier](ID3D12GraphicsCommandList* commandList)
     {
-        D3D12_RESOURCE_BARRIER aliasing{};
-        aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-        aliasing.Aliasing.pResourceAfter = allocation.resource.Get();
-        commandList->ResourceBarrier(1, &aliasing);
-    }
+        if (aliasingRequired)
+        {
+            D3D12_RESOURCE_BARRIER aliasing{};
+            aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+            aliasing.Aliasing.pResourceAfter = target.Get();
+            commandList->ResourceBarrier(1, &aliasing);
+        }
 
-    for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
-    {
-        const auto& footprint = footprints[subresource];
+        for (uint32_t subresource = 0; subresource < subresourceCount; ++subresource)
+        {
+            const auto& footprint = pendingFootprints[subresource];
 
-        D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = allocation.resource.Get();
-        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        dst.SubresourceIndex = subresource;
+            D3D12_TEXTURE_COPY_LOCATION dst{};
+            dst.pResource = target.Get();
+            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            dst.SubresourceIndex = subresource;
 
-        D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = stagingResource;
-        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        src.PlacedFootprint = footprint;
-        src.PlacedFootprint.Offset += stagingBaseOffset;
+            D3D12_TEXTURE_COPY_LOCATION src{};
+            src.pResource = source.Get();
+            src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            src.PlacedFootprint = footprint;
+            src.PlacedFootprint.Offset += stagingBaseOffset;
 
-        commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-    }
+            commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+        }
 
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = allocation.resource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    commandList->ResourceBarrier(1, &barrier);
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = target.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &barrier);
+    });
 
     outEntry.format = image.Format();
     outEntry.width = image.Width();

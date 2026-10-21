@@ -20,7 +20,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
         throw std::runtime_error("Temporal has no material tile producer.");
     if (work)
     {
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        auto uses = graph.CreateDeclarationUsages();
         for (unsigned i = 0; i < targets.size(); ++i)
         {
             targets[i] = graph.Modify(targets[i]);
@@ -83,7 +83,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
     if (!replay)
         return targets;
     replay->Declare(graph, replay);
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    auto uses = graph.CreateDeclarationUsages();
     for (unsigned i = 0; i < targets.size(); ++i)
     {
         targets[i] = graph.Modify(targets[i]);

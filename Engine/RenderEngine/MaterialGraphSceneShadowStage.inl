@@ -51,7 +51,7 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     depth = graph.Modify(depth);
     // Declaration does not run callbacks or yield. Reuse only CPU scratch; the
     // graph copies the final usages before another cascade can change it.
-    thread_local std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    auto uses = graph.CreateDeclarationUsages();
     if (!uses.empty())
     {
         uses.clear();
@@ -64,24 +64,12 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     auto& sharedReads = frame->m_shadowReadSets[readSetIndex];
     if (!frame->m_shadowReadSetsReady[readSetIndex])
     {
+        sharedReads = graph.CreateDeclarationUsages();
         sharedReads.push_back(
             {frame->raster->geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-        for (const auto& draw : std::span{frame->shadowDraws})
-        {
-            if (!draw.shadowEnabled || draw.staticShadow != staticCasters)
-            {
-                continue;
-            }
-            sharedReads.push_back(
-                {draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-            sharedReads.push_back(
-                {draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-            for (const auto& texture : std::span{draw.bindings->resources.textures})
-            {
-                sharedReads.push_back({graph.FindImportedTexture(texture.resource),
-                                       RHIResourceState::PixelShaderResource, RGAccessMode::Read});
-            }
-        }
+        frame->AddPassReadPlan(graph, sharedReads,
+                               staticCasters ? PassReadPlan::Pass::StaticShadow : PassReadPlan::Pass::DynamicShadow,
+                               RHIResourceState::ShaderResource);
         NormalizeSceneReads(graph, sharedReads);
         frame->m_shadowReadSetsReady[readSetIndex] = true;
     }

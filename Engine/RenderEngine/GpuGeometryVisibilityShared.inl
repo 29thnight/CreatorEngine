@@ -174,8 +174,7 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
     std::memcpy(uploads[1].cpuAddress, input.candidates.data(), requests[1].bytes);
     std::memcpy(uploads[2].cpuAddress, input.bins.data(), requests[2].bytes);
     auto* worlds = static_cast<math::vector4*>(uploads[3].cpuAddress);
-    auto& scratch = m_bufferPool->m_upload;
-    const std::lock_guard scratchLock{scratch.m_mutex};
+    static thread_local BufferPool::UploadScratch scratch;
     auto& vertices = scratch.m_vertices;
     auto& topologies = scratch.m_topologies;
     vertices.clear();

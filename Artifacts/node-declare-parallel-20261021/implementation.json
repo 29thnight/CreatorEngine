@@ -1,0 +1,22 @@
+{
+  "defaultParallelSetup": true,
+  "controlEnvironment": "CREATOR_RDG_PARALLEL_SETUP=0 disables declaration branches; 1 enables them.",
+  "wiring": "LivePipelineDesc::AddNode builds slot and explicit CPU dependencies before DeclareAll.",
+  "nodeStorage": "CreateDeclarationBranch assigns private resource/version/pass storage and retained arenas; ready nodes execute their declarations on jobs.",
+  "inputs": "SnapshotDeclarationResource lazily copies published resource metadata. FindImportedBuffer/Texture consult parent imports. CanonicalDeclarationHandle maps identities into the active declaration space.",
+  "publication": "The owner joins and merges declarations in original node order; compiled pass usages reference canonical root handles.",
+  "lifetimes": "The root retains declaration branches and callbacks; graph reset retains capacities and occurs behind the existing queue-idle/RHI/GPU retirement checks. Accepted tasks drain before snapshots or context storage are released.",
+  "reuse": "Branch graph pool, declaration arenas, setup task vector capacities, and per-thread meshlet declaration/upload scratch are reused.",
+  "identityFixes": "Resource comparisons and read normalization include branch identity, kind and epoch; resident buffers, effects, decals, sprites and UI no longer conflate local indices.",
+  "cpuDependency": "METEOR.Scene.Blended explicitly depends on METEOR.Scene.LightTiles.",
+  "regressions": [
+    "RDG_DECLARATION_BRANCH_OK lazy-hidden-input reset",
+    "RDG_BRANCH_IMPORT_LOOKUP_OK parent lookup cross-branch normalization reset",
+    "RDG_NODE_FORKJOIN_OK overlap=true ordered publication once",
+    "RHI_PENDING_NATIVE_OK arenaReuse/resourceCapture/oneShot/pixels",
+    "CreatorRobot matched outputs and scene reload maxAbs=0"
+  ],
+  "performanceAccepted": false,
+  "measuredParallelNodes": true,
+  "measuredParallelAddPass": true
+}

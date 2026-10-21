@@ -3714,6 +3714,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Geometry";
+                node.parallelDeclare = true;
                 node.writes = {LiveSlots::kMeteorGeometry};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
@@ -3725,6 +3726,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Cull.First";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry};
                 node.writes = {LiveSlots::kMeteorFirstList};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3738,6 +3740,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Occluder";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorFirstList};
                 node.writes = {LiveSlots::kMeteorOccluderDepth};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3751,6 +3754,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Cull.Final";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
                 node.writes = {LiveSlots::kMeteorFinalList, LiveSlots::kMeteorBlendedList};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3768,6 +3772,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.LayerWork";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorBlendedList};
                 node.writes = {LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3785,6 +3790,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.StaticCache";
+                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
                 node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
                 node.prepare = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
@@ -3804,6 +3810,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Cull.First";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
                 node.writes = {LiveSlots::kShadowFirstLists};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext&,
@@ -3819,6 +3826,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Occluder";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowStaticDepths, LiveSlots::kShadowFirstLists};
                 node.writes = {LiveSlots::kShadowOccluderDepths};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3834,6 +3842,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Cull.Final";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowOccluderDepths};
                 node.writes = {LiveSlots::kShadowFinalLists};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3848,6 +3857,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Raster";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowStaticDepths, LiveSlots::kShadowFinalLists};
                 node.writes = {LiveSlots::kShadowMap};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3863,6 +3873,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.History";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kShadowMap};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
@@ -3877,6 +3888,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Visibility";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorFinalList};
                 node.writes = {LiveSlots::kGBufferDepth, LiveSlots::kVisibility};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3893,6 +3905,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.MaterialWork";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kVisibility};
                 node.writes = {LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3908,6 +3921,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.SurfaceResolve";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
                     LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments};
                 node.writes = {LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
@@ -3930,6 +3944,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Decal";
+                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.decal; };
                 node.prepare = [this, &p](const EnhancedFrameContext& ctx, std::string& err, uint32_t) -> bool
                 {
@@ -3964,6 +3979,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.History";
+                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kGBufferDepth};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&) {
@@ -4002,6 +4018,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "SSAO";
+                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.ssao; };
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kGBufferNormal };
                 node.writes = { LiveSlots::kAmbientOcclusion };
@@ -4026,6 +4043,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Color";
+                node.parallelDeclare = true;
                 node.reads = {
                     LiveSlots::kMeteorGeometry, LiveSlots::kVisibility,
                     LiveSlots::kMeteorLayerCommands,
@@ -4199,6 +4217,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Volume";
+                node.parallelDeclare = true;
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -4218,6 +4237,7 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.LightTiles";
+                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.lightTiles; };
                 node.reads = { LiveSlots::kGBufferDepth };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -4231,6 +4251,8 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Blended";
+                node.setupDependencies = {"METEOR.Scene.LightTiles"};
+                node.parallelDeclare = true;
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap, LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,

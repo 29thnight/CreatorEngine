@@ -96,29 +96,14 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(
             throw std::runtime_error("SurfaceResolve requires all five initialized surface targets.");
         }
     }
-    std::vector<EnhancedRenderGraph::RGPassUsage> restoreUses;
+    auto restoreUses = graph.CreateDeclarationUsages();
     for (auto* target : {&inputs.diffuse, &inputs.metalRough, &inputs.normal, &inputs.emissive, &inputs.bitmask})
     {
         *target = graph.Modify(*target);
         restoreUses.push_back({*target, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite});
     }
     frame->AddReconstructionReads(graph, restoreUses, inputs.visibility, material, true);
-    for (const auto& draw : frame->draws)
-    {
-        if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-        {
-            continue;
-        }
-        restoreUses.push_back(
-            {draw.geometry->GraphOutput(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read});
-        restoreUses.push_back(
-            {draw.geometry->GraphMeshlets(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read});
-        for (const auto& texture : draw.bindings->resources.textures)
-        {
-            restoreUses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource,
-                                   RGAccessMode::Read});
-        }
-    }
+    frame->AddPassReadPlan(graph, restoreUses, PassReadPlan::Pass::Surface, RHIResourceState::PixelShaderResource);
     NormalizeSceneReads(graph, restoreUses);
     graph.AddPass("METEOR.Scene.Material.Resolve", restoreUses, [this, frame, inputs](const auto& execution) {
         frame->CheckCurrent(execution.graph);

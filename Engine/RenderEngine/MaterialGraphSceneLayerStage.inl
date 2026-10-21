@@ -39,8 +39,8 @@ void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const 
                   });
     this->forwardGbuffer = AdvanceSceneSurface(graph, this->forwardGbuffer, RGAccessMode::Write);
     const auto inputs = this->forwardGbuffer;
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses{
-        {inputs.depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}};
+    auto uses = graph.CreateDeclarationUsages({
+        {inputs.depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}});
     for (const auto target : Colors(inputs))
     {
         uses.push_back({target, RHIResourceState::RenderTarget, RGAccessMode::Write});
@@ -164,8 +164,9 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
             blendedCommands->pipeline = generation;
             const auto& list = frame.raster->layers;
             blendedCommands->visibility = list;
-            std::vector<uint32_t> words;
-            std::vector<std::array<uint32_t, 4>> records;
+            ce::render_arena_buffer<uint32_t> words{frame.m_cpuStorage->Resource(2)};
+            ce::render_arena_buffer<std::array<uint32_t, 4>> records{frame.m_cpuStorage->Resource(2)};
+            ce::render_arena_buffer<uint32_t> roots{frame.m_cpuStorage->Resource(2)};
             uint32_t outputBytes{};
             const auto& order = range.inputs;
             RHIPipelineHandle pipeline{};
@@ -188,7 +189,7 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
                         throw std::runtime_error("METEOR blended range crossed a PSO boundary.");
                     auto& bucket = blendedCommands->buckets.front();
                     const uint32_t first = static_cast<uint32_t>(words.size() * 4);
-                    std::vector<uint32_t> roots;
+                    roots.clear();
                     const auto append = [&](uint32_t slot, RHIBufferSlice slice, bool cbv = false) {
                         uint64_t address{};
                         if (!frame.device->EncodeIndirectBuffer(slice, address) || (cbv && address % 256))
@@ -212,8 +213,8 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
                     if (layout.descriptorIndexSlot)
                         append(*layout.descriptorIndexSlot, draw.bindings->descriptorIndices, true);
                     if (bucket.roots.empty())
-                        bucket.roots = roots;
-                    if (bucket.roots != roots)
+                        bucket.roots.assign(roots.begin(), roots.end());
+                    if (!std::ranges::equal(bucket.roots, roots))
                         throw std::runtime_error("METEOR blended indirect root ABI mismatch.");
                     // Mesh dispatch arguments come from this draw's ordered list bin.
                     records.push_back({first, outputBytes, uint32_t(roots.size() * 2),

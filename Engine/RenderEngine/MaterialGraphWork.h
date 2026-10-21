@@ -85,8 +85,11 @@ struct SceneMaterialWork final
     }
     std::array<RGHandle, 2> GraphInputs(const EnhancedRenderGraph& graph) const
     {
-        if (!packetWork || packetWork->graphOwner != &graph || packetWork->graphEpoch != graph.ResourceEpoch())
+        if (!packetWork || packetWork->graphOwner != graph.DeclarationGraph() ||
+            packetWork->graphEpoch != graph.DeclarationEpoch())
+        {
             throw std::runtime_error("METEOR material consumer requires its explicit packet producer.");
+        }
         return {packetWork->graphPackets, packetWork->graphArguments};
     }
     void ValidateInputs(const EnhancedRenderGraph& graph, const std::array<RGHandle, 2>& inputs) const
@@ -97,7 +100,7 @@ struct SceneMaterialWork final
                 inputs[index].kind != expected[index].kind || inputs[index].epoch != expected[index].epoch)
                 throw std::runtime_error("METEOR material packet input is not its published resource version.");
     }
-    void AddRead(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+    void AddRead(EnhancedRenderGraph& graph, auto& uses,
                  const std::array<RGHandle, 2>& inputs) const
     {
         ValidateInputs(graph, inputs);

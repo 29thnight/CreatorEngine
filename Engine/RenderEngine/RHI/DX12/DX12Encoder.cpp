@@ -1,4 +1,4 @@
-#include "DX12Encoder.h"
+﻿#include "DX12Encoder.h"
 #include "DX12DeviceResources.h"
 
 #include <stddef.h>
@@ -223,7 +223,7 @@ D3D12_GPU_VIRTUAL_ADDRESS DX12Encoder::ResolveSlice(const RHIBufferSlice& slice)
     //   런타임으로 들어가는 COM 호출이라 드로우당 셋(상수·정점·인덱스)이
     //   되면서 `dx12.encoderbench` 실물 경로에 드로우당 +67~81ns 로 나왔다.
     //   주소는 리소스 수명 동안 안 바뀌므로 물어볼 자리는 등록 시점이다.
-    const D3D12_GPU_VIRTUAL_ADDRESS base = m_resources->ResolveGpuAddress(slice.buffer);
+    const D3D12_GPU_VIRTUAL_ADDRESS base = ResolveRecordedGpuAddress(slice.buffer);
     if (0 == base)
     {
         return 0;
@@ -282,7 +282,7 @@ bool DX12Encoder::SetRootUnorderedBuffer(RHIBindPoint bindPoint, uint32_t slot, 
     {
         return false;
     }
-    auto* resource = m_resources->Resolve(slice.buffer);
+    auto* resource = ResolveRecorded(slice.buffer);
     if (!resource)
     {
         return false;
@@ -407,7 +407,7 @@ bool DX12Encoder::DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
         return false;
     }
     ID3D12CommandSignature* const signature = m_resources->GetDrawIndirectSignature();
-    const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
+    const DX12BufferEntry entry = DescribeRecordedBuffer(arguments);
     if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         sizeof(RHIDrawIndirectArguments) > entry.bytes - byteOffset)
     {
@@ -425,7 +425,7 @@ bool DX12Encoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOf
         return false;
     }
     ID3D12CommandSignature* const signature = m_resources->GetDrawIndexedIndirectSignature();
-    const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
+    const DX12BufferEntry entry = DescribeRecordedBuffer(arguments);
     if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
     {
@@ -463,7 +463,7 @@ bool DX12Encoder::DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteO
     {
         return false;
     }
-    const auto entry = m_resources->DescribeBuffer(arguments);
+    const auto entry = DescribeRecordedBuffer(arguments);
     auto* signature = m_resources->GetDispatchMeshIndirectSignature();
     if (!signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         sizeof(RHIDispatchMeshIndirectArguments) > entry.bytes - byteOffset)
@@ -482,7 +482,7 @@ bool DX12Encoder::DispatchMeshIndirectBatch(RHIBufferHandle arguments, uint64_t 
     {
         return false;
     }
-    const auto entry = m_resources->DescribeBuffer(arguments);
+    const auto entry = DescribeRecordedBuffer(arguments);
     const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + 12;
     if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         uint64_t(stride) * count > entry.bytes - byteOffset)
@@ -506,7 +506,7 @@ bool DX12Encoder::DrawIndexedIndirectBatch(RHIBufferHandle arguments, uint64_t b
     {
         return false;
     }
-    const auto entry = m_resources->DescribeBuffer(arguments);
+    const auto entry = DescribeRecordedBuffer(arguments);
     const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + 36;
     if (!entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         uint64_t(stride) * count > entry.bytes - byteOffset)
@@ -536,7 +536,7 @@ bool DX12Encoder::DispatchIndirect(RHIBufferHandle arguments, uint64_t byteOffse
     {
         return false;
     }
-    const auto entry = m_resources->DescribeBuffer(arguments);
+    const auto entry = DescribeRecordedBuffer(arguments);
     auto* signature = m_resources->GetDispatchIndirectSignature();
     if (!signature || !entry.IsValid() || !entry.allowIndirectArguments || byteOffset > entry.bytes ||
         sizeof(RHIDispatchIndirectArguments) > entry.bytes - byteOffset)
@@ -721,16 +721,16 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
     };
     for (const auto texture : batch.aliasTextures)
     {
-        activate(m_resources->Resolve(texture));
+        activate(ResolveRecorded(texture));
     }
     for (const auto buffer : batch.aliasBuffers)
     {
-        activate(m_resources->Resolve(buffer));
+        activate(ResolveRecorded(buffer));
     }
 
     for (const RHITransition& transition : batch.textureTransitions)
     {
-        ID3D12Resource* const resource = m_resources->Resolve(transition.texture);
+        ID3D12Resource* const resource = ResolveRecorded(transition.texture);
         if (nullptr == resource)
         {
             continue;
@@ -754,7 +754,7 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
     {
-        ID3D12Resource* const resource = m_resources->Resolve(transition.buffer);
+        ID3D12Resource* const resource = ResolveRecorded(transition.buffer);
         if (nullptr == resource)
         {
             continue;
@@ -778,7 +778,7 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (RHITextureHandle handle : batch.uavTextures)
     {
-        ID3D12Resource* resource = m_resources->Resolve(handle);
+        ID3D12Resource* resource = ResolveRecorded(handle);
         if (nullptr == resource)
         {
             continue;
@@ -791,7 +791,7 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (RHIBufferHandle handle : batch.uavBuffers)
     {
-        ID3D12Resource* resource = m_resources->Resolve(handle);
+        ID3D12Resource* resource = ResolveRecorded(handle);
         if (nullptr == resource)
         {
             continue;
@@ -829,8 +829,8 @@ void DX12Encoder::CopyResource(RHITextureHandle destination, RHITextureHandle so
         return;
     }
 
-    ID3D12Resource* dst = m_resources->Resolve(destination);
-    ID3D12Resource* src = m_resources->Resolve(source);
+    ID3D12Resource* dst = ResolveRecorded(destination);
+    ID3D12Resource* src = ResolveRecorded(source);
     if (nullptr == dst || nullptr == src)
     {
         return;
@@ -869,8 +869,8 @@ void DX12Encoder::CopyToReadback(const RHIReadback& readback, RHITextureHandle s
     {
         return;
     }
-    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
-    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    ID3D12Resource* const sourceResource = ResolveRecorded(source);
+    ID3D12Resource* const readbackResource = ResolveRecorded(readback.buffer);
     if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid() || slice >= readback.sliceCount)
     {
         return;
@@ -900,8 +900,8 @@ void DX12Encoder::CopyVolumeToReadback(const RHIReadback& readback, RHITextureHa
     {
         return;
     }
-    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
-    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    ID3D12Resource* const sourceResource = ResolveRecorded(source);
+    ID3D12Resource* const readbackResource = ResolveRecorded(readback.buffer);
     if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid())
     {
         return;
@@ -932,8 +932,8 @@ void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureH
     {
         return;
     }
-    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
-    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    ID3D12Resource* const sourceResource = ResolveRecorded(source);
+    ID3D12Resource* const readbackResource = ResolveRecorded(readback.buffer);
     if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid() || slice >= readback.sliceCount)
     {
         return;
@@ -968,8 +968,8 @@ bool DX12Encoder::CopyBuffer(const RHIBufferSlice& destination, const RHIBufferS
     {
         return false;
     }
-    auto* src = m_resources->Resolve(source.buffer);
-    auto* dst = m_resources->Resolve(destination.buffer);
+    auto* src = ResolveRecorded(source.buffer);
+    auto* dst = ResolveRecorded(destination.buffer);
     if (!src || !dst || src == dst)
     {
         return false;
@@ -991,8 +991,8 @@ void DX12Encoder::CopyBufferToReadback(const RHIReadback& readback, RHIBufferHan
     {
         return;
     }
-    ID3D12Resource* const sourceResource = m_resources->Resolve(source);
-    ID3D12Resource* const readbackResource = m_resources->Resolve(readback.buffer);
+    ID3D12Resource* const sourceResource = ResolveRecorded(source);
+    ID3D12Resource* const readbackResource = ResolveRecorded(readback.buffer);
     if (nullptr == sourceResource || nullptr == readbackResource || !readback.IsValid())
     {
         return;
@@ -1015,8 +1015,8 @@ void DX12Encoder::CopyTexture(RHITextureHandle destination, RHITextureHandle sou
         return;
     }
 
-    ID3D12Resource* const dstResource = m_resources->Resolve(destination);
-    ID3D12Resource* const srcResource = m_resources->Resolve(source);
+    ID3D12Resource* const dstResource = ResolveRecorded(destination);
+    ID3D12Resource* const srcResource = ResolveRecorded(source);
     if (nullptr == dstResource || nullptr == srcResource)
     {
         return;
@@ -1053,4 +1053,25 @@ void DX12Encoder::ClearRenderTargetRect(const RHIRenderTargetBinding& binding, c
         return;
     }
     m_resources->ClearRenderTargetsRect(m_commandList, binding, rgba, &native);
+}
+
+ID3D12Resource* DX12Encoder::ResolveRecorded(RHITextureHandle handle) const
+{
+    return m_recordingResources && m_recordingResources->resourceTable
+        ? m_recordingResources->resourceTable->Resolve(handle) : m_resources->Resolve(handle);
+}
+ID3D12Resource* DX12Encoder::ResolveRecorded(RHIBufferHandle handle) const
+{
+    return m_recordingResources && m_recordingResources->resourceTable
+        ? m_recordingResources->resourceTable->Resolve(handle) : m_resources->Resolve(handle);
+}
+DX12BufferEntry DX12Encoder::DescribeRecordedBuffer(RHIBufferHandle handle) const
+{
+    return m_recordingResources && m_recordingResources->resourceTable
+        ? m_recordingResources->resourceTable->DescribeBuffer(handle) : m_resources->DescribeBuffer(handle);
+}
+uint64_t DX12Encoder::ResolveRecordedGpuAddress(RHIBufferHandle handle) const
+{
+    return m_recordingResources && m_recordingResources->resourceTable
+        ? m_recordingResources->resourceTable->ResolveGpuAddress(handle) : m_resources->ResolveGpuAddress(handle);
 }

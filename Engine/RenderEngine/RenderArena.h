@@ -241,6 +241,132 @@ namespace ce
         destructor_record* head_{};
     };
 
+    // Trivial declaration values use raw iterators and retained arena blocks.
+    // The writer must finish before its resource is reset; no resource ownership
+    // is transferred by a span returned from this buffer.
+    template<class T>
+    class render_arena_buffer final
+    {
+        static_assert(std::is_trivially_copyable_v<T> && std::is_trivially_destructible_v<T>);
+
+      public:
+        render_arena_buffer() = default;
+        explicit render_arena_buffer(render_arena_resource& resource) noexcept : resource_(&resource) {}
+        render_arena_buffer(const render_arena_buffer&) = delete;
+        render_arena_buffer& operator=(const render_arena_buffer&) = delete;
+        render_arena_buffer(render_arena_buffer&&) noexcept = default;
+        render_arena_buffer& operator=(render_arena_buffer&&) noexcept = default;
+        T* data() noexcept { return data_; }
+        const T* data() const noexcept { return data_; }
+        size_t size() const noexcept { return size_; }
+        size_t capacity() const noexcept { return capacity_; }
+        size_t max_size() const noexcept { return (std::numeric_limits<size_t>::max)() / sizeof(T); }
+        bool empty() const noexcept { return !size_; }
+        T* begin() noexcept { return data_; }
+        const T* begin() const noexcept { return data_; }
+        T* end() noexcept { return size_ ? data_ + size_ : data_; }
+        const T* end() const noexcept { return size_ ? data_ + size_ : data_; }
+        T& operator[](size_t index) noexcept { return data_[index]; }
+        const T& operator[](size_t index) const noexcept { return data_[index]; }
+        operator std::span<const T>() const noexcept { return {data_, size_}; }
+        void clear() noexcept { size_ = 0; }
+        void pop_back() noexcept
+        {
+            if (size_)
+            {
+                --size_;
+            }
+        }
+        void assign(std::initializer_list<T> values)
+        {
+            clear();
+            reserve(values.size());
+            for (const auto& value : values)
+            {
+                push_back(value);
+            }
+        }
+        void assign(size_t count, const T& value)
+        {
+            const T copy = value;
+            reserve(count);
+            std::fill_n(data_, count, copy);
+            size_ = count;
+        }
+        template<class Predicate>
+        void erase_if(const Predicate& predicate)
+        {
+            size_t destination = 0;
+            for (size_t index = 0; index < size_; ++index)
+            {
+                if (!predicate(data_[index]))
+                {
+                    data_[destination++] = data_[index];
+                }
+            }
+            size_ = destination;
+        }
+        void reserve(size_t capacity)
+        {
+            if (capacity <= capacity_)
+            {
+                return;
+            }
+            if (!resource_ || capacity > (std::numeric_limits<size_t>::max)() / sizeof(T))
+            {
+                throw std::bad_array_new_length();
+            }
+            auto* data = static_cast<T*>(resource_->allocate(capacity * sizeof(T), alignof(T)));
+            if (size_)
+            {
+                std::memcpy(data, data_, size_ * sizeof(T));
+            }
+            data_ = data;
+            capacity_ = capacity;
+        }
+        void resize(size_t size)
+        {
+            reserve(size);
+            if (size > size_)
+            {
+                std::fill_n(data_ + size_, size - size_, T{});
+            }
+            size_ = size;
+        }
+        void push_back(const T& value)
+        {
+            // A caller may append an element from this same buffer.
+            const T copy = value;
+            if (size_ == capacity_)
+            {
+                const auto maximum = (std::numeric_limits<size_t>::max)() / sizeof(T);
+                if (capacity_ > maximum / 2)
+                {
+                    throw std::bad_array_new_length();
+                }
+                reserve(capacity_ ? capacity_ * 2 : 16);
+            }
+            data_[size_++] = copy;
+        }
+        template<class Iterator>
+        void insert(T* position, Iterator first, Iterator last)
+        {
+            if (position != end())
+            {
+                throw std::invalid_argument("Declaration buffer only appends ranges.");
+            }
+            for (; first != last; ++first)
+            {
+                push_back(*first);
+            }
+        }
+
+      private:
+        render_arena_resource* resource_{};
+        T* data_{};
+        size_t size_{}, capacity_{};
+    };
+
     // Stateful STL allocator without a virtual memory_resource dispatch. Nested
     // containers and map values receive the same writer domain through construct.
     template<typename T>

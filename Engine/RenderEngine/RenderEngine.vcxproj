@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -249,6 +249,7 @@
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\DX12\DX12DeviceResourcesDeferred.cpp" />
     <ClCompile Include="RHI\DX12\DX12QueueService.cpp" />
     <ClCompile Include="RHI\RHISoftwareCommandList.cpp" />
     <ClCompile Include="RHI\RHISoftwareEncoder.cpp" />
@@ -363,6 +364,7 @@
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp" />
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphDeclaration.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
     <ClCompile Include="Render\Passes\Geometry\SceneSurfaceTargets.cpp">
@@ -787,6 +789,7 @@
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />
     <ClInclude Include="MaterialGraphPacketPlan.h" />
+    <ClInclude Include="MaterialGraphPassReadPlan.h" />
     <ClInclude Include="MaterialGraphPacketWork.h" />
     <ClInclude Include="MaterialGraphBindingDiagnostics.h" />
     <ClInclude Include="MaterialGraphPreparationTasks.h" />
@@ -910,6 +913,7 @@
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h" />
     <ClInclude Include="Assets\CookedEnvironment.h" />
     <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h" />
+    <ClInclude Include="Render\Graph\RGSetupTaskGraph.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />

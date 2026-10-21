@@ -34,8 +34,29 @@ class SceneRuntimeEffectsFrame
     std::span<const RHITextureHandle> Inputs() const;
     RHITextureHandle Depth() const;
     RHIRenderTargetBinding CaptureTargets(unsigned part) const;
-    void DeclareShadingInputs(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
-                              bool samples = true, bool background = false) const;
+    void DeclareShadingInputs(EnhancedRenderGraph& graph, auto& uses, bool samples = true,
+                              bool background = false) const
+    {
+        CheckCurrent(graph);
+        const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState
+                                                                                          : RGAccessMode::Read;
+        if (samples)
+        {
+            for (const auto input : graphInputs_)
+            {
+                uses.push_back({input, RHIResourceState::PixelShaderResource, read});
+            }
+        }
+        if (!samples)
+        {
+            uses.push_back({graphTileDepth_, RHIResourceState::DepthRead, read});
+        }
+        if (transmission_ && background)
+        {
+            uses.push_back({graphColor_, RHIResourceState::PixelShaderResource, read});
+            uses.push_back({graphDepth_, RHIResourceState::PixelShaderResource, read});
+        }
+    }
     void Bind(RHIEncoder& encoder, unsigned firstRootSlot, std::size_t tile) const;
     void MarkSubmitted(RHICompletionPoint completion) const;
     void ConfirmSubmitted(RHICompletionPoint completion) const;

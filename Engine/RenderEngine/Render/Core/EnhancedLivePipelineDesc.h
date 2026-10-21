@@ -2,6 +2,7 @@
 #include "../../../Utility_Framework/StandardLibrary.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
+#include "../Graph/RGSetupTaskGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
 
 // 라이브 파이프라인 기술(記述) — LivePipelineDesc (PHASE 3-10, 슬라이스 1).
@@ -173,6 +174,66 @@ class LiveBlackboard
                                                                                   : found->second.handles;
     }
 
+    void CopySnapshotFrom(const LiveBlackboard& source, std::span<const std::string> reads,
+                          std::span<const std::string> modifies)
+    {
+        if (this == &source)
+        {
+            throw std::invalid_argument("A declaration snapshot needs independent storage.");
+        }
+        Reset();
+        const auto copy = [&](const auto& slots)
+        {
+            for (const auto& name : slots)
+            {
+                const auto found = source.m_slots.find(name);
+                auto& destination = WritableSlot(name);
+                const bool present = found != source.m_slots.end() && found->second.generation == source.m_generation;
+                const size_t count = present ? found->second.handles.size() : 0;
+                destination.handles.resize(count);
+                if (count)
+                {
+                    std::copy_n(found->second.handles.data(), count, destination.handles.data());
+                }
+                destination.generation = m_generation;
+            }
+        };
+        copy(reads);
+        copy(modifies);
+    }
+    void AppendHandles(std::string_view slot, std::vector<RGHandle>& destination) const
+    {
+        const auto found = m_slots.find(slot);
+        if (found != m_slots.end() && found->second.generation == m_generation)
+        {
+            const auto& handles = found->second.handles;
+            const auto first = destination.size();
+            destination.resize(first + handles.size());
+            std::copy_n(handles.data(), handles.size(), destination.data() + first);
+        }
+    }
+    void Publish(const LiveBlackboard& source, std::span<const std::string> slots, const EnhancedRenderGraph& graph)
+    {
+        for (const auto& name : slots)
+        {
+            const auto found = source.m_slots.find(name);
+            const bool present = found != source.m_slots.end() && found->second.generation == source.m_generation;
+            const size_t count = present ? found->second.handles.size() : 0;
+            auto& destination = WritableSlot(name);
+            destination.handles.resize(count);
+            for (size_t index = 0; index < count; ++index)
+            {
+                if (!graph.CanonicalDeclarationHandle(found->second.handles[index]).IsValid() &&
+                    found->second.handles[index].IsValid())
+                {
+                    throw std::logic_error("Cannot publish an unmapped declaration handle.");
+                }
+                destination.handles[index] = found->second.handles[index];
+            }
+            destination.generation = m_generation;
+        }
+    }
+
   private:
     struct SlotHash
     {
@@ -229,6 +290,9 @@ struct LivePassNode
 {
     std::string name;
     uint32_t declarationMarker{};
+    // Explicit CPU ownership opt-in. GPU slots alone do not prove pass state safety.
+    bool parallelDeclare{false};
+    std::vector<std::string> setupDependencies;
 
     // ── 데이터 절반 ──
 
@@ -303,7 +367,12 @@ class LivePipelineDesc
 {
 public:
     void AddNode(LivePassNode node);
-    void Clear() { m_nodes.clear(); }
+    void Clear()
+    {
+        m_nodes.clear();
+        m_setupWork.clear();
+        m_setupDependencyError.clear();
+    }
     bool IsEmpty() const { return m_nodes.empty(); }
     size_t NodeCount() const { return m_nodes.size(); }
 
@@ -368,5 +437,18 @@ public:
     static bool RunSelfTest(std::string& outLog);
 
 private:
+  struct DeclarationWork
+  {
+      LiveBlackboard input;
+      std::shared_ptr<EnhancedRenderGraph> branch;
+      RGSetupTaskHandle task;
+      std::vector<size_t> dependencies;
+      std::vector<RGHandle> inputs;
+      bool active{}, launched{}, published{};
+  };
     std::vector<LivePassNode> m_nodes;
+    // DeclareAll is the single render-owner entry. Its accepted tasks join
+    // before this storage can be reused for another view/frame.
+    mutable std::vector<DeclarationWork> m_setupWork;
+    std::string m_setupDependencyError;
 };

@@ -224,7 +224,7 @@ struct SceneGpuData final
         recordBuffer->Declare(graph, recordBuffer);
         materialBuffer->Declare(graph, materialBuffer);
     }
-    void AddRead(const EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+    void AddRead(const EnhancedRenderGraph& graph, auto& uses) const
     {
         recordBuffer->AddRead(graph, uses);
         materialBuffer->AddRead(graph, uses);

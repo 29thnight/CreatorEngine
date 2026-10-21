@@ -33,13 +33,37 @@ class SceneLookupFrame
     RHIBufferHandle Statistics() const { return statistics_; }
     bool UsesRuntimeEvaluation() const { return runtimeEvaluation_; }
     bool RequiresCapture() const { return capture_; }
-    void DeclareShadingInputs(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const;
+    void DeclareShadingInputs(EnhancedRenderGraph& graph, auto& uses) const
+    {
+        CheckCurrent(graph);
+        if (!runtimeEvaluation_)
+        {
+            return;
+        }
+        const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState
+                                                                                          : RGAccessMode::Read;
+        for (const auto texture : {environment_, irradiance_, prefiltered_, source_})
+        {
+            if (!texture.IsValid())
+            {
+                continue;
+            }
+            auto handle = graph.FindImportedTexture(texture);
+            if (!handle.IsValid())
+            {
+                handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "METEOR.Scene.RuntimeIBL");
+            }
+            uses.push_back({handle, RHIResourceState::PixelShaderResource, read});
+        }
+    }
     void BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) const;
     const std::array<RGHandle, 11>& DeclareInputs(EnhancedRenderGraph& graph) const;
     bool InputsDeclared(const EnhancedRenderGraph& graph) const
     {
         if (!graph_)
+        {
             return false;
+        }
         CheckCurrent(graph);
         return true;
     }
