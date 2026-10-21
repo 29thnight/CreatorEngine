@@ -352,7 +352,8 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
                     graph.ImportTexture(batch.uploaded.handle, RHIResourceState::PixelShaderResource, "Sprite.Texture");
             }
             if (std::none_of(usages.begin(), usages.end(), [texture](const auto &usage) {
-                    return usage.handle.index == texture.index && usage.handle.version == texture.version;
+                    return usage.handle.index == texture.index && usage.handle.version == texture.version &&
+                           usage.handle.kind == texture.kind && usage.handle.epoch == texture.epoch;
                 }))
             {
                 usages.push_back({texture, RHIResourceState::PixelShaderResource, readAccess});

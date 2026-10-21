@@ -1,4 +1,4 @@
-#include "DX12MeshCache.h"
+﻿#include "DX12MeshCache.h"
 #include "DX12DeviceResources.h"
 #include "../RHIModelMeshletUpload.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -260,24 +260,28 @@ void DX12MeshCache::RecordBufferUpload(const void* data, uint64_t bytes,
     // together before the first copy; recording this batch has no failure path.
     memcpy(staging.cpuAddress, data, static_cast<size_t>(bytes));
 
-    auto* commandList = m_resources->GetCommandList();
-    if (destination.block.requiresAliasingBarrier)
+    m_resources->RecordImmediateNative([target = destination.resource,
+        source = Microsoft::WRL::ComPtr<ID3D12Resource>(stagingResource), offset = staging.offset,
+        aliasingRequired = destination.block.requiresAliasingBarrier, bytes, finalState](ID3D12GraphicsCommandList* commandList)
     {
-        D3D12_RESOURCE_BARRIER aliasing{};
-        aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-        aliasing.Aliasing.pResourceAfter = destination.resource.Get();
-        commandList->ResourceBarrier(1, &aliasing);
-    }
-    commandList->CopyBufferRegion(destination.resource.Get(), 0,
-        stagingResource, staging.offset, bytes);
+        if (aliasingRequired)
+        {
+            D3D12_RESOURCE_BARRIER aliasing{};
+            aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+            aliasing.Aliasing.pResourceAfter = target.Get();
+            commandList->ResourceBarrier(1, &aliasing);
+        }
+        commandList->CopyBufferRegion(target.Get(), 0,
+            source.Get(), offset, bytes);
 
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Transition.pResource = destination.resource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = finalState;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    commandList->ResourceBarrier(1, &barrier);
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = target.Get();
+        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter = finalState;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        commandList->ResourceBarrier(1, &barrier);
+    });
 
     m_stats.bytesUploaded += bytes;
 }
@@ -391,9 +395,9 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
     {
         return empty;
     }
-    auto* const commandList = m_resources->GetCommandList();
+    const bool commandRecordingActive = m_resources->IsImmediateRecordingActive();
     const uint64_t recordingId = m_resources->GetCurrentUploadRecordingId();
-    if (!commandList || !recordingId)
+    if (!commandRecordingActive || !recordingId)
     {
         outError = "Mesh upload requires an active recording.";
         ++m_stats.failures;
@@ -661,7 +665,7 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
         }
     }
 
-    if (m_resources->GetCommandList() != commandList ||
+    if (!m_resources->IsImmediateRecordingActive() ||
         m_resources->GetCurrentUploadRecordingId() != recordingId)
     {
         release();

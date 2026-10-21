@@ -13,6 +13,7 @@
 #include "MaterialGraphPrimitiveCache.h"
 #include "MaterialGraphHybridVisibility.h"
 #include "MaterialGraphRenderBindings.h"
+#include "MaterialGraphPassReadPlan.h"
 #include "MaterialGraphSceneLookup.h"
 #include "MaterialGraphSceneRuntimeEffects.h"
 #include "MaterialGraphSceneSubsurface.h"
@@ -300,6 +301,8 @@ class SceneHost final : private IRHIUploadTransactionListener
                         own::shared_owner<const Program>& result, std::string& error);
     void PruneFailedPreparations(const own::shared_owner<const Generation>& requested = {});
     IRenderDeviceServices* device_{};
+    std::array<std::shared_ptr<const PassReadPlan>, 8> m_passReadPlans;
+    size_t m_nextPassReadPlan{};
     MeshSurfaceEvaluator geometry_;
     GpuGeometryVisibility visibility_;
     GpuGeometryOcclusion cameraOcclusion_;

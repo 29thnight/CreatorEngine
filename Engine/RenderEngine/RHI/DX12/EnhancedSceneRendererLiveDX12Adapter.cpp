@@ -1,4 +1,4 @@
-#include "DX12SoftwareCommandValidator.h"
+﻿#include "DX12SoftwareCommandValidator.h"
 #include "DX12CommandTranslator.h"
 #include "../RHISoftwareRecorder.h"
 #include "../RHISoftwareQueueRecorder.h"
@@ -11,6 +11,7 @@
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../RHI/DX12/DX12CommandListPool.h"
 #include "../../RHI/DX12/DX12DeviceResources.h"
+#include "DX12BackendExecution.h"
 #include "../../RHI/DX12/DX12GpuProfiler.h"
 #include "../../RHI/DX12/DX12MeshCache.h"
 #include "../../RHI/DX12/DX12PSOManager.h"
@@ -580,6 +581,16 @@ bool EnhancedSceneRendererLiveDX12Adapter::BeginFrame(std::string& outError)
     {
         impl.compute.queue->CollectCompleted();
     }
+    static const bool deferredBackend = []
+    {
+        char* value{};
+        size_t length{};
+        const bool read = _dupenv_s(&value, &length, "CREATOR_RHI_DEFERRED_BACKEND") == 0;
+        const bool enabled = !read || !value || std::string_view{value} != "0";
+        std::free(value);
+        return enabled;
+    }();
+    impl.resources.SetDeferredImmediateRecording(deferredBackend && UsesSoftwareRecording() && !impl.ownedQueueExecution);
     if (!impl.resources.BeginFrame(outError)) return false;
     impl.commandPool.BeginFrame(impl.commandPoolFrame);
     return true;
@@ -1052,9 +1063,9 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
     Impl::DisplayResource display;
-    if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap,
+    if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap,
         D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr, IID_PPV_ARGS(&display.texture))))
+        nullptr, IID_PPV_ARGS(&display.texture)); })))
     {
         outError = "공유 텍스처 생성 실패";
         return false;
@@ -1151,8 +1162,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
             description.SampleDesc.Count = 1;
             // No simultaneous-access flag: producer and consumer synchronize by
             // completion + lease and return each copy to COPY_DEST before reuse.
-            if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED,
-                    &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textures[index]))) ||
+            if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED,
+                    &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textures[index])); })) ||
                 FAILED(impl.resources.GetDevice()->CreateSharedHandle(textures[index].Get(), nullptr,
                     GENERIC_ALL, nullptr, &handles[index])))
             {
@@ -1327,9 +1338,9 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
     desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     desc.SampleDesc.Count = 1;
 
-    if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap,
+    if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap,
         D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON,
-        nullptr, IID_PPV_ARGS(&impl.fogCloudNeutral))))
+        nullptr, IID_PPV_ARGS(&impl.fogCloudNeutral)); })))
     {
         outError = "포그 중립 구름 텍스처 생성 실패";
         return false;
@@ -1366,7 +1377,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
     src.PlacedFootprint.Footprint.Height = 1;
     src.PlacedFootprint.Footprint.Depth = 1;
     src.PlacedFootprint.Footprint.RowPitch = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
-    impl.resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    impl.resources.RecordImmediateNative([dst, src, destination = impl.fogCloudNeutral,
+                                        source = Microsoft::WRL::ComPtr<ID3D12Resource>(src.pResource)](ID3D12GraphicsCommandList* list)
+    {
+        list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    });
 
     outTexture = impl.resources.RegisterExternalTexture(impl.fogCloudNeutral.Get());
     if (!outTexture.IsValid())
@@ -1434,11 +1449,17 @@ void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameTo
     {
         return;
     }
-    m_impl->profiler.ResolveFrame(m_impl->resources.GetCommandList(), token);
+    m_impl->resources.RecordImmediateNative([profiler = &m_impl->profiler, token](ID3D12GraphicsCommandList* list)
+    {
+        profiler->ResolveFrame(list, token);
+    });
     const auto* submission = m_impl->FindMeasurementSubmission(token);
     if (submission && submission->computeToken.IsValid())
     {
-        m_impl->computeProfiler.ResolveFrame(m_impl->resources.GetCommandList(), submission->computeToken);
+        m_impl->resources.RecordImmediateNative([profiler = &m_impl->computeProfiler, token = submission->computeToken](ID3D12GraphicsCommandList* list)
+        {
+            profiler->ResolveFrame(list, token);
+        });
     }
 }
 

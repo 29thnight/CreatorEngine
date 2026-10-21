@@ -1,8 +1,9 @@
-#pragma once
+﻿#pragma once
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h> // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
 #include "../RHIEncoder.h"
+#include "DX12ResourceEntries.h"
 
 class DX12DeviceResources;
 struct DX12RecordingResources;
@@ -173,6 +174,10 @@ class DX12Encoder final : public RHIEncoder
     ///
     ///   (예전에는 패스가 withSamplers로 골라 걸었다. 그 선택이 무엇을
     ///   아꼈는지는 기록이 없고, 재 보면 호출 하나 차이다.)
+    ID3D12Resource* ResolveRecorded(RHITextureHandle handle) const;
+    ID3D12Resource* ResolveRecorded(RHIBufferHandle handle) const;
+    DX12BufferEntry DescribeRecordedBuffer(RHIBufferHandle handle) const;
+    uint64_t ResolveRecordedGpuAddress(RHIBufferHandle handle) const;
     void EnsureDescriptorHeaps();
     bool IsPipelineBound(RHIBindPoint point, bool mesh = false) const;
 

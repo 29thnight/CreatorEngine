@@ -524,8 +524,9 @@ bool SceneRuntimeEffectsResources::Prepare(const EnhancedFrameContext& context, 
 
 void SceneRuntimeEffectsFrame::CheckCurrent(const EnhancedRenderGraph& graph) const
 {
-    if (graph_ != &graph || graphEpoch_ != graph.ResourceEpoch() || bundle_->lease.load() != lease_ ||
-        recording_ != device_->GetCurrentUploadRecordingId() || descriptors_ != device_->GetDescriptorVersionToken())
+    if (graph_ != graph.DeclarationGraph() || graphEpoch_ != graph.DeclarationEpoch() ||
+        bundle_->lease.load() != lease_ || recording_ != device_->GetCurrentUploadRecordingId() ||
+        descriptors_ != device_->GetDescriptorVersionToken())
     {
         throw std::runtime_error("Runtime effects have stale graph, lease, or upload ownership.");
     }
@@ -537,8 +538,8 @@ void SceneRuntimeEffectsFrame::DeclareInputs(EnhancedRenderGraph& graph) const
     {
         throw std::runtime_error("Runtime effects need one graph declaration per lease.");
     }
-    graph_ = &graph;
-    graphEpoch_ = graph.ResourceEpoch();
+    graph_ = graph.DeclarationGraph();
+    graphEpoch_ = graph.DeclarationEpoch();
     CheckCurrent(graph);
     for (unsigned i = 0; i < graphInputs_.size(); ++i)
     {
@@ -668,30 +669,7 @@ RHIRenderTargetBinding SceneRuntimeEffectsFrame::CaptureTargets(unsigned part) c
     return captureTargets_[part];
 }
 
-void SceneRuntimeEffectsFrame::DeclareShadingInputs(EnhancedRenderGraph& graph,
-                                                    std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool samples,
-                                                    bool background) const
-{
-    CheckCurrent(graph);
-    const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState
-                                                                                      : RGAccessMode::Read;
-    if (samples)
-    {
-        for (const auto input : graphInputs_)
-        {
-            uses.push_back({input, RHIResourceState::PixelShaderResource, read});
-        }
-    }
-    if (!samples)
-    {
-        uses.push_back({graphTileDepth_, RHIResourceState::DepthRead, read});
-    }
-    if (transmission_ && background)
-    {
-        uses.push_back({graphColor_, RHIResourceState::PixelShaderResource, read});
-        uses.push_back({graphDepth_, RHIResourceState::PixelShaderResource, read});
-    }
-}
+
 
 void SceneRuntimeEffectsFrame::Bind(RHIEncoder& encoder, unsigned firstRootSlot, std::size_t tile) const
 {

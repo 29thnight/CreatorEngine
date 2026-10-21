@@ -1,5 +1,31 @@
 #include "RHISoftwareBatch.h"
 
+bool RHISoftwareBatch::ReplaySerial(RHIEncoder& encoder, RHICommandFailure& failure)
+{
+    failure.Reset();
+    if (!IsValid() || !m_storage || m_storage->targetOrder.size() > 1)
+    {
+        failure.message = "Immediate replay requires a sealed single-target software batch.";
+        return false;
+    }
+    m_state = RHISoftwareBatchState::Translating;
+    for (const auto targetIndex : m_storage->targetOrder)
+    {
+        const auto& target = m_storage->targets[targetIndex];
+        for (size_t index = 0; index < target.activeSegments; ++index)
+        {
+            RHICommandTranslationStats stats;
+            if (!target.segments[index]->Replay(encoder, stats, failure))
+            {
+                m_state = RHISoftwareBatchState::Failed;
+                return false;
+            }
+        }
+    }
+    m_state = RHISoftwareBatchState::Translated;
+    return true;
+}
+
 RHISoftwareBatch::RHISoftwareBatch(RHISoftwareBatch&& other) noexcept
 {
     MoveFrom(std::move(other));

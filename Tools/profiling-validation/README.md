@@ -1,5 +1,31 @@
 # 프레임 프로파일러 라이브 검증 (PHASE 14)
 
+## 기존 CPU/ETW HTML에 GPU 레인 추가
+
+DX12 백엔드가 수집한 `gpu_span` 이벤트와 `gpu_pass` provenance를 사용한다.
+새 timestamp query나 GPU 대기를 추가하지 않는다. CPU 타임라인 생성 시 제외한
+GPU 이벤트를 별도 큐/뷰 레인으로 표시한다.
+
+```powershell
+python Tools/profiling-validation/test_gpu_timeline.py
+python Tools/profiling-validation/attach-gpu-timeline.py --root Artifacts/remeasure-10-20261019
+```
+
+입력은 해당 측정 폴더의 `timeline.src.html`, `timeline/manifest.json`,
+`timeline/<dataset>.json`과 각 variant의 원본 `.ceprof`다. 출력은
+`timeline-gpu.src.html`, `gpu-metrics.json`, `gpu-verdict.json`, 데이터셋별 GPU JSON이다.
+소스 HTML을 기존 HTML 렌더러로 렌더링하면 `timeline-gpu.html`이 만들어진다.
+다시 적용할 때는 GPU가 붙기 전 CPU 원본 소스를 사용한다.
+
+GPU는 기존 CPU QPC 앵커로 정렬한다. 원본 엔진 프레임·marker·begin/end·queue·
+submission·view가 정확히 일치하는 provenance만 허용한다. 제출의 전체 64비트 ID와
+원시 tick은 문자열로 보존하며, 수집 프레임이나 가까운 CPU 구간으로 귀속을 추정하지 않는다.
+기록 경계에 걸친 제출은 평균 통계에서 제외하고 원본 이벤트는 표시용으로 보존한다.
+
+GPU 패스 합, 큐별 계측 구간 합집합, 첫~마지막 계측 폭은 서로 다른 수치다.
+CPU Running과 합산하거나 GPU 사용률·화면 FPS로 해석하지 않는다. 기록 OFF 구간의
+GPU 이벤트 부재도 GPU idle의 근거가 아니다. 없는 Compute/Copy 큐 레인을 만들어내지 않는다.
+
 설계 문서: [ProfilingCapturePlan.md](../../docs/plans/ProfilingCapturePlan.md)
 코어 계약 게이트: [../regression/verify-profile-core.ps1](../regression/verify-profile-core.ps1)
 

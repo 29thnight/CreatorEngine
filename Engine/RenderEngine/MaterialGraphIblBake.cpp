@@ -239,7 +239,7 @@ bool IblBakeResult::IsReady() const
 
 RGHandle IblBakeResult::GraphOutput(const EnhancedRenderGraph& graph) const
 {
-    return graph_ == &graph && graphEpoch_ == graph.ResourceEpoch() &&
+    return graph_ == graph.DeclarationGraph() && graphEpoch_ == graph.DeclarationEpoch() &&
                    graph.ResolveBufferHandle(graphOutput_) == buffer_
                ? graphOutput_
                : RGHandle{};
@@ -296,8 +296,8 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
     {
         environment = graph.ImportTexture(environment_.cube.handle, RHIResourceState::ShaderResource, "METEOR.IBL.Cube");
     }
-    graph_ = &graph;
-    graphEpoch_ = graph.ResourceEpoch();
+    graph_ = graph.DeclarationGraph();
+    graphEpoch_ = graph.DeclarationEpoch();
     graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "METEOR.IBL.Result");
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;

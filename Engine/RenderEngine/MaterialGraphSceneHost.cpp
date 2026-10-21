@@ -613,8 +613,57 @@ namespace material_graph
         ce::render_arena_vector<Draw> shadowDraws{&m_cpuStorage->Resource(1)};
         // Static/dynamic caster reads are invariant across this sealed frame's
         // cascades. CheckCurrent rejects reuse with another graph or epoch.
-        mutable std::array<std::vector<EnhancedRenderGraph::RGPassUsage>, 2> m_shadowReadSets;
+        mutable std::array<ce::render_arena_buffer<EnhancedRenderGraph::RGPassUsage>, 2> m_shadowReadSets;
         mutable std::array<bool, 2> m_shadowReadSetsReady{};
+        std::shared_ptr<const PassReadPlan> m_passReadPlan;
+        void AddPassReadPlan(EnhancedRenderGraph& graph, auto& uses,
+                             PassReadPlan::Pass pass, RHIResourceState geometryState) const
+        {
+            ce::profile_scope profile{ce::marker<"MaterialPassReadPlanResolve">()};
+            const auto& inputs = pass == PassReadPlan::Pass::Surface ? draws : shadowDraws;
+            if (!m_passReadPlan)
+            {
+                for (const auto& draw : inputs)
+                {
+                    const bool selected = pass == PassReadPlan::Pass::Surface ?
+                        draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended :
+                        draw.shadowEnabled && draw.staticShadow == (pass == PassReadPlan::Pass::StaticShadow);
+                    if (!selected)
+                    {
+                        continue;
+                    }
+                    uses.push_back({draw.geometry->GraphOutput(graph), geometryState, RGAccessMode::Read});
+                    uses.push_back({draw.geometry->GraphMeshlets(graph), geometryState, RGAccessMode::Read});
+                    for (const auto& texture : draw.bindings->resources.textures)
+                    {
+                        uses.push_back({graph.FindImportedTexture(texture.resource),
+                                        RHIResourceState::PixelShaderResource, RGAccessMode::Read});
+                    }
+                }
+                return;
+            }
+            const auto& reads = m_passReadPlan->Get(pass);
+            const auto& usageTemplate =
+                reads.usageTemplates[geometryState == RHIResourceState::PixelShaderResource ? 1 : 0];
+            const size_t first = uses.size();
+            uses.resize(first + usageTemplate.size());
+            if (!usageTemplate.empty())
+            {
+                std::memcpy(uses.data() + first, usageTemplate.data(),
+                            usageTemplate.size() * sizeof(EnhancedRenderGraph::RGPassUsage));
+            }
+            size_t slot = first;
+            for (const auto index : reads.geometry)
+            {
+                const auto& geometry = inputs[index].geometry;
+                uses[slot++].handle = geometry->GraphOutput(graph);
+                uses[slot++].handle = geometry->GraphMeshlets(graph);
+            }
+            for (const auto texture : reads.textures)
+            {
+                uses[slot++].handle = graph.FindImportedTexture(texture);
+            }
+        }
         ce::render_arena_vector<std::pair<size_t, size_t>> inputRanges{&m_cpuStorage->Resource(2)};
         ce::render_arena_vector<ForwardDraw> blendedOrder{&m_cpuStorage->Resource(2)};
         std::span<const Draw> DrawsFor(std::optional<size_t> inputIndex) const
@@ -698,7 +747,7 @@ namespace material_graph
         // Geometry replay is exclusively for ordered layers. Opaque work is
         // restored from visibility/material tiles; its HW commands stay in Visibility.
         template<class Predicate>
-        void AddLayerReads(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+        void AddLayerReads(EnhancedRenderGraph& graph, auto& uses,
                            const Predicate& selected, RGHandle commands) const
         {
             bool any = false;
@@ -721,7 +770,7 @@ namespace material_graph
             }
         }
 
-        void AddReconstructionReads(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+        void AddReconstructionReads(EnhancedRenderGraph& graph, auto& uses,
                                     RGHandle visibilityTarget, const std::array<RGHandle, 2>& materialInputs,
                                     bool primitiveCache = false) const
         {
@@ -865,7 +914,8 @@ namespace material_graph
             {
                 throw std::runtime_error("METEOR Scene frame has stale upload/descriptor ownership.");
             }
-            if (currentGraph && (graph != currentGraph || currentGraph->ResourceEpoch() != graphEpoch))
+            if (currentGraph &&
+                (graph != currentGraph->DeclarationGraph() || currentGraph->DeclarationEpoch() != graphEpoch))
             {
                 throw std::runtime_error("METEOR Scene frame belongs to a reset graph.");
             }
@@ -3691,6 +3741,30 @@ namespace material_graph
         {
             return Fail(error, exception.what());
         }
+        if (PassReadPlanReuseEnabled())
+        {
+            ce::profile_scope profile{ce::marker<"MaterialPassReadPlanAcquire">()};
+            for (const auto& plan : m_passReadPlans)
+            {
+                if (plan && plan->Matches(candidate->draws, candidate->shadowDraws))
+                {
+                    ce::profile_scope hit{ce::marker<"MaterialPassReadPlanHit">()};
+                    candidate->m_passReadPlan = plan;
+                    break;
+                }
+            }
+            if (!candidate->m_passReadPlan)
+            {
+                ce::profile_scope build{ce::marker<"MaterialPassReadPlanBuild">()};
+                auto plan = std::make_shared<const PassReadPlan>(candidate->draws, candidate->shadowDraws);
+                if (plan->StorageBytes() <= 128 * 1024)
+                {
+                    m_passReadPlans[m_nextPassReadPlan] = plan;
+                    m_nextPassReadPlan = (m_nextPassReadPlan + 1) % m_passReadPlans.size();
+                }
+                candidate->m_passReadPlan = std::move(plan);
+            }
+        }
         nextPreparationPhase(ce::marker<"MaterialScenePublishAndRelease">());
         // Freeze before any durable publication. Recording and graph callbacks
         // share this exact frame; no mutable candidate alias survives the handoff.
@@ -3806,7 +3880,7 @@ namespace material_graph
         {
             throw std::runtime_error("METEOR HW visibility requires its stage list, commands and atomic keys.");
         }
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        auto uses = graph.CreateDeclarationUsages();
         hybrid->AddRasterUses(graph, uses);
         list->AddVisibleIdsRead(graph, uses);
         commands->AddRead(graph, uses, commandInput);
@@ -3814,20 +3888,7 @@ namespace material_graph
         uses.push_back(
             {frame->raster->geometry->GraphTable(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
 
-        for (const auto& draw : frame->draws)
-        {
-            if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
-            {
-                continue;
-            }
-            uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-            uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-            for (const auto& texture : draw.bindings->resources.textures)
-            {
-                uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource,
-                                RGAccessMode::Read});
-            }
-        }
+        frame->AddPassReadPlan(graph, uses, PassReadPlan::Pass::Surface, RHIResourceState::ShaderResource);
         NormalizeSceneReads(graph, uses);
         const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
         const auto pass = graph.AddSplitPass(
@@ -4705,6 +4766,8 @@ namespace material_graph
             device_->UnregisterUploadTransactionListener(this);
         }
         frame_.reset();
+        m_passReadPlans = {};
+        m_nextPassReadPlan = 0;
         cameraHistories_.clear();
         shadowCaches_.clear();
         shadowHistories_.clear();

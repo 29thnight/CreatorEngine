@@ -97,12 +97,14 @@ struct SceneFrameGeometry final
     }
     void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneFrameGeometry> owner) const
     {
-        if (graphOwner == &graph && graphEpoch == graph.ResourceEpoch())
+        if (graphOwner == graph.DeclarationGraph() && graphEpoch == graph.DeclarationEpoch())
+        {
             return;
+        }
         if (graphOwner)
             throw std::runtime_error("METEOR geometry table cannot cross frame graphs.");
-        graphOwner = &graph;
-        graphEpoch = graph.ResourceEpoch();
+        graphOwner = graph.DeclarationGraph();
+        graphEpoch = graph.DeclarationEpoch();
         if (resident)
         {
             resident->Declare(graph, resident);
@@ -123,8 +125,10 @@ struct SceneFrameGeometry final
     }
     RGHandle GraphTable(const EnhancedRenderGraph& graph) const
     {
-        if (graphOwner != &graph || graphEpoch != graph.ResourceEpoch())
+        if (graphOwner != graph.DeclarationGraph() || graphEpoch != graph.DeclarationEpoch())
+        {
             throw std::runtime_error("METEOR geometry table requires its explicit producer.");
+        }
         return graphTable;
     }
 };

@@ -51,7 +51,33 @@ class GpuGeometryOcclusion final
         void Declare(EnhancedRenderGraph& graph, RGHandle depth) const;
         void RequireView(const ViewKey& view) const;
         void RequireCurrentView(const ViewKey& view) const;
-        void AddReadUsages(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const;
+        void AddReadUsages(EnhancedRenderGraph& graph, auto& usages) const
+        {
+            CheckCurrent(&graph);
+            if (m_declaredLevels != m_levelCount)
+            {
+                throw std::runtime_error("Current-depth pyramid is not completely declared.");
+            }
+            for (const auto level : std::span{m_levels}.first(m_declaredLevels))
+            {
+                const auto duplicate = std::find_if(
+                    std::span{usages}.begin(), std::span{usages}.end(),
+                    [&](const auto& usage)
+                    {
+                        return (level.index == usage.handle.index && level.version == usage.handle.version &&
+                                level.kind == usage.handle.kind && level.epoch == usage.handle.epoch);
+                    });
+                if (duplicate == std::span{usages}.end())
+                {
+                    usages.push_back({level, RHIResourceState::ShaderResource, RGAccessMode::Read});
+                }
+                else if (duplicate->state != RHIResourceState::ShaderResource ||
+                         duplicate->access != RGAccessMode::Read)
+                {
+                    throw std::runtime_error("Current-depth pyramid consumer has conflicting resource usage.");
+                }
+            }
+        }
         RHIBindingTable Bindings(const EnhancedRenderGraph::ExecuteContext& execution) const;
         std::array<RHIBindingDesc, kMaximumLevels> BindingInputs(
             const EnhancedRenderGraph::ExecuteContext& execution) const;

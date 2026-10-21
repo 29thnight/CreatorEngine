@@ -235,7 +235,7 @@ namespace material_graph
         RHIBufferHandle Keys() const { return m_buffers[0]; }
         RHIBufferHandle Data() const { return m_buffers[1]; }
 
-        void AddRead(const EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+        void AddRead(const EnhancedRenderGraph& graph, auto& uses) const
         {
             CheckCurrent(&graph);
             if (!m_declared || !m_graphKeys.IsValid() || !m_graphData.IsValid())
@@ -255,7 +255,7 @@ namespace material_graph
             const std::lock_guard declarationLock(m_resources->m_declarationMutex);
             owner->CheckCurrent(&graph);
             const auto materialInputs = m_material->GraphInputs(graph);
-            if (m_graphOwner == &graph && m_graphEpoch == graph.ResourceEpoch())
+            if (m_graphOwner == graph.DeclarationGraph() && m_graphEpoch == graph.DeclarationEpoch())
             {
                 if (!m_declared)
                 {
@@ -273,8 +273,8 @@ namespace material_graph
             {
                 throw std::runtime_error("METEOR primitive cache requires one ExplicitVersioned recording.");
             }
-            m_graphOwner = &graph;
-            m_graphEpoch = graph.ResourceEpoch();
+            m_graphOwner = graph.DeclarationGraph();
+            m_graphEpoch = graph.DeclarationEpoch();
             m_graphVisibility = visibility;
             m_graphKeys = graph.ImportBuffer(Keys(), RHIResourceState::Common, "METEOR.Scene.PrimitiveCache.Keys");
             m_graphData = graph.ImportBuffer(Data(), RHIResourceState::Common, "METEOR.Scene.PrimitiveCache.Data");
@@ -358,7 +358,7 @@ namespace material_graph
             {
                 throw std::runtime_error("METEOR primitive cache has stale upload/descriptor ownership.");
             }
-            if (graph && (graph != m_graphOwner || graph->ResourceEpoch() != m_graphEpoch))
+            if (graph && (graph->DeclarationGraph() != m_graphOwner || graph->DeclarationEpoch() != m_graphEpoch))
             {
                 throw std::runtime_error("METEOR primitive cache belongs to a different or reset graph.");
             }

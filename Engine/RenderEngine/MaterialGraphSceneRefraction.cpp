@@ -201,7 +201,7 @@ namespace material_graph
 
     void SceneRefractionFrame::CheckCurrent(const EnhancedRenderGraph& graph) const
     {
-        if (graph_ != &graph || graphEpoch_ != graph.ResourceEpoch() ||
+        if (graph_ != graph.DeclarationGraph() || graphEpoch_ != graph.DeclarationEpoch() ||
             recording_ != device_->GetCurrentUploadRecordingId() ||
             descriptors_ != device_->GetDescriptorVersionToken())
         {
@@ -215,8 +215,8 @@ namespace material_graph
         {
             throw std::runtime_error("Scene refraction inputs require one declaration.");
         }
-        graph_ = &graph;
-        graphEpoch_ = graph.ResourceEpoch();
+        graph_ = graph.DeclarationGraph();
+        graphEpoch_ = graph.DeclarationEpoch();
         CheckCurrent(graph);
         for (unsigned i = 0; i < inputs_.size(); ++i)
         {

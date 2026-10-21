@@ -1,3 +1,4 @@
+#include "RGSetupTaskGraph.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/RHIProfilingContext.h"
@@ -19,6 +20,19 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
 {
     output = {};
     outError.clear();
+    if (m_setupTasks)
+    {
+        try
+        {
+            ce::profile_scope join{ce::marker<"RenderGraphSetupExecuteJoin">()};
+            m_setupTasks->Join(RGSetupWaitPoint::Execute);
+        }
+        catch (const std::exception& failure)
+        {
+            outError = failure.what();
+            return false;
+        }
+    }
     // The report survives every return path, including recording and submission
     // rejection. CPU queue-operation tickets are inside submissionMilliseconds;
     // these durations must never be presented as CPU waits for GPU completion.

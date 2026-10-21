@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "RHI/DX12/DX12CommandTranslator.h"
 #include "RHI/RHISoftwareRecorder.h"
 #include "RHI/RHISoftwareQueueRecorder.h"
@@ -241,26 +241,26 @@ namespace
                         error.clear();
                         graph.FinishDeclarationPackets();
                         require(graph.DeclarationPacketCount() == count + 1, "Declaration packet boundaries changed.");
-                        if (ce::get_job_scheduler().is_running() && ce::get_thread_pool().size() > 1)
-                        {
-                            require(graph.DeclarationPacketJobs() > 1, "Declaration packets did not dispatch workers.");
-                        }
+                        require(graph.DeclarationPacketJobs() <= 1,
+                                "Small declaration payload unexpectedly dispatched workers.");
                     }
                     graph.AddPass("AfterPacketCollection",
                                   {{value, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
                     std::vector<EnhancedRenderGraph::RGPassUsage> movedUsages{
                         {value, RHIResourceState::ShaderResource, RGAccessMode::Read}};
-                    const auto* transferredUsages = movedUsages.data();
-                    graph.AddPass("MovedUsagePayload", std::move(movedUsages), nullptr, true);
-                    require(movedUsages.empty() && transferredUsages->handle.index == value.index &&
-                                transferredUsages->handle.version == value.version,
-                            "Rvalue usage input did not transfer its owned storage.");
+                    const auto movedPass = graph.AddPass("MovedUsagePayload", std::move(movedUsages), nullptr, true);
+                    require(movedUsages.empty(), "Rvalue usage input was not consumed.");
                     movedUsages.resize(1);
                     movedUsages.front().handle = {};
-                    require(transferredUsages->handle.index == value.index &&
-                                transferredUsages->handle.version == value.version,
-                            "Reusing the moved-from caller invalidated graph-owned usage storage.");
                     require(graph.Compile(error), error);
+                    EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                    require(graph.CaptureDiagnosticSnapshot(snapshot), "Cannot inspect graph-owned usage storage.");
+                    const auto stored = std::find_if(snapshot.passes.begin(), snapshot.passes.end(),
+                        [&](const auto& pass) { return pass.authoredIndex == movedPass.index; });
+                    require(stored != snapshot.passes.end() && stored->usages.size() == 1 &&
+                                stored->usages[0].resource == value.index && stored->usages[0].version == value.version &&
+                                stored->usages[0].kind == value.kind && stored->usages[0].access == RGAccessMode::Read,
+                            "Reusing the caller changed graph-owned usage storage.");
                 };
                 for (size_t epoch = 0; epoch < 3; ++epoch)
                 {
@@ -298,6 +298,27 @@ namespace
                 require(!packets.Compile(error), "Cancelled declaration packets were compiled.");
                 error.clear();
                 packets.Reset();
+                // Small/reused metadata correctly stays inline. Exercise worker
+                // dispatch with independent payload ranges above its cost gate.
+                auto value = packets.ImportTexture(texture, RHIResourceState::RenderTarget, "LargePacketInput");
+                const std::string largePhaseName(2 * 1024 * 1024, 'p');
+                packets.BeginDeclarationPackets();
+                for (size_t index = 0; index < 8; ++index)
+                {
+                    packets.NextDeclarationPacket();
+                    value = packets.Modify(value);
+                    const std::array<EnhancedRenderGraph::RGPassUsage, 1> usages{
+                        {{value, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}}};
+                    const std::array<EnhancedRenderGraph::RepeatedPhaseView, 1> phases{{{largePhaseName, usages}}};
+                    packets.AddRepeatedPassView("LargePacket", usages, phases, 2,
+                        [](const EnhancedRenderGraph::ExecuteContext&, uint32_t, uint32_t) {}, true);
+                }
+                packets.FinishDeclarationPackets();
+                if (ce::get_job_scheduler().is_running() && ce::get_thread_pool().size() > 1)
+                {
+                    require(packets.DeclarationPacketJobs() > 1, "Large declaration payload did not dispatch workers.");
+                }
+                require(packets.Compile(error), error);
             }
 
             SoftwareNativeProbeValidator validator;
@@ -550,8 +571,20 @@ namespace
                 RHISoftwareQueueFactory ownedFactory(resources, ownedRecorder);
                 std::shared_ptr<IRHICommandQueue> ownedCompute;
                 require(ownedFactory.CreateQueue(RHIQueueKind::Compute, ownedCompute, error), error);
+                std::array<RHITextureHandle, 2> ownedTextures;
+                for (uint32_t index = 0; index < ownedTextures.size(); ++index)
+                {
+                    auto ownedTextureDesc = textureDesc;
+                    ownedTextureDesc.initialState = RHIResourceState::CopySource;
+                    ownedTextureDesc.clearColor[0] = 0;
+                    ownedTextureDesc.clearColor[1] = index == 0 ? 1.0f : 0.0f;
+                    ownedTextureDesc.clearColor[2] = index == 0 ? 0.0f : 1.0f;
+                    require(resources.CreateTexture(ownedTextureDesc, ownedTextures[index], error), error);
+                }
                 for (uint32_t iteration = 0; iteration < 2; ++iteration)
                 {
+                    const auto ownedTexture = ownedTextures[iteration];
+                    const std::array ownedTargets{ownedTexture};
                     require(resources.BeginFrame(error) && resources.BeginQueueFrame(primary, error), error);
                     RHISoftwareBatchDesc ownedDesc;
                     ownedDesc.frameId = 3 + iteration;
@@ -559,7 +592,7 @@ namespace
                     ownedRecorder.SetFrameDesc(ownedDesc);
                     const auto beforeReuse = DX12QueueService::QueryRecordingPool(primary);
                     const auto ownedBinding =
-                        resources.CreateRenderTargets(std::span<const RHITextureHandle>{targets}, nullptr);
+                        resources.CreateRenderTargets(std::span<const RHITextureHandle>{ownedTargets}, nullptr);
                     require(ownedBinding.IsValid(), "Owned software target creation failed.");
                     auto ownedLifetime = std::make_shared<int>(3 + iteration);
                     std::weak_ptr<int> pendingOwned = ownedLifetime;
@@ -568,7 +601,7 @@ namespace
                             error);
                     auto& clear = ownedRecording->AcquireEncoder(0);
                     const std::array<RHITransition, 1> toRenderTarget{
-                        RHITransition{texture, RHIResourceState::CopySource, RHIResourceState::RenderTarget}};
+                        RHITransition{ownedTexture, RHIResourceState::CopySource, RHIResourceState::RenderTarget}};
                     barriers.textureTransitions = toRenderTarget;
                     clear.ResourceBarriers(barriers);
                     clear.BindRenderTargets(ownedBinding);
@@ -577,10 +610,10 @@ namespace
                     clear.ClearRenderTargets(ownedBinding, ownedExpected.data());
                     auto& copy = ownedRecording->AcquireEncoder(1);
                     const std::array<RHITransition, 1> ownedToCopySource{
-                        RHITransition{texture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
+                        RHITransition{ownedTexture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
                     barriers.textureTransitions = ownedToCopySource;
                     copy.ResourceBarriers(barriers);
-                    copy.CopyToReadback(readback, texture, 0, 0);
+                    copy.CopyToReadback(readback, ownedTexture, 0, 0);
                     std::shared_ptr<IRHIQueueCommandBatch> ownedBatch;
                     require(ownedRecording->Finish(ownedBatch, error), error);
                     ownedRecording.reset();
@@ -636,7 +669,99 @@ namespace
                     }
                     require(resources.DrainDebugMessages(validation) == 0, validation);
                 }
+                for (const auto ownedTexture : ownedTextures)
+                {
+                    resources.ReleaseTexture(ownedTexture);
+                }
             }
+            {
+                ce::RenderArenaPool pendingPool;
+                std::weak_ptr<int> weak;
+                int executions = 0;
+                const void* address = nullptr;
+                {
+                    DX12PendingCommands pending(pendingPool);
+                    std::array<uint32_t, 3> input{7, 11, 19};
+                    const auto copy = pending.Copy<uint32_t>(input);
+                    address = copy.data();
+                    auto owner = std::make_shared<int>(41);
+                    weak = owner;
+                    pending.Add([owner, copy, &executions](ID3D12GraphicsCommandList*)
+                    {
+                        if (*owner != 41 || copy[0] != 7 || copy[2] != 19)
+                        {
+                            throw std::runtime_error("Pending payload lost its owning copy.");
+                        }
+                        ++executions;
+                    });
+                    owner.reset();
+                    input.fill(0);
+                    require(!weak.expired(), "Pending command released its resource before retirement.");
+                    pending.Execute(reinterpret_cast<ID3D12GraphicsCommandList*>(uintptr_t{1}));
+                    bool rejected = false;
+                    try
+                    {
+                        pending.Execute(reinterpret_cast<ID3D12GraphicsCommandList*>(uintptr_t{1}));
+                    }
+                    catch (const std::logic_error&)
+                    {
+                        rejected = true;
+                    }
+                    require(rejected && executions == 1, "Pending command executed more than once.");
+                }
+                require(weak.expired(), "Retired pending payload retained its owner.");
+                DX12PendingCommands reused(pendingPool);
+                const std::array<uint32_t, 3> input{1, 2, 3};
+                require(reused.Copy<uint32_t>(input).data() == address, "Pending arena storage was not reused.");
+            }
+            {
+                DX12ResourceTable table;
+                Microsoft::WRL::ComPtr<ID3D12Resource> pinned = resources.Resolve(texture);
+                const auto original = table.AddTexture(pinned);
+                auto frozen = table.CaptureRecordingSnapshot();
+                table.Release(original);
+                const auto replacement = table.AddTexture(pinned);
+                require(original != replacement && !table.Resolve(original) &&
+                            frozen->Resolve(original) == pinned.Get() && !frozen->Resolve(replacement),
+                        "Pending resource snapshot followed a released handle into its replacement generation.");
+                table.Release(replacement);
+            }
+            resources.SetDeferredImmediateRecording(true);
+            require(resources.BeginFrame(error), error);
+            RHISparseBufferDesc refusedAllocation;
+            RHIBufferHandle refusedHandle;
+            require(!resources.CreateSparseBuffer(refusedAllocation, refusedHandle, error) &&
+                        !GetRHISubmissionThread().GetOwnerStats(&resources).faulted,
+                    "A refused resource allocation poisoned the RHI submission owner.");
+            error.clear();
+            const std::array<RHITextureHandle, 1> deferredTargets{texture};
+            const auto deferredBinding = resources.CreateRenderTargets(deferredTargets, nullptr);
+            require(deferredBinding.IsValid(), "Deferred target reservation failed.");
+            const std::array<float, 4> deferredColor{0.25f, 0.5f, 0.75f, 1.0f};
+            auto& deferredEncoder = resources.GetImmediateEncoder();
+            const std::array<RHITransition, 1> toTarget{
+                RHITransition{texture, RHIResourceState::CopySource, RHIResourceState::RenderTarget}};
+            RHIBarrierBatch beforeClear;
+            beforeClear.textureTransitions = toTarget;
+            deferredEncoder.ResourceBarriers(beforeClear);
+            deferredEncoder.ClearRenderTargets(deferredBinding, deferredColor.data());
+            const std::array<RHITransition, 1> toCopy{
+                RHITransition{texture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
+            RHIBarrierBatch afterClear;
+            afterClear.textureTransitions = toCopy;
+            deferredEncoder.ResourceBarriers(afterClear);
+            deferredEncoder.CopyToReadback(readback, texture);
+            require(resources.EndFrame(error), error);
+            resources.WaitForGpu();
+            RHIReadbackImage deferredImage;
+            require(resources.MapReadback(readback, deferredImage, error), error);
+            for (uint32_t channel = 0; channel < 4; ++channel)
+            {
+                require(std::abs(deferredImage.At(0, 0, channel) - deferredColor[channel]) <= 1.0f / 255.0f,
+                        "RHI immediate translation changed target pixels.");
+            }
+            require(resources.DrainDebugMessages(validation) == 0, validation);
+            log += "RHI_PENDING_NATIVE_OK arenaReuse=true resourceCapture=true oneShot=true pixels=true\n";
             resources.ReleaseTexture(other);
             resources.ReleaseReadback(readback);
             resources.ReleaseTexture(texture);

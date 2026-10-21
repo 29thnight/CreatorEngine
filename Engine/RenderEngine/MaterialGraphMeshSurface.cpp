@@ -624,7 +624,8 @@ namespace material_graph
 
     RGHandle MeshSurfaceBatch::GraphMeshlets(const EnhancedRenderGraph& graph) const
     {
-        if (!staticBuffers_ || staticBuffers_->graph != &graph || staticBuffers_->graphEpoch != graphEpoch_)
+        if (!staticBuffers_ || staticBuffers_->graph != graph.DeclarationGraph() ||
+            staticBuffers_->graphEpoch != graphEpoch_)
         {
             throw std::runtime_error("METEOR meshlet topology has no current graph declaration.");
         }
@@ -1834,7 +1835,7 @@ namespace material_graph
 
     RGHandle MeshSurfaceBatch::GraphOutput(const EnhancedRenderGraph& graph) const
     {
-        return graph_ == &graph && graphEpoch_ == graph.ResourceEpoch() &&
+        return graph_ == graph.DeclarationGraph() && graphEpoch_ == graph.DeclarationEpoch() &&
                        graph.ResolveBufferHandle(graphOutput_) == buffer_
                    ? graphOutput_
                    : RGHandle{};
@@ -2285,8 +2286,8 @@ namespace material_graph
             {
                 return Fail(error, "Shared mesh producer has no graph output.");
             }
-            instance->graph_ = &graph;
-            instance->graphEpoch_ = graph.ResourceEpoch();
+            instance->graph_ = graph.DeclarationGraph();
+            instance->graphEpoch_ = graph.DeclarationEpoch();
             instance->graphOutput_ = output;
             instance->declared_.store(true);
         }
@@ -2395,14 +2396,14 @@ namespace material_graph
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
         const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
-        graph_ = &graph;
-        graphEpoch_ = graph.ResourceEpoch();
+        graph_ = graph.DeclarationGraph();
+        graphEpoch_ = graph.DeclarationEpoch();
         if (staticBuffers_)
         {
             auto& buffers = *staticBuffers_;
-            if (buffers.graph != &graph || buffers.graphEpoch != graphEpoch_)
+            if (buffers.graph != graph.DeclarationGraph() || buffers.graphEpoch != graphEpoch_)
             {
-                buffers.graph = &graph;
+                buffers.graph = graph.DeclarationGraph();
                 buffers.graphEpoch = graphEpoch_;
                 const bool needsCopy = !buffers.usable;
                 const RHIBufferHandle handles[]{buffers.vertices.buffer, buffers.indices.buffer, buffers.lods.buffer,

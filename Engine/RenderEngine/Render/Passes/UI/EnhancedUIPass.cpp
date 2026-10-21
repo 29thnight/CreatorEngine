@@ -478,7 +478,8 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
             }
             if (std::none_of(usages.begin(), usages.end(), [texture](const auto& usage)
                 {
-                    return usage.handle.index == texture.index;
+                    return usage.handle.index == texture.index && usage.handle.version == texture.version &&
+                           usage.handle.kind == texture.kind && usage.handle.epoch == texture.epoch;
                 }))
             {
                 usages.push_back({ texture, RHIResourceState::PixelShaderResource, RGAccessMode::Read });

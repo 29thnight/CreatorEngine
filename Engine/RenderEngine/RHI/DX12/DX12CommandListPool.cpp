@@ -1,6 +1,7 @@
-#include "DX12CommandListPool.h"
+﻿#include "DX12CommandListPool.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
+#include "../RHIBackendExecution.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
 
@@ -25,6 +26,15 @@ DX12CommandListPool::~DX12CommandListPool()
 bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t workerCount, uint32_t frameCount,
                                      std::string& outError)
 {
+    if (!RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        return GetRHISubmissionThread().ExecuteAndWait(&resources, "DX12 command target initialization",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                return Initialize(resources, workerCount, frameCount, outError);
+            }, outError);
+    }
     ID3D12Device* const device = resources.GetDevice();
     if (nullptr == device || 0 == workerCount || 0 == frameCount)
     {

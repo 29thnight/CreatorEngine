@@ -541,7 +541,8 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
                     handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "Decal.Texture");
                 }
                 if (std::none_of(applyUses.begin(), applyUses.end(), [handle](const auto& use) {
-                        return use.handle.index == handle.index && use.handle.version == handle.version;
+                        return use.handle.index == handle.index && use.handle.version == handle.version &&
+                               use.handle.kind == handle.kind && use.handle.epoch == handle.epoch;
                     }))
                 {
                     applyUses.push_back({handle, RHIResourceState::PixelShaderResource, readAccess});

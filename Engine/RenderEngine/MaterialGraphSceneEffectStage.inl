@@ -214,9 +214,9 @@ void SceneHost::EffectStage::DeclareRefractionCapture(const own::shared_owner<co
 {
     const auto frame = prepared;
     const auto targets = this->refraction->DeclareCaptureOutputs(graph);
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+    auto uses = graph.CreateDeclarationUsages({
         {inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
-        {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+        {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read}});
     for (const auto input : targets)
     {
         uses.push_back({input, RHIResourceState::RenderTarget, RGAccessMode::Write});
@@ -319,9 +319,11 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     std::shared_ptr<const IndirectMaterialBatch> blendedCommands;
     if (blended && ordinary)
     {
-        const auto order = blendedGroup.empty() ? std::vector<size_t>{*blended} : blendedGroup;
-        const auto found =
-            std::ranges::find_if(this->layers.blendedRanges, [&](const auto& range) { return range.inputs == order; });
+        const std::array single{*blended};
+        const auto order =
+            blendedGroup.empty() ? std::span<const size_t>{single} : std::span<const size_t>{blendedGroup};
+        const auto found = std::ranges::find_if(this->layers.blendedRanges, [&](const auto& range)
+                                                { return std::ranges::equal(range.inputs, order); });
         if (found == this->layers.blendedRanges.end())
         {
             throw std::runtime_error("METEOR blended range was not prepared.");
@@ -332,14 +334,14 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     {
         lighting = AdvanceSceneColor(graph, lighting);
     }
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+    auto uses = graph.CreateDeclarationUsages({
         {lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite},
         {inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
         {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read},
-        {ambientOcclusion, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+        {ambientOcclusion, RHIResourceState::ShaderResource, RGAccessMode::Read}});
     if (reconstruct)
     {
-        std::erase_if(uses, [&](const auto& use) { return use.handle.index == inputs.depth.index; });
+        uses.erase_if( [&](const auto& use) { return same_scene_resource(graph, use.handle, inputs.depth); });
     }
     if (blended)
     {
@@ -390,12 +392,12 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     }
     for (unsigned part = 0; part < (lookup->RequiresCapture() ? 2u : 0u); ++part)
     {
-        std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{
+        auto captureUses = graph.CreateDeclarationUsages({
             {inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
-            {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+            {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read}});
         if (reconstruct)
         {
-            std::erase_if(captureUses, [&](const auto& use) { return use.handle.index == inputs.depth.index; });
+            captureUses.erase_if( [&](const auto& use) { return same_scene_resource(graph, use.handle, inputs.depth); });
         }
         this->decal.AddUses(inputs, captureUses, transmissionStage || blended.has_value());
         const unsigned first = part ? 8 : 0, count = part ? 3 : 8;
@@ -528,14 +530,14 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     {
         const auto targets = this->subsurface->DeclareCaptureOutputs(graph);
         this->subsurface->DeclareReflection(graph, *lookup, inputs.bitmask);
-        std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{
+        auto captureUses = graph.CreateDeclarationUsages({
             {inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
             {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read},
             {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read},
-            {this->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read}};
+            {this->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read}});
         if (reconstruct)
         {
-            std::erase_if(captureUses, [&](const auto& use) { return use.handle.index == inputs.depth.index; });
+            captureUses.erase_if( [&](const auto& use) { return same_scene_resource(graph, use.handle, inputs.depth); });
         }
         this->decal.AddUses(inputs, captureUses, transmissionStage || blended.has_value());
         lookup->DeclareShadingInputs(graph, captureUses);
@@ -859,9 +861,9 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     };
     const auto commonUses = [&]
     {
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+        auto uses = graph.CreateDeclarationUsages({
             {inputs.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read},
-            {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read}};
+            {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, RGAccessMode::Read}});
         if (!blended)
         {
             uses.push_back({ambientOcclusion, RHIResourceState::ShaderResource, RGAccessMode::Read});
@@ -1013,13 +1015,15 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     effects->DeclareShadingInputs(graph, external, false, transmissionStage);
     // Tile depth is already the external Write. Its local Read belongs to the
     // capture phases, not a duplicate access on the outer version.
-    std::erase_if(external, [&](const auto& use)
-                  { return use.handle.index == tileDepth.index && use.access == RGAccessMode::Read; });
+    external.erase_if([&](const auto& use)
+                      { return same_scene_resource(graph, use.handle, tileDepth) && use.access == RGAccessMode::Read; });
     NormalizeSceneReads(graph, external);
-    std::vector<EnhancedRenderGraph::RepeatedPhase> phases;
-    phases.push_back({"METEOR.Scene.RuntimeTileDepth",
-                      {{inputs.depth, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
-                       {tileDepth, RHIResourceState::DepthWrite, RGAccessMode::Write}}});
+    std::array<EnhancedRenderGraph::RepeatedPhaseView, 4> phases{};
+    size_t phaseCount = 0;
+    auto depthUses =
+        graph.CreateDeclarationUsages({{inputs.depth, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
+                                       {tileDepth, RHIResourceState::DepthWrite, RGAccessMode::Write}});
+    phases[phaseCount++] = {"METEOR.Scene.RuntimeTileDepth", depthUses};
     for (unsigned part = 0; part < 2; ++part)
     {
         auto captureUses = commonUses();
@@ -1031,29 +1035,30 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
                 {i < 8 ? firstTargets[i] : targets[i], RHIResourceState::RenderTarget, RGAccessMode::Write});
         }
         NormalizeSceneReads(graph, captureUses);
-        phases.push_back({part ? "METEOR.Scene.RuntimeEffectCapture1" : "METEOR.Scene.RuntimeEffectCapture0",
-                          std::move(captureUses)});
+        phases[phaseCount++] = {part ? "METEOR.Scene.RuntimeEffectCapture1" : "METEOR.Scene.RuntimeEffectCapture0",
+                                captureUses};
     }
     auto colorUses = commonUses();
     colorUses.push_back({inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read});
     colorUses.push_back({lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite});
     effects->DeclareShadingInputs(graph, colorUses);
     NormalizeSceneReads(graph, colorUses);
-    phases.push_back({"METEOR.Scene.RuntimeEffectColor", std::move(colorUses)});
-    graph.AddRepeatedPass(
-        "METEOR.Scene.RuntimeEffects", external, phases, static_cast<std::uint32_t>(effects->Tiles().size()),
-        [effects, raster, inputs, lighting, forward](const auto& execution, std::uint32_t iteration,
-                                                     std::uint32_t phase)
-        {
-            if (phase == 0)
-            {
-                effects->RecordDepth(execution, inputs.depth, iteration);
-            }
-            else
-            {
-                raster(execution, iteration, phase == 3 ? -1 : static_cast<int>(phase - 1), lighting, forward);
-            }
-        });
+    phases[phaseCount++] = {"METEOR.Scene.RuntimeEffectColor", colorUses};
+    graph.AddRepeatedPassView("METEOR.Scene.RuntimeEffects", external, std::span{phases}.first(phaseCount),
+                              static_cast<std::uint32_t>(effects->Tiles().size()),
+                              [effects, raster, inputs, lighting, forward](const auto& execution,
+                                                                           std::uint32_t iteration, std::uint32_t phase)
+                              {
+                                  if (phase == 0)
+                                  {
+                                      effects->RecordDepth(execution, inputs.depth, iteration);
+                                  }
+                                  else
+                                  {
+                                      raster(execution, iteration, phase == 3 ? -1 : static_cast<int>(phase - 1),
+                                             lighting, forward);
+                                  }
+                              });
     return lighting;
 }
 
@@ -1112,7 +1117,7 @@ SceneHost::EffectStage::RuntimeBindings SceneHost::EffectStage::RuntimeState::Ta
 }
 
 void SceneHost::EffectStage::DecalState::AddUses(const SceneSurfaceTargets::Outputs& inputs,
-                                                 std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
+                                                 auto& uses,
                                                  bool transmissionStage) const
 {
     if (!inputs.decalBaseline[0].IsValid() || transmissionStage)

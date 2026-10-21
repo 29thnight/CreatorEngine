@@ -6,6 +6,14 @@
 
 namespace material_graph
 {
+    inline bool same_scene_resource(const EnhancedRenderGraph& graph, RGHandle left, RGHandle right)
+    {
+        left = graph.CanonicalDeclarationHandle(left);
+        right = graph.CanonicalDeclarationHandle(right);
+        return left.IsValid() && right.IsValid() && left.index == right.index && left.kind == right.kind &&
+               left.epoch == right.epoch;
+    }
+
     inline RGHandle AdvanceSceneColor(EnhancedRenderGraph& graph, RGHandle lighting)
     {
         return graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned ? graph.Modify(lighting) : lighting;
@@ -33,12 +41,19 @@ namespace material_graph
     // Draws can share geometry and material textures. Only compatible reads of
     // the exact same version may be combined; writes remain unambiguous.
     inline void NormalizeSceneReads(const EnhancedRenderGraph& graph,
-                                    std::vector<EnhancedRenderGraph::RGPassUsage>& uses,
-                                    std::vector<size_t>& overflowScratch)
+                                    auto& uses,
+                                    auto& overflowScratch)
     {
         if (graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder || uses.size() < 2)
         {
             return;
+        }
+        if (graph.DeclarationGraph() != &graph)
+        {
+            for (auto& use : uses)
+            {
+                use.handle = graph.CanonicalDeclarationHandle(use.handle);
+            }
         }
         struct HandleHash
         {
@@ -146,11 +161,13 @@ namespace material_graph
     }
 
     inline void NormalizeSceneReads(const EnhancedRenderGraph& graph,
-                                    std::vector<EnhancedRenderGraph::RGPassUsage>& uses)
+                                    auto& uses)
     {
         // 선언의 정규화는 재진입하거나 작업을 제출하지 않는다. 그래프 핸들은 저장하지 않고
         // 스레드별 인덱스 용량만 유지해 큰 사용 목록마다 할당자를 다시 호출하지 않는다.
-        thread_local std::vector<size_t> overflowScratch;
+        thread_local ce::render_arena_resource scratchArena;
+        scratchArena.reset();
+        ce::render_arena_buffer<size_t> overflowScratch{scratchArena};
         NormalizeSceneReads(graph, uses, overflowScratch);
     }
 } // namespace material_graph

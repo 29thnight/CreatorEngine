@@ -2,6 +2,7 @@
 #include "IRenderDeviceServices.h"
 #include "RHIParallelCommandPool.h"
 #include "RHITranslationWorkQueue.h"
+#include "RHIBackendExecution.h"
 #include "RHIProfilingContext.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 
@@ -133,6 +134,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
     };
     const auto replayTarget = [&](size_t index)
     {
+        RHIBackendExecutionScope backend;
         const auto target = order[index];
         auto targetContext = rhiContext;
         targetContext.target_index = target;

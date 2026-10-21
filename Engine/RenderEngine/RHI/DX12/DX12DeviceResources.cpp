@@ -1,6 +1,7 @@
-#include "../../../EngineDiagnostics/ProfileScope.h"
+﻿#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
+#include "../RHIBackendExecution.h"
 #include "DX12Format.h"
 #include "../Temporal/TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
@@ -247,7 +248,7 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
     }
 
     m_rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    m_device->CreateRenderTargetView(m_renderTarget.Get(), nullptr, m_rtvHandle);
+    WriteRenderTargetView(m_renderTarget.Get(), nullptr, m_rtvHandle);
 
     // ── 프레임 리드백(행 정렬은 CreateReadback이 한다, R2c-b2) ──
     //
@@ -786,6 +787,11 @@ void DX12DeviceResources::Shutdown()
         m_submissionClient = false;
     }
 
+    AbortPendingImmediate();
+    m_deferred.reset();
+    m_deferredFrames = {};
+    m_pendingViews.reset();
+
     // ticket은 그래프 소유자도 잡는다. 안전한 drain 뒤, backend 표보다 먼저 놓는다.
     m_frameSubmissionTickets = {};
     m_frameFenceValues = {};
@@ -905,6 +911,10 @@ void DX12DeviceResources::UnregisterUploadTransactionListener(IRHIUploadTransact
 
 void DX12DeviceResources::ResetImmediateEncoder()
 {
+    if (m_deferredImmediate)
+    {
+        return;
+    }
     // 리스트를 Reset 할 때마다 새로 만든다. 들고 있으면 인코더가 기억하는
     // 디스크립터 힙 바인딩이 낡는다 — Reset 이 그것을 푸는데 인코더는
     // '이미 걸었다'로 남아, 다음 테이블 바인딩이 힙 없이 나간다.
@@ -913,6 +923,10 @@ void DX12DeviceResources::ResetImmediateEncoder()
 
 RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
 {
+    if (m_deferredImmediate)
+    {
+        return GetDeferredImmediateEncoder();
+    }
     // ★ 부를 때마다 상태 기억을 비운다 (G-2a). A-3 은 "BeginFrame 이 다시
     //   만든다"였는데, 그래프가 **패스마다** 이것을 받게 되면서 계약을 좁혔다 —
     //   기억이 패스 경계를 넘으면 안 되기 때문이다(예전에는 그래프가 패스마다
@@ -1014,49 +1028,57 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     {
         return false;
     }
-    auto& allocator = m_allocators[m_frameIndex];
-
-    HRESULT hr = allocator->Reset();
-    if (FAILED(hr))
+    if (m_deferredImmediate)
     {
-        outError = "얼로케이터 Reset 실패 " + HrToString(hr);
-        AppendDeviceRemovedReport(hr, outError);
-        return false;
+        BeginDeferredImmediate();
     }
+    else
+    {
+        auto& allocator = m_allocators[m_frameIndex];
 
-    bool created = false;
-    if (!m_commandList)
-    {
-        auto& retired = m_retiredCommandLists[m_frameIndex];
-        if (!retired.empty())
-        {
-            m_commandList = retired.front();
-            retired.clear();
-        }
-        else
-        {
-            hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr,
-                                             IID_PPV_ARGS(&m_commandList));
-            if (FAILED(hr))
-            {
-                outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
-                AppendDeviceRemovedReport(hr, outError);
-                return false;
-            }
-            created = true;
-        }
-    }
-    if (!created)
-    {
-        hr = m_commandList->Reset(allocator.Get(), nullptr);
+        HRESULT hr = allocator->Reset();
         if (FAILED(hr))
         {
-            outError = "커맨드 리스트 Reset 실패 " + HrToString(hr);
+            outError = "얼로케이터 Reset 실패 " + HrToString(hr);
             AppendDeviceRemovedReport(hr, outError);
             return false;
         }
+
+        bool created = false;
+        if (!m_commandList)
+        {
+            auto& retired = m_retiredCommandLists[m_frameIndex];
+            if (!retired.empty())
+            {
+                m_commandList = retired.front();
+                retired.clear();
+            }
+            else
+            {
+                hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr,
+                                                 IID_PPV_ARGS(&m_commandList));
+                if (FAILED(hr))
+                {
+                    outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
+                    AppendDeviceRemovedReport(hr, outError);
+                    return false;
+                }
+                created = true;
+            }
+        }
+        if (!created)
+        {
+            hr = m_commandList->Reset(allocator.Get(), nullptr);
+            if (FAILED(hr))
+            {
+                outError = "커맨드 리스트 Reset 실패 " + HrToString(hr);
+                AppendDeviceRemovedReport(hr, outError);
+                return false;
+            }
+        }
+        ResetImmediateEncoder();
+
     }
-    ResetImmediateEncoder();
 
     RHIRecordingAdmissionGuard beginGuard([this] { AbortFrame(); });
 
@@ -1101,6 +1123,10 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
 
 bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::string& outError)
 {
+    if (m_deferredImmediate)
+    {
+        return SubmitPendingImmediate(preserveRecording, false, outError);
+    }
     if (!m_commandList)
     {
         outError = "중간 제출할 DX12 command list가 없다";
@@ -1434,7 +1460,11 @@ void DX12DeviceResources::AbortFrame()
     DrainAbortedQueueFrame();
     // 닫기만 한다. 실패해도 할 수 있는 일이 없고, 여기까지 온 시점에
     // 이미 상위가 원래 사유를 들고 있다 — 덮지 않는다.
-    if (m_commandList)
+    if (m_deferredImmediate)
+    {
+        AbortPendingImmediate();
+    }
+    else if (m_commandList)
     {
         m_commandList->Close();
     }
@@ -1454,6 +1484,10 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     {
         outError = "Queue frame completion must be joined before frame retirement.";
         return false;
+    }
+    if (m_deferredImmediate)
+    {
+        return SubmitPendingImmediate(false, true, outError);
     }
     if (!m_commandList)
     {
@@ -2194,7 +2228,7 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
             outError = "백버퍼 " + std::to_string(i) + " 획득 실패";
             return false;
         }
-        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
+        WriteRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
     }
     return true;
 }
@@ -2233,7 +2267,7 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height, std::
             outError = "리사이즈 후 백버퍼 획득 실패";
             return false;
         }
-        m_device->CreateRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
+        WriteRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
     }
     return true;
 }
@@ -2386,6 +2420,13 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
 
 void DX12DeviceResources::TransitionResources(std::span<const RHITransition> transitions)
 {
+    if (m_deferredImmediate)
+    {
+        RHIBarrierBatch barriers;
+        barriers.textureTransitions = transitions;
+        GetDeferredImmediateEncoder().ResourceBarriers(barriers);
+        return;
+    }
     if (nullptr == m_commandList.Get() || transitions.empty())
     {
         return;
@@ -2428,6 +2469,13 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
 
 void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition> transitions)
 {
+    if (m_deferredImmediate)
+    {
+        RHIBarrierBatch barriers;
+        barriers.bufferTransitions = transitions;
+        GetDeferredImmediateEncoder().ResourceBarriers(barriers);
+        return;
+    }
     if (nullptr == m_commandList.Get() || transitions.empty())
     {
         return;
@@ -2498,7 +2546,7 @@ void DX12DeviceResources::InitializeNullTextureDescriptors()
     description.Format = ToDXGI(RHIFormat::RGBA8Unorm);
     description.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     description.Texture2D.MipLevels = 1;
-    m_device->CreateShaderResourceView(nullptr, &description, source);
+    WriteShaderResourceView(nullptr, &description, source);
 
     // Simple은 한 원본을 반복하는 API가 아니므로 블록 전체를 먼저 채운다.
     // 매 복사의 원본 [0, initialized)와 목적지 [initialized, 2*initialized)는
@@ -2507,7 +2555,7 @@ void DX12DeviceResources::InitializeNullTextureDescriptors()
     {
         auto destination = source;
         destination.ptr += static_cast<SIZE_T>(initialized) * increment;
-        m_device->CopyDescriptorsSimple(initialized, destination, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        CopyNativeDescriptors(initialized, destination, source, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     m_nullTextureDescriptorHeap = std::move(heap);
@@ -2581,7 +2629,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
             }
             // 원본은 worker 전체가 공유하는 불변 CPU 힙이고, 목적지는 이 호출이
             // 새로 예약한 범위다. 제출된 shader-visible page를 원본으로 읽지 않는다.
-            device->CopyDescriptorsSimple(count, handle, m_nullTextureDescriptor,
+            CopyNativeDescriptors(count, handle, m_nullTextureDescriptor,
                                           D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
             i += count - 1;
             continue;
@@ -2609,14 +2657,14 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
                 uav.Texture2D.MipSlice = desc.mostDetailedMip;
                 break;
             }
-            device->CreateUnorderedAccessView(resource, nullptr, &uav, handle);
+            WriteUnorderedAccessView(resource, nullptr, &uav, handle);
             continue;
         }
 
         // Default는 리소스가 스스로 아는 대로 본다 — nullptr 설명과 같다.
         if (RHIBindingDesc::Dim::Default == desc.dim)
         {
-            device->CreateShaderResourceView(resource, nullptr, handle);
+            WriteShaderResourceView(resource, nullptr, handle);
             continue;
         }
 
@@ -2656,7 +2704,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
             srv.Texture2D.MipLevels = desc.mipLevels;
             break;
         }
-        device->CreateShaderResourceView(resource, &srv, handle);
+        WriteShaderResourceView(resource, &srv, handle);
     }
 
     RHIBindingTable table{};
@@ -2670,12 +2718,22 @@ bool DX12DeviceResources::CaptureRecordingResources(std::shared_ptr<const DX12Re
                                                     std::string& outError,
                                                     const DX12RecordingResources* retiredResources)
 {
+    if (m_deferredImmediate && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        return GetRHISubmissionThread().ExecuteAndWait(this, "DX12 recording resource snapshot",
+            [this, &result, retiredResources](std::string& backendError)
+            {
+                return CaptureRecordingResources(result, backendError, retiredResources);
+            }, outError);
+    }
     if (result || !m_device || !m_currentRecordingId)
     {
         outError = "Recording resource capture requires an active recording and empty output.";
         return false;
     }
     auto recording = std::make_shared<DX12RecordingResources>();
+    FlushPendingViews();
+    recording->resourceTable = m_resourceTable.CaptureRecordingSnapshot();
     recording->uploadRecordingId = m_currentRecordingId;
     recording->descriptors = m_descriptorRecycler.PinRecording(m_descriptorRecycler.GetCurrentVersionToken());
     recording->uploads = m_uploadAllocator.PinRecording(m_currentRecordingId);
@@ -2724,7 +2782,10 @@ void DX12DeviceResources::ClearRecordedUnorderedAccess(ID3D12GraphicsCommandList
                                                        const DX12RecordingResources& recording,
                                                        const RHIBindingDesc& desc, const float rgba[4])
 {
-    auto* resource = ResolveBinding(desc);
+    auto* resource = recording.resourceTable
+        ? (desc.dim == RHIBindingDesc::Dim::Buffer ? recording.resourceTable->Resolve(desc.bufferResource)
+                                                 : recording.resourceTable->Resolve(desc.resource))
+        : ResolveBinding(desc);
     if (!resource || !rgba || recording.clearUsed >= recording.clearCapacity)
     {
         throw std::runtime_error("Frozen UAV clear has no resource, color, or descriptor capacity.");
@@ -2757,8 +2818,8 @@ void DX12DeviceResources::ClearRecordedUnorderedAccess(ID3D12GraphicsCommandList
         break;
     }
 
-    m_device->CreateUnorderedAccessView(resource, nullptr, &uav, cpu);
-    m_device->CopyDescriptorsSimple(1, shaderCpu, cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    WriteUnorderedAccessView(resource, nullptr, &uav, cpu);
+    CopyNativeDescriptors(1, shaderCpu, cpu, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     commandList.ClearUnorderedAccessViewFloat(shaderGpu, cpu, resource, rgba, 0, nullptr);
 }
 
@@ -2816,7 +2877,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE DX12DeviceResources::CreateClearDescriptor(const RHI
         break;
     }
 
-    m_device->CreateUnorderedAccessView(resource, nullptr, &uav, handle);
+    WriteUnorderedAccessView(resource, nullptr, &uav, handle);
     return handle;
 }
 
@@ -2886,7 +2947,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(std::span<const 
             const bool defaultView = RHIFormat::Unknown == color.format && 0 == color.mipSlice && 0 == color.sliceCount;
             if (defaultView)
             {
-                device->CreateRenderTargetView(resource, nullptr, m_rtvViewHeap.CpuAt(index + i));
+                WriteRenderTargetView(resource, nullptr, m_rtvViewHeap.CpuAt(index + i));
                 continue;
             }
 
@@ -2904,7 +2965,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(std::span<const 
                 rtv.Texture2DArray.FirstArraySlice = color.firstSlice;
                 rtv.Texture2DArray.ArraySize = color.sliceCount;
             }
-            device->CreateRenderTargetView(resource, &rtv, m_rtvViewHeap.CpuAt(index + i));
+            WriteRenderTargetView(resource, &rtv, m_rtvViewHeap.CpuAt(index + i));
         }
 
         rtvIndex = index;
@@ -2934,7 +2995,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(std::span<const 
             dsv.Texture2DArray.ArraySize = depth->sliceCount;
         }
 
-        device->CreateDepthStencilView(Resolve(depth->resource), &dsv, m_dsvViewHeap.CpuAt(index));
+        WriteDepthStencilView(Resolve(depth->resource), &dsv, m_dsvViewHeap.CpuAt(index));
         dsvIndex = index;
         binding.hasDepth = true;
     }
@@ -3064,6 +3125,25 @@ bool DX12DeviceResources::IsAtomicMin64Buffer(RHIBufferHandle buffer) const
 
 bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandle& outHandle, std::string& outError)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreateBuffer",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreateBuffer(desc, outHandle, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, outError);
+        if (dispatched)
+        {
+            outError = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     ce::profile_scope profile{ce::marker<"DX12CreateBuffer">()};
     outHandle = {};
     if (nullptr == m_device)
@@ -3135,6 +3215,25 @@ uint64_t DX12DeviceResources::SparseBufferTileBytes() const
 bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc, RHIBufferHandle& outHandle,
                                              std::string& outError)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreateSparseBuffer",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreateSparseBuffer(desc, outHandle, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, outError);
+        if (dispatched)
+        {
+            outError = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     outHandle = {};
     if (!m_device || !m_queue || !desc.virtualBytes || !desc.physicalTileCapacity ||
         desc.virtualBytes > uint64_t(UINT32_MAX) * RHISparseTileBytes)
@@ -3442,6 +3541,25 @@ bool DX12DeviceResources::DescribeTransientAllocation(const RHITransientResource
 bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& info,
                                               std::shared_ptr<RHITransientHeap>& heap, std::string& error)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreateTransientHeap",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreateTransientHeap(info, heap, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, error);
+        if (dispatched)
+        {
+            error = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     heap.reset();
     if (!m_device || !info.bytes || info.alignment != D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
         info.bytes % info.alignment != 0 || info.heapClass < 1 || info.heapClass > 3)
@@ -3471,6 +3589,25 @@ bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& 
 bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& desc, RHITransientHeap& heap,
                                                 RHITextureHandle& texture, RHIBufferHandle& buffer, std::string& error)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreatePlacedTransient",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreatePlacedTransient(desc, heap, texture, buffer, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, error);
+        if (dispatched)
+        {
+            error = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     texture = {};
     buffer = {};
     auto* nativeHeap = dynamic_cast<DX12GraphTransientHeap*>(&heap);
@@ -3548,6 +3685,25 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
 
 bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc, RHITextureHandle& outHandle, std::string& outError)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreateTexture",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreateTexture(desc, outHandle, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, outError);
+        if (dispatched)
+        {
+            outError = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     ce::profile_scope profile{ce::marker<"DX12CreateTexture">()};
     if (nullptr == m_device)
     {
@@ -3637,6 +3793,25 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc, RHITextureHa
 bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIFormat format, uint32_t sliceCount,
                                          RHIReadback& outReadback, std::string& outError)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreateReadback",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreateReadback(width, height, format, sliceCount, outReadback, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, outError);
+        if (dispatched)
+        {
+            outError = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     if (nullptr == m_device)
     {
         outError = "디바이스가 없다";
@@ -3703,6 +3878,25 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIFor
 
 bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes, RHIReadback& outReadback, std::string& outError)
 {
+    if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
+    {
+        bool created = false;
+        std::string backendError;
+        const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(this, "DX12 CreateBufferReadback",
+            [&](std::string&)
+            {
+                RHIBackendExecutionScope backend;
+                created = CreateBufferReadback(bytes, outReadback, backendError);
+                // An allocation refusal is a service result, not a failed command submission.
+                return true;
+            }, outError);
+        if (dispatched)
+        {
+            outError = std::move(backendError);
+        }
+        return dispatched && created;
+    }
+
     if (nullptr == m_device)
     {
         outError = "디바이스가 없다";

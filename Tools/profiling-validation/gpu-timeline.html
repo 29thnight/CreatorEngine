@@ -1,0 +1,8 @@
+<section id="gpuTimeline">
+<h2>GPU 큐 · CPU와 같은 시간축</h2>
+<div class="controls"><button id="gpuFit">현재 CPU 뷰와 대응 GPU까지 확대</button><label>GPU 패스 검색<input id="gpuSearch" placeholder="예: Shadow / Shared / SSGI"></label></div>
+<p id="gpuStatus" class="note" role="status"></p>
+<figure><div class="scroll"><canvas id="gpuPasses" class="plot" aria-label="QPC에 정렬된 실제 GPU 패스 시간"></canvas></div><figcaption>실제 GPU timestamp를 CPU QPC로 보정한 시간이다. CPU ETW 상태를 GPU에 적용하지 않는다. 같은 뷰·원본 realFrame·제출·큐를 보존하며 수집 시점이나 가까운 CPU 프레임에 끼워 맞추지 않는다. 빈 구간은 이 계측 범위에서 패스가 보이지 않는다는 뜻이며 GPU 전체 idle을 보장하지 않는다.</figcaption></figure>
+<div class="scroll tableScroll"><table><thead><tr><th>뷰 · 큐 · 패스</th><th>범위 내 합 ms</th><th>호출</th><th>원본 최대 ms</th></tr></thead><tbody id="gpuStats"></tbody></table></div>
+<p class="note">패스 합은 중첩 시 중복된다. 큐별 계측 구간 합집합과 첫~마지막 timestamp 폭은 상태 줄에서 구분한다. GPU 사용률·화면 FPS와는 다른 값이다. 0 tick 패스도 원본 0ms로 보존한다.</p>
+</section>

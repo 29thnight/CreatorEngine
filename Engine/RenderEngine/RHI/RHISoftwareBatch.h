@@ -56,6 +56,7 @@ class RHISoftwareBatch final
     uint64_t GetRecordingId() const { return m_recordingId; }
     uint32_t GetTargetCount() const { return m_storage ? static_cast<uint32_t>(m_storage->targetOrder.size()) : 0; }
     const RHICommandRecordingStats& GetRecordingStats() const { return m_stats; }
+    bool ReplaySerial(RHIEncoder& encoder, RHICommandFailure& failure);
 
   private:
     friend class RHISoftwareRecorder;

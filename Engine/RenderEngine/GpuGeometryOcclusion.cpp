@@ -237,8 +237,8 @@ void GpuGeometryOcclusion::Pyramid::CheckCurrent(const EnhancedRenderGraph* grap
 {
     if (!m_view.device || m_view.device->GetCurrentUploadRecordingId() != m_view.recording ||
         m_view.device->GetDescriptorVersionToken() != m_view.descriptors ||
-        (graph &&
-         (m_graph != graph || m_graphEpoch != graph->ResourceEpoch() || &graph->DeviceServices() != m_view.device)))
+        (graph && (m_graph != graph->DeclarationGraph() || m_graphEpoch != graph->DeclarationEpoch() ||
+                   &graph->DeviceServices() != m_view.device)))
     {
         throw std::runtime_error("Current-depth pyramid escaped its device, recording, descriptors or graph epoch.");
     }
@@ -347,8 +347,8 @@ void GpuGeometryOcclusion::Pyramid::ImportHistory(EnhancedRenderGraph& graph) co
         CheckCurrent(&graph);
         return;
     }
-    m_graph = &graph;
-    m_graphEpoch = graph.ResourceEpoch();
+    m_graph = graph.DeclarationGraph();
+    m_graphEpoch = graph.DeclarationEpoch();
     for (auto texture : m_history->textures)
     {
         auto handle = graph.ImportTexture(texture, RHIResourceState::ShaderResource, m_name);
@@ -390,7 +390,8 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
         return;
     }
     if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned || &graph.DeviceServices() != m_view.device ||
-        !depth.IsValid() || depth.kind != RGResourceKind::Texture || depth.epoch != graph.ResourceEpoch())
+        !depth.IsValid() || depth.kind != RGResourceKind::Texture || (depth.epoch != graph.ResourceEpoch() &&
+         graph.DeclarationGraph()->CanonicalDeclarationHandle(depth).epoch != graph.DeclarationEpoch()))
     {
         throw std::runtime_error("Current-depth pyramid requires an earlier same-view RG2 depth version.");
     }
@@ -399,8 +400,8 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
     {
         throw std::runtime_error("Current-depth pyramid requires its retained prepared owner.");
     }
-    m_graph = &graph;
-    m_graphEpoch = graph.ResourceEpoch();
+    m_graph = graph.DeclarationGraph();
+    m_graphEpoch = graph.DeclarationEpoch();
     m_depth = depth;
     using Usage = EnhancedRenderGraph::RGPassUsage;
     std::array<Usage, kMaximumLevels + 1u> uses;
@@ -477,28 +478,7 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
     graph.DeclareRecordingIndependent(buildPass);
 }
 
-void GpuGeometryOcclusion::Pyramid::AddReadUsages(EnhancedRenderGraph& graph,
-                                                  std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const
-{
-    CheckCurrent(&graph);
-    if (m_declaredLevels != m_levelCount)
-    {
-        throw std::runtime_error("Current-depth pyramid is not completely declared.");
-    }
-    for (const auto level : std::span{m_levels}.first(m_declaredLevels))
-    {
-        const auto duplicate = std::find_if(
-            std::span{usages}.begin(), std::span{usages}.end(), [&](const auto& usage) { return SameOcclusionHandle(level, usage.handle); });
-        if (duplicate == std::span{usages}.end())
-        {
-            usages.push_back({level, RHIResourceState::ShaderResource, RGAccessMode::Read});
-        }
-        else if (duplicate->state != RHIResourceState::ShaderResource || duplicate->access != RGAccessMode::Read)
-        {
-            throw std::runtime_error("Current-depth pyramid consumer has conflicting resource usage.");
-        }
-    }
-}
+
 
 std::array<RHIBindingDesc, GpuGeometryOcclusion::kMaximumLevels> GpuGeometryOcclusion::Pyramid::BindingInputs(
     const EnhancedRenderGraph::ExecuteContext& execution) const

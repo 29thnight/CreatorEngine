@@ -154,20 +154,17 @@ struct GpuGeometryVisibility::BufferPool
 {
     struct DeclarationScratch
     {
-        std::mutex m_mutex;
-        std::array<std::vector<EnhancedRenderGraph::RGPassUsage>, 5> m_uses;
-        std::vector<size_t> m_normalize;
-        std::vector<const material_graph::MeshSurfaceBatch*> m_geometrySeen;
+        ce::render_arena_resource m_arena;
+        std::array<ce::render_arena_buffer<EnhancedRenderGraph::RGPassUsage>, 5> m_uses;
+        ce::render_arena_buffer<size_t> m_normalize;
+        ce::render_arena_buffer<const material_graph::MeshSurfaceBatch*> m_geometrySeen;
     };
     struct UploadScratch
     {
-        std::mutex m_mutex;
         std::vector<RHIBindingDesc> m_vertices, m_topologies;
     };
-    // 선언 메타데이터와 업로드 조립은 서로 다른 저장소를 독점한다.
-    // GPU callback에는 복사된 사용 목록/완성된 테이블만 전달하고 용량은 풀에 남긴다.
-    DeclarationScratch m_declaration;
-    UploadScratch m_upload;
+    // Declaration and upload assembly use independent per-thread scratch.
+    // Callbacks retain copied usages and completed tables, never these ranges.
     struct Entry
     {
         RHIBufferHandle handle;
@@ -1259,7 +1256,8 @@ void GpuGeometryVisibility::Frame::CheckCurrent(const EnhancedRenderGraph* graph
 {
     if (!m_device || m_device->GetCurrentUploadRecordingId() != m_recording ||
         m_device->GetDescriptorVersionToken() != m_descriptors ||
-        (graph && (m_graph != graph || m_graphEpoch != graph->ResourceEpoch() || &graph->DeviceServices() != m_device)))
+        (graph && (m_graph != graph->DeclarationGraph() || m_graphEpoch != graph->DeclarationEpoch() ||
+                   &graph->DeviceServices() != m_device)))
     {
         throw std::runtime_error("GPU visibility frame escaped its recording, descriptors or graph epoch.");
     }
@@ -1506,23 +1504,23 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     }
     const auto owners = std::span{ownerStorage}.first(ownerCount);
     // Upload assembly does not borrow declaration metadata. Finish it before
-    // acquiring the pool's usage-list lock, including any assisted upload work.
+    // entering thread-local declaration scratch, including assisted upload work.
     const auto shared = owners.size() > 1 ? BuildShared(owners) : std::shared_ptr<SharedBatch>{};
     if (!shared)
     {
         owners.front()->UploadMeshletInputs();
     }
 
-    auto& scratch = owners.front()->m_bufferPool->m_declaration;
-    render_graph_declaration_lock scratchLock(scratch.m_mutex);
-    if (!scratchLock.owns_lock())
-    {
-        throw std::runtime_error("Concurrent meshlet declaration cannot borrow the same pool scratch.");
-    }
+    // No scheduling or assisted wait occurs below this point. AddPass copies
+    // every range before return, so this writer can rewind its retained blocks.
+    static thread_local BufferPool::DeclarationScratch scratch;
+    scratch.m_arena.reset();
     for (auto& uses : scratch.m_uses)
     {
-        uses.clear();
+        uses = ce::render_arena_buffer<EnhancedRenderGraph::RGPassUsage>{scratch.m_arena};
     }
+    scratch.m_normalize = ce::render_arena_buffer<size_t>{scratch.m_arena};
+    scratch.m_geometrySeen = ce::render_arena_buffer<const material_graph::MeshSurfaceBatch*>{scratch.m_arena};
     auto& resetUses = scratch.m_uses[0];
     auto& cullUses = scratch.m_uses[1];
     auto& countUses = scratch.m_uses[2];
@@ -1548,7 +1546,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         scatterUses.reserve(ownerCount * 2u);
     }
 
-    const auto advance = [&graph](const Frame& frame, std::vector<EnhancedRenderGraph::RGPassUsage>& uses, bool first)
+    const auto advance = [&graph](const Frame& frame, auto& uses, bool first)
     {
         frame.m_graphArguments = first ? graph.Write(frame.m_graphArguments) : graph.Modify(frame.m_graphArguments);
         frame.m_graphVisibleIds = first ? graph.Write(frame.m_graphVisibleIds) : graph.Modify(frame.m_graphVisibleIds);
@@ -1558,8 +1556,8 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     };
     for (const auto& frame : owners)
     {
-        frame->m_graph = &graph;
-        frame->m_graphEpoch = graph.ResourceEpoch();
+        frame->m_graph = graph.DeclarationGraph();
+        frame->m_graphEpoch = graph.DeclarationEpoch();
         frame->m_graphVisibleIds =
             graph.ImportBuffer(frame->m_visibleIds, RHIResourceState::Common, "METEOR.ShadowMeshlet.IDs");
         frame->m_graphArguments =
@@ -1639,7 +1637,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     };
     const auto* declaration = graph.RetainDeclaration<Declaration>(ownerStorage, ownerCount, shared);
     const auto declare =
-        [&](const char* suffix, const std::vector<EnhancedRenderGraph::RGPassUsage>& uses, MeshletStage stage)
+        [&](const char* suffix, const auto& uses, MeshletStage stage)
     {
         const auto pass =
             graph.AddPass(std::string(passPrefix) + suffix, uses,
@@ -1801,8 +1799,8 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     {
         throw std::runtime_error("GPU visibility requires a DeclarationOrder or ExplicitVersioned graph.");
     }
-    m_graph = &graph;
-    m_graphEpoch = graph.ResourceEpoch();
+    m_graph = graph.DeclarationGraph();
+    m_graphEpoch = graph.DeclarationEpoch();
     m_graphVisibleIds = graph.ImportBuffer(m_visibleIds, RHIResourceState::Common, "Geometry.Visibility.IDs");
     m_graphArguments = graph.ImportBuffer(m_arguments, RHIResourceState::Common, "Geometry.Visibility.Arguments");
     // A retired allocation always returns in Common; consumers can still select
@@ -1828,11 +1826,11 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
         m_graphArguments = graph.Modify(m_graphArguments);
         m_graphVisibleIds = graph.Write(m_graphVisibleIds);
     }
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages{
+    auto usages = graph.CreateDeclarationUsages({
         {m_graphArguments, RHIResourceState::UnorderedAccess,
          versioned ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState},
         {m_graphVisibleIds, RHIResourceState::UnorderedAccess,
-         versioned ? RGAccessMode::Write : RGAccessMode::LegacyState}};
+         versioned ? RGAccessMode::Write : RGAccessMode::LegacyState}});
     if (m_pyramid)
     {
         m_pyramid->AddReadUsages(graph, usages);
@@ -1855,51 +1853,18 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     graph.DeclareRecordingIndependent(cullPass);
 }
 
-void GpuGeometryVisibility::Frame::AddReadUsages(EnhancedRenderGraph& graph,
-                                                 std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const
-{
-    Declare(graph);
-    const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState
-                                                                                        : RGAccessMode::Read;
-    for (const auto& usage :
-         {EnhancedRenderGraph::RGPassUsage{m_graphArguments, RHIResourceState::IndirectArgument, access},
-          EnhancedRenderGraph::RGPassUsage{m_graphVisibleIds, RHIResourceState::ShaderResource, access}})
-    {
-        const auto duplicate = std::ranges::find_if(usages, [&](const auto& existing) {
-            return existing.handle.index == usage.handle.index && existing.handle.version == usage.handle.version &&
-                   existing.handle.kind == usage.handle.kind && existing.handle.epoch == usage.handle.epoch;
-        });
-        if (duplicate == usages.end())
-        {
-            usages.push_back(usage);
-        }
-        else if (duplicate->state != usage.state || duplicate->access != usage.access)
-        {
-            throw std::runtime_error("GPU visibility consumer has conflicting resource usages.");
-        }
-    }
-}
 
-void GpuGeometryVisibility::Frame::AddCommandInputRead(EnhancedRenderGraph& graph,
-                                                       std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const
-{
-    if (m_graph != &graph || m_graphEpoch != graph.ResourceEpoch() || !m_graphArguments.IsValid())
-        throw std::runtime_error("METEOR commands require an explicitly declared visibility producer.");
-    usages.push_back({m_graphArguments, RHIResourceState::ShaderResource, RGAccessMode::Read});
-}
 
-void GpuGeometryVisibility::Frame::AddVisibleIdsRead(EnhancedRenderGraph& graph,
-                                                     std::vector<EnhancedRenderGraph::RGPassUsage>& usages) const
-{
-    if (m_graph != &graph || m_graphEpoch != graph.ResourceEpoch() || !m_graphVisibleIds.IsValid())
-        throw std::runtime_error("METEOR raster requires an explicitly declared visibility producer.");
-    usages.push_back({m_graphVisibleIds, RHIResourceState::ShaderResource, RGAccessMode::Read});
-}
+
+
+
 
 RGHandle GpuGeometryVisibility::Frame::GraphVisibleIds(const EnhancedRenderGraph& graph) const
 {
-    if (m_graph != &graph || m_graphEpoch != graph.ResourceEpoch() || !m_graphVisibleIds.IsValid())
+    if (m_graph != graph.DeclarationGraph() || m_graphEpoch != graph.DeclarationEpoch() || !m_graphVisibleIds.IsValid())
+    {
         throw std::runtime_error("METEOR visibility list was not declared on this graph.");
+    }
     return m_graphVisibleIds;
 }
 
