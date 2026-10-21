@@ -1,0 +1,1781 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>JobSystem 도입 타당성 분석</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="JobSystemFeasibilityAnalysis.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/JobSystemFeasibilityAnalysis.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>JobSystem 도입 타당성 분석</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Job input</ve-node><ve-node id="n1" at="2 1">Scheduler</ve-node><ve-node id="n2" at="3 1" key>Workers</ve-node><ve-node id="n3" at="3 2">Completion</ve-node><ve-node id="n4" at="2 2">Join</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.</li>
+<li>과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L318">ScriptCore/Native.cs:318</a> — <code>private static int _gameThreadId;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L324">ScriptCore/Native.cs:324</a> — <code>public static bool IsGameThread</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L363">ScriptCore/Native.cs:363</a> — <code>ReportOffThread(api);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L126">Engine/SceneRuntime/Animator.h:126</a> — <code>void OnAddedToScene() override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L185">Engine/SceneRuntime/Animator.h:185</a> — <code>void AddClipEvent(int clipIndex);                 // 이름 유일화 신규(구 Animation::AddEvent())</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L190">Engine/SceneRuntime/Animator.h:190</a> — <code>std::size_t InvokeClipEvents(int clipIndex, double currentProgress,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24">Engine/RenderEngine/RenderScene.h:24</a> — <code>class RenderScene</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L46">Engine/RenderEngine/RenderScene.h:46</a> — <code>RenderScene() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L47">Engine/RenderEngine/RenderScene.h:47</a> — <code>&amp;#126;RenderScene();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/IAIComponent.h#L4">Engine/SceneRuntime/IAIComponent.h:4</a> — <code>enum class AIType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/IAIComponent.h#L10">Engine/SceneRuntime/IAIComponent.h:10</a> — <code>class IAIComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/IAIComponent.h#L18">Engine/SceneRuntime/IAIComponent.h:18</a> — <code>virtual void InternalAIUpdate(float deltaSecond) {};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L41">Editor/EngineEntry/ProgressWindow.h:41</a> — <code>ResetEvent(m_hReadyEvent);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L56">Editor/EngineEntry/ProgressWindow.h:56</a> — <code>WaitForSingleObject(m_hReadyEvent, kReadyTimeoutMs);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L133">Editor/EngineEntry/ProgressWindow.h:133</a> — <code>DWORD wait = MsgWaitForMultipleObjects(1, &amp;m_hThread, FALSE, INFINITE, QS_ALLINPUT);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationController.h#L68">Engine/SceneRuntime/AnimationController.h:68</a> — <code>std::shared_ptr&lt;AniTransition&gt; CheckTransition();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationController.h#L74">Engine/SceneRuntime/AnimationController.h:74</a> — <code>std::shared_ptr&lt;AnimationState&gt; GetAniState();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationController.h#L76">Engine/SceneRuntime/AnimationController.h:76</a> — <code>std::shared_ptr&lt;AnimationState&gt; CreateState_UI();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L54">Engine/RenderEngine/Assets/ModelAssetGeneration.h:54</a> — <code>enum class ModelMeshDomain : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L113">Engine/RenderEngine/Assets/ModelAssetGeneration.h:113</a> — <code>enum class ModelTextureColorSpace : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L253">Engine/RenderEngine/Assets/ModelAssetGeneration.h:253</a> — <code>struct ModelAnimationEvent final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h#L16">Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h:16</a> — <code>class DX12CommandListPool : public IRHIParallelCommandPool</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h#L21">Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h:21</a> — <code>explicit DX12CommandListPool(job_scheduler&amp; scheduler = ce::get_job_scheduler());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h#L35">Engine/RenderEngine/RHI/DX12/DX12CommandListPool.h:35</a> — <code>bool CreateTranslationPool(std::shared_ptr&lt;DX12CommandListPool&gt;&amp; result, std::string&amp; outError);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>작성: 2026-09-07 · 목적: &quot;JobSystem을 들이면 동시성 최적화가 되는가&quot;에 답한다 · 근거: 코드·계획서 정독 12관점, high 관련도 발견마다 적대 검증(원문 대조·최신성 2렌즈 합산), 설계안 3각도 심판 3인, 종합 1, 완결성 비평 1. 라이브 실측은 하지 않았다(§8). 방법과 한계는 부록 B.</p>
+<h2>요약</h2>
+<p><strong>판정: 타당하다 — 단 외부 라이브러리를 들이는 형태가 아니라, 기존 <code>Core.ThreadPool</code>의 구조적 결함을 최소 확장으로 고치는 형태다.</strong></p>
+<blockquote>
+<p><strong>2026-09-07 추가 실측(§10).</strong> 문서 최초 작성 뒤 헤더를 그대로 포함하는 독립 벤치를 돌렸다. 그 결과 <strong>더 급한 결함이 나왔다: <code>NotifyAllAndWait</code>은 배리어가 아니다.</strong> 잡이 남아 있는데도 2.5&#126;5.8% 확률로 즉시 반환한다. 아래 &quot;부분집합 대기 불가&quot;는 여전히 사실이지만 <strong>2순위</strong>이며, §10이 §2.1·§2.4·§2.8·§3·§6.2의 일부 서술을 정정한다.</p>
+<p><strong>2026-09-07 적용·비교(§11).</strong> 그 배리어 결함만 <code>Core.ThreadPool.h</code>에 수정 적용했다(J-1, 미커밋). 재검증에서 거짓 반환이 89,000시행 0건이다. 이어 Dispenso·Taskflow·BS::thread_pool·dp::thread_pool을 실제로 받아 같은 하네스에 태웠다. <strong>결론: 수정된 엔진 풀은 BS·dp와 같은 급이고, 남은 최대 손해 요인은 라이브러리 선택이 아니라 <code>THREAD_PRIORITY_HIGHEST</code> 기본값이다.</strong> 외부 라이브러리 도입은 성능으로 정당화되지 않는다.</p>
+</blockquote>
+<ul>
+<li><strong>병목은 &quot;잡이 없다&quot;가 아니라 &quot;대기 원시가 하나뿐이다.&quot;</strong> <code>ThreadPool::NotifyAllAndWait</code>은 인스턴스 전역 단일 카운터 <code>m_taskCounts</code>가 0이 될 때까지 기다린다(<code>Engine/Utility_Framework/Core.ThreadPool.h:68, 80-86, 125, 144</code>). 풀을 공유하는 두 클라이언트는 &quot;내 잡만&quot; 기다릴 수 없다. 세 관점(계획 교차·물리·외부 조사)이 같은 줄을 독립적으로 지목했다.</li>
+<li><strong>이 결함 하나가 두 계획의 공통 하드 블로커다.</strong> PHASE 19 T1(Jolt <code>JobSystemWithBarrier</code> 어댑터를 <code>WorkerPool</code> 위에)은 전역 카운터 위에서는 물리 배리어가 무관한 자산 로드까지 기다리게 되고, PHASE 13 S3.5(워커별 포즈 풀·steal-in-place)는 워커 인덱스 없이는 구현이 불가능하다. S6의 청크 분할만은 정적 분할로 우회할 수 있다(§5.1). 어느 계획서도 JobSystem을 자기 항목으로 소유하지 않는다.</li>
+<li><strong>외부 라이브러리는 지금 정당화되지 않는다.</strong> enkiTS·Wicked·Jolt API 세부 주장 4건이 전부 &quot;이 저장소에 벤더링돼 있지 않아 원문 대조 불가&quot;로 반박됐고, 외부 이식안 스스로 &quot;실패 시 자체 확장안으로 회귀&quot;를 인정했으며, 기존 계획 합의(&quot;Jolt는 엔진 WorkerPool 공유&quot;)와 충돌한다.</li>
+<li><strong>흡수 대상이 아닌 것이 더 많다.</strong> 렌더 병렬 기록 풀(<code>RHIParallelCommandPool</code>, DX12·Vulkan 모두 지속 워커 3)은 워커 인덱스=자원 슬롯·연속 블록 배분·fork-join-only라는 다른 계약이고, PhysX 디스패처는 벤더 소유, 코루틴·트윈은 락 없는 GT 전용이다.</li>
+<li><strong>이 조사가 찾은 유일한 정확성 결함은 JobSystem이 고치는 것이 아니다.</strong> AI <code>std::async</code>가 읽는 트랜스폼을 다음 프레임 <code>AllUpdateWorldMatrix</code>가 쓴다(<code>Engine/SceneRuntime/Scene.cpp:2559, 2784</code>, <code>AIManager.cpp:65</code>). 수정은 PhysicsRedesignPlan T0의 &quot;무조건 join&quot;이 소유한다.</li>
+<li><strong>권고 순서</strong>: 선행 사슬이 없는 국소 수정 다섯(J8b AI 레이스 봉인 — T0 소유, J10 PSO 상한 1단계, J6 죽은 코드 삭제, J4 프로파일러 등록, J5 우선순위 정책)은 <strong>즉시</strong>, J0 기준선 → J1 <code>JobCounter</code>(부분집합 대기) → J1a 계층 게이트 → J1b 잡 콜백 관리 코드 금지 정적 검사와 <strong>병행</strong>한다. Foliage·자산 로드 논블로킹·PSO 큐 이관(J3·J8a·J9·J10 2단계)은 씬당 규모 실측 전에는 착수하지 않는다. 이 저장소 자신의 선례(매 프레임 스레드 생성 병렬 기록이 순차보다 1.7배 느렸다, <code>EnhancedRenderGraph.cpp:777-780</code>)가 게이팅 없는 병렬화의 손해를 이미 증명했다.</li>
+<li><strong>성능 수치는 대부분 미측정이다.</strong> 확정적으로 말할 수 있는 것은 구조적 위험 제거와 이후 계획의 블로커 해소뿐이다. Release 바이너리가 HEAD보다 낡아 라이브 실측을 하지 않았다.</li>
+</ul>
+<h2>1. 지금 무엇이 있는가 — 정독 실측</h2>
+<h3>1.1 하드웨어와 스레드 인구</h3>
+<p>기준 기기: Xeon W-2223 <strong>4코어/8스레드</strong>, 64GB. 워커 수 예산이 작다는 것이 이 문서의 모든 판단을 지배한다.</p>
+<p>런타임에 서는 스레드·풀(에디터 재생 중):</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>스레드/풀</th>
+<th>개수</th>
+<th>우선순위</th>
+<th>생성 지점</th>
+<th>소비자</th>
+<th>수명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GameThread</td>
+<td>1</td>
+<td>기본</td>
+<td>프로세스 메인</td>
+<td>시뮬레이션 전체</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>PresentationThread</td>
+<td>1</td>
+<td>기본</td>
+<td><code>Editor/EngineEntry/EditorMain.cpp:278</code></td>
+<td>ImGui 셸·표시</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>RenderThread</td>
+<td>1</td>
+<td>기본</td>
+<td><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3946</code></td>
+<td>GPU 씬 기록(큐 용량 2)</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>RHISubmissionThread</td>
+<td>1</td>
+<td>기본</td>
+<td><code>Engine/RenderEngine/RHI/RHISubmissionThread.cpp:379</code></td>
+<td>큐 제출·생명주기 명령</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>커맨드 풀 지속 워커 (DX12)</td>
+<td>3 (workerCount 4, 워커 0 = 호출 스레드)</td>
+<td>기본</td>
+<td><code>RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:65</code>, <code>DX12CommandListPool.cpp:83-84</code></td>
+<td><code>EnhancedRenderGraph</code> 병렬 기록</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>커맨드 풀 지속 워커 (Vulkan)</td>
+<td>3 (동일 계약)</td>
+<td>기본</td>
+<td><code>EnhancedSceneRenderer.cpp:443</code>, <code>RHI/Vulkan/VulkanCommandBufferPool.cpp:61-63</code></td>
+<td>동일</td>
+<td>상시</td>
+</tr>
+<tr>
+<td><code>WorkerPool</code>(=<code>Core.ThreadPool</code>)</td>
+<td><strong>8</strong> (<code>GetActiveProcessorCount</code>)</td>
+<td><strong><code>THREAD_PRIORITY_HIGHEST</code></strong></td>
+<td><code>Core.ThreadPool.h:20-23</code>, <code>WorkerPool.h:25</code>, <code>SceneManager.cpp:322</code></td>
+<td><code>DataSystem::LoadAssetBundle</code> 하나</td>
+<td><code>ManagerInitialize</code>&#126;<code>Shutdown</code></td>
+</tr>
+<tr>
+<td><code>AnimationJob</code> 전용 풀</td>
+<td><strong>8</strong></td>
+<td><strong><code>THREAD_PRIORITY_HIGHEST</code></strong></td>
+<td><code>Engine/SceneRuntime/AnimationJob.cpp:39</code></td>
+<td>애니메이터 틱 fork-join</td>
+<td>상시(<code>RenderScene.h:133</code> 값 멤버)</td>
+</tr>
+<tr>
+<td><code>AssetLoadJob</code> 풀</td>
+<td>16</td>
+<td>HIGHEST</td>
+<td><code>Engine/RenderEngine/AssetJob.cpp:3</code> (멤버 선언 <code>AssetJob.h:11</code>)</td>
+<td><strong>소비자 0 — 죽은 코드</strong></td>
+<td>(생성되지 않음)</td>
+</tr>
+<tr>
+<td>PhysX <code>CpuDispatcher</code></td>
+<td>4 (<code>core - 4</code>)</td>
+<td>PhysX 내부(NORMAL 추정, 미검증)</td>
+<td><code>Engine/Physics/Physx.cpp:166-173</code></td>
+<td>솔버 내부 병렬</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>Foliage 컬링 <code>std::async</code></td>
+<td>프레임마다 컴포넌트당 <strong>최대 17</strong> (<code>hw*2+1</code>; 인스턴스 &lt;17이면 인스턴스 수만큼, <code>:334</code> 조기 break)</td>
+<td>ConcRT 풀</td>
+<td><code>Engine/SceneRuntime/FoliageComponent.cpp:315-341, 389-396</code></td>
+<td>인스턴스 컬링</td>
+<td>프레임 내</td>
+</tr>
+<tr>
+<td>AI <code>std::async</code></td>
+<td>프레임마다 1</td>
+<td>ConcRT 풀</td>
+<td><code>Engine/SceneRuntime/Scene.cpp:2784</code></td>
+<td><code>AIManager::InternalAIUpdate</code></td>
+<td>다음 프레임까지</td>
+</tr>
+<tr>
+<td>씬 로드 <code>std::async</code></td>
+<td>로드당 1</td>
+<td>ConcRT 풀</td>
+<td><code>Engine/SceneRuntime/SceneManager.cpp:936, 969</code></td>
+<td>씬 파싱 → 다시 <code>WorkerPool</code> 호출·대기(이중 레이어)</td>
+<td>로드 중</td>
+</tr>
+<tr>
+<td>PSO 컴파일 <code>std::async</code></td>
+<td>미스당 1, 상한 없음</td>
+<td>ConcRT 풀</td>
+<td><code>Engine/RenderEngine/RHI/DX12/DX12PSOManager.cpp:719</code></td>
+<td>PSO 생성</td>
+<td>요청 중</td>
+</tr>
+<tr>
+<td>SoundManager 로더</td>
+<td>1</td>
+<td>기본</td>
+<td><code>Engine/SceneRuntime/SoundManager.cpp:20</code></td>
+<td>사운드 로드</td>
+<td>상시</td>
+</tr>
+<tr>
+<td>CommandService accept · ConsoleCommand stdin · efsw 워처 · ModelPlacement 워커(BELOW_NORMAL) · ProgressWindow</td>
+<td>각 1</td>
+<td>기본</td>
+<td><code>Engine/CommandService/CommandService.cpp:133</code>, <code>Editor/EngineEntry/ConsoleCommandSystem.cpp:496</code>, <code>EditorDirectoryWatcher.cpp:255</code>, <code>EditorModelPlacement.cpp:91</code>, <code>ProgressWindow.h:36</code></td>
+<td>에디터 부대 기능</td>
+<td>상시/작업 중</td>
+</tr>
+</tbody></table></div>
+<p>백엔드 공통 고정 스레드 4(GT·Presentation·RT·RHISubmission)에 커맨드 워커 3을 더하면 <strong>7</strong>로 8논리코어를 거의 채우고, 그 위에 HIGHEST 우선순위 워커 <strong>16개</strong>(WorkerPool 8 + AnimationJob 8)와 PhysX 4가 affinity 없이 얹힌다(<code>Core.ThreadPool.h:38</code> <code>affinityMask=0</code>). MSVC의 <code>std::async(launch::async)</code>는 매번 OS 스레드를 만드는 것이 아니라 ConcRT/PPL 풀에 태스크를 올리므로(<code>VC/Tools/MSVC/14.51.36231/include/future:656, 1394</code>), Foliage 17연발은 &quot;스레드 폭증&quot;이 아니라 <strong>네 번째 스케줄러가 코어를 나눠 쓰는 것</strong>이다. 관리 측 CoreCLR의 GC·ThreadPool 스레드 인구는 이 조사에서 세지 않았다(§9).</p>
+<h3>1.2 <code>Core.ThreadPool</code>의 대기 의미 — 전용 풀이 생긴 구조적 이유</h3>
+<p><code>ThreadPool::Enqueue</code>는 전역 <code>m_taskCounts</code> 하나를 올리고(<code>Core.ThreadPool.h:68</code>), 워커는 태스크 실행 후 내리며 0이 되면 이벤트를 세운다(<code>:125-128</code>). <code>NotifyAllAndWait</code>은 그 카운터가 0이 되는 이벤트를 <code>WaitForSingleObject(INFINITE)</code>로 기다린다(<code>:80-86</code>). 즉 풀을 공유하는 두 클라이언트는 <strong>&quot;내 잡만&quot; 기다릴 수 없고, 논블로킹 완료 통지도 없다</strong>. <code>WorkerLoop(int threadIndex)</code>(<code>:101</code>)의 인덱스는 태스크에 전달되지 않는다(<code>:123</code> <code>task()</code> 무인자, <code>WorkerPool.h:25</code> <code>TaskType = std::function&lt;void()&gt;</code>). <code>SetThreadInitCallback/SetThreadExitCallback</code>(<code>:90, 95</code>)은 <code>WorkerLoop</code>(<code>:103</code>)에 스레드당 1회로 배선돼 있으나 호출자가 0이다.</p>
+<p><code>AnimationJob</code>이 <code>WorkerPools</code>를 쓰지 않고 8스레드 전용 풀을 따로 둔 것은 이 제약과 정합하지만, <code>AnimationSchedulerPlan.md:89</code>(E9)는 그것을 &quot;코어 점유 낭비&quot;로 적고 S6에서 실측 후 재검토하라고 할 뿐 부분 대기 불가를 &quot;이유&quot;로 명시하지는 않는다(부록 A). 부분 집합 대기가 없는 풀은 잡 시스템이 아니다.</p>
+<h3>1.3 프레임 임계 경로 — 게임 스레드 직렬 순서</h3>
+<p><code>Runtime::TickSimulationFrame</code>(<code>Engine/SceneRuntime/RuntimeFrame.cpp:67</code>)이 재생 중 순서를 단독 소유한다(E3-7, <code>verify-frame-orchestration.ps1</code>).</p>
+<pre><code>Initialization → InputEvents → TickManagedPrePhysics(C#)
+→ Physics = Scene::FixedUpdate (Scene.cpp:2557)
+    m_AIFuture wait_for(0s) 비블로킹 체크 (:2559)
+    AllUpdateWorldMatrix(FixedUpdate) → SetInternalPhysicData → CCT FixedUpdate
+    → PhysicsManagers-&gt;Update: simulate() ; fetchResults(true) 연속 (Physx.cpp:441-451) → GetPhysicData() pull (PhysicsManager.cpp:93)
+    → yield_WaitForFixedUpdate
+→ GameLogic (SceneManager.cpp:443)
+    Scene::Update (Scene.cpp:2653): AllUpdateWorldMatrix(PreUpdate) → AnimatorSystem(FSM) → Decal → Foliage(std::async×17/컴포넌트)
+        → UITick → Sound → Camera → Light → PlayerInput → Tween → AllUpdateWorldMatrix(LateUpdate)
+    YieldNull(코루틴)
+    InternalAnimationUpdateEvent → AnimationJob::Update: 애니메이터당 태스크 1개 → 전용 풀 8 → NotifyAllAndWait (fork-join)
+        → PublishAnimatorPose GT 직렬 루프 (AnimationJob.cpp:173)
+    Scene::LateUpdate → UpdateRenderData → CommitRenderProxies(직렬 — &quot;락 규약 미검증&quot;, Scene.cpp:2072)
+→ TickManagedPostPhysics(C#) — &quot;GT 전용, CoreCLR GC가 스레드를 정지시키기 때문&quot; (RuntimeFrame.cpp:27)
+→ SceneManager::EndFramePass (Scene.cpp:2753): DrainAIUpdate(무조건 join, :851-854) → FlushPendingDestroy → Destroy* → AI std::async 발사 (:2784)
+→ EditorMain::Update m_sceneStructureMutex 구간 (EditorMain.cpp:543-556): ModelPlacement Tick · ApplyPendingSceneStructureChange · yield_OnRender · DisableOrEnable · EndOfFrame
+→ App: packet + delta batch를 RenderThread 큐(용량 2)에 발행 — 큐 포화+병합 상한 초과 시에만 GT 블록 (EnhancedSceneRenderer.cpp:4066, 4082)
+</code></pre>
+<p>트랜스폼 전수 동기화가 프레임당 <strong>3회</strong>(FixedUpdate·PreUpdate·LateUpdate) 돈다. X5 이후 dirty epoch가 같으면 O(1) 조기 반환하므로(<code>Scene.cpp:4936-4941</code>) 정지 씬에서 &quot;4,058µs×3&quot;이라는 옛 수치는 더 이상 유효하지 않다. 움직인 프레임의 sparse resolve(<code>Scene.cpp:4185&amp;#126;</code>)는 단일 스레드 range 루프(<code>:4248</code>)이고 병렬 range resolve(X9)는 &quot;선택 확장 중단&quot;이다(<code>docs/plans/archive/TransformUpdatePlan.md:3, 18</code>).</p>
+<h3>1.4 이미 있는 병렬화 — 형태가 여섯이다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>자리</th>
+<th>형태</th>
+<th>대기</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DataSystem::LoadAssetBundle</code> (<code>DataSystem.cpp:1672-1703</code>)</td>
+<td><code>WorkerPools-&gt;Enqueue</code> N건 → <code>NotifyAllAndWait</code></td>
+<td>전역 카운터</td>
+<td>씬 로드 시 1회, GT 블로킹(<code>SceneManager.cpp:862</code>)</td>
+</tr>
+<tr>
+<td><code>AnimationJob::Update</code> (<code>AnimationJob.cpp:94-173</code>)</td>
+<td>애니메이터당 람다 → 전용 풀 8 → <code>NotifyAllAndWait</code></td>
+<td>전역 카운터</td>
+<td>매 프레임 fork-join, 프레임마다 스냅샷 벡터·weak_ptr 벡터·클로저 힙 할당</td>
+</tr>
+<tr>
+<td><code>EnhancedRenderGraph</code> 병렬 기록 (<code>EnhancedRenderGraph.cpp:600-830</code>)</td>
+<td><code>RHIParallelCommandPool::RunParallel(job, workers)</code> — 지속 워커 3 + 호출 스레드</td>
+<td>풀 내부 join</td>
+<td><strong>실측 임계값</strong> <code>kParallelRecordCostThreshold=256</code>(<code>.h:199-221</code>)으로 병렬을 되무른다. 매 프레임 <code>std::thread</code> 생성은 순차 1.3761ms vs 병렬 2.3419ms로 손해였다는 실측 주석(<code>:777-780</code>)</td>
+</tr>
+<tr>
+<td><code>ResolveSpatialTransformsLegacy</code> (<code>Scene.cpp:4157</code>)</td>
+<td><code>std::for_each(std::execution::par, 루트 자식)</code></td>
+<td>STL 내부</td>
+<td>토폴로지 변경 직후 첫 resolve·A/B off 경로만(<code>:4956</code>)</td>
+</tr>
+<tr>
+<td><code>FoliageComponent::UpdateFoliageCullingData</code> (<code>FoliageComponent.cpp:389-400</code>)</td>
+<td><code>std::async(launch::async)</code> × (hw×2+1)</td>
+<td>future 전부 get</td>
+<td><strong>매 프레임·컴포넌트마다</strong>, 컴포넌트 간 직렬 중첩(<code>FoliageSystem.cpp:71</code>)</td>
+</tr>
+<tr>
+<td><code>Scene::EndFramePass</code> AI (<code>Scene.cpp:2784</code>)</td>
+<td><code>std::async(launch::async)</code> 1</td>
+<td>다음 프레임 <code>DrainAIUpdate</code></td>
+<td>워커가 씬을 읽는 동안 GT는 다음 프레임을 진행</td>
+</tr>
+</tbody></table></div>
+<p>즉 &quot;병렬화가 없어서&quot; JobSystem이 필요한 것이 아니다. 병렬화가 <strong>여섯 양식으로 흩어져</strong> 있고, 대기 의미론·우선순위·스케줄러가 제각각이다.</p>
+<h3>1.5 계획서가 이미 전제하는 것</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>계획</th>
+<th>항목</th>
+<th>상태</th>
+<th>무엇을 전제하나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PHASE 13 <code>AnimationSchedulerPlan</code></td>
+<td>S3.5 태스크 레시피·워커별 포즈 풀 · <strong>S6 Job 배치 전환</strong>(청크 분할, 전용 풀 vs <code>WorkerPools</code> 실측, 락프리 이벤트 큐)</td>
+<td>전부 todo</td>
+<td>워커 index 안정성·parallel_for·GT 드레인 큐</td>
+</tr>
+<tr>
+<td>PHASE 19 <code>PhysicsRedesignPlan</code></td>
+<td>T0 스레딩 계약 · <strong>T1 잡 시스템 통합</strong>(Jolt면 <code>JobSystemWithBarrier</code> 어댑터를 <code>WorkerPool</code> 위에, PhysX면 simulate↔fetch 창에 작업 배치) · T2 쿼리 병렬화</td>
+<td>전부 todo, 백엔드 미결(X0 스파이크)</td>
+<td>부분 대기·배리어</td>
+</tr>
+<tr>
+<td>PHASE 4.3 <code>RenderGraphDependencySchedulingPlan</code></td>
+<td>RG4 dependency wave 병렬 기록 · RG8 multi-queue</td>
+<td>미착수</td>
+<td>기존 record-cost 휴리스틱 재사용 명시(<code>:188-189</code>), &quot;JobSystem&quot; 언급 0건</td>
+</tr>
+<tr>
+<td>PHASE 14 <code>ProfilingCapturePlan</code></td>
+<td>P2 thread stream · sealed chunk handoff · <code>ThreadEnd</code></td>
+<td>P0·P1a 완료, P2&#126; todo</td>
+<td>워커 계측이 서려면 선행</td>
+</tr>
+<tr>
+<td>PHASE 15 <code>UtilityFrameworkModernizationPlan</code></td>
+<td>S1 <code>Thread</code>→<code>jthread</code> · S2 <code>CountingSemaphore</code>→<code>std::counting_semaphore</code> · <code>ThreadPool</code>/<code>WorkerPool</code> &quot;존치&quot;</td>
+<td>todo</td>
+<td>풀 코어를 손대는 슬라이스와 겹침</td>
+</tr>
+<tr>
+<td>PHASE 8.75 <code>TransformUpdatePlan</code>(보관)</td>
+<td>X9 병렬 range resolve</td>
+<td>선택 중단</td>
+<td><code>ParallelFor</code>·false sharing 방어</td>
+</tr>
+<tr>
+<td>PHASE 4.75 <code>LightmapBakerPlan</code></td>
+<td>L4-a 베이크 전용 스레드</td>
+<td>todo</td>
+<td><code>RunParallel</code>은 프레임을 못 넘는 fork-join이라 못 쓴다고 명시(<code>:217-218</code>)</td>
+</tr>
+<tr>
+<td><code>docs/design/PhysicsComponentDesign.md:257, 360</code></td>
+<td>&quot;Jolt JobSystem은 새 풀을 만들지 않고 엔진 WorkerPool을 공유&quot; · &quot;물리 전용 스레드는 하지 않는다&quot;</td>
+<td>설계 결정</td>
+<td>잡 시스템의 존재</td>
+</tr>
+</tbody></table></div>
+<p><strong>JobSystem을 자기 항목으로 소유한 계획서는 없다.</strong> 셋(S6·T1·RG4)이 각자 다른 이름으로 같은 것을 전제하거나 자기 풀을 유지한다. <code>AnimationSchedulerPlan.md:475</code>의 <code>WorkerPools</code> 경합 목록에는 PhysicsRedesignPlan T1이 같은 풀을 쓰기로 한 사실이 없다(<code>PhysicsRedesignPlan.md:341</code>).</p>
+<h2>2. 발견 — 검증 통과분</h2>
+<p>각 항목은 원문 대조·최신성 두 렌즈를 합친 적대 검증을 통과했다. 반박된 것은 부록 A.</p>
+<h3>2.1 풀 원시의 결함 — 세 관점이 같은 줄을 지목했다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>NotifyAllAndWait</code>은 잡이 남아 있어도 반환한다 — 배리어가 아니다(실측 2.5&#126;5.8%)</strong></td>
+<td><code>Core.ThreadPool.h:68-72, 125-129</code>; §10</td>
+<td>카운터와 이벤트를 반대 순서로 갱신한다. <strong>1순위 결함</strong></td>
+</tr>
+<tr>
+<td><code>NotifyAllAndWait</code>은 호출자별이 아니라 풀 전체의 단일 <code>m_taskCounts</code>/<code>m_waitEvent</code>로 동작한다</td>
+<td><code>Core.ThreadPool.h:66-68, 80-86</code>, <code>WorkerPool.h:68</code></td>
+<td>특정 클라이언트의 잡만 골라 기다릴 수 없다(계획 교차·외부 조사·물리 관점 모두 확인)</td>
+</tr>
+<tr>
+<td>Jolt <code>JobSystemWithBarrier</code>를 이 위에 얹으면 물리 스텝의 <code>Barrier::Wait()</code>가 그 순간 큐에 남은 무관한 태스크까지 기다린다</td>
+<td><code>Core.ThreadPool.h:81-82</code></td>
+<td>T1 어댑터는 <code>Enqueue</code>만 재사용하고 완료 판정은 자체 카운터로 새로 짜야 한다 — 그것이 곧 J1이다</td>
+</tr>
+<tr>
+<td>완료 콜백·카운터 기반 논블로킹 API가 없다 — <code>WaitForSingleObject(INFINITE)</code>뿐</td>
+<td><code>Core.ThreadPool.h:85</code></td>
+<td>스트리밍·논블로킹 로드의 전제 부재</td>
+</tr>
+<tr>
+<td>워커 인덱스가 태스크에 노출되지 않는다</td>
+<td><code>Core.ThreadPool.h:101, 66</code>, <code>WorkerPool.h:25</code></td>
+<td>S3.5 &quot;워커별 포즈 풀&quot;이 현재 API로 불가</td>
+</tr>
+<tr>
+<td><code>SetThreadInitCallback/SetThreadExitCallback</code>은 <code>WorkerLoop</code>에 스레드당 1회로 배선돼 있으나 설정 호출자가 0개</td>
+<td><code>Core.ThreadPool.h:90, 95</code>(설정), <code>:103</code>(소비)</td>
+<td><strong>정정(§10)</strong>: 생성자가 스레드를 먼저 띄우므로 setter는 경합이다 — 실측 8워커 중 <strong>5회만</strong> 발화. 연결만으로는 안 되고 생성자 인자로 받아야 한다</td>
+</tr>
+<tr>
+<td>엔진에 실행 가능한 범용 JobSystem은 없다 — 문자열은 vcxproj 필터 폴더 이름과 미착수 트랙으로만 존재</td>
+<td><code>Engine/RenderEngine/RenderEngine.vcxproj.filters:7</code></td>
+<td>&quot;부분적으로 존재한다&quot;는 전제는 틀렸다</td>
+</tr>
+</tbody></table></div>
+<h3>2.2 계획서 충돌과 소유권 부재</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>어느 계획서도 JobSystem을 소유하지 않는다. T1은 <code>WorkerPool</code> 위에 어댑터만, S6은 전용 풀 유지 여부를 실측 후 결정으로 미룸</td>
+<td><code>docs/RefactoringPlanDashboard.html:2324</code>, <code>AnimationSchedulerPlan.md:541</code></td>
+</tr>
+<tr>
+<td><code>AnimationSchedulerPlan</code>의 <code>WorkerPools</code> 경합 목록(UI 렌더 데이터·지형 로드)에 T1의 공유 계획이 빠져 있다</td>
+<td><code>AnimationSchedulerPlan.md:475</code>, <code>PhysicsRedesignPlan.md:341</code></td>
+</tr>
+<tr>
+<td>T1은 <code>LoadAssetBundle</code>이 이미 같은 풀을 <code>Enqueue+NotifyAllAndWait</code>으로 쓰는 것과의 충돌을 재검토하지 않았다</td>
+<td><code>PhysicsRedesignPlan.md:341</code>, <code>DataSystem.cpp:1678, 1702</code></td>
+</tr>
+<tr>
+<td>T0(스레딩 계약, P0, todo)가 코드에 미반영 — AI 회수는 여전히 비차단 폴링</td>
+<td><code>Scene.cpp:2559</code>, <code>PhysicsRedesignPlan.md:235</code></td>
+</tr>
+<tr>
+<td><code>AnimationJob.h</code>는 RenderEngine 소속 헤더(<code>RenderScene</code>이 값으로 소유)인데 유일한 구현 <code>AnimationJob.cpp</code>는 SceneRuntime에서 컴파일된다 — S6 완료 조건이 겨냥한 계층 기형이 그대로다</td>
+<td><code>RenderEngine.vcxproj:458</code>, <code>SceneRuntime.vcxproj:167</code>, <code>RenderScene.h:133</code>, <code>AnimationSchedulerPlan.md:541</code></td>
+</tr>
+<tr>
+<td><code>AnimationJob.h</code>는 풀 타입을 Utility_Framework에서 가져온다 — 새 JobSystem 타입도 RenderEngine과 같거나 낮은 계층에 있어야 헤더 참조가 성립한다</td>
+<td><code>Engine/RenderEngine/AnimationJob.h:3, 52</code></td>
+</tr>
+<tr>
+<td>S6은 JobSystem 없이 완결될 수 없다 — 청크 분할·워커별 풀은 현재 API로 불가, 이벤트 큐 락프리화는 선택 항목</td>
+<td><code>Core.ThreadPool.h:80</code>, <code>AnimationSchedulerPlan.md:474</code></td>
+</tr>
+<tr>
+<td>PhysicsComponentDesign과 PhysicsRedesignPlan T1은 &quot;Jolt JobSystem은 기존 WorkerPool 공유&quot;로 정합하다(미검증이나 원문 확인)</td>
+<td><code>PhysicsComponentDesign.md:257</code>, <code>PhysicsRedesignPlan.md:337</code></td>
+</tr>
+</tbody></table></div>
+<h3>2.3 정확성 결함 — 한 건, 그리고 이미 닫힌 것들</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+<th>상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>AI <code>std::async</code>의 트랜스폼 읽기와 다음 프레임 <code>AllUpdateWorldMatrix(FixedUpdate)</code>의 쓰기가 동기화 없이 겹친다</strong> — <code>FixedUpdate</code> 초입의 <code>wait_for(0s)</code>는 준비된 경우에만 회수한다</td>
+<td><code>Scene.cpp:2559, 2564</code>, <code>AIManager.cpp:57-65</code></td>
+<td><strong>열림</strong>. 이 조사의 유일한 실제 데이터 레이스</td>
+</tr>
+<tr>
+<td>레이스 창은 &quot;다음 프레임 FixedUpdate&quot;보다 넓다 — 발사 직후 같은 프레임의 <code>EndOfFrame()</code>이 드레인 없이 실행된다</td>
+<td><code>EditorMain.cpp:555-556</code>, <code>SceneManager.cpp:484</code></td>
+<td>열림</td>
+</tr>
+<tr>
+<td>파괴(UAF)류 레이스는 닫혀 있다 — <code>EndFramePass</code>가 <code>DrainAIUpdate()</code>를 <code>Destroy*</code>보다 항상 먼저 부르고(<code>:2757</code>), <code>Scene</code> 소멸자도 재호출한다</td>
+<td><code>Scene.cpp:851-854, 2753-2790, 361</code></td>
+<td>닫힘</td>
+</tr>
+<tr>
+<td>계획서의 Z-①(&quot;AI 스레드가 BT 액션을 통해 PhysX 컨테이너를 락 없이 만진다&quot;)은 현재 코드에 없다 — BT 틱은 이미 GT로 옮겨졌고 AI 스레드는 <code>QueueAITick</code>으로 담기만 한다</td>
+<td><code>BehaviorTreeComponent.cpp:64-69</code>, <code>ClrHost.cpp:2996</code>, <code>RuntimeFrame.cpp:53, 83</code></td>
+<td>닫힘 — 남은 것은 위 트랜스폼 레이스뿐</td>
+</tr>
+<tr>
+<td>오늘 AI 스레드에서 도는 게임플레이 로직은 사실상 없다 — <code>StateMachineComponent</code>는 갱신 로직이 주석 처리, <code>InternalAIUpdate</code> 미오버라이드(미검증)</td>
+<td><code>StateMachineComponent.cpp:24</code>, <code>IAIComponent.h:16</code></td>
+<td>범위 확정</td>
+</tr>
+<tr>
+<td>R6(워커에서 C# 이벤트 직접 발화)은 SpinLock 큐 + GT 전용 Flush로 이미 해소 — 대시보드의 &quot;R1·R2·R4·R5·R6 전부 살아있다&quot;는 낡았다. R4는 죽은 코드, <strong>R5만 살아 있다</strong></td>
+<td><code>AnimationEventBridge.cpp:199</code>, <code>ClrHost.cpp:3168</code>, <code>RuntimeFrame.cpp:47</code>; R5: <code>AnimationController.cpp:59</code> <code>if (!StateVec.size() &gt;= 2)</code></td>
+<td>정정</td>
+</tr>
+<tr>
+<td>LC5-c <code>Entered()</code> 게이트는 관리 측 정적 스레드 검사라 잡 스레드가 큐잉 경로만 쓰는 한 막을 호출이 없다. 반면 <code>InvokeCallableStatic</code>의 <code>g_userCodeAllowed</code>는 비원자 plain bool로 실행 스레드 검사가 없다(미검증)</td>
+<td><code>ScriptCore/Native.cs:362, 368</code>; <code>ClrHost.cpp:2734, 2765</code></td>
+<td>진입점마다 강제 수준이 다르다</td>
+</tr>
+<tr>
+<td><code>TickManagedPostPhysics</code>는 &quot;CoreCLR GC가 스레드를 정지시키기 때문&quot;에 GT 전용이라고 주석이 명시한다(PrePhysics 주석에는 이 근거가 없다)</td>
+<td><code>RuntimeFrame.cpp:27</code></td>
+<td>관리 경계는 워커 이관 금지</td>
+</tr>
+<tr>
+<td><code>CoroutineManager</code>는 9개 LinkedList 큐를 락 없이 조작하고 GT의 <code>YieldNull</code>/<code>FixedUpdate</code>에서만 구동된다</td>
+<td><code>Core.Coroutine.cpp:16, 19</code>, <code>Core.Coroutine.h:40</code>, <code>Scene.cpp:2597, 2730</code></td>
+<td>병렬화 금지</td>
+</tr>
+</tbody></table></div>
+<h3>2.4 낭비 — JobSystem이 없어도 보이는 것</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+<th>크기</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>WorkerPool·AnimationJob 풀은 HIGHEST 8+8, 렌더 파이프라인 스레드(RT·RHISubmission·Presentation·커맨드 워커)는 <code>SetThreadPriority</code> 호출이 없어 NORMAL — 우선순위가 거꾸로다</td>
+<td><code>Core.ThreadPool.h:20</code>, <code>Core.Thread.h:64</code>, <code>AnimationJob.cpp:39</code>, <code>WorkerPool.h:31</code></td>
+<td><strong>실측(§10)</strong>: 8워커 HIGHEST는 8워커 NORMAL 대비 풀 처리량 −41%, 이웃 스레드 최대 지연 1.8배 — 두 축 모두 손해</td>
+</tr>
+<tr>
+<td>고정 7 + WorkerPool 8 + AnimationJob 8 = 최소 23 스레드가 affinity 없이 8코어를 경쟁</td>
+<td><code>SceneManager.cpp:322</code>, <code>RenderScene.h:133</code>, <code>Core.ThreadPool.h:38</code></td>
+<td>미측정</td>
+</tr>
+<tr>
+<td>PhysX 디스패처 4가 Animation 8·WorkerPool 최대 8과 조정 없이 같은 코어를 다툰다 — 8코어 기준 200%+ 이론 과다구독</td>
+<td><code>Physx.cpp:167-169</code></td>
+<td>산수만 확정</td>
+</tr>
+<tr>
+<td>Foliage: 분할 수가 하드웨어 상수(<code>hw*2+1</code>=17)에 고정 — 인스턴스 &lt;17이면 인스턴스마다 태스크 1개, 그 이상이면 항상 17; 컴포넌트별 팬아웃→조인이 직렬 중첩이라 컴포넌트 간 오버랩 0; 실측 임계값 게이트가 없다</td>
+<td><code>FoliageComponent.cpp:315-341, 389-400</code>, <code>FoliageSystem.cpp:71</code></td>
+<td>미측정(씬당 인스턴스 규모 불명)</td>
+</tr>
+<tr>
+<td><code>AnimationJob</code>: 태스크 입도 &quot;애니메이터 1개 = 태스크 1개&quot;(S6이 요구한 O(워커 수) 청크 없음); 프레임마다 스냅샷 벡터·weak_ptr 벡터·클로저 힙 할당; 포즈 저장소 고정 512본 인라인(Animator 64KB·Controller 32KB)</td>
+<td><code>AnimationJob.cpp:94, 112, 126</code>, <code>Animator.h:194</code>, <code>AnimationController.h:38</code></td>
+<td>미측정(계획서 표 수치만)</td>
+</tr>
+<tr>
+<td><code>LoadAssetBundle</code>이 씬 전환 시 GT를 번들 전체 완료까지 블록한다</td>
+<td><code>SceneManager.cpp:862</code>, <code>DataSystem.cpp:1702</code>, <code>SceneObjectCommands.cpp:192</code>, <code>App.cpp:260</code></td>
+<td>미측정</td>
+</tr>
+<tr>
+<td>한 모델 안의 임베디드 텍스처 디코드는 완전 직렬 — 병렬성은 모델 단위에서만</td>
+<td><code>ModelAssetGeneration.cpp:819, 853</code></td>
+<td>미측정</td>
+</tr>
+<tr>
+<td>PSO 캐시 미스마다 무제한 <code>std::async</code> — 자산 로드 8스레드와 겹치면 과다구독</td>
+<td><code>DX12PSOManager.cpp:719</code></td>
+<td>미측정</td>
+</tr>
+<tr>
+<td>저장소 안에 완료-폴링 IO 잡 패턴이 이미 있다(<code>EditorModelPlacement</code>, BELOW_NORMAL 워커 + <code>Tick()</code> 폴링)</td>
+<td><code>EditorModelPlacement.cpp:91, 181</code></td>
+<td>청사진</td>
+</tr>
+<tr>
+<td><code>DataSystem</code> 캐시 락은 조회·삽입만 감싸고 IO는 락 밖 — 병렬화에 우호적(미검증)</td>
+<td><code>DataSystem.cpp:1219</code>, <code>ModelAssetGeneration.h:435</code></td>
+<td>구조 확인</td>
+</tr>
+<tr>
+<td>아카이브의 <code>textureDecodeMs.scene=550ms</code>는 단일 스레드 모델 벤치 값이지 씬 로드 wall-time이 아니다</td>
+<td><code>AssetAuthoringCommands.cpp:2860</code>, <code>verify-model-cutover-budget.ps1:86</code></td>
+<td>오독 경고</td>
+</tr>
+</tbody></table></div>
+<h3>2.5 렌더 워커 풀은 별개 계약이다 — 흡수 대상이 아니다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RT는 공용 풀과 분리된 자체 지속 워커 풀을 갖는다(DX12 workerCount=4, Vulkan도 동일 계약으로 4)</td>
+<td><code>EnhancedSceneRendererLiveDX12Adapter.cpp:65</code>, <code>DX12CommandListPool.cpp:84</code>; <code>EnhancedSceneRenderer.cpp:443</code>, <code>VulkanCommandBufferPool.cpp:61-63</code></td>
+</tr>
+<tr>
+<td>워커 0은 호출 스레드 자신, 워커가 1개면 인라인 실행 — 비교 기준에 동기화 비용을 섞지 않으려는 설계</td>
+<td><code>DX12CommandListPool.cpp:129, 134</code></td>
+</tr>
+<tr>
+<td>얼로케이터/리스트가 (프레임 슬롯, 워커 인덱스) 2차원 고정 배열 — 워커 인덱스가 곧 자원 슬롯 신원</td>
+<td><code>DX12CommandListPool.cpp:45</code></td>
+</tr>
+<tr>
+<td>기록 조각을 라운드로빈이 아니라 연속 블록으로 배분 — 커맨드 리스트가 통째로 한 번만 제출되는 단위이기 때문</td>
+<td><code>EnhancedRenderGraph.cpp:678, 683</code></td>
+</tr>
+<tr>
+<td>매 프레임 <code>std::thread</code> 생성은 실측으로 기각(순차 1.3761ms vs 병렬 2.3419ms, 1.7배 손해)</td>
+<td><code>EnhancedRenderGraph.cpp:777-778</code></td>
+</tr>
+<tr>
+<td>RG4 계획서는 기존 휴리스틱 유지를 명시하고 &quot;JobSystem&quot;이 한 번도 등장하지 않는다</td>
+<td><code>RenderGraphDependencySchedulingPlan.md:188-189</code></td>
+</tr>
+<tr>
+<td>대시보드는 <code>RunParallel</code>을 &quot;join까지 대기하는 fork-join&quot;으로 규정해 프레임을 넘는 수명(L4-a)에는 못 쓴다고 적는다</td>
+<td><code>RefactoringPlanDashboard.html:2601</code>, <code>LightmapBakerPlan.md:217-218</code></td>
+</tr>
+<tr>
+<td><code>TickLive</code>의 컬링·정렬·풀링은 전부 직렬이고 RG4/RG8 범위 밖 — 규모 근거가 없어 이득 단정 불가</td>
+<td><code>EnhancedSceneRenderer.cpp:2819, 3372</code></td>
+</tr>
+<tr>
+<td>병렬 기록 경로에 워커 구간 계측이 없다</td>
+<td><code>EnhancedRenderGraph.cpp:777, 784</code></td>
+</tr>
+</tbody></table></div>
+<h3>2.6 트랜스폼 — X9를 되살릴 근거는 약하다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>sparse range 순회는 무조건 순차 for — X9는 코드에 없다</td>
+<td><code>Scene.cpp:4248</code></td>
+</tr>
+<tr>
+<td>canonical range는 preorder 정렬+병합으로 항상 서로소 — 병렬 자체의 정당성은 있다</td>
+<td><code>Scene.cpp:4237</code></td>
+</tr>
+<tr>
+<td>그러나 <code>SpatialResolveMetrics</code> 카운터가 range 루프 안에서 비원자 <code>++</code></td>
+<td><code>Scene.cpp:4239, 4355</code></td>
+</tr>
+<tr>
+<td><code>PublishRenderProxyDirty</code>는 <code>registry.dirtyMutex</code> 하나로 잠근다 — 병렬 worldWrite가 여기서 직렬화</td>
+<td><code>Scene.cpp:2015</code></td>
+</tr>
+<tr>
+<td>벤치는 N=10,000·random 1%에서 100노드를 9.5µs(범위당 &#126;95ns)에 처리한다 — 이 크기에서 디스패치 비용이 이득을 삼킬 개연성이 크다</td>
+<td><code>TransformUpdatePlan.md:1135-1137</code></td>
+</tr>
+</tbody></table></div>
+<h3>2.7 물리 창 — T1(b)는 그대로 적용할 수 없다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>simulate()</code>&#126;<code>fetchResults(true)</code> 창 길이는 어디에도 실측이 없고 계측 스코프도 없다</td>
+<td><code>Physx.cpp:441, 447</code></td>
+</tr>
+<tr>
+<td><code>fetchResults</code> 직후 같은 함수에서 <code>GetPhysicData()</code> pull이 끝나고 나서야 GameLogic이 돈다 — 창에 애니메이션·오디오를 넣으면 그 시스템들이 이전 프레임 트랜스폼을 보게 되는 의미 변화</td>
+<td><code>PhysicsManager.cpp:93</code>, <code>RuntimeFrame.cpp:83-84</code></td>
+</tr>
+<tr>
+<td>오늘은 Physics 전체가 끝난 뒤 GameLogic이 시작되므로 겹침이 설계상 0 — (b)는 두 호출의 경계 자체를 바꿔야 성립</td>
+<td><code>RuntimeFrame.cpp:83-84</code></td>
+</tr>
+<tr>
+<td>T0 계약: 물리 잡 내부는 <code>PxScene</code>/<code>PhysicsBodyStore</code>를 읽지 못하고 잡 시작 시점의 불변 스냅샷만 읽는다 — 백엔드와 무관한 공통 요구</td>
+<td><code>PhysicsComponentDesign.md:237, 239</code></td>
+</tr>
+<tr>
+<td>Jolt는 벤더링돼 있지 않다 — Jolt 인터페이스 진술은 일반 지식 추정</td>
+<td><code>vcpkg.json:47</code></td>
+</tr>
+</tbody></table></div>
+<h3>2.8 관측 준비도 — 낮다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>지속 워커는 어디도 <code>gCPUProfiler.RegisterThread</code>를 부르지 않는다 — 호출자는 GT(<code>EditorMain.cpp:77</code>)와 selftest 합성 워커뿐</td>
+<td><code>EditorMain.cpp:77</code>, <code>ProfilerSelfTest.cpp:290</code>, <code>DX12CommandListPool.cpp:92</code></td>
+</tr>
+<tr>
+<td><code>PROFILE_CPU_*</code> 매크로는 세 파일의 GT 함수에만 있다</td>
+<td><code>Scene.cpp:2679, 2784</code></td>
+</tr>
+<tr>
+<td><code>Profiler.cpp:119</code> 주석이 자인: <code>Tick()</code>이 <code>pTLS-&gt;EventBuffer[i]</code>를 읽는 동안 워커가 <code>BeginEvent</code>에서 resize하면 옛 버퍼가 해제된다. 지금 안 터지는 이유는 계약이 아니라 GT가 유일한 writer이기 때문</td>
+<td><code>Profiler.cpp:115-122</code>, <code>ProfilingCapturePlan.md:690</code></td>
+</tr>
+<tr>
+<td><code>Event</code>에 <code>EngineFrameId</code>가 없고 <code>ThreadEnd</code>도 없다 — P1 잔여·P2로 미완료</td>
+<td><code>Profiler.h:230</code>, <code>ProfilingCapturePlan.md:152</code></td>
+</tr>
+<tr>
+<td>대시보드 14-2 note: &quot;PresentationThread/RenderThread를 계측하려면 sealed handoff가 먼저&quot;</td>
+<td><code>RefactoringPlanDashboard.html:2092, 2095</code></td>
+</tr>
+<tr>
+<td><code>run-all.ps1</code>은 <code>profile.selftest</code> 게이트를 부르지 않는다</td>
+<td><code>Tools/regression/run-all.ps1</code> 전체 grep 0건</td>
+</tr>
+<tr>
+<td>ASan 게이트는 R1/R2 수명 시나리오만 잰다</td>
+<td><code>verify-asan-lifecycle.ps1:1, 4</code></td>
+</tr>
+<tr>
+<td>selftest의 멀티스레드 픽스처는 이벤트 하나 찍고 즉시 대기해 resize 경합을 재현하지 않는다</td>
+<td><code>ProfilerSelfTest.cpp:288, 293</code></td>
+</tr>
+</tbody></table></div>
+<h3>2.9 외부 라이브러리 — 저장소 안에서 확인된 것만</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>발견</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ThirdParty/README.md</code> 정책은 &quot;vcpkg로 못 가져오거나 가져오면 안 되는 것&quot;만 허용, mikktspace처럼 stand-alone 파일은 복사 모델 전례</td>
+<td><code>ThirdParty/README.md:5, 12</code></td>
+</tr>
+<tr>
+<td>enkiTS는 표준 헤더만 포함하는 헤더+cpp 쌍, zlib(외부 API 호출·GitHub 메타데이터 — 로컬 대조 불가)</td>
+<td>외부</td>
+</tr>
+<tr>
+<td>enkiTS DAG API·pinned task, Wicked 3풀 구조, Jolt <code>JobSystemWithBarrier</code> 5함수 — <strong>전부 반박</strong>(부록 A)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>marl archived, Taskflow C++20·<code>executor.hpp</code> 2554줄(미검증)</td>
+<td>외부</td>
+</tr>
+</tbody></table></div>
+<h2>3. JobSystem과 무관하게 먼저 고칠 결함·낭비</h2>
+<p>JobSystem 결정과 독립적으로 고쳐야 하고, 각각 소유자가 있거나 정해야 한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>항목</th>
+<th>근거</th>
+<th>소유</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>D0</strong></td>
+<td><strong><code>NotifyAllAndWait</code>이 배리어가 아니다</strong> — 잡이 남아 있어도 2.5&#126;5.8% 반환. <code>AnimationJob</code>의 두 안전 근거(포즈 커밋 순서 <code>:167-170</code>, raw <code>Animator*</code> 수명 <code>:117-119</code>)가 모두 이 불변식 위에 서 있다</td>
+<td><code>Core.ThreadPool.h:68-72, 125-129</code>; §10</td>
+<td><strong>신설 — 최우선</strong></td>
+<td>성능이 아니라 정확성. 20줄로 고쳐지고 고치면 더 빠르다(§10)</td>
+</tr>
+<tr>
+<td>D1</td>
+<td><strong>AI 비동기 ↔ 트랜스폼 데이터 레이스</strong> — <code>wait_for(0s)</code> 폴링을 물리 스텝 전 무조건 join으로</td>
+<td><code>Scene.cpp:2559</code>, <code>AIManager.cpp:65</code></td>
+<td>PhysicsRedesignPlan <strong>T0</strong> (Z-① 재정의: &quot;끊는다&quot;가 아니라 &quot;재발을 계약으로 봉인&quot;)</td>
+<td>J8b. 창이 <code>EndOfFrame</code>까지 이어지므로 join 위치를 실측으로 확정</td>
+</tr>
+<tr>
+<td>D2</td>
+<td><code>AssetLoadJob</code> 죽은 코드 삭제</td>
+<td><code>AssetJob.h:11</code></td>
+<td>정리 슬라이스</td>
+<td>J6. 인스턴스 0건 grep 재확인 선행(미검증 발견)</td>
+</tr>
+<tr>
+<td>D3</td>
+<td>Foliage 분할 수가 하드웨어 상수(17)에 고정·임계값 게이트 부재</td>
+<td><code>FoliageComponent.cpp:315-341</code></td>
+<td>신설</td>
+<td>J8a. 인스턴스 규모 실측 전 착수 금지</td>
+</tr>
+<tr>
+<td>D4</td>
+<td>PSO <code>std::async</code> 상한 부재</td>
+<td><code>DX12PSOManager.cpp:719</code></td>
+<td>RHI PSO 소유자</td>
+<td>J10</td>
+</tr>
+<tr>
+<td>D5</td>
+<td><code>LoadAssetBundle</code> GT 블록</td>
+<td><code>DataSystem.cpp:1702</code></td>
+<td>자산 스트리밍(계획서 부재)</td>
+<td>J7·J9</td>
+</tr>
+<tr>
+<td>D6</td>
+<td>R5 연산자 우선순위 버그 <code>if (!StateVec.size() &gt;= 2)</code></td>
+<td><code>AnimationController.cpp:59</code></td>
+<td>PHASE 13 S0</td>
+<td>항상 false 비교 — JobSystem 무관</td>
+</tr>
+<tr>
+<td>D7</td>
+<td>대시보드 서술 갱신: R1·R2·R4·R6 해소/사망, PHASE 19 M1 행이 PHASE 4.75 L3 텍스트 복사(데이터 오류, 미검증)</td>
+<td><code>RefactoringPlanDashboard.html</code></td>
+<td>대시보드</td>
+<td>이 문서 범위 밖(수정 안 함)</td>
+</tr>
+<tr>
+<td>D8</td>
+<td><code>profile.selftest</code>가 run-all에 없다</td>
+<td><code>run-all.ps1</code></td>
+<td>PHASE 14</td>
+<td>라이브 캡처 교란(§3.2 자인) 때문에 격리 실행 구간 필요</td>
+</tr>
+<tr>
+<td>D9</td>
+<td><code>Profiler.cpp:119</code> EventBuffer resize 잠복 결함</td>
+<td><code>Profiler.cpp:115-122</code></td>
+<td>PHASE 14 <strong>P2</strong></td>
+<td>워커 계측을 넣는 순간 발동 — 모든 워커 계측 슬라이스의 선행</td>
+</tr>
+<tr>
+<td>D10</td>
+<td><code>SetThreadPriority</code> 비대칭(작업 풀 HIGHEST, 렌더 NORMAL) + 풀마다 논리코어 수만큼 워커</td>
+<td><code>Core.ThreadPool.h:20, 23</code></td>
+<td>신설</td>
+<td>J5. <strong>실측(§10)</strong>: HIGHEST는 처리량 −41%. 워커 8→3에서 이웃 스레드 지연이 거의 사라지고 처리량은 75% 유지</td>
+</tr>
+<tr>
+<td>D13</td>
+<td><code>SetThreadInitCallback</code>이 생성자 스레드 기동과 경합 — 배선해도 일부 워커에서만 발화(실측 5/8)</td>
+<td><code>Core.ThreadPool.h:31-43, 90, 103</code>; §10</td>
+<td>신설</td>
+<td>J4의 전제를 바꾼다</td>
+</tr>
+<tr>
+<td>D11</td>
+<td><code>DisableOrEnable()</code>이 이름과 달리 <code>EndFramePass</code> 위임(미검증)</td>
+<td><code>SceneManager.cpp:496-499</code></td>
+<td>씬 그래프</td>
+<td>이름 정정만</td>
+</tr>
+<tr>
+<td>D12</td>
+<td><code>Canvas::TickCanvasOrder</code>의 <code>needSort</code> 공유 플래그 락 없음(미검증)</td>
+<td><code>Canvas.cpp:120, 129</code></td>
+<td>UI</td>
+<td>지금은 단일 스레드라 안전, UITick 병렬화 시 선행</td>
+</tr>
+</tbody></table></div>
+<h2>4. JobSystem이 주는 것과 안 주는 것</h2>
+<p><strong>주는 것(구조):</strong></p>
+<ul>
+<li><strong>부분집합 대기</strong> — S6(청크 분할)·T1(Jolt 배리어)·T0 계약이 같은 풀 위에서 서로를 기다리지 않게 된다. 이것이 유일하게 &quot;지금&quot; 필요한 것이다.</li>
+<li><strong>워커 인덱스</strong> — S3.5 워커별 포즈 풀·steal-in-place, render 풀과 같은 &quot;인덱스=자원 슬롯&quot; 패턴을 공용 풀에서도 쓸 수 있다.</li>
+<li><strong>실측 게이팅이 붙은 <code>ParallelFor</code></strong> — Foliage 17분할·애니메이터당 태스크 1개라는 두 낭비를 한 원시로 대체하되, 임계값 미만은 직렬 폴백.</li>
+<li><strong>핸들 반환 제출</strong> — AI·자산 로드·PSO의 fire-and-forget을 명시적 드레인 계약으로 바꾼다.</li>
+<li><strong>스케줄러 통합 가능성</strong> — ConcRT(std::async)·전용 풀·WorkerPool 셋을 하나로 줄이면 4코어에서 과다구독이 준다. 크기는 미측정.</li>
+</ul>
+<p><strong>안 주는 것:</strong></p>
+<ul>
+<li><strong>트랜스폼 속도</strong> — X5가 이미 정지 O(1)·변경분 O(k)를 달성했다. X9가 벌 수 있는 몫은 수 µs&#126;수백 µs의 sparse 열이고, 비원자 카운터·단일 mutex·false sharing 선행 결함이 남아 있다.</li>
+<li><strong>렌더 기록 속도</strong> — 자체 풀이 3차 실측을 거쳐 굳었고 RG4/RG8이 소유한다.</li>
+<li><strong>물리 백엔드 결정</strong> — X0 스파이크(PhysX vs Jolt) 미결. T1(b)의 창 배치는 pull 시점 재설계 없이는 의미 변화를 낳는다.</li>
+<li><strong>관리 경계 안전</strong> — 큐잉(<code>Queue*</code>/<code>Flush*</code>) 규약은 이미 있다. JobSystem은 그 규약을 게이트로 강제할 뿐 새로 풀지 않는다.</li>
+<li><strong>코루틴·트윈 병렬화</strong> — 락 없는 GT 전용 구조.</li>
+<li><strong>지금 당장의 ms 수치</strong> — 어떤 슬라이스도 실측 이득을 갖고 있지 않다.</li>
+</ul>
+<h2>5. 설계안 비교</h2>
+<p>세 각도의 설계안을 독립 심판 3인이 채점했다(이득/공수·위험·계획 정합·검증 가능성, 각 10점).</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>각도</th>
+<th>명제</th>
+<th>공수</th>
+<th>심판 1</th>
+<th>심판 2</th>
+<th>심판 3</th>
+<th>치명</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A. <code>Core.ThreadPool</code> 최소 확장</strong></td>
+<td>전역 카운터를 클라이언트별 <code>JobCounter</code>로 쪼개고(J1) 그 위에 워커 인덱스·<code>ParallelFor</code>·프로파일러 등록·핸들 제출을 얹어 산재한 소비자를 하나씩 옮긴다</td>
+<td>15.5일 → 접목 후 17일</td>
+<td><strong>8.2</strong></td>
+<td><strong>8.2</strong></td>
+<td><strong>8.0</strong></td>
+<td>J1의 default-counter 경로와 신규 counter 경로 간 우선순위 역전을 스트레스 테스트로 남겨 둠</td>
+</tr>
+<tr>
+<td>B. 외부 잡 시스템 벤더링 + 계층 계약</td>
+<td>enkiTS/Wicked/Jolt 중 하나를 ThirdParty 정책 예외로 들여 <code>Utility_Framework::Jobs</code> 얇은 계약으로 감싼다</td>
+<td>10일</td>
+<td>5.4</td>
+<td>5.0</td>
+<td>5.6</td>
+<td>핵심 근거(외부 API 4건) 전부 반박; S0 실사 실패 시 A로 회귀를 스스로 인정; &quot;Jolt는 WorkerPool 공유&quot; 기존 합의와 충돌; bshoshany-thread-pool 제거 전례와 배치</td>
+</tr>
+<tr>
+<td>C. JobSystem 없이 국소 패치(대조군)</td>
+<td>—</td>
+<td>—</td>
+<td>1.2</td>
+<td>0.4</td>
+<td>2.0</td>
+<td><strong>자리표시자로 돌아와 논증되지 않았다</strong>(부록 B). 별도 재논증은 §5.1</td>
+</tr>
+</tbody></table></div>
+<p><strong>A가 만장일치</strong>로 채택됐고, B에서 접목한 것은 셋이다: 계층 위반 회귀 게이트(J1a), 잡 콜백 내 관리 코드 호출 금지 정적 검사(J1b, PHASE 24 완성을 기다리지 않는 독립 슬라이스), &quot;외부 근거는 원문을 fetch해 대조한 뒤에만 채택&quot;이라는 실사 원칙. Jolt 자체 <code>JobSystemThreadPool</code>을 국소적으로 쓰는 대안은 T1 각주로만 남긴다.</p>
+<p>비평(critic)은 판정을 뒤집지 않았으나 A의 세부 넷을 결함으로 지적했고 §6·§9에 반영했다: <code>EnqueueIndexed</code>는 오버로드 추가가 아니라 <code>TaskType</code> 변경을 요구한다, <code>JobCounter</code>/<code>JobHandle</code> 수명 규약이 없다, 측정 선행 공수가 17일에 합산돼 있지 않다, Vulkan 비대칭 논거(이 문서에서 정정 — 부록 A).</p>
+<h3>5.1 대조군 재논증 — &quot;JobSystem 없이 국소 패치&quot;</h3>
+<p>심판을 거치지 않은 단독 에이전트가 대조군을 최대한 강하게 논증했다(읽기 전용, 코드 재확인 55회). 요지와 판정.</p>
+<p><strong>대조군의 명제.</strong> 실측 결함·낭비 9건 중 8건은 공유 원시를 한 줄도 건드리지 않고 <strong>9일</strong>에 고칠 수 있고, 그중 Foliage·PSO·프로파일러 등록·AI join은 찬성안의 선행 사슬(J0→J1→J1a→J1b, 4일) 없이 오늘 착수할 수 있다. 부분집합 대기는 <code>DX12CommandListPool.h:100-131</code>이 이미 뮤텍스+condition_variable+세대 카운터(<code>m_generation</code>)로 프로덕션에서 구현한 선례가 있으니 &quot;공유 카운터를 일반화한다&quot;가 유일한 길이 아니다. 우회 원시는 클라이언트별 별도 풀(가장 비쌈 — AnimationJob이 이미 그 길을 갔고 계획서가 낭비로 적음)도, PPL <code>task_group</code>(이 저장소가 PPL 상위 알고리즘을 0건으로 유지해 왔고 ConcRT 워커는 프로파일러 등록 지점이 없음)도 아니라 <strong>기존 <code>Enqueue</code> + 로컬 <code>std::latch</code>/원자 카운터</strong>여야 한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대조군 슬라이스</th>
+<th>공수</th>
+<th>찬성안 대응</th>
+<th>비교</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C1 AI 레이스 무조건 join</td>
+<td>1</td>
+<td>J8b 1 (J1b 선행)</td>
+<td>수정 내용 동일, 선행만 다름</td>
+</tr>
+<tr>
+<td>C2 Foliage 인스턴스 기반 분할 + 임계값</td>
+<td>1.5</td>
+<td>J8a 1.5 (선행 7.5)</td>
+<td>게이트가 검증하는 것은 &quot;임계값이 있는가&quot;이지 &quot;공용 원시를 쓰는가&quot;가 아니다</td>
+</tr>
+<tr>
+<td>C3 PSO 세마포어 상한(<code>Core.CountingSemaphore.h</code> 기존 원시)</td>
+<td>1</td>
+<td>J10 1.5 (J2 선행)</td>
+<td>PSO는 카운팅 문제라 워커 인덱스가 필요 없다</td>
+</tr>
+<tr>
+<td>C4 <code>AssetLoadJob</code> 삭제</td>
+<td>0.5</td>
+<td>J6 0.5</td>
+<td>동일</td>
+</tr>
+<tr>
+<td>C5 <code>LoadAssetBundle</code> 로컬 원자 카운터 + 폴링(<code>EditorModelPlacement.cpp:29, 181</code> 패턴 복제)</td>
+<td>2.5</td>
+<td>J7+J9 3.5 (J1 선행)</td>
+<td>호출부 넷(<code>SceneManager.cpp:745, 862, 969, 1077</code>)의 계약 통일 필요</td>
+</tr>
+<tr>
+<td>C7 <code>AnimationJob</code> 정적 청크(<code>GetThreadCount()</code>, <code>:88</code>)</td>
+<td>1</td>
+<td>S6 일부 — &quot;J2 없이 불가&quot;를 반증</td>
+<td>steal-in-place 제외</td>
+</tr>
+<tr>
+<td>C8 프로파일러 등록</td>
+<td>0.5</td>
+<td>J4 1 (J1 선행)</td>
+<td>기존 setter 호출만</td>
+</tr>
+<tr>
+<td>C9 우선순위 통일</td>
+<td>1</td>
+<td>J5 1 (J1 선행)</td>
+<td>동일</td>
+</tr>
+<tr>
+<td>C10 <code>ThreadPool</code> permit 유실 방지(양쪽 공통, 합계 밖)</td>
+<td>0.5&#126;1</td>
+<td>—</td>
+<td>찬성안 §6.1에 이 문장이 없었다</td>
+</tr>
+<tr>
+<td><strong>합계</strong></td>
+<td><strong>9</strong> (+T1 조건부 2&#126;3)</td>
+<td>17.5</td>
+<td>커버리지가 절반 — 대조군 자신의 표현으로 &quot;이득이 아니라 범위를 좁힌 값&quot;</td>
+</tr>
+</tbody></table></div>
+<p><strong>대조군이 맞힌 것 — 채택.</strong></p>
+<ol>
+<li>J8b는 JobSystem 원시가 필요 없다. 기존 <code>std::future</code>를 join하는 한 줄이다. 선행 사슬에서 뗐다(§6.2).</li>
+<li>J10은 워커 인덱스가 필요 없다. J2 의존은 과잉 결합이었다. 1단계는 세마포어 상한, 2단계만 J1 위 이관으로 갈랐다(§6.2).</li>
+<li>S6의 &quot;태스크 수 = O(워커 수)&quot;는 정적 분할로 J2 없이 충족된다. &quot;S6 하드 블로커&quot;는 정확히는 <strong>S3.5 워커별 포즈 풀·steal-in-place의 하드 블로커</strong>다(§요약 정정).</li>
+<li><code>ThreadPool</code> permit 유실 의심(<code>PPLContainerMigrationAnalysis.md:337-339</code>: <code>acquire()</code> 후 <code>try_pop</code> 실패 시 카운터 미보정) — 코드 구조(<code>Core.ThreadPool.h:68-77</code> 카운터·큐·세마포어 3중 비원자 갱신, <code>:113-131</code> 실패 경로 보정 없음)는 재확인했으나 레이스 재현은 없다(<strong>미검증</strong>). 세마포어 permit이 push 수를 넘지 않으므로 정상 경로에서는 <code>try_pop</code>이 실패하지 않아야 하지만, J1이 같은 스켈레톤 위에 얹히면 결함이 있을 경우 N배로 상속한다. J0 exit 게이트에 &quot;카운터 = 큐 잔량&quot; 스트레스 단정을 넣어 먼저 가른다.</li>
+<li><code>PPLContainerMigrationAnalysis.md</code>(08-08)가 인용한 <code>WorkerPools</code> 소비자(카메라 루프 10건·<code>Terrain.cpp:479</code>·<code>ModelSceneBridge</code>)는 HEAD에 없다 — 한 달 사이 소비자가 줄어 <code>LoadAssetBundle</code> 하나만 남았다. &quot;풀 클라이언트가 늘어난다&quot;는 전제는 현재 추세와 반대이며, 늘어나는 시점은 T1·S6 착수 때다.</li>
+</ol>
+<p><strong>대조군이 무너지는 곳 — 판정 유지.</strong></p>
+<ol>
+<li>S3.5 워커별 포즈 풀·steal-in-place는 물리적 워커 정체성이 필요하다. <code>WorkerLoop(int threadIndex)</code>(<code>:101</code>)의 인덱스를 <code>TaskType = std::function&lt;void()&gt;</code>(<code>WorkerPool.h:25</code>)가 막고 있어, 로컬 우회는 <code>DX12CommandListPool</code> 규모(약 140줄)의 세 번째 풀을 Animation 전용 파일 안에 또 짜는 것이다. 대조군 스스로 &quot;국소 패치라는 이름값을 깨뜨린다&quot;고 인정했다.</li>
+<li>T1(Jolt 배리어)은 &quot;그때 가서 짠다&quot;뿐이다. X0 미결은 양쪽 공통이지만, 찬성안은 얹을 API(§6.1)가 있고 대조군은 약속만 있다.</li>
+<li>C5(로컬 카운터)는 <code>WorkerPools</code> 소비자가 하나일 때만 안전하다. 물리가 풀을 공유하는 순간 &quot;레거시 <code>NotifyAllAndWait</code> 사용자 0&quot;이 깨져 <strong>C5를 물리 착수보다 먼저 끝내야 한다는 순서 제약</strong>이 새로 생긴다. <code>JobCounter</code>는 클라이언트별 격리라 이 제약을 만들지 않는다.</li>
+<li>9일 대 17.5일은 이득이 아니라 커버리지 절반의 값이다.</li>
+</ol>
+<p><strong>결론.</strong> 판정은 바뀌지 않는다 — J1은 T1·S3.5·풀 공유의 전제로 여전히 필요하다. 다만 <strong>착수 순서는 대조군이 옳다.</strong> 선행 사슬이 없는 국소 수정 다섯(J8b·J10 1단계·J6·J4·J5)을 J0/J1과 병행해 즉시 착수하고, 자산 로드(J7/J9)는 로컬 카운터가 아니라 J1 위에서 해 순서 제약을 피하며, J2/J3은 S3.5·S6 착수 결정 시점까지 보류한다.</p>
+<h2>6. 권고안 — <code>Core.ThreadPool</code> JobSystem 최소 통합</h2>
+<h3>6.1 API 스케치</h3>
+<pre><code class="language-cpp">// Engine/Utility_Framework/Core.ThreadPool.h 확장.
+// 계층: Utility_Framework에 둔다. SceneRuntime/RenderEngine 타입을 include하지 않는다(J1a 게이트).
+
+struct JobCounter {                       // J1. 소유자는 호출자. 잡이 참조하는 동안 살아 있어야 한다(§6.3 수명 규약).
+    std::atomic&lt;int&gt; pending{0};
+    std::mutex m;
+    std::condition_variable cv;
+};
+
+struct JobHandle {                        // J9/J10. Utility_Framework 소유 — RenderEngine(DataSystem)·RHI(PSO)가 공유.
+    void Wait();
+    bool IsDone() const;
+};
+
+class ThreadPool {
+public:
+    // 기존 API — 그대로. 내부 default counter로 위임해 하위호환 유지.
+    void Enqueue(std::function&lt;void()&gt; job);
+    void NotifyAllAndWait();
+
+    // J1: 클라이언트별 부분집합 대기.
+    void Enqueue(JobCounter&amp; counter, std::function&lt;void()&gt; job);
+    void Wait(JobCounter&amp; counter);       // counter.pending==0까지만. 다른 클라이언트 잡과 무관.
+
+    // J2: 워커 인덱스 노출. ★ 오버로드 추가로 끝나지 않는다 —
+    //     TaskType이 std::function&lt;void()&gt;(WorkerPool.h:25)이고 WorkerLoop가 task()를 무인자로 부르므로(:123),
+    //     (a) TaskType을 std::function&lt;void(int)&gt;로 바꾸거나 (b) WorkerLoop에 thread_local 워커 인덱스를 두고
+    //     조회 API를 제공해야 한다. (b)가 기존 소비자를 깨지 않는다.
+    void EnqueueIndexed(JobCounter&amp; counter, std::function&lt;void(int workerIndex)&gt; job);
+    static int CurrentWorkerIndex();      // (b) 경로. 워커 밖에서는 -1.
+
+    // J3: 청크 분할 parallel_for. 청크 수 = O(워커 수). count &lt; minCountForParallel이면 호출 스레드에서 직렬.
+    void ParallelFor(JobCounter&amp; counter, size_t count, size_t minCountForParallel,
+                     std::function&lt;void(size_t begin, size_t end, int workerIndex)&gt; chunkFn);
+
+    // J9/J10: fire-and-forget 대신 핸들. 호출자가 프레임 경계에서 명시적으로 드레인.
+    JobHandle SubmitDrainable(std::function&lt;void()&gt; job);
+
+    // J4: 이미 존재하는 콜백(Core.ThreadPool.h:90,95)을 프로파일러에 연결. 등록/은퇴만.
+    void SetThreadInitCallback(std::function&lt;void()&gt; cb);   // -&gt; gCPUProfiler.RegisterThread
+    void SetThreadExitCallback(std::function&lt;void()&gt; cb);   // -&gt; gCPUProfiler.UnregisterThread
+};
+</code></pre>
+<h3>6.2 슬라이스</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>슬라이스</th>
+<th>공수</th>
+<th>선행</th>
+<th>소유</th>
+<th>exit 게이트(변이 증명 포함)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>J-1</strong></td>
+<td><strong>배리어 정직성 복구</strong> — <code>m_waitEvent</code>를 카운터+<code>condition_variable</code>로 교체(§10.4 V1). <code>AnimationJob</code>·<code>LoadAssetBundle</code>의 안전 근거가 이것에 의존한다 · <strong>적용 완료(§11.1, 미커밋)</strong></td>
+<td>0.5</td>
+<td>없음</td>
+<td>신설(JobSystem 트랙)</td>
+<td>독립 완료 카운터로 배리어 반환 직후 잔여 잡 수를 단정 → <strong>89,000시행 0건 확인</strong>. 변이(Event 배리어 원복)로 §10.1의 2&#126;6% 재현. <strong>잔여: 이 단정을 저장소 안 회귀로 고정하는 일</strong></td>
+</tr>
+<tr>
+<td>J0</td>
+<td>현재 <code>ThreadPool</code> 계약 회귀 고정 — 전역 카운터 의미론·각 풀 우선순위를 합성 테스트로 기준선화</td>
+<td>0.5</td>
+<td>J-1</td>
+<td>신설(JobSystem 트랙)</td>
+<td>태스크 100개 투입 후 <code>NotifyAllAndWait</code>이 무관한 호출자의 잡까지 기다림을 단정(지금은 반드시 참). <strong>추가(§5.1)</strong>: 고빈도 push/pop 스트레스에서 <code>m_taskCounts</code>가 큐 실제 잔량과 항상 일치함을 단정 — permit 유실 의심(<code>PPLContainerMigrationAnalysis.md:337-339</code>, 미검증)을 J1이 상속하지 않도록 먼저 가른다</td>
+</tr>
+<tr>
+<td><strong>J1</strong></td>
+<td><strong><code>JobCounter</code> 도입 — 부분집합 대기</strong></td>
+<td>2</td>
+<td>J0</td>
+<td>신설 — S6·T1이 이 위에 얹힌다</td>
+<td>A(긴 태스크 100, counterA)·B(짧은 태스크 1, counterB) 동시 투입 → <code>Wait(counterB)</code> 즉시 반환 단정; 변이(카운터 합침)로 실패. <strong>추가</strong>: default-counter 경로와 신규 경로가 같은 큐를 채우는 스트레스로 상호 지연을 수치화해 허용 오차로 명시 — 계측 없이 &quot;해결&quot;로 닫지 않는다</td>
+</tr>
+<tr>
+<td>J1a</td>
+<td>계층 위반 회귀 게이트 <code>verify-jobsystem-layering.ps1</code></td>
+<td>0.5</td>
+<td>J1</td>
+<td>신설 — S6·T1 공통 전제로 문서화</td>
+<td>JobSystem 헤더의 include에 SceneRuntime/RenderEngine 없음. 변이(임시 include 추가)로 빨강. run-all 배선</td>
+</tr>
+<tr>
+<td>J1b</td>
+<td>잡 콜백 내 <code>ClrHost::*</code>/<code>Native.*</code> 호출 금지 정적 검사</td>
+<td>1</td>
+<td>J1a</td>
+<td>신설 — PHASE 24를 전제하지 않음</td>
+<td><code>Enqueue*/ParallelFor</code> 람다 본문 grep. 변이(가짜 <code>ClrHost::</code> 호출)로 빨강. 참조 구현: <code>QueueScriptMessage</code>/<code>QueueAITick</code></td>
+</tr>
+<tr>
+<td>J2</td>
+<td>워커 인덱스 노출</td>
+<td><strong>1.5</strong> (비평 반영: <code>TaskType</code>/<code>thread_local</code> 내부 변경)</td>
+<td>J1b</td>
+<td>PHASE 13 S3.5/S6</td>
+<td>N개 투입 시 인덱스가 0..workerCount-1이고 동시에 두 태스크가 같은 인덱스를 관측하지 않음. 변이(항상 0)로 실패</td>
+</tr>
+<tr>
+<td>J3</td>
+<td><code>ParallelFor</code> + 실측 게이팅 임계값</td>
+<td>2</td>
+<td>J2</td>
+<td>PHASE 13 S6</td>
+<td>인스턴스 1/17/100/1000에서 직렬 대비 손익분기점 실측 → <code>minCountForParallel</code> 고정. 변이(게이트 제거)로 소규모 손해 재현</td>
+</tr>
+<tr>
+<td>J4</td>
+<td>프로파일러 스레드 등록 배선(등록/은퇴만) — <strong>콜백을 setter가 아니라 생성자 인자로 옮기는 것이 선행</strong>(§10: 현재 setter는 5/8만 발화)</td>
+<td>1</td>
+<td>J1</td>
+<td>PHASE 14 P1 잔여</td>
+<td><code>ProfilerSelfTest</code>에 워커 N 기동/종료 시 Register/Unregister N/N 단정. 변이(미배선)로 0. <strong><code>BeginEvent</code>는 P2 전 금지</strong></td>
+</tr>
+<tr>
+<td><strong>J5</strong></td>
+<td>우선순위·워커 수 정책 통일 + 자가진단 — <strong>§11 이후 J1보다 우선순위가 높다</strong></td>
+<td>1</td>
+<td>없음</td>
+<td>신설</td>
+<td>각 풀 생성 시 <code>GetThreadPriority</code> 로그, run-all에서 정책 불일치 시 실패. <strong>§10.5·§11.2 근거</strong>: HIGHEST 기본값 폐기(같은 풀에서 배속 2.47→4.52), 풀 합계 워커 수를 논리코어 미만으로</td>
+</tr>
+<tr>
+<td>J6</td>
+<td><code>AssetLoadJob</code> 삭제</td>
+<td>0.5</td>
+<td>J0</td>
+<td>정리</td>
+<td>grep 0건 재확인 → 삭제 → 빌드 exit code 0 + 회귀 세트 통과</td>
+</tr>
+<tr>
+<td>J7</td>
+<td><code>LoadAssetBundle</code> → J1 counter 경로</td>
+<td>1</td>
+<td>J1</td>
+<td>자산 스트리밍</td>
+<td>이관 전/후 총 완료 시간 동일(동일 워크로드)</td>
+</tr>
+<tr>
+<td>J8a</td>
+<td>Foliage <code>std::async</code> → <code>ParallelFor</code></td>
+<td>1.5</td>
+<td>J3</td>
+<td>신설</td>
+<td>교체 전/후 동일 컴포넌트 수 프레임 CPU 비교. 컴포넌트 간 오버랩은 이 슬라이스가 고치지 않음을 명시</td>
+</tr>
+<tr>
+<td><strong>J8b</strong></td>
+<td><strong>AI async → 무조건 join 계약</strong></td>
+<td>1</td>
+<td><strong>없음</strong> (기존 <code>std::future</code> join — <code>SubmitDrainable</code> 이관은 J1 이후 선택, §5.1)</td>
+<td><strong>PhysicsRedesignPlan T0</strong> — JobSystem은 <code>SubmitDrainable</code>만 제공</td>
+<td>FixedUpdate 쓰기와 <code>InternalAIUpdate</code> 읽기를 인위 동시 실행하는 합성 레이스: 적용 전 불일치 재현, 후 통과. join 위치는 <code>EndOfFrame</code> 창까지 닫히는지 확인</td>
+</tr>
+<tr>
+<td>J9</td>
+<td><code>LoadAssetBundle</code> 논블로킹화(GT 블록 제거)</td>
+<td>2.5</td>
+<td>J7, J1b</td>
+<td>자산 스트리밍</td>
+<td>블로킹판은 GT 프레임타임 스파이크 관측, 논블로킹판은 폴링 프레임당 수 µs 이하. 변이(폴링 제거)로 스파이크 재현. <code>LoadSceneAsync</code> 이중 레이어 중 어느 지점을 바꿀지 먼저 확정</td>
+</tr>
+<tr>
+<td>J10</td>
+<td>PSO <code>std::async</code> 상한 — 1단계 <code>Core.CountingSemaphore.h</code> 기존 원시로 동시 컴파일 수 상한(선행 없음), 2단계 J1 <code>SubmitDrainable</code> 위 bounded 큐로 이관</td>
+<td>1.5</td>
+<td>1단계 없음 · 2단계 J1 (워커 인덱스 불필요 — J2 의존은 과잉 결합, §5.1)</td>
+<td>RHI PSO 소유자</td>
+<td>동시 미스 N에서 활성 스레드 수 ≤ 상한. 변이(unbounded)로 N까지 치솟음. 상한이 너무 작으면 폴백 셰이더 프레임 드롭이 생기는 반대 위험</td>
+</tr>
+</tbody></table></div>
+<p>합계 <strong>18일</strong>(J2 0.5 증가, J-1 0.5 신설). <strong>여기에 §8의 측정 선행 공수는 포함돼 있지 않다.</strong></p>
+<p><strong>§10 이후 J1의 성격이 바뀐다.</strong> J-1이 배리어를 정직하게 만들면 <code>JobCounter</code>는 &quot;그 카운터를 클라이언트별로 쪼개는 것&quot;이 되어 J-1의 자연스러운 연장이 된다. 반대로 J-1 없이 J1만 하면 클라이언트마다 거짓 배리어를 하나씩 갖게 된다.</p>
+<p>착수 순서(§5.1 반영): <strong>선행 사슬이 없는 다섯 — J8b(정확성)·J10 1단계·J6·J4·J5 — 는 J0→J1과 병행해 즉시.</strong> 그 뒤 J1a → J1b → J7 → J2 → J3 → (실측 후) J8a·J9·J10 2단계. J2·J3은 S3.5/S6 착수가 결정될 때까지 보류해도 된다.</p>
+<h3>6.3 수명 규약 — 비평이 비운 자리</h3>
+<ul>
+<li><code>JobCounter</code>는 호출자 소유 값이며 <strong><code>Wait(counter)</code>가 반환하기 전에 파괴돼서는 안 된다.</strong> 프레임 스코프 스택 객체로 두는 경우(AnimationJob 패턴) 조기 반환·예외·씬 전환 경로마다 <code>Wait</code>가 반드시 도달함을 J1 exit 게이트에 단정으로 넣는다. 도달하지 않는 경로가 있으면 디버그 빌드에서 소멸자가 <code>pending != 0</code>을 검출해 abort한다(정책을 assert로만 적지 말 것 — Release에서도 도는 검출 축을 둔다).</li>
+<li><code>JobHandle</code>은 공유 상태(<code>shared_ptr</code> 또는 풀 소유 슬롯)를 가리키는 값 타입이며, 소유자가 핸들을 버려도 잡은 완료까지 실행되고 결과는 버려진다. 프레임 경계 드레인이 필요한 소비자(AI·자산 로드)는 핸들을 프레임 경계까지 보관해 <code>Wait</code>한다 — 이것이 J1b가 강제하는 &quot;fire-and-forget 금지&quot;의 실체다.</li>
+<li>풀 <code>Shutdown</code>은 미완 <code>JobCounter</code>가 있으면 대기 후 종료한다(현재 <code>SceneManager::Shutdown</code>(<code>:532</code>) 경로에 단정 추가).</li>
+</ul>
+<h2>7. 경계 규칙</h2>
+<ol>
+<li><strong>렌더 병렬 기록 풀은 흡수하지 않는다.</strong> <code>RHIParallelCommandPool</code> → <code>DX12CommandListPool</code> / <code>VulkanCommandBufferPool</code>은 <strong>두 백엔드 모두</strong> 지속 워커 3 + 호출 스레드, 워커 인덱스=자원 슬롯, 연속 블록 배분, fork-join-only 계약이다. RG4/RG8이 소유한다.</li>
+<li><strong>PhysX 디스패처 교체·PhysX→Jolt 전환은 이 트랙이 결정하지 않는다.</strong> PhysicsRedesignPlan §2.3 X0 스파이크 소유, 미결.</li>
+<li><strong>AI/트랜스폼 레이스 수정은 T0가 소유한다.</strong> JobSystem은 <code>SubmitDrainable</code> API만 제공한다.</li>
+<li><strong>워커 콜백 안에서 <code>ClrHost::*</code>/<code>Native.*</code> 직접 호출 금지.</strong> 관리 콜백은 <code>Queue*</code>/<code>Flush*</code> 큐잉만, Flush는 GT 전용. J1b 정적 검사로 강제하며 PHASE 24 완성을 기다리지 않는다.</li>
+<li><strong>프로파일러 <code>BeginEvent</code>/<code>PROFILE_CPU_SCOPE</code>는 PHASE 14 P2 완료 전 워커에 넣지 않는다.</strong> 등록/은퇴만.</li>
+<li><strong><code>CoroutineManager</code>·<code>TweenManager</code>는 병렬화 대상이 아니다.</strong></li>
+<li><strong>외부 잡 라이브러리는 이번 트랙 범위 밖이다.</strong> 재검토는 실제 소스를 fetch해 원문 대조하는 S0 스파이크 이후에만.</li>
+<li><strong>새 API는 Utility_Framework에 두고 상위 계층 타입을 include하지 않는다.</strong> <code>JobHandle</code>도 같은 계층 — DataSystem(RenderEngine)과 PSO(RHI)가 역방향 결합 없이 공유한다.</li>
+<li><strong>PHASE 15 S1/S2(<code>jthread</code>·<code>counting_semaphore</code>)와 J1은 같은 파일을 만진다.</strong> 착수 순서를 한쪽으로 고정한다(J1 먼저를 권고 — S1/S2는 타입 교체라 J1 위에 얹기 쉽다).</li>
+</ol>
+<h2>8. 먼저 재야 할 것 — 이 조사의 측정 공백</h2>
+<p>이 공수는 §6 합계에 <strong>포함되지 않았다.</strong></p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>측정</th>
+<th>왜</th>
+<th>선행 대상</th>
+<th>추정 공수</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M1</td>
+<td>HEAD 기준 x64-Release 재빌드 — <strong>exit code로만 판정</strong>(mtime 금지) — 후 기존 회귀 세트 재통과</td>
+<td><code>Bin/x64-Release/Editor/CreatorEditor.exe</code>가 08:02 빌드, HEAD가 16:58로 낡음. Debug는 25배 느리고 방향까지 뒤집힌다</td>
+<td>모든 A/B</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>M2</td>
+<td>씬당 규모 진단 커맨드 <code>scene.stats</code> 신설 — Foliage 컴포넌트·인스턴스, Animator, Decal, UI 요소, Sound 개수</td>
+<td>J3의 <code>minCountForParallel</code>과 J8a 착수 여부가 이 수치에 전적으로 좌우. 저장소에 씬 자산이 없어 grep 불가</td>
+<td>J3·J8a</td>
+<td>1</td>
+</tr>
+<tr>
+<td>M3</td>
+<td>물리 창(<code>simulate</code>&#126;<code>fetchResults</code>) 길이 계측</td>
+<td>T1(b) 채택 여부. P2 전에는 GT 스코프로만(호출 스레드가 GT)</td>
+<td>T1</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>M4</td>
+<td><code>profile.selftest</code>를 run-all에 격리 구간으로 배선</td>
+<td>게이트가 있어도 도는 세트에 없으면 없는 것과 같다. 라이브 캡처 교란 자인(§3.2)</td>
+<td>J4</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>M5</td>
+<td>&#126;&#126;ETW 컨텍스트 스위치 추적으로 우선순위 역전·과다구독 실측&#126;&#126; → <strong>§10.5로 일부 대체</strong>(처리량·지연 간접 지표). ETW 직접 추적은 여전히 미실시</td>
+<td>J5·J10의 이득 주장이 산수뿐이었다</td>
+<td>J5·J10</td>
+<td>0.5 잔여</td>
+</tr>
+<tr>
+<td>M6</td>
+<td>CoreCLR 스레드 인구(GC·ThreadPool·finalizer) 집계 — <code>ScriptCore.runtimeconfig.json</code>에 GC 관련 키 0개라 기본값(Workstation, Concurrent) 의존</td>
+<td>§1.1 인구표가 관리 측을 빠뜨림</td>
+<td>J5</td>
+<td>0.5</td>
+</tr>
+</tbody></table></div>
+<p>CLI 관측 표면은 <code>profile.stats</code>(프로파일러 자체 비용·용량)뿐이다. 스코프별 프레임 분해를 덤프하는 명령이 없다.</p>
+<h2>9. 조사가 못 본 것</h2>
+<ul>
+<li><strong>CoreCLR 스레드 인구</strong>를 어느 관점도 세지 않았다. <code>Bin/x64-Release/Managed/ScriptCore.runtimeconfig.json</code>의 <code>configProperties</code>에 GC·ThreadPool 키가 없어 기본값에 의존한다. 과다구독 계산이 불완전하다(M6).</li>
+<li><strong>Vulkan 비대칭 논거는 틀렸다.</strong> 검증 단계의 정정문과 비평이 &quot;Vulkan에는 지속 워커 풀이 없다&quot;고 했으나, <code>VulkanCommandBufferPool::Initialize</code>가 <code>workerCount-1</code>개의 지속 <code>WorkerLoop</code> 스레드를 만들고(<code>VulkanCommandBufferPool.cpp:61-63</code>) <code>EnhancedSceneRenderer.cpp:443</code>이 4로 초기화한다. 두 백엔드는 대칭이며 경계 규칙 1은 둘 다에 적용된다.</li>
+<li><strong><code>JobCounter</code>/<code>JobHandle</code> 수명 규약</strong>이 설계안에 없었다 — §6.3으로 보강했으나 구현 전 재검토 대상.</li>
+<li><strong><code>EnqueueIndexed</code>의 실제 비용</strong> — <code>TaskType</code> 고정 때문에 &quot;오버로드 추가&quot;로 끝나지 않는다. J2를 1.5일로 올렸다.</li>
+<li><strong>측정 선행 공수</strong>(§8, 약 4일)가 17.5일에 합산돼 있지 않다.</li>
+<li><strong>Player/Shipping 빌드의 스레드 토폴로지</strong>를 보지 않았다. 조사 전체가 에디터 프로세스 범위다. Shipping 구성 자체가 부재라는 기존 정찰(PHASE 14, 9-3)과 겹친다.</li>
+<li><strong>대조군(C)이 설계 단계에서 자리표시자로 돌아왔다.</strong> §5.1의 재논증은 심판을 거치지 않은 단독 에이전트 결과이며, 그 결과가 찬성안의 선행 사슬 과잉 결합(J8b·J10) 둘과 줄 번호 오류 셋(<code>AssetJob</code> 생성자 위치, Exit setter 줄, Foliage 분할 수)을 잡아냈다 — 첫 실행에서 대조군이 제대로 돌았다면 심판 단계에서 잡혔을 것들이다.</li>
+<li><strong><code>ThreadPool</code> permit 유실 의심</strong>(<code>PPLContainerMigrationAnalysis.md:337-339</code>)은 레이스 재현 없이 코드 구조만 확인했다(◻미검증). J0에서 가른다.</li>
+<li><strong>검증 2건이 스키마 오류로 탈락</strong>했다(thread-census·frame-critical-path 각 1건). 해당 발견은 문서에 싣지 않았다.</li>
+<li><strong>씬 로드 중 텍스처 GPU 업로드가 어느 스레드에서 일어나는지</strong>, <code>scene.switch</code>(GT 블로킹)와 <code>LoadSceneAsync</code>(백그라운드) 중 실제 게임 시작 시나리오가 어느 쪽을 쓰는지 미확인.</li>
+<li><strong><code>InvokeClipEvents</code>의 <code>m_clipOverrides</code></strong> 워커/에디터 동시 편집 경합 가능성 — 에디터 UI 스레드 모델을 더 봐야 확정.</li>
+<li><strong>FMOD 채널별 동시 호출 스레드 안전성</strong>, <strong>SoundManager 로더 종료 플래그</strong>(미검증 결함) — 벤더 문서·실행 확인 필요.</li>
+<li><strong><code>m_transformStore</code>에 물리 결과를 쓰는 <code>ApplyWorldWriteBatch</code></strong>(<code>PhysicsManager.cpp:945</code>)와 <code>PublishAnimatorPose</code>의 1프레임 지연 가능성(미검증) — 본에 부착된 비-Socket 자식이 있으면 확인 필요.</li>
+</ul>
+<h2>10. 추가 실측 — <code>Core.ThreadPool</code> 독립 벤치 (2026-09-07)</h2>
+<p>문서 최초 작성 뒤, 엔진을 건드리지 않고 <code>Core.ThreadPool.h</code>·<code>Core.Thread.h</code>·<code>Core.CountingSemaphore.h</code>를 <strong>그대로 포함하는</strong> 독립 벤치를 MSVC <code>/O2</code>로 빌드해 돌렸다. 기기 8논리/4물리. 이 절이 §2·§3·§6·§8의 &quot;미측정&quot; 항목 일부를 대체한다.</p>
+<p>재현 소스는 세션 스크래치패드에 있다(<code>poolbench.cpp</code>·<code>poolbench2.cpp</code>·<code>poolbench3.cpp</code>·<code>poolbench4.cpp</code>·<code>FixedThreadPool.h</code>). 임시 디렉터리라 유실될 수 있으므로, §10.1을 회귀로 고정하려면 J-1 슬라이스에서 저장소 안(<code>Tools/</code> 또는 자가 검증 커맨드)으로 옮겨야 한다. 빌드:</p>
+<pre><code class="language-bash">cl /O2 /EHsc /std:c++20 /MD /DNOMINMAX /I Engine/Utility_Framework poolbench3.cpp
+</code></pre>
+<h3>10.1 <code>NotifyAllAndWait</code>은 배리어가 아니다 — 1순위 결함</h3>
+<p>풀과 무관한 독립 완료 카운터를 태스크마다 증가시키고, 배리어가 반환한 직후 그 카운터를 읽었다. 배리어가 정직하면 항상 N이어야 한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>배치 간 유휴 간격</th>
+<th>시행</th>
+<th>잡이 남았는데 반환</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0 ms(연속)</td>
+<td>3,000</td>
+<td>173 (5.77%)</td>
+</tr>
+<tr>
+<td>0.5 ms</td>
+<td>3,000</td>
+<td>63 (2.10%)</td>
+</tr>
+<tr>
+<td>2 ms</td>
+<td>600</td>
+<td>17 (2.83%)</td>
+</tr>
+<tr>
+<td>8 ms(프레임 페이싱)</td>
+<td>600</td>
+<td>15 (2.50%)</td>
+</tr>
+</tbody></table></div>
+<p>배치당 태스크 N=1이면 0%, N≥8이면 &#126;5%다(20,000 시행). <strong>간격을 벌려도 사라지지 않는다</strong> — 배치 사이의 문제가 아니라 배치 <em>안</em>의 문제이기 때문이다.</p>
+<p><strong>원인.</strong> 카운터와 이벤트가 반대 순서로 갱신된다.</p>
+<ul>
+<li>워커는 <code>m_taskCounts.fetch_sub</code>로 0을 만든 <strong>뒤에</strong> <code>SetEvent</code>를 부른다(<code>Core.ThreadPool.h:125-129</code>).</li>
+<li>생산자는 <code>fetch_add</code>로 0→1을 관측한 <strong>뒤에</strong> <code>ResetEvent</code>를 부른다(<code>:68-72</code>).</li>
+<li>그 사이가 벌어지면 생산자의 <code>ResetEvent</code>를 직전 배치의 뒤늦은 <code>SetEvent</code>가 덮는다. 이후 잡이 남아 있어도 이벤트는 신호 상태이고, <code>WaitForSingleObject</code>(<code>:85</code>)는 즉시 반환한다.</li>
+<li>워커 8이 생산자 1보다 빠르게 큐를 비우므로(§10.2) 한 배치를 넣는 동안 카운터가 0을 여러 번 스쳐 창이 반복해서 열린다.</li>
+</ul>
+<p><strong>무엇이 무너지나.</strong> <code>AnimationJob</code>의 안전 근거 둘이 정확히 이 불변식 위에 서 있다.</p>
+<ul>
+<li><code>AnimationJob.cpp:167-170</code>: &quot;worker는 Animator 소유 pose/socket staging만 쓴다 … 모든 job이 끝난 이 barrier 뒤에서 메인 스레드가 직렬 commit한다.&quot; → 배리어가 거짓이면 <code>PublishAnimatorPose</code>가 워커가 쓰는 중인 포즈를 읽는다. 배리어 직후라 겹칠 확률이 가장 높은 지점이다.</li>
+<li><code>AnimationJob.cpp:117-119</code>: raw <code>Animator*</code> 캡처의 근거가 &quot;<code>NotifyAllAndWait</code>까지 반드시 도달해 잡을 프레임 안에서 완결한다&quot;. → 창은 좁지만 같은 프레임 <code>EndFramePass</code>의 파괴와 겹치면 UAF다.</li>
+<li><code>DataSystem::LoadAssetBundle</code>(<code>DataSystem.cpp:1702</code>)도 같은 배리어를 쓴다 → 번들이 덜 로드된 채 반환할 수 있다.</li>
+</ul>
+<p>엔진에서 재현하지는 않았다(Release exe가 낡음). 코드 경로상의 귀결이며, 60fps·프레임당 배리어 1회·2.5%면 <strong>초당 1&#126;2프레임</strong>꼴이다.</p>
+<h3>10.2 태스크당 비용은 4.3µs이고 전액 생산자가 낸다</h3>
+<p>빈 태스크 4,096개(완료 검증 포함, 200회 평균):</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구간</th>
+<th>태스크당</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>생산자 측 <code>Enqueue</code>만</td>
+<td>4,291 ns</td>
+</tr>
+<tr>
+<td><code>Enqueue</code> + 배리어 왕복 전체</td>
+<td>4,295 ns</td>
+</tr>
+</tbody></table></div>
+<p>둘이 같다 = <strong>워커는 놀고 생산자가 병목이다.</strong> <code>Enqueue</code>마다 <code>ResetEvent</code>(조건부)와 <code>CountingSemaphore::release</code>의 <code>ReleaseSemaphore</code>(워커가 파킹돼 있으면 매번) 두 커널 호출이 붙기 때문이다. 게임 스레드가 애니메이터 100개를 뿌리면 분배에만 &#126;430µs를 쓴다.</p>
+<h3>10.3 그래서 실제 병렬 이득이 얼마나 깎이나</h3>
+<p>10µs짜리 작업 N개, 완료를 독립 카운터로 검증한 시간(직렬 대비 배속):</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>N</th>
+<th>직렬</th>
+<th>태스크당 1개</th>
+<th>청크(=워커 수)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8</td>
+<td>0.084 ms</td>
+<td>1.17×</td>
+<td>1.25×</td>
+</tr>
+<tr>
+<td>64</td>
+<td>0.676 ms</td>
+<td>2.30×</td>
+<td>2.88×</td>
+</tr>
+<tr>
+<td>256</td>
+<td>2.855 ms</td>
+<td>3.12×</td>
+<td>4.04×</td>
+</tr>
+<tr>
+<td>1024</td>
+<td>11.395 ms</td>
+<td>2.00×</td>
+<td><strong>4.66×</strong></td>
+</tr>
+</tbody></table></div>
+<p>4물리코어에서 이론 상한 4×. <strong>청크 분할은 상한에 닿고, 태스크당 1개 방식은 절반을 버린다.</strong> <code>AnimationJob</code>은 애니메이터당 1개(<code>AnimationJob.cpp:126</code>)라 정확히 버리는 쪽이다 — PHASE 13 S6의 청크 분할이 여기에 직접 대응한다.</p>
+<h3>10.4 고치면 되는가 — 최소 수정 두 단계 실측</h3>
+<p>같은 워크로드를 세 풀에 태웠다. V1·V2는 스크래치패드 프로토타입이다(엔진 미변경).</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>풀</th>
+<th>N=64 배치</th>
+<th>N=1024 배치</th>
+<th>1024 배속</th>
+<th>거짓 반환/3,000</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>원본(Event 배리어)</td>
+<td>0.313 ms</td>
+<td>3.718 ms</td>
+<td>2.97×</td>
+<td><strong>77</strong></td>
+</tr>
+<tr>
+<td>V1 = 원본 + 카운터·<code>condition_variable</code> 배리어</td>
+<td>0.286 ms</td>
+<td>2.827 ms</td>
+<td>3.90×</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td>V2 = V1 + 배치당 1회 웨이크 + 대기 스레드가 잡을 함께 실행</td>
+<td><strong>0.143 ms</strong></td>
+<td><strong>2.179 ms</strong></td>
+<td><strong>5.07×</strong></td>
+<td><strong>0</strong></td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><strong>V1(약 20줄)</strong>: 거짓 반환이 0이 되고 <em>동시에 더 빨라진다</em>(1024 배치 −24%). 정확성과 성능이 상충하지 않는다 — 배치당 커널 호출이 사라지기 때문이다.</li>
+<li><strong>V2</strong>: N=64에서 <strong>2.2배</strong>. 세 가지를 함께 바꿨다 — 배치당 웨이크 1회, 대기 스레드의 작업 참여(<code>DX12CommandListPool</code>이 이미 쓰는 &quot;워커 0 = 호출 스레드&quot; 계약, <code>DX12CommandListPool.cpp:129</code>), 워커 수 <code>hw-1</code>·NORMAL. 셋을 분리 측정하지는 않았다.</li>
+</ul>
+<h3>10.5 우선순위와 워커 수</h3>
+<p>NORMAL 우선순위 &quot;렌더 스레드&quot;(1ms 작업 300회)를 돌리면서 풀에 64태스크 배치를 계속 던졌다. <strong>양쪽을 다 쟀다</strong> — 이웃 지연만 재면 &quot;풀이 일을 덜 했다&quot;와 구별되지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>워커</th>
+<th>우선순위</th>
+<th>렌더 반복 평균</th>
+<th>렌더 최대</th>
+<th>풀 배치/s</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>8</td>
+<td>HIGHEST(현재 기본값)</td>
+<td>2.105 ms</td>
+<td>8.731 ms</td>
+<td>2,769</td>
+</tr>
+<tr>
+<td>8</td>
+<td>NORMAL</td>
+<td>2.160 ms</td>
+<td>4.951 ms</td>
+<td><strong>4,675</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>NORMAL</td>
+<td>1.390 ms</td>
+<td>18.188 ms</td>
+<td>4,274</td>
+</tr>
+<tr>
+<td>3</td>
+<td>NORMAL</td>
+<td><strong>1.036 ms</strong></td>
+<td>4.123 ms</td>
+<td>3,522</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><strong>HIGHEST는 두 축 모두 손해다</strong>: 같은 8워커에서 NORMAL 대비 풀 처리량 −41%, 이웃 스레드 최대 지연 1.8배. 기본값 <code>THREAD_PRIORITY_HIGHEST</code>(<code>Core.ThreadPool.h:20</code>)에 근거가 없다.</li>
+<li><strong>워커 8→3이면</strong> 이웃 스레드가 사실상 무간섭(0.952ms 공칭 대비 1.036ms)이 되고 풀 처리량은 최고치의 75%를 지킨다. 풀마다 <code>GetActiveProcessorCount()</code>를 쓰는 기본값(<code>:23</code>)이 문제이고, 엔진은 그런 풀을 <strong>둘</strong>(<code>WorkerPool</code> 8 + <code>AnimationJob</code> 8) 세운다.</li>
+<li>4워커 행의 최대 18.188ms는 단발 스케줄링 잡음으로 보이며 평균만 취했다.</li>
+</ul>
+<h3>10.6 벤치가 답하지 못한 것</h3>
+<ul>
+<li>엔진 안에서 재현하지 않았다. 프레임 페이싱·실제 애니메이터 수·실제 태스크 길이가 다르면 §10.1의 비율은 달라진다.</li>
+<li>§10.4의 V2는 세 변경을 묶은 값이라 기여도를 못 가른다. 프로토타입이지 설계안이 아니다(다중 생산자 미지원).</li>
+<li><code>try_pop</code> 실패로 permit이 유실되는지(<code>PPLContainerMigrationAnalysis.md:337-339</code>)는 여전히 관측하지 못했다 — 모든 배치가 완료됐으므로 이 워크로드에서는 발생하지 않았다.</li>
+<li>ETW 컨텍스트 스위치 추적은 하지 않았다. §10.5는 처리량·지연이라는 간접 지표다.</li>
+</ul>
+<h2>11. 배리어 수정 적용과 외부 풀 4종 비교 (2026-09-07)</h2>
+<h3>11.1 적용한 것</h3>
+<p><code>Engine/Utility_Framework/Core.ThreadPool.h</code>에 <strong>J-1(배리어 정직성)만</strong> 적용했다. 파일은 CP949·CRLF이므로 인코딩을 보존하는 스크립트로 편집했고, 한글 주석 11줄 왕복을 확인했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>바뀐 것</th>
+<th>전</th>
+<th>후</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>완료 통지</td>
+<td>manual-reset <code>HANDLE m_waitEvent</code> + <code>SetEvent</code>/<code>ResetEvent</code></td>
+<td><code>std::mutex m_doneMutex</code> + <code>std::condition_variable m_doneCondition</code></td>
+</tr>
+<tr>
+<td><code>Enqueue</code></td>
+<td><code>fetch_add</code> 후 0→1 전이면 <code>ResetEvent</code></td>
+<td><code>fetch_add</code>만</td>
+</tr>
+<tr>
+<td><code>NotifyAllAndWait</code></td>
+<td><code>WaitForSingleObject(m_waitEvent, INFINITE)</code></td>
+<td>술어 <code>m_taskCounts == 0</code>으로 <code>wait</code></td>
+</tr>
+<tr>
+<td>워커 완료</td>
+<td><code>fetch_sub(release)</code> 후 <code>SetEvent</code></td>
+<td><code>fetch_sub(acq_rel)</code> 후 <strong>락을 잡고</strong> <code>notify_all</code></td>
+</tr>
+</tbody></table></div>
+<p>공개 API·생성자 시그니처·워커 수·우선순위 기본값은 그대로 두었다. 배치당 웨이크 1회, 호출자 작업 참여, <code>JobCounter</code>는 <strong>적용하지 않았다</strong>.</p>
+<p><strong>검증.</strong> 같은 하네스를 수정된 헤더로 다시 돌렸다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>시나리오</th>
+<th>수정 전</th>
+<th>수정 후</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>배치 격리, N=8/64/256 각 20,000시행</td>
+<td>5.29% / 5.12% / 4.71%</td>
+<td><strong>0 / 0 / 0</strong></td>
+</tr>
+<tr>
+<td>연속 배치(AnimationJob 패턴), N=8/64/256 각 3,000시행</td>
+<td>4.47% / 5.87% / 5.83%</td>
+<td><strong>0 / 0 / 0</strong></td>
+</tr>
+</tbody></table></div>
+<h3>11.2 외부 풀 4종을 실제로 받아 같은 하네스에 태웠다</h3>
+<p>이번에는 저장소 밖 주장을 쓰지 않았다. 네 라이브러리를 직접 clone해 빌드했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>라이브러리</th>
+<th>커밋</th>
+<th>형태</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BS::thread_pool 5.1</td>
+<td><code>bd4533f</code></td>
+<td>단일 헤더</td>
+<td>의존 0</td>
+</tr>
+<tr>
+<td>dp::thread_pool</td>
+<td><code>0de593c</code></td>
+<td>헤더 2개</td>
+<td>C++20 concepts·<code>std::jthread</code></td>
+</tr>
+<tr>
+<td>Taskflow 4.1.0</td>
+<td><code>83f90a2</code></td>
+<td>헤더 다수</td>
+<td>C++20</td>
+</tr>
+<tr>
+<td>Dispenso</td>
+<td><code>68b6dc3</code></td>
+<td><strong>.cpp 16개 + moodycamel concurrentqueue</strong></td>
+<td>정적 라이브러리 빌드 필요, <code>Synchronization.lib</code>·<code>Winmm.lib</code> 링크</td>
+</tr>
+</tbody></table></div>
+<p>측정은 모두 풀과 무관한 독립 완료 카운터로 검증했다. 워커 8, 항목당 작업 10.2µs, 직렬 기준 N=64 0.696ms · N=256 3.086ms · N=1024 10.537ms.</p>
+<p><strong>태스크당 1개 제출 후 배리어 대기 (AnimationJob의 패턴). 직렬 대비 배속.</strong></p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>풀</th>
+<th>N=64</th>
+<th>N=256</th>
+<th>N=1024</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CreatorEngine, HIGHEST(현재 기본값)</td>
+<td>2.47</td>
+<td>3.26</td>
+<td>2.52</td>
+</tr>
+<tr>
+<td><strong>CreatorEngine, NORMAL</strong></td>
+<td><strong>4.52</strong></td>
+<td><strong>6.40</strong></td>
+<td><strong>5.80</strong></td>
+</tr>
+<tr>
+<td>BS::thread_pool 5.1</td>
+<td>4.34</td>
+<td>6.28</td>
+<td>5.90</td>
+</tr>
+<tr>
+<td>dp::thread_pool</td>
+<td>4.15</td>
+<td>7.15</td>
+<td>6.15</td>
+</tr>
+<tr>
+<td>Taskflow 4.1.0</td>
+<td>3.68</td>
+<td>3.50</td>
+<td>4.11</td>
+</tr>
+<tr>
+<td>Dispenso</td>
+<td>1.61</td>
+<td>3.01</td>
+<td>3.74</td>
+</tr>
+</tbody></table></div>
+<p><strong>청크 분할(태스크 수 = 워커 수).</strong></p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>풀</th>
+<th>N=64</th>
+<th>N=256</th>
+<th>N=1024</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CreatorEngine, HIGHEST</td>
+<td>3.40</td>
+<td>4.43</td>
+<td>4.57</td>
+</tr>
+<tr>
+<td>CreatorEngine, NORMAL</td>
+<td>3.43</td>
+<td>4.84</td>
+<td>4.43</td>
+</tr>
+<tr>
+<td>BS::thread_pool 5.1</td>
+<td>3.64</td>
+<td>5.23</td>
+<td>4.60</td>
+</tr>
+<tr>
+<td>dp::thread_pool</td>
+<td>4.08</td>
+<td>6.62</td>
+<td>4.63</td>
+</tr>
+<tr>
+<td>Taskflow 4.1.0</td>
+<td>3.23</td>
+<td>3.95</td>
+<td>4.24</td>
+</tr>
+<tr>
+<td>Dispenso</td>
+<td>2.91</td>
+<td>3.81</td>
+<td>4.03</td>
+</tr>
+</tbody></table></div>
+<p><strong>라이브러리 자체 parallel_for.</strong> 엔진과 dp에는 없다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>풀</th>
+<th>N=64</th>
+<th>N=256</th>
+<th>N=1024</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BS <code>detach_loop</code></td>
+<td>3.60</td>
+<td><strong>5.36</strong></td>
+<td><strong>4.65</strong></td>
+</tr>
+<tr>
+<td>Taskflow <code>for_each_index</code></td>
+<td>3.36</td>
+<td>4.89</td>
+<td>4.28</td>
+</tr>
+<tr>
+<td>Dispenso <code>parallel_for</code></td>
+<td>3.37</td>
+<td>4.38</td>
+<td>4.20</td>
+</tr>
+</tbody></table></div>
+<p><strong>빈 태스크 4,096개 왕복(순수 디스패치 비용)과 대기의 정직성.</strong></p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>풀</th>
+<th>태스크당</th>
+<th>거짓 반환</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CreatorEngine, HIGHEST</td>
+<td>3,507 ns</td>
+<td>0</td>
+</tr>
+<tr>
+<td>CreatorEngine, NORMAL</td>
+<td>3,194 ns</td>
+<td>0</td>
+</tr>
+<tr>
+<td>BS::thread_pool 5.1</td>
+<td>2,503 ns</td>
+<td>0</td>
+</tr>
+<tr>
+<td>dp::thread_pool</td>
+<td>1,821 ns</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Taskflow 4.1.0</strong></td>
+<td><strong>335 ns</strong></td>
+<td>0</td>
+</tr>
+<tr>
+<td>Dispenso</td>
+<td>660 ns</td>
+<td>0</td>
+</tr>
+</tbody></table></div>
+<h3>11.3 읽는 법</h3>
+<ul>
+<li><strong>거짓 반환은 모든 풀에서 0이다.</strong> 수정된 엔진 포함. §10.1의 결함은 엔진 고유였고 이제 없다.</li>
+<li><strong>가장 큰 손해 요인은 라이브러리 선택이 아니라 우선순위 기본값이다.</strong> 같은 엔진 풀에서 <code>THREAD_PRIORITY_HIGHEST</code>를 NORMAL로 바꾸는 것만으로 per-item이 2.47→4.52, 3.26→6.40, 2.52→5.80이다. 어떤 외부 풀로 교체해도 이보다 크게 얻지 못한다.</li>
+<li><strong>수정 + NORMAL이면 엔진 풀은 BS·dp와 같은 급이다.</strong> 셋의 차이는 실행 간 변동(약 ±20%, §11.4) 안이다. 외부 라이브러리 도입을 성능으로 정당화할 근거가 없다. §5의 각도 A 채택이 이번엔 추측이 아니라 실측으로 뒷받침된다.</li>
+<li><strong>Taskflow·Dispenso는 순수 디스패치에서 압도적이고(각각 10배·5배 저렴) fork-join 배속에서는 오히려 낮다.</strong> 워크스틸링 그래프 실행기라 제출이 싸지만, 이 저장소의 워크로드는 의존 그래프가 아니라 고정 배치 fork-join이라 그 강점이 발현되지 않는다. 태스크가 마이크로초 이하로 잘게 쪼개지고 단계 간 의존이 생기는 날에만 다시 볼 값이다.</li>
+<li><strong>parallel_for가 필요하면 BS가 가장 빠르다.</strong> 다만 J3(<code>ParallelFor</code> 자체 구현)과 비교하려면 J3이 먼저 있어야 한다.</li>
+</ul>
+<h3>11.4 이 비교의 한계</h3>
+<ul>
+<li><strong>Dispenso가 정적 초기화에서 <code>timeBeginPeriod(1)</code>을 부른다.</strong> 프로세스 전역 타이머 해상도라 같은 실행의 모든 행에 동일하게 적용된다. 표 내부 비교는 유효하지만 §10의 다른 실행과 절대값을 비교하면 안 된다. 별도 대조 실행에서 이 설정만으로 엔진 per-item N=256이 3.72→5.32배로 바뀌었고, <strong>per-item과 chunked의 우열까지 뒤집혔다</strong>.</li>
+<li><strong>배속 4배가 상한이 아니다.</strong> 벤치의 작업이 부동소수 의존 사슬이라 SMT가 잘 먹는다. 4물리코어에서 5.9배가 관측된다. §10.3에 적은 &quot;이론 상한 4배&quot;는 틀렸다.</li>
+<li><strong>실행 간 변동이 약 ±20%다.</strong> 같은 엔진 풀·같은 설정에서 per-item N=256이 6.40배와 5.32배로 갈렸다. 표에서 0.5배 이내 차이는 순위로 읽지 말 것.</li>
+<li><strong>워크로드가 하나뿐이다.</strong> 균일한 CPU 바운드 10µs 작업이다. 불균형 작업·IO 대기·중첩 병렬·의존 그래프는 재지 않았고, 그 축들이 Taskflow·Dispenso의 설계 목적이다.</li>
+<li>스레드 수를 8로 고정했다. §10.5는 3&#126;4가 더 낫다고 시사하므로 이 표는 모든 풀에 불리한 설정에서 잰 값이다.</li>
+<li>Dispenso의 <code>TaskSet</code>은 배치마다 생성했고 Taskflow의 <code>Taskflow</code> 객체는 재사용했다. 각 라이브러리의 관용 사용법을 따랐으나 완전한 동일 조건은 아니다.</li>
+</ul>
+<h2>부록 A. 반박된 발견</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>관점</th>
+<th>발견</th>
+<th>왜 반박됐나</th>
+<th>정정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>thread-census F2</td>
+<td>&quot;<code>AnimationSchedulerPlan.md:89</code>가 부분 대기 불가를 전용 풀의 이유로 명시&quot;</td>
+<td>코드 인용은 정확하나 계획서는 전용 풀을 E9 비효율로 적고 S6에서 실측 후 재검토하라고 할 뿐</td>
+<td>부분 대기 불가는 코드 사실. 계획서는 이유로 명시하지 않음</td>
+</tr>
+<tr>
+<td>thread-census F4</td>
+<td>&quot;고정 파이프라인 스레드 7개&quot;</td>
+<td>백엔드 조건성을 숨김 — 커맨드 워커 3은 DX12 어댑터 초기화 경로</td>
+<td>공통 4 + DX12 3 = 7. <strong>정정문의 &quot;Vulkan에는 지속 풀이 없다&quot;는 부분은 이 문서에서 다시 정정</strong> — Vulkan도 3(§9)</td>
+</tr>
+<tr>
+<td>frame-critical-path F3</td>
+<td>&quot;<code>AnimationJob</code>이 게임로직 구간 중 유일한 병렬화 지점&quot;</td>
+<td>Foliage <code>std::async</code>·AI <code>std::async</code>도 같은 구간</td>
+<td>&quot;유일&quot;이 아니라 &quot;하나&quot;</td>
+</tr>
+<tr>
+<td>frame-critical-path F9</td>
+<td>&quot;PrePhysics/PostPhysics 모두 GC 정지 근거 주석&quot;</td>
+<td><code>RuntimeFrame.cpp:27</code>은 PostPhysics에만, PrePhysics 주석(:8-13)은 순서 이유만</td>
+<td>PostPhysics만 근거 명시</td>
+</tr>
+<tr>
+<td>transform F2</td>
+<td>&quot;sparse가 legacy 대비 0.235&#126;0.382배, random 1%에서 9.5µs vs 3,353µs&quot;</td>
+<td>표 열을 잘못 짝지음 — 9.5µs는 sparse random 1%, 3,353µs는 legacy 100% 이동, 0.235는 100%끼리의 비율</td>
+<td>표(<code>:1135-1137</code>)에 legacy random 1% 열이 없어 그 배수는 계산 불가</td>
+</tr>
+<tr>
+<td>render F10</td>
+<td>&quot;공용 풀을 RG4가 빌리면 RT join이 무관 태스크를 기다린다&quot;</td>
+<td><code>Core.ThreadPool.h:20</code> 인용이 두 줄(20·23)을 섞은 재구성이고, RG4가 공용 풀을 빌린다는 전제가 코드에 없음</td>
+<td>전역 카운터 사실은 성립(<code>:68, 80, 125, 144</code>). 전제는 추론</td>
+</tr>
+<tr>
+<td>managed-ai-boundary F11</td>
+<td>&quot;fire-and-forget 잡은 매 프레임 명시적 블로킹 드레인이 보장돼야 한다&quot;의 근거로 <code>Scene.cpp:2559</code></td>
+<td>그 줄은 비블로킹 조기 회수이고, 진짜 블로킹 드레인은 <code>EndFramePass</code>(<code>:2753-2757</code>)에 이미 있다</td>
+<td>규칙(1)은 이미 실장. 규칙(2)(3)은 별도</td>
+</tr>
+<tr>
+<td>external-survey F1/F2/F4/F5</td>
+<td>enkiTS DAG·pinned task, Wicked 3풀 무-DAG, Jolt 5함수</td>
+<td>파일이 저장소·로컬 어디에도 없어 원문 대조 불가. F5는 <code>PhysicsRedesignPlan.md:341</code>(&quot;QueueJob·QueueJobs·GetMaxConcurrency 정도&quot;)와도 목록이 다름</td>
+<td><strong>여전히 미해소.</strong> §11은 다른 네 라이브러리(Dispenso·Taskflow·BS·dp)를 실제로 clone해 빌드·측정한 것이고, enkiTS·Wicked·Jolt는 이번에도 받지 않았다</td>
+</tr>
+</tbody></table></div>
+<h2>부록 B. 방법과 한계</h2>
+<ul>
+<li><strong>정독 12관점</strong>: 스레드 인구 · 프레임 임계 경로 · 트랜스폼 · 애니메이션 · 물리 · 렌더 · 관리/AI 경계 · 자산 IO · 기타 시스템 · 계획 교차 · 외부 조사 · 관측/게이트. 관점당 발견 10&#126;14건, 관련도 high/medium/low 태깅.</li>
+<li><strong>적대 검증</strong>: high 관련도 발견마다 검증자 1명이 원문 대조(file:line을 다시 열어 인용이 그 줄에 있는가)와 최신성(그 줄이 최근 커밋으로 바뀌었는가) 두 렌즈를 합쳐 반박을 시도. 줄 번호가 몇 줄 어긋나도 원문이 있으면 반박하지 않고 실제 줄을 기록. medium은 미검증으로 표기해 실었다(◻미검증). 2건은 구조화 출력 스키마 실패로 탈락.</li>
+<li><strong>설계 3각도 → 심판 3인 → 종합 → 비평</strong>. 각도 C(&quot;JobSystem 없이&quot;)는 자리표시자로 돌아와 채점 불가였고, §5.1에서 단독 에이전트(읽기 전용, 도구 호출 55회, 약 18분)로 재논증했다(심판 미경유). 그 결과로 §요약·§6.2의 착수 순서와 J8b·J10 선행을 고쳤다.</li>
+<li><strong>첫 실행은 세션 요청 한도(5시간)에 걸려 검증 148건이 실패</strong>했다. 한도 해제 후 검증 부하를 줄여(두 렌즈 → 한 검증자, high만) 완료된 정독 9건을 캐시로 재개했다. 총 에이전트 106, 완료 104.</li>
+<li><strong>엔진 라이브 실측 0.</strong> Release exe가 HEAD보다 낡아 하지 않았다. §1&#126;§9의 &quot;이득&quot;은 모두 미측정이다. 예외는 <strong>§10</strong>으로, 엔진 헤더를 그대로 포함한 독립 벤치(MSVC <code>/O2</code>, 8논리/4물리)를 돌린 실측이며 엔진 코드는 건드리지 않았다.</li>
+<li><strong>코드 변경 0.</strong> 이 문서만 산출했다. 대시보드·계획서는 수정하지 않았다(§3 D7).</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-지금-무엇이-있는가--정독-실측"></span><span id="10-추가-실측--corethreadpool-독립-벤치-2026-09-07"></span><span id="101-notifyallandwait은-배리어가-아니다--1순위-결함"></span><span id="102-태스크당-비용은-43µs이고-전액-생산자가-낸다"></span><span id="103-그래서-실제-병렬-이득이-얼마나-깎이나"></span><span id="104-고치면-되는가--최소-수정-두-단계-실측"></span><span id="105-우선순위와-워커-수"></span><span id="106-벤치가-답하지-못한-것"></span><span id="11-배리어-수정-적용과-외부-풀-4종-비교-2026-09-07"></span><span id="11-하드웨어와-스레드-인구"></span><span id="111-적용한-것"></span><span id="112-외부-풀-4종을-실제로-받아-같은-하네스에-태웠다"></span><span id="113-읽는-법"></span><span id="114-이-비교의-한계"></span><span id="12-corethreadpool의-대기-의미--전용-풀이-생긴-구조적-이유"></span><span id="13-프레임-임계-경로--게임-스레드-직렬-순서"></span><span id="14-이미-있는-병렬화--형태가-여섯이다"></span><span id="15-계획서가-이미-전제하는-것"></span><span id="2-발견--검증-통과분"></span><span id="21-풀-원시의-결함--세-관점이-같은-줄을-지목했다"></span><span id="22-계획서-충돌과-소유권-부재"></span><span id="23-정확성-결함--한-건-그리고-이미-닫힌-것들"></span><span id="24-낭비--jobsystem이-없어도-보이는-것"></span><span id="25-렌더-워커-풀은-별개-계약이다--흡수-대상이-아니다"></span><span id="26-트랜스폼--x9를-되살릴-근거는-약하다"></span><span id="27-물리-창--t1b는-그대로-적용할-수-없다"></span><span id="28-관측-준비도--낮다"></span><span id="29-외부-라이브러리--저장소-안에서-확인된-것만"></span><span id="3-jobsystem과-무관하게-먼저-고칠-결함낭비"></span><span id="4-jobsystem이-주는-것과-안-주는-것"></span><span id="5-설계안-비교"></span><span id="51-대조군-재논증--jobsystem-없이-국소-패치"></span><span id="6-권고안--corethreadpool-jobsystem-최소-통합"></span><span id="61-api-스케치"></span><span id="62-슬라이스"></span><span id="63-수명-규약--비평이-비운-자리"></span><span id="7-경계-규칙"></span><span id="8-먼저-재야-할-것--이-조사의-측정-공백"></span><span id="9-조사가-못-본-것"></span><span id="sec-1-지금-무엇이-있는가--정독-실측"></span><span id="sec-10-추가-실측--corethreadpool-독립-벤치-2026-09-07"></span><span id="sec-11-배리어-수정-적용과-외부-풀-4종-비교-2026-09-07"></span><span id="sec-2-발견--검증-통과분"></span><span id="sec-3-jobsystem과-무관하게-먼저-고칠-결함낭비"></span><span id="sec-4-jobsystem이-주는-것과-안-주는-것"></span><span id="sec-5-설계안-비교"></span><span id="sec-6-권고안--corethreadpool-jobsystem-최소-통합"></span><span id="sec-7-경계-규칙"></span><span id="sec-8-먼저-재야-할-것--이-조사의-측정-공백"></span><span id="sec-9-조사가-못-본-것"></span><span id="sec-부록-a-반박된-발견"></span><span id="sec-부록-b-방법과-한계"></span><span id="sec-요약"></span><span id="부록-a-반박된-발견"></span><span id="부록-b-방법과-한계"></span><span id="요약"></span></details></main></body></html>

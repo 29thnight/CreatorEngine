@@ -1,5 +1,42 @@
 # Editor 제목 표시줄 정리 검증 (2026-09-12)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/icons/Export-EngineIcon.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/icons/Export-EngineIcon.ps1#L1) — `[CmdletBinding()]`
+- [Tools/icons/Export-EngineIcon.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/icons/Export-EngineIcon.ps1#L4) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/icons/Export-EngineIcon.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/icons/Export-EngineIcon.ps1#L10) — `$bitmap = $icon.ToBitmap()`
+- [Tools/regression/verify-editor-theme.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-theme.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-editor-theme.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36) — `$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/SceneManager.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L28) — `class SceneManager : public Singleton<SceneManager>`
+- [Engine/SceneRuntime/SceneManager.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L33) — `gc::domain m_gcDomain;`
+- [Engine/SceneRuntime/SceneManager.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L41) — `gc::domain& ManagedDomain();`
+- [Engine/SceneRuntime/SceneManager.cpp:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L64) — `throw std::runtime_error("Scene asset bundle preparation failed (status "`
+- [Engine/SceneRuntime/SceneManager.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L65) — `+ std::to_string(static_cast<unsigned>(result.status)) + ", completed "`
+- [Engine/SceneRuntime/SceneManager.cpp:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L66) — `+ std::to_string(result.completed) + "/" + std::to_string(result.submitted)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 2026-10-07 물리 픽셀 최소 높이 정정
 
 사용자 확인에 따라 제목 표시줄의 최소 높이는 사용자 배율과 OS DPI를 적용한
@@ -44,3 +81,5 @@
 ## 경계
 
 Vulkan은 사용자 결정에 따라 보류했다. 이 변경은 W4/W5의 ViewportHost나 Play 입력 소유권 재설계를 완료하지 않는다.
+
+</details>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Graph Scene의 이미지별 UV·LOD</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphTextureFootprints.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphTextureFootprints.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Graph Scene의 이미지별 UV·LOD</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4">Tools/regression/verify-material-raster-surface.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;,&#39;Release&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9">Tools/regression/verify-material-raster-surface.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10">Tools/regression/verify-material-raster-surface.ps1:10</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang#L9">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang:9</a> — <code>float4 LXSampleMaterialImage(Texture2D&lt;float4&gt; image, SamplerState sampler, float2 uv, float explicitLod, uint encoding)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang#L13">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang:13</a> — <code>image.GetDimensions(0, width, height, levels);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang#L22">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang:22</a> — <code>float4 sampled = image.SampleLevel(sampler, uv, lod);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.h#L9">Lattice/Material/LXMaterialCompiler.h:9</a> — <code>struct LXMaterialSource</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.h#L28">Lattice/Material/LXMaterialCompiler.h:28</a> — <code>enum class LXMaterialResourceKind : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.h#L74">Lattice/Material/LXMaterialCompiler.h:74</a> — <code>struct LXMaterialCompilerOptions</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.cpp#L149">Lattice/Material/LXMaterialCompiler.cpp:149</a> — <code>Generator(const LXMaterialIR&amp; ir, LXMaterialCompilerOptions options) : ir_(ir), options_(options) {}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.cpp#L752">Lattice/Material/LXMaterialCompiler.cpp:752</a> — <code>struct LXMaterialContext</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialCompiler.cpp#L904">Lattice/Material/LXMaterialCompiler.cpp:904</a> — <code>append(std::to_string(LXMaterialProgram::CompilerVersion));</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>샘플링 계약</h2>
+<p><code>LXMaterialCompiler</code>는 Image Texture와 <code>LXTextureSample</code>을
+<code>LXSampleMaterialImage(image, sampler, vector.xy, context.lod)</code>로 생성한다.
+Color/Alpha는 같은 노드의 한 샘플을 공유한다. 같은 이미지 자원은 하나의 슬롯을
+공유하지만 Vector·sampler가 다른 노드는 각각 샘플한다.</p>
+<p>실제 Scene host는 generated module 앞에서 <code>LX_MATERIAL_PIXEL_FOOTPRINT=1</code>을 정의한다.
+<code>MaterialGraphTextureSample.slang</code>은 각 샘플의 최종 Vector 식에 <code>ddx_fine</code>/<code>ddy_fine</code>을
+적용하고, 그 샘플에 바인딩된 이미지의 폭·높이·mip 수로 LOD를 계산한다.</p>
+<pre><code class="language-text">footprint = max(length(ddx_fine(uv) * imageDimensions),
+                length(ddy_fine(uv) * imageDimensions))
+lod = clamp(log2(max(footprint, 1e-20)), 0, imageMipCount - 1)
+</code></pre>
+<p>따라서 서로 다른 해상도·종횡비·mip 수는 각각의 LOD를 사용한다. 상수 Vector의
+footprint는 0이므로 첫 mip을 사용한다. 같은 이미지의 다른 Vector 식도 별도로 계산한다.
+Scene host의 한 텍스처 제한과 첫 텍스처에서 구한 공통 LOD를 제거했다.</p>
+<p>평가는 기존 coverage/draw-owner의 divergent 분기 전에 실행한다. Scene의 GBuffer,
+lookup 입력 수집 2개 PS와 Color PS가 같은 규칙을 사용한다. 실제 SRGB view는 보간 전에
+RGB를 선형화하며 alpha와 Data 이미지는 선형 값이다. filter/address는 각 sampler를 따른다.</p>
+<h2>다른 host와 버전</h2>
+<p>compute·evaluated-point host는 기본 플래그 0으로 <code>context.lod</code>를 그대로 사용한다.
+픽셀 quad가 없는 이 경로에는 Scene fine derivative를 삽입하지 않는다.
+현재 지원은 mesh의 기본 UV와 지원된 explicit Vector 식이다. named UV set·UV1 선택,
+Mapping/Texture Coordinate를 포함한 Blender 전체 노드 목록은 별도 지원 작업이다.</p>
+<p>생성기 <code>CompilerVersion</code>은 2, semantic key는 <code>lx.material.compiler/2;common-abi/MAT-5</code>다.
+공용 include 의존성과 생성 코드가 프로그램 identity에 포함된다. LXMC reader는 현재
+compiler version과 다른 쿠킹 결과를 거부하므로 v1 프로그램은 다시 생성·검증·쿠킹해야 한다.
+<code>.shadergraph</code>의 저장 schema와 <code>LXMaterialContext</code> ABI는 바꾸지 않았다.</p>
+<h2>독립 reference와 검증 범위</h2>
+<p>native Scene fixture는 두 제품(Core/Layered)에 이미지 2개·sampler 3개·샘플 3개를 사용한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>샘플</th>
+<th>이미지</th>
+<th>Vector / sampler</th>
+<th>소비</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A</td>
+<td>SRGB 32×16, 6 mip</td>
+<td>mesh UV / Linear Repeat</td>
+<td>Base Color</td>
+</tr>
+<tr>
+<td>B</td>
+<td>Data 8×64, 7 mip</td>
+<td>mesh UV / Linear Clamp</td>
+<td>Roughness alpha</td>
+</tr>
+<tr>
+<td>C</td>
+<td>A와 같은 자원</td>
+<td>상수 parameter / Closest Clamp</td>
+<td>Metallic alpha</td>
+</tr>
+</tbody></table></div>
+<p>CPU double reference는 mip별 RGBA8 패턴, texel 중심·wrap/clamp, SRGB decode,
+bilinear/trilinear interpolation과 analytic UV gradient로 각 샘플을 계산한다.
+8개 프레임에서 다음을 검사한다.</p>
+<ul>
+<li>순차·1워커·4워커의 cold/warm cache와 공유 depth/HDR 합성.</li>
+<li>서로 다른 fractional LOD, 같은 이미지의 독립 Vector/sampler와 첫 mip.</li>
+<li>Core Vector parameter만 변경할 때 Layered의 정확한 재사용.</li>
+<li>Core 이미지 B를 16×8·5 mip으로 교체할 때 바뀐 해상도·mip 수의 반영.</li>
+<li>UV를 128배 확대할 때 각 이미지의 서로 다른 마지막 mip 제한.</li>
+<li>변경 없는 프레임의 전 픽셀 재사용, parameter/image 교체의 부분 갱신.</li>
+</ul>
+<p>선형 필터의 SRGB RGB와 Data alpha 입력 transport에는 절대 오차 0.001을 적용한다.
+그 외 입력은 기존 정규화 0.0001이다. nearest alpha는 0.0001 기준을 유지한다.
+Direct3D의 필터 좌표·LOD에는 제한된 분수 정밀도가 허용된다.
+<a href="https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm">Microsoft Direct3D functional specification §7.18.16</a>
+이 fixture의 관측 차이는 해당 필터 정밀도 범위와 일치하지만 GPU 내부의 특정
+양자화 방식을 증명한 것은 아니다.</p>
+<p>transport를 통과한 실제 입력으로 독립 CPU double IBL/직접광을 계산한다.
+IBL 36성분의 정규화 0.0001과 최종 HDR half의 <code>0.001 * max(1, abs(expected))</code>
+기준은 유지한다. 공통 LOD를 잘못 적용하면 mip 패턴에서 이 transport 상한보다
+큰 차이가 나므로 샘플별 LOD 오류를 구분할 수 있다.</p>
+<h2>동결 소스의 결과 (2026-09-29)</h2>
+<p>같은 소스의 Debug/Release 빌드와 RTX 4070 Ti native D3D12 GPU validation을 통과했다.
+생성기 golden 동결 대조는 별도 native host에서 20 graph·13,306개 검사,
+DXIL/SPIR-V 93개와 GPU 3,600성분을 통과했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검증</th>
+<th>각 구성의 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전체 Scene 회귀</td>
+<td>20,892,205개 검사 · GPU 3,735,460성분</td>
+</tr>
+<tr>
+<td>실제 합성</td>
+<td>44 graph · 가시 43,644픽셀</td>
+</tr>
+<tr>
+<td>준비/선언 실패 복구</td>
+<td>240개 거부 · accepted frame 보존</td>
+</tr>
+<tr>
+<td>신규 이미지별 샘플링</td>
+<td>8프레임 · 가시 1,352픽셀</td>
+</tr>
+<tr>
+<td>fractional / 마지막 mip</td>
+<td>1,014 / 338픽셀</td>
+</tr>
+<tr>
+<td>lookup 작업 합계</td>
+<td>새 적분 21,021픽셀 · 정확한 재사용 22,623픽셀</td>
+</tr>
+<tr>
+<td>최대 필터 transport 차이</td>
+<td>절대 0.000956118 (상한 0.001)</td>
+</tr>
+<tr>
+<td>정규화 0.0001 게이트</td>
+<td>최대 0.0000859499 (입력 transport·독립 물리 계산 포함)</td>
+</tr>
+<tr>
+<td>D3D12 GPU validation</td>
+<td>WARNING 이상 0건</td>
+</tr>
+</tbody></table></div>
+<p>Core/Layered 기본 제품과 footprint 제품의 Scene VS/GBuffer PS/lookup PS 2종/Color PS는
+DXIL·SPIR-V 40개, lookup bake/clear CS는 4개 artifact다. 기존 probe signature의
+<code>compiled=24</code>와 별도이며 SPIR-V 컴파일 성공을 native Vulkan 실행으로 세지 않는다.</p>
+<p>기존 1920×1080 희소 coverage cold/warm GPU timestamp는 Debug 53.7335/10.4984 ms,
+Release 64.2373/7.05165 ms였다. GPU validation이 켜진 단일 측정이고 dense Scene,
+카메라 이동 또는 제품 성능 수용 기준이 아니다. 시간값은 세션별로 변할 수 있다.</p>
+<p>증거는 <code>Build/Obj/MaterialProductProbe/texture-footprint-{Debug,Release}.log</code>,
+<code>texture-footprint-build-{Debug,Release}.log</code>, <code>texture-footprint-codegen-frozen.log</code>다.
+<code>texture-footprint-source-hashes.json</code>의 101개 소스 SHA-256을 두 구성 이후 다시 확인했다.
+확장 signature·입력 오차 상한·소스 동결의 최종 판정은 <code>texture-footprint-gate-final.log</code>다.
+반복 실행은 <code>Tools/regression/verify-material-raster-surface.ps1 -SkipDependencyRestore</code>다.</p>
+<h2>제품 완료와의 경계</h2>
+<p>이 작업은 실제 Scene host의 샘플링 계약이다. native Vulkan 실행·실제 Editor Live Tick,
+named UV set과 Blender 전체 노드 지원, Special/투명 합성, 비동기 generation/PSO 교체,
+자동 Scene host 쿠킹과 일반 Scene의 시간/메모리 수용은 별도다. MAT-7은 진행 중이다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-다른-host와-버전"></span><span id="sec-독립-reference와-검증-범위"></span><span id="sec-동결-소스의-결과-2026-09-29"></span><span id="sec-샘플링-계약"></span><span id="sec-제품-완료와의-경계"></span><span id="다른-host와-버전"></span><span id="독립-reference와-검증-범위"></span><span id="동결-소스의-결과-2026-09-29"></span><span id="샘플링-계약"></span><span id="제품-완료와의-경계"></span></details></main></body></html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Texture Inspector UI 배율·내부 분리 검증 (2026-10-10)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="TextureInspectorScaleDockValidation20261010.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/TextureInspectorScaleDockValidation20261010.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Texture Inspector UI 배율·내부 분리 검증 (2026-10-10)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L17">Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:17</a> — <code>class ImGuiHost final : public IImGuiHost</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L25">Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:25</a> — <code>ImGuiWin32Cursor::Reset(hwnd);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L38">Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:38</a> — <code>throw std::runtime_error(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28">Engine/Utility_Framework/Sha256.h:28</a> — <code>class Sha256</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30">Engine/Utility_Framework/Sha256.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40">Engine/Utility_Framework/Sha256.h:40</a> — <code>std::memcpy(m_buffer + m_bufferUsed, p, take);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Debug UI 배율0.8과 Release1.5에서 실제 Inspector 내부 분리·숫자 입력0→2·다른 텍스처 선택·원래 선택 복귀·제목 표시줄 X 종료를 확인했다. Debug0.8 재도킹도 확인했다. Release1.5는 여러 이동 시도 후에도 결합된 상태를 확인하지 못했으므로 재도킹 수용에서 제외한다. 제품 결함 원인은 확정하지 않았다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성</th>
+<th>실행 폴더</th>
+<th>실제 UI 관찰</th>
+<th>파일·종료 판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug0.8</td>
+<td><code>Build/TAUI-Debug-manual-2aae48dd</code></td>
+<td>내부 분리, 편집, 선택 복귀, 재도킹에서2 유지</td>
+<td>12 checks 통과, exit0</td>
+</tr>
+<tr>
+<td>Release1.5</td>
+<td><code>Build/TAUI-Release-manual-81e5cd18</code></td>
+<td>내부 분리·패널 크기 조정, 편집, 선택 복귀에서2 유지; 재도킹 미확인</td>
+<td>12 checks 통과, exit0</td>
+</tr>
+</tbody></table></div>
+<h2>기계 판정과 실행 신원</h2>
+<p><code>Build/TextureInspectorScale/result.json</code>에 두 실행의 최종 <code>editor.theme</code> receipt, runtime SHA256, 입력4파일 전후 hash와 sourceDrift0을 저장했다. HEAD는 <code>d3c85faf182e93842217dd46eee3d3aabf4afc13</code>이다. 각12 checks는 exit0, theme/geometry/scale/DPI 일치, 실제 적용 배율, 종료 후 저장 배율, GUID, maxDimension2, Tiny4 PNG hash, 원래 저장 씬의 프로젝트 경로 치환 후 정확한 내용, Finalize, WM_CLOSE 수신, DX12 pending0/0/0, runtime hash 일치다. UI 조작 관찰은 기계 판정과 별도 필드다.</p>
+<p>두 실행 모두 OS DPI1.5였다. UI 배율은0.8/1.5, renderedFontSize는19/36으로 관측됐으며 glyph 누락0, geometryMatches/clean=true였다. 실행기는 격리 프로젝트에만 선택한 <code>imguiScale</code>을 기록하고 두 <code>editor.theme</code> 스냅샷을 추가했다. 제품 코드 변경이나 추가 빌드는 없다.</p>
+<p>Release의 최초240초 프로세스 관찰은 수동 조작 중 제한을 넘겨 <code>exit.json</code>에 exited=false/exitCode=null과 관찰기 오류를 남겼다. 프로세스를 강제 종료하지 않고 새 대기 핸들을 확보한 뒤 실제 X로 닫았다. <code>exit-after-ui.json</code>은 exited=true/exitCode0이며 이전 제한 초과를 보존한다. 최초 receipt를 정상 종료로 해석하지 않는다.</p>
+<h2>수용 경계와 잔여</h2>
+<p><code>ImGuiHost.cpp</code>의 DockingEnable은 활성화돼 있지만 ViewportsEnable은 창 생성 스레드와 메시지 펌프 소유권 문제로 보류돼 있다. 이번 검증은 메인 OS 창 내부의 floating Inspector다. 별도 OS 창, 다중 모니터, 실행 중 DPI 전환, 전체 Debug/Release×0.8/1.5 조합 및 GPU pixel 결과는 수용하지 않는다. Release1.5 재도킹과 좁은 dock에서의 읽기·편집도 후속으로 남긴다.</p>
+<p>12-0-D의 후속 범위로 기록하며 추가 가중치를 얻지 않는다. PHASE12 진행률66.25%(표시66%), T1b 대기·T3 중단을 유지한다. 400ms 안 실제 닫기 클릭, 실패 유형별 반복 확장, 전체 소비자·포맷·Shipping GPU는 기존 잔여다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-기계-판정과-실행-신원"></span><span id="sec-수용-경계와-잔여"></span><span id="기계-판정과-실행-신원"></span><span id="수용-경계와-잔여"></span></details></main></body></html>

@@ -1,5 +1,40 @@
 # PHASE 12 — 실제 Editor 씬 재로드 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-texture-scene-reload.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-scene-reload.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-scene-reload.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-scene-reload.ps1#L14) — `$root = Join-Path $repo ('Build/TSR-' + $config + '-' + [guid]::NewGuid().ToString('N').Substring(0,8))`
+- [Tools/regression/verify-texture-scene-reload.ps1:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-scene-reload.ps1#L23) — `[IO.File]::WriteAllText($texture + '.meta', "guid: 33333333-3333-4333-8333-333333333333n")`
+- [Engine/SceneRuntime/ImageComponent.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L14) — `class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent, UIComponent>`
+- [Engine/SceneRuntime/ImageComponent.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L19) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/ImageComponent.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L21) — `UIComponent::gc_trace(tracer);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/ImageComponent.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L19) — `ImageComponent::ImageComponent()`
+- [Engine/SceneRuntime/ImageComponent.cpp:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L24) — `bool ImageComponent::ReplaceTextureOwner(const Texture* previous,`
+- [Engine/SceneRuntime/ImageComponent.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L25) — `const own::shared_owner<const Texture>& replacement)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준일: 2026-10-10 KST. 정본은 [TexturePipelinePlan](../plans/TexturePipelinePlan.md),
 직전 자산 서비스 검사는 [임포트 수명 기록](TextureImportLifecycleValidation20261010.md)에 있다.
 
@@ -62,3 +97,5 @@ Shipping GPU package, 신규 BC5/BC7·모델 전체 소비 및 품질/시간/메
 각 실패 유형을 모든 runtime publication 실패나 모든 GPU/장시간 조건으로 확대하지 않는다.
 
 T0/T1a/T2는 진행 중이며 `earnedDays: 0`, T1b 대기, T3 중단을 유지한다.
+
+</details>

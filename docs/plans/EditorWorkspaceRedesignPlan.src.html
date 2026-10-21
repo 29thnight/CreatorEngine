@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>에디터 워크스페이스 · 도킹 · ViewportHost 재설계 (PHASE 21)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="EditorWorkspaceRedesignPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/EditorWorkspaceRedesignPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>에디터 워크스페이스 · 도킹 · ViewportHost 재설계 (PHASE 21)</h1><p>W2-V/W2-B·W7/W8의 남은 편집 표면/동작과 멀티뷰·복구·제품 UI 수용을 닫는다. 완료된 shell chrome·메뉴/창 선언 M0~M4와 W0~W6 기반은 제거한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>W2-V/W2-B·W7/W8의 남은 편집 표면/동작과 멀티뷰·복구·제품 UI 수용을 닫는다. 완료된 shell chrome·메뉴/창 선언 M0&#126;M4와 W0&#126;W6 기반은 제거한다.</li>
+<li>W9의 설정 저장/프로필/품질/Player 계약은 EditorRenderingSurfacesPlan으로 단일화한다. 이 W9는 완료된 PBR-W9와 다른 작업이다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>Editor window/commands → common editing transaction → scene component → dirty publication</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>W2-V</code> · PHASE 21</td>
+<td>씬뷰 툴바·오버레이 반응형 배치 규칙</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>W2-B</code> · PHASE 21</td>
+<td>컨텐츠 브라우저 내부 분할·탐색·New·검색 도구</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>W7</code> · PHASE 21</td>
+<td>Hierarchy/Browser clipping과 presentation cache</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>W8</code> · PHASE 21</td>
+<td>DX12·DPI·Play·layout·시각·성능 통합 회귀</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>W9</code> · PHASE 21</td>
+<td>Preferences·Project Settings 설정 소유권·저장·Quality</td>
+<td>progress</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L459">Editor/EngineGUIWindow/MenuBarWindow.cpp:459</a> — <code>if (ImGui::BeginMenu(&quot;Settings&quot;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandRegistry.h#L15">Engine/RuntimeHost/CommandCore/CommandRegistry.h:15</a> — <code>class CommandRegistry</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandDescriptor.h#L134">Engine/RuntimeHost/CommandCore/CommandDescriptor.h:134</a> — <code>struct CommandDescriptor</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L428">Engine/SceneRuntime/Scene.h:428</a> — <code>bool PublishRenderProxyDirty(Component* component, ProxyDirty dirty);</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="0-결정-요약"></span>
+<span id="1-현재-소스-기준선-2026-08-30-실측"></span>
+<span id="10-의존성과-병행"></span>
+<span id="11-검증-행렬"></span>
+<span id="11-스타일은-한-함수에-있으나-semantic-token이-아니다"></span>
+<span id="110-재사용-가능한-기존-자산과-편집-위험"></span>
+<span id="12-기본-배치가-표시-방식과-결합돼-있다"></span>
+<span id="12-위험과-대응"></span>
+<span id="13-최종-완료-조건"></span>
+<span id="13-핵심-toolpanel이-사실상-잠겨-있다"></span>
+<span id="14-표시-문자열이-persistence-id다--그리고-이미-끊겼다"></span>
+<span id="15-scene과-game은-이미-서로-다른-표시-타깃이다"></span>
+<span id="16-play-전이는-즉시-완료되지-않는다"></span>
+<span id="17-os-multi-viewport는-아직-지원-계약이-없다"></span>
+<span id="18-입력-소유권-신호가-매-프레임-덮여-있다"></span>
+<span id="19-에디터-chrome을-밖에서-볼-수단이-없다"></span>
+<span id="2-범위와-비범위"></span>
+<span id="2026-09-1213-적용-완료-부분"></span>
+<span id="2026-09-16-재기준선--다섯-줄-중-넷이-줄어들었다"></span>
+<span id="2026-09-16-재기준선--잔여를-문장에서-셈으로-바꾼다"></span>
+<span id="2026-09-17-import-settings-이관--1515"></span>
+<span id="2026-09-17-w2-i2-recttransform-최소-폭--1616"></span>
+<span id="2026-09-17-w2-i3-중첩-필드배열--자극물-55-줄-넘침-0"></span>
+<span id="2026-09-17-방문-이력가상-위치끌어다-놓기-신원volume-profile-생성-착지"></span>
+<span id="2026-09-17-전용-드로어-열둘-이관--1414"></span>
+<span id="2026-09-17-착수--자를-먼저-연다"></span>
+<span id="2026-09-18--정본이-답할-수-있는-것을-답하게-하고-그-판정을-세웠다"></span>
+<span id="2026-09-18-w2-i1-공통-순회와-편집-정책--2안-착지"></span>
+<span id="2026-09-18-w2-i5-폭--배율-행렬--전환-경계--편집-왕복"></span>
+<span id="2026-09-18-예열-창구--진행이-화면에만-있었다"></span>
+<span id="2026-10-07-최근-병합-반영"></span>
+<span id="21-이번-계획이-해결하는-것"></span>
+<span id="22-의도적으로-하지-않는-것"></span>
+<span id="3-sbox-참고-범위와-creatorengine-토큰"></span>
+<span id="31-외부-값을-runtime-의존성으로-만들지-않는다"></span>
+<span id="32-typography와-dpi"></span>
+<span id="33-imgui-style-mapping"></span>
+<span id="4-window와-docking-계약"></span>
+<span id="41-window-role"></span>
+<span id="42-central-node"></span>
+<span id="43-toolpanel-자유도"></span>
+<span id="44-기본-preset"></span>
+<span id="5-workspace-persistence"></span>
+<span id="51-저장-단위"></span>
+<span id="52-saveloadreset-규칙"></span>
+<span id="53-legacy-migration"></span>
+<span id="6-viewporthost와-play-ux"></span>
+<span id="61-상태-모델"></span>
+<span id="62-전이-원칙"></span>
+<span id="63-선택적-game-preview"></span>
+<span id="64-viewport-extent와-render-demand"></span>
+<span id="7-소수-custom-widget-정책"></span>
+<span id="71-허용-목록"></span>
+<span id="72-tab과-scrollbar의-한계"></span>
+<span id="8-성능-계약"></span>
+<span id="81-기대치를-분리한다"></span>
+<span id="82-hard-gate"></span>
+<span id="83-hierarchybrowser"></span>
+<span id="9-실행-계획"></span>
+<span id="90-현재-완료잔여-정본-2026-09-13"></span>
+<span id="a1-meta에-얹지-않는다"></span>
+<span id="a10-m1-착지-기록--그리는-자리-열둘과-팝업-세-벌-통합-2026-09-11"></span>
+<span id="a11-m2-착지-기록--editormenu-와-표면-대조-게이트-2026-09-11"></span>
+<span id="a2-형태를-결정하는-링크-제약-실측"></span>
+<span id="a3-표면을-문자열이-아니라-닫힌-집합으로-둔다"></span>
+<span id="a4-선언-표기--서명이-결속을-선언한다"></span>
+<span id="a5-중앙-목록과-누락-게이트"></span>
+<span id="a6-그리기-배선과-스레드-규약"></span>
+<span id="a7-이번-범위에서-하지-않는-것"></span>
+<span id="a8-슬라이스와-공수"></span>
+<span id="a9-m0-착지-기록-2026-09-10"></span>
+<span id="b1-m3-착지-기록--셸이-프레임을-소유한다-2026-09-10"></span>
+<span id="b2-m3이-측정으로-드러낸-것"></span>
+<span id="b3-m4-계약--창-선언"></span>
+<span id="b4-슬라이스와-공수"></span>
+<span id="b5-m4-12단계-착지-기록-2026-09-10"></span>
+<span id="b6-m4-3단계-착지-기록--직접-begin-열둘-2026-09-11"></span>
+<span id="b7-m4-3b-착지-기록--애니메이터-셋과-선택-종속-시험대-2026-09-11"></span>
+<span id="b8-m4-4단계-착지-기록--옛-펌프-은퇴와-배선-게이트-2026-09-11"></span>
+<span id="content-browser-를-기본-앞-탭으로-2026-09-15--사용자-요청--대가를-함께-적는다"></span>
+<span id="new와-기존-자산-동작-연결"></span>
+<span id="phase21-current-status"></span>
+<span id="sec-0-결정-요약"></span>
+<span id="sec-1-현재-소스-기준선-2026-08-30-실측"></span>
+<span id="sec-10-의존성과-병행"></span>
+<span id="sec-11-검증-행렬"></span>
+<span id="sec-12-위험과-대응"></span>
+<span id="sec-13-최종-완료-조건"></span>
+<span id="sec-2-범위와-비범위"></span>
+<span id="sec-2026-10-07-최근-병합-반영"></span>
+<span id="sec-3-sbox-참고-범위와-creatorengine-토큰"></span>
+<span id="sec-4-window와-docking-계약"></span>
+<span id="sec-5-workspace-persistence"></span>
+<span id="sec-6-viewporthost와-play-ux"></span>
+<span id="sec-7-소수-custom-widget-정책"></span>
+<span id="sec-8-성능-계약"></span>
+<span id="sec-9-실행-계획"></span>
+<span id="sec-w9--preferences--project-settings-수명설정-정본-2026-10-01-추가"></span>
+<span id="sec-부록-a-메뉴-등록-배선-계약-editor"></span>
+<span id="sec-부록-b-셸-크롬과-창-선언-계약-editor"></span>
+<span id="transform-계통-결정--2안-채택"></span>
+<span id="w0--관측-표면--기준선--실패-게이트-p0-2일--정찰-뒤-1일2일"></span>
+<span id="w1--theme-token--fonticon--dpi-정본-p1-2일"></span>
+<span id="w2--공통-styled-primitive와-custom-draw-4종-p1-3일"></span>
+<span id="w2-1-착지--keyboard-navigation-2026-09-15"></span>
+<span id="w2-2-착지--clipping--tooltip-2026-09-15"></span>
+<span id="w2-3-state-matrix"></span>
+<span id="w2-3-착지--상태-행렬-2026-09-15"></span>
+<span id="w2-4-착지--시각-기준선과-8-성능-계약-2026-09-15"></span>
+<span id="w2-b--컨텐츠-브라우저-내부-분할탐색생성검색-도구-p1-7일--초기-추정"></span>
+<span id="w2-content-browser"></span>
+<span id="w2-i--인스펙터-공통-속성-배치-규칙--transform-컴포넌트-렌더-통합-p1-6일--초기-추정"></span>
+<span id="w2-inspector-layout"></span>
+<span id="w2-v--씬뷰-툴바오버레이-반응형-배치-규칙-p1-4일--초기-추정"></span>
+<span id="w2-v3-후속--오버레이-제외는-그림이-아니라-입력에-건다-2026-09-14"></span>
+<span id="w2-viewport-overlay"></span>
+<span id="w3--stable-id--자유-docking--workspace-저장복구-p0-3일"></span>
+<span id="w4--중앙-viewporthost--canvas-분리--view-demand-p0-4일--done"></span>
+<span id="w4-착지와-결함-2026-09-13"></span>
+<span id="w4-후속--extent-기반-resize--렌더-배율-2026-09-14"></span>
+<span id="w5--playpauseeject-표시입력-상태-머신-p0-4일--정찰-뒤-3일4일"></span>
+<span id="w5-착지와-결함-2026-09-14"></span>
+<span id="w6--preset-5종과-layout-ux-p2-2일"></span>
+<span id="w6-2-착지--이름-붙인-workspace-여럿-2026-09-15"></span>
+<span id="w6-착지--preset-다섯과-자리의-정본-이동-2026-09-15"></span>
+<span id="w7--hierarchybrowser-clipping과-presentation-cache-p1-3일"></span>
+<span id="w7-0-착지--재는-법과-fixture-그리고-기준선-2026-09-14"></span>
+<span id="w7-1-착지--browser-스냅샷-2026-09-15"></span>
+<span id="w7-2w7-3-착지--평탄-목록과-clipping-2026-09-15"></span>
+<span id="w7-4-착지--평탄-목록-정본-계약-게이트-2026-09-15"></span>
+<span id="w7-5-착지--스캔-밖에서-디스크를-만지던-자리-2026-09-16"></span>
+<span id="w7-6-착지--아이콘을-비동기-썸네일로-2026-09-16"></span>
+<span id="w8--통합-회귀와-legacy-강제-배치-은퇴-p0-2일"></span>
+<span id="w8-1-착지--어댑터-판-canary와-legacy-잔재-2026-09-15"></span>
+<span id="w8-2-착지--chrome-crop-visual-golden과-hierarchy-끌어오기-2026-09-15"></span>
+<span id="w8-3-착지--통합-행렬-그리고-판정이-잴-수-없는-것이었다-2026-09-15"></span>
+<span id="w9--preferences--project-settings-수명설정-정본-2026-10-01-추가"></span>
+<span id="같은-날-좌표계가-바뀌었다--계약이-전제에-묶여-있었다"></span>
+<span id="검증과-완료-판정"></span>
+<span id="검증과-완료-판정-1"></span>
+<span id="검증과-완료-판정-2"></span>
+<span id="게이트--verify-browser-thumbnail-contractps1-대조-56-checks"></span>
+<span id="공통-배치-계약"></span>
+<span id="공통-배치입력-계약"></span>
+<span id="남은-것"></span>
+<span id="단계-상태와-남은-목록"></span>
+<span id="배치탐색-계약"></span>
+<span id="변이-다섯-다섯-다-잡았다"></span>
+<span id="부록-a-메뉴-등록-배선-계약-editor"></span>
+<span id="부록-b-셸-크롬과-창-선언-계약-editor"></span>
+<span id="산정검증-범위"></span>
+<span id="스크린샷과-착수-전-코드-대조"></span>
+<span id="실측-release--fixture-셋을-뿌리에-올린-회차"></span>
+<span id="완료한-적용-범위"></span>
+<span id="이관-순서와-초기-공수"></span>
+<span id="이관-순서와-초기-공수-1"></span>
+<span id="이관-순서와-초기-공수-2"></span>
+<span id="자극이-재는-값에-닿지-않고-있었다"></span>
+<span id="자극할-수-없는-절이-하나-있었다"></span>
+<span id="자를-세우자-잠금이-드러났다"></span>
+<span id="착수-시점-문제와-w4w5의-책임-경계"></span>
+<span id="착수-전-문제와-이관-경계-현재-상태는-90-참조"></span>
+<span id="캐시-키는-계약이-적은-것과-다르다"></span></p>
+</details>
+</main></body></html>

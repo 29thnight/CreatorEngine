@@ -1,5 +1,52 @@
 # SDF 텍스트 경로
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- UI는 현행 Canvas/UIManager·Component와 값 기반 렌더 준비 경계를 소비한다. GC 객체와 렌더 스냅샷의 수명을 분리한다.
+- scene-local 입력 routing·layout dirty·UIDrawSnapshot·전역 UIManager 퇴역은 UI 계획의 실제 소비자/제품 수용으로 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang#L1) — `struct RectInstance`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang#L19) — `struct VSOut`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/UI.slang#L55) — `const float4 sampled = gTexture.Sample(gSampler, input.uv);`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L1) — `struct SpriteInstance`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L25) — `struct VSOut`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WorldSprite.slang#L53) — `const float4 sampled = gTexture.Sample(gSampler, uv);`
+- [Engine/SceneRuntime/Canvas.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14) — `class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>`
+- [Engine/SceneRuntime/Canvas.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Canvas.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20) — `Component::gc_trace(tracer);`
+- [Engine/RenderEngine/FontAsset.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FontAsset.h#L16) — `own::shared_owner<const Texture> GetTexture() const`
+- [Engine/RenderEngine/FontAsset.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FontAsset.h#L24) — `void Publish(own::shared_owner<const Texture> texture)`
+- [Engine/RenderEngine/FontAsset.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FontAsset.h#L31) — `own::shared_owner<const Texture> m_texture;`
+- [Engine/RenderEngine/DataSystem.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30) — `own::shared_owner<const Texture> descriptor;`
+- [Engine/RenderEngine/DataSystem.h:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45) — `std::vector<own::shared_owner<const Texture>> textures;`
+- [Engine/RenderEngine/DataSystem.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L47) — `own::shared_owner<TextureFramePins> textureImages;`
+- [Engine/SceneRuntime/TextComponent.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TextComponent.h#L14) — `class FontAsset;`
+- [Engine/SceneRuntime/TextComponent.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TextComponent.h#L15) — `struct TextLayout;`
+- [Engine/SceneRuntime/TextComponent.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TextComponent.h#L17) — `class [[reflgen::reflect]] TextComponent : public meta::identity<TextComponent, UIComponent>`
+- [Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L63) — `class EnhancedUIPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:114](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L114) — `own::shared_owner<TextureFramePins> texturePins = {})`
+- [Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:184](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L184) — `own::shared_owner<TextureFramePins> m_texturePins;`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h#L14) — `class EnhancedSpritePass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h#L68) — `own::shared_owner<TextureFramePins> texturePins = {})`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h:118](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.h#L118) — `own::shared_owner<TextureFramePins> m_texturePins;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-08, 기준 master `3afe1daaee7b75f644ac10b12d96fb684a0e74c8`.
 
 이 변경은 [PHASE 16 트랙 T](../plans/UISystemRedesignPlan.md)의 소스 연결이다.
@@ -100,3 +147,5 @@ Player는 패키지의 원본 TTF/OTF를 읽고 첫 사용 시 직렬로 SDF를 
 
 아직 포함하지 않는 것: MSDF 품질 비교, shaping/ligature/BiDi, grapheme 단위 줄바꿈,
 컬러 emoji, 세로 텍스트, rich text, 말줄임·부모 마스크/height clipping, PHASE 16의 나머지 위젯·UI 소유권 재설계.
+
+</details>

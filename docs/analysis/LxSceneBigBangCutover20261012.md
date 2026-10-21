@@ -1,5 +1,49 @@
 # LX Scene 단일 배선 전환 — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98) — `enum class ShaderPassQueue : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106) — `enum class ShaderBlendMode : std::uint8_t`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L24) — `class GraphSceneFixture`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L27) — `GraphSceneFixture() = default;`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L28) — `GraphSceneFixture(const GraphSceneFixture&) = delete;`
+- [Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h#L7) — `class SceneSurfaceTargets final`
+- [Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h#L9) — `public:`
+- [Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h#L12) — `struct Outputs {`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/ShaderMeta.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28) — `outError = std::string(context) + ": " + std::string(detail);`
+- [Engine/RenderEngine/ShaderMeta.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65) — `const bool known = std::any_of(allowed.begin(), allowed.end(),`
+- [Engine/RenderEngine/ShaderMeta.cpp:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102) — `else return Fail(context, std::string("'") + key + "'는 true|false여야 한다", outError);`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L36) — `bool GraphSceneFixture::Initialize(const EnhancedFrameContext& context, std::string& error, float alpha)`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L101) — `std::uint32_t GraphSceneFixture::AddMesh(const std::vector<Vertex>& vertices,`
+- [Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:148](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L148) — `void GraphSceneFixture::CookMesh(uint32_t index)`
+- [Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp#L4) — `RHIFormat SceneSurfaceTargets::GetRenderTargetFormat(uint32_t index)`
+- [Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp#L9) — `void SceneSurfaceTargets::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)`
+- [Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp#L15) — `void SceneSurfaceTargets::DeclareVisibility(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > HDR 후속 전환: [LX HDR 최초 발행 전환](LxHdrCutover20261012.md). 일반 Deferred 패스·셰이더를 삭제하고 HDR 생성·초기화를 LX로 옮겼다.
 
 
@@ -59,3 +103,5 @@ Release·Debug 빌드 통과. 최종 판정은 `Build/Verification/SceneSurfaceC
 실패한 중간 실행도 보존했다. 캡처의 게임/에디터 대상 오류와 LX 프로그램 준비 전 캡처를 수정했으며, CPU 프레임 대기는 예열일 뿐 합격 근거는 GPU 캡처와 리드백이다. GPU 기반 validation의 초기 준비 시간은 성능 판정으로 사용하지 않는다. old/new A/B는 사용자 몫이며 Vulkan 실행 검증은 PHASE 4.9에 남는다.
 
 변경 전 소스는 해당 디렉터리의 `Before`에 보존했다. 이는 삭제한 활성 구현의 복구용 기록이며 프로젝트·런타임 배선에 등록하지 않는다. 작업 전부터 존재한 다른 변경은 유지한다.
+
+</details>

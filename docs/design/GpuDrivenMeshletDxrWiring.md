@@ -1,5 +1,50 @@
 # EnhancedSceneRenderer 기반 Meshlet·Mesh Shader·DXR 상세 배선 계약
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Mesh.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Mesh.h#L29) — `struct Vertex`
+- [Engine/RenderEngine/Mesh.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Mesh.h#L40) — `Vertex() = default;`
+- [Engine/RenderEngine/Mesh.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Mesh.h#L41) — `Vertex(`
+- [Engine/RenderEngine/RHI/RHIEncoder.h:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L90) — `enum class RHIBindPoint : uint8_t`
+- [Engine/RenderEngine/RHI/RHIEncoder.h:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L96) — `enum class RHIPrimitiveTopology : uint8_t`
+- [Engine/RenderEngine/RHI/RHIEncoder.h:195](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L195) — `virtual void SetVertexBuffer(const RHIBufferSlice& slice, uint32_t stride) = 0;`
+- [Engine/RenderEngine/RHI/RHIResourceTypes.h:131](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIResourceTypes.h#L131) — `enum class Kind : uint8_t { ShaderResource, UnorderedAccess };`
+- [Engine/RenderEngine/RHI/RHIResourceTypes.h:132](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIResourceTypes.h#L132) — `enum class Dim  : uint8_t { Default, Texture2D, Texture2DArray, TextureCube, Texture3D, Buffer };`
+- [Engine/RenderEngine/RHI/RHIResourceTypes.h:1093](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIResourceTypes.h#L1093) — `struct RHIMeshBinding`
+- [Engine/RenderEngine/Experiment/Import/ImportedScene.h:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/ImportedScene.h#L94) — `struct VertexStreams final`
+- [Engine/RenderEngine/Experiment/Import/ImportedScene.h:110](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/ImportedScene.h#L110) — `[[nodiscard]] std::size_t VertexCount() const noexcept`
+- [Engine/RenderEngine/Experiment/Import/ImportedScene.h:167](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/ImportedScene.h#L167) — `(std::tuple_size_v<decltype(VertexStreams::ValueStreams())> + 2)`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:274](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L274) — `struct EnhancedLiveFramePacket`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:1065](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L1065) — `EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:1073](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L1073) — `bool PublishLiveFrame(EnhancedLiveFramePacket frame);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:403](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L403) — `mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:450](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L450) — `mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8109) — `bool LiveState::ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame)`
+- [Engine/RenderEngine/Experiment/Import/ImportedScene.cpp:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/ImportedScene.cpp#L121) — `notes.Error(ImportNoteCode::InvalidVertexStreams, context,`
+- [Engine/RenderEngine/Experiment/Import/ImportedScene.cpp:247](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/ImportedScene.cpp#L247) — `const std::size_t vertexCount = streams.VertexCount();`
+- [Engine/RenderEngine/Experiment/Import/ImportedScene.cpp:615](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/ImportedScene.cpp#L615) — `std::span<const JointInfluence> VertexStreams::InfluencesOf(`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-10-08 제품 범위 확장:** 실제 RT 구현은 [PHASE 4.85 Path Tracing·Hybrid RT](../plans/PathTracingHybridPipelinePlan.md)가 소유한다. 공통 RT scene/material 기반 위에 독립 PathTracing graph 구성과 기존 raster+RT Hybrid 구성을 같은 renderer 수명 아래 연결한다. 본 문서의 hard shadow는 첫 Hybrid 슬라이스이며 전체 목표가 아니다. RT0→RTP-1/2, RT1→RTP-4, HY0→RTP-12로 대응하고 구현 공수/완료를 중복 계상하지 않는다. ReSTIR PT Enhanced·tetrahedral cages는 신규 계획의 연구 구현/평가 트랙이다.
 
 **설계 결정 2026-10-01 · GPU-1/GPU-3 상세 계약 · 구현/빌드/GPU 런타임 미검증.**
@@ -348,3 +393,5 @@ baseline 기반 예산, GD/RT/HY 구현 공수와 실행 순서를 확정해야 
 fallback 범위는 [GPU-driven 구현 계획](../plans/GpuDrivenGeometryImplementationPlan.md)을
 따른다. 이 작업에서는 DXR를 추가하지 않는다. 빌드·셰이더 컴파일·GPU 실행 검증은
 수행하지 않았으며, native HZB와 shadow visibility는 별도 순서로 연결한다.
+
+</details>

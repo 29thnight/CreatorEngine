@@ -1,5 +1,53 @@
 # REAC 2025 비교에 따른 렌더링 파이프라인 후속 구현
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/MaterialGraphProduct.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.h#L34) — `enum class Tier : std::uint8_t`
+- [Engine/RenderEngine/MaterialGraphProduct.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.h#L41) — `enum class Route : std::uint8_t`
+- [Engine/RenderEngine/MaterialGraphProduct.h:111](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.h#L111) — `enum class TextureSampleEncoding : std::uint32_t`
+- [Engine/RenderEngine/MaterialGraphPrimitiveCache.h:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPrimitiveCache.h#L32) — `const std::array parameters{RHILayout::Cbv(0),`
+- [Engine/RenderEngine/MaterialGraphPrimitiveCache.h:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPrimitiveCache.h#L126) — `class ScenePrimitiveCacheFrame final`
+- [Engine/RenderEngine/MaterialGraphPrimitiveCache.h:129](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPrimitiveCache.h#L129) — `ScenePrimitiveCacheFrame() = default;`
+- [Engine/RenderEngine/DataSystem.cpp:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L55) — `for (const auto& entry : file::directory_iterator(directory))`
+- [Engine/RenderEngine/DataSystem.cpp:129](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L129) — `throw std::runtime_error("Asset image decoder apartment initialization failed.");`
+- [Engine/RenderEngine/DataSystem.cpp:139](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L139) — `std::ranges::transform(value, value.begin(), [](unsigned char character)`
+- [Tools/regression/verify-reac-shaders.py:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reac-shaders.py#L18) — `import struct`
+- [Tools/regression/verify-reac-shaders.py:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reac-shaders.py#L23) — `SHADERS = Path("Dynamic_CPP/Assets/Shaders/DefaultPassShader")`
+- [Tools/regression/verify-reac-shaders.py:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-reac-shaders.py#L36) — `class ShaderCase:`
+- [Tools/regression/verify-primitive-cache.py:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-primitive-cache.py#L19) — `ROOT = Path(__file__).resolve().parents[2]`
+- [Tools/regression/verify-primitive-cache.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-primitive-cache.py#L20) — `HOST = Path('Engine/RenderEngine/MaterialGraphSceneHost.cpp')`
+- [Tools/regression/verify-primitive-cache.py:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-primitive-cache.py#L21) — `CACHE = Path('Engine/RenderEngine/MaterialGraphPrimitiveCache.h')`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L46) — `bytes += std::uint64_t(width) * height * sizeof(float);`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L53) — `const auto found = std::ranges::find_if(`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:495](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L495) — `std::array<RHIBindingDesc, GpuGeometryOcclusion::kMaximumLevels> GpuGeometryOcclusion::Pyramid::BindingInputs(`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:3533](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3533) — `if (budget.m_primitiveCache && ScenePrimitiveCacheFrame::SupportsPacketDispatch(*work))`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:3874](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3874) — `std::array<uint32_t, 3> SceneHost::ShadowBucketSubmissionCounts() const`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:3901](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3901) — `std::array<uint32_t, 2> SceneHost::LayerBucketCounts() const`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L94) — `std::bit_cast<std::array<std::uint32_t, 16>>(input.World()),`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:95](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L95) — `std::bit_cast<std::array<std::uint32_t, 4>>(input.View().eye)};`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:1163](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L1163) — `const std::array indices{source.indices_[std::size_t(triangle) * 3],`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성일: 2026-10-19. 기준 master: [`0d3c2cac6d3bd16a2c4511ccb067749feafcd33c`](https://github.com/29thnight/CreatorEngine/commit/0d3c2cac6d3bd16a2c4511ccb067749feafcd33c).
 
 구현 코드: [`deeaff2785fa059fe13e632ff934ce292ccf2801`](https://github.com/29thnight/CreatorEngine/commit/deeaff2785fa059fe13e632ff934ce292ccf2801). 검증한 로컬 코드와 게시한 GitHub 코드의 tree는 `6565bd9bf82e768bb86c9252d52895415d37f90e`로 동일하다.
@@ -254,3 +302,5 @@ native에서는 `SceneHostIdentity` 41의 material 자산을 재쿠킹하고 다
 | CPU admission / cooked PSO 선택 | [MaterialGraphSceneHost.cpp](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphSceneHost.cpp), [MaterialGraphProduct.h](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphProduct.h) |
 | Shadow prediction 의존성 / current-only HZB | [MaterialGraphSceneShadowStage.inl](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl), [GpuGeometryVisibilityShared.inl](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/GpuGeometryVisibilityShared.inl), [GpuGeometryOcclusion.cpp](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Engine/RenderEngine/GpuGeometryOcclusion.cpp) |
 | Native 검사 진입과 실행 marker | [verify-material-scene-probes.ps1](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Tools/regression/verify-material-scene-probes.ps1), [material_raster_surface_probe.cpp](https://github.com/29thnight/CreatorEngine/blob/deeaff2785fa059fe13e632ff934ce292ccf2801/Tools/regression/material_raster_surface_probe.cpp) |
+
+</details>

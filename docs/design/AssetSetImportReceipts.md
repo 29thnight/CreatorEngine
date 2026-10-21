@@ -1,5 +1,52 @@
 # BuildAssetSet import receipts
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/AssetCooker/AssetSetBuild.cpp:1355](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetSetBuild.cpp#L1355) — `auto cooked = ck::BuildShaderMetaCookProduct({ source, assetRoot });`
+- [Tools/AssetCooker/AssetSetBuild.cpp:1468](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetSetBuild.cpp#L1468) — `cooked = ck::BuildMaterialProgramAssetSetProduct({ authored.asset.key.assetId,`
+- [Tools/AssetCooker/AssetSetBuild.cpp:1473](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetSetBuild.cpp#L1473) — `cooked = ck::BuildMaterialAssetSetProduct({ authored.asset.key.assetId, sourceInput, metaInput,`
+- [Tools/regression/asset_set_import_receipt_probe.cpp:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/asset_set_import_receipt_probe.cpp#L67) — `Require(cold.succeeded && cold.recookedImports == 2u && cold.reusedImports == 0u && cold.blobs == 1u,`
+- [Tools/regression/asset_set_import_receipt_probe.cpp:99](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/asset_set_import_receipt_probe.cpp#L99) — `Require(warm.succeeded && warm.reusedImports == 2u && warm.recookedImports == 0u,`
+- [Tools/regression/asset_set_import_receipt_probe.cpp:107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/asset_set_import_receipt_probe.cpp#L107) — `Require(remanifest.succeeded && remanifest.reusedImports == 2u && remanifest.recookedImports == 0u,`
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98) — `enum class ShaderPassQueue : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106) — `enum class ShaderBlendMode : std::uint8_t`
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+- [Tools/AssetCooker/AssetSetBuild.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetSetBuild.h#L8) — `struct AssetSetBuildRequest final`
+- [Tools/AssetCooker/AssetSetBuild.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetSetBuild.h#L18) — `struct AssetSetBuildResult final`
+- [Tools/AssetCooker/AssetSetBuild.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetSetBuild.h#L33) — `[[nodiscard]] AssetSetBuildResult BuildAssetSet(const AssetSetBuildRequest& request);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/AssetCooker/AssetCooker.cpp:123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L123) — `const auto size = std::filesystem::file_size(path, error);`
+- [Tools/AssetCooker/AssetCooker.cpp:1570](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L1570) — `ck::TextureCookProductResult result = ck::BuildTextureCookProduct(`
+- [Tools/AssetCooker/AssetCooker.cpp:1604](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L1604) — `ck::BuildShaderMetaCookProduct({ shaderMeta, assetRoot });`
+- [Engine/RenderEngine/ShaderMeta.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28) — `outError = std::string(context) + ": " + std::string(detail);`
+- [Engine/RenderEngine/ShaderMeta.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65) — `const bool known = std::any_of(allowed.begin(), allowed.end(),`
+- [Engine/RenderEngine/ShaderMeta.cpp:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102) — `else return Fail(context, std::string("'") + key + "'는 true|false여야 한다", outError);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Status: source implementation and unrun regression harness only. No compiler,
 engine binary, shader compiler or test was executed for this change.
 
@@ -128,3 +175,5 @@ Further real-fixture release gates are deliberately unclaimed:
    mandatory inputs, altered filename/hash, missing blobs and candidate limit
 
 The current static-only implementation is not runtime or performance evidence.
+
+</details>

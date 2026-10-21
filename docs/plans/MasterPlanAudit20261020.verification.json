@@ -1,0 +1,18 @@
+{
+  "master": "27de3f5a02aadde7456aab680db3184c36ee735e",
+  "planDocuments": 66,
+  "sourceFilesVerified": 59,
+  "sourceCitationsVerified": 228,
+  "preservedAnchors": 2831,
+  "dashboardRows": 452,
+  "cancelledRows": 15,
+  "allDocumentationFilesInspected": 971,
+  "localLinksInspected": 6088,
+  "inheritedLinkDefects": 0,
+  "removedInheritedLinkDefects": 955,
+  "newLinkDefects": 0,
+  "planLinkDefects": 0,
+  "problems": [],
+  "visualPagesVerified": 67,
+  "inheritedDetails": []
+}

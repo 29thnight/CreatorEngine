@@ -1,5 +1,43 @@
 # PHASE 12 — 저장 대기 중 WM_CLOSE 종료 경로 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/App.cpp:308](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L308) — `PrefabEditors->TickAutomaticSave(true);`
+- [Editor/EngineEntry/App.cpp:348](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L348) — `void Core::App::RegisterHandler(WindowsCoreWindow& coreWindow)`
+- [Editor/EngineEntry/App.cpp:667](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L667) — `LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)`
+- [Editor/EngineGUIWindow/EditorWindowChrome.cpp:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.cpp#L40) — `WidenUtf8(EditorSettingsStore::Get().Build().GetProjectName());`
+- [Editor/EngineGUIWindow/EditorWindowChrome.cpp:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.cpp#L45) — `EditorWindowChrome& EditorWindowChrome::Get() noexcept`
+- [Editor/EngineGUIWindow/EditorWindowChrome.cpp:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.cpp#L51) — `void EditorWindowChrome::Attach(HWND windowHandle) noexcept`
+- [Tools/regression/verify-texture-pending-native-close.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-pending-native-close.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-pending-native-close.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-pending-native-close.ps1#L9) — `$fixture = [IO.Path]::GetFullPath($FixtureProject)`
+- [Tools/regression/verify-texture-pending-native-close.ps1:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-pending-native-close.ps1#L12) — `$root = [IO.Path]::GetFullPath($root)`
+- [Editor/EngineGUIWindow/EditorWindowChrome.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.h#L8) — `struct EditorTitleBarLayout`
+- [Editor/EngineGUIWindow/EditorWindowChrome.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.h#L18) — `inline EditorTitleBarLayout LayoutEditorTitleBar(float width, float height, float scale) noexcept`
+- [Editor/EngineGUIWindow/EditorWindowChrome.h:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorWindowChrome.h#L45) — `class EditorWindowChrome final`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 방법과 변경
 
 제목 표시줄 닫기 버튼은 `EditorWindowChrome.cpp`에서 `PostMessageW(WM_CLOSE)`를 보내며
@@ -32,12 +70,12 @@ DX12 pending0/0/0, 실행 전후 runtime hash를 판정한다.
 GUID·PNG·저장 씬 보존과 DX12 pending task/batch/retirement0/0/0을 확인했다.
 입력7파일 sourceDrift0과 실행 전후 runtime hash 일치를 확인했다. 판정기 hash는 최종
 수정본을 별도로 기록한다. Debug/Release 라이브러리·host 빌드도 통과했으며
-[최종 빌드 receipt](../../Build/TexturePendingNativeClose/build-result.json)를 남긴다.
+최종 빌드 receipt (`../../Build/TexturePendingNativeClose/build-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)를 남긴다.
 
 Release2회는 잘리지 않은 Inspector를 조작하기 위해 실제 최대화 버튼을 눌렀다. 창 크기
 변경 관찰이며 DPI 변경·다중 창·모든 control clipping의 수용 증거로 확대하지 않는다.
 
-[최종 receipt·소스 hash](../../Build/TexturePendingNativeClose/result.json)에 각 실행 루트와
+최종 receipt·소스 hash (`../../Build/TexturePendingNativeClose/result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 각 실행 루트와
 age, 종료 상태, 보존 판정을 남긴다. 각 루트의 launch.json, commands.jsonl, editor.out/err,
 exit.json과 격리 프로젝트를 보존한다. 실제 UI 입력 화면은 이번 대화의 도구 캡처로 관찰했다.
 
@@ -53,3 +91,5 @@ runtime으로 다시 실행하며 이 첫 실행을 최종 수용 횟수에 포�
 실제 클릭을 구분하며,400ms 안의 제목 표시줄 클릭·다중 창/배율·다른 실패 유형 반복·
 RenderProfile UI/GPU 및 전체 소비자 검증은 남긴다. 한정된 fixture age는 성능 수용값이
 아니다. 12-0-D 후속 보강으로 추가 가중치 없이66.25%(표시66%), T1b 대기·T3 중단을 유지한다.
+
+</details>

@@ -1,5 +1,40 @@
 # PHASE 21 W1 — 실제 화면·OS DPI 전환 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L45) — `const float denom = math::dot(planeNormal, ray.direction);`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L47) — `if (std::fabs(denom) < 1e-6f)`
+- [Editor/EngineGUIWindow/SceneViewWindow.cpp:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.cpp#L51) — `const float t = math::dot(diff, planeNormal) / denom;`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L10) — `class GizmoRenderer;`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L38) — `const std::vector<gc::trace_ref<Entity>>& slots);`
+- [Editor/EngineGUIWindow/SceneViewWindow.h:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/SceneViewWindow.h#L42) — `const Ray& ray, const std::vector<gc::trace_ref<Entity>>& slots);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31) — `enum class EnhancedLiveDisplayTarget : uint8_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39) — `enum class EnhancedLiveViewFlags : uint32_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:1992](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L1992) — `preparation->progress = std::move(progress);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:2026](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L2026) — `preparation->progress.error = std::move(reason);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3154](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3154) — `std::printf("[render.pipeline.progress] phase=%s\n", phase);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-11, 기존 W1 Material Symbols 적용 Debug/Release 실행 파일과 현재 작업 트리 기준.
 [정본 계획](../plans/EditorWorkspaceRedesignPlan.md) ·
 [폰트 적용·자동 회귀](EditorMaterialSymbolsW1Validation.md) ·
@@ -109,3 +144,5 @@ Release 62.719ms로 줄었다. Scene·Game이 새 generation을 표시하는 것
 이전 Vulkan device loss는 이번에 수정·재검증하지 않았다.
 이후 사용자가 Vulkan 대응을 우선 보류하기로 결정해 현재 W1은 **DX12 기준 `done`**이다.
 Vulkan 오류는 별도 보류하며 해결된 것으로 세지 않는다.
+
+</details>

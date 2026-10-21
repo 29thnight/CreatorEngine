@@ -1,33 +1,64 @@
 # 종료·대체된 계획 보관함
 
-정리일: 2026-09-06. 완료·선택 중단·후속 계획으로 승계된 문서 19종을 보관한다.
-보관은 원래 범위의 종료를 뜻한다. 새 빌드·런타임 검증을 수행했다는 뜻이 아니며,
-선택 중단·이관 작업·검증 한계는 아래와 각 원문에 남긴다. 원문의 과거 제안·측정은 당시 기록으로 읽는다.
+> 2026-10-20 정리 · master `27de3f5a02aadde7456aab680db3184c36ee735e` · 종료/승계 문서
 
-[활성 계획 색인](../../README.md#plans) · [대시보드](../../RefactoringPlanDashboard.html) · [종료 페이즈 이력](../../RefactoringPlanDashboard.html#closed-phases)
+판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
 
-| 문서 | 종료 분류 | 근거와 남은 경계 |
-|---|---|---|
-| [AssetResidencyPlan.md](AssetResidencyPlan.md) | 완료 | 2026-08-15 갱신: DX12/Vulkan 상주·퇴출·completion 수명 경로 완료. 후속 메모리 설계는 별도 범위. |
-| [BehaviorTreeManagedPlan.md](BehaviorTreeManagedPlan.md) | 엔진 범위 완료 | PHASE 9의 9-8·9-10 완료 기록. 기존 게임 BT 콘텐츠 43종 이식은 별도 잔여이며 엔진 완료로 대신하지 않는다. |
-| [LifecycleRedesignPlan.html](LifecycleRedesignPlan.html) | 완료 | PHASE 9 종료. 현재 컴포넌트 수명 계약은 SceneGraphRedesignPlan과 스크립트 안정화 기록을 함께 참조한다. |
-| [LivePipelineDescPlan.md](LivePipelineDescPlan.md) | 완료 | PHASE 3의 3-13 완료. 초기 문서의 전용 CLI 제안은 채택하지 않았고 진단은 기존 창·회귀 명령에 통합했다. 후속은 PHASE 4.75. |
-| [MaterialPipelinePlan.md](MaterialPipelinePlan.md) | 완료 | PHASE 3.5 M0~M7 종료. 현재 PBR 배선 수정은 PHASE 4, Material Graph는 PHASE 4.25에서 진행한다. |
-| [ModelAssetBigBangCutoverPlan.md](ModelAssetBigBangCutoverPlan.md) | 완료 | 2026-09-04 MBC11 cutover·PHASE 3.75 종료 기록. 임베디드 텍스처 디코드는 PHASE 12 T1a/T2로 이관했고 비회귀 기준은 유지한다. |
-| [ModelAssetBigBangCutoverBaseline.md](ModelAssetBigBangCutoverBaseline.md) | 완료 계획의 기준선 | PHASE 3.75 MBC0/MBC11의 동결·재유도 근거. 기존 예산·회귀 스크립트의 참조 자료로 계속 보존한다. |
-| [MultiCameraRenderPlan.md](MultiCameraRenderPlan.md) | 완료 | 다중 뷰 구현 기록. §0의 2026-08-24 카메라 아키텍처 이행 계약과 검증 근거를 보존한다. |
-| [Phase5CouplingPlan.md](Phase5CouplingPlan.md) | 완료·선택 중단 | PHASE 5 종료. 5-5의 포괄적 폴더 재구성은 중단했고 후속 계층·빌드 작업은 각 활성 계획이 소유한다. |
-| [ReflectionRedesignPlan.md](ReflectionRedesignPlan.md) | 완료 | PHASE 18 CT0~CT11 종료. 매크로 없는 reflect()/meta::schema 계약과 검증 기록을 보존한다. |
-| [RenderSceneViewPlan.md](RenderSceneViewPlan.md) | 완료 | PHASE 3의 3-14 완료. 카메라 후속 이행은 MultiCameraRenderPlan §0을 참조한다. |
-| [RhiBoundaryPlan.md](RhiBoundaryPlan.md) | 완료 | PHASE 3의 3-1 및 필수 RHI 구조 작업 종료. GPU 메모리 후속 설계와 PHASE 4.75 확장은 별도 범위. |
-| [SceneGraphRedesignPlan.md](SceneGraphRedesignPlan.md) | 완료 | PHASE 8.5의 전체 트랙 종료. 조건부 S4는 PHASE 8.75 X8로 승계되어 완료됐다. |
-| [ScriptLifecycleContractHardeningPlan.md](ScriptLifecycleContractHardeningPlan.md) | 완료·검증 한계 명시 | LC0~LC7 종료. LC6 변경은 측정 후 보류. LC7 일시 정지 중 대기와 세대 게이트 변이 판정은 미검증으로 남아 있으며 PrSM 도입 완료를 뜻하지 않는다. |
-| [TransformUpdatePlan.md](TransformUpdatePlan.md) | 완료·선택 중단 | PHASE 8.75 X0~X8 완료, X9 선택 확장 중단. Windows 제품 TSan 미지원 등 검증 경계는 원문 그대로 유지한다. |
-| [ModelImportPipelinePlan.md](ModelImportPipelinePlan.md) | 대체됨 | 2026-09-02 PHASE 3.75로 대체. 구 I/V experiment 계획은 구현·측정·실패의 역사 자료다. |
-| [ScriptApiMigrationPlan.html](ScriptApiMigrationPlan.html) | 승계됨 | 기존 API 이전 기록. 폐기된 T1~T4 표면 등급 대신 PHASE 9.5 ScriptSurfacePlan을 따른다. |
-| [TransformExecutionGraphPlan.md](TransformExecutionGraphPlan.md) | 통합됨 | 2026-08-25 TransformUpdatePlan으로 통합된 제안과 절 매핑. |
-| [TransformUpdatePipeline.html](TransformUpdatePipeline.html) | 구판 | 폐기된 T0~T5 기준의 시각화. 최종 X0~X9 계약은 TransformUpdatePlan에 있다. |
+[전체 문서 대조·충돌 판정](../MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/archive/README.md)
 
-후속 작업의 정본은 [PBR 배선](../PBRWiringStabilizationPlan.md), [Material Graph](../BlenderMaterialGraphPlan.md),
-[텍스처 파이프라인](../TexturePipelinePlan.md), [스크립트 표면](../ScriptSurfacePlan.md),
-[미래 효과 계약](../SimulationEffectContractPlan.md) 등 활성 계획을 따른다. 미래 계획은 보관 대상이 아니다.
+## 남은 작업과 완료 판정
+
+- 이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.
+
+## 적용할 구조와 경계
+
+`SceneManager → GC roots → Scene → Entity → Component; handle invalidation and lifecycle cleanup precede collection`
+
+위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.
+
+## 보존한 이전 진입점
+
+- [AssetResidencyPlan](AssetResidencyPlan.html) → [AssetDepotImplementationPlan](../AssetDepotImplementationPlan.md)
+- [BehaviorTreeManagedPlan](BehaviorTreeManagedPlan.html) → [LatticeAdoptionPlan](../LatticeAdoptionPlan.md)
+- [LifecycleRedesignPlan](LifecycleRedesignPlan.html) → [NativeObjectMemoryPolicyPlan](../NativeObjectMemoryPolicyPlan.md)
+- [MaterialPipelinePlan](MaterialPipelinePlan.html) → [BlenderMaterialGraphPlan](../BlenderMaterialGraphPlan.md)
+- [ModelAssetBigBangCutoverBaseline](ModelAssetBigBangCutoverBaseline.html) → [AssetDepotImplementationPlan](../AssetDepotImplementationPlan.md)
+- [ModelAssetBigBangCutoverPlan](ModelAssetBigBangCutoverPlan.html) → [AssetDepotImplementationPlan](../AssetDepotImplementationPlan.md)
+- [ModelImportPipelinePlan](ModelImportPipelinePlan.html) → [AssetDepotImplementationPlan](../AssetDepotImplementationPlan.md)
+- [MultiCameraRenderPlan](MultiCameraRenderPlan.html) → [EditorWorkspaceRedesignPlan](../EditorWorkspaceRedesignPlan.md)
+- [Phase425ImplementationHistory](Phase425ImplementationHistory.html) → [BlenderMaterialGraphPlan](../BlenderMaterialGraphPlan.md)
+- [Phase5CouplingPlan](Phase5CouplingPlan.html) → [EngineLayerSeparationPlan](../EngineLayerSeparationPlan.md)
+- [ReflectionRedesignPlan](ReflectionRedesignPlan.html) → [SerializationPlan](../SerializationPlan.md)
+- [RenderSceneViewPlan](RenderSceneViewPlan.html) → [EditorWorkspaceRedesignPlan](../EditorWorkspaceRedesignPlan.md)
+- [RhiBoundaryPlan](RhiBoundaryPlan.html) → [RenderGraphDependencySchedulingPlan](../RenderGraphDependencySchedulingPlan.md)
+- [SceneGraphRedesignPlan](SceneGraphRedesignPlan.html) → [NativeObjectMemoryPolicyPlan](../NativeObjectMemoryPolicyPlan.md)
+- [ScriptApiMigrationPlan](ScriptApiMigrationPlan.html) → [ScriptSurfacePlan](../ScriptSurfacePlan.md)
+- [ScriptLifecycleContractHardeningPlan](ScriptLifecycleContractHardeningPlan.html) → [ScriptSurfacePlan](../ScriptSurfacePlan.md)
+- [TransformExecutionGraphPlan](TransformExecutionGraphPlan.html) → [NativeObjectMemoryPolicyPlan](../NativeObjectMemoryPolicyPlan.md)
+- [TransformUpdatePipeline](TransformUpdatePipeline.html) → [NativeObjectMemoryPolicyPlan](../NativeObjectMemoryPolicyPlan.md)
+- [TransformUpdatePlan](TransformUpdatePlan.html) → [NativeObjectMemoryPolicyPlan](../NativeObjectMemoryPolicyPlan.md)
+
+## master 소스 근거
+
+모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.
+
+- [Engine/SceneRuntime/SceneManager.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L33) — `gc::domain m_gcDomain;`
+- [Engine/SceneRuntime/Scene.h:276](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L276) — `class [[reflgen::reflect]] Scene : public gc::managed`
+- [Engine/SceneRuntime/Entity.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L21) — `class [[reflgen::reflect]] Entity : public Object, public gc::managed`
+- [Engine/SceneRuntime/Component.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L14) — `class [[reflgen::reflect]] Component : public meta::identity<Component, Object>, public gc::managed`
+- [Engine/SceneRuntime/SceneGC.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneGC.h#L5) — `#include "../../ThirdParty/GCCE/include/gc/gc.hpp"`
+- [Engine/SceneRuntime/DetachedEntityTransfer.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/DetachedEntityTransfer.h#L12) — `gc::root_ref<Entity> entity{};`
+- [Engine/SceneRuntime/SceneManager.cpp:304](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L304) — `gc::domain& SceneManager::ManagedDomain()`
+- [Editor/RenderTests/Tasks/SceneGCSelfTest.cpp:161](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/Tasks/SceneGCSelfTest.cpp#L161) — `void gc_trace(gc::tracer& tracer) const override`
+- [Tools/regression/verify-scene-gc.ps1:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-gc.ps1#L18) — `'Editor/RenderTests/Tasks/SceneGCSelfTest.cpp',`
+
+## 검증 경계
+
+이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.
+
+<details><summary>이전 절 링크 호환</summary>
+
+이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.
+
+
+</details>

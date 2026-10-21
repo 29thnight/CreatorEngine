@@ -1,5 +1,46 @@
 # Balanced 검증과 Hierarchy 반복자 크래시
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/EditorMain.h:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L2) — `class ProjectLayerSettings;`
+- [Editor/EngineEntry/EditorMain.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L5) — `class AudioHost;`
+- [Editor/EngineEntry/EditorMain.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.h#L6) — `class PlaybackService;`
+- [Editor/EngineGUIWindow/HierarchyWindow.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L6) — `class Entity;`
+- [Editor/EngineGUIWindow/HierarchyWindow.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L7) — `class HierarchyWindow`
+- [Editor/EngineGUIWindow/HierarchyWindow.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.h#L9) — `public:`
+- [Engine/SceneRuntime/TemporalMotionFixture.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TemporalMotionFixture.h#L5) — `enum class TemporalMotionFixtureState : std::uint8_t`
+- [Engine/SceneRuntime/TemporalMotionFixture.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TemporalMotionFixture.h#L10) — `struct TemporalMotionFixtureStatus`
+- [Engine/SceneRuntime/TemporalMotionFixture.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TemporalMotionFixture.h#L22) — `class TemporalMotionFixture`
+- [Editor/EngineEntry/EditorMain.cpp:74](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp#L74) — `auto* window = WindowsCoreWindow::GetForCurrentInstance();`
+- [Editor/EngineEntry/EditorMain.cpp:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp#L81) — `Editor::EditorMain::EditorMain()`
+- [Editor/EngineEntry/EditorMain.cpp:991](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp#L991) — `void Editor::EditorMain::OnGui()`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:240](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L240) — `void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_flat_row& row)`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:370](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L370) — `void HierarchyWindow::Draw()`
+- [Editor/EngineGUIWindow/HierarchyWindow.cpp:680](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/HierarchyWindow.cpp#L680) — `const auto& flatRows = m_flat.Rows(scene, flatKey, m_searchFilter);`
+- [Engine/SceneRuntime/TemporalMotionFixture.cpp:280](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TemporalMotionFixture.cpp#L280) — `session.status.error += " Cleanup is pending: " + std::string(exception.what());`
+- [Engine/SceneRuntime/TemporalMotionFixture.cpp:904](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TemporalMotionFixture.cpp#L904) — `void TemporalMotionFixture::TickAfterAnimation()`
+- [Engine/SceneRuntime/TemporalMotionFixture.cpp:1188](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TemporalMotionFixture.cpp#L1188) — `void TemporalMotionFixture::TickAfterAnimation()`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 발견
 
 자동 DLSS Balanced Debug 검증 PID 728에서 `can't decrement invalidated vector iterator` 단정이 발생했다. 사용자는 에디터를 조작하지 않았다고 확인했다. 첫 캡처 전 종료 코드 `0x80000003`으로 종료됐으며 최초 실패는 성공으로 대체하지 않는다.
@@ -27,3 +68,5 @@ fixture가 Preparing/Running 상태인 동안 Editor GameLogic을 동일한 씬 
 수정 후 Debug/Release 빌드 및 34캡처 통과. 각 구성 history 506단정 통과, GPU validation 메시지/문제/누락 0, 정상 종료 0. 17프레임 × 12 attachment 해시가 수정 전후와 D/R 간 동일했다. 최초 간헐 크래시를 강제로 반복 재현한 결정론적 테스트는 없으며, 확인된 동기화 누락을 수정하고 제품 실행으로 검증한 범위다.
 
 최종 성공 대표 frame-1 두 개(원본 34개)와 최초 실패 기록/덤프를 보존했다. 마지막 정리에서 실제 1.55 GiB 회수, 여유 85.29 GiB를 확인했다. 중간 성공 및 최종 전체 시퀀스는 판정/manifest/해시만 남아 전체 픽셀 재생은 불가하다.
+
+</details>

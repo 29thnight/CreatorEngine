@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Graph Scene generation 준비와 마지막 정상 재질</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSceneGeneration.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSceneGeneration.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Graph Scene generation 준비와 마지막 정상 재질</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L41">Engine/Utility_Framework/TypeTrait.h:41</a> — <code>inline constexpr bool is_gc_strong_ref_v&lt;gc::trace_ref&lt;T&gt;&gt; = true;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L43">Engine/Utility_Framework/TypeTrait.h:43</a> — <code>inline constexpr bool is_gc_strong_ref_v&lt;gc::root_ref&lt;T&gt;&gt; = true;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L52">Engine/Utility_Framework/TypeTrait.h:52</a> — <code>constexpr bool is_shared_ptr_v&lt;own::shared_owner&lt;T&gt;&gt; = true;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4">Tools/regression/verify-material-raster-surface.ps1:4</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string[]]$Configurations = @(&#39;Debug&#39;,&#39;Release&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9">Tools/regression/verify-material-raster-surface.ps1:9</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10">Tools/regression/verify-material-raster-surface.ps1:10</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-generation.ps1#L8">Tools/regression/verify-material-vulkan-generation.ps1:8</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-generation.ps1#L9">Tools/regression/verify-material-vulkan-generation.ps1:9</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-vulkan-generation.ps1#L10">Tools/regression/verify-material-vulkan-generation.ps1:10</a> — <code>$vswhere = Join-Path ${env:ProgramFiles(x86)} &#39;Microsoft Visual Studio\Installer\vswhere.exe&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L28">Engine/RenderEngine/RHI/RHIRecordedBatch.h:28</a> — <code>enum class RHIRecordedBatchState : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L55">Engine/RenderEngine/RHI/RHIRecordedBatch.h:55</a> — <code>MoveFrom(std::move(other));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L63">Engine/RenderEngine/RHI/RHIRecordedBatch.h:63</a> — <code>MoveFrom(std::move(other));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L17">Engine/RenderEngine/MaterialGraphSceneVolume.h:17</a> — <code>struct SceneVolumeTriangle</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L31">Engine/RenderEngine/MaterialGraphSceneVolume.h:31</a> — <code>own::shared_owner&lt;const RenderBindings&gt; material;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneVolume.h#L89">Engine/RenderEngine/MaterialGraphSceneVolume.h:89</a> — <code>void ShutdownAfterIdle();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L10">Engine/RenderEngine/MaterialGraphSceneSubsurface.h:10</a> — <code>struct SceneSubsurfaceReflection</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L12">Engine/RenderEngine/MaterialGraphSceneSubsurface.h:12</a> — <code>math::vector4 metalSingleAlbedo, metalAverage;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSubsurface.h#L61">Engine/RenderEngine/MaterialGraphSceneSubsurface.h:61</a> — <code>void ShutdownAfterIdle();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L10">Engine/RenderEngine/MaterialGraphSceneRefraction.h:10</a> — <code>struct SceneRefractionSample</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L12">Engine/RenderEngine/MaterialGraphSceneRefraction.h:12</a> — <code>math::vector4 glassSingleAlbedo, glassAverage, glassEnvironment, rawTransmission, radiance;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneRefraction.h#L64">Engine/RenderEngine/MaterialGraphSceneRefraction.h:64</a> — <code>void ShutdownAfterIdle();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h#L121">Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h:121</a> — <code>class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSignatureCache</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h#L124">Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h:124</a> — <code>explicit VulkanPipelineCache(job_scheduler&amp; scheduler = ce::get_job_scheduler()) : m_scheduler(scheduler) {}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h#L125">Engine/RenderEngine/RHI/Vulkan/VulkanPipelineCache.h:125</a> — <code>&amp;#126;VulkanPipelineCache() override;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>2026-09-29 · MAT-7 완료. Core/Layered·SSS·transmission Scene host의 준비·교체 경계.</strong></p>
+<h2>1. 설치 범위</h2>
+<p><code>SceneHost::SelectReadyInput</code>을 실제 DX12/Vulkan <code>EnhancedSceneRenderer</code>의
+texture residency·native parallel prefix 이전에 연결했다. 불변 generation을 준비하는
+동안 같은 Scene epoch·view·Material 슬롯의 마지막 정상 재질을 사용한다.
+geometry·world·pose·camera는 현재 밀봉한 입력을 사용한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>단계</th>
+<th>실행 위치와 게시 조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>요청</td>
+<td>render owner에서 generation/backend별 중복 제거·route 검사·source 소유</td>
+</tr>
+<tr>
+<td>Slang 검증</td>
+<td>scheduler worker에서 VS·GBuffer·Color·Lookup0/1·Shadow VS/PS·SSS/Refraction Capture, DXIL·SPIR-V 검증</td>
+</tr>
+<tr>
+<td>layout·PSO 준비</td>
+<td>owner가 reflected layout과 Surface Core/Layered 9개·SSS 또는 transmission 11개·혼합 13개 PSO의 소유 descriptor 작성 (shadow 포함)</td>
+</tr>
+<tr>
+<td>native PSO</td>
+<td>DX12/Vulkan worker; owner poll은 호출당 PSO 요청 1개, pending을 기다리지 않음</td>
+</tr>
+<tr>
+<td>frame 선택</td>
+<td>Surface generation의 9/11/13개 PSO가 모두 ready, 아니면 같은 슬롯의 마지막 정상 instance·coverage</td>
+</tr>
+<tr>
+<td>제출 게시</td>
+<td>fully recorded graph의 정확한 completion·티켓 성공 확인 뒤 lookup·재질 슬롯 게시</td>
+</tr>
+<tr>
+<td>해제</td>
+<td>GPU completion 이후 recording owner 회수; 새 요청의 stale 제출은 활성 슬롯 교체 거부</td>
+</tr>
+</tbody></table></div>
+<p>Slang 작업은 host·device·root/PSO cache를 캡처하지 않는다. source·경로·generation과
+컴파일 결과를 독립 소유한다. task가 host보다 늦게 끝나도 host 메모리를 접근하지 않는다.
+owner는 완료된 task만 읽으며, 이미 완료된 job/ticket의 결과 확인 외에는 기다리지 않는다.</p>
+<p>Vulkan도 <code>RequestGraphics</code>를 override한다. bytecode·입력 element·semantic 문자열을
+복사한 요청을 scheduler worker에서 생성하고, owner가 완료 결과만 native handle 표에 게시한다.
+mesh transform·lookup 초기 CS 설치와 root layout 생성도 아직 owner의 동기 초기화다.
+따라서 Scene의 모든 최초 준비 비용이 비동기가 되었다고 표현하지 않는다.</p>
+<h2>2. 슬롯·원자적 선택</h2>
+<p>producer의 <code>SceneMaterialSource::Capture(Material)</code>은 runtime Material GUID를 복사한다.
+이는 graph GUID·instance 주소·mesh geometry key와 별도의 슬롯 신원이다.
+동일 Material의 여러 draw는 같은 instance와 coverage를 요구하며, 충돌하면 선택을 거부한다.</p>
+<p>슬롯 키는 <code>(sceneEpoch, viewId, materialSlot)</code>이다. 제출 성공한 instance와 coverage를
+한 쌍으로 저장한다. 새 요청이 pending·실패·미설치 Blended이면 그 쌍을 선택한다.
+cold 슬롯은 마지막 정상 재질이 없으므로 해당 draw만 준비 완료까지 생략한다.
+다른 준비 완료 슬롯과 legacy draw는 계속 렌더한다.</p>
+<ul>
+<li>generation·layout·shader·PSO는 불변 Program에 묶인다. PSO 일부 성공은 ready가 아니다.</li>
+<li>새 numeric instance는 같은 ready generation을 재컴파일하지 않는다.</li>
+<li>fallback에도 현재 geometry를 사용한다. 이전 frame의 upload slice를 새 recording에 재사용하지 않는다.</li>
+<li>슬롯별 request revision이 바뀌면 이전에 기록한 제출의 재질 게시를 거부한다.
+그 제출의 물리 렌더와 lookup 결과는 별도로 검증할 수 있다.</li>
+<li>해당 view의 Scene epoch 변경·슬롯 제거는 이전 active 재질을 제거한다.
+현재 frame이 아닌 빈 입력은 슬롯을 지우지 못한다.</li>
+<li>삭제·실패·취소가 legacy 재질 변환을 의미하지 않는다. 기존 자산 변환은 이번 범위에 없다.</li>
+</ul>
+<h2>3. 제출과 수명</h2>
+<p>parallel batch의 completion과 뒤따르는 <code>EndFrame</code> completion은 서로 다를 수 있다.
+live consumer는 <code>RHIRecordedBatch::GetCompletionPoint()</code>와 그 batch의
+<code>RHISubmissionTicket</code>을 전달한다. 예약된 upload notification만으로 성공을 게시하지 않는다.</p>
+<p>티켓이 pending이면 publication frame·티켓을 보관하고 다음 owner poll에서 완료를 확인한다.
+그때까지 active 슬롯과 lookup history는 교체하지 않는다. 티켓 성공 후에만 완전한
+lookup 기록과 정확한 recording/frame/completion을 검증하고 게시한다.
+그 사이 새 요청·Scene epoch 변경이 있으면 오래된 revision의 active 교체는 거부한다.
+오프스크린 순차 검증의 빈 티켓은 앞선 성공적인 CPU submission drain을 호출자의 전제로 한다.</p>
+<p>abort는 recording owner를 제거하고 active 슬롯을 보존한다. 제출한 GPU 자원은 completion까지
+graph/batch/host recording owner가 유지한다. host shutdown은 submission과 GPU를 drain한 뒤,
+device보다 먼저 수행한다. worker source 작업은 자체 owner로 scheduler drain까지 유지된다.</p>
+<h2>4. 예산과 남은 경계</h2>
+<p>generation 준비는 host별 한 번에 Slang 작업 1개, admission 64개로 제한한다.
+CPU ready Program 캐시는 32개를 넘으면 슬롯·in-flight owner가 없는 항목을 정리한다.
+준비 record가 16개를 넘으면 현재 슬롯이 요구하지 않는 실패 memo를 정리한다.
+이는 엄격한 LRU나 전체 native PSO 메모리 예산이 아니다.</p>
+<p>공유 native PSO/layout handle을 임의 invalidation하면 다른 consumer도 stale이 된다.
+따라서 CPU record 정리와 global native cache eviction은 분리했다. 전체 shader source
+디스크 캐시·native PSO/layout eviction·메모리 수용은 후속 작업이다.</p>
+<p>자동 Scene host/compiler 쿠킹·packaged 실행은 <a href="MaterialGraphSceneCook.html">MaterialGraphSceneCook.md</a>,
+Volume transport는 <a href="MaterialGraphSceneVolume.html">MaterialGraphSceneVolume.md</a>,
+LX shadow caster·Decal은 <a href="MaterialGraphSceneShadowDecal.html">MaterialGraphSceneShadowDecal.md</a>의
+후속 구현으로 완료했다. 실제 Editor Live Tick·Vulkan 전체 Scene 실행도
+<a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>의 Debug/Release 검증으로 완료했다.
+SSS의 실제 transport와 근사 한계는 <a href="MaterialGraphSceneSubsurface.html">MaterialGraphSceneSubsurface.md</a>가 소유한다.
+transmission/refraction의 배경·자원·계산·검증 계약은
+<a href="MaterialGraphSceneRefraction.html">MaterialGraphSceneRefraction.md</a>가 소유한다.
+초기 CS 전체 비동기화·전역 cache 최적화는 별도 개선이며, 일반 Scene의 최종 cold/카메라 이동
+시간·메모리 수용은 MAT-9에서 판정한다.</p>
+<h2>5. 검증</h2>
+<p><code>Tools/regression/verify-material-raster-surface.ps1 -SkipDependencyRestore</code>는
+실제 <code>EnhancedGBufferPass</code>·<code>EnhancedDeferredPass</code>·Scene host를 사용한다.
+12프레임의 generation fixture는 다음을 native D3D12에서 검사한다.</p>
+<ol>
+<li>worker를 지연시키고 pending B·더 최신 C 요청에도 기존 A·Opaque coverage 유지.</li>
+<li>더 오래된 B가 먼저 준비되어도 현재 C 요청을 대신하지 않음.</li>
+<li>C의 PSO 9개가 모두 준비된 후 정확한 instance·double-sided coverage 선택.</li>
+<li>Slang 오류 및 PSO 4개 성공 뒤 5번째 실패에 기존 재질 유지·실패 memo 중복 컴파일 방지.</li>
+<li>recording abort·아직 완료되지 않은 실제 제출 티켓에 active 게시 금지.</li>
+<li>기록 뒤 새 요청이 들어온 C 제출의 stale 활성 교체 거부.</li>
+<li>같은 ready C generation의 numeric instance 교체에 추가 Slang 작업 없음.</li>
+<li>Scene epoch 변경 시 이전 epoch의 fallback 금지.</li>
+</ol>
+<p>Slang/PSO 오류는 host 준비 경계의 테스트용 generation 사본과 cache wrapper에 주입한다.
+일반 LXMC decode·cook integrity 검사는 기존 제품 회귀가 소유한다.</p>
+<p>현재 geometry·coverage·44개 material 입력·36개 IBL 성분·HDR half 출력과 shared depth/owner를
+독립 CPU 기준으로 대조한다. 기존 물리 <code>1e-4</code>, SRGB/필터 transport <code>1e-3</code>,
+LOD <code>5e-4</code>, HDR half 상대 <code>1e-3</code> 게이트를 변경하지 않는다.</p>
+<p>같은 108개 source SHA-256을 고정한 Debug/Release 빌드·native D3D12 실행이 통과했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검증</th>
+<th>각 구성의 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전체 raster/material/IBL 회귀</td>
+<td>21,079,762개 검사 · GPU 3,899,966성분</td>
+</tr>
+<tr>
+<td>실제 GBuffer·Deferred·LX 합성</td>
+<td>56 graph · 가시 45,626픽셀 · 실패 거부 312개</td>
+</tr>
+<tr>
+<td>신규 generation 시나리오</td>
+<td>12프레임 · 이전 재질 유지 7회 · abort 1회</td>
+</tr>
+<tr>
+<td>제출 보호</td>
+<td>pending native ticket 1회 · stale 활성 게시 거부 1회</td>
+</tr>
+<tr>
+<td>shader 준비</td>
+<td>정확한 generation 6개 · worker 실행 6회 · 실패 memo 2개</td>
+</tr>
+<tr>
+<td>native PSO 준비</td>
+<td>DX12 worker 실행 24회 · 일부 PSO만 성공한 candidate 게시 거부</td>
+</tr>
+<tr>
+<td>정확한 Scene lookup</td>
+<td>새 적분 21,901픽셀 · 재사용 23,725픽셀</td>
+</tr>
+<tr>
+<td>기존 물리 정규화 최대 오차</td>
+<td><code>0.0000859499</code> (기준 <code>0.0001</code>)</td>
+</tr>
+<tr>
+<td>D3D12 GPU validation</td>
+<td>DebugLayer/GPUValidation on · WARNING 이상 0건</td>
+</tr>
+</tbody></table></div>
+<p>실행 로그는 <code>Build/Obj/MaterialProductProbe/scene-generation-{Debug,Release}.log</code>,
+source manifest는 <code>scene-generation-source-hashes.json</code>, 최종 gate는
+<code>scene-generation-gate-final.log</code>다. gate는 회귀 script의 최종 signature와 source drift를 검사한다.
+기존 <code>compiled=24</code>는 고정 raster 회귀 artifact 수이며 신규 Scene generation 수와 합산하지 않는다.</p>
+<p>1920×1080 희소 coverage의 기존 GPU timer는 Debug cold/warm <code>22.3713/3.64717 ms</code>,
+Release <code>124.146/2.7024 ms</code>였다. GPU validation을 켠 단회 기록이며 dense Scene 또는
+steady-state 실시간 성능 수용으로 사용하지 않는다. cold 변동·메모리/초기화 비용은 후속이다.
+실제 Editor Live Tick과 native Vulkan 실행은 앞선 D3D12 회귀에 포함하지 않았다.</p>
+<h2>6. Vulkan native PSO 준비 (2026-09-29)</h2>
+<p><code>VulkanPipelineCache</code>의 native graphics 작업은 cache/host를 캡처하지 않는다.
+owned request와 native device/layout만 유지한다. layout과 device는 cache의 <code>Shutdown</code>
+join 이전에 해제하면 안 된다. GPU idle·cache shutdown·device shutdown 순서를 유지한다.</p>
+<ul>
+<li><code>RequestGraphics</code>는 Pending을 기다리지 않는다. legacy <code>GetOrCreate</code>는 같은 accepted
+작업을 동기 소비할 수 있으며, 별도의 native 컴파일을 중복 제출하지 않는다.</li>
+<li>같은 descriptor의 실패는 diagnostic과 함께 memo한다. 전체 invalidation은 실패 memo도 지운다.</li>
+<li>전체 invalidation은 accepted 작업을 abandoned 목록으로 옮긴다. 그 결과는 새 캐시에
+게시하지 않고 완료 확인 후 파괴한다. 기존 published handle은 generation을 올려 retire한다.</li>
+<li>pending·failed memo·abandoned record의 합은 64개다. abandoned 작업도 완료까지 admission을
+점유한다. 무효화는 worker를 기다리지 않으며 종료의 join만 lifecycle 경계에서 기다린다.</li>
+<li>graphics/compute shader module은 native PSO 생성 호출 후 성공·실패 모두 해제한다.
+worker가 공유 module 배열을 변경하지 않는다. native <code>VkPipelineCache</code>는 아직 사용하지 않는다.</li>
+<li>native stage는 SPIR-V 산출물의 실제 <code>OpEntryPoint</code> 이름을 사용한다. 기존의
+<code>VSMain/PSMain/CSMain</code> 고정값 때문에 <code>LXSceneVS</code> 등 생성 셰이더 설치가 실패하던 문제를 수정했다.
+stage 불일치·잘린 instruction·빈/중복 entry는 native 호출 전에 실패한다.
+이 검사는 전체 SPIR-V validator를 대신하지 않는다.</li>
+</ul>
+<p><code>Tools/regression/verify-material-vulkan-generation.ps1 -SkipDependencyRestore</code>는 source SHA-256을
+고정하고 Debug/Release 엔진·probe를 빌드한 뒤 Vulkan validation layer를 켜서 실행한다.</p>
+<ol>
+<li>worker를 막은 Pending·반복 poll에 owner 생성/대기·중복 job 없음.</li>
+<li>요청 이후 원본 bytecode·semantic·input element를 교체해도 native PSO 생성과 GPU 출력 유지.</li>
+<li>invalidation 중 완료된 오래된 candidate 게시 금지·stale handle 거부·fresh 요청 복구.</li>
+<li>실제 worker의 지원하지 않는 vertex slot 실패와 동일 실패 memo의 재제출 금지.</li>
+<li>64개 admission·65번째 거부·abandoned 64개 완료/회수·종료 시 queued job join.</li>
+<li>stopped scheduler 거부·재시작 후 복구·synchronous consumer의 accepted job 공유.</li>
+<li>Core/Layered Scene generation 두 개가 각각 shadow caster를 포함한 9개 Ready 응답 후에만 게시됨.
+같은 descriptor는 native cache를 공유한다. 최초 검증의 8개 PSO 결과와 아래 확장 검증을 구분한다.</li>
+<li>worker에서 생성된 실제 PSO로 세 번 draw하고 독립 상수 RGBA 기준으로 768픽셀·3,072성분 대조.</li>
+<li>기존 <code>CSMain</code>·생성된 이름의 compute PSO 생성/캐시 재사용·잘못된 execution model 거부.
+최종 validation은 cache와 device를 실제 shutdown한 뒤 읽는다.</li>
+</ol>
+<p>최초 검증에서는 554개 source SHA-256이 유지된 Debug/Release 빌드와 RTX 4070 Ti native Vulkan 실행이 통과했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>Debug / Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>검사</td>
+<td>9,352 / 9,198개 (poll 횟수에 따라 달라짐)</td>
+</tr>
+<tr>
+<td>Scene 준비</td>
+<td>Core/Layered 2개 · Ready 응답 16개 · native worker 14회</td>
+</tr>
+<tr>
+<td>주 회귀 cache</td>
+<td>accepted request/worker 각 83회 · stale 회수 65개</td>
+</tr>
+<tr>
+<td>실패</td>
+<td>graphics worker 실패 memo 1개 · compute stage 거부 1개</td>
+</tr>
+<tr>
+<td>실제 GPU 출력</td>
+<td>각 768픽셀 · 3,072성분 · 상수 기준 절대 오차 <code>1e-6</code> 이내</td>
+</tr>
+<tr>
+<td>Vulkan validation</td>
+<td>켬 · device 종료까지 VALIDATION/PERFORMANCE WARNING 이상 0건</td>
+</tr>
+</tbody></table></div>
+<p>cache의 queued shutdown·재시작 요청은 주 회귀 stats를 캡처한 뒤 별도로 검사한다.
+Release 빌드에서 기존 <code>TypeTrait.h</code> C4189, Debug에서 같은 C4189와 LNK4075 경고가 남았다.
+새 빌드 오류·native validation 결함은 없다. 이번 준비 회귀는 GPU 성능 수용 게이트가 아니다.</p>
+<p>Vulkan 전체 Scene의 legacy/LX 공유 depth·조명·lookup·HDR 합성 readback, 실제 Editor Live Tick,
+일반 Scene 비용·전체 cache/retirement 예산·자동 Scene host 쿠킹은 이 준비 검증의 완료 범위가 아니다.
+검증 로그와 source manifest는 <code>Build/Obj/MaterialProductProbe/vulkan-generation-*</code>에 둔다.
+이 절은 당시의 준비 검증 기록이다. MAT-7의 후속 제품 통합 종료 결과는
+<a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>가 소유한다.</p>
+<h3>6.1 Shadow caster 추가 후 재검증 (2026-09-29)</h3>
+<p>569개 source SHA-256 변경 0개로 Debug/Release를 다시 빌드하고 같은 native Vulkan gate를 실행했다.
+Core/Layered의 9개 PSO 준비에는 신규 <code>LXSceneShadowVS/PS</code>가 포함된다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>Debug / Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>검사</td>
+<td>14,273 / 10,727개 (poll 횟수에 따라 달라짐)</td>
+</tr>
+<tr>
+<td>Scene 준비</td>
+<td>generation 2개 · Ready 응답 18개 · native worker 15회</td>
+</tr>
+<tr>
+<td>주 회귀 cache</td>
+<td>accepted request/worker 각 84회 · stale 회수 65개</td>
+</tr>
+<tr>
+<td>실제 GPU 출력</td>
+<td>각 768픽셀 · 3,072성분 · 상수 기준 절대 오차 <code>1e-6</code> 이내</td>
+</tr>
+<tr>
+<td>실패 복구 / validation</td>
+<td>기대한 실패 2개 · 종료까지 WARNING 이상 0건</td>
+</tr>
+</tbody></table></div>
+<p>최종 로그는 <code>Build/Obj/MaterialProductProbe/shadow-decal-vulkan-gate-final.log</code>,
+source manifest와 개별 빌드/native 로그는 같은 폴더의 <code>vulkan-generation-*</code>다.
+이는 당시 shader/PSO 설치와 기존 baseline draw의 검증이다. 이후 native Vulkan 전체 Scene
+합성은 <a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>의 Debug/Release
+6개 실제 실행 경로로 확인했다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-설치-범위"></span><span id="2-슬롯원자적-선택"></span><span id="3-제출과-수명"></span><span id="4-예산과-남은-경계"></span><span id="5-검증"></span><span id="6-vulkan-native-pso-준비-2026-09-29"></span><span id="61-shadow-caster-추가-후-재검증-2026-09-29"></span><span id="sec-1-설치-범위"></span><span id="sec-2-슬롯원자적-선택"></span><span id="sec-3-제출과-수명"></span><span id="sec-4-예산과-남은-경계"></span><span id="sec-5-검증"></span><span id="sec-6-vulkan-native-pso-준비-2026-09-29"></span></details></main></body></html>

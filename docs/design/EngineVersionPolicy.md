@@ -1,5 +1,45 @@
 # CreatorEngine 버전 정책
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/DumpHandler.h:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/DumpHandler.h#L53) — `inline std::string BuildStackTrace(const CONTEXT& capturedContext, int skipFrames = 0)`
+- [Engine/Utility_Framework/DumpHandler.h:122](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/DumpHandler.h#L122) — `inline std::string BuildCrashReport(EXCEPTION_POINTERS* pExceptionPointers)`
+- [Engine/Utility_Framework/DumpHandler.h:160](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/DumpHandler.h#L160) — `inline std::string BuildAbnormalExitReport(const char* reason, const char* detail)`
+- [Engine/Utility_Framework/ScriptApiVersion.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ScriptApiVersion.h#L1) — `#pragma once`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:188](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L188) — `m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kBuildSceneSetting,`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:390](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L390) — `if (ImGui::MenuItem("GameBuild"))`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:393](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L393) — `EditorSettingsStore::Get().Build().GetStartupSceneName();`
+- [Tools/distribution/update-engine-version.ps1:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/distribution/update-engine-version.ps1#L6) — `$Repository = [IO.Path]::GetFullPath($Repository)`
+- [Tools/distribution/update-engine-version.ps1:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/distribution/update-engine-version.ps1#L75) — `$actual = if (Test-Path -LiteralPath $path) { [IO.File]::ReadAllText($path).Replace("rn", "n") } else { '' }`
+- [Tools/distribution/update-engine-version.ps1:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/distribution/update-engine-version.ps1#L78) — `[IO.File]::WriteAllText($path, $expected, [Text.UTF8Encoding]::new($false))`
+- [Editor/EngineGUIWindow/MenuBarWindow.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L8) — `struct EditorTitleBarLayout;`
+- [Editor/EngineGUIWindow/MenuBarWindow.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L10) — `class MenuBarWindow`
+- [Editor/EngineGUIWindow/MenuBarWindow.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L24) — `void ShowBuildSceneSettingWindow();`
+- [Engine/Utility_Framework/EngineVersion.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/EngineVersion.h#L1) — `#pragma once`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 결정일: 2026-09-13
 - 상태: **정책 확정 · 개발 배포 경로 적용 중 · 제품 Launcher/MSI/공식 릴리스 검증은 후속 구현**
 - 적용 계획: [엔진 배포 · Launcher · 프로젝트 관리](../plans/EngineDistributionAndLauncherPlan.md) — PHASE 23 DL5·DL6·DL10
@@ -138,3 +178,5 @@ MSI용 숫자 범위와 버전 비교 규칙은 별도로 준수하며, installe
 - [MSI ProductVersion](https://learn.microsoft.com/en-us/windows/win32/msi/productversion) — 세 자리 비교와 installer 버전 제약
 
 Windows의 개념을 참고한 CreatorEngine 자체 정책이며 Microsoft 제품 전체에 적용되는 단일 번호 부여 규칙을 주장하지 않는다.
+
+</details>

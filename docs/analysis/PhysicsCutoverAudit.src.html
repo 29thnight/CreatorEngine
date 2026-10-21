@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Phase 19 R0 철거 기록</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="PhysicsCutoverAudit.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/PhysicsCutoverAudit.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Phase 19 R0 철거 기록</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Scene</ve-node><ve-node id="n1" at="2 1">Simulation</ve-node><ve-node id="n2" at="3 1" key>Body / shape</ve-node><ve-node id="n3" at="3 2">Contact stream</ve-node><ve-node id="n4" at="2 2">PostPhysics</ve-node><ve-node id="n5" at="1 2">Managed code</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>물리 쿼리는 sceneAnchor Entity, 호출자 버퍼와 PhysicsQueryResult를 사용한다. 현재 hit 타입은 PhysicsHit이며 LayerId는 신원 값이다.</li>
+<li>접촉은 OnBeginSimulation에서 ContactStream을 등록하고 PostPhysics에서 소비한다. OnTrigger*/OnCollision* 훅과 RaycastAll을 현행 공개 API로 사용하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L84">Engine/SceneRuntime/Scene.cpp:84</a> — <code>m_begin = Clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L94">Engine/SceneRuntime/Scene.cpp:94</a> — <code>const TimePoint end = Clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L102">Engine/SceneRuntime/Scene.cpp:102</a> — <code>m_begin = Clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/physics-legacy-files.json#L1">Tools/regression/physics-legacy-files.json:1</a> — <code>[</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-physics-cutover.ps1#L3">Tools/regression/audit-physics-cutover.ps1:3</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-physics-cutover.ps1#L13">Tools/regression/audit-physics-cutover.ps1:13</a> — <code>if([IO.Path]::GetFileName($node.Include) -in @($legacy | ForEach-Object {[IO.Path]::GetFileName($_.path)})) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-physics-cutover.ps1#L30">Tools/regression/audit-physics-cutover.ps1:30</a> — <code>if($hits.Count){$consumers+=@{path=[IO.Path]::GetRelativePath($repo,$file.FullName).Replace(&#39;\&#39;,&#39;/&#39;);hits=@($hits|ForEach-Object {@{line=$_.LineNumber;text=$_.Line.Trim()}})}}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13">ScriptCore/Physics.cs:13</a> — <code>public struct PhysicsHit</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41">ScriptCore/Physics.cs:41</a> — <code>public readonly struct PhysicsQueryRequest</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65">ScriptCore/Physics.cs:65</a> — <code>public readonly struct PhysicsBatchResult</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Collision.cs#L1">ScriptCore/Collision.cs:1</a> — <code>// ContactStream.cs defines the replacement contact value and stream API.</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L12">Engine/Physics/PhysicsScene.h:12</a> — <code>enum class resource_kind : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L29">Engine/Physics/PhysicsScene.h:29</a> — <code>enum class execution_preference : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Physics/PhysicsScene.h#L35">Engine/Physics/PhysicsScene.h:35</a> — <code>enum class execution_backend : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L96">Engine/SceneRuntime/ClrHost.h:96</a> — <code>enum class AniEventKind : int { Enter = 0, Update = 1, Exit = 2 };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L266">Engine/SceneRuntime/ClrHost.h:266</a> — <code>enum class BTNodeKind : int { None = 0, Action = 1, Condition = 2, ConditionDecorator = 3 };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L341">Engine/SceneRuntime/ClrHost.h:341</a> — <code>enum class ScriptFieldType : int</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-10-01. P0 baseline HEAD: 12f970c7ed3a4408d268479f5d5acb5f80372b8c.</p>
+<p>구 구현 55개 파일을 삭제 전에 P0 ZIP의 SHA256과 대조했다. 삭제 목록과 해시는
+Tools/regression/physics-legacy-files.json에 보존한다. ZIP은
+Build/Obj/Phase19P0/pre-r0-12f970c7.zip이며 이 ZIP을 철거 후 새 snapshot으로 덮어쓰지 않는다.</p>
+<h2>제거한 실행 소유자</h2>
+<ul>
+<li>Engine/Physics의 구 PhysicX, 바디/리소스 상속 래퍼, CCT/이동, 이벤트/디버그 구현.</li>
+<li>PhysicsManager, 구 8종 물리 컴포넌트 및 CharacterControllerSystem 구현.</li>
+<li>Physics/SceneRuntime 프로젝트 및 filters의 구 파일 편입.</li>
+<li>Physics 프로젝트의 CUDA imports/compile/link 설정과 SceneRuntime/Editor/Mono 역방향 include.</li>
+<li>구 컴포넌트 reflection/lifecycle/type UUID 등록 및 Editor 물리 저작 그룹.</li>
+<li>bootstrap singleton 생성/파괴와 Editor/Player 물리 초기화, PVD 연결.</li>
+</ul>
+<p>PhysX SDK 의존과 Physics 프로젝트의 identity는 P1 새 구현에 사용하기 위해 유지한다.
+구 UUID는 활성 등록에서 제거하고 P0 fixture의 legacy-type-uuids.json에 마이그레이션 자료로 보존한다.
+구 제품 바이너리/Physics.lib는 디스크에 있어도 철거 후 소스 검증이나 실행 증거로 사용하지 않는다.
+R0 당시 빈 Physics 프로젝트는 명시적으로 빌드를 거부했다. P1 새 PhysicsScene 편입 후 이 임시 guard는 제거했다.</p>
+<h2>검증 및 미완성 경계</h2>
+<p>audit-physics-cutover.ps1 -Gate Owners 통과: owner files/project references=0.
+Complete gate는 남은 소비자 때문에 실패하며 이를 정상 제품 통과로 표시하지 않는다.
+실제 Debug 빌드는 Scene의 Collision/PhysicsManager/ColliderContainerType 미이전으로 reflgen에서 실패했다.
+RequirePhysicsImplementation 직접 실행도 비어 있는 새 모듈을 의도대로 거부했다.
+제품을 빌드 가능하게 만들기 위한 빈 물리 구현이나 구 타입 호환 어댑터는 추가하지 않았다.</p>
+<p>현재 lexical 소비자 12개 파일의 정확한 위치는 Build/Obj/Phase19R0/cutover-audit.json에 있다.
+Scene.cpp/h의 컬렉션·fixed-step·이벤트는 B/C/T 연결, ClrHost/Native/managed API는 M0,
+model/terrain 생성과 editor authoring/inspector는 B1/M0에서 새 계약으로 이전한다.
+Articulation/Link 등 구 ragdoll 데이터 참조도 새 지원 범위와 스키마 이전을 확정해야 한다.
+이 감사는 AST/링크 도달성 검증이 아니며 최종 M4에서 제품 빌드·실행과 함께 다시 검증한다.</p>
+<p><strong>상태: R0 소유자 철거 완료, R0 전체 완료는 미확보.</strong>
+P1&#126;P3 API를 먼저 작성하고 B/C/T/M 소비자 교체 후 Complete gate를 닫는다.
+R0 표의 &#39;새 계약으로 전량 교체&#39;는 후속 단계가 필요한 최종 cutover 조건이다.
+P1 새 PhysicsScene CPU 기반과 단독 모듈 Debug/Release 빌드를 검증했다. 제품 소비자 이전은 아직 남아 있다.</p>
+<h2>2026-10-03 현재 판정</h2>
+<p>Fresh Complete gate 통과: 구 파일55개 제거, 남은 파일/프로젝트 참조/소비자0.
+앞의 소비자12개 및 제품 미빌드 기록은 철거 당시 이력이다.
+새 API 제품 빌드·실행은 PhysicsRedesignPlan의 M2 수용 근거와 연결한다.
+R0는 완료로 갱신하며 AST/최종 링크/재유입 감사는 M4에서 수행한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="2026-10-03-현재-판정"></span><span id="sec-2026-10-03-현재-판정"></span><span id="sec-검증-및-미완성-경계"></span><span id="sec-제거한-실행-소유자"></span><span id="검증-및-미완성-경계"></span><span id="제거한-실행-소유자"></span></details></main></body></html>

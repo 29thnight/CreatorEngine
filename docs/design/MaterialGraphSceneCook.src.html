@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Graph: Scene cook / package / Player</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialGraphSceneCook.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialGraphSceneCook.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Graph: Scene cook / package / Player</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h#L9">Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h:9</a> — <code>class ReadNode;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h#L55">Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h:55</a> — <code>struct SceneCookProductRequest final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h#L65">Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h:65</a> — <code>struct SceneCookProduct final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-cook.ps1#L11">Tools/regression/verify-material-scene-cook.ps1:11</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-cook.ps1#L13">Tools/regression/verify-material-scene-cook.ps1:13</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-cook.ps1#L45">Tools/regression/verify-material-scene-cook.ps1:45</a> — <code>$build | Set-Content -LiteralPath (Join-Path $output &quot;scene-cook-build-$([IO.Path]::GetFileNameWithoutExtension($project))-$configuration.log&quot;) -Encoding utf8</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-package.ps1#L12">Tools/regression/verify-material-scene-package.ps1:12</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-package.ps1#L14">Tools/regression/verify-material-scene-package.ps1:14</a> — <code>$cookRoot = [IO.File]::ReadAllText((Join-Path $output &quot;scene-cook-$Configuration-root.txt&quot;)).Trim()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-package.ps1#L16">Tools/regression/verify-material-scene-package.ps1:16</a> — <code>$caseRoot = Join-Path $output (&quot;ScenePkg-$variant-&quot; + [Guid]::NewGuid().ToString(&#39;N&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L18">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:18</a> — <code>struct LXSceneLight</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L82">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:82</a> — <code>uint LXSceneOwner(uint record) { return record != 0u ? lx_sceneRecords[record].material.z : lx_drawOwner; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L83">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:83</a> — <code>uint LXSceneCoverage(uint record) { return record != 0u ? lx_sceneRecords[record].material.w : lx_coverage; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4">ScriptCore/BlackBoard.cs:4</a> — <code>public enum BlackBoardType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28">ScriptCore/BlackBoard.cs:28</a> — <code>public sealed class BlackBoard</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30">ScriptCore/BlackBoard.cs:30</a> — <code>private readonly struct Value(BlackBoardType type, object boxed)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L8">Engine/SceneRuntime/BlackBoard.h:8</a> — <code>class Entity;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L9">Engine/SceneRuntime/BlackBoard.h:9</a> — <code>class Transform;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L10">Engine/SceneRuntime/BlackBoard.h:10</a> — <code>class MenuBarWindow;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30">Engine/RenderEngine/DataSystem.h:30</a> — <code>own::shared_owner&lt;const Texture&gt; descriptor;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L44">Engine/RenderEngine/DataSystem.h:44</a> — <code>std::vector&lt;own::shared_owner&lt;const Material&gt;&gt; materials;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45">Engine/RenderEngine/DataSystem.h:45</a> — <code>std::vector&lt;own::shared_owner&lt;const Texture&gt;&gt; textures;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>1. 구현 계약</h2>
+<p><code>MaterialGraphSceneCompiler</code>가 Editor 준비와 AssetCooker의 Scene shader 생성 계약을 함께 소유한다.
+그래프 IR에서 bound source를 만들고 현재 <code>MaterialGraphSceneHost.slang</code>, include 의존성,
+permutation, strict math, fine derivative, entry/profile과 compiler identity를 검증한다.</p>
+<pre><code class="language-mermaid">flowchart LR
+    Graph[.shadergraph + Blackboard] --&gt; Compiler[공용 Scene compiler]
+    Host[현재 host + include + compiler] --&gt; Compiler
+    Compiler --&gt; Product[LXMC2: DXIL + SPIR-V 전체 stage]
+    Material[재질 override / Scene inline 재질] --&gt; Closure[타입 및 의존성 검증]
+    Product --&gt; Closure
+    Texture[Texture artifact] --&gt; Closure
+    Closure --&gt; Manifest[CEMF + Derived/MaterialPrograms]
+    Manifest --&gt; Package[BuildTool / GameAssets.pak]
+    Package --&gt; Player[DataSystem / SceneHost]
+    Player --&gt; Native[backend별 native PSO 준비]
+</code></pre>
+<p>Core/Layered의 stage set은 각 backend의 Scene VS, GBuffer, Color, Lookup0/1,
+Shadow VS/PS다. SSS·refraction·Volume feature에 필요한 PS/CS를 추가한다.
+순수 Volume은 shadow caster stage를 요구하지 않는다. 지원하지 않는 공간 의존 Volume은
+쿠킹에서 거부한다. DXIL과 SPIR-V 중 하나만 포함한 결과도 완전한 Scene product로 받지 않는다.</p>
+<p><code>semanticKey</code>의 <code>|lx-scene-host:2</code>와 정확한 stage/profile 집합으로 Scene 산출물을 구분한다.
+2는 가시광 Fourier 박막 모델을 포함한다. 이전 3파장 모델의 Scene product는 재쿠킹한다.
+LXMC2의 checksum, bound source, typed resource table과 byte budget 검증도 유지한다.
+일반 단일 VS/PS용 <code>PipelineSlot</code>은 여러 pass가 있는 product를 거부하며 이전 PSO를 보존한다.</p>
+<h2>2. 자동 쿠킹과 게시</h2>
+<pre><code class="language-text">AssetCooker --asset-root &lt;Assets&gt; --output &lt;new-directory&gt;
+  --shadergraph &lt;graph.shadergraph&gt; --texture &lt;image&gt;
+  [--material &lt;instance.asset&gt;] [--scene &lt;scene.creator&gt;]
+  [--material-shader-root &lt;DefaultPassShader&gt;]
+</code></pre>
+<p>기본 shader root는 <code>&lt;Assets&gt;/Shaders/DefaultPassShader</code>다. 생성 source의 캐시는
+<code>&lt;Assets&gt;/../Library/LXSceneCook/&lt;graph GUID&gt;.slang</code>이다. 출력 파일은 기존 GUID 기반
+<code>Derived/MaterialPrograms/&lt;prefix&gt;/&lt;GUID&gt;.lxmaterial</code>과 CEMF에 포함된다.
+<code>--material-program-root</code>는 기존 검증 산출물의 명시적 입력 경로로 유지한다.
+자동 compiler root와 함께 지정할 수 없다. Player Scene은 일반 단일 pass 결과를 거부한다.</p>
+<p>standalone <code>.asset</code>의 Lattice identity는 sidecar와 같아야 한다. Scene의 inline 재질은
+nil material identity를 허용한다. 두 경로 모두 graph와 texture override GUID를 manifest
+의존성으로 수집한다. 실제 쿠킹한 MaterialProgram, exposed numeric parameter의 타입·유한 값,
+exposed/active Texture parameter와 Texture artifact를 검증한 뒤 게시한다.
+의존성을 만족시키는 source sidecar만 있고 artifact가 없으면 실패한다.</p>
+<p>BuildTool은 <code>.shadergraph</code>를 <code>--shadergraph</code>로 자동 수집하고 <code>MaterialPrograms/*.lxmaterial</code>의
+GUID 경로와 개수·해시를 검증한다. 모델 generation·재질·Scene 및 기존 shader 입력의
+패키징 계약을 유지한다. 실패한 cook/package는 기존 게시 결과와 current pointer를 보존한다.
+쿠킹 과정에서 Base 아래 생긴 Library 캐시는 두 런타임 mount의 복사 대상에서 제외한다.</p>
+<p>compiler identity는 절대 source/include 경로를 포함한다. 동일 입력 경로와 compiler 설정에서
+반복 쿠킹의 바이트 일치를 검증하며, 다른 위치로 옮긴 프로젝트의 바이트 일치를 보장하지 않는다.</p>
+<h2>3. Player 소비</h2>
+<p>Player의 DataSystem은 cooked graph generation과 typed instance를 읽고 texture owner를 준비한다.
+MeshRenderer의 inline 재질 post-load도 <code>lattice_material</code>을 DataSystem에 전달한다.
+처음 적재한 LX 문서가 잘못되면 재질을 비우며 기본 ShaderMeta 재질로 바꾸지 않는다.
+SceneHost는 <code>LoadSceneShaders</code>로 완전한 bytecode를 복사하고 native PSO worker에 제출한다.
+Scene 재질의 source 읽기·Slang 컴파일 job은 제출하지 않는다. pending PSO는 계속 poll하며
+전체 ready 뒤 같은 Scene generation 선택 및 graph completion/fence 게시 계약을 사용한다.
+incomplete stage 집합은 이전 shader set을 보존한다.</p>
+<p>공용 고정 pass/transport shader의 기존 RHI 준비 경로는 유지한다. 따라서 <code>sceneCompiles=0</code>은
+Scene 재질 specialization의 컴파일 0회이며 모든 runtime shader 준비가 제거됐다는 의미가 아니다.
+Player는 cooked Scene ready 시 <code>[lx.scene.program] source=cooked ... sceneCompiles=0</code>을 출력한다.</p>
+<p><code>Player --smoke N --smoke-offscreen</code>과 BuildTool <code>package-game --smoke-offscreen</code>은
+작은 숨겨진 창으로 실제 render/promotion을 검증한다. 일반 실행 창 설정에는 적용되지 않는다.
+<code>--smoke-promotions N</code>은 필요한 실제 화면 게시 횟수를 지정한다. 기본값은 기존 2회이며,
+LX 패키지 검증은 비동기 PSO 준비 뒤 실행까지 확인하기 위해 24회를 요구한다.</p>
+<h2>4. 검증</h2>
+<p><code>Tools/regression/verify-material-scene-cook.ps1 -SkipDependencyRestore</code>:</p>
+<ul>
+<li>VS18/v145 Debug/Release probe·AssetCooker 빌드.</li>
+<li>Core/Layered 두 그래프, PNG 하나, standalone instance 하나, inline Scene 하나의 5 artifact.</li>
+<li>같은 경로에서 재쿠킹한 전체 artifact와 manifest 바이트 일치.</li>
+<li>unknown parameter, missing graph, missing texture artifact, 다른 재질 identity,
+missing host, unknown node의 6가지 거부와 accepted 결과 해시 보존.</li>
+<li>loose와 encrypted PAK의 complete DXIL/SPIR-V 집합 일치, 두 backend의 stage loader,
+incomplete set 거부와 이전 bytecode 보존.</li>
+<li>native D3D12 cooked Scene 각 24프레임·57,185개 검사·10,746 GPU 성분,
+Scene compile 0회·WARNING 이상 GPU validation 0건.</li>
+<li>588 source SHA-256 변경 0개.</li>
+</ul>
+<p>실행 로그와 SHA snapshot은 <code>Build/Obj/MaterialProductProbe/scene-cook-*</code>에 있다.
+<code>Tools/regression/verify-material-scene-package.ps1 -Configuration Debug|Release</code>도 통과했다.
+현재 소스로 Player와 CreatorEditor의 두 구성 전체를 빌드하고, 별도 프로젝트·engine distribution을
+게시한 뒤 실제 <code>package-game</code>의 자동 cook→encrypted PAK→Player→current pointer 게시를 검사했다.</p>
+<ul>
+<li>Core/Layered program 2개·standalone instance 1개·inline LX Scene·실제 모델/HDR을 포함한다.</li>
+<li>패키지 artifact 14개/derived file 17개, CEMF entry 16개/source identity 110개.</li>
+<li>실제 MeshRenderer에서 Core cooked Scene ready 응답과 Scene specialization compile 0회.</li>
+<li>각 화면 게시 24회, cooked Scene document 1개·텍스트 파서 호출 0회·managed lifecycle 성공.</li>
+<li>Player 종료 후 runtime entry와 PAK의 manifest SHA-256 일치.</li>
+<li>각 실행의 615 source SHA-256 변경 0개. Debug 검증 이후 검증 스크립트의 임시 경로만 줄였고,
+Release는 변경한 스크립트로 실행했다. 최초 Release 시도의 loader error 206은 긴 검증 경로로
+발생했으며, 짧은 격리 경로에서 재실행했다. 긴 Windows 경로 지원을 완료한 것으로 세지 않는다.</li>
+</ul>
+<p><code>scene-package-&lt;Configuration&gt;-root.txt</code>가 각 독립 검증 디렉터리를 가리킨다.
+그 안의 <code>package.log</code>, <code>package-live.log</code>, <code>source-hashes.json</code>과 게시한 package manifest가
+제품 실행 증거다. 화면 게시 전 대기 중의 game/display frame 수는 성능 수용 지표로 사용하지 않는다.</p>
+<p>동작 검증 뒤 <code>SceneCookProducer.h</code> 한 파일의 들여쓰기·줄바꿈과 namespace 닫는 주석을
+저장소 <code>.clang-format</code>에 맞췄다. HEAD 대비 코드 차이는 기존 검증에 사용한
+<code>materialGraphEdges</code> 필드 하나뿐임을 공백/namespace 주석을 제외하여 확인했다.
+따라서 위 실행 당시의 SHA snapshot과 최종 헤더 SHA는 다르다. 포맷 후 재빌드·실행으로
+기록하지 않으며, 최종 format 검사와 비교는 <code>scene-cook-format-evidence.json</code>이 소유한다.</p>
+<p>현재 compiler로 기존 authored 경로도 Debug/Release 회귀를 완료했다. 각 구성의 결과:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th align="right">검사</th>
+<th align="right">GPU 성분</th>
+<th align="right">graph/frame</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>전체 raster / Scene / generation</td>
+<td align="right">21,079,764</td>
+<td align="right">3,899,966</td>
+<td align="right">Scene 56 / generation 12</td>
+</tr>
+<tr>
+<td>Shadow + Decal 누적</td>
+<td align="right">295,801</td>
+<td align="right">290,898</td>
+<td align="right">42 + 114</td>
+</tr>
+<tr>
+<td>Volume</td>
+<td align="right">35,028</td>
+<td align="right">57,840</td>
+<td align="right">33</td>
+</tr>
+<tr>
+<td>Refraction</td>
+<td align="right">185,068</td>
+<td align="right">155,877</td>
+<td align="right">24</td>
+</tr>
+<tr>
+<td>SSS</td>
+<td align="right">119,415</td>
+<td align="right">108,072</td>
+<td align="right">12</td>
+</tr>
+</tbody></table></div>
+<p>모두 WARNING 이상 GPU validation 0건이다. 일반 product 121개·10 shader·60 GPU 성분,
+runtime 43개/동시 8 GUID, 기존 preverified AssetCooker의 두 구성 각 3종 거부·accepted 해시 보존,
+cooked consumer 각 7개/compiler 호출 0회, BuildTool 46개 검사도 통과했다.</p>
+<p>대시보드 JS 전체 파싱과 Vite 문서 빌드도 통과했다. 전체 dashboard checker의 미산정
+<code>days:null</code> 24행 및 PHASE 4.6 meta 불일치 1건은 현재와 HEAD의 출력이 같다.
+이 전역 checker는 실패 상태로 기록하며 이번 수정의 통과로 세지 않는다.</p>
+<h2>5. 범위</h2>
+<p>MAT-7의 실제 Editor Scene/Game 교체·저장 후 재개방·수명과 native Vulkan 전체 Scene
+통합 검증은 <a href="MaterialGraphProductIntegration.html">MaterialGraphProductIntegration.md</a>의
+후속 Debug/Release 실행으로 완료했다. SPIR-V stage loader 검사와 실제 native 실행 증거는
+구분한다. 마지막 GBuffer shader 수정 후 이 문서의 자동 cook gate도 다시 통과했다:
+588 source 변경 0개·반복 바이트 일치·6종 거부/accepted 해시 보존·DX12 cooked Scene 각
+24 frame/Scene compile 0회/validation 0개. 새 cook의 Vulkan encrypted Scene도 각
+24 frame/Scene compile 0회/validation 0개다.
+성능 수용·구적법 수렴·Blender rendered parity는 MAT-9, artist 표시/preview는 MAT-8,
+LX canvas/HTTP는 LX-3/LX-3H가 소유한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-구현-계약"></span><span id="2-자동-쿠킹과-게시"></span><span id="3-player-소비"></span><span id="4-검증"></span><span id="5-범위"></span><span id="sec-1-구현-계약"></span><span id="sec-2-자동-쿠킹과-게시"></span><span id="sec-3-player-소비"></span><span id="sec-4-검증"></span><span id="sec-5-범위"></span></details></main></body></html>

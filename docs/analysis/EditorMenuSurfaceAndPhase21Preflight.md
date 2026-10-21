@@ -1,5 +1,48 @@
 # 에디터 메뉴 표면 감사 · PHASE 21 재정찰 (2026-09-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.
+- 모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/EngineCallable.cs:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L35) — `[AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]`
+- [ScriptCore/EngineCallable.cs:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L36) — `public sealed class EngineCallableAttribute : Attribute`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Editor/EngineGUIWindow/ExternUI.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ExternUI.h#L5) — `extern void DrawYamlNodeEditor(Authoring::WriteNode node,`
+- [Editor/EngineGUIWindow/ExternUI.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ExternUI.h#L8) — `extern bool DrawTextureImportEditor(Authoring::WriteNode node,`
+- [Editor/EngineGUIWindow/ExternUI.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ExternUI.h#L12) — `extern void ImGuiDrawHelperPlayerInput(class PlayerInputComponent* playerInput);`
+- [Editor/EngineGUIWindow/ICustomEditor.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L6) — `virtual ~ICustomEditor() = default;`
+- [Editor/EngineGUIWindow/ICustomEditor.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L8) — `virtual void OnInspectorGUI() = 0;`
+- [Editor/EngineGUIWindow/MenuBarWindow.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L10) — `class MenuBarWindow`
+- [Editor/EngineGUIWindow/MenuBarWindow.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L13) — `explicit MenuBarWindow(std::mutex& sceneStructureMutex);`
+- [Editor/EngineGUIWindow/MenuBarWindow.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L14) — `~MenuBarWindow() = default;`
+- [Editor/EngineEntry/EditorPreferences.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorPreferences.h#L6) — `enum class EditorFrameRateMode : std::uint8_t`
+- [Editor/EngineEntry/EditorPreferences.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorPreferences.h#L17) — `struct EditorPreferences`
+- [Editor/EngineEntry/EditorPreferences.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorPreferences.h#L23) — `EditorFrameRateMode GetFrameRateMode() const noexcept { return frameRateMode; }`
+- [Editor/EngineEntry/ConsoleCommandSystem.h:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L37) — `using ConsoleCommandResultHandler = CommandCore::CommandResult(*)(const ConsoleCommandContext&);`
+- [Editor/EngineEntry/ConsoleCommandSystem.h:101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L101) — `void EnqueueStructured(std::vector<std::string> arguments);`
+- [Editor/EngineEntry/ConsoleCommandSystem.h:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L127) — `bool EnqueueStructured(std::vector<std::string> arguments, CommandCompletion completion,`
+- [Editor/EngineEntry/EditorObjectOperations.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L30) — `CommandCore::CommandResult ResolveTarget(const std::string& nameOrId, EntityHandle& target);`
+- [Editor/EngineEntry/EditorObjectOperations.h:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L33) — `CommandCore::CommandResult Rename(EntityHandle target, const std::string& name);`
+- [Editor/EngineEntry/EditorObjectOperations.h:58](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L58) — `CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent = 0);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 기준 트리: `c86ab960` + 미커밋 변경(에디터 UI 계층에는 변경 없음)
 - 대조 정본: [CommandSurfaceDisposition.tsv](CommandSurfaceDisposition.tsv)(처분표 · api 95 + split 3),
   [CommandSurfaceImplementation.md](CommandSurfaceImplementation.md)(GUI↔CLI 공통 편집표),
@@ -274,3 +317,5 @@ seed→descriptor 복사에 한 줄. `commands.list` TSV에 열을 더하면 `ve
    registry 없이는 또 하나의 하드코딩 메뉴를 낳는다. 권고: W0과 병행 가능한 **W3-pre(1~2일)**로 둔다.
 2. **DPI를 W1에서 실제로 채택하는가.** PMv2 매니페스트가 이미 켜져 있어 "하지 않는다"는 선택이 곧 150% 모니터에서
    1:1 렌더를 유지한다는 뜻이다. 계획서 W1 판정문("채택하지 않으면 명시")은 이 사실을 전제로 다시 적어야 한다.
+
+</details>

@@ -1,5 +1,43 @@
 # LX 그림자 DX12 현재 빌드 회귀 기준선 (2026-10-11)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L8) — `bool EnhancedShadowPass::Initialize(const EnhancedFrameContext& context, std::string& outError)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L19) — `void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L63) — `if (math::length_sq(m_lightDirection) < 1e-6f)`
+- [Engine/RuntimeHost/CommandCore/CommandSession.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.h#L28) — `struct SessionEntry`
+- [Engine/RuntimeHost/CommandCore/CommandSession.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.h#L36) — `class CommandSession`
+- [Engine/RuntimeHost/CommandCore/CommandSession.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.h#L38) — `public:`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L25) — `class EnhancedShadowPass : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L27) — `public:`
+- [Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L36) — `const char* GetName() const override { return "Shadow"; }`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RuntimeHost/CommandCore/CommandSession.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.cpp#L25) — `CommandSession& CommandSession::Batch()`
+- [Engine/RuntimeHost/CommandCore/CommandSession.cpp:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.cpp#L31) — `void CommandSession::Record(std::string_view commandId, const CommandResult& result)`
+- [Engine/RuntimeHost/CommandCore/CommandSession.cpp:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.cpp#L35) — `entry.commandId = std::string(commandId);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **후속 목록 2번 완료.** 현재 작업 트리에서 DX12 Debug/Release를 빌드하고 backOff 확장 제거 변이를 실행한 뒤, 원본 소스를 바이트 단위로 복구·재빌드하여 정상 회귀를 실행했다. Vulkan 실행·교차 비교는 [PHASE 4.9](../plans/BackendParityPlan.md)에 남긴다.
 
 ## 판정
@@ -30,16 +68,16 @@
 
 ## 재현과 증거
 
-반복 실행 스크립트: [verify-lx-shadow-baseline.ps1](../../Tools/regression/verify-lx-shadow-baseline.ps1). 현재 Editor를 먼저 빌드하고 구성, 작은 fixture 프로젝트, 새로운 출력 폴더를 지정한다. 스크립트는 프로젝트를 복사하고 현행 셰이더·입력 manifest·소스/binary 해시·명령 결과·stdout/stderr·판정을 보관한다. 변이 옵션은 별도로 빌드한 backOff 제거 실행 파일에서만 사용한다.
+반복 실행 스크립트: verify-lx-shadow-baseline.ps1 (`../../Tools/regression/verify-lx-shadow-baseline.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조). 현재 Editor를 먼저 빌드하고 구성, 작은 fixture 프로젝트, 새로운 출력 폴더를 지정한다. 스크립트는 프로젝트를 복사하고 현행 셰이더·입력 manifest·소스/binary 해시·명령 결과·stdout/stderr·판정을 보관한다. 변이 옵션은 별도로 빌드한 backOff 제거 실행 파일에서만 사용한다.
 
 아티팩트 용량 검사를 통과한 뒤 약 12 MB의 fixture를 복사했다. 시작 여유 공간은 약 179 GiB였다. 원본 fixture와 사용자 자산을 수정하지 않았으며, 이 변이 실행은 픽셀 payload 복사본을 만들지 않았다. 성공 보존 ledger와 로그·해시는 유지한다.
 
-- Mutant-Debug: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/reviewed-verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/identity-before.json).
-- Mutant-Release: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/identity-before.json).
-- Normal-Debug: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/identity-before.json).
-- Normal-Release: [판정](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/verdict.json), [명령 결과](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/results.jsonl), [실행 신원](../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/identity-before.json).
+- Mutant-Debug: 판정 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/reviewed-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/identity-before.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+- Mutant-Release: 판정 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/identity-before.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+- Normal-Debug: 판정 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/identity-before.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+- Normal-Release: 판정 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/identity-before.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
-- [최종 재검토 집계](../../Build/Verification/ShadowBaseline-20261011T142012Z/reviewed-overall.json), [소스 복구 확인](../../Build/Verification/ShadowBaseline-20261011T142012Z/restoration.json), [실행·빌드 기록](../../Build/Verification/ShadowBaseline-20261011T142012Z/orchestration.log).
+- 최종 재검토 집계 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/reviewed-overall.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 소스 복구 확인 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/restoration.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행·빌드 기록 (`../../Build/Verification/ShadowBaseline-20261011T142012Z/orchestration.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 - Debug 변이의 최초 harness는 실패 종료 코드를 0/1로 잘못 예상했다. 실제 명령은 의도한 이유로 실패하고 정상 종료했으며 `CommandSession::ExitCodeFor(Failed)` 계약은 4다. 스크립트를 수정하고 원본 결과·최초 판정·최초 집계를 보존한 채 `reviewed-verdict.json`과 `reviewed-overall.json`에서 재판정했다. Release 변이와 두 정상 회귀는 수정된 스크립트로 통과했다.
 
 최종 정상 runtime SHA-256:
@@ -47,3 +85,5 @@
 - Debug: `A0A57F115873729F8D316A36D82A8C2DE44A683A33FBACD46BC55C2CF30439FD`
 - Release: `DC9C0E79FCA4E3ED7B17A1A936847D36A07FC60B50F3C2BECAC71EB78F2D9162`
 - 복구된 `EnhancedShadowPass.cpp`: `A75EB1D2C8F41EA226BC04F8F2686BBE4F5DB188D1177DAC309B7C418FD21625`
+
+</details>

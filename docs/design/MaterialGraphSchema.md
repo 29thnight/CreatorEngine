@@ -1,5 +1,50 @@
 # MAT-2 Material 문서와 typed IR
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Lattice/Material/LXMaterialIR.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialIR.h#L10) — `struct LXMaterialIRSocket`
+- [Lattice/Material/LXMaterialIR.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialIR.h#L24) — `struct LXMaterialIRNode`
+- [Lattice/Material/LXMaterialIR.h:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialIR.h#L67) — `std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, std::vector<Issue>* issues = nullptr);`
+- [Lattice/Material/LXMaterialGraph.h:72](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialGraph.h#L72) — `class LXMaterialAsset`
+- [Lattice/Material/LXMaterialGraph.h:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialGraph.h#L75) — `explicit LXMaterialAsset(LXMaterialDefinitions definitions = CreateMaterialDefinitions());`
+- [Lattice/Material/LXMaterialGraph.h:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialGraph.h#L90) — `bool Equals(const LXMaterialAsset& other) const;`
+- [Lattice/Material/LXMaterialNodes.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialNodes.cpp#L15) — `if (!registry.Register({"material", std::move(spec)}, &error))`
+- [Lattice/Material/LXMaterialNodes.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialNodes.cpp#L17) — `throw std::logic_error(error);`
+- [Lattice/Material/LXMaterialNodes.cpp:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Material/LXMaterialNodes.cpp#L64) — `schema.enumProperties = {{"colorSpace", {"data", "linear", "srgb"}},`
+- [Tools/regression/verify-plan-dashboard.ps1:51](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L51) — `$text = [IO.File]::ReadAllText($Dashboard)`
+- [Tools/regression/verify-plan-dashboard.ps1:226](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L226) — `$tableMatches = [regex]::Matches($text, '<table class="tasks" data-phase="([\d.]+)"')`
+- [Tools/regression/verify-plan-dashboard.ps1:318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-plan-dashboard.ps1#L318) — `const tables = [...html.matchAll(/<table class="tasks" data-phase="([\d.]+)"/g)].map(match => {`
+- [Tools/blender/export-lx-material-schema.ps1:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-lx-material-schema.ps1#L33) — `if (!registry.Register({"material", std::move(spec)}, &error))`
+- [Tools/blender/export-lx-material-schema.ps1:103](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-lx-material-schema.ps1#L103) — `[void]$source.AppendLine('        spec.properties = {{"image", ""}, {"colorSpace", "srgb"}, {"interpolation", "Linear"}, {"extension", "REPEAT"}, {"projection", "FLAT"}};')`
+- [Tools/blender/export-lx-material-schema.ps1:104](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-lx-material-schema.ps1#L104) — `[void]$source.AppendLine('        schema.enumProperties = {{"colorSpace", {"data", "linear", "srgb"}}, {"interpolation", {"Linear", "Closest", "Cubic", "Smart"}}, {"extension", {"REPEAT", "EXTEND", "CLIP", "MIRROR"}}, {"projection", {"FLAT", "BOX", "SPHERE", "TUBE"}}};')`
+- [Lattice/Core/LXGraph.h:119](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L119) — `class LXGraph;`
+- [Lattice/Core/LXGraph.h:189](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L189) — `class LXGraph`
+- [Lattice/Core/LXGraph.h:192](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L192) — `explicit LXGraph(std::string domain = "material",`
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-09-28 · 독립 예제 Debug/Release 검증 완료.** Editor 창 연결은 LX-3,
 Slang 생성은 MAT-6, 자산 등록·cook·runtime generation 연결은 MAT-7에서 진행한다.
 이 문서의 generation은 마지막 정상 **IR**이다. GPU shader generation은 아직 생성하지 않는다.
@@ -113,3 +158,5 @@ node/socket compiler 진단으로 낮춘다. Material 그룹 생성 시 unlinked
 10/34를 별도로 확인했다. 기존 `verify-plan-dashboard.ps1`은 `days:null` 행
 24건과 PHASE 4.6 metadata 한 건을 오류로 판정한다. HEAD 기준 파일에서도
 같은 결과를 재현했으므로 전체 검사 통과로 기록하지 않는다.
+
+</details>

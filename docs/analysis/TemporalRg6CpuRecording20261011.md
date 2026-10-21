@@ -1,5 +1,34 @@
 # TR0 — RG6 제품 CPU 그래프 기록 비용 개선
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78) — `enum class RGMeasurementDomain : uint8_t { Normal, Capture };`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79) — `enum class RGQueueFallbackReason : uint8_t`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108) — `enum class RGQueuePlacement : uint8_t`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34) — `std::free(value);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:4195](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L4195) — `bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool, uint32_t workerCount,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:4226](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L4226) — `bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, uint32_t workerCount,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 이전 동일 fixture A/B의 CPU record 중앙값은 Debug legacy 1.62630/product 3.66040ms,
 Release legacy 1.09585/product 2.25195ms였다. 측정 구간은 기본 DX12 queue mode 0의
 `EnhancedRenderGraph::RecordParallel` 전체다. Compile/prepare·queue mode 2 planning·GPU 시간·
@@ -84,3 +113,5 @@ historical before/after이고 새 legacy/product A/B는 동일 현재 source inv
 검사가 차단했고 구체적인 이유가 반환되지 않아 그대로 남겼다. 텍스트 stack과 실패 원인은 보존한다.
 
 최종 대표 raw는 legacy/product × D/R의 4개다. 전후 비교 종료 뒤 이전 A/B·v2·진단 원본과 중복 reference 바이너리를 정리했고 historical verdict/manifest/hash/log는 보존했다. 이전 픽셀/바이너리 replay는 불가하며 최신 대표와 reference 최소 바이너리는 유지한다. v3 실행 중 raw 정리 실제 회수는 구성별 약 1.50/1.50/0.95/0.95GiB, 마지막 정리는 0.35GiB이며 최종 실제 여유 88.21GiB다. retained failed dump는 3.50GiB이며 자동 정책 차단으로 남는다.
+
+</details>

@@ -1,5 +1,44 @@
 # METEOR camera compute meshlet work — 2026-10-13
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/support/MeshletHzbProbe.inl:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletHzbProbe.inl#L7) — `const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),`
+- [Tools/regression/support/MeshletHzbProbe.inl:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletHzbProbe.inl#L8) — `RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18),`
+- [Tools/regression/support/MeshletHzbProbe.inl:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletHzbProbe.inl#L9) — `RHILayout::SrvBufferTable(4096, 4114), RHILayout::Srv(8211), RHILayout::SrvTable(16, 2)};`
+- [Tools/regression/support/MeshletBatchDispatchProbe.inl:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletBatchDispatchProbe.inl#L7) — `const RHIPipelineLayoutParam params[]{RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1),`
+- [Tools/regression/support/MeshletBatchDispatchProbe.inl:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletBatchDispatchProbe.inl#L8) — `RHILayout::UavBufferTable(2, 0), RHILayout::SrvBufferTable(4096, 18), RHILayout::SrvBufferTable(4096, 4114),`
+- [Tools/regression/support/MeshletBatchDispatchProbe.inl:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/support/MeshletBatchDispatchProbe.inl#L9) — `RHILayout::Srv(8211)};`
+- [Engine/RenderEngine/GpuGeometryOcclusion.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L11) — `struct EnhancedFrameContext;`
+- [Engine/RenderEngine/GpuGeometryOcclusion.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L15) — `class GpuGeometryOcclusion final`
+- [Engine/RenderEngine/GpuGeometryOcclusion.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.h#L17) — `struct HistoryPool;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:236](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L236) — `void GpuGeometryOcclusion::Pyramid::CheckCurrent(const EnhancedRenderGraph* graph) const`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:313](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L313) — `std::shared_ptr<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadHistory(`
+- [Engine/RenderEngine/GpuGeometryOcclusion.cpp:330](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryOcclusion.cpp#L330) — `void GpuGeometryOcclusion::Pyramid::ImportHistory(EnhancedRenderGraph& graph) const`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## Implementation
 
 - The camera prepares one metadata range per geometry/material bin. CPU preparation no longer constructs a candidate for every meshlet.
@@ -123,3 +162,5 @@ The 24-frame camera Scene gate checks actual accepted-history reuse, invalidatio
 `Editor-Release/verdict.json` passed meshlet contracts, skinning, render-graph checks, and empty/live product captures with normal quit, stable sources, 12 shadow GPU-list checks and 12 payload checks. The live image had 252 covered/lit geometry pixels and zero validation problems; the empty image retained the METEOR HDR clear. Debug Editor and the separate matched-image probe were not rerun for B2.
 
 `Release-Regression/verdict.json` passed all six related modes: shadow/decal, forward blend, subsurface, refraction, volume and forward transport. All gates exited normally with stable source hashes and GPU validation enabled. The aggregate `b2-verdict.json` records the accepted verdict hashes and verification scope; `git diff --check` passed. No performance measurement or optimization was performed. Vulkan runtime equivalence remains Phase 4.9.
+
+</details>

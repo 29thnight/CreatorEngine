@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>GCCE scene graph integration</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="GCCEIntegration.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/GCCEIntegration.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>GCCE scene graph integration</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Scene owner</ve-node><ve-node id="n1" at="2 1">GC roots</ve-node><ve-node id="n2" at="3 1" key>Scene</ve-node><ve-node id="n3" at="3 2">Entity</ve-node><ve-node id="n4" at="2 2">Component</ve-node><ve-node id="n5" at="1 2">Collection</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>SceneManager는 GCCE domain과 Scene root를 소유한다. Scene→Entity→Component의 trace 참조와 논리적 제거·핸들 무효화를 분리한다.</li>
+<li>일반 new/unique_ptr 기반 Scene 그래프를 새 이행 목표로 사용하지 않는다. 자산·SDK·GPU 수명은 독립 owner/완료 계약을 따른다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneGC.h#L1">Engine/SceneRuntime/SceneGC.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/GCCEProbe.ps1#L5">Tools/regression/GCCEProbe.ps1:5</a> — <code>[Parameter(Mandatory)][string]$Repository,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/GCCEProbe.ps1#L6">Tools/regression/GCCEProbe.ps1:6</a> — <code>[Parameter(Mandatory)][ValidateSet(&#39;Debug&#39;, &#39;Release&#39;)][string]$Configuration</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10">ScriptCore/Prefab.cs:10</a> — <code>public readonly struct Prefab</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12">ScriptCore/Prefab.cs:12</a> — <code>private readonly string? _name;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14">ScriptCore/Prefab.cs:14</a> — <code>private Prefab(string name) =&gt; _name = name;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14">ScriptCore/Animator.cs:14</a> — <code>public sealed class Animator : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18">ScriptCore/Animator.cs:18</a> — <code>public void SetBool(string name, bool value) =&gt; Native.AnimatorSetBool(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19">ScriptCore/Animator.cs:19</a> — <code>public void SetFloat(string name, float value) =&gt; Native.AnimatorSetFloat(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13">ScriptCore/MeshRenderer.cs:13</a> — <code>public sealed class MeshRenderer : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15">ScriptCore/MeshRenderer.cs:15</a> — <code>public string MaterialName =&gt; Native.MeshGetMaterialName(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24">ScriptCore/MeshRenderer.cs:24</a> — <code>public void InstantiateMaterial(string newName) =&gt; Native.MeshInstantiateMaterial(OwnerHandle, newName);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L10">Engine/SceneRuntime/Prefab.h:10</a> — <code>class [[reflgen::reflect]] Prefab : public Object</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L12">Engine/SceneRuntime/Prefab.h:12</a> — <code>friend struct reflgen::access;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.h#L18">Engine/SceneRuntime/Prefab.h:18</a> — <code>static Prefab* CreateFromGameObject(const Entity* source, std::string_view name = &quot;&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.h#L38">Engine/SceneRuntime/Socket.h:38</a> — <code>void AttachObject(Entity* Object);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.h#L39">Engine/SceneRuntime/Socket.h:39</a> — <code>void DetachObject(Entity* Object);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Socket.h#L40">Engine/SceneRuntime/Socket.h:40</a> — <code>void DetachAllObject();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81">Engine/SceneRuntime/Animator.h:81</a> — <code>own::shared_owner&lt;const assets::ModelAnimationPayload&gt; payload{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L112">Engine/SceneRuntime/Animator.h:112</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L114">Engine/SceneRuntime/Animator.h:114</a> — <code>Component::gc_trace(tracer);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Status: scoped Windows Debug/Release validation, 2026-10-09. Scene GC repeated
+20 times per configuration and Play round-trip regressions passed. See the
+<a href="../analysis/GCCEValidation20261009.html">validation record</a> for evidence and remaining gates.</p>
+<h2>Ownership and construction</h2>
+<p>The scope is Scene → Entity → Component. <code>Object</code> is deliberately not managed:
+Prefab and other non-GC objects retain their existing ownership. AssetDepot and
+<code>ownership_cpp</code> resource owners, native SDK handles, renderer snapshots, and GPU
+accepted-work/completion ownership are unchanged.</p>
+<ul>
+<li>SceneManager owns one GameThread <code>gc::domain</code>, declared before its external
+<code>root_ref&lt;Scene&gt;</code> registry so the domain is destroyed last. Its public Scene list
+is a const, nonowning enumeration. Temporary loading and DDOL transfers hold roots.</li>
+<li>Scene traces its Entity slots; Entity traces its ordered Component edges and the
+eagerly allocated missing-Transform fallback. SceneStore indexes/generations,
+hierarchy transactions, and DDOL identity remain authoritative.</li>
+<li>Component observes its owner through a weak identity. <code>GetOwner()</code> remains a raw
+frame-borrow accessor for joined workers and fenced presentation reads; it does
+not promote a weak reference on those threads.</li>
+<li>Scene factories take the domain and return a root. The manager adopts that root.
+Entity factories publish through <code>gc::make</code> before attaching Components. This
+two-phase construction makes owner identity available before <code>SetOwner</code>.</li>
+<li>Engine Components use <code>Component::CreateManaged</code>, which creates an external
+temporary root and establishes a cleanup obligation immediately. Publication
+into Entity precedes scheduler registration; failure rolls back both.</li>
+<li>GC objects must not be created on the stack, embedded by value, made by ordinary
+<code>new</code>, or held by <code>unique_ptr</code>. Socket pose data is a plain matrix value, not a
+Transform Component. Standalone probes explicitly finalize before dropping roots.</li>
+</ul>
+<h2>Tracing and reflection</h2>
+<p>Tracing is explicit and independent of serialization. Every shipped concrete
+Component declares its own <code>gc_trace</code>, calls its base hook, and visits any strong
+GC fields, including ignored/nonserialized fields. The typed Component factory
+rejects a new subtype that only inherits a trace hook. This is a source contract,
+not automatic detection of an omitted field.</p>
+<p>Graph references retain their prior serialized pointer/sequence shape. Generic
+property copying and graph deserialization do not allocate or reassign ownership;
+Scene and ComponentFactory perform restoration in the explicit domain. The closed
+factory uses the existing <code>REFLECT_TYPE_LIST</code> and type IDs. Public CLR/native ABI
+handles remain generation values, never <code>gc::weak_ref</code> values that could outlive a
+domain. Editor cross-frame selections/popups re-resolve scene/entity/component IDs.</p>
+<p>The pinned reflgen 1.0.0 descriptor factory previously checked only default
+constructibility before instantiating <code>new T</code> and <code>delete T</code>. The local vcpkg port
+patch additionally requires legal class allocation/deletion. Managed types still
+have metadata/serialization, but no ordinary descriptor factory. No reflgen
+repository changes or new code-generation protocol are required.</p>
+<h2>Thread and borrow boundaries</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Entry</th>
+<th>Execution and retained data</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Runtime/CLR graph operations</td>
+<td>GameThread; Scene roots and traced edges</td>
+</tr>
+<tr>
+<td>Editor create/delete/duplicate/reparent/component/prefab operations</td>
+<td>PresentationThread queues owned values and generation handles; existing GameThread command pump applies them</td>
+</tr>
+<tr>
+<td>Light creation and configuration</td>
+<td>One queued operation; no fabricated immediate creation result</td>
+</tr>
+<tr>
+<td>Undo/Redo replay</td>
+<td>GameThread; value-only Undo commits retain their existing synchronous UI behavior</td>
+</tr>
+<tr>
+<td>UI factories, hierarchy paste, terrain attachment, prefab drops</td>
+<td>Whole actions queued with owned paths/IDs; targets resolved at execution</td>
+</tr>
+<tr>
+<td>Prefab editor open/close</td>
+<td>GameThread adoption/retirement; persisted identities are re-resolved</td>
+</tr>
+<tr>
+<td>Editor command delivery/polling</td>
+<td>Separate orchestration and scene-borrow sections; no blocking PresentationThread future</td>
+</tr>
+<tr>
+<td>Animation and transform workers</td>
+<td>Existing jobs join before graph edges may detach or collection runs; stable Scene-rooted graph supplies their borrow lifetime</td>
+</tr>
+<tr>
+<td>AI jobs</td>
+<td>Existing immutable snapshots and EntityHandle values</td>
+</tr>
+<tr>
+<td>Render/presentation/GPU work</td>
+<td>Existing sealed snapshots and independent resource/completion owners</td>
+</tr>
+</tbody></table></div>
+<p>Queued edits capture the scene-context epoch as well as target generations. A
+scene/session transition rejects an old click instead of applying it to a new
+context. Queue admission closes before teardown. No GC root or pin is moved into a
+worker/editor closure whose destructor could run on another thread. A pin protects
+memory, not logical Destroy state or unsynchronized data writes. An asynchronous
+borrow that can outlive its graph edge needs a pin for the actual borrowed object,
+retained and released by the owner thread after its job joins.</p>
+<p>Live-scene command handlers must not synchronously wait for PresentationThread
+work while holding the scene borrow fence. Use request/poll splitting for such
+operations. Source review found bounded RT/GPU waits and nonblocking presentation
+polls, not a demonstrated GT/PT wait cycle. This is not proof of runtime deadlock
+freedom, and some existing diagnostic handlers still block while they execute.</p>
+<h2>Deterministic cleanup and collection</h2>
+<p>Destroy still delivers the existing lifecycle hooks. Pending cleanup keeps objects
+reachable. Script handles remain valid during final hooks and are invalidated before
+Entity edge removal; DDOL detach does not invalidate them. Selection borrows are
+pruned before a Scene slot is released. Detached components leave the source
+lifecycle schedule and re-register in the destination.</p>
+<p><code>FinalizeManagedDestroy</code> performs idempotent native resource release before clearing
+owner observations and marking the GC lifecycle destroyed. Animator releases CLR
+animation instances, controller owners, sockets, asset requests, and its native
+instance record there; MeshRenderer/Foliage cancel their subscriptions there.
+Collector destructors release owned storage, not normal engine lifecycle callbacks.
+The current CLR animation release is <code>AniBehaviorFactory.Destroy</code> dictionary removal,
+not a user Enter/Exit callback. Future cleanup extensions must recheck reentrancy.</p>
+<p>Scene retirement sets its guard before callbacks and rejects new graph mutations or
+re-adoption. Cleanup failures retain their roots and fail closed; they are not marked
+successfully retired. Scene slot reuse still invalidates generation handles.</p>
+<p>Collection runs after EndOfFrame callbacks and the DDOL observer sweep, while the
+editor&#39;s existing scene/presentation fence is held. The Player has the equivalent
+post-EndOfFrame boundary. Normal collection is <code>collect_step</code>: 250 μs soft budget,
+16 minimum units, 1 MiB allocation trigger, and a one-second maximum cycle interval.
+Teardown/edge release explicitly requests collection. No full collection runs every
+frame. Root scans, a large tracer/destructor, and allocator maintenance may overrun
+the soft budget; no latency or performance improvement is claimed.</p>
+<p>Shutdown order is stop admission → drain loads/AI/jobs and PT/RT consumers → run
+Scene/component hooks and invalidate handles → drop graph/transfer roots → full
+collection → clear callback roots and collect again → shut down CLR/audio/other
+services. The domain is destroyed last. Module object count alone is not enough to
+unload code; callbacks and workers must also be quiescent.</p>
+<p>The default GCCE violation handler still aborts. Quarantine is not a substitute for
+cleanup, root release does not itself request collection, and nonmoving allocator
+pools may retain warm committed memory. No returning production violation handler
+has been installed to hide lifetime errors.</p>
+<h2>Dependency and packaging</h2>
+<p><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ThirdParty/GCCE/PROVENANCE.md">Upstream provenance</a> pins all 16 unmodified
+source files to <code>aef79b3f57861fc16d0045e860e9082eeed8ec29</code> with hashes. Upstream
+supplies no LICENSE at this revision; none has been invented or changed.</p>
+<p><code>Engine/GCCE/GCCE.vcxproj</code> builds one C++23 DLL. Only that project defines
+<code>GCCE_BUILDING</code>; consumers use <code>GCCE_SHARED</code> and matching <code>GC_DEBUG_CHECKS</code> (Debug 1,
+Release 0). SceneGC.h is the engine entry header. The DLL opts out of reflgen and
+vcpkg and uses the matching shared CRT. This exported C++ interface requires matching
+toolchain/configuration, not a stable cross-version C ABI.</p>
+<p>GCCE is shipping-neutral: <code>Bin/&lt;platform&gt;-&lt;configuration&gt;/Runtime/Common/gcce.dll</code>
+and <code>Build/Lib/&lt;platform&gt;-&lt;configuration&gt;/gcce.lib</code> are shared by Development and
+Shipping, including identical intermediate/PDB paths. The existing launcher and
+hashed deployment/package manifests carry its import closure. Standalone compiler
+probes use GCCEProbe.ps1 for the same definitions, import library, and DLL lookup.
+The vendored CMakeLists is provenance; its unvendored upstream tests/benchmarks are
+not an engine build entrypoint.</p>
+<h2>Validation and remaining gates</h2>
+<p>Initial integration review covered source, exact upstream blob hashes, changed
+project XML, Python source parsing, include/reference inspection and whitespace.
+Subsequent authorized validation built the Editor dependency closure and managed
+assemblies in Windows x64 Debug/Release. Editor GC owner-source contracts (8),
+Entity ownership contracts, reflection container classification (D/R), and
+reflection value/shape round-trip (Debug, 37 axes) passed.</p>
+<p>Regression source includes <code>SceneGCSelfTest</code> (real graph cycles, hooks, stale handles,
+selection, DDOL and an actual component pin through job join), editor owner-thread
+source contracts, and migrated existing standalone component probes. The Scene GC
+fixture is invoked by the process-scoped <code>scene.gc.selftest</code> commandlet under the
+host scene borrow fence. Debug/Release each passed 20 repetitions with exit 0,
+including final incremental collection and unchanged live/quarantine/aborted-cycle
+counts. Its pin example intentionally distinguishes storage retention from
+logical cleanup and does not claim pins prevent Destroy.</p>
+<p>Play-to-Stop content restoration and the W5 state-machine/failure-injection/Undo
+preservation gates also passed in both configurations. These scoped initialized
+host runs exercise DLL loading, reflection regeneration, script handle identity
+and normal shutdown. They do not complete general script/native ABI coverage.
+Remaining runtime gates include repeated prefab UI transitions, cleanup callback
+reentrancy/failure paths, pending-work shutdown, packaged Player/Shipping,
+NativeAOT publish, ASan, and scale/latency benchmarks. Upstream tests were not run.
+The validation record also preserves Release PDB and profiler shutdown warnings.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="dependency-and-packaging"></span><span id="deterministic-cleanup-and-collection"></span><span id="ownership-and-construction"></span><span id="sec-dependency-and-packaging"></span><span id="sec-deterministic-cleanup-and-collection"></span><span id="sec-ownership-and-construction"></span><span id="sec-thread-and-borrow-boundaries"></span><span id="sec-tracing-and-reflection"></span><span id="sec-validation-and-remaining-gates"></span><span id="thread-and-borrow-boundaries"></span><span id="tracing-and-reflection"></span><span id="validation-and-remaining-gates"></span></details></main></body></html>

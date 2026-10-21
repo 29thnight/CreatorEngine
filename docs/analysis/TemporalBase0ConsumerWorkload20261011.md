@@ -1,5 +1,39 @@
 # TR0 — 실제 BASE-0 population과 RG6 소비자
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+이 문서는 연구/운영/표현 가이드 성격이므로, 아래 파일은 관련 엔진 경계의 근거다. 문서의 제안 전체가 구현됐다는 증거로 해석하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L216) — `const auto started = std::chrono::steady_clock::now();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:230](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L230) — `std::chrono::steady_clock::now() - started).count();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L307) — `const uint64_t generation = std::exchange(token.captureGeneration, 0);`
+- [Engine/RenderEngine/Camera.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L18) — `class [[reflgen::reflect]] Camera`
+- [Engine/RenderEngine/Camera.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L47) — `static constexpr math::vector3 kForward = math::vector3::unit_z();`
+- [Engine/RenderEngine/Camera.h:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L48) — `static constexpr math::vector3 kRight = math::vector3::unit_x();`
+- [Player/PlayerMain.cpp:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L56) — `auto* window = WindowsCoreWindow::GetForCurrentInstance();`
+- [Player/PlayerMain.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L82) — `const Authoring::TextParseTelemetrySnapshot parseTelemetry = Authoring::GetTextParseTelemetry();`
+- [Player/PlayerMain.cpp:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L83) — `std::printf("[runtime.text-parser] calls=%llu\n", static_cast<unsigned long long>(parseTelemetry.calls));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 범위
 
 이 후속은 앞선 저장 행 metadata 검사에서 실제 비용 population 수집으로 진행한다.
@@ -91,3 +125,5 @@ native BASE-0/RG6 저장 population 소비자다. 다음 수용은 legacy/produc
 
 
 2026-10-11 후속: 현재 소스 legacy/product SDK D/R 전체 RG6 행렬(8프로세스·800표본·408캡처)은 [TemporalRg6ABAcceptance20261011](TemporalRg6ABAcceptance20261011.md)에서 수용됐다. raw 대표 4개와 최소 진단 바이너리만 보존, 실측 여유 92.37GiB. UI/actual generated/외부 계측/제품 예산은 잔여다. 이전 체크포인트의 미확인 표기는 당시 상태로 유지한다.
+
+</details>

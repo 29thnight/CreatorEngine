@@ -1,5 +1,51 @@
 # Output Log 저장 경계 정리 — 1·2·3단계
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Debug.cs:33](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Debug.cs#L33) — `Native.PrintLog((int)level, message, file, line, member);`
+- [ScriptCore/Debug.cs:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Debug.cs#L40) — `=> Native.PrintLog((int)LogLevel.Info, message, file, line, member);`
+- [ScriptCore/Debug.cs:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Debug.cs#L46) — `=> Native.PrintLog((int)LogLevel.Warning, message, file, line, member);`
+- [ScriptCore/Native.cs:609](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L609) — `=> PrintLog(level, message, file, line, member);`
+- [ScriptCore/Native.cs:611](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L611) — `public static void PrintLog(int level, string message, string file, int line, string member)`
+- [ScriptCore/Native.cs:624](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L624) — `_api.PrintLog(level, messagePointer, filePointer, line, memberPointer);`
+- [ScriptCore/Component.cs:314](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Component.cs#L314) — `public T? GetComponent<T>() where T : Component => Entity.GetComponent<T>();`
+- [ScriptCore/Component.cs:315](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Component.cs#L315) — `public List<T> GetComponents<T>() where T : Component => Entity.GetComponents<T>();`
+- [ScriptCore/Component.cs:316](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Component.cs#L316) — `public bool TryGetComponent<T>(out T component) where T : Component => Entity.TryGetComponent(out component);`
+- [ScriptCore/Bootstrap.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Bootstrap.cs#L14) — `public static class Bootstrap`
+- [ScriptCore/Bootstrap.cs:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Bootstrap.cs#L16) — `private static readonly Diagnostics.ProfilerMarker PrePhysicsProfile = new("ScriptCore.PrePhysicsTick");`
+- [ScriptCore/Bootstrap.cs:256](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Bootstrap.cs#L256) — `try { return BehaviorTreeRegistry.Create(owner, nodes, count, entries, entryCount); }`
+- [Engine/Utility_Framework/LogGroup.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogGroup.h#L11) — `struct LogGroup`
+- [Engine/Utility_Framework/LogGroup.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogGroup.h#L39) — `struct LogOccurrence`
+- [Engine/Utility_Framework/LogSystem.h:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogSystem.h#L53) — `std::source_location where = std::source_location::current())`
+- [Engine/Utility_Framework/LogSystem.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogSystem.h#L55) — `PrintLog(level, message, spdlog::source_loc{ where.file_name(),`
+- [Engine/Utility_Framework/LogSystem.h:107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/LogSystem.h#L107) — `std::source_location where = std::source_location::current())`
+- [Engine/Utility_Framework/PakHelper.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/PakHelper.h#L25) — `std::source_location where = std::source_location::current()) noexcept`
+- [Engine/Utility_Framework/PakHelper.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/PakHelper.h#L36) — `std::source_location where = std::source_location::current()) noexcept`
+- [Engine/Utility_Framework/PakHelper.h:271](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/PakHelper.h#L271) — `Debug::PrintLog(spdlog::level::info, "Added " + std::to_string(rootFileCount) + " files from '" + source.mountName + "' to pak queue.");`
+- [Editor/EngineGUIWindow/OutputLogView.h:124](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/OutputLogView.h#L124) — `std::string EllipsizeToWidth(std::string_view text, float maxWidth, Measure measure)`
+- [Editor/EngineGUIWindow/OutputLogView.h:128](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/OutputLogView.h#L128) — `if (measure(text) <= maxWidth) return std::string(text);`
+- [Editor/EngineGUIWindow/OutputLogView.h:217](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/OutputLogView.h#L217) — `const LogGroup* FindGroup(std::uint64_t groupId) const`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1단계: 저장 경계 정리
 
 날짜: 2026-09-13
@@ -740,3 +786,5 @@ not become the stored payload")` 는 남겼다 — 싱크의 패턴이 저장 pa
 에디터 선언·클리핑·키보드 탐색·상태 행렬 네 게이트, 기동 진단 게이트 19 checks(변이
 G0~G4·H1~H3·W1~W2), Editor Release 빌드, 그리고 창을 띄운 눈 확인. 픽셀 골든과
 Vulkan 백엔드에서의 확인은 하지 않았다.
+
+</details>

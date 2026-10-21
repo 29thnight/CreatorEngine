@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 4.x 공수 재산정 원장</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="RenderPhaseEffortEstimate.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RenderPhaseEffortEstimate.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PHASE 4.x 공수 재산정 원장</h1><p>완료된 행의 과거 공수는 제거한다. 전문 계획별 남은 구현·제품 수용만 재산정한다. 대시보드 수치는 보존된 별도 원장이므로 이번 문서 정리로 변경하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 종료/승계</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<p><strong>단일 소유 계획:</strong> <a href="RenderPhaseRoadmap.html">RenderPhaseRoadmap</a>. 이 문서는 이전 진입 링크를 보존하는 인계 문서다.</p>
+<ul>
+<li>완료된 행의 과거 공수는 제거한다. 전문 계획별 남은 구현·제품 수용만 재산정한다. 대시보드 수치는 보존된 별도 원장이므로 이번 문서 정리로 변경하지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>live pipeline → explicit graph versions → dependency recording → queue execution → completion retirement</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L75">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:75</a> — <code>enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L188">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:188</a> — <code>if (graph-&gt;m_scheduling == RGSchedulingMode::ExplicitVersioned &amp;&amp; !graph-&gt;ValidVersionHandle(handle)) return {};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp#L6">Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp:6</a> — <code>void EnhancedRenderGraph::RequireQueueIdle() const</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/RenderGraphDeclarationTask.h#L8">Engine/RenderEngine/Render/Graph/RenderGraphDeclarationTask.h:8</a> — <code>class render_graph_declaration_lock final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L54">Engine/RenderEngine/RHI/IRHICommandTranslator.h:54</a> — <code>virtual bool Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L6">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:6</a> — <code>bool RHICommandTranslator::Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1099">Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1099</a> — <code>bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources&amp; completionSource,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L54">Engine/RenderEngine/RHI/IRHICommandTranslator.h:54</a> — <code>virtual bool Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L6">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:6</a> — <code>bool RHICommandTranslator::Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1099">Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1099</a> — <code>bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources&amp; completionSource,</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="id별-재산정"></span>
+<span id="sec-id별-재산정"></span>
+<span id="sec-선행-관계"></span>
+<span id="sec-집계-규칙"></span>
+<span id="sec-페이즈별-비교"></span>
+<span id="선행-관계"></span>
+<span id="집계-규칙"></span>
+<span id="페이즈별-비교"></span></p>
+</details>
+</main></body></html>

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 12 — 조건부 게시 수정 후 실제 붙여넣기·종료 검증 (2026-10-10)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="ConditionalPublishActualInspectorValidation20261010.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/ConditionalPublishActualInspectorValidation20261010.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 12 — 조건부 게시 수정 후 실제 붙여넣기·종료 검증 (2026-10-10)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>조작과 판정 경계</h2>
+<p><a href="ConditionalAssetPublishValidation20261010.html">조건부 게시 수정</a>의 Debug/Release runtime을
+사용해 격리된 Tiny4/SavedFixture 프로젝트에서 실제 Windows Inspector를 조작했다.
+other.png의 Maximum Dimension 2를 Ctrl+C로 복사한 뒤 fixture.png의 0을 선택하고
+Ctrl+V로 붙여넣었다. 이후 실행에서도 같은 복사 값을 사용했다. 입력을 생성하는 API
+자동화가 아니라 실제 키 조작이다. 매번 선택 필드와 미저장 객체가 있는 화면을 관찰했다.</p>
+<p>저장 대기 경합 4회는 <code>assets.texture.pendingprobe</code>가 실제 UI 입력으로 생긴 대기를
+관찰해 외부 상태를 변경하고 <code>RequestQuit</code>을 호출한다. 창 닫기 2회는 실제 제목 표시줄의
+X를 클릭했다. 후자는 400ms 저장 대기 안의 클릭이라는 계측이 없어 일반 닫기로만 수용한다.
+두 결과를 저장 대기 중 네이티브 닫기 수용으로 합치지 않는다.</p>
+<h2>결과</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성/조작</th>
+<th align="right">경합 요청/flush age(ms)</th>
+<th align="right">종료 코드</th>
+<th>격리 실행 루트</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug 붙여넣기·metadata 삭제·RequestQuit</td>
+<td align="right">3 / 20</td>
+<td align="right">0</td>
+<td>TAUI-Debug-deleteshutdown-840481bd</td>
+</tr>
+<tr>
+<td>Debug 붙여넣기·유효 외부 변경·RequestQuit</td>
+<td align="right">3 / 31</td>
+<td align="right">0</td>
+<td>TAUI-Debug-conflictshutdown-6d915afe</td>
+</tr>
+<tr>
+<td>Debug 붙여넣기·실제 X 닫기</td>
+<td align="right">미계측</td>
+<td align="right">0</td>
+<td>TAUI-Debug-manual-8f132f41</td>
+</tr>
+<tr>
+<td>Release 붙여넣기·손상 metadata·RequestQuit</td>
+<td align="right">7 / 29</td>
+<td align="right">0</td>
+<td>TAUI-Release-corruptshutdown-5e416ac4</td>
+</tr>
+<tr>
+<td>Release 붙여넣기·유효 외부 변경·RequestQuit</td>
+<td align="right">0 / 32</td>
+<td align="right">0</td>
+<td>TAUI-Release-conflictshutdown-7e6436f6</td>
+</tr>
+<tr>
+<td>Release 붙여넣기·실제 X 닫기</td>
+<td align="right">미계측</td>
+<td align="right">0</td>
+<td>TAUI-Release-manual-cfea6d41</td>
+</tr>
+</tbody></table></div>
+<p>경합 4회는 외부 상태와 원본 PNG·저장 씬을 보존하고 flush 충돌 거부, Finalize,
+DX12 pending task/batch/retirement0/0/0을 통과했다. 일반 닫기 2회는 maxDimension2 저장과
+GUID·PNG·저장 씬 보존, Finalize, 동일한 빈 종료 큐를 통과했다. 저장 씬에는 미저장 객체를
+추가하지 않았다. age는 이 fixture의 관찰값이며 성능 수용값이 아니다.</p>
+<ul>
+<li>전체 receipt·파일 판정·runtime/source hash (<code>../../Build/ConditionalPublishActualUi/result.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+<li>저장 대기 종료 경합 검사 receipt (<code>../../Build/ConditionalPublishActualUi/shutdown-result.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)</li>
+</ul>
+<p>각 루트의 launch.json, commands.jsonl, editor.out/err, exit.json과 프로젝트를 보관했다.
+runtime hash는 실행 전후와 직전 빌드 receipt가 일치한다. 이전 검증에서 저장한 제품
+입력11파일과 UI 관찰기/실행기/판정기3파일의 hash를 실행 후 대조해14파일 일치를 확인했다.
+이번 실행에 제품 소스 변경이나 추가 빌드는 없다.</p>
+<p>최초 Debug 유효 충돌 실행 <code>TAUI-Debug-conflictshutdown-5d02eeb6</code>도 실제 Ctrl+V와
+요청8/flush48ms·정상 Finalize 로그를 관찰했으나 프로세스가 종료된 뒤 확인해 종료 코드를
+기록하지 못했다. 이를 위6회에서 제외하고 종료 코드까지 기록한 별도 Debug 실행으로
+반복했다. 로그와 격리 프로젝트는 삭제하지 않았다.</p>
+<h2>수용과 잔여</h2>
+<p>최신 runtime의 실제 Ctrl+V6회, 제어된 저장 대기 종료 경합4회, 네이티브 일반 닫기2회를
+한정 수용한다. 저장 대기 400ms 안의 네이티브 닫기, 실패 유형별 반복 확장, 다중 창/배율,
+RenderProfile 실제 UI·GPU 적용과 전체 소비자는 잔여다. 실패를 주입한4회는 최초 원본
+비교 전에 변경하므로 마지막 게시 경계 검증을 대신하지 않는다.
+12-0-D 후속 보강으로 추가 가중치 없이66.25%(표시66%), T1b 대기·T3 중단을 유지한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-결과"></span><span id="sec-수용과-잔여"></span><span id="sec-조작과-판정-경계"></span><span id="결과"></span><span id="수용과-잔여"></span><span id="조작과-판정-경계"></span></details></main></body></html>

@@ -1,5 +1,50 @@
 # Material Node Editor
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/material_codegen_probe.cpp:132](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L132) — `Case Surface(const LXMaterialDefinitions& definitions, std::string name)`
+- [Tools/regression/material_codegen_probe.cpp:566](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L566) — `ExpectError(target, "material_output_target", target.activeOutput);`
+- [Tools/regression/material_codegen_probe.cpp:868](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L868) — `fails([](const auto&, auto&, auto&) -> bool { throw std::runtime_error("compiler exception"); }, "exception");`
+- [Tools/regression/verify-material-node-editor.ps1:182](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-node-editor.ps1#L182) — `Assert ($state.requestSucceeded -ne [bool]$Reject) "Material request failed expectation: $($state.requestError)"`
+- [Tools/regression/verify-material-node-editor.ps1:214](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-node-editor.ps1#L214) — `Assert (!$initial.automaticPreview -and !$initial.requestPending -and $initial.requestSerial -eq 0) 'New drafts must wait for an explicit compile or save request'`
+- [Tools/regression/verify-material-node-editor.ps1:282](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-node-editor.ps1#L282) — `Assert ((Doc).sourceRevision -eq $layoutSource -and (Doc).preparedSourceKey -eq $layoutKey) 'Layout-only save must preserve the compiled source key'`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [Lattice/Core/LXDocument.h:278](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXDocument.h#L278) — `bool HasActivePreview() const { return previewActive_; }`
+- [Lattice/Core/LXDocument.h:282](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXDocument.h#L282) — `bool PreviewNodePositions(const std::vector<NodePosition>& positions);`
+- [Lattice/Core/LXDocument.h:283](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXDocument.h#L283) — `LXCommandResult FinishNodePositionPreview(const std::vector<NodePosition>& start,`
+- [ScriptCore/MeshRenderer.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13) — `public sealed class MeshRenderer : NativeComponent`
+- [ScriptCore/MeshRenderer.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15) — `public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);`
+- [ScriptCore/MeshRenderer.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24) — `public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86) — `own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};`
+- [Engine/SceneRuntime/Animator.h:142](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L142) — `[[nodiscard]] bool IsDirectEditorPreview() const;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1. Editor 진입과 저작 흐름
 
 2026-09-29부터 MeshRenderer Inspector의 재질 이름과 More 메뉴의
@@ -496,3 +541,5 @@ Scene context guard는 active Scene ID가 달라지면 Inspector 미리보기와
 handle/component를 해제한다. 열린 자산 문서와 미저장 초안은 유지하고 새 Scene에 자동 할당하지 않는다.
 Assign은 현재 선택한 MeshRenderer를 다시 검사한다. 종료는 별도의 Apply/Save를 만들지 않으므로
 보존할 변경은 종료 전에 Save를 요청해야 한다.
+
+</details>

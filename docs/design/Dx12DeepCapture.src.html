@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>DX12 deep capture: separate ETW collector</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="Dx12DeepCapture.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/Dx12DeepCapture.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>DX12 deep capture: separate ETW collector</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Producers</ve-node><ve-node id="n1" at="2 1">Records</ve-node><ve-node id="n2" at="3 1" key>Collector</ve-node><ve-node id="n3" at="3 2">Snapshot</ve-node><ve-node id="n4" at="2 2">Stream</ve-node><ve-node id="n5" at="1 2">Viewer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>CPU engine frame·render submission·GPU pass·presenter 관측은 서로 다른 식별 축이다. bounded producer 기록과 손실/출처를 보존한다.</li>
+<li>집계 메모리 표본은 객체별 native/CLR/GPU 소유 그래프가 아니다. 과거 .ceprof/ETW 기록은 그 실행 신원에만 유효하다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/DxCaptureFileTests.cpp#L21">Tools/regression/DxCaptureFileTests.cpp:21</a> — <code>std::fprintf(stderr, &quot;DxCaptureFileTests: %s\n&quot;, message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/DxCaptureFileTests.cpp#L22">Tools/regression/DxCaptureFileTests.cpp:22</a> — <code>std::abort();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/DxCaptureFileTests.cpp#L29">Tools/regression/DxCaptureFileTests.cpp:29</a> — <code>std::memcpy(bytes.data() + offset, &amp;value, sizeof(value));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/DxCaptureHelper/DxCaptureHelper.cpp#L17">Tools/DxCaptureHelper/DxCaptureHelper.cpp:17</a> — <code>if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &amp;token))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/DxCaptureHelper/DxCaptureHelper.cpp#L23">Tools/DxCaptureHelper/DxCaptureHelper.cpp:23</a> — <code>const bool queried = GetTokenInformation(token, TokenElevation, &amp;elevation, bytes, &amp;bytes) != FALSE;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/DxCaptureHelper/DxCaptureHelper.cpp#L24">Tools/DxCaptureHelper/DxCaptureHelper.cpp:24</a> — <code>CloseHandle(token);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>Scope and status</h2>
+<p>This is an optional Windows x64 development feature. The ordinary Editor keeps its renderer,
+DX12 timestamp queries, profiler and UI. <code>CreatorDxCaptureHelper.exe</code> is a headless ETW consumer:
+it creates no graphics device, command queue, swapchain, window or replay capture.</p>
+<p>The first slice records DirectX submission and calibrated GPU-work intervals using Microsoft&#39;s
+<a href="https://github.com/microsoft/DxTimingCaptureLibrary">DxTimingCaptureLibrary</a> at commit
+<code>05bf5ff1d9e1b1d63c7420a166e61ded2ca7c072</code>. The vendored source provenance, hashes and notices
+are in <code>ThirdParty/DxTimingCaptureLibrary</code>. It is not WinPixTimingCapturer.dll.</p>
+<p>The source was implemented and reviewed without building, running tests, launching the Editor
+or helper, capturing ETW, installing an SDK, changing permissions, or triggering UAC. Runtime
+correctness and security acceptance remain open. Do not present the source review as a Windows
+build, working driver capture, measured overhead, or a security certification.</p>
+<p><strong>Elevation is intentionally unavailable in this first slice.</strong> Static review found unsafe
+payload/index handling in the upstream decoder. Some local bounds guards are included, but the
+complete parser has not passed adversarial Windows validation. The Editor never invokes <code>runas</code>,
+and the helper refuses an elevated token, including a manual administrator launch. Administrator
+launch is not a supported workaround. Ordinary-token collection works only where the account&#39;s
+existing ETW permissions allow it; otherwise the feature reports unavailable.</p>
+<p>Not included in this slice:</p>
+<ul>
+<li>PIX user marker text and Begin/End scope decoding. Upstream&#39;s decoder stub is deliberately
+used; the capability is explicitly unavailable. Raw API marker IDs are retained as opaque IDs</li>
+<li>PSO compilation, residency, DirectStorage, context-switch sampling or call stacks</li>
+<li>Vulkan live GPU timing or a standalone viewer application</li>
+<li>Installation, a persistent service, Performance Log Users membership changes or credentials</li>
+</ul>
+<h2>Opt-in build and UI</h2>
+<p><code>EngineDxDeepCapture</code> defaults to <code>false</code>. Existing profiling remains the default. Development
+Debug/Release x64 builds can explicitly set <code>EngineDxDeepCapture=true</code> and
+<code>DxTimingCaptureSdkInclude=&lt;existing Microsoft.Direct3D.D3D12 1.619.5 build/native/include&gt;</code>.
+The helper project checks the package&#39;s retained nuspec version and required headers. It never
+restores a NuGet package or installs an SDK. Agility headers precede the Windows SDK headers.
+Shipping cannot build or link the collector. Offline <code>.cedx</code> viewing does not require the SDK.</p>
+<p>The CreatorEditor project conditionally builds the helper without linking it into the Editor.
+The helper uses a static CRT, its own asInvoker manifest, and system-only dependencies. Its fixed
+location is <code>DxCaptureHelper/CreatorDxCaptureHelper.exe</code> below the Editor executable directory.
+The helper is excluded from engine reflection and vcpkg generation paths.</p>
+<p>In the Profiler&#39;s <code>DX12 Deep Capture</code> page:</p>
+<ol>
+<li>Choose a new <code>.cedx</code> output path and click <code>Start DX12 Deep Capture</code></li>
+<li>The normal-token helper is tried. Insufficient ETW permission is reported; there is no UAC retry</li>
+<li>Stop requests asynchronous draining; the Editor worker finalizes and opens the recorded file</li>
+<li><code>Open .cedx</code> reads a bounded file and prepares immutable links off the UI thread</li>
+</ol>
+<p>Capture is bounded to 60 seconds, the file to 64 MiB and 262,144 records. Each transport/submission
+queue has 8,192 records. ETW uses bounded real-time buffers. Caps, decode failures, queue drops,
+source loss, missing finalization and unfinished executions are visible rather than filled with
+zero timing data. The helper also bounds decoded input and process memory. These bounds may stop
+a busy capture early; the costs and effect of system-wide provider traffic require measurement.</p>
+<p>The existing <code>profile.stats</code>/recording payload includes <code>dxDeepCapture</code> status. There is no new
+unattended command that triggers UAC. Capture controls are independent of <code>.ceprof</code> Record/Stop.</p>
+<h2>Clocks and identities</h2>
+<p>ETW uses QPC input (<code>ClientContext=1</code>, <code>PROCESS_TRACE_MODE_RAW_TIMESTAMP</code>). The session stores
+its original QPC start, frequency, target PID, process creation time and Windows session ID.
+That tuple identifies a recorded session; the randomized IPC nonce is a separate security token.</p>
+<p>The upstream converter contract is <strong>nanoseconds</strong>, even for raw-QPC input. Its implementation
+adds GPU nanosecond deltas to converted CPU clocks. Returning raw QPC ticks from that converter
+would silently mix units. The helper therefore uses checked integer QPC-to-ns conversion, keeps
+the upstream callback ns values, and derives a QPC-domain view at the recording boundary.
+For supported frequencies up to 1 GHz, the CPU submit inverse uses ceiling to recover the exact
+original QPC tick. GPU intervals are calibrated/rounded QPC coordinates and retain original ns;
+they are not native raw GPU hardware ticks. Captures do not use the viewing machine&#39;s clock.</p>
+<p>Upstream API queue IDs are session-local callback IDs. Engine submission records carry opaque
+native queue addresses. These two ID spaces are never equated by numerical value. A GPU execution
+is attributed to an engine submission only when its PID, TID and exact CPU submit QPC lie in one
+unique <code>ExecuteCommandLists</code> before/after interval. Zero candidates remain unmatched and multiple
+candidates remain ambiguous. There is no nearest-frame or current-frame guess.</p>
+<p>The renderer copies exact <code>GpuFrameToken</code> frame/submission/view values through the recorded batch.
+Immediate submissions without that token retain unknown IDs. Submission ID zero can be a valid
+first token, so validity is explicit. The prior query <code>cpuSubmitTick</code> remains the time the query
+recording opened; it is not silently redefined as the actual API call.</p>
+<p>Execution IDs join begin/work/end records; hardware queue is a work attribute. The upstream
+<code>commandListIndexInExecution</code> value is retained as an opaque list token, not assumed to be a
+dense index bounded by the engine&#39;s submitted-list count. Raw marker IDs have no decoded names.</p>
+<h2>Artifact and viewer</h2>
+<p><code>.cedx</code> v1 is separate from <code>.ceprof</code>. No v1/v2/v3 record type, flag, size, CRC rule or reader
+meaning is changed. The file contains versioned headers, bounded fixed-size records, sequences,
+checksums and a final summary. A recovered prefix cannot become a complete capture just because
+the prefix parses. Original timing and identity fields survive save/open.</p>
+<p>The viewer renders prepared work links with list clipping, gray submit-to-start intervals and
+blue GPU-work intervals on one stored QPC axis. Tooltips expose source ns, QPC, ETW queue IDs,
+engine queue identity and explicit association state. Intervals can overlap and must not be summed
+as exclusive GPU busy time. Unmatched work remains visible. The helper never receives an output
+path; only the ordinary Editor writes or reads the artifact.</p>
+<h2>Privilege boundary</h2>
+<p>The protocol accepts fixed-size versioned messages and bounded record kinds, not shell commands,
+DLLs, plugins, paths or arbitrary target processes. Local pipe endpoints bind a fresh nonce,
+verified peer PID, process creation time, same user and Windows session. Remote clients, replay,
+incorrect message sizes, unknown enums, timeout and parent exit terminate the connection.</p>
+<p>Elevation is rejected unconditionally while decoder security validation remains incomplete.
+Additional installation checks are retained for future reviewed work. Matching a filename or being beside the
+Editor is insufficient: the implementation checks held no-reparse paths and protected owners/ACLs,
+the helper&#39;s dedicated directory and PE dependency policy. Protected deployment must contain only
+the intended helper executable in its dedicated folder; symbols and other files are kept elsewhere.
+The linker uses system-only dependent-load flags; supported OS and emitted PE policy require
+verification before elevation. System-only DLL search also applies after helper entry.</p>
+<p>The blocked-elevation result affects only deep capture. Nothing changes the Editor token, existing profiling,
+group membership, service installation or persistent permissions. The helper owns a fresh ETW
+session handle and stops only that handle. A name collision never grants ownership of a session.
+The parent lease, capture bound and shutdown path stop collection on disconnect or process exit.</p>
+<h2>Relationship to profiler integrity work</h2>
+<p>This change starts from master <code>94e2e911</code>; it does not merge or reimplement PR #126. That PR&#39;s CPU
+scope pairing, generation and GPU-query stop-tail fixes remain independent. Adding ETW does not
+repair the existing <code>.ceprof</code> boundary behavior or claim that the two recordings have identical
+start/stop coverage.</p>
+<h2>Required Windows acceptance (not run)</h2>
+<ul>
+<li>Build default/off and opt-in Debug/Release x64; inspect Shipping symbols and helper absence</li>
+<li>Verify static CRT/import table, PE dependent-load flags, and actual Windows loader resolution</li>
+<li>Normal permission success/denial, rejection of elevated Editor/helper and absence of UAC,
+wrong PID/user/session, replay and malformed pipe clients</li>
+<li>Pre-created pipe/session names, <code>.local</code>/manifest/DLL planting, reparse/rename races and ACL changes</li>
+<li>Immediate Stop, Stop/exit during startup, helper crash, parent death, repeated start,
+slow reader, ETW overflow, file cap, disk error and recovered/truncated artifact</li>
+<li>Real DX12 queue-to-work correlation, multiple views/lists/queues, clock frequency/rounding,
+delayed history buffers, missing PIX decoder, GPU/device loss and no-work captures</li>
+<li>Compare decoder results against Microsoft&#39;s reference consumer; measure disabled hot-path cost,
+helper memory/CPU, dropped events and Editor frame-time impact before claiming performance</li>
+</ul>
+<p><code>Tools/regression/DxCaptureFileTests.cpp</code> contains source fixtures for format, bounds, loss and
+identity contracts. They were added for a future authorized test run, not executed here.</p>
+<p>Helper teardown is cooperative: stopping its owned ETW session and closing the consumer normally
+releases <code>ProcessTrace</code>, but an upstream callback that stalls can delay its thread join. The Editor
+uses a bounded client shutdown and marks a nonterminal result incomplete. Cleanup of an ETW session
+after a helper process crash has not been established; no code guesses or stops other sessions to
+hide that residual. These are open acceptance items, not verified guarantees.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="artifact-and-viewer"></span><span id="clocks-and-identities"></span><span id="opt-in-build-and-ui"></span><span id="privilege-boundary"></span><span id="relationship-to-profiler-integrity-work"></span><span id="required-windows-acceptance-not-run"></span><span id="scope-and-status"></span><span id="sec-artifact-and-viewer"></span><span id="sec-clocks-and-identities"></span><span id="sec-opt-in-build-and-ui"></span><span id="sec-privilege-boundary"></span><span id="sec-relationship-to-profiler-integrity-work"></span><span id="sec-required-windows-acceptance-not-run"></span><span id="sec-scope-and-status"></span></details></main></body></html>

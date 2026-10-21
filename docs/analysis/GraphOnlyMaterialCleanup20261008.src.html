@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Graph-only material cleanup — 2026-10-08</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="GraphOnlyMaterialCleanup20261008.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/GraphOnlyMaterialCleanup20261008.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Graph-only material cleanup — 2026-10-08</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Contract.h#L1">Engine/Utility_Framework/Contract.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Base: <code>9c1c2aeae0e85cc3a2caacea142aee1e706cf88f</code>. This cleanup preserves the exact requested MaterialGraph instance, all-or-nothing readiness selection, graph transparent ordering and recording-owned resource lifetime.</p>
+<h2>Changes</h2>
+<ul>
+<li><code>SceneHost::SelectReadyInput</code> checks every requested program before copying the input. Ready inputs copy draw records once and update only <code>selectionRevision</code>; pending or failed inputs do not allocate the selected input. Geometry payload owners remain shared.</li>
+<li>Removed the unpopulated native <code>opaqueShadowIndices</code> loop and the live native <code>forwardDraws</code> sort. Graph shadow eligibility and Forward+ graph ordering remain. Empty native input vectors still serve the existing common pass and standalone capture/replay interfaces; this is not removal of standalone native regression APIs.</li>
+<li>Removed <code>PooledDraw::authoredMaterialSource</code> and <code>authoredRevision</code>, including their mesh and foliage assignments. Graph source and model generation owners remain.</li>
+<li>DX12 and Vulkan now share <code>PrepareSceneRecording</code>: residency → recording boundary → palette upload → Decal/Sprite visibility → graph material preparation → optional capture input. Shader output scope, failure propagation and material preparation deferral are preserved.</li>
+<li>Updated stale comments about native material sealing and cold-compile fallback.</li>
+</ul>
+<h2>Scope and validation</h2>
+<p>Other dirty worktree changes are outside this cleanup. No material binding cache was introduced. The existing texture/sampler caches, per-draw data and descriptor validity rules remain unchanged. No FPS or CPU performance improvement is claimed without a new equivalent workload measurement.</p>
+<p>VS 2026 / VS18 / v145 Debug and Release RenderEngine + MaterialRasterSurfaceProbe builds passed. Both complete DX12 raster regression processes exited 0 with GPU validation enabled and the expected success marker. Each reported:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Result per configuration</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Scene composition</td>
+<td>59 frames, 330 rejected candidates</td>
+</tr>
+<tr>
+<td>Exact generation selection</td>
+<td>5 frames, 0 fallbacks, 7 rejected pending/failed requests</td>
+</tr>
+<tr>
+<td>Recording/publication rejection</td>
+<td>1 abort, 1 pending submission, 1 stale publication</td>
+</tr>
+<tr>
+<td>Shared/skinned depth</td>
+<td>24 / 6 frames</td>
+</tr>
+<tr>
+<td>Scene input rejection</td>
+<td>24 frames, 24 failures checked</td>
+</tr>
+<tr>
+<td>Complete raster checks</td>
+<td>21,072,207 checks, 3,879,955 GPU components</td>
+</tr>
+</tbody></table></div>
+<p>Scoped removal/caller checks and <code>git diff --check</code> passed. SHA-256 hashes of the two modified sources were unchanged throughout the accepted runs. Both backend helper instantiations compiled; this is DX12 native regression acceptance, not a fresh live Editor capture or Vulkan runtime acceptance.</p>
+<p>Artifacts use <code>Build/Verification/graph-only-cleanup-*</code>, including separate Debug/Release build/runtime logs, source hashes, static checks and <code>acceptance.json</code>. The raster wrapper&#39;s first build collided with another Editor build, and its subsequent runtime used an outdated dependency DLL path. Neither attempt counts as runtime acceptance. Accepted runtime commands use the actual <code>vcpkg_installed/x64-windows/x64-windows/{debug/bin,bin}</code> paths. Release linking retained LNK4020 warnings about Utility_Framework PDB type records; runtime checks still passed. These checks do not measure or claim a performance improvement.</p>
+<h2>Subsequent issue integration</h2>
+<p>The initial acceptance above predates the complete #131 removal and the #133 binding cache. The subsequent all-issue implementation replaces mutable live native streams with one const empty reference boundary, removes PooledDraw material/transparent metadata, and admits shadows only after graph-source validation. The latest Debug full raster integration passed the same 21,072,207 checks and 3,879,955 GPU components; Editor graph WireFrame static/skinned transport also passed. Current broader lifecycle and backend validation is recorded in GitHubIssueRemediation20261008.md. The original source hashes validate only the original cleanup slice.</p>
+<p>Latest Release full integration also passed 21,072,207 checks / 3,879,955 GPU components after lifecycle integration. No equivalent-work performance acceptance is inferred from these correctness runs.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="changes"></span><span id="scope-and-validation"></span><span id="sec-changes"></span><span id="sec-scope-and-validation"></span><span id="sec-subsequent-issue-integration"></span><span id="subsequent-issue-integration"></span></details></main></body></html>

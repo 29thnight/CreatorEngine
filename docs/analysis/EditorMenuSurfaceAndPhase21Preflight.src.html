@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>에디터 메뉴 표면 감사 · PHASE 21 재정찰 (2026-09-10)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorMenuSurfaceAndPhase21Preflight.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorMenuSurfaceAndPhase21Preflight.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>에디터 메뉴 표면 감사 · PHASE 21 재정찰 (2026-09-10)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Reflgen schema</ve-node><ve-node id="n1" at="2 1">Authoring</ve-node><ve-node id="n2" at="3 1" key>Cooked data</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Reader</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.</li>
+<li>모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L35">ScriptCore/EngineCallable.cs:35</a> — <code>[AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L36">ScriptCore/EngineCallable.cs:36</a> — <code>public sealed class EngineCallableAttribute : Attribute</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ExternUI.h#L5">Editor/EngineGUIWindow/ExternUI.h:5</a> — <code>extern void DrawYamlNodeEditor(Authoring::WriteNode node,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ExternUI.h#L8">Editor/EngineGUIWindow/ExternUI.h:8</a> — <code>extern bool DrawTextureImportEditor(Authoring::WriteNode node,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ExternUI.h#L12">Editor/EngineGUIWindow/ExternUI.h:12</a> — <code>extern void ImGuiDrawHelperPlayerInput(class PlayerInputComponent* playerInput);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L6">Editor/EngineGUIWindow/ICustomEditor.h:6</a> — <code>virtual &amp;#126;ICustomEditor() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L8">Editor/EngineGUIWindow/ICustomEditor.h:8</a> — <code>virtual void OnInspectorGUI() = 0;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L10">Editor/EngineGUIWindow/MenuBarWindow.h:10</a> — <code>class MenuBarWindow</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L13">Editor/EngineGUIWindow/MenuBarWindow.h:13</a> — <code>explicit MenuBarWindow(std::mutex&amp; sceneStructureMutex);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.h#L14">Editor/EngineGUIWindow/MenuBarWindow.h:14</a> — <code>&amp;#126;MenuBarWindow() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorPreferences.h#L6">Editor/EngineEntry/EditorPreferences.h:6</a> — <code>enum class EditorFrameRateMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorPreferences.h#L17">Editor/EngineEntry/EditorPreferences.h:17</a> — <code>struct EditorPreferences</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorPreferences.h#L23">Editor/EngineEntry/EditorPreferences.h:23</a> — <code>EditorFrameRateMode GetFrameRateMode() const noexcept { return frameRateMode; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L37">Editor/EngineEntry/ConsoleCommandSystem.h:37</a> — <code>using ConsoleCommandResultHandler = CommandCore::CommandResult(*)(const ConsoleCommandContext&amp;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L101">Editor/EngineEntry/ConsoleCommandSystem.h:101</a> — <code>void EnqueueStructured(std::vector&lt;std::string&gt; arguments);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.h#L127">Editor/EngineEntry/ConsoleCommandSystem.h:127</a> — <code>bool EnqueueStructured(std::vector&lt;std::string&gt; arguments, CommandCompletion completion,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L30">Editor/EngineEntry/EditorObjectOperations.h:30</a> — <code>CommandCore::CommandResult ResolveTarget(const std::string&amp; nameOrId, EntityHandle&amp; target);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L33">Editor/EngineEntry/EditorObjectOperations.h:33</a> — <code>CommandCore::CommandResult Rename(EntityHandle target, const std::string&amp; name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L58">Editor/EngineEntry/EditorObjectOperations.h:58</a> — <code>CommandCore::CommandResult Create(Scene* scene, const std::string&amp; name, GameObjectType type, uint32_t parent = 0);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<ul>
+<li>기준 트리: <code>c86ab960</code> + 미커밋 변경(에디터 UI 계층에는 변경 없음)</li>
+<li>대조 정본: <a href="CommandSurfaceDisposition.tsv">CommandSurfaceDisposition.tsv</a>(처분표 · api 95 + split 3),
+<a href="CommandSurfaceImplementation.html">CommandSurfaceImplementation.md</a>(GUI↔CLI 공통 편집표),
+<code>Editor/EngineEntry/CommandCore/CommandDescriptorSeeds.cpp</code>(seed 217),
+<a href="../plans/EditorWorkspaceRedesignPlan.html">EditorWorkspaceRedesignPlan.md</a>(PHASE 21 · 2026-08-30 정찰)</li>
+<li>세 질문에 답한다. ① CLI/API에는 있는데 에디터 GUI 메뉴에 없는 기능은 무엇인가. ② 임의 동작을
+상단 메뉴·팝업 메뉴의 특정 카테고리에 등록하기 쉬운 확장 구조가 있는가. ③ PHASE 21 착수 전제가
+지금도 서 있는가.</li>
+</ul>
+<hr>
+<h2>0. 결론</h2>
+<ol>
+<li><strong>GUI 메뉴는 3개(File·Edit·Settings) 19항목이 전부고, Window·Tools·Help 메뉴는 없다.</strong> 제품
+명령 98개 중 GUI에 대응 동작이 있는 것은 32개, 나머지 66개는 GUI에서 닿을 수 없다. 그중 편집·상태
+변경 계열 16개가 실질 공백이고(§1.2), 50개는 조회·진단이다(§1.3). 반대로 GUI에만 있고 CLI에 없는
+동작도 30여 종이다(§1.4) — PHASE 21 W0의 관측 표면 설계는 이 목록을 그대로 쓴다.</li>
+<li><strong>메뉴 확장 기구는 0이다.</strong> <code>ImGui::MenuItem(&quot;…&quot;)</code> 리터럴과 인라인 본문이 4개 파일에 흩어져 있고,
+순회할 표·registry·contributor 인터페이스가 없다. 다만 필요한 부품은 전부 다른 이름으로 이미 있다
+(§2.2) — 창 registry, 명령 registry와 seed 표, 스레드 안전 실행 창구, 공통 편집 계층, C# 표식 호출.
+메뉴 registry 하나(1&#126;2일)를 세우면 &quot;경로 문자열 + 콜백&quot; 등록이 가능하고, seed 표에 꼬리 필드
+하나를 더하면 명령이 자기 메뉴 위치를 선언할 수 있다(§2.3).</li>
+<li><strong>PHASE 21 전제 17항 중 15항 그대로, 2항 정정.</strong> 에디터 chrome 계층은 8-30 이후 실질 변경 0이다
+(<code>EditorRenderer.cpp</code>·ImGui host 커밋 0). 정정은 DPI(프로세스가 매니페스트로 PMv2를 이미 선언 →
+OS 보정 없이 1:1 렌더 중)와 ImGui 위치(ThirdParty가 아니라 vcpkg 1.92.8)다. 신규 발견 9건은 §3.2.
+<strong>착수 가능하나 W0 착수 전에 결정 2건이 필요하다</strong>(§3.4).</li>
+</ol>
+<hr>
+<h2>1. CLI에는 있고 GUI에는 없는 기능</h2>
+<h3>1.1 방법과 모수</h3>
+<ul>
+<li>명령 모수: 처분표 <code>api</code> 95 + <code>split</code> 3 = <strong>98</strong>(Editor 제품 명령). seed에는 있으나 처분표에 없는
+14개는 Player 전용 5(<code>player.*</code>)와 Probe 9(<code>model.async</code>, <code>render.pbr.*</code>)라 GUI 대조 대상이 아니다.</li>
+<li>GUI 모수: 상단 메뉴 19항목 + 툴바 16 버튼 + 팝업 MenuItem 68(하드코딩) + 데이터 구동 루프 10곳<ul>
+<li>전역 단축키 5. 전수 목록은 §1.5 표.</li>
+</ul>
+</li>
+<li>판정 기준: &quot;GUI에 같은 결과를 내는 사용자 조작이 있는가&quot;. 드래그 드롭·OS 파일 드롭·단축키도
+GUI로 센다(단 §1.2에서 메뉴 부재는 따로 표기).</li>
+</ul>
+<h3>1.2 GUI에 없는 편집·상태 변경 명령 — 16개 (실질 공백)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>CommandClass</th>
+<th>GUI 현황</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>prefab.create</code></td>
+<td>EngineService</td>
+<td>메뉴 없음. Content Browser의 Prefab 폴더에 SCENE_OBJECT 드롭만 (<code>ContentsBrowserWindow.cpp:180</code>)</td>
+<td>Hierarchy 팝업에 &quot;Create Prefab&quot; 부재</td>
+</tr>
+<tr>
+<td><code>prefab.update</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td>프리팹 정의 갱신은 CLI 전용</td>
+</tr>
+<tr>
+<td><code>script.reload</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong>. 상태바 LiveCode 버튼은 <code>BeginDisabled(true)</code> 자리만 유지 (<code>MenuBarWindow.cpp:599</code>)</td>
+<td>핫리로드가 GUI에서 불가</td>
+</tr>
+<tr>
+<td><code>script.invoke</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td><code>[EngineCallable]</code> 표식 호출. §2.3의 C# 메뉴 씨앗</td>
+</tr>
+<tr>
+<td><code>model.load</code> / <code>model.loadcached</code></td>
+<td>EngineService</td>
+<td>메뉴 없음. OS 파일 드롭만 (<code>App.cpp:221</code>, <code>WM_DROPFILES</code>)</td>
+<td>&quot;Import Model&quot; 항목 부재</td>
+</tr>
+<tr>
+<td><code>camera.editor match/follow</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong>. <code>G</code>(선택을 카메라로) · <code>F</code>(선택 프레이밍)만 (<code>SceneViewWindow.cpp:584,596</code>)</td>
+<td>역방향(에디터 카메라를 게임 카메라로)은 CLI 전용</td>
+</tr>
+<tr>
+<td><code>assets.unload</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>scene.ddol</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>scene.flag</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td>dirtytraversal·bonecache 진단 플래그</td>
+</tr>
+<tr>
+<td><code>gc.collect</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>window.resize</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td>해상도 회귀용</td>
+</tr>
+<tr>
+<td><code>pix.capture</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>lifecycle.trace on/off/clear</code> · <code>mem.hook</code> · <code>mem.reset</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td>계측 토글</td>
+</tr>
+<tr>
+<td><code>gpu.baseline</code></td>
+<td>EngineService</td>
+<td>부분 — Resource Counter 창의 &quot;현재를 기준선으로&quot; (<code>ResourceCounterWindow.cpp:40</code>)는 다른 스냅샷</td>
+<td></td>
+</tr>
+<tr>
+<td><code>cli.drain.budget</code></td>
+<td>EngineService</td>
+<td><strong>없음</strong></td>
+<td>서비스 전용이라 GUI 대상 아님</td>
+</tr>
+</tbody></table></div>
+<h3>1.3 GUI에 없는 조회·진단 명령 — 50개</h3>
+<p>GUI 창이 일부 겹치는 것은 괄호에 적었다.</p>
+<p><code>ai.status</code> · <code>animator.status</code> · <code>assets.modeldiag</code> · <code>bt.status</code> · <code>commands.list/describe/selftest</code> ·
+<code>component.list</code>(Add Component 팝업이 같은 표를 순회) · <code>crash.status</code> · <code>dump.list/show</code> · <code>dx12.live</code> ·
+<code>gc.stats</code> · <code>gpu.census</code>(Resource Counter 부분) · <code>help</code> · <code>lifecycle.registry/dump</code> · <code>light.proxy</code> ·
+<code>log.flush</code> · <code>mem.delta/stats</code> · <code>object.describe</code> · <code>pipeline.nodes</code>(Pipeline Setting 창 부분) ·
+<code>play.state</code> · <code>prefab.objectguid/overrides/status</code> · <code>profile.stats</code>(FrameProfiler 창 부분) ·
+<code>render.rtinfo/shadowinfo</code> · <code>scene.dump/hierarchycheck/transformdigest/bonedump/sparseresolver/selection</code> ·
+<code>scene.transformstats/transformwritestats/transformpull</code> · <code>script.status</code> · <code>ui.status/rect/hitbox</code> ·
+<code>undo.state</code> · <code>window.info</code> · <code>cli.echo.args</code></p>
+<h3>1.4 반대 방향 — GUI에만 있고 CLI에 없는 동작 (W0 관측 표면 입력)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>영역</th>
+<th>GUI 동작</th>
+<th>위치</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>재생</td>
+<td><strong>Pause 토글</strong></td>
+<td><code>MenuBarWindow.cpp:494</code> <code>ToggleGamePaused</code></td>
+<td><code>play</code>/<code>stop</code>만 등록(<code>SceneObjectCommands.cpp:1222</code>). pause 없음. <code>play.state</code>가 읽기만</td>
+</tr>
+<tr>
+<td>생성</td>
+<td>Directional/Point/Spot Light 하위 타입</td>
+<td><code>HierarchyWindow.cpp:135-151</code></td>
+<td><code>object.create &lt;이름&gt; Light</code>는 타입만, 하위 타입 없음</td>
+</tr>
+<tr>
+<td>생성</td>
+<td>UI Image / Text</td>
+<td><code>HierarchyWindow.cpp:172,176</code></td>
+<td>UI 생성 명령 없음(<code>ui.*</code>는 편집만)</td>
+</tr>
+<tr>
+<td>편집</td>
+<td>Copy / Paste(복제)</td>
+<td><code>HierarchyWindow.cpp:108,112</code></td>
+<td><code>object.duplicate</code>가 근사</td>
+</tr>
+<tr>
+<td>편집</td>
+<td>Reset Transform · Add Layer · meta Save · 스크립트 인스턴스 재생성</td>
+<td><code>InspectorWindow.cpp:1028,794,493,567</code></td>
+<td>없음</td>
+</tr>
+<tr>
+<td>뷰</td>
+<td>기즈모 모드 Q/W/E/R · Snap · Ortho/Persp · Grid · 카메라 설정 · Wireframe(Ctrl+W) · GameView 숨김(F5) · PVD(F9)</td>
+<td><code>SceneViewWindow.cpp:167-181,258-322</code>, <code>EditorMain.cpp:526-536</code></td>
+<td>없음</td>
+</tr>
+<tr>
+<td>자산</td>
+<td>Create Volume Profile · Delete 파일 · 탐색기 열기</td>
+<td><code>ContentsBrowserWindow.cpp:256-548</code></td>
+<td>없음</td>
+</tr>
+<tr>
+<td>저작 창</td>
+<td>Behavior Tree · Blackboard · InputActionMaps 편집기의 Create/Open/Save 전부</td>
+<td><code>MenuBarWindow.cpp:947-2600</code></td>
+<td><code>bt.status</code>·<code>blackboard.authoring.probe</code>(commandlet)만</td>
+</tr>
+<tr>
+<td>설정</td>
+<td>Pipeline Setting 튜닝 · Render Backend 선택 · Build Settings 시작 씬 · Collision Matrix Save/Load · ImGuiScale · Content Browser 스타일</td>
+<td><code>MenuBarWindow.cpp:372-452,195-204,2656-2672</code></td>
+<td><code>render.backend status</code>는 조회만(&quot;변경은 Settings&quot;)</td>
+</tr>
+<tr>
+<td>chrome</td>
+<td>Output Log · ProfileFrame 토글 · 기즈모 콜라이더 디버그</td>
+<td><code>MenuBarWindow.cpp:549,555,619</code></td>
+<td><strong>editor chrome 관측 명령 0</strong>(§3.1 #14)</td>
+</tr>
+<tr>
+<td>컴포넌트</td>
+<td>Material Instantiate/Picker · Terrain 레이어/마스크/저장 · Animator 편집 대부분</td>
+<td><code>ImGuiDrawHelperMeshRenderer.cpp:73-84</code>, <code>ImGuiDrawHelperTerrainComponent.cpp:107-334</code>, <code>ImGuiDrawHelperAnimator.cpp</code></td>
+<td><code>animator.param</code>·<code>render.matmode</code>만 공유</td>
+</tr>
+</tbody></table></div>
+<h3>1.5 GUI 표면 전수 (요약)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>표면</th>
+<th>항목 수</th>
+<th>위치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>상단 메뉴 File</td>
+<td>6 (New Scene·Save·Save As·Load Scene·GameBuild·Exit)</td>
+<td><code>MenuBarWindow.cpp:228-321</code></td>
+</tr>
+<tr>
+<td>상단 메뉴 Edit</td>
+<td>5 (LightMap·Effect Editor·Behavior Tree·Blackboard·InputAction Maps)</td>
+<td><code>:325-365</code></td>
+</tr>
+<tr>
+<td>상단 메뉴 Settings</td>
+<td>6 + 하위 2 + DragFloat 1</td>
+<td><code>:369-459</code></td>
+</tr>
+<tr>
+<td>메뉴바 툴바</td>
+<td>3 (Play/Stop·Pause·Browser 스타일)</td>
+<td><code>:467-510</code></td>
+</tr>
+<tr>
+<td>상태바 툴바</td>
+<td>5 (Content Drawer·Output Log·ProfileFrame·LiveCode[비활성]·Debug)</td>
+<td><code>:534-619</code></td>
+</tr>
+<tr>
+<td>Scene View 툴바</td>
+<td>8</td>
+<td><code>SceneViewWindow.cpp:249-322</code></td>
+</tr>
+<tr>
+<td>Hierarchy 팝업</td>
+<td>13</td>
+<td><code>HierarchyWindow.cpp:98-186</code></td>
+</tr>
+<tr>
+<td>Content Browser 팝업</td>
+<td>4개 팝업 9항목(3벌이 사실상 복제)</td>
+<td><code>ContentsBrowserWindow.cpp:252,330,447,527</code></td>
+</tr>
+<tr>
+<td>Inspector 팝업/버튼</td>
+<td>Add Component(데이터 구동 2루프)·Remove·Reset Transform·Tag/Layer 추가 등</td>
+<td><code>InspectorWindow.cpp:379-1325</code></td>
+</tr>
+<tr>
+<td>BT/Blackboard/InputAction/Animator/Log 팝업</td>
+<td>40여</td>
+<td><code>MenuBarWindow.cpp:1558-2625</code>, <code>ImGuiDrawHelperAnimator.cpp</code></td>
+</tr>
+<tr>
+<td>전역 단축키(메뉴 항목 없음)</td>
+<td>5 (Ctrl+Z·Ctrl+Y·F5·Ctrl+W·F9)</td>
+<td><code>EditorMain.cpp:227-536</code></td>
+</tr>
+</tbody></table></div>
+<p>Edit 메뉴에는 Undo/Redo/Copy/Paste가 없다(Hierarchy 팝업과 단축키에만 있다). <code>AssetBundle</code> 창은
+어느 메뉴에서도 열 수 없다(imgui.ini에 남아 있을 때만 보인다).</p>
+<h3>1.6 대조 중 드러난 GUI 결함 (요청 범위 밖 · 기록만)</h3>
+<ul>
+<li>본문이 비어 있는 항목 3: Hierarchy <code>UI &gt; Button</code>(<code>HierarchyWindow.cpp:180</code>), Animator <code>Copy Contorller</code>
+(<code>ImGuiDrawHelperAnimator.cpp:251</code>), FSM <code>Add State</code>(<code>InspectorWindow.cpp:1058</code>).</li>
+<li>도달 불가 조건 2: <code>Create Volume Profile</code>의 가드가 <code>X.empty() &amp;&amp; equivalent(X, VolumeProfilePath())</code>
+(<code>ContentsBrowserWindow.cpp:254,546</code>). 같은 파일 <code>:333</code>은 <code>!X.empty()</code>로 옳다.</li>
+<li><code>GameBuild</code>는 시작 씬이 비어 있으면 <strong>조용히 무동작</strong>(<code>MenuBarWindow.cpp:302</code>). 비활성 표시가 없다.</li>
+<li>Content Browser <code>Delete</code> 두 곳이 확인·Undo 없이 <code>file::remove</code>(<code>:458,:531</code>).</li>
+<li>Save/Save As 본문이 메뉴(<code>:235-278</code>)와 단축키 핸들러(<code>:747-800</code>)에 <strong>두 벌</strong> 복제돼 있다.
+<code>MenuItem</code>의 <code>&quot;Ctrl+S&quot;</code> 문자열은 표시용이고 바인딩이 아니다. <code>Ctrl+Shift+N</code>도 표시만 있다.</li>
+<li>LightMap Window·Render Debug는 stub 창(전자는 &quot;unavailable&quot; 문구, 후자는 Pipeline Setting으로 redirect).</li>
+</ul>
+<hr>
+<h2>2. 메뉴 확장성</h2>
+<h3>2.1 현재 — 기구 0</h3>
+<ul>
+<li>상단 메뉴: <code>MenuBarWindow::RenderMenuBar()</code>(<code>MenuBarWindow.cpp:217-523</code>)에 <code>BeginMenu(&quot;File&quot;|&quot;Edit&quot;|&quot;Settings&quot;)</code>
+세 리터럴과 인라인 본문. Save 하나가 25줄이다.</li>
+<li>팝업: Hierarchy는 <code>BeginPopup(&quot;HierarchyMenu&quot;)</code>(<code>HierarchyWindow.cpp:98</code>) 하드코딩. Content Browser는
+같은 이름 <code>&quot;Context Menu&quot;</code> 팝업이 <strong>세 벌</strong>(<code>:252,:447,:527</code>) + <code>&quot;Directory Context&quot;</code>(<code>:330</code>).</li>
+<li><code>Contributor|MenuEntry|MenuRegistry|RegisterMenu|AddMenuItem|MenuExtension|ToolMenu|MenuPath</code> 전역 grep:
+메뉴 관련 0건(<code>IRenderFeatureContributor</code>만 매치).</li>
+<li><code>ICustomEditor.h</code>는 구현체 0·호출자 1(<code>InspectorWindow.cpp:358</code> dynamic_cast)인 죽은 확장점.
+<code>ExternUI.h</code>는 extern 함수 선언 목록이고 등록이 아니다.</li>
+<li>데이터 구동으로 메뉴를 그리는 곳은 팝업 안에만 10곳(Add Component가 <code>ComponentFactorys-&gt;m_componentTypes</code>와
+<code>ClrHost::GetComponentTypeNames()</code>를 순회 — <code>InspectorWindow.cpp:393,421</code>). <strong>동작(action) registry는 없다.</strong></li>
+<li>단축키 registry도 없다. <code>IsKeyPressed</code> 인라인 검사가 5개 파일에 흩어져 있고, 입력 API가 넷
+(<code>InputManagement</code>, <code>ImGui::IsKeyPressed</code>, <code>ImGui::IsKeyDown</code>, <code>VK_F5</code> raw)이다.</li>
+<li>C# 쪽 attribute는 <code>[SerializeField]</code>·<code>[EngineCallable]</code> 둘뿐(<code>ScriptCore/EngineCallable.cs:35</code>).
+<code>[MenuItem]</code> 류 없음.</li>
+</ul>
+<h3>2.2 이미 있는 부품</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>필요한 것</th>
+<th>있는 것</th>
+<th>위치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>문자열 키 콜백 registry + 매 프레임 pump</td>
+<td><code>ImGuiRegister</code>(창 단위) · <code>EditorRenderer::Render</code></td>
+<td><code>ImGuiRegisterClass.h:5,101</code> · <code>EditorRenderer.cpp:250-259</code></td>
+</tr>
+<tr>
+<td>유니티 빌드에서 안전한 명시 등록 관례</td>
+<td><code>Registrar</code> + <code>RegisterXxxCommands(Registrar&amp;)</code> 순서 호출</td>
+<td><code>Commands/CommandRegistrar.h:30-66</code> · <code>ConsoleCommandSystem.cpp:4297-4303</code></td>
+</tr>
+<tr>
+<td>이름·요약·usage·비용·Undo 여부가 붙은 동작 목록 212개</td>
+<td><code>CommandRegistry</code> + <code>kSeeds</code></td>
+<td><code>CommandRegistry.cpp:65</code> · <code>CommandDescriptorSeeds.cpp:33</code></td>
+</tr>
+<tr>
+<td>스레드 안전·게임 스레드 위임 실행</td>
+<td><code>ConsoleCommandSystem::EnqueueStructured(args, completion)</code></td>
+<td><code>ConsoleCommandSystem.h:119</code></td>
+</tr>
+<tr>
+<td>GUI·CLI가 이미 함께 쓰는 편집 계층</td>
+<td><code>EditorObjectOperations</code> / <code>EditorProjectOperations</code></td>
+<td><code>EditorObjectOperations.h:19-55</code></td>
+</tr>
+<tr>
+<td>표를 순회해 MenuItem을 내는 전례</td>
+<td>Add Component 팝업</td>
+<td><code>InspectorWindow.cpp:386-413</code></td>
+</tr>
+<tr>
+<td>C# 표식 메서드 호출(승인 경계 포함)</td>
+<td><code>[EngineCallable]</code> + <code>script.invoke</code>(<code>executesUserCode=true</code>)</td>
+<td><code>EngineCallable.cs:35</code> · seed <code>:235</code></td>
+</tr>
+</tbody></table></div>
+<h3>2.3 최소 기구와 변경 지점</h3>
+<blockquote>
+<p>확정 설계는 <a href="../plans/EditorWorkspaceRedesignPlan.html">EditorWorkspaceRedesignPlan.md</a> <strong>부록 A</strong>로
+옮겼다. 아래는 그 설계를 유도한 초안이다. 확정본과 다른 점 둘: 표면을 경로 문자열 하나로 두지 않고
+상단 카테고리와 팝업 호스트의 <strong>닫힌 열거형 둘</strong>로 갈랐고, 등록은 런타임 호출이 아니라
+<code>for_editor()</code> 컴파일 타임 선언과 중앙 목록 하나로 세웠다. 후자의 근거는 Editor가 StaticLibrary이고
+<code>/WHOLEARCHIVE</code>가 없어 참조되지 않는 TU의 자기 등록자가 링커에 탈락한다는 실측이다.</p>
+</blockquote>
+<p><strong>신설</strong> <code>Editor/EngineGUIWindow/EditorMenuRegistry.{h,cpp}</code> — <code>IncludeInUnityFile=false</code>
+(<code>Commands/*.cpp</code>·<code>EnhancedRenderDebugWindow.cpp</code> 전례, <code>Editor.vcxproj:129-182</code>).</p>
+<pre><code class="language-text">EditorMenuEntry { path &quot;Tools/Assets/Reimport&quot; | &quot;Hierarchy/Create/Prop&quot;; label; shortcutHint(표시용);
+                  enabled(); invoke(); order }
+Register / Unregister / DrawRoot(&quot;File&quot;|&quot;Edit&quot;|&quot;Settings&quot;|&quot;Tools&quot;|&quot;Window&quot;|&quot;Hierarchy&quot;|&quot;ContentBrowser.Asset&quot;|...)
+RegisterCommandMenuItem(path, commandName, args)  →  invoke = EnqueueStructured({name,args...}, [](auto&amp;,auto&amp;){})
+</code></pre>
+<p><strong>수정</strong></p>
+<ul>
+<li><code>MenuBarWindow.cpp</code> <code>RenderMenuBar()</code>: 각 <code>EndMenu</code>(<code>:321,:365,:459</code>) 직전에 <code>DrawRoot</code>, <code>EndMainMenuBar</code>(<code>:523</code>)
+앞에 registry 전용 <code>Tools</code>·<code>Window</code> 메뉴. 기존 인라인 항목은 그대로 두고 <strong>덧붙이기만</strong> 한다.</li>
+<li><code>HierarchyWindow.cpp:186</code> <code>EndPopup</code> 앞, <code>ContentsBrowserWindow.cpp:266,340,473,553</code> 네 곳(폴더/자산 루트를
+나누고 세 벌 복제를 이 기회에 합친다).</li>
+<li><code>EditorMain.cpp:173-205</code> 창 생성 블록에서 <code>EnsureRegistryPopulated()</code> 뒤 seed 순회 등록.</li>
+</ul>
+<p><strong>선택 — 명령이 메뉴 위치를 선언</strong>: <code>DescriptorSeed</code> 꼬리에 <code>const char* menuPath = &quot;&quot;;</code>
+(<code>CommandDescriptorSeeds.h:62</code> 뒤). 위치 지정 집합 초기화라 기존 212행 무편집, 정렬 <code>static_assert</code>
+(<code>CommandDescriptorSeeds.cpp:294</code>)는 <code>name</code>만 보므로 영향 0. 소비는 <code>ConsoleCommandSystem.cpp:4207-4249</code>의
+seed→descriptor 복사에 한 줄. <code>commands.list</code> TSV에 열을 더하면 <code>verify-cli-registry-golden.ps1</code> 골든 재생성 필요.</p>
+<p><strong>주의 3건</strong></p>
+<ol>
+<li><strong>스레드</strong>: 메뉴 콜백은 PresentationThread에서 <code>m_sceneStructureMutex</code> 아래 실행된다
+(<code>EditorMain.cpp:320-372</code> → <code>PresentFrame</code> → <code>OnGui</code> → <code>RenderMenuBar</code>). 오늘 File&gt;Save는 그 스레드에서
+<code>SceneManagers</code>를 직접 만진다(<code>MenuBarWindow.cpp:243</code>). registry 동작은 <code>EnqueueStructured</code>로 게임 스레드에
+넘기는 쪽이 옳다.</li>
+<li><strong>큐 선택</strong>: completion을 넘기지 않으면 배치 큐로 가서 <code>CommandSession::Batch()</code>에 누적되고 exit code를
+오염시킨다(<code>ConsoleCommandSystem.cpp:638,856,872</code> — LC5가 HTTP에서 고친 그 결함). GUI 호출은 <strong>빈 completion을
+반드시</strong> 넘기거나 origin 플래그를 새로 둔다.</li>
+<li><strong>단축키는 별건</strong>: registry는 <code>shortcutHint</code>를 표시할 뿐 바인딩하지 않는다. 진짜 바인딩은 별도 registry가
+필요하고, 동작 ID를 가진 메뉴 registry가 그 선행조건이다.</li>
+</ol>
+<p><strong>공수</strong>: registry + 두 루트(상단·Hierarchy) + Content Browser 통합 = 1&#126;2일. seed <code>menuPath</code> 선택지 +0.5일.</p>
+<h3>2.4 PHASE 21과의 관계</h3>
+<p>계획서 §1.3(<code>:130</code>)과 W3(<code>:774</code>)은 &quot;Window 메뉴를 통한 재열기 계약&quot;을 요구하는데 <strong>Window 메뉴 자체가
+없다.</strong> 또 창 표시 상태 저장소가 둘로 갈라져 있다 — <code>MenuBarWindow</code> bool 10개와 <code>ImGuiRenderContext::m_opened</code>
+(§3.2 #17). 메뉴 registry는 W3의 선행 부품이며, 두 저장소 통합과 같은 슬라이스에서 다루는 것이 맞다.</p>
+<hr>
+<h2>3. PHASE 21 재정찰 (2026-08-30 정찰 대비)</h2>
+<h3>3.1 17항 판정</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>8-30 주장</th>
+<th>9-10 판정</th>
+<th>현재 근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Content Browser dock 이름 공백 불일치</td>
+<td><strong>그대로</strong></td>
+<td><code>EditorRenderer.cpp:167</code>(공백 2) vs <code>ContentsBrowserWindow.cpp:103</code>(공백 1). 14건 중 유일한 불일치</td>
+</tr>
+<tr>
+<td>2</td>
+<td>imgui.ini 4벌, Content Browser entry 둘</td>
+<td><strong>그대로</strong></td>
+<td>4벌 전부 entry 2개(DockId 다름)</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>SetGameStart</code> 즉시 true, 스냅샷 실패 시 미복구</td>
+<td><strong>그대로</strong>(위치 이동)</td>
+<td><code>SceneManager.cpp:275-282</code>, <code>:1545-1548</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>DPI 배관 0</td>
+<td><strong>정정</strong></td>
+<td>코드 0은 맞으나 매니페스트가 <code>permonitorv2</code>(<code>Academy_4Q.exe.manifest:26</code>) — OS 보정 없이 물리 픽셀 1:1. <code>DisplayFramebufferScale=(1,1)</code>은 <code>ImGuiHost.cpp:106</code> 리사이즈 분기 안에서만</td>
+</tr>
+<tr>
+<td>4&#39;</td>
+<td>ImGui 1.92.8 ThirdParty</td>
+<td><strong>정정</strong></td>
+<td>vcpkg 1.92.8(<code>vcpkg_installed/.../imgui.h:32</code>). <code>FontScaleMain/FontScaleDpi/ConfigDpiScaleFonts</code> 존재(<code>:2374,2375,2536</code>). <code>io.FontGlobalScale</code> 2곳(<code>EditorRenderer.cpp:88,120</code>)은 obsolete 블록 덕에 컴파일</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>BeginFrame</code>이 WantCapture*·ConfigFlags 매 프레임 덮음</td>
+<td><strong>그대로</strong></td>
+<td><code>HostImGuiPresentation/RHI/ImGuiHost.cpp:114-118</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>m_contexts</code> unordered_map</td>
+<td><strong>그대로</strong></td>
+<td><code>ImGuiRegisterClass.h:101</code>, pump <code>EditorRenderer.cpp:252-256</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>gizmoWindowFlags</code> 죽은 `</td>
+<td>= NoMove`</td>
+<td><strong>그대로</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td>PushStyleColor 48 + Var 43 = 91, MenuBar 48</td>
+<td><strong>그대로</strong></td>
+<td>동일 수치</td>
+</tr>
+<tr>
+<td>9</td>
+<td>ImGuiListClipper 0</td>
+<td><strong>그대로</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>10</td>
+<td>비-UTF8 9파일</td>
+<td><strong>8파일</strong></td>
+<td><code>DrawYamlNodeEditor.cpp</code>는 이제 UTF-8. 나머지 8 그대로</td>
+</tr>
+<tr>
+<td>11</td>
+<td><code>ImGuiContext.h</code>가 <code>imgui_impl_dx11.h</code> include</td>
+<td><strong>그대로</strong></td>
+<td><code>:5</code>. host는 DX12/Vulkan shell만(<code>ImGuiHost.cpp:48-52</code>)</td>
+</tr>
+<tr>
+<td>12</td>
+<td>FA4·FA6 공존</td>
+<td><strong>그대로</strong></td>
+<td>FA6 15파일, FA4 1(<code>ProfilerWindow.cpp:10</code>). <code>ICON_MIN/MAX_FA</code> 값 충돌, 같은 폴더 유니티 청크 위험</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Console/Profiler는 bool 토글</td>
+<td><strong>그대로</strong></td>
+<td><code>MenuBarWindow.h:20-29</code> bool 10개</td>
+</tr>
+<tr>
+<td>14</td>
+<td>editor chrome CLI 표면 0</td>
+<td><strong>그대로</strong></td>
+<td><code>editor./imgui./layout./dock./workspace.</code> 0. <code>window.info</code>는 OS 클라이언트 크기만</td>
+</tr>
+<tr>
+<td>15</td>
+<td>verify-editor-workspace 없음</td>
+<td><strong>그대로</strong></td>
+<td>127 verify 중 0. <code>capture-window.ps1</code>(PrintWindow PNG)은 재사용 가능</td>
+</tr>
+<tr>
+<td>16</td>
+<td>—</td>
+<td>8-30 이후 에디터 UI 계층 커밋 20, 전부 타 시스템 파급. <code>EditorRenderer.cpp</code>·ImGui host <strong>0</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>17</td>
+<td>—</td>
+<td>Window 메뉴 없음. <code>EditorSettingsStore</code>는 5키(browser style·imguiScale·startup scene·backend 2)만 저장, 창 상태 0</td>
+<td><code>EditorSettingsStore.cpp:194-219</code></td>
+</tr>
+</tbody></table></div>
+<h3>3.2 신규 발견 9건 (8-30 정찰에 없음)</h3>
+<ol>
+<li><strong>Tile 분기는 Content Browser·AssetBundle을 dock하지 않는다</strong>(<code>EditorRenderer.cpp:184-189</code>, 6창만). Tile이
+기본값(<code>EditorPreferences.h:33</code>)이라 새 설치에서 Browser는 이름 결함과 무관하게 <strong>항상 떠 있다</strong>.</li>
+<li><strong>dock 지정에 없는 창 15+</strong>: FrameProfiler·Log·InputActionMaps·Build Scene Setting·RenderPass(2)·Resource
+Counter·LightMap·CollisionMatrixPopup·Animator 3·Select Audio Clip·자산 picker 2. <code>BuildInitialDockLayout</code>은
+워크스페이스의 부분집합만 기술한다.</li>
+<li><strong>ini는 한 번 생기면 재생성 경로가 없다</strong>(<code>EditorRenderer.cpp:238-246</code> 부재 시에만 빌드). 손상 layout을
+치유할 코드가 없고, browser style을 바꿔도 기존 ini에는 영향 0. W3의 reset/version 키가 필수다.</li>
+<li><strong>Play 실패의 파급이 더 넓다</strong>: <code>PlayModeEvent.Broadcast(true)</code>가 <code>CaptureSceneSnapshot()</code> <strong>앞</strong>에서 발화해
+(<code>SceneManager.cpp:1538-1540</code>) 구독자가 Undo 스택을 비우고 game mode로 바꾼다(<code>EditorPlayModeController.cpp:25-52</code>).
+스냅샷이 실패해도 Undo는 이미 파괴됐고 <code>m_isEditorSceneLoaded</code>는 무조건 true(<code>:347-357</code>).</li>
+<li><strong><code>play.state</code>는 <code>ScenePhase</code>를 내지 않는다</strong>(<code>SceneObjectCommands.cpp:1034-1057</code>). 위 실패 상태가 CLI에서
+성공과 구분되지 않는다. W0 관측 명령이 ScenePhase를 실어야 W5 게이트가 이빨을 갖는다.</li>
+<li><strong><code>GetContext(name)</code>이 <code>operator[]</code>로 유령 창을 만든다</strong>(<code>ImGuiRegisterClass.h:95-98</code>). 오타 이름이 빈
+<code>m_name</code> entry를 pump 맵에 영구 삽입하고 <code>ImGuiContext.h:45-48</code>이 조용히 건너뛴다. #1의 공백 결함이
+<code>MenuBarWindow.cpp:515,536</code>을 지나면 정확히 이 경로다.</li>
+<li><strong>multi-viewport가 반만 배선</strong>: <code>PlatformHasViewports</code>를 매 프레임 OR하지만 <code>ViewportsEnable</code>은 어디서도
+켜지지 않고 <code>EndFrame</code>(<code>ImGuiHost.cpp:135-139</code>)은 그 플래그를 본다. §1.7 &quot;지원 계약 없음&quot;의 실체.</li>
+<li><strong>창 표시 상태 저장소가 둘</strong>: <code>MenuBarWindow</code> bool 10개(비영속) vs <code>ImGuiRenderContext::m_opened</code>
+(popup은 등록 시 강제 true, &quot;테스트용 임시&quot; 주석 <code>ImGuiRegisterClass.h:43,58</code>). 동기화 0. 매 기동 시 모든
+패널이 닫힌 상태로 시작하고 geometry만 ini에서 복원된다.</li>
+<li><strong><code>HostImGuiPresentation/</code>은 8-24 E7-b 재배치분</strong>이지 신규가 아니다. 8-30 정찰이 <code>ImGuiHelper</code>에서 host를
+찾아 위치를 잘못 적었다(<code>ImGuiHost.cpp:113&amp;#126;118</code> → 실제 <code>HostImGuiPresentation/RHI/ImGuiHost.cpp:114-118</code>).</li>
+</ol>
+<h3>3.3 계획서 슬라이스별 영향</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>슬라이스</th>
+<th>영향</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>W0</td>
+<td><code>editor.*</code> 5종은 여전히 0이라 신설 그대로. <strong><code>editor.viewport</code>(또는 <code>play.state</code>)에 <code>ScenePhase</code>를 추가</strong>해야 W5 실패 상태를 단정할 수 있다(#5). <code>capture-window.ps1</code>을 screenshot 기구로 재사용. GUI 전용 동작 목록(§1.4)이 &quot;관측해야 할 상태&quot;의 정본이다</td>
+</tr>
+<tr>
+<td>W1</td>
+<td>DPI 절 재서술: 프로세스는 이미 PMv2라 &quot;인식 채택 여부 판정&quot;이 아니라 **&quot;이미 인식 중인데 보정이 0&quot;**이 문제다. <code>WM_DPICHANGED</code> 처리 + <code>FontScaleDpi</code>/<code>ConfigDpiScaleFonts</code> 채택이 최소 경로. <code>Fonts-&gt;Build()</code>(<code>EditorRenderer.cpp:84</code>)도 1.92 동적 아틀라스에서 legacy</td>
+</tr>
+<tr>
+<td>W3</td>
+<td>Window 메뉴 부재(§2.4) → <strong>메뉴 registry가 선행 부품</strong>. 두 표시 상태 저장소 통합(#8), ini 재생성/버전 키(#3), <code>GetContext</code> <code>operator[]</code> → <code>find</code>(#6), Tile 분기 dock 누락(#1)</td>
+</tr>
+<tr>
+<td>W4</td>
+<td>15+ 미도킹 창(#2)을 ToolPanel 인벤토리에 넣지 않으면 &quot;자유 도킹&quot;이 부분집합에만 적용된다</td>
+</tr>
+<tr>
+<td>W5</td>
+<td>신호 순서: Broadcast → Snapshot → Phase 를 <strong>Snapshot → Phase → Broadcast</strong>로 바꾸지 않으면 committed 신호가 있어도 Undo는 먼저 죽는다(#4). <code>bdb22b0d</code>(9-4)가 이 순서의 상류를 옮겼다</td>
+</tr>
+<tr>
+<td>W2</td>
+<td>비-UTF8 대상 8(9→8). FA4 유일 소비자 <code>ProfilerWindow.cpp</code>의 <code>ICON_FA_TIMES</code>·<code>ICON_FA_PAINT_BRUSH</code>는 FA6에 없는 이름</td>
+</tr>
+</tbody></table></div>
+<h3>3.4 착수 판정</h3>
+<p><strong>진입 가능.</strong> 8-30 기준선이 그대로라 계획서 §1을 다시 쓸 필요는 없고, §1.9·§3.2·W0·W3·W5에 위 정정을
+반영하면 된다. 단 W0 착수 전에 결정 2건이 선다.</p>
+<ol>
+<li><strong>메뉴 registry를 PHASE 21 안(W3 선행)으로 넣는가, 별도 슬라이스로 두는가.</strong> W3의 &quot;Window 메뉴 재열기&quot;는
+registry 없이는 또 하나의 하드코딩 메뉴를 낳는다. 권고: W0과 병행 가능한 **W3-pre(1&#126;2일)**로 둔다.</li>
+<li><strong>DPI를 W1에서 실제로 채택하는가.</strong> PMv2 매니페스트가 이미 켜져 있어 &quot;하지 않는다&quot;는 선택이 곧 150% 모니터에서
+1:1 렌더를 유지한다는 뜻이다. 계획서 W1 판정문(&quot;채택하지 않으면 명시&quot;)은 이 사실을 전제로 다시 적어야 한다.</li>
+</ol>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="0-결론"></span><span id="1-cli에는-있고-gui에는-없는-기능"></span><span id="11-방법과-모수"></span><span id="12-gui에-없는-편집상태-변경-명령--16개-실질-공백"></span><span id="13-gui에-없는-조회진단-명령--50개"></span><span id="14-반대-방향--gui에만-있고-cli에-없는-동작-w0-관측-표면-입력"></span><span id="15-gui-표면-전수-요약"></span><span id="16-대조-중-드러난-gui-결함-요청-범위-밖--기록만"></span><span id="2-메뉴-확장성"></span><span id="21-현재--기구-0"></span><span id="22-이미-있는-부품"></span><span id="23-최소-기구와-변경-지점"></span><span id="24-phase-21과의-관계"></span><span id="3-phase-21-재정찰-2026-08-30-정찰-대비"></span><span id="31-17항-판정"></span><span id="32-신규-발견-9건-8-30-정찰에-없음"></span><span id="33-계획서-슬라이스별-영향"></span><span id="34-착수-판정"></span><span id="sec-0-결론"></span><span id="sec-1-cli에는-있고-gui에는-없는-기능"></span><span id="sec-2-메뉴-확장성"></span><span id="sec-3-phase-21-재정찰-2026-08-30-정찰-대비"></span></details></main></body></html>

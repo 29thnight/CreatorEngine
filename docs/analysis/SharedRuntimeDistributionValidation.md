@@ -1,5 +1,50 @@
 # 공용 DLL·사전 빌드 배포·버전 정책 적용 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/EngineVersion.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/EngineVersion.h#L1) — `#pragma once`
+- [Tools/regression/verify-engine-distribution.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-engine-distribution.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-engine-distribution.ps1:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-engine-distribution.ps1#L35) — `$fixture = Assert-EngineChildPath (Join-Path $fixtureRoot ([Guid]::NewGuid().ToString('N'))) $fixtureRoot`
+- [Tools/regression/verify-engine-distribution.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-engine-distribution.ps1#L36) — `[void][IO.Directory]::CreateDirectory($fixture)`
+- [Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp#L22) — `issues.push_back({ code, std::move(context), std::move(message) });`
+- [Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp#L127) — `bool ReadIdentityEpochHeader(std::string_view documentBytes, IdentityEpochHeader& out,`
+- [Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp:137](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp#L137) — `: Authoring::ParsedDocument::ParseText(std::string(documentBytes), parseError);`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.cpp#L90) — `[[nodiscard]] bool ReadText(const std::filesystem::path& path,`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:141](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.cpp#L141) — `: Authoring::ParsedDocument::ParseText(std::string(text), parseError);`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:766](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.cpp#L766) — `ModelAssetGenerationLoadResult LoadModelAssetGeneration(`
+- [BuildTool/EngineDistribution.cs:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EngineDistribution.cs#L5) — `internal sealed record EngineDistribution(string Root, JsonObject Manifest)`
+- [BuildTool/EngineDistribution.cs:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EngineDistribution.cs#L7) — `public string Configuration => Manifest.Text("configuration");`
+- [BuildTool/EngineDistribution.cs:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EngineDistribution.cs#L35) — `if (!File.Exists(pointer)) throw new BuildException($"No prebuilt {configuration} engine. Use CreatorBuildTool publish-engine, or --engine-distribution.");`
+- [Engine/RenderEngine/Experiment/AssetIdentity.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/AssetIdentity.h#L11) — `[[nodiscard]] inline bool IsAssetIdV4(const AssetId& id) noexcept`
+- [Engine/RenderEngine/Experiment/AssetIdentity.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/AssetIdentity.h#L25) — `if (!Uuid::TryParse(text, parsed)) return false;`
+- [Engine/RenderEngine/Experiment/AssetIdentity.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/AssetIdentity.h#L28) — `if (!IsAssetIdV4(candidate) || Uuid::ToString(parsed) != text)`
+- [Engine/RenderEngine/Assets/AssetIdentityEpoch.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/AssetIdentityEpoch.h#L28) — `struct IdentityEpochHeader final`
+- [Engine/RenderEngine/Assets/AssetIdentityEpoch.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/AssetIdentityEpoch.h#L36) — `enum class EpochHeaderIssueCode : std::uint8_t`
+- [Engine/RenderEngine/Assets/AssetIdentityEpoch.h:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/AssetIdentityEpoch.h#L64) — `[[nodiscard]] bool ReadIdentityEpochHeader(std::string_view documentBytes,`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L54) — `enum class ModelMeshDomain : std::uint8_t`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:357](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L357) — `[[nodiscard]] ModelAssetGenerationLoadResult LoadModelAssetGeneration(`
+- [Engine/RenderEngine/Assets/ModelAssetGeneration.h:370](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAssetGeneration.h#L370) — `friend ModelAssetGenerationLoadResult LoadModelAssetGeneration(`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 검증일: 2026-09-13. 기존 UI/Editor 작업이 함께 있는 작업 트리 기준이며 Git commit 완료 보고가 아니다.
 
 ## 구현
@@ -104,3 +149,5 @@ lock/Launcher/MSI, 공식 버전 발행과 서명/Stable 승격, PHASE 22의 FMO
 native plugin/Core ABI와 native hot reload도 후속 경계다. 기존 모델 씬을 포함한 모든 게임의 배포 준비 완료를 선언하지 않는다.
 
 사용법: [사전 빌드 개발 환경](../../Tools/distribution/README.md), [CreatorBuildTool](../../BuildTool/README.md).
+
+</details>

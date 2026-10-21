@@ -1,5 +1,34 @@
 # PR169 검증 산출물 보존·정리 — 2026-10-11
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 이 문서는 실행 산출물 보존 정책이다. 산출물 경로·실행 신원·해시는 작성 당시 실행의 기록이며, 파일이 없는 경우 현재 검증 근거로 사용할 수 없다.
+- 현재 checkout에 없는 Build/Artifacts 링크는 비활성 기록으로 전환한다. 현재 master 재실행이나 원본 측정 복구를 의미하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/ArtifactRetention.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ArtifactRetention.ps1#L3) — `$path=[IO.Path]::GetFullPath($Directory)`
+- [Tools/regression/ArtifactRetention.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ArtifactRetention.ps1#L4) — `$drive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($path))`
+- [Tools/regression/ArtifactRetention.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ArtifactRetention.ps1#L11) — `$root=[IO.Path]::GetFullPath($Directory).TrimEnd('\','/')`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L5) — `[ValidateSet('Debug','Release')][string]$Config = 'Debug',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 대표 원본 외의 raw 픽셀과 재생성 가능한 private fixture 사본을 실제 삭제했다. 파일 크기 합계가 아니라 C: 여유 공간의 전후 차이로 **60.12 + 11.89 = 72.01 GiB**를 회수했다. 두 번째 정리 종료 시 여유 공간은 **125.84 GiB**다. 첫 조사에서 제시했던 188.10 GiB는 하드링크를 중복 합산한 논리 용량이며 회수 가능 용량이 아니다.
 
 ## 보존 범위
@@ -69,3 +98,5 @@ SDK 활성 Debug/Release 판정 후 중간/반복 raw 66개를 제거했다. 대
 
 
 2026-10-11 후속: 현재 소스 legacy/product SDK D/R 전체 RG6 행렬(8프로세스·800표본·408캡처)은 [TemporalRg6ABAcceptance20261011](TemporalRg6ABAcceptance20261011.md)에서 수용됐다. raw 대표 4개와 최소 진단 바이너리만 보존, 실측 여유 92.37GiB. UI/actual generated/외부 계측/제품 예산은 잔여다. 이전 체크포인트의 미확인 표기는 당시 상태로 유지한다.
+
+</details>

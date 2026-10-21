@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>DLSS 최종 바이너리 검증 공백 해소</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="TemporalDlssFinalBuild20261011.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/TemporalDlssFinalBuild20261011.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>DLSS 최종 바이너리 검증 공백 해소</h1><p>연구·운영 기록의 유효 범위를 관련 runtime 경계와 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Camera</ve-node><ve-node id="n1" at="2 1">Frame input</ve-node><ve-node id="n2" at="3 1" key>SDK provider</ve-node><ve-node id="n3" at="3 2">History</ve-node><ve-node id="n4" at="2 2">Presenter</ve-node><ve-node id="n5" at="1 2">Provenance</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.</li>
+<li>SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.</li>
+</ul>
+<p>이 문서는 연구/운영/표현 가이드 성격이므로, 아래 파일은 관련 엔진 경계의 근거다. 문서의 제안 전체가 구현됐다는 증거로 해석하지 않는다.</p>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L216">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:216</a> — <code>const auto started = std::chrono::steady_clock::now();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L230">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:230</a> — <code>std::chrono::steady_clock::now() - started).count();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L307">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:307</a> — <code>const uint64_t generation = std::exchange(token.captureGeneration, 0);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L18">Engine/RenderEngine/Camera.h:18</a> — <code>class [[reflgen::reflect]] Camera</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L47">Engine/RenderEngine/Camera.h:47</a> — <code>static constexpr math::vector3 kForward = math::vector3::unit_z();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L48">Engine/RenderEngine/Camera.h:48</a> — <code>static constexpr math::vector3 kRight = math::vector3::unit_x();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L56">Player/PlayerMain.cpp:56</a> — <code>auto* window = WindowsCoreWindow::GetForCurrentInstance();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L82">Player/PlayerMain.cpp:82</a> — <code>const Authoring::TextParseTelemetrySnapshot parseTelemetry = Authoring::GetTextParseTelemetry();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L83">Player/PlayerMain.cpp:83</a> — <code>std::printf(&quot;[runtime.text-parser] calls=%llu\n&quot;, static_cast&lt;unsigned long long&gt;(parseTelemetry.calls));</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-10-11. 근거: <code>Artifacts/PR169/dlss-final-build-20261011/checkpoint.json</code>, <code>plan.json</code>, <code>storage.json</code>.</p>
+<p>직전 검증의 Quality/Native AA/Balanced 전환 결과는 Performance/Ultra Performance preset 변경 전 빌드였고, Native AA startup은 수동 노출 입력 연결 전 기록이었다. 관련 소스 해시가 직전 최종 소스 기록과 일치함을 확인하고 현재 SDK 활성 Debug/Release 바이너리에서 해당 항목을 실행했다. 이번에는 제품 코드 수정이나 재빌드가 필요하지 않았다.</p>
+<ul>
+<li>Quality/Native AA/Balanced 품질 전환·960×640/1280×720 host resize: D/R 6실행, 72캡처, 첫/여덟 번째 승인 reset 36비교 통과. depth/baseColor/SSGI/HDR/display 차이 모두 0.</li>
+<li>각 전환 실행의 history 계약 506단정, GPU validation 메시지/문제/누락 0, 정상 종료 0.</li>
+<li>Native AA startup: D/R 2실행·34캡처 통과. 첫 관측 non-reset 프레임부터 검사.</li>
+<li>신규 106캡처의 비교 대상 D/R 픽셀 해시 일치. 세 품질의 이전 전환 출력과도 동일하다.</li>
+<li>기존 Performance/Ultra Performance 전환 및 나머지 네 품질 startup의 실행 바이너리 SHA256이 이번 바이너리와 동일함을 재확인했다. 따라서 다섯 품질의 지정 전환·startup 근거가 구성별 현재 바이너리로 통일됐다. 전체 항목을 이번에 모두 재실행한 것은 아니다.</li>
+</ul>
+<p>성공 원본은 실행별 대표만 남겼고 대체된 이전 성공 6개 대표의 raw도 제거했다. 이번 정리의 실제 회수량은 3.576GiB, 정리 직후 여유는 82.69GiB다. ledger·로그·판정·manifest·해시는 유지한다. 제거한 raw의 과거 픽셀 재생은 불가능하며 필요한 원래 실패 기록은 보존했다.</p>
+<p>이 결과는 DX12 RTX 2080 Ti, Editor Game 뷰, 정적 cube/floor, 고정 SDK 시간 및 지정 품질 전환/해상도에 한정한다. TR2/TR3/TU3 progress와 PHASE 4.5 기성 12/71은 유지한다. 다음 좁은 검증은 수직 FOV/투영 변경의 실제 제출 및 reset 복구다. 멀티뷰·실제 자산 화질·가변 시간·성능·FG·외부 지연 수용도 남는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main></body></html>

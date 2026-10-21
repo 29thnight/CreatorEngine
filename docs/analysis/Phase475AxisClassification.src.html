@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 4.75 축 분류 — 독립 완료선 분리 전 점검</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="Phase475AxisClassification.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/Phase475AxisClassification.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 4.75 축 분류 — 독립 완료선 분리 전 점검</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">DataSystem</ve-node><ve-node id="n1" at="2 1">Resolver</ve-node><ve-node id="n2" at="3 1" key>Typed request</ve-node><ve-node id="n3" at="3 2">Payload pin</ve-node><ve-node id="n4" at="2 2">Frame pin</ve-node><ve-node id="n5" at="1 2">Retirement</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.</li>
+<li>ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.</li>
+<li>구 SRP 및 C# pipeline 저작 전환 제안은 취소됐다. 필요한 Pass는 현재 C++ 계약으로 작성하며, 별도 저작 체계는 실제 요구가 생기면 새 미래 계획으로 검토한다. 아래 원래 제안은 활성 계획이 아니다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/LightMapping.h#L6">Engine/RenderEngine/Interfaces/LightMapping.h:6</a> — <code>struct [[reflgen::reflect]] LightMapping</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/LightMapping.h#L8">Engine/RenderEngine/Interfaces/LightMapping.h:8</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/LightMapping.h#L12">Engine/RenderEngine/Interfaces/LightMapping.h:12</a> — <code>math::vector2 lightmapOffset{ 0,0 };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.cpp#L50">Engine/RenderEngine/RHI/RHIShaderCompiler.cpp:50</a> — <code>stream &lt;&lt; std::hex &lt;&lt; std::setfill(&#39;0&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.cpp#L51">Engine/RenderEngine/RHI/RHIShaderCompiler.cpp:51</a> — <code>&lt;&lt; std::setw(16) &lt;&lt; lo &lt;&lt; std::setw(16) &lt;&lt; hi;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.cpp#L292">Engine/RenderEngine/RHI/RHIShaderCompiler.cpp:292</a> — <code>: m_runtime(std::exchange(other.m_runtime, nullptr)), m_slot(std::exchange(other.m_slot, nullptr)) {}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34</a> — <code>std::free(value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L43">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:43</a> — <code>const auto path = prefix + &quot;.&quot; + std::to_string(++serial);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L67">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:67</a> — <code>std::copy_n(source.data(), source.size(), destination.data());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3658">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3658</a> — <code>p.desc.AddNode(std::move(node));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3671">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3671</a> — <code>p.desc.AddNode(std::move(node));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3684">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3684</a> — <code>p.desc.AddNode(std::move(node));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L8">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:8</a> — <code>bool EnhancedShadowPass::Initialize(const EnhancedFrameContext&amp; context, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L19">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:19</a> — <code>void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext&amp; context)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L190">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:190</a> — <code>void EnhancedShadowPass::DeclareGraphTargets(EnhancedRenderGraph&amp; graph, const EnhancedFrameContext&amp; context)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.h#L9">Engine/RenderEngine/RHI/RHIShaderCompiler.h:9</a> — <code>enum class RHIShaderBinary : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.h#L15">Engine/RenderEngine/RHI/RHIShaderCompiler.h:15</a> — <code>struct RHIShaderCompileOptions</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.h#L30">Engine/RenderEngine/RHI/RHIShaderCompiler.h:30</a> — <code>struct RHIShaderCompileRequest</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78</a> — <code>enum class RGMeasurementDomain : uint8_t { Normal, Capture };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79</a> — <code>enum class RGQueueFallbackReason : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108</a> — <code>enum class RGQueuePlacement : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31</a> — <code>enum class EnhancedLiveDisplayTarget : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39</a> — <code>enum class EnhancedLiveViewFlags : uint32_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177</a> — <code>own::shared_owner&lt;const material_graph::SceneMaterialSource&gt; materialPreview;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<blockquote>
+<p><strong>분리 전 시점 기록.</strong> 아래 22행·95.5일과 <code>Phase4UnifiedPlan.md</code> 정본 표기는
+작성 당시의 상태다. 실제 분리 이후 페이즈·공수 정본은
+<a href="../plans/RenderPhaseRoadmap.html"><code>RenderPhaseRoadmap.md</code></a>로 이동했다.</p>
+</blockquote>
+<p><strong>2026-09-23 · 계획/현재 소스 대조 · 분류 결과.</strong> 순서·공수·상태의 정본은
+<a href="../plans/Phase4UnifiedPlan.html"><code>Phase4UnifiedPlan.md</code></a> §8&#126;§10이다. 이 문서는 페이즈 번호를
+새로 배정하거나 구현 완료를 선언하지 않는다. 기존 22개 활성 행 95.5일(완료 4일)을
+어떤 완료선으로 나눌 수 있는지 판별한다. <code>SRP-3</code>은 0일 중단 이력으로 활성 합계에서 뺀다.</p>
+<h2>1. 분류 원칙</h2>
+<ol>
+<li>같은 제품 결과와 같은 회귀 게이트로 닫히는 작업만 한 축에 둔다. 공용 인프라는 가장 먼저
+필요한 소유 페이즈에 한 번만 두고 나머지는 계약을 소비한다.</li>
+<li><strong>구현 선행</strong>(해당 API·데이터가 없으면 실행 불가), <strong>판정 선행</strong>(기능은 개발할 수 있지만
+acceptance를 고정하려면 필요), <strong>순서 선호</strong>를 구분한다. 이 셋을 모두 페이즈 전체의
+직렬 의존으로 바꾸지 않는다.</li>
+<li>설계 공수와 구현 공수를 합치지 않는다. <code>GPU-1&amp;#126;GPU-3</code>과 <code>GPU-9</code>의 5.5일은 구상·판정
+공수다. GPU 기능 구현은 아직 미산정이다.</li>
+<li>공통 <code>BASE-0</code>, <code>RG5/RG6</code>, <code>Q0</code>의 소유권은 PHASE 4.3에 남긴다. PHASE 4.5의 <code>TR</code>
+결과와 PHASE 4.25의 <code>MAT</code> 결과도 각각 입력으로 받는다.</li>
+</ol>
+<h2>2. 분리 가능한 완료선</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>축</th>
+<th>기존 항목</th>
+<th align="right">활성 행 / 일</th>
+<th align="right">완료</th>
+<th>독립 산출물과 판정</th>
+<th>실제 선행 경계</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>SRP 저작·확장</strong></td>
+<td><code>4-1</code>, <code>SRP-0&amp;#126;SRP-2</code>, <code>SRP-4&amp;#126;SRP-6</code></td>
+<td align="right">7 / 35</td>
+<td align="right">2일</td>
+<td>Pipeline Asset과 Pass Stack, pass-domain Graph/Code, Native Pass를 제품 픽셀·schema/실패 fixture로 판정</td>
+<td><code>BASE-0</code>; <code>SRP-1</code>은 <code>RG5</code>, <code>SRP-4</code>는 <code>MAT-6</code>; 제품 전환은 <code>RG6</code> 뒤</td>
+</tr>
+<tr>
+<td><strong>라이트맵 베이킹</strong></td>
+<td><code>L0&amp;#126;L7</code></td>
+<td align="right">8 / 35</td>
+<td align="right">2일</td>
+<td>UV1·BVH·직접/간접광과 백그라운드 베이크를 차트, 수렴, 중단/재개, Editor 응답성으로 판정</td>
+<td><code>L1</code>은 PHASE 3.75 authoring/vertex schema, <code>L4</code>는 <code>Q0</code>; 제품 전환은 <code>RG6</code> 뒤</td>
+</tr>
+<tr>
+<td><strong>반사·차폐 품질</strong></td>
+<td><code>RND-1</code></td>
+<td align="right">1 / 4</td>
+<td align="right">0</td>
+<td>local reflection probe와 specular AO의 별도 golden·성능 판정</td>
+<td><code>MAT-9</code>의 pre-tone material 기준선은 판정 선행</td>
+</tr>
+<tr>
+<td><strong>그림자 품질</strong></td>
+<td><code>RND-2</code></td>
+<td align="right">1 / 10</td>
+<td align="right">0</td>
+<td>cascade/point/spot atlas와 tier별 shadow golden·성능 판정</td>
+<td>현 계획의 <code>RND-1</code> 선행은 코드/API 선행 근거가 확인되지 않아 재검토 대상</td>
+</tr>
+<tr>
+<td><strong>표시·후처리</strong></td>
+<td><code>RND-3</code></td>
+<td align="right">1 / 6</td>
+<td align="right">0</td>
+<td>OETF·AgX·auto exposure·bloom의 순서와 각 독립 golden·성능 판정</td>
+<td><code>BASE-0</code>; <code>MAT-9</code> pre-tone 기준은 후처리 acceptance의 판정 선행</td>
+</tr>
+<tr>
+<td><strong>GPU 가시성</strong></td>
+<td><code>GPU-1</code></td>
+<td align="right">1 / 2</td>
+<td align="right">0</td>
+<td>GPU-driven 입력·컬링·indirect·CPU fallback 설계</td>
+<td><code>BASE-0</code>과 PHASE 3.75 모델/프록시 계약; 구현 공수 미산정</td>
+</tr>
+<tr>
+<td><strong>확률 조명</strong></td>
+<td><code>GPU-2</code></td>
+<td align="right">1 / 1.5</td>
+<td align="right">0</td>
+<td>stochastic sampling·reuse·denoise·누출/노이즈·폴백 설계</td>
+<td>설계는 <code>BASE-0</code> 뒤 가능; temporal reuse 구현은 PHASE 4.5 모션/히스토리 입력 필요</td>
+</tr>
+<tr>
+<td><strong>Ray tracing</strong></td>
+<td><code>GPU-3</code></td>
+<td align="right">1 / 1.5</td>
+<td align="right">0</td>
+<td>첫 DXR 효과·BLAS/TLAS·RHI/graph 계약·raster fallback 설계</td>
+<td><code>BASE-0</code>; Vulkan RT 지원 여부는 지원 행렬에서 별도 판정</td>
+</tr>
+<tr>
+<td><strong>교차 축 설계 게이트</strong></td>
+<td><code>GPU-9</code></td>
+<td align="right">1 / 0.5</td>
+<td align="right">0</td>
+<td>위 세 GPU 후보의 공유 자원·선후·최소 수직 슬라이스·구현 공수 결정</td>
+<td><code>GPU-1&amp;#126;GPU-3</code> 뒤. 라이트맵·SRP·renderer 품질의 완료 게이트는 아님</td>
+</tr>
+<tr>
+<td><strong>합계</strong></td>
+<td></td>
+<td align="right"><strong>22 / 95.5</strong></td>
+<td align="right"><strong>4일</strong></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p><code>SRP-3</code>은 PHASE 4.25 <code>MAT-2/MAT-6</code>에 흡수된 이력 포인터이므로 SRP 축의 새 공수나
+완료 조건으로 계산하지 않는다. <code>GPU-9</code>를 별도 축으로 둔 것은 세 GPU 기능을 한 구현
+페이즈로 확정했다는 뜻이 아니다. 각 기능의 첫 수직 슬라이스와 공수를 산정한 다음 독립
+구현 완료선이 필요한지 결정한다.</p>
+<h2>3. 경계에서 발견한 재검토 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>현재 계획의 연결</th>
+<th>분리 전 판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RND-1 → RND-2</code></td>
+<td>반사 probe 뒤에 그림자를 둠</td>
+<td>그림자 구현은 <code>EnhancedShadowPass::Declare</code>의 별도 graph pass다. 반사 probe의 출력/API를 받는 연결이 계획·현재 소스에서 확인되지 않는다. 순서 선호인지 실제 선행인지 확인하고, 근거가 없으면 그림자 축을 독립시킨다.</td>
+</tr>
+<tr>
+<td><code>RND-3</code> / <code>MAT-9</code></td>
+<td>표에는 <code>BASE-0</code>, 설명에는 pre-tone material golden 뒤</td>
+<td>표시 기능 개발과 재질 기준선 오염 방지용 판정 순서를 분리해 적어야 한다. <code>MAT-9</code>를 renderer 소유권으로 옮기지 않는다.</td>
+</tr>
+<tr>
+<td><code>SRP-6</code> fixture</td>
+<td>기존 계획은 DXR <strong>또는</strong> 업스케일러 Native Pass 예시</td>
+<td>DXR 구현을 SRP 전체의 필수 선행으로 만들지 않는다. 연결된 SRP 계획은 소스 Native Pass fixture로 registry를 증명하도록 정리했다. 실제 fixture는 구현 착수 전에 고른다.</td>
+</tr>
+<tr>
+<td><code>GPU-9</code></td>
+<td>SRP 계약과 GPU 세 기능을 한 의존 그래프로 합침</td>
+<td>공유 resource/feature 입력의 설계 인터페이스만 묶는다. 세 기능의 실장·지원 행렬·fallback·release gate는 각 축에서 독립 판정한다.</td>
+</tr>
+<tr>
+<td><code>L4</code> / <code>Q0</code></td>
+<td>라이트맵이 별도 COMPUTE 큐를 요구</td>
+<td><code>Q0</code>는 PHASE 4.3의 RHI queue/fence 계약이다. <code>L4</code>는 소비자이며 새 queue 계층을 세우지 않는다. <code>Q0</code> 0일 표시는 완료가 아니라 미산정이다.</td>
+</tr>
+</tbody></table></div>
+<p>현재 소스 확인 지점: <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp"><code>EnhancedSceneRenderer.cpp</code></a>에는
+제품 <code>AddNode</code> 조립과 graph compile이 있고,
+<a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp"><code>EnhancedRenderGraph.cpp::BuildOrder</code></a>는
+현재 순서 계약의 소유자다. 그림자는
+<a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp"><code>EnhancedShadowPass.cpp::Declare</code></a>에서
+graph pass로 제출한다. Slang 컴파일 기반은
+<a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIShaderCompiler.cpp"><code>RHIShaderCompiler.cpp</code></a>에 있으며,
+라이트맵은 현재 <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/LightMapping.h"><code>LightMapping.h</code></a>
+저작 데이터가 남은 상태다. GPU-driven·stochastic·DXR 구현을 이번 분류에서 완료로 세지 않았다.</p>
+<h2>4. 다음 재배치에서 지킬 것</h2>
+<ul>
+<li><strong>바로 독립 완료선 후보:</strong> SRP, 라이트맵, 반사·차폐, 그림자, 표시·후처리.
+항목 ID와 기존 공수는 그대로 옮기고 각 축의 회귀 결과를 별도로 닫는다.</li>
+<li><strong>설계 뒤 구현 완료선 결정:</strong> GPU 가시성, 확률 조명, ray tracing. <code>GPU-9</code>에서
+공통 인터페이스와 기능별 수직 슬라이스·공수를 확정한 뒤 구현 페이즈를 배정한다.</li>
+<li><strong>페이즈 번호보다 의존 그래프 우선:</strong> <code>BASE-0</code>/<code>RG5</code>/<code>RG6</code>/<code>Q0</code>와 <code>MAT</code>/<code>TR</code> 중
+실제 소비 항목만 선행으로 단다. <code>GPU-9</code>를 SRP·L·RND 전체의 완료 선행으로 삼지 않는다.</li>
+<li><strong>재배치 회계:</strong> 현재 22행 95.5일과 완료 4일은 순수 이동 시 보존한다. <code>Q0</code>와 GPU
+기능 구현처럼 미산정인 작업은 임의의 0일 구현으로 처리하지 않고 별도 산정한다.</li>
+</ul>
+<p>이 분류는 문서/소스 정적 대조다. 새 제품 경로의 빌드·GPU 런타임·픽셀 회귀 증거는 아니다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-분류-원칙"></span><span id="2-분리-가능한-완료선"></span><span id="3-경계에서-발견한-재검토-항목"></span><span id="4-다음-재배치에서-지킬-것"></span><span id="sec-1-분류-원칙"></span><span id="sec-2-분리-가능한-완료선"></span><span id="sec-3-경계에서-발견한-재검토-항목"></span><span id="sec-4-다음-재배치에서-지킬-것"></span></details></main></body></html>

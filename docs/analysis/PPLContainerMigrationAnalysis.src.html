@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PPL 동시성 컨테이너 → STL 교체 분석</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="PPLContainerMigrationAnalysis.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/PPLContainerMigrationAnalysis.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PPL 동시성 컨테이너 → STL 교체 분석</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Job input</ve-node><ve-node id="n1" at="2 1">Scheduler</ve-node><ve-node id="n2" at="3 1" key>Workers</ve-node><ve-node id="n3" at="3 2">Completion</ve-node><ve-node id="n4" at="2 2">Join</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.</li>
+<li>과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L827">Engine/RenderEngine/DataSystem.h:827</a> — <code>std::vector&lt;own::weak_owner&lt;SceneAssetPreparation&gt;&gt; m_sceneAssetPreparations;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L935">Engine/RenderEngine/DataSystem.h:935</a> — <code>std::vector&lt;own::weak_owner&lt;SceneAssetPreparation&gt;&gt; scenes;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L938">Engine/RenderEngine/DataSystem.h:938</a> — <code>std::vector&lt;own::shared_owner&lt;SceneAssetPreparation&gt;&gt; scenePins;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L11">Engine/RenderEngine/RenderScene.h:11</a> — <code>class Scene;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L18">Engine/RenderEngine/RenderScene.h:18</a> — <code>class TerrainComponent;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24">Engine/RenderEngine/RenderScene.h:24</a> — <code>class RenderScene</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L43">Engine/RenderEngine/ProxyCommandQueue.h:43</a> — <code>void push_back(ProxyCommand&amp;&amp; command) { m_commands.push_back(std::move(command)); }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L84">Engine/RenderEngine/ProxyCommandQueue.h:84</a> — <code>m_extraArenas.push_back({ base, std::move(arena) });</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L105">Engine/RenderEngine/ProxyCommandQueue.h:105</a> — <code>if (m_commands.empty()) { *this = std::move(source); return; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.h#L68">Engine/RenderEngine/RHI/DX12/DX12PSOManager.h:68</a> — <code>bool Initialize(DX12DeviceResources* resources, const std::wstring&amp; cacheFilePath,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.h#L130">Engine/RenderEngine/RHI/DX12/DX12PSOManager.h:130</a> — <code>ComPtr&lt;ID3D12PipelineState&gt; CreateOne(const RHIGraphicsPipelineDesc&amp; desc,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.h#L132">Engine/RenderEngine/RHI/DX12/DX12PSOManager.h:132</a> — <code>ComPtr&lt;ID3D12PipelineState&gt; CreateOneCompute(const RHIComputePipelineDesc&amp; desc,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L63">Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:63</a> — <code>class EnhancedUIPass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L99">Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:99</a> — <code>bool Initialize(const EnhancedFrameContext&amp; context, std::string&amp; outError) override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h#L113">Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.h:113</a> — <code>void SetRects(const std::vector&lt;Rect&gt;* rects,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L153">Editor/EngineEntry/App.cpp:153</a> — <code>if (!EditorSettingsStore::Get().Initialize()) return false;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L259">Editor/EngineEntry/App.cpp:259</a> — <code>void Core::App::Initialize(WindowsCoreWindow&amp; coreWindow, CoreWindow&amp; window)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L298">Editor/EngineEntry/App.cpp:298</a> — <code>void Core::App::Finalize()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L359">Engine/SceneRuntime/Scene.cpp:359</a> — <code>void Scene::InitializeManaged()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L1851">Engine/SceneRuntime/Scene.cpp:1851</a> — <code>void Scene::DetachEntityHierarchy(Entity* root, std::vector&lt;DetachedEntityTransfer&gt;&amp; detached)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L2049">Engine/SceneRuntime/Scene.cpp:2049</a> — <code>Scene::AttachExistingEntityHierarchy(std::vector&lt;DetachedEntityTransfer&gt;&amp; objects)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.cpp#L37">Engine/SceneRuntime/Terrain.cpp:37</a> — <code>void TerrainComponent::Initialize()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.cpp#L643">Engine/SceneRuntime/Terrain.cpp:643</a> — <code>bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path&amp; pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector&lt;float&gt;&amp; out)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.cpp#L655">Engine/SceneRuntime/Terrain.cpp:655</a> — <code>bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path&amp; pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector&lt;std::vector&lt;float&gt;&gt;&amp; out)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>작성: 2026-08-08 · 목적: 외부 라이브러리 최소화 · 근거: 사용처 32건/16파일 전수 조사</p>
+<h2>요약</h2>
+<p><strong>전면 교체는 권고하지 않는다. 단, 현재 사용 중인 9개 지점 중 실제로 동시성이 필요한 곳은 2곳뿐이다.</strong></p>
+<p>핵심 발견은 교체 가능성이 아니라 <strong>현행 사용의 부정확성</strong>이다.</p>
+<ul>
+<li><code>parallel_for</code>·<code>parallel_invoke</code>는 코드베이스에 <strong>한 건도 없다</strong>. 병렬성은 전부 자체 <code>ThreadPool</code>이 담당한다.</li>
+<li>렌더 큐 8종(<code>concurrent_vector</code>)은 <strong>생산자가 없다</strong> — <code>PushRenderQueue</code> 계열 3함수의 호출처가 코드베이스에 존재하지 않는다.</li>
+<li><code>RenderScene.h</code>의 <code>concurrent_unordered_map.h</code>는 <strong>죽은 include</strong>다 — 실제 맵은 전부 <code>std::unordered_map</code>.</li>
+<li><code>HLSLCompiler</code>는 동시성 컨테이너를 쓰면서 오히려 <strong>레이스가 남아 있다</strong>.</li>
+</ul>
+<p>따라서 작업 순서는 &quot;PPL → STL 치환&quot;이 아니라 <strong>죽은 것 제거 → 잘못 쓰는 것 교정 → 남은 것 판단</strong>이다.</p>
+<h2>1. 사용처 전수 분류 — 생산·소비 스레드 실측 기준</h2>
+<p>각 지점의 push/pop 호출부를 역추적해 실제 스레드를 특정한 결과다. 초판의 &quot;SPSC 추정&quot;은
+패턴만 보고 내린 것이라 이번에 근거를 붙여 재판정했다.</p>
+<h3>등급 A — 동시성 자체가 불필요 (제거 대상)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>지점</th>
+<th>근거</th>
+<th>조치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RenderScene.h:27</code> <code>concurrent_unordered_map.h</code></td>
+<td>죽은 include — 실제 맵은 전부 <code>std::unordered_map</code>(48·50·51·59행)</td>
+<td>즉시 제거</td>
+</tr>
+<tr>
+<td><code>RenderPassData.h:17-18</code> <code>concurrent_vector&lt;*Proxy*&gt;</code> ×8</td>
+<td><strong>생산자 없음</strong> — <code>PushRenderQueue</code> 계열 3함수의 호출처가 코드베이스에 0 (§2)</td>
+<td>판정 후 삭제</td>
+</tr>
+<tr>
+<td><code>IRenderPass.h:30</code> <code>concurrent_queue&lt;ID3D11CommandList*&gt;</code></td>
+<td>DX11 디퍼드 컨텍스트 전용. 패스당 3×10=30 인스턴스</td>
+<td>DX11 은퇴 시 소멸</td>
+</tr>
+</tbody></table></div>
+<h3>등급 B — 크로스 스레드지만 동시성 컨테이너가 과함</h3>
+<p>전부 <strong>소수 push + 프레임당 1회 drain</strong> 형태다. 락 경합이 성립하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>지점</th>
+<th>생산자</th>
+<th>소비자</th>
+<th>빈도</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ProxyCommandQueue.h:13</code></td>
+<td>게임 — <code>RenderSceneBridge.cpp</code> 8곳</td>
+<td>렌더 — <code>EnhancedSceneRendererLive.cpp:2154</code></td>
+<td>3프레임 링으로 시간 분리</td>
+</tr>
+<tr>
+<td><code>EffectProxyController.h:13</code></td>
+<td>게임</td>
+<td>렌더 — <code>EffectManager.cpp:58</code></td>
+<td>위와 동일 구조</td>
+</tr>
+<tr>
+<td><code>EffectRenderProxy.h:8</code></td>
+<td>게임</td>
+<td>렌더 (<code>TryPop</code>)</td>
+<td>프록시별, 소량</td>
+</tr>
+<tr>
+<td><code>DataSystem.h:118</code></td>
+<td>메인 — 드롭 핸들러 <code>App.cpp:324</code></td>
+<td>렌더 — <code>ImGuiRenderer.cpp:366</code></td>
+<td><strong>사용자가 파일을 끌어놓을 때만</strong></td>
+</tr>
+<tr>
+<td><code>RenderScene.h:160-161</code></td>
+<td>프록시 소멸 지점 ×2</td>
+<td>렌더 — <code>OnProxyDestroy()</code></td>
+<td>파괴 시점만</td>
+</tr>
+</tbody></table></div>
+<h3>등급 C — 동시성이 실제로 필요</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>지점</th>
+<th>근거</th>
+<th>비고</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Core.ThreadPool.h:18</code></td>
+<td>진짜 MPMC — 워커 N개 동시 pop</td>
+<td>부하는 낮다 (§5-정정)</td>
+</tr>
+<tr>
+<td><code>RenderPassData.h:19-20</code> <code>concurrent_vector&lt;HashedGuid&gt;</code> ×3</td>
+<td>스레드풀 잡 6개가 같은 벡터에 동시 push (<code>Scene.cpp:552&amp;#126;620</code>)</td>
+<td>대안 있음 (§4)</td>
+</tr>
+<tr>
+<td><code>HLSLCompiler.h:81</code></td>
+<td><code>BS::thread_pool</code>이 셰이더 로드를 병렬 실행 (§3)</td>
+<td><strong>부팅 시 1회뿐</strong></td>
+</tr>
+</tbody></table></div>
+<h2>2. 렌더 큐 8종 — 생산자가 없다</h2>
+<p><code>m_deferredQueue</code>·<code>m_forwardQueue</code>·<code>m_terrainQueue</code>·<code>m_foliageQueue</code>·<code>m_shadowRenderQueue</code>·
+<code>m_UIRenderQueue</code>·<code>m_decalQueue</code>·<code>m_spriteRenderQueue</code>를 채우는 경로는
+<code>PushRenderQueue</code> / <code>PushShadowRenderQueue</code> / <code>PushUIRenderQueue</code> 세 함수뿐인데,
+이 함수들의 호출처는 <code>RenderPassData.h</code>(선언)와 <code>RenderPassData.cpp</code>(정의) 밖에 없다.</p>
+<p>소비 측은 살아 있다 — DX12가 읽는다:</p>
+<ul>
+<li><code>EnhancedSceneRenderer.cpp:2341-2342</code> — <code>copyQueue(renderData-&gt;m_deferredQueue, draws)</code></li>
+<li><code>EnhancedSceneRenderer.cpp:2422</code> — <code>m_UIRenderQueue</code>를 flat에 insert</li>
+<li><code>EnhancedGizmoSceneTest.cpp:124-125</code> — 동일</li>
+</ul>
+<p><strong>즉 DX12 라이브 경로는 항상 빈 큐를 읽고 있을 가능성이 높다.</strong> DX11 은퇴 과정에서 채우는 쪽이
+먼저 사라지고 읽는 쪽만 남은 형태다. 이건 컨테이너 교체 문제가 아니라 <strong>파이프라인 결손</strong>이므로
+DX12 라이브 작업에서 먼저 판정해야 한다.</p>
+<blockquote>
+<p>참고: 소비 측은 어차피 <code>std::vector</code>로 즉시 복사한다(<code>copyQueue</code>). 소비 경로에는
+동시성 컨테이너가 필요 없다. <code>EnhancedUIPass.h:118-119</code> 주석도 같은 인식을 적어 두었다 —
+포인터+개수로 받아 컨테이너 타입을 헤더가 모르게 했다.</p>
+</blockquote>
+<h3>부수 발견 — 실제 버그</h3>
+<p><code>RenderPassData.cpp:286</code> — <code>SortShadowRenderQueue()</code>가 <code>m_deferredQueue.empty()</code>를 검사하고
+<code>m_shadowRenderQueue</code>를 정렬한다. 검사 대상과 정렬 대상이 다르다.</p>
+<h2>3. HLSLCompiler — 동시성 컨테이너인데 안전하지 않다</h2>
+<pre><code class="language-cpp">// HLSLCompiler.h:81-82
+static concurrency::concurrent_unordered_map&lt;std::string, ComPtr&lt;ID3DBlob&gt;&gt; m_shaderCache;
+//static std::mutex m_compileMutex;   // ← 주석 처리됨
+</code></pre>
+<p>세 가지가 겹쳐 있다.</p>
+<ol>
+<li><strong><code>operator[]</code> 대입이 원자적이지 않다.</strong> <code>HLSLCompiler.cpp:76</code>의
+<code>m_shaderCache[key] = shaderBlob</code>은 슬롯 삽입만 스레드 안전하고, <code>ComPtr</code> 대입(참조 카운트
+조작)은 보호되지 않는다. 같은 셰이더를 두 스레드가 동시에 컴파일하면 그대로 레이스다.</li>
+<li><strong><code>find</code> → <code>operator[]</code> 사이에 창이 있다</strong> (<code>HLSLCompiler.cpp:16-18</code>).</li>
+<li><strong><code>clear()</code>는 동시 안전하지 않다</strong> (<code>CleanUpCache</code>, <code>HLSLCompiler.h:74</code>). PPL 문서상
+<code>clear</code>/<code>erase</code>는 단독 접근을 전제한다.</li>
+</ol>
+<p>→ <code>std::unordered_map</code> + <code>std::mutex</code>로 되돌리는 것이 <strong>기능적으로 더 안전하다</strong>.
+주석 처리된 뮤텍스를 되살리는 방향이다.</p>
+<h3>동시성의 출처 — 그리고 같은 파일 안의 불일치</h3>
+<p>이 캐시를 동시에 만지는 주체가 확인됐다. <code>ShaderSystem.cpp:44</code>의 <code>BS::thread_pool pool</code>이
+<code>AddShaderFromPath</code>를 병렬 제출하고(69·78·86·96행), 그 안에서 <code>LoadFormFile</code>이 캐시를 읽고 쓴다.
+<strong>단, 이 병렬성은 <code>LoadShaders()</code> — 엔진 부팅 시 1회뿐이다.</strong></p>
+<p>같은 흐름의 도착지인 <code>AddShader</code>는 이미 <code>std::mutex</code> 6개로 셰이더 타입별 맵을 보호한다
+(<code>ShaderSystem.cpp:524&amp;#126;574</code>). 즉 <strong>같은 병렬 구간에서 맵 6개는 뮤텍스로 지키고 캐시 맵 하나만
+PPL로 지키는</strong> 상태다. 뮤텍스로 통일하면 패턴이 일관되고 PPL 의존이 하나 준다.</p>
+<h3>부수 발견 — 외부 스레드풀 병존</h3>
+<p><code>BS::thread_pool</code>(bshoshany/thread-pool)이 vcpkg로 이미 들어와 있다(<code>vcpkg-installed-ports.json:119</code>).
+자체 <code>ThreadPool</code>이 있는데도 <code>ShaderSystem.cpp</code> 한 곳에서 지역 변수로 병행 사용 중이다.
+외부 라이브러리 최소화 관점에서는 <strong>PPL보다 이쪽이 먼저 걸린다</strong> — 사용처가 한 곳뿐이라
+자체 풀로 치환하는 비용이 작다.</p>
+<p>같은 파일의 <code>m_shaderReloadThreadPool</code>(<code>ShaderSystem.h:71</code>)은 <code>Initialize</code>에서 생성만 되고
+<code>Enqueue</code> 호출이 <strong>0건</strong>이다. <code>Finalize</code>가 delete하지 않아 누수이기도 하다.</p>
+<h2>3-0. 선행 질문 — 셰이더 로드 병렬화에 효과가 있는가</h2>
+<p><code>LoadFormFile</code>은 확장자로 두 갈래로 갈린다. 성격이 완전히 다르다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>호출</th>
+<th>성격</th>
+<th>실측 규모</th>
+<th>병렬화 이득</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>.cso</code></td>
+<td><code>D3DReadFileToBlob</code>(<code>HLSLCompiler.cpp:111</code>)</td>
+<td>디스크 읽기 + 메모리 복사</td>
+<td>294개 / 9.1 MB</td>
+<td><strong>작다</strong></td>
+</tr>
+<tr>
+<td><code>.hlsl</code></td>
+<td><code>D3DCompileFromFile</code>(<code>:57</code>)</td>
+<td>CPU 바운드 컴파일</td>
+<td>147개 / 481 KB</td>
+<td><strong>크다</strong></td>
+</tr>
+</tbody></table></div>
+<p>분기는 <code>ShaderSystem.cpp:59&amp;#126;99</code>가 정한다 — cso가 존재하고 hlsl보다 최신이면 cso를 읽고,
+아니면 컴파일한다. 따라서 <strong>평시 실행은 거의 전부 <code>.cso</code> 경로</strong>이고, 셰이더를 수정한 직후
+첫 실행에서만 컴파일이 돈다.</p>
+<p>→ 의문은 절반 타당하다. 평시에는 병렬화가 거의 값을 하지 않고(NVMe에서 9 MB 순차 읽기),
+셰이더 수정 후 첫 실행에서는 147개 컴파일이 병렬로 갈라져 이득이 크다.
+<strong>벤치마크를 평시 상태에서 돌렸다면 측정한 것은 컴파일 성능이 아니라 I/O 편차일 수 있다.</strong></p>
+<h3>그보다 큰 문제 — 이 캐시는 아무도 읽지 않는다</h3>
+<p><code>m_shaderCache</code>는 넣기만 하고 히트가 발생하지 않는다.</p>
+<ul>
+<li><code>LoadShaders()</code> — 디렉터리를 순회하며 각 파일을 <strong>1회씩만</strong> 로드한다. 중복 경로가 없다.</li>
+<li><code>ReloadShaders()</code> — <code>HLSLCompiler::CleanUpCache()</code>를 먼저 부르고(<code>ShaderSystem.cpp:129</code>)
+시작하므로 캐시는 항상 비어 있다.</li>
+<li>개별 핫 리로드 경로는 없다 — <code>ReloadShaderFromPath</code>는 <code>ReloadShaders</code> 내부(162·166·171행)
+에서만 호출된다.</li>
+</ul>
+<p>즉 캐시는 <strong>블롭을 영구 보관하는 역할만</strong> 한다. <code>AddShader</code>가 셰이더 객체를 만든 뒤 원본 블롭은
+쓰이지 않으므로, 상주 메모리만 늘린다.</p>
+<p>→ <strong>PPL 컨테이너 교체를 논하기 전에 이 캐시가 필요한지부터 물어야 한다.</strong> 캐시를 제거하면
+§3의 레이스도 함께 사라진다. 남기려면 히트가 생기는 경로(개별 파일 감시 기반 핫 리로드)를
+먼저 만들어야 하는데, 그때는 <strong>캐시 무효화가 없으면 옛 블롭을 반환</strong>하므로 키에 타임스탬프를
+넣는 설계가 필요하다.</p>
+<h3>결정적 전제 — DX12는 이 경로를 전혀 쓰지 않는다</h3>
+<p>DX12 렌더러가 셰이더 바이트코드를 어디서 얻는지 확인한 결과, <strong>DX11 셰이더 자산과 완전히
+분리되어 있다.</strong></p>
+<ul>
+<li>DX12 패스 <strong>24개 전부</strong>가 <code>.cpp</code> 안의 raw string literal을 <code>D3DCompile</code>로 런타임 컴파일한다
+(<code>EnhancedGBufferPass.cpp:202</code>, <code>EnhancedDeferredPass.cpp:295</code>, <code>EnhancedForwardPass.cpp:690</code>,
+<code>EnhancedSkyBoxPass.cpp:94</code>, <code>EnhancedUIPass.cpp:119</code> 등).</li>
+<li><code>RHI/DX12</code> 전체에서 <code>.cso</code> 읽기(<code>D3DReadFileToBlob</code>) <strong>0건</strong>, <code>HLSLCompiler::</code> 호출 <strong>0건</strong>,
+<code>ShaderSystem-&gt;</code> 호출 <strong>0건</strong>.</li>
+<li><code>Material::GetShaderPSO()</code> 참조도 <strong>0건</strong> — <code>DX12PSOManager.h:16</code>의 설명 주석 한 줄이 전부다.
+(&quot;ShaderPSO/VisualShaderPSO는 이름만 PSO인 &#39;셰이더 묶음&#39;이다. 진짜 PSO는 DX12에서…&quot;)</li>
+</ul>
+<p>받을 자리는 이미 있다. <code>DX12GraphicsPipelineDesc</code>(<code>DX12PSOManager.h:28</code>)는 <code>vsBytecode</code>/
+<code>psBytecode</code>를 <code>const void*</code> + 길이로 받아 <strong>출처를 묻지 않는다</strong>. 다만 지금은 그 자리에
+인라인 컴파일 결과만 꽂힌다.</p>
+<p>그리고 <code>ShaderSystem</code>은 <code>Shader.h</code>를 통해 <code>ID3D11Device::CreateVertexShader</code> 계열로 DX11 셰이더
+객체를 만든다 — <strong>디바이스 종속이라 DX12가 재사용할 수 없는 구조</strong>다.</p>
+<p><strong>따라서 이 절과 §3의 리팩터링(캐시 제거·PPL 교체)은 지금 하면 낭비다.</strong> 두 갈래 중 어느
+쪽이든 이 코드는 유지 대상이 아니다.</p>
+<ul>
+<li>DX11이 은퇴하면 → <code>HLSLCompiler</code>·<code>ShaderSystem</code>·<code>m_shaderCache</code>가 통째로 사라진다.</li>
+<li>DX12가 머티리얼 셰이더를 받게 되면 → 필요한 것은 <strong>바이트코드뿐</strong>이므로(디바이스 객체 생성
+불필요) 현재 경로를 재사용할 수 없고 새로 만들어야 한다.</li>
+</ul>
+<p>남는 것은 <strong>PDB 덮어쓰기 버그</strong>(아래)뿐이다. 그건 DX11이 살아 있는 동안 계속 물릴 수 있으므로
+독립적으로 고칠 값이 있다.</p>
+<h3>파생 문제 — 셰이더 자산과 머티리얼이 DX12에서 끊겨 있다</h3>
+<p>이건 PPL 논의 밖이지만 같은 조사에서 드러났으므로 적어 둔다.</p>
+<ol>
+<li><strong>147개 hlsl / 294개 cso 자산이 DX12에서 미사용</strong>이다. DX11 은퇴 시점에 이대로면 자산이
+통째로 버려진다.</li>
+<li><strong>머티리얼이 지정한 커스텀 셰이더(ShaderDSL·VisualShader)가 DX12에서 무시된다.</strong> 모든 드로우가
+패스에 하드코딩된 셰이더로 그려진다.</li>
+<li>셰이더 핫 리로드도 DX12에서는 의미가 없다.</li>
+<li>매 실행마다 24개 패스 셰이더를 런타임 컴파일하므로 그 비용이 부팅 시간에 실린다 —
+사전 컴파일(cso) 도입 후보지만, 그때 필요한 것은 지금의 <code>HLSLCompiler</code>가 아니라
+<strong>바이트코드 로더</strong>다.</li>
+</ol>
+<p>§2의 &quot;렌더 큐에 생산자가 없다&quot;와 같은 결의 결손이다 — DX12가 아직 자기 소스로만 그리는 단계다.</p>
+<h3>부수 발견 — PDB가 CSO를 덮어쓴다</h3>
+<p><code>HLSLCompiler.cpp</code>의 두 경로가 <strong>완전히 같은 파일명</strong>을 만든다.</p>
+<pre><code class="language-cpp">:78  std::string csoPath = ...RelativeToPrecompiledShader() + filePath.stem() + &quot;.cso&quot;;
+:97  std::string pdbPath = ...RelativeToPrecompiledShader() + filePath.stem() + &quot;.cso&quot;;  // ← .pdb가 아니다
+</code></pre>
+<p>DEBUG 빌드에서 hlsl을 컴파일하면 방금 쓴 cso를 디버그 블롭으로 덮어쓴다. 다음 실행은 그 파일을
+셰이더로 읽는다. <code>_DEBUG</code> 한정이므로 릴리스에서는 드러나지 않는다.</p>
+<h2>3-1. BS::thread_pool 교체가 중단된 이유 — 가설과 검증법</h2>
+<p><code>m_shaderReloadThreadPool</code>은 죽은 멤버가 아니라 <strong>중단된 마이그레이션의 잔해</strong>다.
+경위: 벤치마크에서 BS 쪽이 우세해 교체를 진행하다가 크래시가 나서 되돌렸고, 원인은 미규명
+상태로 남았다(마감 압박). <code>LoadShaders()</code>만 BS로 넘어간 채 멈춘 것이 현재 모습이다.</p>
+<p>먼저 <strong>배제된</strong> 후보부터. <code>SetThreadInitCallback</code>/<code>SetThreadExitCallback</code>은 <code>Core.ThreadPool.h</code>에
+정의만 있고 <strong>호출처가 0건</strong>이다. 따라서 &quot;자체 풀은 워커에서 COM을 초기화했는데 BS는 안 했다&quot;는
+설명은 성립하지 않는다 — 양쪽 다 워커에 COM 초기화가 없다(<code>CoInitializeEx</code>는 <code>Dx11Main</code>·
+<code>GameMain</code>의 CB/CE 전용 스레드에만 있다).</p>
+<h3>가설 1 (가장 유력) — <code>NotifyAllAndWait</code>이 사실상 전역 배리어였다</h3>
+<p><code>SceneManagers-&gt;m_threadPool</code>은 <strong>공유 풀</strong>이다. 프레임 컬링(<code>Scene.cpp</code>), 지형 저장
+(<code>Terrain.cpp</code>), 모델 로드(<code>ModelSceneBridge.cpp</code>)가 전부 같은 인스턴스를 쓴다.</p>
+<pre><code class="language-cpp">void NotifyAllAndWait() {
+    if (m_taskCounts.load(std::memory_order_acquire) == 0) return;
+    WaitForSingleObject(m_waitEvent, INFINITE);
+}
+</code></pre>
+<p>이 대기는 <strong>전역 카운터 기반</strong>이라 누가 넣은 작업인지 구분하지 않는다. <code>Terrain</code>이 부른
+<code>NotifyAllAndWait</code>은 <code>Scene</code>의 컬링 잡까지 기다리고, 그 반대도 성립한다. 즉 호출자가 의도한
+것보다 <strong>넓은 배리어</strong>로 동작하며, 서브시스템 간 순서를 우연히 지켜주고 있었다.</p>
+<p>BS로 옮기면서 <code>submit_task</code>가 돌려주는 <code>future</code>로 대기를 바꾸면 의미론이 <strong>내 작업만 대기</strong>로
+좁아진다. 넓은 배리어에 기대고 있던 코드가 있었다면 이 전환에서 그대로 깨진다 —
+기억에 남은 &quot;설계 차이&quot;와 부합한다.</p>
+<p>전환 흔적이 코드에 그대로 남아 있어 이 가설을 뒷받침한다:</p>
+<pre><code class="language-cpp">// ShaderSystem.cpp:103&amp;#126;105
+// 3) 모든 제출 작업 완료 대기 (NotifyAllAndWait 대체)
+for (auto&amp; f : futures) f.get();
+// 또는 pool.wait(); // 풀에 들어간 모든 작업을 기다릴 때
+</code></pre>
+<p>&quot;NotifyAllAndWait 대체&quot;라는 주석과, 전역 대기(<code>pool.wait()</code>)를 대안으로 남겨둔 흔적이
+곧 두 의미론 사이에서 고민한 자국이다.</p>
+<p><strong>검증법</strong>: <code>NotifyAllAndWait</code> 호출부 4곳(<code>Scene.cpp:677</code>, <code>Terrain.cpp:479</code>,
+<code>ModelSceneBridge.cpp:34,55</code>)에서, 대기 직전에 자신이 넣지 않은 작업이 큐에 남아 있는지 로그로
+센다. 남아 있다면 그 호출부는 전역 배리어에 의존하고 있다.</p>
+<h3>가설 2 — 워커 우선순위 차이로 잠재 레이스가 드러났다</h3>
+<p>자체 풀은 워커를 <code>THREAD_PRIORITY_HIGHEST</code>로 만든다(<code>Core.ThreadPool.h:20</code>). BS는 기본
+우선순위다. 또 스레드 수 산정도 다르다 — 자체는
+<code>GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)</code>, BS는 <code>hardware_concurrency()</code>(MSVC에서는
+현재 프로세서 그룹만 센다). 둘 다 실행 순서와 병렬도를 바꾸므로, <strong>원래 있던 레이스가
+BS에서만 드러났을</strong> 수 있다. 이 경우 진짜 원인은 BS가 아니라 그 레이스다.</p>
+<p><strong>검증법</strong>: 자체 풀의 우선순위를 <code>THREAD_PRIORITY_NORMAL</code>로, 스레드 수를 BS와 같게 맞춘 뒤
+재현되는지 본다. 재현되면 원인은 BS가 아니다.</p>
+<h3>가설 3 — 자체 풀의 <code>ResetEvent</code> 레이스 (BS와 무관하게 존재)</h3>
+<pre><code class="language-cpp">int prev = m_taskCounts.fetch_add(1, std::memory_order_relaxed);
+if (prev == 0) ResetEvent(m_waitEvent);   // ← fetch_add와 원자적이지 않다
+m_tasks-&gt;push(std::move(task));
+</code></pre>
+<p><code>fetch_add</code>와 <code>ResetEvent</code> 사이에 워커가 직전 작업을 끝내고 <code>SetEvent</code>를 부르면, 뒤늦은
+<code>ResetEvent</code>가 그 신호를 덮어쓴다 → <code>NotifyAllAndWait</code> 무한 대기. 다중 생산자에서 성립한다.
+§5-정정의 permit 유실과는 별개 경로다.</p>
+<p>이건 자체 풀 쪽 결함이므로 BS 교체의 원인은 아니지만, <strong>재현 실험 중 잡음이 되므로 먼저
+막아두는 편이 낫다.</strong></p>
+<h3>재개 시 순서</h3>
+<ol>
+<li>가설 2를 먼저 친다 — 자체 풀의 우선순위·스레드 수만 BS와 맞춰 재현 시도. 가장 싸고,
+재현되면 BS는 무죄이며 진짜 레이스를 잡는 문제로 바뀐다.</li>
+<li>재현되지 않으면 가설 1 — 대기 의미론. 위 로그 계측으로 전역 배리어 의존을 찾는다.</li>
+<li>그 전에 가설 3을 막아 잡음을 줄인다.</li>
+</ol>
+<h2>4. 컬 데이터 버퍼 — 동시성이 진짜 필요한 유일한 곳</h2>
+<p><code>Scene.cpp:538-620</code>에서 카메라마다 스레드풀 잡을 6개 띄우고, 각 잡이 같은
+<code>RenderPassData</code>의 <code>m_findProxyVec[index]</code> / <code>m_findShadowProxyVec[index]</code>에 push_back한다.
+static·skinned·terrain·foliage·decal·sprite 잡이 <strong>동시에 같은 벡터에 쓴다</strong>.</p>
+<p>여기서 <code>concurrent_vector</code>는 정당하다. 다만 두 가지 대안이 더 낫다.</p>
+<ul>
+<li><strong>대안 A — 잡별 스레드 로컬 수집 후 병합</strong>: 각 잡이 자기 <code>std::vector</code>에 모으고 마지막에
+한 번 병합. 동시성 자체를 없앤다. 병합 비용은 프록시 수백 개 수준에서 무시할 만하다.</li>
+<li><strong>대안 B — 잡 종류별로 벡터 분리</strong>: 6개 잡이 각자의 벡터를 가지면 경합이 사라진다.
+소비 측은 6개를 순회하면 된다.</li>
+</ul>
+<p>둘 다 <code>std::vector</code>의 연속 메모리를 회복한다. <code>concurrent_vector</code>는 세그먼트 기반이라
+순회·정렬에서 캐시 지역성이 나쁘다 — 실제로 <code>RenderPassData.cpp:251,260,288,310</code>에서
+<code>std::ranges::sort</code>를 걸고 있다.</p>
+<h3><code>clear()</code> 문제는 교체해도 남는다</h3>
+<p>종료 크래시 스택(<code>Tools/regression/SHUTDOWN-CRASH-NOTES.md:53-56</code>)은
+<code>concurrent_vector::clear</code>와 <code>concurrent_queue::push</code>가 파괴된 객체를 만진 흔적이다.
+이건 <strong>수명 관리 문제</strong>이지 컨테이너 선택 문제가 아니다. STL로 바꿔도 동일하게 터진다.
+교체를 크래시 해결책으로 기대해서는 안 된다.</p>
+<h2>5. 교체의 손익</h2>
+<p><strong>얻는 것</strong></p>
+<ul>
+<li>MSVC 전용 의존 제거 — PPL은 표준이 아니고 MSVC에만 있다. 이식성 확보.</li>
+<li><code>concurrent_vector</code> → <code>std::vector</code>: 연속 메모리, 캐시 지역성, 정렬 성능.</li>
+<li>락이 코드에 드러난다. 지금은 &quot;동시성 컨테이너를 썼으니 안전하다&quot;는 착시가 있고,
+§3이 그 착시의 실례다.</li>
+<li><code>using namespace concurrency;</code>가 헤더에 퍼져 있는 문제(<code>IRenderPass.h:29</code>,
+<code>RenderPassData.h:8</code>, <code>RenderScene.h:29</code>, <code>ProxyCommandQueue.h:7</code>)도 함께 해소된다.</li>
+</ul>
+<p><strong>잃는 것</strong></p>
+<ul>
+<li><code>ThreadPool</code>의 MPMC 큐는 직접 구현해야 한다 — <code>std::deque</code> + <code>mutex</code> + <code>condition_variable</code>.</li>
+<li><code>try_pop</code> 같은 비블로킹 API를 손으로 만들어야 한다.</li>
+</ul>
+<h3>정정 — 작업 큐는 고빈도가 아니다</h3>
+<p>초판에서 <code>ThreadPool</code> 큐를 &quot;유일하게 락프리가 값을 하는 자리&quot;로 적었으나, 호출 빈도를 세어 보니
+근거가 약하다. <code>Scene.cpp:538&amp;#126;661</code>이 카메라당 <code>Enqueue</code> 10건, 카메라 3&#126;10개면 프레임당 30&#126;100잡 —
+60fps 기준 <strong>초당 2천&#126;6천 회</strong>다. 뮤텍스 하나로 세 자릿수 여유가 있는 영역이다. 나머지 풀(셰이더
+리로드·에셋 로드·애니메이션)은 더 한산하다.</p>
+<p>또한 현재 구조는 큐 push와 세마포어 release를 따로 센다(<code>Core.ThreadPool.h:75-77</code>). 워커가
+<code>acquire()</code> 후 <code>try_pop</code>에 실패하면 permit이 유실되고 <code>m_taskCounts</code>가 줄지 않아
+<code>NotifyAllAndWait()</code>이 무한 대기할 수 있다 — <code>Scene.cpp:677</code>·<code>Terrain.cpp:479</code>·<code>ModelSceneBridge</code>가
+프레임 동기화 지점에서 이를 호출한다. 락프리 큐로 교체하면 이 창은 오히려 넓어진다
+(생산자별 서브큐를 두는 구현은 큐가 비지 않아도 pop이 실패할 수 있다).
+뮤텍스+<code>condition_variable</code>은 큐 상태와 대기를 한 락 아래 묶어 이 문제를 구조적으로 없앤다.</p>
+<p><strong>중립</strong></p>
+<ul>
+<li>SPSC 성격의 프레임 링 큐들(#4&#126;#8)은 애초에 경합이 거의 없다. 어느 쪽이든 성능 차이가
+드러나지 않는다. 교체 판단은 성능이 아니라 일관성 기준으로 하면 된다.</li>
+</ul>
+<h2>6. 권고 — 단계</h2>
+<p>교체 자체보다 앞서야 할 정리가 있다.</p>
+<p><strong>등급 A부터 — 교체가 아니라 삭제다.</strong></p>
+<ol>
+<li><strong>죽은 include 제거</strong> — <code>RenderScene.h:27</code>. 위험 없음.</li>
+<li><strong>렌더 큐 8종 판정</strong> — 생산자 결손이 의도인지 결손인지 DX12 라이브 작업에서 확인.
+결손이면 파이프라인 수정이 먼저이고, 폐기라면 멤버 8개와 함수 3개를 삭제한다.
+<code>SortShadowRenderQueue</code> 버그(§2)도 이때 함께.</li>
+<li><strong><code>m_shaderReloadThreadPool</code> 삭제</strong> — 죽은 멤버 + 누수(§3). PPL과 무관하지만 같은 파일이다.</li>
+</ol>
+<p><strong>그다음 등급 C의 오작동 교정.</strong></p>
+<ol start="4">
+<li>&#126;&#126;<strong>HLSLCompiler 교체</strong>&#126;&#126; — <strong>철회.</strong> DX12가 이 경로를 전혀 쓰지 않고(§3-0), <code>ShaderSystem</code>이
+DX11 디바이스에 묶여 있어 어느 쪽으로 가든 유지 대상이 아니다. 여기서 손댈 것은
+<strong>PDB 덮어쓰기 버그 하나뿐</strong>이며, 그것도 PPL과 무관한 독립 수정이다.</li>
+<li><strong>컬 데이터 버퍼</strong> — §4 대안 A 또는 B. <code>std::vector</code>의 연속 메모리 회복.
+현재 등급 C 중 <strong>유일하게 손댈 값이 있는 항목</strong>이다.</li>
+</ol>
+<p><strong>마지막이 등급 B — 순수 치환이라 이득이 가장 작다.</strong></p>
+<ol start="6">
+<li><strong>크로스 스레드 큐 5종</strong> — 얇은 래퍼(<code>FrameQueue&lt;T&gt;</code>) 하나로 일괄 치환.
+<code>push</code>/<code>try_pop</code>/<code>empty</code>만 있으면 현재 호출부가 그대로 통과한다.</li>
+<li><strong><code>IRenderPass::CommandQueue</code></strong> — 손대지 않는다. DX11 은퇴와 함께 사라진다.</li>
+<li><strong><code>ThreadPool</code></strong> — 큐 교체 전에 permit 유실(§5-정정)부터 막고, 프레임 시간 기준선을 잡는다.
+외부 라이브러리 도입은 뮤텍스 버전이 실제로 밀릴 때 검토해도 늦지 않다.</li>
+</ol>
+<p>1&#126;5까지만 해도 PPL 의존 지점은 9곳에서 5곳으로 줄고, 그 과정에서 실제 결함 3건
+(생산자 결손·캐시 레이스·죽은 멤버 누수)이 함께 정리된다. 6은 그 뒤에 해도 되고,
+안 해도 기능적으로 잃는 것이 없다.</p>
+<h2>7. 연계</h2>
+<ul>
+<li>렌더 큐 판정은 <a href="../plans/archive/MultiCameraRenderPlan.html">MultiCameraRenderPlan.md</a> / DX12 라이브 파이프라인 작업과 한 몸.</li>
+<li><code>using namespace concurrency;</code> 헤더 오염은 <a href="../plans/archive/Phase5CouplingPlan.html">Phase5CouplingPlan.md</a>의 인용 경로 규칙과 같은 결.</li>
+<li>종료 크래시 수명 문제는 <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/SHUTDOWN-CRASH-NOTES.md">Tools/regression/SHUTDOWN-CRASH-NOTES.md</a> — 컨테이너 교체로 해결되지 않음.</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-사용처-전수-분류--생산소비-스레드-실측-기준"></span><span id="2-렌더-큐-8종--생산자가-없다"></span><span id="3-0-선행-질문--셰이더-로드-병렬화에-효과가-있는가"></span><span id="3-1-bsthread_pool-교체가-중단된-이유--가설과-검증법"></span><span id="3-hlslcompiler--동시성-컨테이너인데-안전하지-않다"></span><span id="4-컬-데이터-버퍼--동시성이-진짜-필요한-유일한-곳"></span><span id="5-교체의-손익"></span><span id="6-권고--단계"></span><span id="7-연계"></span><span id="clear-문제는-교체해도-남는다"></span><span id="sec-1-사용처-전수-분류--생산소비-스레드-실측-기준"></span><span id="sec-2-렌더-큐-8종--생산자가-없다"></span><span id="sec-3-0-선행-질문--셰이더-로드-병렬화에-효과가-있는가"></span><span id="sec-3-1-bsthread_pool-교체가-중단된-이유--가설과-검증법"></span><span id="sec-3-hlslcompiler--동시성-컨테이너인데-안전하지-않다"></span><span id="sec-4-컬-데이터-버퍼--동시성이-진짜-필요한-유일한-곳"></span><span id="sec-5-교체의-손익"></span><span id="sec-6-권고--단계"></span><span id="sec-7-연계"></span><span id="sec-요약"></span><span id="가설-1-가장-유력--notifyallandwait이-사실상-전역-배리어였다"></span><span id="가설-2--워커-우선순위-차이로-잠재-레이스가-드러났다"></span><span id="가설-3--자체-풀의-resetevent-레이스-bs와-무관하게-존재"></span><span id="결정적-전제--dx12는-이-경로를-전혀-쓰지-않는다"></span><span id="그보다-큰-문제--이-캐시는-아무도-읽지-않는다"></span><span id="동시성의-출처--그리고-같은-파일-안의-불일치"></span><span id="등급-a--동시성-자체가-불필요-제거-대상"></span><span id="등급-b--크로스-스레드지만-동시성-컨테이너가-과함"></span><span id="등급-c--동시성이-실제로-필요"></span><span id="부수-발견--pdb가-cso를-덮어쓴다"></span><span id="부수-발견--실제-버그"></span><span id="부수-발견--외부-스레드풀-병존"></span><span id="요약"></span><span id="재개-시-순서"></span><span id="정정--작업-큐는-고빈도가-아니다"></span><span id="파생-문제--셰이더-자산과-머티리얼이-dx12에서-끊겨-있다"></span></details></main></body></html>

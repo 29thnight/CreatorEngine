@@ -1,5 +1,53 @@
 # 렌더 파이프라인 구조와 프레임 플로우
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Material.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.h#L39) — `class [[reflgen::reflect]] Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>`
+- [Engine/RenderEngine/Material.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.h#L50) — `const own::shared_owner<const material_graph::Instance>& GetMaterialGraphInstance() const`
+- [Engine/RenderEngine/Material.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Material.h#L55) — `const own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin>& GetAssetOrigin() const noexcept`
+- [Engine/RenderEngine/RenderScene.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L11) — `class Scene;`
+- [Engine/RenderEngine/RenderScene.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24) — `class RenderScene`
+- [Engine/RenderEngine/RenderScene.h:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L46) — `RenderScene() = default;`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h#L47) — `struct EnhancedMaterialTextureBinding`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h#L65) — `struct EnhancedForwardMaterialFlowSnapshot`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h:155](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h#L155) — `struct EnhancedMaterialDrawSnapshot`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:200](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L200) — `void TrackHeap(const std::shared_ptr<AliasHeapAccounting>& accounting);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:311](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L311) — `bool structuralScheduleReused{false}; // Declarations/DAG/lifetimes reused; native state/barrier/allocation plans remain per frame.`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:422](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L422) — `void SetTransientAliasing(bool enabled, bool extendLifetimes = false)`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:178](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L178) — `std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:189](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L189) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:280](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L280) — `bool InitializeAll(const EnhancedFrameContext& context, uint32_t viewCount,`
+- [Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:295](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L295) — `void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,`
+- [Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:313](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L313) — `result.push_back({node.name, bool(node.active), node.IsActive(), node.perView, node.reads, node.writes, node.modifies});`
+- [Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h#L9) — `class Material;`
+- [Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h:62](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h#L62) — `[[nodiscard]] bool BuildSealSourceFromLegacy(const Material& legacy,`
+- [Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/ExperimentMaterialSealing.h#L94) — `void ApplyAuthoredMaterial(SealSource& source,`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8407](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8407) — `EnhancedSceneRenderer::TickLive(submission.frame);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:8790](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L8790) — `bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:9011](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L9011) — `EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 CreatorEngine 의 **렌더 패스 · 렌더러 · 머테리얼** 구조와, 한 프레임을 그리기 위한 실행
 흐름을 순서도로 정리한 문서다. 모든 다이어그램은 Mermaid 로 작성했다.
 
@@ -610,3 +658,5 @@ flowchart LR
 각 화살표는 **값 복사 경계**다. 오른쪽 층은 왼쪽 층의 객체를 포인터로 붙들지 않는다.
 `RenderProxy → PooledDraw` 만 예외로 `shared_ptr` 을 들고, 그것도 `BuildDrawPool` 의
 안정된 프레임 경계 동안 generation owner 의 수명을 보장하기 위해서다.
+
+</details>

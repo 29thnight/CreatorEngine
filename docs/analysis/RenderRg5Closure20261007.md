@@ -1,5 +1,53 @@
 # RG5 종결 검사 — 2026-10-07
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:142](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L142) — `if (!sprite.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:146](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L146) — `sprite.Declare(graph, frame);`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h:271](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedSpriteRg5Tests.h#L271) — `if (!sprite.PrepareFrame(frame, error))`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:146](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L146) — `if (!sprite.PrepareFrame(frame, error) || !sss.PrepareFrame(frame, error) ||`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:147](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L147) — `!ssr.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))`
+- [Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h:151](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/EnhancedScreenRg5Tests.h#L151) — `sprite.Declare(graph, frame);`
+- [Tools/regression/verify-rg5-decal.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-decal.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg5-decal.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-decal.ps1#L8) — `$output = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-rg5-decal.ps1:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg5-decal.ps1#L42) — `$marker = [regex]::Match($log, '(?m)^RG5_DECAL_GPU_OK policies=3 frames=([1-9][0-9]*) maxError=([0-9.eE+-]+) validation=0\r?$')`
+- [Engine/RenderEngine/MaterialGraphIblBake.cpp:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp#L12) — `if (!std::ranges::all_of(values, [](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; }))`
+- [Engine/RenderEngine/MaterialGraphIblBake.cpp:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp#L26) — `const double normalLength = std::hypot(normal[0], normal[1], normal[2]);`
+- [Engine/RenderEngine/MaterialGraphIblBake.cpp:266](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphIblBake.cpp#L266) — `bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) const`
+- [Tools/regression/material_scene_decal_tests.inl:111](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_scene_decal_tests.inl#L111) — `Check(decal.PrepareFrame(context, error),`
+- [Tools/regression/material_scene_decal_tests.inl:124](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_scene_decal_tests.inl#L124) — `Check(decal.PrepareGpuVisibility(context, error),`
+- [Tools/regression/material_scene_decal_tests.inl:185](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_scene_decal_tests.inl#L185) — `lighting = SceneHost::DeclareHdrTarget(*graph, context);`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L12) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L19) — `[](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; });`
+- [Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp:385](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSurfaceBatch.cpp#L385) — `bool SurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.cpp:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp#L11) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp#L29) — `if (!std::isfinite(value) || std::abs(value) > 1e6f)`
+- [Engine/RenderEngine/MaterialGraphRasterSurface.cpp:155](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphRasterSurface.cpp#L155) — `bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:886](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L886) — `if (!pipeline.decal.PrepareGpuVisibility(context, error)`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:887](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L887) — `|| !pipeline.sprite.PrepareGpuVisibility(context, error))`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3982](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3982) — `const auto hdr = material_graph::SceneHost::DeclareHdrTarget(graph, ctx);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **최신 판정:** reference 및 최종 Fog/PostChain/UI/Editor·실제 capture/fixture 수용까지 완료해 RG5를 done/기성 10인일로 닫았다. [최종 수용 기록](RenderRg5FinalAcceptance20261007.md). 아래 보류 판정과 실패/복구 증거는 이 검사의 중간 이력으로 보존하며 RG6 전환 전후 수용은 별도로 남는다.
 
 ## 판정 범위
@@ -81,3 +129,5 @@ RenderGraph 명령은 기존 RG1~RG4 양·음성/정렬 검사와 RG5 producer·
 - 재현 진입점: 증거 폴더의 `run-commandlet.ps1`에 구성·새 Tag·`-Fixture Build/Verification/RG5Closure20261007/fixture/Project`를 지정한다. 재질 검사는 실제 구성별 DLL 경로를 PATH에 추가한 세션에서 `Tools/regression/verify-rg5-decal.ps1`에 구성과 새 OutputDirectory를 지정한다.
 
 문서 대시보드 442항목의 전체 파싱/렌더·상태 구조 검사 및 `git diff --check`를 통과했다. 기존 완료 공수는 늘리지 않았다.
+
+</details>

@@ -1,5 +1,34 @@
 # LX 메시 변환 단일 dispatch 전환 — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/regression/ArtifactRetention.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ArtifactRetention.ps1#L3) — `$path=[IO.Path]::GetFullPath($Directory)`
+- [Tools/regression/ArtifactRetention.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ArtifactRetention.ps1#L4) — `$drive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($path))`
+- [Tools/regression/ArtifactRetention.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ArtifactRetention.ps1#L11) — `$root=[IO.Path]::GetFullPath($Directory).TrimEnd('\','/')`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 메시별 `Dispatch` 루프를 제거했다. 현재 LX 메시 변환은 한 뷰의 새 변환 작업을 모아 공통 커널을 **한 번** 호출한다. GPU가 각 메시 출력 UAV에 직접 쓰며 중간 결과 재복사나 기존 셰이더 전환 경로는 없다.
 
 ## 배선과 계약
@@ -76,13 +105,15 @@ CPU 열은 전체 뷰의 준비·기록·제출 범위다. 작업 목록 업로�
 
 ## 증거와 재현
 
-- [소스 계약](../../Build/Verification/LxTransformDispatch-20261012/source-audit.json)
-- [변경 SHA](../../Build/Verification/LxTransformDispatch-20261012/scope-manifest.json)
-- [Debug 변환 판정](../../Build/Verification/LxTransformDispatch-20261012/Debug-Accepted/transform-verdict.json)
-- [Release 변환 판정](../../Build/Verification/LxTransformDispatch-20261012/Release-Accepted/transform-verdict.json)
-- [성능 원시 값·통합 판정](../../Build/Verification/LxTransformDispatch-20261012/performance-verdict.json)
-- [현재 GPU gate](../../Tools/regression/verify-lx-transform-dispatch.ps1)
-- [측정 도구](../../Tools/regression/measure-lx-transform-dispatch.ps1)
-- [exact-frame 분석](../../Tools/regression/verify-lx-transform-performance.py)
+- 소스 계약 (`../../Build/Verification/LxTransformDispatch-20261012/source-audit.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 변경 SHA (`../../Build/Verification/LxTransformDispatch-20261012/scope-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 변환 판정 (`../../Build/Verification/LxTransformDispatch-20261012/Debug-Accepted/transform-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 변환 판정 (`../../Build/Verification/LxTransformDispatch-20261012/Release-Accepted/transform-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 성능 원시 값·통합 판정 (`../../Build/Verification/LxTransformDispatch-20261012/performance-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 현재 GPU gate (`../../Tools/regression/verify-lx-transform-dispatch.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)
+- 측정 도구 (`../../Tools/regression/measure-lx-transform-dispatch.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)
+- exact-frame 분석 (`../../Tools/regression/verify-lx-transform-performance.py` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)
 
 GPU gate는 `-Configuration Debug|Release -FixtureProject <source> -OutputDirectory <fresh-directory>`로 실행한다. 성능 도구는 `-Counts 16,64,256,512 -Iterations 4`로 실행한 뒤 분석 도구를 같은 디렉터리에 실행한다. 실패를 검토하고 모든 oracle·정상 종료가 통과한 후에만 ArtifactRetention 완료 정책을 적용한다.
+
+</details>

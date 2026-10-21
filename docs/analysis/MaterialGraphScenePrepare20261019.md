@@ -1,5 +1,52 @@
 # MaterialGraphScenePrepare: 가시성 작업의 시작 시점과 반복 CPU 비용
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/MaterialGraphSceneGpuData.h:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L84) — `bool AssignGeometry(uint32_t record, const std::shared_ptr<const MeshSurfaceBatch>& current,`
+- [Engine/RenderEngine/MaterialGraphSceneGpuData.h:170](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L170) — `bool PrepareBindings(IRenderDeviceServices& device, std::string& error)`
+- [Engine/RenderEngine/MaterialGraphSceneGpuData.h:200](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneGpuData.h#L200) — `cache.Prepare({sceneEpoch, viewId, 2}, materialBytes, 16, "METEOR.Scene.Materials", materialBuffer, error);`
+- [Engine/RenderEngine/MaterialGraphPreparationTasks.h:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h#L52) — `throw std::runtime_error(failure.empty() ? "Scene preparation task failed." : failure);`
+- [Engine/RenderEngine/MaterialGraphPreparationTasks.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h#L63) — `throw std::runtime_error("Scene preparation task admission limit exceeded.");`
+- [Engine/RenderEngine/MaterialGraphPreparationTasks.h:69](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphPreparationTasks.h#L69) — `slot = scheduler_.submit_indexed(1, [execute = std::move(execute)](std::size_t) mutable`
+- [Engine/Utility_Framework/ThreadPool.cpp:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L37) — `std::swprintf(name, std::size(name), L"Creator.JobWorker.%u", threadnum - kExternalThreads);`
+- [Engine/Utility_Framework/ThreadPool.cpp:76](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L76) — `const bool previous = std::exchange(executing_pool_work, true);`
+- [Engine/Utility_Framework/ThreadPool.cpp:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ThreadPool.cpp#L77) — `enki::ICompletable::OnDependenciesComplete(scheduler, thread);`
+- [Engine/Utility_Framework/JobScheduler.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L19) — `notifications.push_back({std::move(callback), error});`
+- [Engine/Utility_Framework/JobScheduler.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L28) — `auto next = std::move(notifications.back());`
+- [Engine/Utility_Framework/JobScheduler.cpp:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.cpp#L39) — `std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:603](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L603) — `bool GpuGeometryVisibility::PrepareMeshlets(`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:719](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L719) — `if (!PrepareInternal(context, projection, candidates, bins, result, error,`
+- [Engine/RenderEngine/GpuGeometryVisibility.cpp:915](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L915) — `bool GpuGeometryVisibility::PrepareInternal(`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:1614](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1614) — `bool SceneHost::PrepareProgram(const EnhancedFrameContext&, const Instance& instance,`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:1782](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1782) — `bool SceneHost::PrepareResidency(const EnhancedFrameContext& context,`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:1813](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1813) — `bool SceneHost::Prepare(const EnhancedFrameContext& context, own::shared_owner<const SceneViewInput> input,`
+- [Tools/regression/verify-scene-geometry-pages.py:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-geometry-pages.py#L13) — `SOURCE = Path('Engine/RenderEngine/MaterialGraphSceneGpuData.h')`
+- [Tools/regression/verify-scene-geometry-pages.py:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-geometry-pages.py#L49) — `method, line = block(source, 'bool AssignGeometry(')`
+- [Tools/regression/verify-scene-geometry-pages.py:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-geometry-pages.py#L50) — `bindings, binding_line = block(source, 'bool PrepareBindings(')`
+- [Tools/regression/verify-scene-cpu-preparation.py:100](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-cpu-preparation.py#L100) — `definitions += emit(baseline, baseline_path, 'struct SceneCpuPreparation final', True) + '}\n'`
+- [Tools/regression/verify-scene-cpu-preparation.py:102](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-cpu-preparation.py#L102) — `'struct PreparationScratch; };\n')`
+- [Tools/regression/verify-scene-cpu-preparation.py:103](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-scene-cpu-preparation.py#L103) — `definitions += emit(source, root / HOST, 'struct SceneCpuPreparation final', True)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준 커밋: `001ff417b7745401622f4f9ab8e8b9b15fb9ab4d` (`master`, 2026-10-19).
 앞선 RenderGraphDeclare PR #184가 병합된 이후의 최신 코드에서 시작했다.
 
@@ -354,3 +401,5 @@ Scene+Game 1186×514·Playing/Possessed·native·전경·unlimited·동일 계�
 ScenePrepare 전체/세부 scope의 p50/p95, Running/Ready/Waiting, 카메라/owner 실행 중첩,
 CPU Game 시간과 GPU 출력 일치 여부를 함께 확인한다.
 이 native 빌드·GPU 회귀·전체 프레임 재측정은 현재 환경에서 실행하지 않았으며 통과로 표시하지 않는다.
+
+</details>

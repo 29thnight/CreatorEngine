@@ -1,5 +1,48 @@
 # Release 자동 Inspector·붙여넣기·저장 대기 경합 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/WinProcProxy.cpp:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/WinProcProxy.cpp#L5) — `void WinProcProxy::PushMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)`
+- [Editor/EngineEntry/WinProcProxy.cpp:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/WinProcProxy.cpp#L14) — `m_messageQueue.push(std::move(queued));`
+- [Editor/EngineEntry/WinProcProxy.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/WinProcProxy.cpp#L17) — `WinProcProxy::Message WinProcProxy::PopMessage()`
+- [Tools/regression/texture_auto_ui_pending_probe.inl:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/texture_auto_ui_pending_probe.inl#L15) — `const auto source = file::path(ctx.parts[1]);`
+- [Tools/regression/texture_auto_ui_pending_probe.inl:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/texture_auto_ui_pending_probe.inl#L17) — `if (source.filename() != "fixture.png" || !file::exists(project / ".texture-auto-ui-race"))`
+- [Tools/regression/texture_auto_ui_pending_probe.inl:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/texture_auto_ui_pending_probe.inl#L21) — `const auto sidecar = file::path(source.string() + ".meta");`
+- [Tools/regression/verify-texture-reimport-scene.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-reimport-scene.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L15) — `$root = Join-Path $repo ('Build/TRS-' + $config + '-' + [guid]::NewGuid().ToString('N').Substring(0,8))`
+- [Tools/regression/verify-texture-reimport-scene.ps1:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-reimport-scene.ps1#L24) — `[IO.File]::WriteAllText($texture + '.meta', "guid: 33333333-3333-4333-8333-333333333333n")`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Editor/EngineEntry/WinProcProxy.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/WinProcProxy.h#L7) — `class WinProcProxy : public Singleton<WinProcProxy>`
+- [Editor/EngineEntry/WinProcProxy.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/WinProcProxy.h#L9) — `public:`
+- [Editor/EngineEntry/WinProcProxy.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/WinProcProxy.h#L11) — `public:`
+- [Engine/SceneRuntime/ImageComponent.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L14) — `class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent, UIComponent>`
+- [Engine/SceneRuntime/ImageComponent.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L19) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/ImageComponent.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L21) — `UIComponent::gc_trace(tracer);`
+- [Engine/SceneRuntime/SpriteRenderer.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L11) — `class [[reflgen::reflect]] SpriteRenderer : public meta::identity<SpriteRenderer, Component>`
+- [Engine/SceneRuntime/SpriteRenderer.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L16) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/SpriteRenderer.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L18) — `Component::gc_trace(tracer);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-10, HEAD `b2f918c196d02c648eef5ef064e11ae4f8d7846b`의 로컬 수정 소스로
 Release 실제 Editor를 빌드하고 격리 프로젝트에서 입력했다. 실제 복사·붙여넣기,
 잘못된 설정 거부, cook 실패·Retry·원본 복구, 저장 대기 중 Inspector 닫기와 정상
@@ -10,8 +53,8 @@ Release 실제 Editor를 빌드하고 격리 프로젝트에서 입력했다. �
 실행 파일은 `Bin/x64-Release/Editor/CreatorEditor.exe`, 검증 runtime DLL SHA-256은
 `0225A5ABC1A685BC5AA2EDF3D1DA36E4B5EE93410E0E2A62B19C46167387540E`다.
 최종 Editor와 host 빌드는 각각
-[Editor 빌드 로그](../../Build/phase12-release-ui-clipboard-editor.log),
-[host 빌드 로그](../../Build/phase12-release-ui-clipboard-host.log)에서 성공했다.
+Editor 빌드 로그 (`../../Build/phase12-release-ui-clipboard-editor.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+host 빌드 로그 (`../../Build/phase12-release-ui-clipboard-host.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에서 성공했다.
 링커의 Utility_Framework.pdb LNK4020 경고는 남았다. 실행 검증은 성공했지만
 해당 라이브러리의 디버그 형식 정보가 완전하다고 주장하지 않는다.
 
@@ -34,13 +77,13 @@ Enter·저장 버튼·재임포트 버튼·씬 재로드 없이 metadata 2와 In
 
 | 검사 | 결과 | 근거 |
 |---|---|---|
-| Release 실제 복사·붙여넣기 | 자동 저장·cook·씬 표시 변경 | [화면](../../Build/TAUI-Release-manual-075e7c23/clipboard-auto-saved.png) |
-| Normal Map 없는 BC5 | 오류 표시, 저장 및 실제 Retry 거부; 당시 정상 meta hash 유지 | [화면](../../Build/TAUI-Release-manual-075e7c23/invalid-bc5-rejected.png) |
-| PNG 손상과 실제 Retry | 진단과 재시도 오류 표시, 직전 정상 씬 및 미저장 엔티티 유지 | [화면](../../Build/TAUI-Release-manual-075e7c23/failure-retry-retained.png) |
-| PNG 원본 복구 | 추가 버튼이나 씬 재로드 없이 Ready 복귀 | [화면](../../Build/TAUI-Release-manual-075e7c23/automatic-recovery.png) |
-| 저장 대기 중 Inspector 닫기 | 요청 시 대기 age 0ms, 디스크는 이전 값; 닫힌 패널과 저장된 2 및 씬 변경 관찰 | [화면](../../Build/TAUI-Release-close-84c0265b/pending-close-saved.png), [명령 receipt](../../Build/TAUI-Release-close-84c0265b/commands.jsonl) |
-| 저장 대기 중 정상 종료 | 요청 age 7ms·이전 디스크, Finalize에서 age 28ms 대기 저장 처리, 최종 값 2 | [종료 로그](../../Build/TAUI-Release-shutdown-d9d7470b/editor.out), [명령 receipt](../../Build/TAUI-Release-shutdown-d9d7470b/commands.jsonl) |
-| 종료 후 같은 프로젝트 재실행 | Inspector 2와 변경된 씬 표시 복원 | [화면](../../Build/TAUI-Release-shutdown-d9d7470b/restart-persisted.png) |
+| Release 실제 복사·붙여넣기 | 자동 저장·cook·씬 표시 변경 | 화면 (`../../Build/TAUI-Release-manual-075e7c23/clipboard-auto-saved.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
+| Normal Map 없는 BC5 | 오류 표시, 저장 및 실제 Retry 거부; 당시 정상 meta hash 유지 | 화면 (`../../Build/TAUI-Release-manual-075e7c23/invalid-bc5-rejected.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
+| PNG 손상과 실제 Retry | 진단과 재시도 오류 표시, 직전 정상 씬 및 미저장 엔티티 유지 | 화면 (`../../Build/TAUI-Release-manual-075e7c23/failure-retry-retained.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
+| PNG 원본 복구 | 추가 버튼이나 씬 재로드 없이 Ready 복귀 | 화면 (`../../Build/TAUI-Release-manual-075e7c23/automatic-recovery.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
+| 저장 대기 중 Inspector 닫기 | 요청 시 대기 age 0ms, 디스크는 이전 값; 닫힌 패널과 저장된 2 및 씬 변경 관찰 | 화면 (`../../Build/TAUI-Release-close-84c0265b/pending-close-saved.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 receipt (`../../Build/TAUI-Release-close-84c0265b/commands.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
+| 저장 대기 중 정상 종료 | 요청 age 7ms·이전 디스크, Finalize에서 age 28ms 대기 저장 처리, 최종 값 2 | 종료 로그 (`../../Build/TAUI-Release-shutdown-d9d7470b/editor.out` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 receipt (`../../Build/TAUI-Release-shutdown-d9d7470b/commands.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
+| 종료 후 같은 프로젝트 재실행 | Inspector 2와 변경된 씬 표시 복원 | 화면 (`../../Build/TAUI-Release-shutdown-d9d7470b/restart-persisted.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) |
 
 manual·close fixture와 재실행 host는 native 창 닫기로 정상 종료했다.
 pending shutdown은 관찰 명령의 RequestQuit으로 정상 Finalize 경로에 들어갔다.
@@ -65,17 +108,17 @@ pending shutdown은 관찰 명령의 RequestQuit으로 정상 Finalize 경로에
 대기 후 36000 프레임 명령은 close 화면 관찰을 위한 유지 요청이며 장시간 완료 증거가 아니다.
 Debug에는 이번 keyboard-state 수정의 실제 UI 재검증을 수행하지 않았다.
 
-최종 [통합 receipt와 소스 manifest](../../Build/TextureAutomaticReleaseUi/result.json)는
+최종 통합 receipt와 소스 manifest (`../../Build/TextureAutomaticReleaseUi/result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)는
 runtime 일치, 세 fixture의 최종 meta/PNG/GUID/저장 씬, pending 명령 결과, 종료 로그와
-관련 소스 11개의 hash를 기록한다. [수집 스크립트](../../Build/collect-texture-release-ui.ps1)는
+관련 소스 11개의 hash를 기록한다. 수집 스크립트 (`../../Build/collect-texture-release-ui.ps1` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)는
 디스크/로그 단정을 다시 검사한다. UI 관찰은 화면과 실행 기록에 의존한다.
 Build 아래 실행 산출물은 로컬 증거이며 저장소 배포 산출물이 아니다.
 
 동일 최종 Release runtime으로 `verify-texture-reimport-scene.ps1 -Configuration Release`도
 다시 통과했다. ImageComponent/SpriteRenderer 4→2 자동 연결, 미저장 씬 유지,
 저장 씬 재로드, cook/reload 실패 보존, 4 복구, Undo 및 프리팹 자동 Apply/Undo/Redo를
-확인했다. [명령 receipt](../../Build/TRS-Release-6bbf7e7a/results.jsonl)와
-[통합 회귀 결과](../../Build/TextureReimportScene/result.json)에 sourceDrift 0을 기록했다.
+확인했다. 명령 receipt (`../../Build/TRS-Release-6bbf7e7a/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)와
+통합 회귀 결과 (`../../Build/TextureReimportScene/result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 sourceDrift 0을 기록했다.
 UI source manifest 11개도 최종 확인에서 drift 0이다. 문서 갱신 후 대시보드 전체 파싱,
 457항목의 문자열/구조 검사 및 phase-meta 검사를 통과했다. 관련 tracked 변경의
 `git diff --check` 오류는 0이다.
@@ -90,3 +133,5 @@ T0/T1a/T2는 진행 중 및 earnedDays 0, T1b는 품질·성능 측정 대기, T
 부재 중단을 유지한다. 이번 Release UI·실제 붙여넣기와 제어된 pending close/정상 종료는
 남은 작업에서 제거한다. 디스크 충돌, 다중 창·배율, 장시간/반복 경합, Debug 수정 재검증,
 모든 소비자·포맷·모델과 GPU pixel/Shipping GPU·품질·성능 수용은 남는다.
+
+</details>

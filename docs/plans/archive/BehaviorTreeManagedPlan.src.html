@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>행동 트리 C# 우선 재설계 — 실행 설계</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../../RefactoringPlanDashboard.html">대시보드</a> · <a href="../MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="BehaviorTreeManagedPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/archive/BehaviorTreeManagedPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>행동 트리 C# 우선 재설계 — 실행 설계</h1><p>이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 종료/승계</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Managed code</ve-node><ve-node id="n1" at="2 1">API handle</ve-node><ve-node id="n2" at="3 1" key>SceneRuntime</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<p><strong>단일 소유 계획:</strong> <a href="../LatticeAdoptionPlan.html">LatticeAdoptionPlan</a>. 이 문서는 이전 진입 링크를 보존하는 인계 문서다.</p>
+<ul>
+<li>이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.</li>
+<li>과거 계획에 남은 게임 BT 콘텐츠 43종의 이식은 엔진 기반 완료와 별개다. 현재 콘텐츠 인벤토리를 재확인하고 실제 콘텐츠/Player 수용을 닫는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>managed component → native API table/handle → SceneRuntime → proxy publication</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L10">ScriptCore/ScriptRegistry.cs:10</a> — <code>internal static class ScriptRegistry</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PlayerInput.cpp#L33">Engine/SceneRuntime/PlayerInput.cpp:33</a> — <code>m_actionMap-&gt;CheckAction(controllerIndex, script-&gt;m_scriptType,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputAction.h#L8">Engine/SceneRuntime/InputAction.h:8</a> — <code>enum class ActionType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Component.cs#L22">ScriptCore/Component.cs:22</a> — <code>public abstract class Component</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="1-왜-이-방향인가"></span>
+<span id="2-경계-계약"></span>
+<span id="3-옮길-것과-남길-것"></span>
+<span id="4-슬라이스"></span>
+<span id="5-위험"></span>
+<span id="6-완료-기준"></span>
+<span id="sec-1-왜-이-방향인가"></span>
+<span id="sec-2-경계-계약"></span>
+<span id="sec-3-옮길-것과-남길-것"></span>
+<span id="sec-4-슬라이스"></span>
+<span id="sec-5-위험"></span>
+<span id="sec-6-완료-기준"></span></p>
+</details>
+</main></body></html>

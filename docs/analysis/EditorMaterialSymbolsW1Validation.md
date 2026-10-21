@@ -1,5 +1,42 @@
 # PHASE 21 W1 — Material Symbols 제품 적용
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/ImGuiHelper/EditorIcons.h:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/EditorIcons.h#L84) — `struct Role { const char* name; const char* symbol; unsigned int codepoint; };`
+- [Editor/ImGuiHelper/EditorIcons.h:162](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/EditorIcons.h#L162) — `template<std::size_t N> struct Text`
+- [Editor/ImGuiHelper/EditorIcons.h:165](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/EditorIcons.h#L165) — `consteval Text(const char (&text)[N])`
+- [Editor/EngineEntry/App.cpp:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L65) — `enabled |= std::wstring_view(arguments[index]) == L"--smoke-offscreen";`
+- [Editor/EngineEntry/App.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L82) — `result = std::filesystem::absolute(arguments[i + 1]).lexically_normal();`
+- [Editor/EngineEntry/App.cpp:121](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L121) — `requested |= std::wstring_view(arguments[i]) == L"--warmup-check";`
+- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L17) — `class ImGuiHost final : public IImGuiHost`
+- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L25) — `ImGuiWin32Cursor::Reset(hwnd);`
+- [Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp#L38) — `throw std::runtime_error(`
+- [Tools/regression/verify-imgui-obsolete-surface.ps1:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-imgui-obsolete-surface.ps1#L38) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-imgui-obsolete-surface.ps1:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-imgui-obsolete-surface.ps1#L50) — `$withoutBlocks = [regex]::Replace($Text, '(?s)/\*.*?\*/', '')`
+- [Tools/regression/verify-imgui-obsolete-surface.ps1:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-imgui-obsolete-surface.ps1#L126) — `$text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($file.FullName))`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-11. 작업 시작 HEAD `3efbb23f`와 작업 트리 기준.
 [정본 계획](../plans/EditorWorkspaceRedesignPlan.md) ·
 [선정 근거와 W7 썸네일 계약](EditorIconSelectionStudy.md).
@@ -75,3 +112,5 @@
   요청/생성, 캐시·무효화·완료 게시 및 Ready 결과로의 교체는 아직 구현하지 않았다.
 - 이 작업 중 별도 변경된 `App.cpp`·`ImGuiHost.cpp`와 기존 `reflect_golden.yaml`은 보존했다.
   빌드·실행 결과는 해당 작업 트리를 포함한 통합 결과다.
+
+</details>

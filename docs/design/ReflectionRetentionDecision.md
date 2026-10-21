@@ -1,5 +1,52 @@
 # 엔진 전용 리플렉션 — 존치 결정
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.
+- 모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/SceneManager.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L28) — `class SceneManager : public Singleton<SceneManager>`
+- [Engine/SceneRuntime/SceneManager.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L50) — `void Editor();`
+- [Engine/SceneRuntime/SceneManager.h:188](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L188) — `bool IsEditorSceneLoaded() const { return m_sessionPolicy.RestoresAuthoring() && m_isSimulationSessionActive; }`
+- [Engine/SceneRuntime/InputManager.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L15) — `class InputManager : public Singleton<InputManager>`
+- [Engine/SceneRuntime/InputManager.h:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L17) — `friend class Singleton<InputManager>;`
+- [Engine/SceneRuntime/InputManager.h:148](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L148) — `inline static auto InputManagement = InputManager::GetInstance();`
+- [Engine/RenderEngine/Interfaces/Navigation.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/Navigation.h#L7) — `enum class Direction`
+- [Engine/RenderEngine/Interfaces/Navigation.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/Navigation.h#L15) — `enum class ClipDirection : std::uint8_t`
+- [Engine/RenderEngine/Interfaces/Navigation.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/Navigation.h#L86) — `enum class TextAlignment : std::uint8_t`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:107](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L107) — `case MethodInputKind::Int: { int result{}; method.invoke(instance, arguments, &result); return "Result: " + std::to_string(result); }`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L108) — `case MethodInputKind::Float: { float result{}; method.invoke(instance, arguments, &result); return "Result: " + std::to_string(result); }`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L126) — `if (nullptr == address) throw std::invalid_argument("method '" + std::string(method.name()) + "': argument is not set");`
+- [Engine/SceneRuntime/Prefab.cpp:326](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L326) — `const reflgen::type_descriptor* type = Meta::Find(obj->GetTypeID());`
+- [Engine/SceneRuntime/Prefab.cpp:330](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L330) — `Meta::SerializeInto(nonConst, *type, outNode);`
+- [Engine/SceneRuntime/Prefab.cpp:354](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Prefab.cpp#L354) — `const reflgen::type_descriptor* type = Meta::Find(obj->GetTypeID());`
+- [Engine/SceneRuntime/ActionMap.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ActionMap.cpp#L15) — `InputAction* ActionMap::AddAction()`
+- [Engine/SceneRuntime/ActionMap.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ActionMap.cpp#L23) — `finalName = baseName + std::to_string(uniqueIndex);`
+- [Engine/SceneRuntime/ActionMap.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ActionMap.cpp#L34) — `void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action)`
+- [Engine/SceneRuntime/SceneManager.cpp:217](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L217) — `if (componentType && Meta::TypeIDOf(*componentType) == type_guid(BoneComponent))`
+- [Engine/SceneRuntime/SceneManager.cpp:269](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L269) — `Meta::Typed::ReadScalar(positionNode, value);`
+- [Engine/SceneRuntime/SceneManager.cpp:958](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp#L958) — `Meta::SerializeInto(gameObject, Meta::TypeOf<Entity>(),`
+- [Engine/SceneRuntime/PrefabUtility.cpp:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L97) — `Meta::SerializeDocument(&obj, Meta::TypeOf<Entity>());`
+- [Engine/SceneRuntime/PrefabUtility.cpp:180](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L180) — `if (const reflgen::type_descriptor* type = Meta::FindTypeByInstance(comp.get()))`
+- [Engine/SceneRuntime/PrefabUtility.cpp:214](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrefabUtility.cpp#L214) — `Meta::DeserializePrefab(comp, *type, node, overriddenNames);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성: 2026-08-07 · 근거: 소스 실측 (`Meta::*` 호출 지점 · `*.generated.h` 분포 · 헤더툴 pre-build 배선)
 
 ## 결론
@@ -93,3 +140,5 @@ ScriptReflectionAndFactoryClear)을 제거했다. 남은 헤더툴은 MetaGenera
   **갱신(2026-09-30)**: MetaGenerator는 은퇴했고 지금은 reflgen이 프로젝트의 `ClInclude` 를 읽는다. 반영
   모듈(`RenderEngine`·`SceneRuntime`·`Editor`) 밖으로 헤더를 옮기면 서술이 다른 프로젝트에 주입되지 않고
   등록되지도 않는 같은 계열의 함정이 남는다([ReflectionDesign.md](ReflectionDesign.md) §1.2).
+
+</details>

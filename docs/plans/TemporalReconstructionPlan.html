@@ -1,660 +1,801 @@
-<!DOCTYPE html>
-<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/TemporalReconstructionPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    color-scheme: dark light;
-    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
-    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
-    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
     --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
-    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
-    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
-    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
-    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
-    --r-1: 4px; --r-2: 10px;
-    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
-      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
-      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
-      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
+
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
+
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
+
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
+
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
+
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
+
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
+
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
+
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
+
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="TemporalReconstructionPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/TemporalReconstructionPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation</h1><p>TR0/2/3·TU0~4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Camera</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Frame input</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">SDK provider</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">History</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Presenter</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Provenance</text></g></svg></div><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>TR0/2/3·TU0&#126;4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.</li>
+<li>FG/TFG9: 실제 Player generated output identity·물리 표시 cadence/latency·resize/device loss/teardown 및 장치별 비용을 검증한다. requested/configured/active count와 CPU Present 반환을 실제 생성/표시 증거로 바꾸지 않는다.</li>
+<li>현재 portable renderFeatures·startup precedence·camera cut revision·profiler provenance/continuous presenter 기록을 기준으로 persistence/cook·실패 복원·계측 무해화를 수용한다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>sealed camera/render inputs → temporal provider → successful submission history → Player presenter/provenance</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TR0</code> · PHASE 4.5</td>
+<td>계측 무해화 계약 — 측정 표면의 해상도·프레임 종류 선언</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TR2</code> · PHASE 4.5</td>
+<td>렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TU0</code> · PHASE 4.5</td>
+<td>벤더 중립 Upscaler 인터페이스·기능 질의·폴백 사슬</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TU1</code> · PHASE 4.5</td>
+<td>무-upscale 기준 경로·A/B 대조군</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TU2</code> · PHASE 4.5</td>
+<td>FSR 백엔드 — 벤더 중립 베이스라인</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TU3</code> · PHASE 4.5</td>
+<td>DLSS Super Resolution 백엔드 (NGX)</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TU4</code> · PHASE 4.5</td>
+<td>XeSS 백엔드</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>FG0</code> · PHASE 4.5</td>
+<td>present 소유권·proxy swapchain·frame pacing 계약</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>FG1</code> · PHASE 4.5</td>
+<td>지연 마커 — Reflex·Anti-Lag 2, 게임 루프 경유</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>FG2</code> · PHASE 4.5</td>
+<td>FSR 3 Frame Generation 백엔드 — 벤더 중립 베이스라인</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>FG3</code> · PHASE 4.5</td>
+<td>DLSS Frame Generation 백엔드</td>
+<td>progress</td>
+</tr>
+<tr>
+<td><code>TFG9</code> · PHASE 4.5</td>
+<td>지원 행렬 전수·폴백 사슬·계측 단정·성능/지연 판정</td>
+<td>progress</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L92">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:92</a> — <code>struct TemporalFixtureExchange</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Camera.h#L43">Engine/RenderEngine/Camera.h:43</a> — <code>void NotifyCameraCut() noexcept { ++m_cameraCutRevision; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp#L124">Player/PlayerMain.cpp:124</a> — <code>StopPresentation();</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="0-이-페이즈가-생긴-이유"></span>
+<span id="1-정본-경계"></span>
+<span id="10-미해결-결정"></span>
+<span id="11-변경-이력"></span>
+<span id="2-현재-코드의-사실--2026-09-14-실측"></span>
+<span id="2026-10-07-최근-병합-반영"></span>
+<span id="2026-10-09-벤더-구현-착수"></span>
+<span id="2026-10-09-실제-입력렌더-그래프player-배선-확장"></span>
+<span id="2026-10-09-제품-설정히스토리profiler-소스-보완"></span>
+<span id="2026-10-10-pr-169-실행-증거-보완"></span>
+<span id="2026-10-11-dlss-첫-이동-잔상-후속"></span>
+<span id="2026-10-11-phase-45-종료-검증"></span>
+<span id="21-시간축-입력이-없다"></span>
+<span id="22-ui-합성-위치는-유리하다"></span>
+<span id="23-present는-셸이-독점하고-에디터-뷰포트는-present를-타지-않는다"></span>
+<span id="24-해상도-이원화는-방금-데인-축이다"></span>
+<span id="3-계층-분리-결정"></span>
+<span id="31-세-계층은-소유-대상이-다르다"></span>
+<span id="32-자체-tsr을-만들지-않는다"></span>
+<span id="33-fg는-q0를-선행으로-받지-않는다"></span>
+<span id="4-벤더-지원-행렬"></span>
+<span id="41-업스케일-축"></span>
+<span id="42-프레임-생성-축"></span>
+<span id="43-두-축에서-같은-결론"></span>
+<span id="44-선택은-벤더-id가-아니라-기능-질의로"></span>
+<span id="5-작업-표--71일--선행-base-0"></span>
+<span id="51-선행-입력--base-0-phase-43-소유-잔여-4인일"></span>
+<span id="52-트랙-tr--시간축-기반-21인일"></span>
+<span id="53-트랙-tu--업스케일-20인일"></span>
+<span id="54-트랙-fg--프레임-생성-26인일"></span>
+<span id="55-통합-게이트--4인일"></span>
+<span id="6-실행-순서"></span>
+<span id="7-계측-무해화--이-페이즈의-첫-단정"></span>
+<span id="8-완료-기준"></span>
+<span id="9-금지하는-재혼합"></span>
+<span id="sec-0-이-페이즈가-생긴-이유"></span>
+<span id="sec-1-정본-경계"></span>
+<span id="sec-10-미해결-결정"></span>
+<span id="sec-11-변경-이력"></span>
+<span id="sec-2-현재-코드의-사실--2026-09-14-실측"></span>
+<span id="sec-2026-10-07-최근-병합-반영"></span>
+<span id="sec-2026-10-09-벤더-구현-착수"></span>
+<span id="sec-2026-10-09-실제-입력렌더-그래프player-배선-확장"></span>
+<span id="sec-2026-10-09-제품-설정히스토리profiler-소스-보완"></span>
+<span id="sec-2026-10-10-pr-169-실행-증거-보완"></span>
+<span id="sec-2026-10-11-dlss-첫-이동-잔상-후속"></span>
+<span id="sec-2026-10-11-phase-45-종료-검증"></span>
+<span id="sec-3-계층-분리-결정"></span>
+<span id="sec-4-벤더-지원-행렬"></span>
+<span id="sec-5-작업-표--71일--선행-base-0"></span>
+<span id="sec-6-실행-순서"></span>
+<span id="sec-7-계측-무해화--이-페이즈의-첫-단정"></span>
+<span id="sec-8-완료-기준"></span>
+<span id="sec-9-금지하는-재혼합"></span>
+<span id="트랙-fg"></span>
+<span id="트랙-tr"></span>
+<span id="트랙-tu"></span>
+<span id="페이즈"></span></p>
+</details>
+</main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
+
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
     }
-  }
-  html { font-size: 17px; scroll-padding-top: var(--s-6); }
-  * { box-sizing: border-box; margin: 0; }
-  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
-  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
-    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
-    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
-  ::selection { background: var(--accent-dim); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
-  a:hover { color: var(--accent); }
-  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
-  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
-  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
-  main > *, section, figure, header { min-width: 0; }
-  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
-  .crumbs a { color: var(--text-dim); }
-  header.page { display: grid; gap: var(--s-4); }
-  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
-  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
-  h1, h2 { text-box: trim-both cap alphabetic; }
-  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
-  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
-  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
-  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
-  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
-  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
-  .meta p + p { margin-top: var(--s-1); }
-  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
-  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
-  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
-
-  /* figure: stage on the dot grid */
-  figure { display: grid; gap: var(--s-3); }
-  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
-  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
-  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
-
-  /* chips: shape + word, never color alone */
-  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
-  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
-  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
-  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-  .chip.risk { color: var(--risk); }
-  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
-  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
-
-  /* KPI strip: one frame, hairline cells */
-  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
-  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
-  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
-  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
-
-  /* stacked status bar */
-  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
-  .stack > i { display: block; min-width: 2px; }
-  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
-  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
-  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
-
-  /* prose */
-  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
-  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
-  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
-  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
-  .prose li::marker { color: var(--text-dim); }
-  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
-  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
-  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
-  .prose hr { border: 0; border-top: 1px solid var(--border); }
-  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
-  .prose strong { font-weight: 600; color: var(--text); }
-  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
-
-  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
-  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
-  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
-  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
-  .sec-head .ve-label { letter-spacing: .08em; }
-
-  /* tables */
-  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
-  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
-  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
-  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
-  td.num, th.num { text-align: right; }
-  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
-
-  /* code */
-  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
-  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
-  pre.mermaid { background: var(--bg); text-align: left; }
-  pre.mermaid svg { max-width: none; }
-
-  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
-  summary:hover { color: var(--accent); }
-
-  /* table of contents with scroll-spy */
-  nav.toc { display: none; }
-  @media (min-width: 75rem) {
-    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
-    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
-    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
-    nav.toc a:hover { color: var(--text); }
-    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
-    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
   }
 
-  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
-
-  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
-  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
-  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
-
-  @media print {
-    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
-    body::before, nav.toc, .crumbs { display: none; }
-    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
-    .js-motion main > * { opacity: 1 !important; transform: none !important; }
-    svg * { filter: none !important; }
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
   }
-  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
-  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
-  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
-  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
-  .map-row:hover .map-bar i { background: var(--accent); }
-  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
-  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
-</style>
-</head>
-<body>
-<div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#2026-10-11-dlss-첫-이동-잔상-후속">2026-10-11 DLSS 첫 이동 잔상 후속</a></li><li><a href="#2026-10-11-phase-45-종료-검증">2026-10-11 PHASE 4.5 종료 검증</a></li><li><a href="#2026-10-10-pr-169-실행-증거-보완">2026-10-10 PR #169 실행 증거 보완</a></li><li><a href="#2026-10-09-제품-설정히스토리profiler-소스-보완">2026-10-09 제품 설정·히스토리·profiler 소스 보완</a></li><li><a href="#2026-10-09-실제-입력렌더-그래프player-배선-확장">2026-10-09 실제 입력·렌더 그래프·Player 배선 확장</a></li><li><a href="#2026-10-09-벤더-구현-착수">2026-10-09 벤더 구현 착수</a></li><li><a href="#2026-10-07-최근-병합-반영">2026-10-07 최근 병합 반영</a></li><li><a href="#0-이-페이즈가-생긴-이유">0. 이 페이즈가 생긴 이유</a></li><li><a href="#1-정본-경계">1. 정본 경계</a></li><li><a href="#2-현재-코드의-사실--2026-09-14-실측">2. 현재 코드의 사실 — 2026-09-14 실측</a></li><li><a href="#3-계층-분리-결정">3. 계층 분리 결정</a></li><li><a href="#4-벤더-지원-행렬">4. 벤더 지원 행렬</a></li><li><a href="#5-작업-표--71일--선행-base-0">5. 작업 표 — 71일 + 선행 BASE-0</a></li><li><a href="#6-실행-순서">6. 실행 순서</a></li><li><a href="#7-계측-무해화--이-페이즈의-첫-단정">7. 계측 무해화 — 이 페이즈의 첫 단정</a></li><li><a href="#8-완료-기준">8. 완료 기준</a></li><li><a href="#9-금지하는-재혼합">9. 금지하는 재혼합</a></li><li><a href="#10-미해결-결정">10. 미해결 결정</a></li><li><a href="#11-변경-이력">11. 변경 이력</a></li></ol></nav>
-<main>
-<header class="page">
-<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="TemporalReconstructionPlan.md">원본 Markdown</a></nav>
-<p class="eyebrow">계획</p>
-<h1>PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation</h1>
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
 
-</header>
-<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">19<span class="unit">곳</span></span>
-<div class="stack" role="img" aria-label="완료·통과 5, 진행·부분 14"><i class="ok" style="flex:5"></i><i class="info" style="flex:14"></i></div>
-<span class="legend"><span class="chip ok">완료·통과 5</span><span class="chip info">진행·부분 14</span></span></div></div>
-<figure>
-<div class="frame doc-map" role="img" aria-label="절 19개의 분량 막대">
-<a class="map-row" href="#2026-10-11-dlss-첫-이동-잔상-후속"><span class="ve-label">§01</span><span class="map-name">2026-10-11 DLSS 첫 이동 잔상 후속</span><span class="map-bar"><i style="width:1.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-11-phase-45-종료-검증"><span class="ve-label">§02</span><span class="map-name">2026-10-11 PHASE 4.5 종료 검증</span><span class="map-bar"><i style="width:1.5%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-10-pr-169-실행-증거-보완"><span class="ve-label">§03</span><span class="map-name">2026-10-10 PR #169 실행 증거 보완</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-09-제품-설정히스토리profiler-소스-보완"><span class="ve-label">§04</span><span class="map-name">2026-10-09 제품 설정·히스토리·profiler 소스 보완</span><span class="map-bar"><i style="width:8.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-09-실제-입력렌더-그래프player-배선-확장"><span class="ve-label">§05</span><span class="map-name">2026-10-09 실제 입력·렌더 그래프·Player 배선 확장</span><span class="map-bar"><i style="width:4.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-09-벤더-구현-착수"><span class="ve-label">§06</span><span class="map-name">2026-10-09 벤더 구현 착수</span><span class="map-bar"><i style="width:3.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2026-10-07-최근-병합-반영"><span class="ve-label">§07</span><span class="map-name">2026-10-07 최근 병합 반영</span><span class="map-bar"><i style="width:7.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#0-이-페이즈가-생긴-이유"><span class="ve-label">§0</span><span class="map-name">이 페이즈가 생긴 이유</span><span class="map-bar"><i style="width:3.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#1-정본-경계"><span class="ve-label">§1</span><span class="map-name">정본 경계</span><span class="map-bar"><i style="width:3%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2-현재-코드의-사실--2026-09-14-실측"><span class="ve-label">§2</span><span class="map-name">현재 코드의 사실 — 2026-09-14 실측</span><span class="map-bar"><i style="width:8.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#3-계층-분리-결정"><span class="ve-label">§3</span><span class="map-name">계층 분리 결정</span><span class="map-bar"><i style="width:6.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#4-벤더-지원-행렬"><span class="ve-label">§4</span><span class="map-name">벤더 지원 행렬</span><span class="map-bar"><i style="width:6.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#5-작업-표--71일--선행-base-0"><span class="ve-label">§5</span><span class="map-name">작업 표 — 71일 + 선행 BASE-0</span><span class="map-bar"><i style="width:9.5%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">14</span> <span class="chip ok" title="완료·통과">2</span></span></a>
-<a class="map-row" href="#6-실행-순서"><span class="ve-label">§6</span><span class="map-name">실행 순서</span><span class="map-bar"><i style="width:4.3%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#7-계측-무해화--이-페이즈의-첫-단정"><span class="ve-label">§7</span><span class="map-name">계측 무해화 — 이 페이즈의 첫 단정</span><span class="map-bar"><i style="width:4.4%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">3</span></span></a>
-<a class="map-row" href="#8-완료-기준"><span class="ve-label">§8</span><span class="map-name">완료 기준</span><span class="map-bar"><i style="width:5.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#9-금지하는-재혼합"><span class="ve-label">§9</span><span class="map-name">금지하는 재혼합</span><span class="map-bar"><i style="width:2.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#10-미해결-결정"><span class="ve-label">§10</span><span class="map-name">미해결 결정</span><span class="map-bar"><i style="width:2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#11-변경-이력"><span class="ve-label">§11</span><span class="map-name">변경 이력</span><span class="map-bar"><i style="width:2.2%"></i></span><span class="map-marks"></span></a>
-</div>
-<figcaption><span class="fig-n">그림 1</span>절 19개 가운데 「2026-10-10 PR #169 실행 증거 보완」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
-</figure>
-<section class="prose"><p>DLSS 렌즈 후속: 다섯 품질 D/R FOV·near/far 변경 180캡처·90비교 및 no-op history 유지 80건 통과. 실제 투영·depth 반영과 cut 없는 reset을 확인했다. <a href="../analysis/TemporalDlssLens20261011.html">근거</a>.</p>
-<p>DLSS 최종 빌드 후속: Quality/Native AA/Balanced 전환 D/R 및 Native AA startup 106캡처 통과. 다섯 품질의 지정 전환·startup 근거를 현재 바이너리로 통일했다. <a href="../analysis/TemporalDlssFinalBuild20261011.html">근거</a>.</p>
-<p>DLSS 전환/reset 후속: 수동 노출 입력과 RT capture ready 경계를 수정하고 D/R 다섯 품질 전환·resize 120캡처, 네 품질 startup 136캡처 및 Performance/Ultra Performance warmed 68캡처 통과. 전체 품질·FG 수용은 잔여. <a href="../analysis/TemporalDlssTransitions20261011.html">근거</a>.</p>
-<p>비 Quality startup 후속: Native AA/Balanced/Performance/Ultra Performance 최종 D/R 136캡처 통과. Balanced preset J 수정 및 warmed D/R 34캡처 회귀 통과. TU3 전체 품질·FG 수용은 잔여. <a href="../analysis/TemporalDlssStartup20261011.html">근거</a>.</p>
-<p>Performance/Ultra Performance 후속: 기존 제품 Debug/Release 68캡처 통과, 각 모드 출력 해시 동일. 누적 다섯 품질의 warmed fixture D/R 근거 확보. startup/다른 해상도/실제 장면 등 TU3 전체 수용은 잔여. <a href="../analysis/TemporalDlssPerformance20261011.html">근거</a>.</p>
-<p>Balanced 후속: 자동 fixture의 계층 변경과 UI 순회 사이 씬 구조 경계를 보완하고 최종 Debug/Release 34캡처·history 각 506 검증 완료. Performance/Ultra Performance 및 전체 수용은 잔여. <a href="../analysis/TemporalBalancedHierarchyRace20261011.html">근거</a>.</p>
-<!-- 2026-10-11: Native AA first-disocclusion follow-up; TU3 remains progress. -->
-<p>Native AA 후속: preset J 수정으로 Debug/Release 34캡처 및 동일 입력/출력 비교 통과. 나머지 품질 모드와 전체 화질 수용은 미완료. <a href="../analysis/TemporalDlssNativeAA20261011.html">근거</a>.</p>
-<blockquote>
-<p>2026-10-11 TR0 CPU 기록 후속: Grid의 불필요한 CPU join을 제거하고 선언된 기록량/resource usages로 연속 target 분할을 배분했다. 물리 history barrier 수를 힌트로 쓴 v5의 결정성 실패를 수정하고 실패 원본을 보존했다. SDK legacy/product D/R 4빌드·8독립 프로세스·800표본·408캡처·120 population/3 comparator 거부 통과. 제품 CPU 중앙값 Debug 2.37030→2.01750ms(-14.88%), Release 1.48505→1.24070ms(-16.45%); 현재 legacy 1.64830/1.09415ms 대비 +22.40/+13.39% 잔여. 두 독립 실행 및 legacy 정규화 감소 기준 통과. 정상 제품 1 wave/1 dispatch/4 jobs·balanced 사용, GPU 순서·배리어 유지. 전후/D-R 17 attachments 차이 0·기존 full-topology 비교기 변경/카운터 예외 0. 대표 raw 4개+필요 실패만 보존, 여유 87.40GiB. 정적 DX12 fixture 범위로 TR0 progress·기성 0, PHASE 4.5 12/71 유지. <a href="../analysis/TemporalRg6CpuRecordingTail20261011.html">검증 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-11 TR0 CPU 기록 개선: GPU edge의 보수적 CPU join으로 직렬화된 기록을 확인하고 준비된 불변 입력의 명시적 독립 기록 계약을 추가했다. SDK legacy/product D/R 4빌드·8독립 프로세스·800표본·408캡처·120 population/3 comparator 거부 통과. 제품 CPU 중앙값 Debug 3.66040→2.37030ms(-35.24%), Release 2.25195→1.48505ms(-34.05%). 현재 legacy 1.61310/1.12330ms 대비 제품 +46.94/+32.20%는 남는다. GPU 순서·배리어 유지, 제품 전후 및 D/R 17 attachments 차이 0·GPU validation 0·exit 0. historical CPU 진단 필드 차이만 구분하고 GPU 구조/픽셀 8변이 거부. 최신 대표 raw 4개·필요 실패 기록만 보존, 여유 88.21GiB(3.50GiB dump 삭제 자동 정책 차단). 정적 DX12 fixture 범위이며 UI/actual generated/외부 계측/제품 budget 잔여로 TR0 progress·기성 0, PHASE 4.5 12/71 유지. <a href="../analysis/TemporalRg6CpuRecording20261011.html">검증 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-11 TR0 RG6 A/B 후속: 현재 소스 진단 legacy/product의 SDK Debug/Release 4빌드·8독립 프로세스·800실제 비용 표본·408캡처·120 population/3 comparator 변이 거부를 수용했다. A/B display 차이 0·전체 허용 초과 0, 제품 D/R 17 attachment 차이 0. CPU record Release 1.10→2.25ms(+105.5%)로 성능 개선 판정은 아니다. 대표 raw 4개·최소 진단 바이너리만 보존, 여유 92.37GiB. 현재 정적 fixture의 전체 행렬이며 역사적 lattice 전수와 구분한다. UI/actual generated/외부 계측/제품 budget은 남아 TR0 progress·기성 0, PHASE 4.5 12/71 유지. <a href="../analysis/TemporalRg6ABAcceptance20261011.html">실행 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-11 TR0 BASE-0 population 후속: SDK 활성 Debug/Release 재빌드·native 회귀 3종/구성, 독립 4프로세스의 실제 비용 400표본·204캡처·60 population 변이 거부를 통과했다. typed native CPU snapshot으로 텍스트 busy 측정 누락을 해결하고 scene Ready 및 자가검사 UI 격리를 강화했다. D/R 17 attachment 픽셀 차이 0. 대표 성공 2·필요 실패 2만 raw 보존, 최종 여유 93.21GiB. 전체 legacy/product A/B·UI·actual generated/외부 계측·제품 budget은 남아 TR0 progress·기성 0, PHASE 4.5 12/71 유지. <a href="../analysis/TemporalBase0ConsumerWorkload20261011.html">실행 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-11 TR0 측정 표면 후속: Scene GPU 캐시의 실프레임 신원·해상도·sample age, ProfilerViewer GPU/display 연결, 네 기존 픽셀 소비자와 BASE-0/RG6 저장 행 admission을 구현했다. SDK 활성 Debug/Release Editor·Viewer 빌드와 실제 DLSS 성공 후 native golden 오차 0·validation 0·lossless 기록 및 소비자 변이 검사를 통과했다. 대표 캡처 두 개만 보존하고 중복 raw 66개를 제거해 실제 약 1GiB를 회수했다. 전체 기존 workload·UI 육안·actual generated/외부 기구·제품 budget 수용은 남아 TR0 progress·기성 0, PHASE 4.5 12/71 유지. <a href="../analysis/TemporalMeasurementSurfaces20261011.html">검증 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-11 TR0 material 후속: 실제 Debug/Release empty·Aria 측정, lossless native 기록·정상 종료·저장 population/geometry/전경 감사 통과. 단일 offscreen view 332×182, draw 3·전경 깊이 픽셀 858; 제품 viewport/마스터 비교 수용은 별도. RG8 전체 workload·UI 육안·제품 budget·actual generated/외부 계측은 잔여이며 TR0 기성 0, PHASE 4.5 12/71(17%) 유지. <a href="../analysis/TemporalMeasurementConsumers20261010.html">실행 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-10 TR0 소비자 후속: native Player D/R 연속 owner 기록을 실행해 첫 경계 전 presenter admission 손실과 writer poll 필드 오류를 수정했다. SDK 활성 Editor/Player D/R 빌드·새 native 기록 loss 0·normal exit·C++/reader 회귀 및 예산 소비자의 13거부·초과 대조·Scene/Game 분리 검사를 수용했다. 외부 importer는 반복 Present의 정확한 sequence 연결을 추가해 27계약 검사와 기존 actual D/R 기록 476/429관측 연결·native의 FG-on 오표기 거부를 수용했다. material/RG8 native preflight·저장 metadata·GPU 측정 신원 결합을 강화해 새 actual D/R 각 2관측으로 62/52거부 검사를 통과했다. UI는 Scene updates/s·engine boundary time·GPU pass sum·참고선 표기로 수정했다. UI 빌드/native smoke와 육안 검증은 별도 checkpoint로 구분한다. 전체 material/RG8 workload·UI 육안/픽셀·실제 generated 신원·외부 기구 지연/표시·제품 budget 정책은 남아 TR0 progress·기성 0 유지. <a href="../analysis/TemporalMeasurementConsumers20261010.html">소비자 검증 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-10 TR0 후속: SDK 활성 D/R golden 캡처의 강제 native·요청 의도 복구·실제 전경·픽셀 오차 0·29변이, 실제 profiler CRC 유지 wire 변이 각 12개와 reader 회귀 10개를 수용했다. 전체 계측/예산/Player generated 신원은 남아 TR0 progress·기성 0, 완료 집계 12/71(17%) 유지. <a href="../analysis/TemporalMeasurementCheckpoint20261010.html">검증 기록</a>.</p>
-</blockquote>
-<blockquote>
-<p>2026-10-10 PR #169: SDK 활성 DX12 Debug/Release 실행 증거로 TR1(8)·TU5(4)를 종료한다. PHASE 4.5는 16행 중 2행 완료·기성 12/71·잔여 59(17%), 전체 추정 563·기성 138·잔여 425(+별도 미산정)다. 품질 전수·FG·물리 지연/지원 행렬은 progress·기성 0을 유지한다. <a href="../analysis/TemporalClosureCheckpoint20261010.html">종료 체크포인트</a>. 아래 이전 기록은 당시 스냅샷이다.</p>
-</blockquote>
-</section>
-<section class="doc-sec" id="sec-2026-10-11-dlss-첫-이동-잔상-후속">
-<div class="sec-head"><p class="ve-label">§01</p><h2 id="2026-10-11-dlss-첫-이동-잔상-후속">2026-10-11 DLSS 첫 이동 잔상 후속</h2></div>
-<div class="prose"><p>이전 종료 검증의 직접 활성 실패를 동일 raw로 재현하고, 같은 SDK 입력의 Quality preset J 비교로 수정했다. 최종 SDK D/R warmed/startup 68캡처·history 506단정/구성·4변이 거부 통과. 전체 TU3 품질 행렬과 PHASE 4.5 종료는 별개다. <a href="../analysis/TemporalDlssDisocclusion20261011.html">원인 분리·수정·보존 기록</a>을 따른다. PHASE 4.5 12/71 유지.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2026-10-11-phase-45-종료-검증">
-<div class="sec-head"><p class="ve-label">§02</p><h2 id="2026-10-11-phase-45-종료-검증">2026-10-11 PHASE 4.5 종료 검증</h2></div>
-<div class="prose"><p>SDK 전환 12방향·오류 복구 D/R 검증을 실행했으나 DLSS 직접 활성 Debug 품질 실패가 독립 2회 재현됐다. 제품 코드 원인 수정은 미완료다. 전체 상태와 원본 보존은 <a href="../analysis/TemporalPhase45Closure20261011.html">종료 검증 기록</a>을 따른다. PHASE 4.5 12/71 유지.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2026-10-10-pr-169-실행-증거-보완">
-<div class="sec-head"><p class="ve-label">§03</p><h2 id="2026-10-10-pr-169-실행-증거-보완">2026-10-10 PR #169 실행 증거 보완</h2></div>
-<div class="prose"><p>카메라 cut으로 발생한 <strong>실제 SDK 리셋 제출 프레임 자체</strong>의 HDR 품질을 별도 보완했다. 기존 history observation readback의 ordinal 1을 사용하며 <code>capturedReset=true</code>, <code>acceptedBefore=0</code>, <code>previousSubmittedRealFrameId=0</code>, <code>resetRealFrameId=sourceRealFrameId=realFrameId</code> 및 정확한 cut receipt/view/scene/history를 요구한다. FSR/XeSS adapter는 이 프레임의 reset을 실제 SDK reset 인수에 전달한다. 첫 관측 후 3~6프레임의 검사를 리셋 프레임 수용으로 바꾸지 않았다. 새 도구는 <code>Verify-TemporalResetQuality.ps1</code>·<code>Compare-TemporalResetQuality.py</code>다. 엔진 코드나 벤더 알고리즘 변경 없이 기존 SDK 활성 바이너리와 실제 캡처 경로를 사용했다.</p>
-<p>정적 cube/floor의 authored glTF hash·sealed material/draw·카메라 원점 및 실제 GPU color/depth/normal 입력을 확인한다. 입력에서 2 render-pixel cardinal/corner 경계 검사와 local HDR variation 0.02 이하로 정한 smooth foreground/clear background만 측정하며, 각 영역의 input/output 최소 64픽셀·contrast 0.03을 요구한다. 리셋 sample-zero jitter (0,-1/6)로 같은 프레임 SDK 전 HDR을 대응시켜 normalized mean 0.10/p95 0.25를 검사한다. 별도 SDK stage와 reconstructed HDR attachment도 일치해야 한다. 같은 자세에서 두 차례 실제 cut을 실행하며 SSGI/HDR/final GPU display의 반복 최대 오차는 1e-6 이하다. final display의 절대 tone-map 정답을 독립 증명하는 검사는 아니다.</p>
-<p>Debug/Release FSR Quality(Game 838x394, input 558x262), Debug XeSS Ultra Performance(1238x728, 413x243), Release XeSS Balanced(1238x728, 619x364)·Performance(1506x994, 655x433)의 5조건·10 리셋 캡처가 통과했다. 반복 SSGI/HDR/display의 최대 차이는 모두 0이고 각 실행 basic DX12 validation의 메시지·문제·누락은 0이다. 모든 실행은 자신의 Editor를 종료했다. 실제 GPU 증거의 20변이를 거부하며, 두 리셋의 HDR/SDK stage에 같은 비상수 RGB bias를 넣어 nonempty·반복성 검사를 유지한 변이도 독립 입력 대비 HDR 임계값에서 거부된다. 정본은 <code>Artifacts/PR169/sdk-reset/results.json</code>, 최종 재감사는 각 <code>live/reaudit.json</code>과 <code>mutation-reaudit.json</code>이다. 이전 <code>sdk-startup</code>의 golden/history 494/SSGI 회귀와 같은 runtime hash이며 이번 엔진 재빌드나 회귀 재실행으로 표기하지 않는다.</p>
-<p>작은 검사 영역을 통과로 만들지 않았다. XeSS Ultra Game 972x462에서 input 전경 40픽셀, Balanced 838x394에서 20픽셀, Performance 1238x728에서 60픽셀은 최소 64에 못 미쳐 미수용으로 보존했다. Ultra 확대 최초 실행은 픽셀 판정이 통과했지만 검사 후 cleanup 연결의 <code>request.deadline</code> 때문에 전체 실행을 실패로 보존했고, 모든 reset command/poll 연결을 닫고 오프라인 판정 전에 캡처를 해제해 fresh retry를 통과시켰다. Release FSR 최초 실행은 기존과 같은 모델 이름의 입력 로드 단계에서 실패했으며 고유한 진단 자산 이름을 사용한 retry만 수용한다. 이 실패들의 원본은 변경하지 않았다. 정본의 <code>passed</code>는 선택한 5조건의 범위이며 <code>allAttemptsPassed=false</code> 및 별도 rejected attempts를 유지한다.</p>
-<p>수용 범위는 <strong>기존 SDK context의 live camera-cut reset</strong>에서 측정 가능한 정적 내부 픽셀과 반복 출력이다. 새 SDK context 최초 프레임, 물체 최초 등장, 거부된 해상도의 충분한 검사 영역, 원래 opaque-quad cold-motion 실패와 동일한 초기 조건, 전체 신규 바이너리 품질 행렬, silhouette/다른 재질/variable-time/물리 scanout은 남는다.</p>
-<p>초기 관측 구간을 별도 진단으로 기록했다. <code>render.temporal.motion.fixture &lt;new-directory&gt; sdk-startup</code> 및 verifier의 <code>-Startup</code>은 첫 non-reset baseline 제출을 관측한 뒤 캡처 admission을 시작한다. 별도 schema <code>temporal.sdk.startup.v1</code>에서 최소 관측 수는 1이며, renderer contention 때문에 추가 관측/제출이 생길 수 있다. 판정기는 32개 이상의 관측 또는 첫 관측에서 baseline 캡처까지 32 real-frame 이상의 간격을 거부한다. 실제 관측 수와 첫/마지막 관측에서 캡처까지의 간격을 결과에 남긴다. 기존 warmed v2와 startup은 <code>--require-baseline</code> / <code>--require-startup</code>으로 서로 거부하며 기존 32회 조건을 낮추지 않았다.</p>
-<p>SDK 활성 Debug/Release 빌드 후 Debug XeSS Ultra Performance(Game 972x462), Release XeSS Balanced(838x394)·Performance(972x462), 두 구성 FSR Quality(838x394)의 5조건을 각 1회 실행했다. 초기 정지·8회 이동·8회 회복의 85 GPU 캡처와 80개의 캡처 간 exact predecessor를 확인했고 모두 기존 mean 0.10/p95 0.25·contrast 0.03·2 render-pixel guard를 통과했다. 관측 수는 1<del>2개, baseline 캡처는 첫 관측에서 3</del>6 real-frame 뒤였다. 이동/회복의 최악 HDR mean/p95는 0.042760/0.097987, final display는 0.072211/0.157143이다. 초기 HDR은 같은 프레임 pre-upscale 입력과 비교하고 final display 초기 검사는 contrast/균일성이다. 같은 바이너리의 Debug XeSS Ultra warmed 대조 17캡처도 통과했다. 최종 checker 재감사 결과는 각 <code>verification/reaudit.json</code>, 정본은 <code>Artifacts/PR169/sdk-startup/results.json</code>이다.</p>
-<p>두 구성의 기존 golden 캡처·temporal history 494단정·SSGI 회귀 및 basic DX12 validation 0건을 확인했다. 초기 XeSS 실제 캡처를 이용한 25개 변이 거부, 두 모드 혼용 거부 2개와 native oracle 단위 회귀 23개도 통과했다. 실행이 소유한 Editor는 종료했다. 기존 40조건 matrix의 3실패 및 이전 아티팩트는 그대로 보존했다.</p>
-<p>이 결과는 <strong>첫 관측 이후의 짧은 non-reset 구간</strong>이다. 관측 이전 SDK context의 누적 수명이나 리셋 제출 프레임, 새 물체가 처음 등장하는 프레임을 증명하지 않는다. 원래 실패와 완전히 동일한 초기 상태의 재현/수용, 전체 신규 바이너리 matrix, variable-time 및 다른 material/edge 품질도 잔여다. 벤더 알고리즘을 수정하거나 기존 실패를 통과로 바꾼 결과가 아니다.</p>
-<p>SDK 연속 이동 진단의 초기 상태를 후속 보완했다. 기존 v1은 첫 승인 baseline을 보자마자 이동했으며 안정된 SDK 출력은 캡처하지 않았다. v2는 같은 view/scene/history의 서로 다른 non-reset 승인 제출을 최소 32개 관측한 뒤, 동일 자세의 측정 step 2를 별도 GPU 캡처한다. 초기 HDR은 같은 프레임 SDK 전 입력과 비교하며 foreground color/depth·0 모션·실제 SDK provenance·final display contrast/균일성을 확인한다. 첫 이동 step 3은 이 초기 캡처와 exact source/real predecessor가 같아야 한다. 기존 8회 이동·8회 회복 및 평균 0.10/p95 0.25·contrast 0.03·2 render-pixel guard는 유지했다. <code>Verify-TemporalSdkSequence.ps1</code>은 captured/warmed v2 baseline을 요구하고, 독립 checker의 <code>--require-baseline</code>은 기존 v1을 거부한다. 역사 기록 검토용 v1 해석은 유지한다.</p>
-<p>final display의 기존 좌측 배경 평균 비교에는 위치별 후처리 차이가 포함된다. v2는 실제 물체가 사라진 8번째 회복 캡처의 동일 픽셀을 기준으로 비교하며, 그 캡처의 입력·pose·source/history·RGB/depth·finite bytes 및 HDR을 별도로 확인한다. 이 reference는 절대 tone-map 동등성이나 post-chain 자체의 독립 수용 증거가 아니다. 예열 변경만 적용하고 비교 위치를 바꾸기 전에도 원래 세 실패 조건의 첫 이동 평균/p95는 Debug XeSS Ultra Performance 0.067753/0.100000, Release Balanced 0.057330/0.071429, Release Performance 0.088242/0.128572로 기존 기준을 통과했다(<code>warmup-only-observations.json</code>). 초기 조건이 결과에 영향을 줬다는 실행 증거이며 벤더 SDK 알고리즘 자체를 수정한 것은 아니다.</p>
-<p>SDK 활성 Debug/Release를 빌드하고 위 세 XeSS 조건을 각각 3회, FSR Quality 대조를 각 구성 1회 실행했다. 최종 checker로 11회·187캡처·176개의 캡처 간 exact predecessor를 재감사해 모두 통과했다. 초기 정지 캡처까지 포함한 17개 입력/출력의 신원과 상태를 검사하며 측정 이동 step은 각각 한 번만 제출한다. 이동/회복 프레임별 최대 평균/p95는 HDR 0.028018/0.054884, final display 0.048990/0.100000이다. 예열 부족/중복/히스토리 변경/캡처 이후로 위조된 예열, 초기 캡처 누락 및 HDR/모션 훼손, 회복 기준 display/HDR/color 훼손을 포함한 v2 변이 23개를 모두 거부했다. native oracle 단위 회귀 23개, 각 구성 native 7경로·14캡처·63 probe, 일반 golden 및 히스토리 계약 494단정·SSGI abort/reset 회귀도 통과했다. 각 실행 basic DX12 메시지/문제/누락은 0이며 같은 구성의 SDK/native/golden runtime hash가 일치한다.</p>
-<p>정본은 <code>Artifacts/PR169/sdk-baseline/results.json</code>, 최종 11회 재감사는 각 <code>verification/reaudit.json</code>, 변이는 <code>mutations-final-xess-ultra-Debug/results.json</code>이다. Debug golden 최초 실행은 UTF-8 BOM이 첫 명령에 섞인 driver 실패로 보존했고 <code>golden-Debug-retry</code>에서 BOM 없는 명령 파일과 실제 exit-code 확인으로 전체 통과했다. Release 회귀는 <code>native-Release</code>·<code>golden-Release</code>, Debug native는 <code>native-Debug</code>다. 이전 40조합 중 3실패의 정본 및 원본은 유지한다. 이번 수용은 예열된 opaque quad 내부/disocclusion의 위 3조건 반복 및 FSR 대조이며, cold/appearance 품질·새 바이너리 전체 40조합·silhouette/다른 재질/카메라 연속 이동·variable-time/물리 pacing/성능의 수용을 뜻하지 않는다.</p>
-<p>품질·해상도 확대 행렬을 실행했다. 기존 SDK 연속 opaque quad 내부/disocclusion 검사를 Native AA/Quality/Balanced/Performance/Ultra Performance로 확장하고 요청 품질→authored 입력→모든 캡처의 품질 일치를 요구한다. Native AA는 render/display 1:1, 다른 모드는 축소 입력을 요구하며 기존 contrast 0.03·2 render-pixel 경계 제외·평균 0.10/p95 0.25 기준은 유지했다. 판정 영역 순회를 최적화한 뒤 기존 Quality 및 확대 Native AA 16프레임의 측정값·attachment hash가 정확히 같음을 확인했다. 화질 실패는 전체 16프레임의 <code>qualityFailures</code>로 남기되 <code>passed=false</code>·종료 코드 1을 유지한다.</p>
-<p>DX12 Debug/Release × FSR/XeSS × 다섯 품질 × 두 host 크기 1400x900/1600x1000의 40조합을 완료했다. 실제 Game display는 838x394/972x462이며 총 640 GPU 캡처·600개 캡처 간 exact predecessor 연결, 모션 1,333,840 probe·배경 노출/회복 3,794,356픽셀을 검사했다. FSR 20조합은 통과, XeSS 20조합 중 17통과·3실패다. 실패는 모두 첫 이동 프레임의 final GPU display residual이다: Debug Ultra Performance 972x462는 평균 0.147778/p95 0.328572, Release Balanced 838x394는 0.162587/0.228572, Release Performance 972x462는 0.111968/0.200000이다. 세 실패의 이후 15프레임과 HDR은 기준 안에 있으며 실패 기록을 교체하지 않는다. 최초 baseline은 제출 존재만 확인하고 안정화된 출력 및 고정된 예열 제출 수를 증명하지 않는다. SDK 지터/초기 히스토리·baseline 안정화와 첫 이동 잔상의 인과관계는 추가 조사 대상이며, 이번 결과를 steady-state 전체 화질 수용으로 확대하지 않는다.</p>
-<p>통과 37조합의 프레임별 최대 평균/p95는 HDR 0.032301/0.116891, final display 0.094861/0.228572다. 최종 판정기로 기존 Quality·확대 FSR/XeSS Ultra Performance의 13변이씩 총 39개를 모두 거부하고 원본 증거 유지도 확인했다. 39조합의 최종 global basic DX12 receipt는 메시지/문제/누락 0이며, Debug XeSS Ultra Performance의 최초 실패 실행은 최종 global receipt가 없어 미확인으로 남긴다(640개 캡처의 validationCount는 0). 모든 실행 프로세스는 종료됐고 실행 바이너리는 이전 SDK/native/golden 검증과 동일한 Debug/Release runtime hash다. 이번 수정은 검증 도구·문서 범위이며 엔진 재빌드를 수반하지 않는다. Debug FSR Quality의 최초 <code>request.deadline</code> 조회 실패는 보존하고 POST의 새 연결 및 async polling을 사용한 새 실행에서 전체 통과했다.</p>
-<p>정본은 <code>Artifacts/PR169/sdk-quality-matrix/results.json</code>이다(<code>completed=true</code>, <code>passed=false</code>, 37통과/3실패). 각 구성/provider/quality/host-size 디렉터리에 실행·fixture·oracle·복원 상태·프로세스 종료를 보존한다. Debug FSR Quality만 <code>-retry</code>가 최종 수용 증거이며 최초 실패는 원본 디렉터리에 유지한다. Debug XeSS Ultra Performance의 전체 16프레임 재판정은 <code>verification/reaudit.json</code>, 최종 39변이 감사는 <code>mutation-reaudit.json</code>이다. 다음 우선 작업은 위 XeSS 최초 이동의 초기 히스토리·baseline 출력 증명을 보완하고 같은 기준으로 원인을 검증하는 것이다. silhouette/다른 재질·카메라 연속 이동·variable-time SDK·물리 pacing/성능 등은 여전히 잔여다.</p>
-<p>FSR/XeSS Quality의 원근 카메라 연속 승인 제출과 opaque quad 내부/disocclusion 픽셀을 후속 수용했다. 회색 배경 앞 붉은 quad를 0.5 world-unit씩 8프레임 이동시키고, 실제 component disable 이후 8프레임 회복을 관측했다. SDK native exclusion 없이 고정 SDK packet 1000/60ms를 사용하며 측정 step은 각각 한 번만 제출한다. DX12 Debug/Release × FSR/XeSS 4조합, 총 64 GPU 캡처·60개의 캡처 간 exact source/real predecessor 연결을 통과했다. 최종 display는 332x144, 실제 렌더 크기는 FSR 221x96·XeSS 196x85다. authored 입력/asset hash, 같은 view/scene/history, non-reset actual SDK provenance, 실제 foreground/background color·depth 및 current-to-previous render-pixel 모션 11,127 probe를 확인했다. 배경 노출/회복 영역 31,680픽셀에서 HDR은 같은 프레임의 SDK 전 입력과, 최종 GPU display는 같은 프레임의 안정 배경 영역과 비교한다.</p>
-<p>측정 전에 정한 제한은 foreground/background contrast 대비 residual 평균 ≤0.10·p95 ≤0.25, 최소 contrast 0.03, 경계에서 render-pixel 2개 제외다. 네 조합의 프레임별 최대 평균/p95는 HDR 0.0165383/0.0316578, final GPU display 0.0557166/0.0869566으로 모두 통과했다. 각 조합의 provider/clock/reset/predecessor/session 및 상수 HDR/display·0 모션·잘못된 depth/color·NaN·잘린 파일 12변이를 모두 거부했다(총 48개). 모든 SDK 캡처의 basic DX12 validation은 0이며, 원래 native 7-route의 각 14캡처·63 probe, 일반 golden 캡처·SSGI 취소/reset 및 히스토리 계약 각 494단정도 Debug/Release에서 통과했다. 현재 binary hash는 해당 구성의 SDK/native/golden 실행과 일치하고 테스트 process 종료를 별도 확인했다.</p>
-<p>정본은 <code>Artifacts/PR169/sdk-sequence/results.json</code>, 실행은 <code>accepted-{fsr,xess}-{Debug,Release}/verification</code>, 변이 재감사는 각 <code>mutations/reaudit.json</code>, 회귀는 <code>golden-{Debug,Release}</code>와 <code>Artifacts/PR169/motion/sequence-native-{Debug,Release}</code>다. 도구는 <code>Verify-TemporalSdkSequence.ps1</code>·<code>Compare-TemporalSdkSequence.py</code>·<code>TemporalSdkSequenceOracleTests.py</code>이며, <code>render.temporal.motion.fixture ... sdk-sequence</code>가 기존 typed asset/scene lifecycle을 통해 장면을 일시 격리·복원한다. SDK 진단의 provenance는 native golden과 분리하며 폴백/FG/NIS/DeepDVC/fault 결과를 수용하지 않는다. 최초 실행의 서비스 5초 sync timeout은 보존했고 async operation polling으로 driver를 수정했다. 이 수용은 위 단순 opaque quad의 내부와 새로 드러난 배경에 한정한다. silhouette 경계, skinned/alpha/foliage 등 다른 재질 경로, 다른 품질/해상도·variable-time SDK 및 물리 scanout/pacing/성능은 잔여다.</p>
-<p>연속 SDK 화질 검사의 선행인 진단 측정 프레임 연결을 보완했다. 기존 native 7-route fixture는 readback 대기 중 같은 측정 자세를 여러 번 제출했다. 보존한 Debug 기록의 static current real-frame 1071 다음 control의 실제 predecessor는 1075였으며, 강화한 검사는 이를 거부한다. tagged Game 진단에서 같은 session/view/scene/source history의 이미 제출된 측정 자세와 더 오래된 queued 자세를 <code>PrepareTemporalView</code> 전에 제외한다. baseline은 non-reset history를 확보하도록 반복할 수 있고 일반 untagged 렌더 및 새 신원은 기존 admission을 유지한다. 새 fixture의 <code>singleSubmissionPerMeasuredStep</code> 선언은 JSON emitter에서 1로 저장되며 새 실행 도구는 선언 누락을 거부한다. 독립 oracle은 다음 control의 실제 predecessor real-frame이 current 캡처 real-frame과 정확히 같아야 한다.</p>
-<p>SDK 활성 DX12 Debug/Release 빌드 후 각 7개 경로·14 GPU 캡처·63 probe가 통과했고 두 구성의 14개 measured/control 연결이 모두 정확히 일치한다. 각 구성의 basic validation 합계는 0, 기존 golden 캡처·SSGI 취소/reset 회귀·히스토리 계약 485단정도 통과했다. oracle 단위 회귀 23개와 실제 Debug 캡처의 predecessor 신원 변이 거부를 확인했다. 정본은 <code>Artifacts/PR169/motion-step/results.json</code>, 실행은 <code>Artifacts/PR169/motion/step-{Debug,Release}</code>이며 런타임 hash는 해당 golden 회귀 및 현재 바이너리와 일치한다. 이 수용은 native 진단의 제출 순서 보존이다. 현재 fixture의 직교 카메라는 SDK 검사에 사용할 수 없으므로 원근 카메라·배경 가림을 포함한 연속 FSR/XeSS ghosting/disocclusion 픽셀 검사는 여전히 잔여다.</p>
-<p>FSR/XeSS의 실제 장면 SDK 회복 픽셀을 DX12 Debug/Release에서 후속 수용했다. 큐브·바닥·광원 live 장면에서 실제 카메라 이동·cut, host resize 960x640·1280x720 이후 첫 번째·여덟 번째 승인 제출을 캡처했다. 두 SDK × Native AA/Quality/Balanced/Performance/Ultra Performance × 두 구성의 20조합, 총 260캡처·120 recovery/reference 비교에서 SSGI RGBA·재구성 HDR·최종 GPU display 최대 오차가 모두 0이고 basic DX12 validation 메시지·문제·누락은 0건이다. 기존 진단 readback의 표시/렌더 크기 혼용을 <code>frameContext</code> 실제 크기로 수정했고, SDK 출력은 display extent에서 읽는다. 모든 조합에서 실제 카메라 이동의 depth 및 HDR/display RGB 변화와 비어 있지 않은 출력도 독립 확인했다. 각 조합의 기존 17변이 거부와 두 SDK/두 구성 Quality의 상수 HDR/display 8변이 추가 거부를 기록했다. 기존 golden 캡처·temporal 계약 468단정·SSGI 취소/reset 회귀도 두 구성에서 통과했다.</p>
-<p>이 SDK 비교는 명시적 <code>fixed-sdk-clock</code>으로 대상 SDK packet의 시간 간격만 1000/60ms로 맞춘 조건이다. 카메라·시뮬레이션 시계는 live이며 캡처는 native exclusion 없이 실제 SDK를 실행하고 golden 수용에서 제외된다. FSR의 서로 다른 variable-time 실행은 HDR 최대 오차 0.14794921875로 엄격 비교에 실패했으므로 별도 보존하며 허용오차를 늘리지 않았다. 정본은 <code>Artifacts/PR169/sdk-pixels/results.json</code>, 실행은 <code>verified-{fsr,xess}-{Debug,Release}-{quality}</code>, 최종 출력 검사와 회귀는 <code>final-oracle.json</code>·<code>golden-{Debug,Release}</code>다. 도구는 기존 <code>Verify-LiveSSGIRecovery.ps1 -Provider fsr|xess -Quality ...</code>를 확장했다. 수용 범위는 이 정적 장면/명시적 SDK 시간 조건의 cut·resize 회복이며, 연속 이동의 잔상·disocclusion 화질, variable-time 화질, native 기존 픽셀 동등성 및 물리 scanout은 잔여다.</p>
-<p>SSGI의 native live camera-cut/실제 창 resize 회복 픽셀을 DX12 Debug/Release에서 후속 수용했다. 정상 Editor의 glTF 큐브·바닥·광원 장면에서 실제 카메라 이동과 cut, host resize 960x640·1280x720을 실행하고 다음 reset의 첫 번째·여덟 번째 승인 제출을 관측 캡처했다. 각 구성 13캡처·6 recovery/reference 쌍에서 SSGI RGBA 및 최종 GPU display 이미지 최대 오차가 모두 0이고 유효 표면 누적은 1→8이다. 카메라 이동의 깊이 픽셀 최대 차이 0.034343183은 실제 pose 변화가 렌더에 도달했음을 확인한다. 기존 SSAO 전역 회전 카운터 때문에 같은 reset 순서의 조명·SSGI 입력이 달라지는 실패를 재현하고, 회전을 뷰의 제출 승인된 sample sequence에 연결해 수정했다. 캡처는 자체 히스토리를 초기화하지 않고 reset·cut·view/scene·승인 predecessor 신원을 기록하며 일반 golden 캡처의 native exclusion/controlled 동작은 유지한다. 별도 commandlet 회귀에서 두 구성 모두 기존 golden 캡처, temporal 계약 468단정, SSGI 취소 3/reset 8비교 및 basic DX12 validation 0건을 통과했다. 정상 13캡처 수용과 신원/NaN/유한 픽셀 손상 변이 8개의 거부도 실행했다. 정본은 <code>Artifacts/PR169/ssgi-live/results.json</code>, live 통과 기록은 <code>accepted-{debug,release}</code>, golden 회귀는 <code>golden-ready-{Debug,Release}</code>에 둔다. 도구는 <code>Verify-LiveSSGIRecovery.ps1</code>·<code>Compare-LiveSSGIRecovery.py</code>다. 수용 범위는 native 최종 GPU 이미지까지이며 실제 scanout, SDK 업스케일 화질 및 native 기존 픽셀 동등성을 대신하지 않는다.</p>
-<p>SSGI reset 소비 경계의 GPU 픽셀 복구를 후속 수용했다. 8프레임 누적한 pass를 새 pass와 비교해 같은 pose의 공용 camera-cut reset, 축소/확대 resize reset, 공용 reset 없이 해상도만 바뀐 재생성의 4경우에서 첫 프레임과 8프레임 후를 검사했다. 실제 크기의 절차적 depth/normal 입력은 각각 256x256·128x192·384x320·192x128이며 RGBA 전체를 비교한다. DX12 Debug/Release 각 8비교 모두 최대 오차 0, 첫 프레임 유효 표면 누적 1·8프레임 후 평균 8, 기존 취소 복구 3경우 통과 및 basic validation 메시지·문제·누락 0건이다. 해상도만 바뀐 경로는 수정 전 첫 프레임 최대 오차 0.971679688로 실패했다. 텍스처 재생성 완료 시 <code>ResetHistory()</code>로 샘플 순서·이전 카메라·슬롯도 초기화해 수정했다. 로컬 정본은 <code>Artifacts/PR169/ssgi-reset/results.json</code>, 실패 재현은 <code>before-debug</code>, 통과 실행은 <code>verified-{debug,release}</code>에 보존한다. 같은 재실행 도구가 취소 3비교와 reset/재생성 8비교를 모두 요구한다. reset 신호는 검사가 <code>PrepareFrame</code>에 직접 전달하므로 live 이동 카메라·실제 창 변경부터 최종 화면까지의 픽셀 수용, device loss, 공용 view history 흡수 및 SDK 업스케일 화질은 잔여다.</p>
-<p>SSGI 후속 검증은 준비·그래프 선언·명령 기록 후 제출 전 취소의 3지점을 DX12 Debug/Release에서 통과했다. 샘플 순서·히스토리 슬롯·이전 카메라는 제출 승인 시에만 갱신하며, 취소는 마지막 정상 히스토리를 보존한다. 구/바닥이 있는 절차적 장면에서 각 취소를 8회 끼워 넣은 실행을 정상 8프레임 실행과 비교했고, 각 구성의 3경우 모두 RGBA 65,536개 값의 최대 오차가 0이었다. 기존 누적은 유효 픽셀 9,032개에서 평균/최소/최대 8, basic DX12 validation 메시지·문제·누락은 0건이다. 로컬 정본은 <code>Artifacts/PR169/ssgi/verified-{debug,release}/results.json</code>, 재실행 도구는 <code>Tools/temporal-validation/Verify-SSGIAbortRecovery.ps1</code>다. 이 실행의 수용 범위는 SSGI 제출 전 취소 복구이며 reset 소비 경계의 픽셀 복구는 위 후속 실행이 보완한다.</p>
-<p>후속 live history recovery 검증은 native/FSR/XeSS 각각 일반 이동·camera cut·두 차례 실제 창 resize·연속 프레임 복구의 5항목을 DX12 Debug/Release에서 실행해 각 15항목을 통과했다. 이동은 제출된 카메라 위치가 실제로 0→0.1에 도달한 프레임에서 history revision 유지로 확인한다. cut/resize는 제출된 reset의 신원·view/scene·해상도·첫 Halton jitter를 보존하고 해당 reset frame의 GPU 완료를 기다린다. basic DX12 validation은 문제·메시지·누락 0건이며 원래 host client 크기를 복원했다. 순수 reset predicate는 정상 live reset 9개를 수용하고 신원/jitter/해상도/view/scene/provider 변이 9개를 거부했다. 계약 회귀는 latch의 취소/유지 단정을 포함해 각 구성 468개를 통과했다. 로컬 정본은 <code>Artifacts/PR169/recovery/results.json</code>, 재실행 도구는 <code>Tools/temporal-validation/Verify-TemporalHistoryRecovery.ps1</code>다.</p>
-<p>이 과정에서 <code>window.resize</code>가 자체 editor chrome에 기본 OS caption 높이를 중복 적용해 실제 client 높이를 45px 크게 만드는 결함을 수정했다. 실제 outer/client 차이로 계산하며 <code>window.info</code>는 기존 screen-bus 크기와 host client 크기를 별도로 보고한다. 위 복구 증거는 camera-only scene의 렌더 제출·SDK dispatch·GPU 완료 관측이다. 회복 픽셀, native 기존 픽셀 동등성, 비어 있지 않은 장면의 업스케일 화질 및 SSGI 취소 복구 완료로 확대하지 않는다.</p>
-<p>아래 10월 9일의 미실행 기록은 당시 상태다. 현재 작업 checkout에서는 SDK 활성 DX12 Debug/Release 빌드와 TR1 7-route 모션 픽셀 검증을 실행했다. 로컬 증거는 <code>Artifacts/PR169/motion/results.json</code>에 있으며, 각 구성 14 GPU 캡처·63 probe와 strict oracle을 통과했다. 이 결과를 전체 16행 완료로 확대하지 않는다.</p>
-<p><code>dx12.temporalhistory</code>는 실제 <code>EnhancedTemporalViewState::Begin/Commit</code>과 DX12 디바이스·FSR/XeSS context configure를 검사한다. Debug/Release 각각 407개 단정과 basic DX12 validation 0건을 통과했다. 독립 Halton 샘플, render-pixel jitter 행렬, 취소 시 시퀀스 유지, 일반 이동, cut/FOV/명시적 reset/resize/view/scene/source revision/품질 변경 및 native-AA 1:1을 확인했다. Commit은 검사가 직접 호출하므로 live camera-cut/resize 제출 또는 SDK 픽셀 수용 증거가 아니다. 로컬 결과는 <code>Artifacts/PR169/history/accepted-{debug,release}/contract.json</code>에 보존한다.</p>
-<p>같은 바이너리의 live Editor camera scene에서 FSR/XeSS quality·native-AA dispatch와 명시적 history reset 관측을 각각 확인했다. reset driver는 정확한 요청 세대의 새 제출 프레임과 history revision 증가를 요구한다. 빈 camera scene의 관측이므로 업스케일 화질을 판정하지 않는다. TR2의 native 기존 픽셀 동등성, live resize/camera-cut 회복 픽셀, 비어 있지 않은 장면의 시간축 품질 검증은 남는다. TR3의 SSGI는 공용 reset 신호를 소비하지만 자체 radiance/depth ping-pong 및 재투영 행렬을 유지한다. 자체 히스토리 흡수는 잔여이며 제출 전 취소 복구는 위 후속 GPU 검증으로 보완했다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2026-10-09-제품-설정히스토리profiler-소스-보완">
-<div class="sec-head"><p class="ve-label">§04</p><h2 id="2026-10-09-제품-설정히스토리profiler-소스-보완">2026-10-09 제품 설정·히스토리·profiler 소스 보완</h2></div>
-<div class="prose"><p>Editor <code>editorRenderFeatures</code> / Player <code>build.renderFeatures</code>의 portable 기본값과 cook 후 <code>renderFeatures</code>·device 생성 전 소비, 저장값→명시적 환경 override→세션 CLI 우선순위, 요청/지원/설정/활성 MFG count 분리를 소스로 연결했다. 명시적 camera cut·unjittered projection 변경은 마지막 제출 history와 비교한다. CPU profiler frame owner와 render publication/real-frame/submission 신원을 분리하고, CPU render-submit/GPU-pass provenance sidecar를 <code>.ceprof</code> snapshot v6·stream v7 (기존 v4/v5 읽기 유지) 및 viewer/summary로 운반한다. live PLRD는 v3이며 legacy 기록의 provenance는 unknown으로 남긴다. development-only TU/FG fault와 결함 활성 측정의 fail-closed, CPU presenter-return 연속 기록도 소스 범위다. QPC 반환 관측은 물리 표시 시각이 아니다.</p>
-<p>Presenter observation은 정확한 source identity를 가진 CPU Present 결과이며 물리 display timestamp·개별 generated identity·GPU/SDK 최종 소비 증거가 아니다. 외부 latency/pacing 수집·분석 소스는 작성되었으나 실행 수용은 전부 남는다. development-only 전체 7-route 씬 생성/제출 sequencing·probe pixel 소유권 driver와 strict v2 oracle을 소스로 작성했다. 실제 자산·제출 predecessor·입력 hash·positive/disabled-control GPU 픽셀·indexed/meshlet 실행 경로가 모두 일치해야 향후 PASS할 수 있다. 기존 analytic fixture 및 증거 누락은 여전히 INCOMPLETE다. 새 driver·checker도 실행하지 않았으며 TR1 수용 완료를 뜻하지 않는다.</p>
-<p>FG capability/configure/prepare/Present 및 실제 drain 이후 host acknowledgement fault, FSR 전용 evaluate callback fault/staging은 소스로 작성했다. DLSS/XeSS의 별도 evaluate 주입은 명시적으로 미지원이며 실제 device-loss·소비 지연·물리 표시 행렬 수용을 대신하지 않는다. 상세 범위는 <a href="TemporalVendorIntegration20261009.html#product-defaults-history-and-profiler-gap-closure--source-only-checkpoint">통합 기록</a>에 둔다. W9는 temporal/render-feature 설정 부분만 보완했으며 전체 설정/품질/제품 수용 완료가 아니다. 빌드·테스트·스크립트·native 실행 없이 정적 검토만 했고 <strong>16행/71일·기성 0 및 모든 DX12 Debug/Release 실행 수용 미완료</strong>를 유지한다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2026-10-09-실제-입력렌더-그래프player-배선-확장">
-<div class="sec-head"><p class="ve-label">§05</p><h2 id="2026-10-09-실제-입력렌더-그래프player-배선-확장">2026-10-09 실제 입력·렌더 그래프·Player 배선 확장</h2></div>
-<div class="prose"><p>벤더 중립 계약/SDK 어댑터에 이어 실제 LX 이전 오브젝트·스키닝 입력, per-view history/jitter와 렌더/표시 크기 분리, PostChain 전 TU, DX12 Player의 전체 GPU temporal packet·proxy·최종 소비 lease와 게임 루프 지연 마커를 연결하는 소스 구현을 진행한다. TR0는 캡처 강제 native 범위와 실/생성·양쪽 해상도 provenance를 실제 capture/profiler/gate에 전달한다.</p>
-<p>단계별 관측/요청 커맨드와 실행 드라이버는 <a href="../../Tools/temporal-validation/README.md">Temporal validation</a>에 둔다. 요청 접수와 renderer/Player 관측 세대를 나누며, SDK query·선택·실제 dispatch/present·완료점을 섞지 않는다. <strong>빌드·컴파일러·셰이더·테스트·제품·성능 실행은 하지 않았으므로 아래 16행 완료선/71인일 수용을 완료로 바꾸지 않는다.</strong></p>
-<p>Vulkan Player FG의 현 CPU 표시 브리지는 GPU temporal 입력/전용 present queue 배선이 없으므로 <code>NativePresentationInteropUnavailable</code>로 fail-closed한다. 이는 FSR Vulkan SDK 또는 GPU 지원 부재 판정이 아니다. Vulkan SR/native 어댑터 경계는 유지하고, Vulkan 실행 비교는 PHASE 4.9가 소유한다. 상세 소스 범위·외부 SDK 설정·미실행 검증은 <a href="TemporalVendorIntegration20261009.html">벤더 통합 기록</a>을 참조한다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2026-10-09-벤더-구현-착수">
-<div class="sec-head"><p class="ve-label">§06</p><h2 id="2026-10-09-벤더-구현-착수">2026-10-09 벤더 구현 착수</h2></div>
-<div class="prose"><p>사용자 결정에 따라 업스케일러/FG의 <strong>벤더 구현과 중립 공통 계약부터</strong> 만들고, 실제 렌더 입력·그래프·Player 실행 경로는 뒤에 연결한다. 첫 구현의 SDK 정본과 제한은 <a href="TemporalVendorIntegration20261009.html">벤더 통합 기록</a>에 둔다. FSR은 사용자 최종 선택인 <strong>3.1.4 / FidelityFX SDK 1.1.4</strong>, DLSS는 Streamline 2.14.1, XeSS는 3.0.2를 기준으로 한다.</p>
-<p>소스 구현·정적 검토만으로 아래 TR/TU/FG 행을 완료 처리하지 않는다. 모션 입력, 렌더/표시 크기 분리와 FG 입력 수명·present 통합에는 실제 소스 경로가 있으며, 구현 누락 감사와 DX12 Debug/Release 실행 수용을 구분한다. 공개 공통 계약에는 native API 타입을 올리지 않으며, FSR의 두 API 구현은 SDK 정적 라이브러리 심볼 충돌 때문에 한 바이너리에서 하나만 링크한다.</p>
-<p>아래 2026-09-14 지원 행렬은 당시 조사 기록이다. XeSS FG의 Arc 전용 설명은 현재 SDK에 적용되지 않는다: XeSS 2.1 이후 지원되는 타사 GPU에서도 FG가 가능하고, 3.x 추가 보간 수는 런타임 기능 질의로 판정한다. 라이브 기능 활성화나 현재 하드웨어 지원은 벤더 ID/표의 추정으로 결정하지 않는다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2026-10-07-최근-병합-반영">
-<div class="sec-head"><p class="ve-label">§07</p><h2 id="2026-10-07-최근-병합-반영">2026-10-07 최근 병합 반영</h2></div>
-<div class="prose"><p>PR #118/#120은 consumer lease를 GPU 완료까지 유지하는 표시 수명, 최신 packet/Host GPU 진입 제한과 Player native Present 기반을 적용했다. 이 변경은 FG provider/SDK·생성 프레임 구현 또는 PHASE 4.5 완료 공수가 아니다. 16행 71인일 및 TR/TU/FG 미완료 판정을 유지한다.</p>
-<p>FG는 shell/RHI Present·pacing와 게임 루프가 소유하고 Editor viewport live_present는 삽입 지점이 아니다. 향후 provider의 최종 소비까지 lease를 연장하며 GT/실프레임과 생성 출력 신원을 구분한다. 50/250ms admission과 queue 상한은 지연/VRAM 최대 보장이 아니고, 실제 전후 지연·resize·device loss·종료 수용은 남는다. 계약: <a href="../design/OwnedBoundedPresentation.html">OwnedBoundedPresentation</a>, <a href="../design/PlayerNativePresentation.html">PlayerNativePresentation</a>.</p>
-<p>근거: <a href="../analysis/MergedPrReview20261007.html">10월 4~7일 PR 적용 감사</a>. 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.</p>
-<p><strong>2026-10-01 사용자 결정:</strong> 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 <a href="BackendParityPlan.html">PHASE 4.9</a>의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.</p>
-<p><strong>신설 2026-09-14 · <code>BASE-0</code> 이관 2026-09-15 · 활성 16행 71일 · 2026-10-09 벤더 소스 구현 착수, 실행 수용 미완료</strong></p>
-<p>PHASE 4.75의 GPU 설계 게이트에 <code>4-5 DLSS 구상</code> 1일이 한 줄로 있었다. 이 문서는 그 한 줄을
-독립 페이즈로 분리하고, 벤더 이름 대신 <strong>계층</strong>으로 다시 세운다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>트랙</th><th>단일 책임</th><th style="text-align:right">행</th><th style="text-align:right">일</th></tr></thead>
-<tbody><tr><td><strong>TR</strong></td><td>모션 벡터·jitter·히스토리·렌더 해상도 계약 — 시간축 기반</td><td class="num" style="text-align:right">4</td><td class="num" style="text-align:right">21</td></tr>
-<tr><td><strong>TU</strong></td><td>벤더 중립 Temporal Upscaler와 DLSS/FSR/XeSS 백엔드</td><td class="num" style="text-align:right">6</td><td class="num" style="text-align:right">20</td></tr>
-<tr><td><strong>FG</strong></td><td>present 소유권·pacing·지연 마커와 Frame Generation 백엔드</td><td class="num" style="text-align:right">5</td><td class="num" style="text-align:right">26</td></tr>
-<tr><td>게이트</td><td>지원 행렬 전수·폴백 사슬·계측 단정</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">4</td></tr>
-<tr><td><strong>합계</strong></td><td></td><td class="num" style="text-align:right"><strong>16</strong></td><td class="num" style="text-align:right"><strong>71</strong></td></tr></tbody></table></div>
-<p><code>BASE-0</code>(현재 공통 밀봉 하네스 잔여 4일)은 2026-09-15에 <strong>PHASE 4.3</strong>으로 옮겨갔다. 이 페이즈는 그것을
-<strong>선행 입력</strong>으로 받으며 <code>TR0</code>·<code>TR1</code>이 직접 소비한다 — 공수에서 빠졌을 뿐 의존은 그대로다.
-하네스 산출물 계약은 이 문서 §5.1이 계속 기술한다.</p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-0-이-페이즈가-생긴-이유">
-<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-이-페이즈가-생긴-이유">0. 이 페이즈가 생긴 이유</h2></div>
-<div class="prose"><p><code>4-5 DLSS 구상</code>은 두 가지를 동시에 틀렸다.</p>
-<p><strong>첫째, 벤더 이름을 기능 이름으로 썼다.</strong> DLSS는 구현이지 기능이 아니다. NVIDIA가 아닌
-하드웨어에서 무엇을 하는지 계획서가 답하지 못했다. 당시(2026-09-14) 조사에서는 <code>FSR</code>·<code>XeSS</code>·<code>FidelityFX</code>·<code>TSR</code> 구현이
-저장소 전체에 <strong>0건</strong>이었다. 현재 PR #169의 SDK/제품 배선 소스와 혼동하지 않는다. <a href="ScriptableRenderPipelinePlan.html"><code>ScriptableRenderPipelinePlan.md</code></a> §10.4에
-*&quot;DXR/DLSS 같은 조건부 Pass는 모든 지원 행렬에 fallback 또는 명시적 pipeline invalid 사유를
-가져야 한다&quot;*는 규칙은 이미 서 있었지만, 행렬의 나머지 칸이 비어 있었다.</p>
-<p><strong>둘째, 업스케일과 프레임 생성을 한 항목에 묶었다.</strong> 업스케일러는 렌더 그래프 안의 Pass다.
-프레임 생성은 Pass가 아니라 <strong>swapchain/present 계층을 가져간다.</strong> 소유 계층이 다르고,
-완료선이 다르고, 계측에 끼치는 해가 다르다. 한 항목 1일에 둘을 넣으면 둘 다 설계되지 않는다.</p>
-<p>그리고 셋째로, 당시에는 둘 다 같은 선행을 요구하는데 <strong>그 선행이 이 엔진에 없었다.</strong> 현재의 구현/미구현/실행 미검증 상태는 문서 상단의 최신 기록을 따른다.</p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-1-정본-경계">
-<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-정본-경계">1. 정본 경계</h2></div>
-<div class="prose"><div class="table-scroll"><table>
-<thead><tr><th>범위</th><th>정본</th></tr></thead>
-<tbody><tr><td>PHASE 4.5 순서·공수·완료선</td><td>이 문서</td></tr>
-<tr><td>페이즈 간 순서와 총공수</td><td><a href="RenderPhaseRoadmap.html"><code>RenderPhaseRoadmap.md</code></a></td></tr>
-<tr><td>C# Pass 저작·조건부 구성·fallback 계약</td><td><a href="CSharpRenderPipelinePlan.html"><code>CSharpRenderPipelinePlan.md</code></a>·<a href="../design/RenderPipelineTargetArchitecture.html"><code>RenderPipelineTargetArchitecture.md</code></a></td></tr>
-<tr><td>versioned resource·DAG·barrier·queue/fence</td><td><a href="RenderGraphDependencySchedulingPlan.html"><code>RenderGraphDependencySchedulingPlan.md</code></a></td></tr>
-<tr><td>재질 의미·pre-tone linear HDR 응답</td><td><a href="BlenderMaterialGraphPlan.html"><code>BlenderMaterialGraphPlan.md</code></a></td></tr>
-<tr><td>vertex attribute schema·model generation</td><td><a href="archive/ModelAssetBigBangCutoverPlan.html"><code>ModelAssetBigBangCutoverPlan.md</code></a></td></tr></tbody></table></div>
-<p>이 문서는 <strong>재질 의미도, Pass topology도, RenderGraph resource lifetime도 소유하지 않는다.</strong>
-시간축 입력을 생산하고, 화면 해상도와 present 소유권을 정하고, 그 위에 벤더 백엔드를 꽂는
-책임만 갖는다.</p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-2-현재-코드의-사실--2026-09-14-실측">
-<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-현재-코드의-사실--2026-09-14-실측">2. 현재 코드의 사실 — 2026-09-14 실측</h2></div>
-<div class="prose"><h3 id="21-시간축-입력이-없다">2.1 시간축 입력이 없다</h3>
-<p><code>Engine/RenderEngine/Render/Passes/</code> 아래 Geometry·Lighting·PostProcess·UI를 전수 확인했다.</p>
-<ul>
-<li><strong>모션 벡터 생산 패스 0건.</strong> velocity 채널도, 별도 패스도 없다.</li>
-<li><strong>TAA 0건, jitter 0건.</strong> projection에 sub-pixel offset을 넣는 자리가 없다.</li>
-<li>시간축 히스토리를 가진 유일한 패스는 SSGI다. <code>m_history[2]</code>·<code>m_historyDepth[2]</code>와
-<code>m_previousViewProjection</code>으로 <strong>depth 재투영</strong>을 한다
-(<code>EnhancedSSGIPass.h</code> 227~252행).</li>
-</ul>
-<p>SSGI의 방식은 <strong>정적 장면 전용 근사</strong>다. 이전 view-projection으로 되쏘는 것이므로 스킨드
-메시나 움직이는 오브젝트의 자기 운동이 담기지 않는다. 업스케일러에 그대로 넘기면 움직이는
-물체에서 고스팅이 난다. <strong>재사용 대상이 아니라 흡수·교체 대상이다.</strong></p>
-<h3 id="22-ui-합성-위치는-유리하다">2.2 UI 합성 위치는 유리하다</h3>
-<p>현재 순서는 이렇다.</p>
-<pre><code class="language-text">GBuffer/Deferred/Forward (HDR) → Sprite → SSAO/SSGI/SSR/SSS/Fog
-    → PostChain (HDR → LDR RGBA8) → UI (LDR) → live_present</code></pre>
-<p><code>EnhancedSceneRenderer.cpp:1523</code>이 *&quot;화면 UI는 PostChain 뒤 LDR에 합성한다&quot;*를 명시한다.
-<code>EnhancedUIPass</code>가 독립 패스이고 이미 포스트 체인 뒤에 있다 — TU와 FG 양쪽이 요구하는
-&quot;UI는 재구성 이후&quot;가 구조적으로 이미 만족돼 있다. <strong>이 페이즈에서 가장 운이 좋은 지점이다.</strong></p>
-<h3 id="23-present는-셸이-독점하고-에디터-뷰포트는-present를-타지-않는다">2.3 present는 셸이 독점하고, 에디터 뷰포트는 present를 타지 않는다</h3>
-<ul>
-<li><code>DX12DeviceResources.h:156</code> <code>Present()</code>, 495행 <code>m_swapChain</code> — 주석이
-<em>&quot;셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다&quot;</em>.</li>
-<li>에디터 뷰포트의 <code>live_present</code> 패스는 <strong>swapchain present가 아니라</strong> 공유 텍스처
-<code>CopyTexture</code> 또는 <code>CopyToReadback</code>이다 (<code>EnhancedSceneRenderer.cpp:2432</code>).</li>
-</ul>
-<p>이것이 FG 트랙의 경계를 그대로 정해 준다. <strong>FG는 셸 swapchain에서만 성립하고 에디터
-뷰포트에서는 성립하지 않는다.</strong> 정책이 아니라 구조가 그렇다.</p>
-<h3 id="24-해상도-이원화는-방금-데인-축이다">2.4 해상도 이원화는 방금 데인 축이다</h3>
-<p>2026-09-14 세션에서 라이브 렌더러가 씬 렌더 전에 해상도를 바꿔 FPS가 반토막 난 일이 있었다.
-업스케일은 <strong>렌더 해상도 ≠ 표시 해상도</strong>를 제품 불변식으로 도입한다. 그 축이 아직 안정되지
-않은 상태에서 업스케일러를 얹으면 원인 판별이 불가능해진다. <code>TR2</code>가 이 부채를 먼저 갚는다.</p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-3-계층-분리-결정">
-<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-계층-분리-결정">3. 계층 분리 결정</h2></div>
-<div class="prose"><h3 id="31-세-계층은-소유-대상이-다르다">3.1 세 계층은 소유 대상이 다르다</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>계층</th><th>소유</th><th>사는 곳</th><th>없으면</th></tr></thead>
-<tbody><tr><td><strong>TR</strong> 시간축 기반</td><td>모션 벡터·jitter·히스토리·renderScale</td><td>렌더 그래프 생산 측</td><td>TU도 FG도 불가능</td></tr>
-<tr><td><strong>TU</strong> 업스케일</td><td>재구성 Pass 하나 + 벤더 백엔드</td><td>렌더 그래프, PostChain <strong>앞</strong></td><td>원해상도 렌더</td></tr>
-<tr><td><strong>FG</strong> 프레임 생성</td><td>present 소유권·pacing·지연 마커</td><td>RHI/셸 + 게임 루프</td><td>실프레임만 표시</td></tr></tbody></table></div>
-<p><strong>TR의 공수가 이 페이즈의 절반 가까이다.</strong> 벤더 SDK를 붙이는 일이 아니라 모션 벡터를 만드는
-일이 본체다. NVIDIA든 AMD든 이 비용은 똑같이 낸다. 그리고 이걸 깔면 TAA·모션 블러·SSGI
-품질 개선이 함께 열린다 — TR은 TU/FG가 취소돼도 남는 자산이다.</p>
-<h3 id="32-자체-tsr을-만들지-않는다">3.2 자체 TSR을 만들지 않는다</h3>
-<p>언리얼은 벤더 중립 고품질 재구성을 위해 TSR을 직접 만들었다. 우리는 만들지 않는다.</p>
-<p><strong>FSR이 이미 벤더 중립이기 때문이다.</strong> FSR 2/3의 업스케일러는 순수 컴퓨트 셰이더이고
-하드웨어 잠금이 없으며 MIT 소스다. 벤더 중립 경로가 공짜로 생기는데 자체 TSR을 쓰는 것은
-YAGNI다. <code>TU1</code>은 완전한 TAAU가 아니라 <strong>무-upscale 기준 경로</strong>만 만든다 — 폴백의 마지막
-칸이자 A/B 대조군이다.</p>
-<p>이 결정이 뒤집히는 조건은 하나뿐이다. FSR을 실을 수 없는 플랫폼이 생기는 경우. 현재
-소비자 0이다.</p>
-<h3 id="33-fg는-q0를-선행으로-받지-않는다">3.3 FG는 <code>Q0</code>를 선행으로 받지 않는다</h3>
-<p>FG의 보간 작업이 async compute를 요구하므로 <code>Q0</code>(queue/fence RHI 계약)가 선행처럼 보인다.
-<strong>아니다.</strong> 우리는 자체 보간기를 만들지 않는다. FidelityFX의 frame interpolation swapchain도
-NGX의 DLSS Frame Generation도 <strong>SDK가 자기 큐와 자기 present 타이밍을 소유한다.</strong> 우리가
-넘기는 것은 디바이스와 present 소유권이지 큐 스케줄이 아니다.</p>
-<p>따라서 PHASE 4.5는 PHASE 4.3의 <code>RG6</code>·<code>Q0</code>를 기다리지 않는다. <strong>이 전제가 뒤집히는 경우는
-자체 보간기를 쓰기로 결정할 때뿐이고, 그때는 <code>FG0</code> 공수가 다시 산정돼야 한다.</strong></p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-4-벤더-지원-행렬">
-<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-벤더-지원-행렬">4. 벤더 지원 행렬</h2></div>
-<div class="prose"><h3 id="41-업스케일-축">4.1 업스케일 축</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>벤더</th><th>기술</th><th>하드웨어 잠금</th><th>라이선스</th></tr></thead>
-<tbody><tr><td>전체 (베이스라인)</td><td>FSR 2/3</td><td><strong>없음</strong> — 컴퓨트 셰이더</td><td>MIT, 소스 벤더링</td></tr>
-<tr><td>AMD RDNA4</td><td>FSR 4</td><td>RDNA4 (ML)</td><td>FidelityFX SDK 경유</td></tr>
-<tr><td>NVIDIA RTX</td><td>DLSS Super Resolution</td><td>RTX (Tensor Core)</td><td>NVIDIA SDK, 재배포 조건</td></tr>
-<tr><td>Intel</td><td>XeSS</td><td>DP4a 경로 범용 / XMX는 Arc</td><td>바이너리 SDK</td></tr>
-<tr><td>폴백</td><td>무-upscale</td><td>—</td><td>—</td></tr></tbody></table></div>
-<h3 id="42-프레임-생성-축">4.2 프레임 생성 축</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>벤더</th><th>기술</th><th>하드웨어 잠금</th></tr></thead>
-<tbody><tr><td>전체 (베이스라인)</td><td>FSR 3 Frame Generation</td><td><strong>없음</strong> — NVIDIA/Intel에서도 동작</td></tr>
-<tr><td>NVIDIA</td><td>DLSS Frame Generation</td><td><strong>Ada (RTX 40) 이상</strong> — Optical Flow Accelerator</td></tr>
-<tr><td>NVIDIA</td><td>DLSS Multi Frame Generation</td><td><strong>Blackwell (RTX 50) 전용</strong></td></tr>
-<tr><td>Intel</td><td>XeSS 2 Frame Generation</td><td>Arc 전용</td></tr>
-<tr><td>드라이버</td><td>AMD AFMF · NVIDIA Smooth Motion</td><td>엔진 통합 대상 아님</td></tr>
-<tr><td>폴백</td><td>생성 없음</td><td>—</td></tr></tbody></table></div>
-<h3 id="43-두-축에서-같은-결론">4.3 두 축에서 같은 결론</h3>
-<p><strong>AMD 대응을 위한 별도 분기를 만들지 않는다.</strong> 두 축 모두 AMD 기술이 벤더 중립이므로
-<strong>FSR을 베이스라인으로 깔고 DLSS/XeSS를 그 위에 조건부로 덮는다.</strong> 폴백 사슬의 끝이
-&quot;기능 없음&quot;이 아니라 &quot;FSR&quot;이 되므로 지원 행렬의 빈칸이 사라진다.</p>
-<p>FSR 3.1부터 FG 모듈이 업스케일러에서 분리됐다. <strong>두 축은 독립적으로 고를 수 있어야 한다</strong> —
-DLSS 업스케일 + FSR 3 FG 조합이 성립하고, 이 조합을 구조가 막으면 안 된다.</p>
-<h3 id="44-선택은-벤더-id가-아니라-기능-질의로">4.4 선택은 벤더 ID가 아니라 기능 질의로</h3>
-<p><code>0x10DE</code>/<code>0x1002</code>/<code>0x8086</code> 분기를 금지한다. 드라이버 버전·노트북 MUX·가상화 어댑터에서
-벤더 ID는 거짓말을 한다. <strong>런타임 기능 질의에 성공한 후보만 사슬에 남긴다.</strong> 이 저장소의
-기존 판정 규약과 같다 — 판은 런타임이 찍는 값으로 정한다.</p>
-<p>DX12 한정으로는 Microsoft DirectSR이 이 추상화를 OS 레벨에서 제공하는 방향이다. 다만
-2026-09-14 기준 preview 단계이고 Vulkan에 대응물이 없다. <strong>우리 추상 계층은 어차피 필요하며,
-DirectSR은 DX12 백엔드의 구현 수단 후보로만 둔다</strong> — <code>TU0</code>가 판정한다.</p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-5-작업-표--71일--선행-base-0">
-<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-작업-표--71일--선행-base-0">5. 작업 표 — 71일 + 선행 <code>BASE-0</code></h2></div>
-<div class="prose"><h3 id="51-선행-입력--base-0-phase-43-소유-잔여-4인일">5.1 선행 입력 — <code>BASE-0</code> (PHASE 4.3 소유, 잔여 4인일)</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>ID</th><th>내용</th><th>상태</th><th>선행</th><th style="text-align:right">일</th><th>소유</th></tr></thead>
-<tbody><tr><td><code>BASE-0</code></td><td>공통 밀봉 frame/PNG/HDR/timing/graph stats</td><td>·</td><td>구현·검증된 MAT-0~MAT-8 기반 (MAT-9 최종 수용 제외)</td><td class="num" style="text-align:right">4</td><td><strong>PHASE 4.3</strong></td></tr></tbody></table></div>
-<p><strong>이 행은 이 페이즈의 공수에 포함되지 않는다.</strong> 2026-09-14에 PHASE 4.75에서 이곳으로 이관했고
-2026-09-15에 PHASE 4.3으로 다시 옮겼다 — 소비자 중 4.3 <code>RG1</code>/<code>RG6</code>가 가장 앞에 서기
-때문이다. 이후 분리된 4.6~4.8도 필요한 게이트에서 같은 하네스를 소비한다. <strong>하네스 산출물 계약 서술은 이 문서가 계속
-소유한다</strong> — 밀봉 frame packet·PNG/HDR·timing·graph stats의 형식과 계측 무해화 요구가 <code>TR0</code>의
-직접 입력이라 여기서 갈라 놓으면 두 벌이 된다. 소유 페이즈·공수·선후는
-<a href="RenderPhaseRoadmap.html"><code>RenderPhaseRoadmap.md</code></a>가 정본이다.</p>
-<h3 id="52-트랙-tr--시간축-기반-21인일">5.2 트랙 TR — 시간축 기반, 21인일</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>ID</th><th>내용</th><th>상태</th><th>선행</th><th style="text-align:right">일</th></tr></thead>
-<tbody><tr><td><code>TR0</code></td><td>계측 무해화 계약 — 모든 측정 표면의 프레임 종류 선언</td><td><span class="chip info">진행</span></td><td>BASE-0</td><td class="num" style="text-align:right">3</td></tr>
-<tr><td><code>TR1</code></td><td>모션 벡터 생산 — static/skinned/instanced/decal/알파</td><td><span class="chip ok">완료</span></td><td>BASE-0</td><td class="num" style="text-align:right">8</td></tr>
-<tr><td><code>TR2</code></td><td>렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스</td><td><span class="chip info">진행</span></td><td>TR1</td><td class="num" style="text-align:right">5</td></tr>
-<tr><td><code>TR3</code></td><td>히스토리·이전 프레임 행렬 공용 계약, SSGI 자체 히스토리 흡수 판정</td><td><span class="chip info">진행</span></td><td>TR2</td><td class="num" style="text-align:right">5</td></tr></tbody></table></div>
-<p><code>TR0</code>가 트랙 첫 항목인 것은 실수가 아니다. §7을 참조한다.</p>
-<h3 id="53-트랙-tu--업스케일-20인일">5.3 트랙 TU — 업스케일, 20인일</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>ID</th><th>내용</th><th>상태</th><th>선행</th><th style="text-align:right">일</th></tr></thead>
-<tbody><tr><td><code>TU0</code></td><td>벤더 중립 Upscaler 인터페이스·런타임 기능 질의·폴백 사슬·DirectSR 판정</td><td><span class="chip info">진행</span></td><td>TR3</td><td class="num" style="text-align:right">3</td></tr>
-<tr><td><code>TU1</code></td><td>무-upscale 기준 경로 — 폴백 마지막 칸이자 A/B 대조군</td><td><span class="chip info">진행</span></td><td>TU0</td><td class="num" style="text-align:right">2</td></tr>
-<tr><td><code>TU2</code></td><td>FSR 백엔드 — 벤더 중립 베이스라인</td><td><span class="chip info">진행</span></td><td>TU0</td><td class="num" style="text-align:right">5</td></tr>
-<tr><td><code>TU3</code></td><td>DLSS Super Resolution 백엔드 (NGX)</td><td><span class="chip info">진행</span></td><td>TU2</td><td class="num" style="text-align:right">3</td></tr>
-<tr><td><code>TU4</code></td><td>XeSS 백엔드</td><td><span class="chip info">진행</span></td><td>TU2</td><td class="num" style="text-align:right">3</td></tr>
-<tr><td><code>TU5</code></td><td>PostChain 앞 삽입·슬롯 schema 크기 유도·UI 합성 위치 재확인</td><td><span class="chip ok">완료</span></td><td>TU2</td><td class="num" style="text-align:right">4</td></tr></tbody></table></div>
-<p><code>TU3</code>·<code>TU4</code>가 <code>TU2</code> 뒤에 오는 것은 의존이 아니라 <strong>순서 규약</strong>이다. 벤더 중립 경로가 먼저
-서야 벤더 백엔드가 &quot;추가 경로&quot;가 되고, 그 반대면 벤더 백엔드가 기준이 되어 폴백이 2등 시민이
-된다.</p>
-<h3 id="54-트랙-fg--프레임-생성-26인일">5.4 트랙 FG — 프레임 생성, 26인일</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>ID</th><th>내용</th><th>상태</th><th>선행</th><th style="text-align:right">일</th></tr></thead>
-<tbody><tr><td><code>FG0</code></td><td>present 소유권 이전·proxy swapchain·frame pacing 계약</td><td><span class="chip info">진행</span></td><td>TU5</td><td class="num" style="text-align:right">8</td></tr>
-<tr><td><code>FG1</code></td><td>지연 마커 — Reflex·Anti-Lag 2, 게임 루프 경유</td><td><span class="chip info">진행</span></td><td>FG0</td><td class="num" style="text-align:right">4</td></tr>
-<tr><td><code>FG2</code></td><td>FSR 3 Frame Generation 백엔드 — 벤더 중립 베이스라인</td><td><span class="chip info">진행</span></td><td>FG0</td><td class="num" style="text-align:right">6</td></tr>
-<tr><td><code>FG3</code></td><td>DLSS Frame Generation 백엔드</td><td><span class="chip info">진행</span></td><td>FG2</td><td class="num" style="text-align:right">4</td></tr>
-<tr><td><code>FG4</code></td><td>HUD-less 백버퍼·UI 합성·<strong>에디터 금지 강제</strong></td><td><span class="chip info">진행</span></td><td>FG2</td><td class="num" style="text-align:right">4</td></tr></tbody></table></div>
-<p><code>FG1</code>은 렌더 트랙 안에서 끝나지 않는다. 지연 마커는 시뮬레이션 루프에 박혀야 하므로
-3계층 분리(L0~L4) 경계를 가로지른다. <strong>이 항목만 다른 계층의 승인을 받는다.</strong></p>
-<h3 id="55-통합-게이트--4인일">5.5 통합 게이트 — 4인일</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>ID</th><th>내용</th><th>상태</th><th>선행</th><th style="text-align:right">일</th></tr></thead>
-<tbody><tr><td><code>TFG9</code></td><td>지원 행렬 전수·폴백 사슬·계측 단정·성능/지연 판정</td><td><span class="chip info">진행</span></td><td>TU3, TU4, FG3, FG4</td><td class="num" style="text-align:right">4</td></tr></tbody></table></div>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-6-실행-순서">
-<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-실행-순서">6. 실행 순서</h2></div>
-<div class="prose"><pre><code class="language-text">PHASE 4.25 MAT-0~MAT-8 구현·검증 기반 (MAT-9 열린 상태)
-    ↓
-PHASE 4.3 BASE-0  (이 페이즈가 소유하지 않는다 · RG 본체는 기다리지 않는다)
-    ├─ TR0 (계측 무해화) ──────────────────┐
-    └─ TR1 → TR2 → TR3 → TU0 → TU1        │
-                          ├→ TU2 → TU3     │
-                          │      ├→ TU4    │
-                          │      └→ TU5 → FG0 → FG1
-                          │                 ├→ FG2 → FG3
-                          │                 │      └→ FG4
-                          └─────────────────────────→ TFG9
-    ↓
-PHASE 4.6 C# 저작 · 4.7 라이트맵 · 4.75 렌더러 품질 · 4.8 GPU 설계
-(각 항목이 필요한 BASE-0·RG·Q0 계약을 PHASE 4.3에서 입력으로 받는다)</code></pre>
-<p><code>TR0</code>는 <code>TR1</code>과 병렬이지만 <strong><code>TU2</code> 착지 전에는 반드시 끝나 있어야 한다.</strong> 업스케일러가 붙는
-순간부터 모든 성능 수치가 두 해상도 중 무엇을 잰 것인지 물어야 하기 때문이다.</p>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-7-계측-무해화--이-페이즈의-첫-단정">
-<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-계측-무해화--이-페이즈의-첫-단정">7. 계측 무해화 — 이 페이즈의 첫 단정</h2></div>
-<div class="prose"><p>이 저장소에서 가장 위험한 지점이다. TU/FG는 <strong>측정 하네스 전체를 동시에 눈멀게 한다.</strong></p>
-<div class="table-scroll"><table>
-<thead><tr><th>표면</th><th>TU를 켜면</th><th>FG를 켜면</th></tr></thead>
-<tbody><tr><td>FPS·frame time 게이트</td><td>저해상도 렌더를 원해상도로 읽음</td><td><strong>생성 프레임을 세어 수치 2배</strong></td></tr>
-<tr><td>golden 이미지·<code>render.pbr.capture</code></td><td>재구성된 픽셀이 제품 픽셀과 다름</td><td><strong>보간 프레임은 제품 프레임이 아님</strong></td></tr>
-<tr><td><span class="chip ok">프로파일러 pass GPU 시간</span></td><td><span class="chip ok">pass별 해상도가 갈림</span></td><td><span class="chip ok"><strong>생성 프레임엔 pass가 없음</strong></span></td></tr>
-<tr><td>성능 예산</td><td>기준값의 축이 바뀜</td><td>축 자체가 무의미</td></tr></tbody></table></div>
-<p>이 저장소에는 이미 같은 실패 양식이 반복 기록돼 있다 — <em>벤치가 모형만 재고 있었다</em>,
-<em>게이트가 초록이어도 눈멀 수 있다</em>, <em>예산이 붉은 원인은 축 불일치일 수 있다</em>. <strong>TU/FG는 그
-세 가지를 한 번에 유발한다.</strong></p>
-<p>따라서 <code>TR0</code>의 산출물은 코드가 아니라 <strong>계약</strong>이다.</p>
-<ol>
-<li>모든 측정 표면은 <strong>렌더 해상도·표시 해상도·프레임 종류(실/생성)를 산출물에 적는다.</strong>
-적지 않는 표면은 게이트에서 실패한다.</li>
-<li>golden·픽셀 비교 게이트는 <strong>TU/FG를 강제로 끈 상태에서만 유효</strong>하다. 끄는 것은 게이트가
-하고 사용자 설정에 의존하지 않는다.</li>
-<li>성능 게이트는 <strong>실프레임 frame time</strong>을 1급 지표로 삼고, 생성 프레임 포함 수치는 별도
-축으로만 보고한다. 두 값을 한 칸에 쓰지 않는다.</li>
-<li><code>TR0</code> 자체를 <strong>변이로 증명한다.</strong> 해상도 표기를 지운 산출물과 생성 프레임을 실프레임으로
-센 산출물 각각에 대해 게이트가 붉어져야 한다. 붉어지지 않으면 <code>TR0</code>는 완료가 아니다.</li>
-</ol>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-8-완료-기준">
-<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-완료-기준">8. 완료 기준</h2></div>
-<div class="prose"><h3 id="트랙-tr">트랙 TR</h3>
-<ul>
-<li>모션 벡터가 static·skinned·instanced·decal·알파 경로 전부에서 생산되고, 합성 fixture로
-각 경로의 벡터 방향/크기를 독립 검증한다.</li>
-<li>jitter 시퀀스가 결정적이고, 같은 시드에서 같은 프레임열을 낸다.</li>
-<li>렌더 해상도와 표시 해상도가 분리된 뒤에도 <code>renderScale = 1.0</code>에서 <strong>기존 픽셀과 동등</strong>하다.</li>
-<li>모든 측정 표면이 해상도·프레임 종류를 선언하고, 선언 누락 변이가 게이트를 붉게 만든다.</li>
-</ul>
-<h3 id="트랙-tu">트랙 TU</h3>
-<ul>
-<li>지원 행렬의 모든 칸이 채워져 있고, 각 칸이 성공 경로 또는 <strong>명시적 invalid 사유</strong>를 갖는다.</li>
-<li>벤더 ID 기반 분기가 소스에 0건이다. 선택은 런타임 기능 질의 결과로만 이뤄진다.</li>
-<li>어떤 백엔드에서도 폴백 전후 출력 슬롯의 <strong>포맷·의미가 같다.</strong> 크기는 <code>renderScale</code>에서
-유도되며 schema에 하드코딩되지 않는다.</li>
-<li>DX12에서 같은 단정을 통과한다. backend 중립 capability와 fallback 의미를 유지한다.</li>
-<li>업스케일러 선택과 FG 선택이 <strong>독립적으로</strong> 가능하다.</li>
-</ul>
-<h3 id="트랙-fg">트랙 FG</h3>
-<ul>
-<li>셸 swapchain에서만 활성화되고, <strong>에디터 뷰포트에서 활성화 시도가 fail-closed</strong>한다.</li>
-<li>UI가 보간 대상에 포함되지 않는다. HUD-less 백버퍼 또는 UI 마스크 경로가 검증된다.</li>
-<li>지연 마커가 시뮬레이션 루프에 있고, FG on/off의 입력 지연 차이가 실측된다.</li>
-<li>생성 프레임이 pacing 창 안에서 균등 간격으로 present된다.</li>
-<li><strong>FG를 켠 상태에서 모든 golden·픽셀 게이트가 자동으로 FG를 끄고 판정한다.</strong></li>
-</ul>
-<h3 id="페이즈">페이즈</h3>
-<ul>
-<li>위 세 트랙의 완료 기준이 모두 통과한다.</li>
-<li>NVIDIA·AMD·Intel·통합 GPU 각각에서 폴백 사슬이 끝까지 도달하고, 어느 하드웨어에서도
-&quot;기능 없음&quot;이 아니라 최소 FSR 또는 무-upscale에 착지한다.</li>
-</ul>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-9-금지하는-재혼합">
-<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-금지하는-재혼합">9. 금지하는 재혼합</h2></div>
-<div class="prose"><ul>
-<li><strong>벤더 이름을 기능 이름·Pass 이름·설정 키에 쓰지 않는다.</strong> DLSS는 백엔드 하나의 이름이다.</li>
-<li>자체 TSR/보간기를 만들지 않는다. §3.2의 조건이 성립하기 전까지 소비자 0이다.</li>
-<li>업스케일 품질 저하를 재질·조명 수정으로 덮지 않는다. 시간축 결함과 재질 결함은 다른
-게이트에서 판정한다.</li>
-<li><strong>TU/FG 성능 이득으로 렌더 성능 회귀를 가리지 않는다.</strong> 성능 게이트는 <code>renderScale = 1.0</code>
-실프레임을 1급 지표로 유지한다.</li>
-<li>에디터 뷰포트에 FG를 넣지 않는다. <code>live_present</code>가 swapchain present가 아니라는 구조적
-사실을 우회하지 않는다.</li>
-<li>PHASE 4.3의 RenderGraph resource lifetime이나 queue 계약을 이 페이즈가 재정의하지 않는다.</li>
-<li>SSGI의 depth 재투영 히스토리를 모션 벡터 대용으로 쓰지 않는다. 정적 장면 전용 근사다.</li>
-</ul>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-10-미해결-결정">
-<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-미해결-결정">10. 미해결 결정</h2></div>
-<div class="prose"><p><code>TU0</code>·<code>FG0</code> 착수 전에 답해야 한다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>질문</th><th>판정 시점</th><th>뒤집히면</th></tr></thead>
-<tbody><tr><td>DirectSR을 DX12 백엔드 구현 수단으로 쓰는가</td><td><code>TU0</code></td><td><code>TU3</code>/<code>TU4</code> 공수 재산정</td></tr>
-<tr><td>FSR 소스 벤더링인가 FidelityFX SDK 바이너리인가</td><td><code>TU2</code></td><td>오픈소스 재배포 조건이 갈림</td></tr>
-<tr><td>DLSS/XeSS SDK 재배포 조건이 이 저장소 라이선스와 양립하는가</td><td><code>TU3</code>/<code>TU4</code></td><td>해당 백엔드 선택적 빌드로 격리</td></tr>
-<tr><td>자체 보간기를 쓸 가능성이 있는가</td><td><code>FG0</code></td><td><code>Q0</code>가 선행으로 들어오고 <code>FG0</code> 재산정</td></tr>
-<tr><td>Vulkan의 FG proxy swapchain·SDK 지원 비교</td><td>PHASE 4.9 BP-0/BP-2</td><td>FG0 완료 조건에서 제외; 지원/미지원·fallback을 4.9에서 판정</td></tr></tbody></table></div>
-<hr>
-</div>
-</section>
-<section class="doc-sec" id="sec-11-변경-이력">
-<div class="sec-head"><p class="ve-label">§11</p><h2 id="11-변경-이력">11. 변경 이력</h2></div>
-<div class="prose"><div class="table-scroll"><table>
-<thead><tr><th>날짜</th><th>변경</th></tr></thead>
-<tbody><tr><td>2026-09-15</td><td><code>BASE-0</code> 1행 6일이 <strong>PHASE 4.3</strong>으로 이관됐다. 이 페이즈는 17행 92일 → <strong>16행 86일</strong>이며 <code>BASE-0</code>을 선행 입력으로 받는다. 하네스 산출물 계약 서술(§5.1)은 <code>TR0</code>의 직접 입력이라 이 문서가 계속 소유한다. 소유 페이즈·공수·선후 정본은 <code>Phase4UnifiedPlan.md</code> §6.1. <strong>이 페이즈의 TR/TU/FG 공수·선후는 하나도 바뀌지 않았다</strong></td></tr>
-<tr><td>2026-09-14</td><td>신설. PHASE 4.75의 <code>4-5 DLSS 구상</code> 1일을 PHASE 4.5로 분리하고 TR/TU/FG 세 트랙 17행 92일로 재산정. <code>BASE-0</code> 6일을 PHASE 4.75 공통·GPU 설계 게이트(현 §7.1)에서 이관</td></tr></tbody></table></div>
-</div>
-</section>
-<section class="sources" aria-label="출처">
-<p class="ve-label">출처</p>
-<p><a href="TemporalReconstructionPlan.md"><code>docs/plans/TemporalReconstructionPlan.md</code></a> · 마지막 커밋 2026-10-12 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
-</section>
-</main>
-</div>
-<script>
-(() => {
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
-  if (links.length) {
-    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
-    const spy = new IntersectionObserver(entries => {
-      for (const e of entries) if (e.isIntersecting) {
-        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
       }
-    }, { rootMargin: '0px 0px -70% 0px' });
-    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
-  }
-  if (still) return;
-  document.documentElement.classList.add('js-motion');
-  const io = new IntersectionObserver(entries => {
-    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
-  }, { rootMargin: '0px 0px -5% 0px' });
-  for (const el of document.querySelectorAll('main > *')) io.observe(el);
-})();
-</script>
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
 
-</body>
-</html>
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
+</script>
+</body></html>

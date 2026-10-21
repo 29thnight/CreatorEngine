@@ -1,5 +1,53 @@
 # CreatorEngine 기술설명서
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현재 제품 기반은 C++23·DX12/Vulkan·CoreCLR/.NET 10·miniaudio/Null이다. live rendering은 C++ Pass와 명시적 graph 버전·dependency order를 소비한다.
+- SceneManager의 GCCE domain/root와 Scene→Entity→Component trace, native 자산 owner, CLR GC와 GPU retirement를 별도 경계로 다룬다. 리플렉션 서술 정본은 reflgen이다.
+- managed 물리 표면은 PhysicsHit·sceneAnchor·호출자 버퍼와 ContactStream을 사용한다. 구 SRP/C# pipeline 저작 전환은 취소됐으며 별도 제품 수용·패키징·성능 결과는 해당 신원의 기록으로 구분한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Scene.h:313](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L313) — `explicit Scene(gc::domain& domain);`
+- [Engine/SceneRuntime/Scene.h:315](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L315) — `gc::domain& ManagedDomain() const noexcept { return *m_gcDomain; }`
+- [Engine/SceneRuntime/Scene.h:444](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.h#L444) — `gc::domain* m_gcDomain;`
+- [ScriptCore/ContactStream.cs:73](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ContactStream.cs#L73) — `public sealed class ContactStream : IDisposable`
+- [ScriptCore/ContactStream.cs:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ContactStream.cs#L92) — `internal ContactStream(Component subscriber, ObjectHandle owner, ShapeRole self, ShapeRole other,`
+- [ScriptCore/ContactStream.cs:219](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ContactStream.cs#L219) — `private static readonly Dictionary<RouteKey, List<ContactStream>> Routes = new();`
+- [Engine/SceneRuntime/Entity.h:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L48) — `static gc::root_ref<Entity> Create(gc::domain& domain);`
+- [Engine/SceneRuntime/Entity.h:50](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L50) — `static gc::root_ref<Entity> Create(gc::domain& domain, Scene* scene,`
+- [Engine/SceneRuntime/Entity.h:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L53) — `static gc::root_ref<Entity> Create(gc::domain& domain, Scene* scene, size_t instanceID,`
+- [Engine/RuntimeHost/EngineBootstrap.h:142](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L142) — `thread_pool::set_worker_hooks({[](unsigned int index)`
+- [Engine/RuntimeHost/EngineBootstrap.h:379](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L379) — `ce::get_job_scheduler().start(jobWorkerCount);`
+- [Engine/RuntimeHost/EngineBootstrap.h:397](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L397) — `SHUTDOWN_STEP(ce::get_job_scheduler().shutdown());`
+- [Engine/Utility_Framework/JobScheduler.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.h#L27) — `friend class job_scheduler;`
+- [Engine/Utility_Framework/JobScheduler.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.h#L55) — `friend class job_scheduler;`
+- [Engine/Utility_Framework/JobScheduler.h:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/JobScheduler.h#L60) — `class job_scheduler`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:231](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L231) — `class EnhancedRenderGraph : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:451](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L451) — `explicit EnhancedRenderGraph(IRenderDeviceServices& services,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:469](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L469) — `~EnhancedRenderGraph();`
+- [Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.h#L7) — `enum class TextureColorSpace : std::uint8_t { Source, Linear, Srgb };`
+- [Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.h#L8) — `enum class TextureCompression : std::uint8_t { None, Auto, BC1, BC3, BC5, BC7 };`
+- [Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.h#L10) — `enum class TextureMipPolicy : std::uint8_t { PreserveAuthored, GenerateFull };`
+- [Editor/EngineEntry/App.cpp:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L127) — `std::filesystem::path ResolveEditorWorkspaceRoot(`
+- [Editor/EngineEntry/App.cpp:180](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L180) — `ResolveEditorWorkspaceRoot(executableRoot);`
+- [Editor/EngineEntry/App.cpp:186](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L186) — `const auto explicitProject = EditorPathArgument(L"--development-project");`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 이 문서는 CreatorEngine의 현재 구현을 처음 읽는 개발자를 위한 구조 안내입니다. 개별 기능의 API 전체나 미래 설계는 분야별 문서로 연결합니다.
 
 **기준:** 2026-10-10, master `08d13459a15caa50459bf8b662ee75878afa5635`. 작업 폴더의 미커밋 RG8·GCCE 변경은 기준에 포함하지 않습니다. 이 문서 작성 과정에서는 커밋된 소스·빌드 설정·기존 검증 기록을 대조했으며, 새 빌드나 런타임·GPU 검증은 실행하지 않았습니다. 이후 변경은 현재 소스를 우선해 판단하십시오.
@@ -120,7 +168,7 @@ Lattice Scene 경로는 sealed geometry chunk를 메시렛 토폴로지로 준�
 
 `CREATOR_LX_MESHLETS=0`과 `CREATOR_LX_HZB=0`은 비교·복귀 경로입니다. Scene host identity는 18이며 예전 Scene cooked 제품은 다시 cook해야 합니다. GPU LOD 선택, meshlet 단위 HZB·압축·cone culling, Vulkan meshlet 제품 수용과 전체 성능 이득은 이 구현의 완료 범위가 아닙니다.
 
-소스: [MaterialGraphSceneLod.h](../Engine/RenderEngine/MaterialGraphSceneLod.h), [MaterialGraphSceneHost.cpp](../Engine/RenderEngine/MaterialGraphSceneHost.cpp), [GpuMeshletVisibility](../Engine/RenderEngine/GpuMeshletVisibility.cpp). 실행 기록: [LX 기하 통합](analysis/LatticeGeometryIntegration20261009.md).
+소스: [MaterialGraphSceneLod.h](../Engine/RenderEngine/MaterialGraphSceneGeometryStage.inl), [MaterialGraphSceneHost.cpp](../Engine/RenderEngine/MaterialGraphSceneHost.cpp), [GpuMeshletVisibility](../Engine/RenderEngine/GpuGeometryVisibility.cpp). 실행 기록: [LX 기하 통합](analysis/LatticeGeometryIntegration20261009.md).
 
 ## 재질 저작과 실행
 
@@ -311,3 +359,5 @@ flowchart LR
 | 배포 | 컴파일·cook·PAK·Player 검증·게시 | Launcher·MSI·정식 프로젝트 파일·일반 native plugin ABI |
 
 네트워크 fixed tick·replication, C# 렌더 파이프라인 저작, Hybrid RT/Path Tracing 등 계획서의 목표는 구현 기능 목록에 포함하지 않습니다. 현재 범위는 [문서 색인](README.md), [렌더 정본](plans/RenderPhaseRoadmap.md), [개발 대시보드](RefactoringPlanDashboard.html)에서 분야별로 확인합니다. 과거 분석은 해당 커밋·환경의 기록이며 최신 전체 회귀 통과를 대신하지 않습니다.
+
+</details>

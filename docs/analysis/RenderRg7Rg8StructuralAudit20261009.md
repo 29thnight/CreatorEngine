@@ -1,5 +1,53 @@
 # RG7·RG8 구조 및 배선 재감사 — 2026-10-09
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:636](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L636) — `bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:720](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L720) — `bool SubmitQueues(const std::shared_ptr<EnhancedRenderGraph>& self,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:856](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L856) — `bool RecordParallel(IRHIParallelCommandPool& pool, uint32_t workerCount,`
+- [Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h#L27) — `require(!graph.BuildQueueSchedule(caps, {}, 100, plan, error) && plan.entries.empty(), "Uncompiled graph admitted.");`
+- [Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h#L39) — `require(graph.BuildQueueSchedule(caps, hints, 100, plan, error), error);`
+- [Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h#L56) — `require(graph.BuildQueueSchedule(unsupported, hints, 100, plan, error) && !plan.usesCompute && plan.waits.empty(), "Compute fallback failed.");`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L23) — `error = std::move(message);`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L30) — `[](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; });`
+- [Engine/RenderEngine/MaterialGraphMeshSurface.cpp:223](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphMeshSurface.cpp#L223) — `void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override`
+- [Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp:651](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp#L651) — `!QueueOperation(state_, [&] { return queue->native->Signal(marker.Get(), 1); }, error))`
+- [Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp:667](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp#L667) — `!QueueOperation(state_, [&] { return primary->Signal(marker.Get(), 1); }, error))`
+- [Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp:829](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp#L829) — `bool DX12QueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,`
+- [Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp#L18) — `DX12CommandListPool::DX12CommandListPool(job_scheduler& scheduler) : IRHIParallelCommandPool(scheduler) {}`
+- [Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp#L25) — `bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t workerCount, uint32_t frameCount,`
+- [Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp:368](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp#L368) — `bool DX12CommandListPool::SubmitRecordedCommands(uint32_t frameSlot, std::span<const uint32_t> workerOrder,`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1229](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1229) — `bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError)`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1386](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1386) — `bool DX12DeviceResources::SubmitCommandLists(std::span<ID3D12CommandList* const> lists, RHICompletionPoint completion,`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1505](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1505) — `error = "DX12 EndFrame Signal 실패 " + HrToString(signalResult);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:3209](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L3209) — `schedule->order = std::move(m_executeOrder);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:3768](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L3768) — `bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabilities,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:4195](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L4195) — `bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool, uint32_t workerCount,`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:1324](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L1324) — `presentationSink->SubmitCpuFrame(`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:1358](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L1358) — `textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:7269](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L7269) — `",\"totalMilliseconds\":" + std::to_string(recordSubmitMilliseconds) +`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 후속: [구조 수정 1 — 배치·기록 저장소 재사용](RenderRg8Batching20261009.md)과 [구조 수정 2 — 공통 배리어 계획](RenderRg8Barriers20261009.md)을 적용했다. 아래 내용은 수정 전 소스의 감사 기록이다. 다중 큐의 보수적 경계 전이·overlap·RG7 조합은 남아 있으며 RG8 progress·기성 0·기본 OFF를 유지한다.
 
 ## 결론
@@ -210,3 +258,5 @@ warm frame의 allocator/list 신규 생성 수, batch/Signal/Wait 수, 실제 ba
 CPU record+submit, overlap 가능한 패스 쌍/실제 queue 시간, 캐시 포함 보유 바이트를 확인해야 한다.
 픽셀/실패/수명 검사는 기존 회귀를 재사용한다. 이들은 새로운 기능 추가가 아니라 이번에 빠뜨린
 원래 queue pool·효율적인 실행·수명/메모리 채택 판단의 직접적인 검증 항목이다.
+
+</details>

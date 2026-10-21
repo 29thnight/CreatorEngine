@@ -1,5 +1,38 @@
 # RG5-8 GraphSurface·Draw 접근과 반환 출력 — 완료
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31) — `enum class EnhancedLiveDisplayTarget : uint8_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39) — `enum class EnhancedLiveViewFlags : uint32_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L216) — `const auto started = std::chrono::steady_clock::now();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:230](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L230) — `std::chrono::steady_clock::now() - started).count();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L307) — `const uint64_t generation = std::exchange(token.captureGeneration, 0);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 SceneHost의 Shadow/GBuffer/Color/Blended는 갱신 출력 핸들을 반환하고 EnhancedSceneRenderer 블랙보드와 Forward+ m_output이 이를 이어 받는다. opaque GBuffer/Shadow는 기존 legacy 생산자가 채운 값을 보존하는 Modify/ReadWrite다. Forward GraphDepthCopy는 Write, 이어지는 GraphSurface 색상은 Write·깊이는 복사된 값 보존을 위한 Modify다. 최종 색상 합성은 Modify이며 선언 당시 값을 콜백에 보관한다.
 
 공통 SceneAccess의 AdvanceSceneSurface/AdvanceSceneColor는 실제 SceneHost가 사용하는 버전 계약이다. NormalizeSceneReads는 명시 모드에서 동일 epoch/kind/index/version의 Read만 병합하며 ShaderResource/PixelShaderResource는 넓은 ShaderResource로 합친다. 중복 쓰기나 서로 호환되지 않는 읽기 상태는 거부한다. 기존 DeclarationOrder 진단은 그대로 보존한다.
@@ -27,3 +60,5 @@ rg5-surface-completion-v1.json은 sliceComplete=true, rg5Complete=false, version
 
 
 후속 갱신: [RG5-9 혼합 GPU 수용](RenderRg5MixedGpuAcceptance.md)에서 실제 versioned SceneHost/Forward+ Code·Graph 혼합 검증과 ExplicitVersioned guard 제거를 완료했다. 최신 기본 제품 기준선도 이 기록을 따른다. 전체 제품 versioned 수용/RG6 전환 및 나머지 소비자 이관은 계속 열린다.
+
+</details>

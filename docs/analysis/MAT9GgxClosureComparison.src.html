@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 공통 GGX 반사·레이어 감쇠 대조 — 2026-10-01</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9GgxClosureComparison.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9GgxClosureComparison.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 공통 GGX 반사·레이어 감쇠 대조 — 2026-10-01</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-ggx-energy-tables.py#L8">Tools/blender/export-ggx-energy-tables.py:8</a> — <code>ROOT = Path(__file__).resolve().parents[2]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-ggx-energy-tables.py#L15">Tools/blender/export-ggx-energy-tables.py:15</a> — <code>parser = argparse.ArgumentParser()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/export-ggx-energy-tables.py#L20">Tools/blender/export-ggx-energy-tables.py:20</a> — <code>raise ValueError(&quot;Source must be the unmodified Blender v5.1.1 shader.tables&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-thin-film-images.py#L15">Tools/regression/assess-thin-film-images.py:15</a> — <code>sys.path.insert(0, str(Path(__file__).resolve().parents[1]/&#39;blender&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-thin-film-images.py#L20">Tools/regression/assess-thin-film-images.py:20</a> — <code>SPEC = importlib.util.spec_from_file_location(&#39;images&#39;, Path(__file__).with_name(&#39;compare-material-blender-images.py&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-thin-film-images.py#L26">Tools/regression/assess-thin-film-images.py:26</a> — <code>parser = argparse.ArgumentParser(description=__doc__)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12">Tools/regression/measure-material-blender-images.ps1:12</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15">Tools/regression/measure-material-blender-images.ps1:15</a> — <code>$Reference=[IO.Path]::GetFullPath($Reference)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49">Tools/regression/measure-material-blender-images.ps1:49</a> — <code>if($ReferenceRepeat) { $comparisonArguments+=@(&#39;--reference-repeat&#39;,[IO.Path]::GetFullPath($ReferenceRepeat)) }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>판정</h2>
+<p><strong>고정 박막 on/off 32조건이 기존 이미지 목표를 모두 통과했다.</strong> 박막 8종 × 두 조명과
+같은 입력의 thickness=0 대조군을 사용했다. 이전 cutoff 수정 단계의 박막 on 판정은
+4/16이었다. 이번 판정은 on <strong>16/16</strong>, off <strong>16/16</strong>이며 허용치를 높이지 않았다.
+MAT-9 전체 완료나 모든 씬의 성능 수용을 의미하지 않는다. 완료 공수는 <strong>32/34일</strong>이다.
+이후 <a href="MAT9HdriImageComparison.html">HDRI 대조</a>에서 Scene radiance 필터와 host identity 5를
+적용했다. 이 문서의 단색 환경 수용을 HDRI 전체 수용으로 확대하지 않는다.</p>
+<ul>
+<li>scene-linear relative RGB RMS ≤1%, p95 normalized ≤1%, maximum normalized ≤5%.</li>
+<li>독립 Blender 시드 간 RMS ≤0.25%. normalized는 <code>abs(native-reference)/max(1,abs(reference))</code>.</li>
+<li><a href="MAT9GgxFilmAcceptance.json">수용 JSON</a>, <a href="MAT9GgxClosureComparison.json">36장 비교·이미지 SHA</a>.</li>
+<li><a href="MAT9ThinFilmAcceptance.html">이전 4/16 결과</a>는 변경 전 증거로 보존한다.</li>
+</ul>
+<h2>원인과 변경</h2>
+<ol>
+<li>금속과 유전체를 섞은 총반사율로 유전체 diffuse를 다시 감쇠했다. 이제 metallic 가중치는
+한 번만 적용하고, diffuse는 유전체 closure의 layering albedo로 감쇠한다.</li>
+<li>GGX 부족 에너지를 Lambertian lobe로 더해 직접광의 반사 모양이 달랐다. 이제 금속·유전체·
+coat의 기판 Fss를 각각 계산하고 <code>1 + Fms*(1-E)/E</code>를 각 GGX 반사 lobe에 곱한 뒤 합친다.
+IBL 적분·방향별 환경 convolution도 같은 응답을 사용한다. 추가 diffuse 보상은 없다.</li>
+<li>박막이 꺼지면 Scene Principled 그래프가 기존 Core 계산으로 되돌아갔다. Core 그래프에도
+같은 GGX base를 적용했다. feature/tier는 작가 기능 분류로 유지하고 <code>viewTier.w</code>는 계산 모델
+선택으로 명확히 했다. GPU Scene host, CPU SurfaceEvaluator, Scene packet 검증을 맞췄다.
+일반 Core/glTF 공용 함수와 독립 legacy IBL 모델 0은 유지한다.</li>
+</ol>
+<p>Blender 5.1.1의 <a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_microfacet.h">GGX 에너지 보상</a>과
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/svm/closure.h">Principled closure 조합</a>을 기준으로 했다.
+<code>ggx_E</code> 32×32, <code>ggx_Eavg</code> 32, dielectric albedo 16³의 <strong>5,152 float / 20,608 byte</strong>를
+Apache-2.0 고지·원본 SHA와 함께 고정했다. 실제 GPU 배치 크기나 FPS 비용으로 환산하지 않는다.
+<code>export-ggx-energy-tables.py</code>는 원본 파일 SHA가 다르면 생성을 거부한다.</p>
+<p>Coat layering은 closure의 darkened weight로 감쇠한다. 박막의 평균 보상은 film 색의 평균으로
+대체하지 않고 기판 Fss를 사용한다. film IOR=1 및 기판과 일치하는 무효 인터페이스의
+기존 불변식은 보존한다. Glass의 단일 인터페이스 transmission budget은 이번에 재설계하지 않았다.</p>
+<h2>결과 — relative RMS</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">film sun</th>
+<th align="right">off sun</th>
+<th align="right">film furnace</th>
+<th align="right">off furnace</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0.25nm, IOR 1.4, metal 0.6</td>
+<td align="right">0.0537%</td>
+<td align="right">0.0553%</td>
+<td align="right">0.1444%</td>
+<td align="right">0.1460%</td>
+</tr>
+<tr>
+<td>100nm, IOR 1.5, dielectric</td>
+<td align="right">0.2039%</td>
+<td align="right">0.0410%</td>
+<td align="right">0.2050%</td>
+<td align="right">0.1176%</td>
+</tr>
+<tr>
+<td>1000nm, IOR 2, dielectric</td>
+<td align="right">0.0453%</td>
+<td align="right">0.0410%</td>
+<td align="right">0.1309%</td>
+<td align="right">0.1176%</td>
+</tr>
+<tr>
+<td>100nm, IOR 1.5, metal 1</td>
+<td align="right">0.0689%</td>
+<td align="right">0.0616%</td>
+<td align="right">0.1086%</td>
+<td align="right">0.1142%</td>
+</tr>
+<tr>
+<td>1000nm, IOR 2, metal 1</td>
+<td align="right">0.0693%</td>
+<td align="right">0.0616%</td>
+<td align="right">0.1152%</td>
+<td align="right">0.1142%</td>
+</tr>
+<tr>
+<td>200nm, IOR 3, metal 0.6</td>
+<td align="right">0.0594%</td>
+<td align="right">0.0553%</td>
+<td align="right">0.1241%</td>
+<td align="right">0.1460%</td>
+</tr>
+<tr>
+<td>550nm, IOR 1.4, metal 0.6, rough 0.88</td>
+<td align="right">0.0421%</td>
+<td align="right">0.0427%</td>
+<td align="right">0.1685%</td>
+<td align="right">0.1638%</td>
+</tr>
+<tr>
+<td>550nm, IOR 1.4, metal 0.6, coat 0.7</td>
+<td align="right">0.1079%</td>
+<td align="right">0.1027%</td>
+<td align="right">0.1792%</td>
+<td align="right">0.1671%</td>
+</tr>
+</tbody></table></div>
+<p>거친 혼합 금속의 off 오차는 sun <strong>35.5239→0.0427%</strong>, furnace **19.6764→0.1638%**로 줄었다.
+박막 on RMS 최대는 **0.2050%**다. 공통 침식 mask 345픽셀, cosine <strong>0.57404&#126;0.99843</strong>,
+normal/view diagnostic 및 Blender 5.1.1 <code>b70da489d7f4</code> / Cycles CPU 1,024 samples / seed 0·11을 유지했다.
+낮은 cosine 구간의 rendered 이미지 수용이나 보편적인 JND 기준으로 확대하지 않는다.</p>
+<h2>회귀·캐시 계약</h2>
+<ul>
+<li>Scene host identity <strong>3→4</strong>. 이전 Scene shader product의 재사용을 막는다.</li>
+<li>IBL point <strong>176 byte</strong>, sample <strong>144 byte</strong>와 자원 바인딩 슬롯은 유지했다.
+모델 1의 <code>singleScatter</code>는 이제 보상된 반사 적분이다. 다시 multiple scatter를 더하지 않는다.</li>
+<li>강한 anisotropy에서는 등방성 E LUT가 근사다. prepared directional integral과 남은 diffuse
+budget에서 정규화해 직접광·IBL에 똑같이 적용한다. pixel shader에서 적분하지 않는다.</li>
+<li>alpha 상한 1을 Cycles와 맞췄다. 기존 white furnace 상한 <strong>1.005</strong>를 유지했다.</li>
+<li>RGB-3 / spectral / 0.1nm cutoff 수치 파일을 보존하고 버전 4 <code>numeric-golden-ggx.csv</code>를 별도 추가했다.
+CPU double oracle이 생성한 1,960/4,410행과 변경되지 않은 optical/profile 성분을 각각 검증한다.</li>
+<li>판정기 v2는 off의 실제 픽셀·독립 시드 지표도 재계산한다. film만 통과하고 off가 실패한
+중간 결과와 수정된 off metric을 거부하는 검사 2건을 통과했다.</li>
+</ul>
+<p>Native 최종 36장: <strong>597,673개 검사</strong>, GPU validation <strong>0건</strong>, 정상 종료.
+최종 raw 에너지 제한 보정 후 <code>Mat9Images-Release-ggx-budget-final</code>에서 재촬영했다.
+직전 판정의 36개 재질/제어 이미지와 3개 diagnostic, 총 <strong>39개 float 이미지의 SHA가 모두 동일</strong>했다.
+수치 테스트와 제품 회귀의 최종 증거는 아래 기록을 사용한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검증</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기존 Core/Layered 이미지 24장</td>
+<td>400,495개 검사, validation 0건, emission 제어 오차 0</td>
+</tr>
+<tr>
+<td>상수 재질 20조건</td>
+<td>동일 수치 목표 이내, RMS 최대 0.1999%, p95 최대 0.1958%, max 최대 0.8245%</td>
+</tr>
+<tr>
+<td>Layered</td>
+<td>216,776개 검사·5,712개 furnace 검사·14개 DXIL/SPIR-V 컴파일·8개 거부</td>
+</tr>
+<tr>
+<td>금속/유전체 불변식</td>
+<td>CPU 135개 검사</td>
+</tr>
+<tr>
+<td>순백 금속 에너지 budget</td>
+<td>4종·32시선·GPU 3,352개 검사, raw 에너지 초과 8시선 포함</td>
+</tr>
+<tr>
+<td>Special</td>
+<td>202,049개 검사·4,410개 furnace 검사·28개 컴파일·22개 거부</td>
+</tr>
+<tr>
+<td>IBL bake</td>
+<td>Debug/Release 각각 19,351개 검사·18,240 GPU 성분</td>
+</tr>
+<tr>
+<td>Surface batch</td>
+<td>Release 19,387개 검사·19,092 GPU 성분·8프레임</td>
+</tr>
+<tr>
+<td>Scene packet</td>
+<td>Debug/Release 각각 165개 검사·2개 in-flight 제출</td>
+</tr>
+<tr>
+<td>Scene raster·합성</td>
+<td>Release 21,067,374개 검사, shared depth·texture·generation·lookup reuse 포함</td>
+</tr>
+<tr>
+<td>Editor</td>
+<td>최신 shader resource를 포함한 Debug 전체 빌드</td>
+</tr>
+<tr>
+<td>계획/대시보드</td>
+<td>439행 full parse·유한 progress·Vite build</td>
+</tr>
+</tbody></table></div>
+<p><a href="MAT9GgxCoreComparison.json">기존 Core/Layered 비교 JSON</a>은 이미지 SHA와 독립 시드 변동을 기록한다.
+거친 Core sun RMS는 1.941%에서 0.0380%로 줄었다. 대조 contact sheet에서도 같은 조명/형상을
+확인했다. CPU golden과 GPU 일치만으로 이 rendered 판정을 대신하지 않았다.
+Shader 단일 적분을 미리 1로 clamp하면 direct 보상의 초과가 숨겨지므로 raw 적분을 보존한다.
+남은 에너지로 <strong>직접광·IBL을 같이</strong> 정규화하며, 순백 금속 회귀로 이를 확인했다.
+본 실행은 GPU validation을 켠 정확도 검사다. 로그의 lookup 시간은 성능 수용 자료로 사용하지 않는다.</p>
+<h2>재현과 남은 범위</h2>
+<pre><code class="language-powershell">Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label ggx-film-recheck `
+  -Reference Tools/blender/fixtures/material-thin-film-5.1.1 -ReferenceRepeat Build/Obj/Mat9FilmSweep-reference-11
+C:/Python313/python.exe Tools/regression/assess-thin-film-images.py `
+  Build/Obj/Mat9Images-Release-ggx-film-recheck/comparison.json Build/Obj/ggx-film-recheck.json
+</code></pre>
+<p>출력 폴더는 새 이름을 사용한다. 독립 seed-11 reference는 기존 fixed contract로 재생성할 수 있다.
+현재 shader를 포함한 실제 Scene 이동 카메라·cold/warm·tier 성능은 이번 이미지 검증으로
+수용하지 않는다. 원래 grid의 area-light/HDRI 조건, Special transport와 texture/normal-map 대조,
+Deferred/Forward route parity 및 실제 Scene 성능 판정이 남는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-결과--relative-rms"></span><span id="sec-원인과-변경"></span><span id="sec-재현과-남은-범위"></span><span id="sec-판정"></span><span id="sec-회귀캐시-계약"></span><span id="결과--relative-rms"></span><span id="원인과-변경"></span><span id="재현과-남은-범위"></span><span id="판정"></span><span id="회귀캐시-계약"></span></details></main></body></html>

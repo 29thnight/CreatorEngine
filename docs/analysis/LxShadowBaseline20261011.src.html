@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>LX 그림자 DX12 현재 빌드 회귀 기준선 (2026-10-11)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="LxShadowBaseline20261011.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/LxShadowBaseline20261011.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>LX 그림자 DX12 현재 빌드 회귀 기준선 (2026-10-11)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L8">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:8</a> — <code>bool EnhancedShadowPass::Initialize(const EnhancedFrameContext&amp; context, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L19">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:19</a> — <code>void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext&amp; context)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp#L63">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.cpp:63</a> — <code>if (math::length_sq(m_lightDirection) &lt; 1e-6f)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.h#L28">Engine/RuntimeHost/CommandCore/CommandSession.h:28</a> — <code>struct SessionEntry</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.h#L36">Engine/RuntimeHost/CommandCore/CommandSession.h:36</a> — <code>class CommandSession</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.h#L38">Engine/RuntimeHost/CommandCore/CommandSession.h:38</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L25">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:25</a> — <code>class EnhancedShadowPass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L27">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:27</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h#L36">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h:36</a> — <code>const char* GetName() const override { return &quot;Shadow&quot;; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.cpp#L25">Engine/RuntimeHost/CommandCore/CommandSession.cpp:25</a> — <code>CommandSession&amp; CommandSession::Batch()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.cpp#L31">Engine/RuntimeHost/CommandCore/CommandSession.cpp:31</a> — <code>void CommandSession::Record(std::string_view commandId, const CommandResult&amp; result)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/CommandCore/CommandSession.cpp#L35">Engine/RuntimeHost/CommandCore/CommandSession.cpp:35</a> — <code>entry.commandId = std::string(commandId);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>후속 목록 2번 완료.</strong> 현재 작업 트리에서 DX12 Debug/Release를 빌드하고 backOff 확장 제거 변이를 실행한 뒤, 원본 소스를 바이트 단위로 복구·재빌드하여 정상 회귀를 실행했다. Vulkan 실행·교차 비교는 <a href="../plans/BackendParityPlan.html">PHASE 4.9</a>에 남긴다.</p>
+<h2>판정</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th>Debug</th>
+<th>Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dx12.shadowquality</code></td>
+<td>통과</td>
+<td>통과</td>
+</tr>
+<tr>
+<td><code>dx12.skinning</code></td>
+<td>통과</td>
+<td>통과</td>
+</tr>
+<tr>
+<td><code>dx12.iblshade</code></td>
+<td>통과</td>
+<td>통과</td>
+</tr>
+<tr>
+<td><code>dx12.rendergraph</code></td>
+<td>통과</td>
+<td>통과</td>
+</tr>
+<tr>
+<td><code>dx12.scene</code></td>
+<td>통과</td>
+<td>통과</td>
+</tr>
+<tr>
+<td>backOff 확장 제거 변이</td>
+<td>먼 판 그림자 누락으로 예상 거부</td>
+<td>먼 판 그림자 누락으로 예상 거부</td>
+</tr>
+<tr>
+<td>GPU 검증 레이어</td>
+<td>GPU 모드 활성, 문제 0, 누락 메시지 0</td>
+<td>GPU 모드 활성, 문제 0, 누락 메시지 0</td>
+</tr>
+<tr>
+<td>정상 회귀 프로세스</td>
+<td>종료 코드 0, quit 성공</td>
+<td>종료 코드 0, quit 성공</td>
+</tr>
+</tbody></table></div>
+<p>정상·변이 네 실행 모두 실행 전후 소스·실행 파일 해시가 일치했다. 복구된 소스와 최종 Debug/Release 실행 파일도 정상 회귀의 해시와 다시 대조했다. 기존 작업 트리 변경은 보존했고, 문서 갱신 전 상태 비교에서 추가된 항목은 새 검증 스크립트뿐이었다.</p>
+<h2>확인한 동작과 범위</h2>
+<ul>
+<li>수직 광원 아래 판 높이 1823.7: 정상 코드는 깊이 범위 2270.1, 중앙 그늘 0 → 2622. backOff 제거 변이는 깊이 범위 729.5, 그늘 0 → 0으로 실패했다. Debug/Release 결과가 같다.</li>
+<li>스키닝 그림자: 첫 캐스케이드에서 맵 텍셀 45,856, 포즈에 따른 변화 40,762. 비어 있지 않음·포즈 변화의 검증이며 정확한 형상이나 3개 캐스케이드 전체 동치 수용은 아니다.</li>
+<li>장면: Suzanne 모델과 카메라·방향광을 배치하고 실제 렌더 준비 완료를 기다렸다. 두 구성 모두 드로우 1, 광원 1, 커버리지 276/65,536. <code>dx12.scene</code>은 내부적으로 최대 1,024개 드로우·여러 재질·순차/병렬 기록 회귀도 실행한다.</li>
+<li>렌더 그래프: RG5 sprite/screen/final 및 RG3/RG4 실행·픽셀 비교와 transient 재사용 검사가 통과했다.</li>
+<li>GPU validation ledger의 메시지 1건은 GPU-Based Validation 활성화 안내다. 문제 0건이며 메시지 전체가 0이라고 표현하지 않는다.</li>
+<li>두 정상 실행과 변이 실행의 stderr에는 <code>[profiler] shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]</code> 진단이 있다. GPU 검증 오류는 아니며, 이번 결과로 프로파일러 종료 진단까지 해결됐다고 주장하지 않는다.</li>
+<li>GPU 검증 레이어를 켠 기능 회귀다. 로그의 GPU/CPU 시간과 순차/병렬 배율을 일반 성능 수용에 사용하지 않는다.</li>
+<li>그림자 맵 3장의 indexed/meshlet 동치, 메시렛 누락 변이, 알파 마스크·변환·경계 확대 검증, 새 compute 생존 목록 비교는 다음 작업이다. 본 검사는 GPU readback을 메모리에서 판정하며, 경로 동치 검사용 3장 원본 깊이 캡처를 확보한 것은 아니다.</li>
+</ul>
+<h2>재현과 증거</h2>
+<p>반복 실행 스크립트: verify-lx-shadow-baseline.ps1 (<code>../../Tools/regression/verify-lx-shadow-baseline.ps1</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조). 현재 Editor를 먼저 빌드하고 구성, 작은 fixture 프로젝트, 새로운 출력 폴더를 지정한다. 스크립트는 프로젝트를 복사하고 현행 셰이더·입력 manifest·소스/binary 해시·명령 결과·stdout/stderr·판정을 보관한다. 변이 옵션은 별도로 빌드한 backOff 제거 실행 파일에서만 사용한다.</p>
+<p>아티팩트 용량 검사를 통과한 뒤 약 12 MB의 fixture를 복사했다. 시작 여유 공간은 약 179 GiB였다. 원본 fixture와 사용자 자산을 수정하지 않았으며, 이 변이 실행은 픽셀 payload 복사본을 만들지 않았다. 성공 보존 ledger와 로그·해시는 유지한다.</p>
+<ul>
+<li><p>Mutant-Debug: 판정 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/reviewed-verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/results.jsonl</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Debug/identity-before.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+</li>
+<li><p>Mutant-Release: 판정 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/results.jsonl</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Mutant-Release/identity-before.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+</li>
+<li><p>Normal-Debug: 판정 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/results.jsonl</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Debug/identity-before.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+</li>
+<li><p>Normal-Release: 판정 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/verdict.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령 결과 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/results.jsonl</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 신원 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/Normal-Release/identity-before.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+</li>
+<li><p>최종 재검토 집계 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/reviewed-overall.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 소스 복구 확인 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/restoration.json</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행·빌드 기록 (<code>../../Build/Verification/ShadowBaseline-20261011T142012Z/orchestration.log</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</p>
+</li>
+<li><p>Debug 변이의 최초 harness는 실패 종료 코드를 0/1로 잘못 예상했다. 실제 명령은 의도한 이유로 실패하고 정상 종료했으며 <code>CommandSession::ExitCodeFor(Failed)</code> 계약은 4다. 스크립트를 수정하고 원본 결과·최초 판정·최초 집계를 보존한 채 <code>reviewed-verdict.json</code>과 <code>reviewed-overall.json</code>에서 재판정했다. Release 변이와 두 정상 회귀는 수정된 스크립트로 통과했다.</p>
+</li>
+</ul>
+<p>최종 정상 runtime SHA-256:</p>
+<ul>
+<li>Debug: <code>A0A57F115873729F8D316A36D82A8C2DE44A683A33FBACD46BC55C2CF30439FD</code></li>
+<li>Release: <code>DC9C0E79FCA4E3ED7B17A1A936847D36A07FC60B50F3C2BECAC71EB78F2D9162</code></li>
+<li>복구된 <code>EnhancedShadowPass.cpp</code>: <code>A75EB1D2C8F41EA226BC04F8F2686BBE4F5DB188D1177DAC309B7C418FD21625</code></li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-재현과-증거"></span><span id="sec-판정"></span><span id="sec-확인한-동작과-범위"></span><span id="재현과-증거"></span><span id="판정"></span><span id="확인한-동작과-범위"></span></details></main></body></html>

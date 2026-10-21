@@ -1,5 +1,32 @@
 # RG5-2 실행 순서 정책 분리 — 2026-10-03 검증 완료
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-03 RGOrderPolicy를 선언/버전 모드와 별도 생성 인자로 추가했다. ExplicitVersioned의 Write/Modify·RAW/WAR/WAW·컬링 계약은 그대로 사용하며 DependencyOrder 또는 PreserveDeclarationOrder를 선택한다. 후자는 동일한 live DAG를 검증하고 살아 있는 역방향 의존성이 있으면 컴파일을 거부한다. legacy DeclarationOrder 제품 기본은 이번 묶음에서 전환하지 않는다.
 
 검사는 동일한 버전 RAW 그래프의 정방향/역방향 선언 × 두 정책을 검사한다. DependencyOrder는 역방향 선언을 재정렬해야 하고 PreserveDeclarationOrder는 이를 거부해야 한다. 기존 GBuffer·Shadow 실제 Declare 검사와 함께 실행한다.
@@ -10,3 +37,5 @@ Debug/Release 빌드는 Build/rg5-order-Debug-build.log 및 Build/rg5-order-Rele
 이번 검증은 native 계획·GPU fixture이며 제품 전체 장면 이미지 대조를 새로 수행하지 않았다. 이전 RG5-1의 phaseComplete는 변경 전 해시에 대한 증거로 보존한다. 현행 전체 프레임 기준선 갱신과 제품 GPU 수용은 후속 이관 게이트로 남는다. RG5-2 정책 분리 묶음은 완료지만 RG5 전체 완료는 아니다.
 
 후속 RG5-3의 현행 기준선 갱신은 [소비 체인 기록](RenderRg5ConsumerMigration.md)을 따른다. 위 미갱신 표기는 RG5-2 완료 당시 상태다.
+
+</details>

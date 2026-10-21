@@ -1,5 +1,32 @@
 # RG5-5 Forward+ 타일 버퍼·Code 색상 스트림 — 2026-10-03 검증 완료
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Forward+.Cull의 imported tile count/list에 Write/v1을, depth 및 Shade 소비자에 Read를 연결했다. 자체 색상이면 Clear가 Write/v0을 초기화하고 Code 배치마다 Modify/ReadWrite로 다음 색상 버전을 만든다. 기존 lighting이면 그 버전에서 바로 Modify를 시작한다. 각 Clear/Shade callback은 해당 패스의 출력 handle을 값으로 캡처해 최종 멤버 handle을 공유하지 않는다.
 
 선언 검사는 실제 Forward Initialize/PrepareFrame 후 합성된 세 Code draw 순서를 사용한다. Compile 계획만 검사하며 합성 draw를 GPU에서 실행하지 않는다. 두 정책 × 자체/입력 색상 경로에서 tile 두 개 Write/v1, 색상 세 배치 ReadWrite/v1→v2→v3와 출력 v3을 확인한다. 실제 제품 장면 회귀는 별도 수행한다.
@@ -13,3 +40,5 @@ Debug native-v1은 검사에서 프레임 기록을 열지 않아 Forward 업로
 현행 기준선은 Build/Obj/RenderRG5ForwardCode/{Debug,Release}-regression-v1/result.json이다. 각각 두 프로세스 × 두 캡처 모두 통과했고 실패 0·exitCode=0이다. RG5-4 대비 변경 전후와 현행 Debug/Release 구성 간 비교는 각각 16개 이미지 maxError=0·exceededPixels=0이며 입력·전체 그래프 해시가 일치한다. current-baseline-phase-complete-v1.json은 현행 소스·바이너리 해시 확인 후 phaseComplete=true다.
 
 rg5-forward-code-completion-v1.json은 sliceComplete=true, rg5Complete=false, versionedProductGpuAcceptance=false다. Code 경로의 버전 선언 계획 검사와 제품 기본 DeclarationOrder 화면 회귀를 구분한다. 다음은 SceneHost/Lookup/Refraction/Subsurface/Volume의 소유 핸들 전달, DeclareBlended의 갱신 색상 반환 및 실제 혼합 Code/Graph GPU 검증이다. 해당 수용 후 이번 guard를 제거한다. RG5 전체 기성은 0을 유지한다.
+
+</details>

@@ -1,5 +1,41 @@
 # CreatorEngine 문서
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+- 구 SRP 및 C# pipeline 저작 전환 제안은 취소됐다. 필요한 Pass는 현재 C++ 계약으로 작성하며, 별도 저작 체계는 실제 요구가 생기면 새 미래 계획으로 검토한다. 아래 원래 제안은 활성 계획이 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Physics.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13) — `public struct PhysicsHit`
+- [ScriptCore/Physics.cs:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41) — `public readonly struct PhysicsQueryRequest`
+- [ScriptCore/Physics.cs:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65) — `public readonly struct PhysicsBatchResult`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86) — `own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};`
+- [Engine/SceneRuntime/Animator.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};`
+- [Engine/SceneRuntime/Animator.cpp:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L26) — `Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}`
+- [Engine/SceneRuntime/Animator.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L28) — `AnimInstance& Animator::GetInstance() noexcept`
+- [Engine/SceneRuntime/Animator.cpp:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L31) — `::ce::contracts::assert_that(`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 엔지니어링 문서 트리. 루트에 흩어져 있던 30개 문서를 2026-08-17에 여기로 옮겼다.
 
 - **[TechnicalGuide.md](TechnicalGuide.md)** — 커밋된 master 기준의 기술설명서.
@@ -31,7 +67,6 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [BlenderMaterialGraphPlan.md](plans/BlenderMaterialGraphPlan.md) | PHASE 4.25 · MAT-0 완료 — Blender 5.1.1 재질 기준 장면과 선형 HDR golden 고정. Principled ABI와 Material Graph 제품 작업은 후속. |
 | [RenderPhaseRoadmap.md](plans/RenderPhaseRoadmap.md) | PHASE 4 계열 · 정본 — DAG 우선 순서, 분리 완료선, 현재 공수 원장. |
 | [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.3 · RG — 공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환. |
-| [CSharpRenderPipelinePlan.md](plans/CSharpRenderPipelinePlan.md) | PHASE 4.6 · CSRP — C# 저작·불변 IR·native Pass 연결. 공수 미산정. |
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.7 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
 | [RendererQualityPlan.md](plans/RendererQualityPlan.md) | PHASE 4.75 · RND — probe/AO·shadow·display/post의 독립 품질 게이트. |
 | [GpuFeaturePlanningPlan.md](plans/GpuFeaturePlanningPlan.md) | PHASE 4.8 · GPU — GPU-driven·확률 조명·DXR 설계 및 구현 공수 확정. |
@@ -62,7 +97,6 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 
 이전 PHASE 4 계열 원장과 Asset-first SRP 판단은
 [Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md),
-[ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md)에 이력으로 보존한다.
 
 ## plans/archive/
 
@@ -76,7 +110,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 
 | 문서 | 대상 |
 |---|---|
-| [RenderPipelineTargetArchitecture.md](design/RenderPipelineTargetArchitecture.md) | C# `Build()` 저작·불변 IR·기존 C++ Pass 실행의 현재 설계 정본 |
+| [RenderPipelineTargetArchitecture.md](design/RenderPipelineTargetArchitecture.md) | 기존 C++ Pass·LivePipelineDesc·RenderGraph 실행 경계. SRP/C# 저작 전환 취소 반영 |
 | [LatticeNodeSystem.md](design/LatticeNodeSystem.md) | Lattice(LX) 공통 그래프 계약·편집 UI 초안과 [화면 와이어프레임](design/LatticeEditorWireframe.svg) |
 | [EngineVersionPolicy.md](design/EngineVersionPolicy.md) | 확정 — 제품 세대·기능 릴리스·네 자리 엔진 빌드·API 계약·채널. 적용은 PHASE 23 DL5·DL6·DL10 |
 | [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | `ce::dynamic_array` — 자체 컨테이너 설계와 기각 근거 |
@@ -112,3 +146,5 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 - **측정**이면 `analysis/`. 측정 시점을 명시하고 이후 갱신하지 않는다.
 - 어느 쪽이든 **틀린 것으로 드러난 판단은 지우지 말고 정정 이력으로 남긴다.**
   이 저장소의 관례이며, 실제로 그 기록이 재실수를 막았다.
+
+</details>

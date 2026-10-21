@@ -1,5 +1,47 @@
 # RG8 실제 큐 기록·제출 연결 — 2026-10-09
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-rg8-live-queues.ps1:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L3) — `[ValidateSet('Debug','Release')][string]$Configuration = 'Debug',`
+- [Tools/regression/verify-rg8-live-queues.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L13) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-rg8-live-queues.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L14) — `$out = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:142](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L142) — `bool EndFrame(std::string& outError) override;`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:172](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L172) — `bool JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError);`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:236](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L236) — `uint32_t DrainDebugMessages(std::string& outMessages) override;`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78) — `enum class RGMeasurementDomain : uint8_t { Normal, Capture };`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79) — `enum class RGQueueFallbackReason : uint8_t`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108) — `enum class RGQueuePlacement : uint8_t`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L5) — `[ValidateSet('Debug','Release')][string]$Config = 'Debug',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:359](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L359) — `std::printf("[DX12 검증] DebugLayer=%s GPUValidation=%s DRED=%s BreakOnError=%s\n",`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1229](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1229) — `bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError)`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1272](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1272) — `bool DX12DeviceResources::JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError)`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34) — `std::free(value);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L43) — `const auto path = prefix + "." + std::to_string(++serial);`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L67) — `std::copy_n(source.data(), source.size(), destination.data());`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **후속 구조 감사 우선:** [RG7·RG8 상세 감사](RenderRg7Rg8StructuralAudit20261009.md)에 따라 RG8 제품 완료 판정을 철회하고 progress·기성 0으로 되돌렸다. 아래 실행/정확성 증거는 보존하되 다음의 최종 종료 문구는 현재 상태가 아니다.
 
 **같은 날 최종 종료:** [RG8 종료·기본 OFF 판정](RenderRg8Closure20261009.md)의 Release 1496×692 336출력·일반 GPU 192프레임·연속 메모리 비교와 최신 Release 전체 회귀로 기존 채택 판정을 마쳤다. RG8 done·기성 16이며 성능 개선 미입증으로 기본 OFF를 유지한다. 아래 진행 문구는 최종 측정 전 이력이다.
@@ -122,3 +164,5 @@ SubmitQueues의 기록 시간은 native queue admission과 분리하여 CPU 기�
 이번 제품 OFF/ON은 기존 기본 경로(0)와 compute 파일럿(2)의 정확성 비교다. owned graphics(1)도 유지하므로 후속 성능 분석에서 1↔2의 큐 분산 효과와 0 대비 실행 구조 전환 비용을 구분한다.
 
 SSAO 파일럿의 제품 compute 소비와 큐별 계측 연결을 수용한다. 332×182 제어 출력 검사를 전체 해상도·GPU critical path 개선·peak memory 채택 판정으로 확대하지 않는다. 남은 작업은 기존 3단계 제품 비교와 채택 판정이며 RG8 진행·기성 0·기본 OFF, RG7/Q0 완료를 유지한다.
+
+</details>

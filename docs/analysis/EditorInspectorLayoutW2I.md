@@ -1,5 +1,51 @@
 # W2-I0 — 인스펙터 배치 실측과 공통 계약
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Entity.h:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L90) — `void AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex);`
+- [Engine/SceneRuntime/Entity.h:297](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L297) — `bool HasTransform() const { return nullptr != m_pTransformComponent; }`
+- [Engine/SceneRuntime/Entity.h:301](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L301) — `static Transform& MissingTransformFallback(const Entity* who);`
+- [Engine/SceneRuntime/LightComponent.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L19) — `class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent, Component>`
+- [Engine/SceneRuntime/LightComponent.h:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L94) — `const auto& position = m_pOwner->Transform_().GetPositionValue();`
+- [Engine/SceneRuntime/LightComponent.h:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L96) — `math::vector3{ position.x, position.y, position.z },`
+- [Engine/SceneRuntime/CameraComponent.h:59](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/CameraComponent.h#L59) — `const auto& position = m_pOwner->Transform_().GetPositionValue();`
+- [Engine/SceneRuntime/CameraComponent.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/CameraComponent.h#L71) — `resolved.m_eyePosition = m_pOwner->Transform_().GetWorldPosition();`
+- [Engine/SceneRuntime/CameraComponent.h:72](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/CameraComponent.h#L72) — `const math::quaternion rotation = math::normalize(`
+- [Editor/EngineGUIWindow/ICustomEditor.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L6) — `virtual ~ICustomEditor() = default;`
+- [Editor/EngineGUIWindow/ICustomEditor.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L8) — `virtual void OnInspectorGUI() = 0;`
+- [Engine/SceneRuntime/RegisterReflectManual.h:185](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L185) — `failures += "\n  " + std::string(type.name()) + (type.is_serializable() ? "" : " [쓰기 불가]")`
+- [Engine/SceneRuntime/RegisterReflectManual.h:191](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L191) — `failures += " " + std::string(field.name()) + "(" + std::string(field.type_name()) + ")";`
+- [Engine/SceneRuntime/RegisterReflectManual.h:204](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L204) — `Debug::PrintLog(spdlog::level::critical, "reflgen 서술자가 쓰거나 읽지 못하는 타입(필드의 serializer 가 등록 함수에"`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:186](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L186) — `ImGui::CalcTextSize(label).x), state);`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:460](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L460) — `ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);`
+- [Editor/EngineGUIWindow/ReflectionTypedDraw.h:940](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L940) — `ImGui::Text("%s: nullptr [For GUI Debug]", name);`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L126) — `if (nullptr == address) throw std::invalid_argument("method '" + std::string(method.name()) + "': argument is not set");`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:145](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L145) — `: ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);`
+- [Editor/EngineGUIWindow/ReflectionImGuiHelper.h:146](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L146) — `ImGui::PushStyleColor(ImGuiCol_Text, color);`
+- [Engine/SceneRuntime/Entity.cpp:165](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L165) — `void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex)`
+- [Engine/SceneRuntime/Entity.cpp:451](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L451) — `Transform& Entity::MissingTransformFallback(const Entity* who)`
+- [Engine/SceneRuntime/Entity.cpp:460](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L460) — `"Transform requested on UI Entity '" + who->m_name.ToString()`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 작성: 2026-09-12
 - 2026-09-13 상태 정정: I0는 완료. 아래는 착수 당시 실측과 추가 범위 제안이며 §5의 9일안은 현재 채택 견적이 아니다. 정본은 [최신 완료·잔여](../plans/EditorWorkspaceRedesignPlan.md#phase21-current-status)의 W2-I 6일·I0 완료 공수 0.5일을 따른다. 현재 외관은 사용자 승인으로 고정했다.
 - 대상: `docs/plans/EditorWorkspaceRedesignPlan.md` 의 [W2-I](../plans/EditorWorkspaceRedesignPlan.md#w2-inspector-layout)
@@ -322,3 +368,5 @@ I1 부터는 `InspectorWindow.cpp`·`ReflectionTypedDraw.h`·`ImGuiDrawHelper*.c
 이 글을 쓰는 시점에 **다른 세션이 그 파일들을 미커밋으로 들고 있다**(아이콘을 Material Symbols
 로 바꾸는 작업, 작업 트리에 64개 파일). 같은 파일을 두 세션이 동시에 고치면 한쪽이 사라진다.
 I0 은 새 파일 하나라 충돌하지 않지만, I1 착수는 그 세션이 커밋한 뒤로 미룬다.
+
+</details>

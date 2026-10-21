@@ -1,5 +1,34 @@
 # LX 그림자 3개 캐스케이드 경로 동치 (2026-10-12)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 후속 목록 3번의 검증기를 `dx12.skinning`의 선택 실행 모드에 추가했다. 제품의 SceneHost 그림자 경로에서 동일한 합성 메시 두 개(스킨드·비스킨드)를 indexed와 meshlet로 각각 렌더링한다. 바인드 포즈·본 이동 포즈 각각에서 2048×2048 D32Float 캐스케이드 3장을 비교한다.
 
 ## 판정 조건
@@ -38,10 +67,10 @@
 
 Release는 구성과 출력 디렉터리를 변경한다. 스크립트는 용량 하한 30GiB 검사 후 격리된 프로젝트·설정으로 `dx12.skinning`, `dx12.validation`, `quit`을 실행한다. 성공 구성별 대표 원본을 보존하고 retention 기록을 남긴다.
 
-- [검증 스크립트](../../Tools/regression/verify-lx-shadow-baseline.ps1)
-- [Debug 판정](../../Build/Verification/ShadowEquivalence-20261012/Debug/verdict.json), [동치 상세](../../Build/Verification/ShadowEquivalence-20261012/Debug/equivalence.json), [원본 해시](../../Build/Verification/ShadowEquivalence-20261012/Debug/capture-manifest.json), [명령별 결과](../../Build/Verification/ShadowEquivalence-20261012/Debug/results.jsonl)
-- [Release 판정](../../Build/Verification/ShadowEquivalence-20261012/Release-Final/verdict.json), [동치 상세](../../Build/Verification/ShadowEquivalence-20261012/Release-Final/equivalence.json), [원본 해시](../../Build/Verification/ShadowEquivalence-20261012/Release-Final/capture-manifest.json), [명령별 결과](../../Build/Verification/ShadowEquivalence-20261012/Release-Final/results.jsonl)
-- [Debug 빌드](../../Build/Verification/ShadowEquivalence-20261012/build-Debug-final.log), [Release 빌드](../../Build/Verification/ShadowEquivalence-20261012/build-Release-final.log)
+- 검증 스크립트 (`../../Tools/regression/verify-lx-shadow-baseline.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)
+- Debug 판정 (`../../Build/Verification/ShadowEquivalence-20261012/Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 동치 상세 (`../../Build/Verification/ShadowEquivalence-20261012/Debug/equivalence.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 원본 해시 (`../../Build/Verification/ShadowEquivalence-20261012/Debug/capture-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령별 결과 (`../../Build/Verification/ShadowEquivalence-20261012/Debug/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 판정 (`../../Build/Verification/ShadowEquivalence-20261012/Release-Final/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 동치 상세 (`../../Build/Verification/ShadowEquivalence-20261012/Release-Final/equivalence.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 원본 해시 (`../../Build/Verification/ShadowEquivalence-20261012/Release-Final/capture-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령별 결과 (`../../Build/Verification/ShadowEquivalence-20261012/Release-Final/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 빌드 (`../../Build/Verification/ShadowEquivalence-20261012/build-Debug-final.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Release 빌드 (`../../Build/Verification/ShadowEquivalence-20261012/build-Release-final.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 원본은 각 실행의 `captures/`에 `{indexed,meshlet}-{bind,posed}-C{0,1,2}.f32`로 남긴다. little-endian float32, 행 우선, 2048×2048, 파일당 16MiB다. `.matrix`는 같은 캐스케이드의 4×4 float32 행렬 64바이트다. 구성당 깊이 파일 12개(192MiB)를 보존한다.
 
@@ -56,3 +85,5 @@ Release 빌드가 링크 중일 때 첫 실행 준비에서 DLL 해시 읽기가
 Debug/Release stderr의 기존 `[profiler] shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]` 진단은 해결 범위 밖이다. 이번 동치 검사로 프로파일러 종료 진단이 해결되었다고 주장하지 않는다.
 
 검증 runtime SHA256: Debug `2CF091C5D899D8FE756556485C81F02FD0444128B4E0342F9E82100344FE9792`, Release `50A676E2A52599D9008A06240D9BE3DB89AE760E20671E9D7270D0DF75134F2A`. 전체 소스·exe·runtime 해시는 각 실행의 `identity-before.json`과 `identity-after.json`에 남겼다.
+
+</details>

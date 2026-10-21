@@ -1,0 +1,2610 @@
+{
+  "master": "27de3f5a02aadde7456aab680db3184c36ee735e",
+  "status": "PASS",
+  "updatedMarkdownDocuments": 316,
+  "standaloneReports": 14,
+  "apiPages": 31,
+  "apiMembers": 224,
+  "documentationFilesInspected": 971,
+  "localLinksInspected": 6088,
+  "brokenLinks": [],
+  "originalReportedMissingLinks": 732,
+  "sourceFilesVerified": 648,
+  "sourceCitationsVerified": 4182,
+  "visualPagesVerified": 320,
+  "dashboardPreserved": true,
+  "problems": [],
+  "historicalMasterDocumentSnapshotsVerified": 250,
+  "apiBrowserVerification": {
+    "pages": 31,
+    "members": 224,
+    "legacyAliasPassed": true,
+    "failures": [],
+    "errors": []
+  },
+  "inlineScriptVerification": {
+    "pages": 655,
+    "scripts": 335,
+    "failures": []
+  },
+  "documentationSiteBuild": "PASS",
+  "deploymentVerification": {
+    "filesCompared": 1529,
+    "deployedLocalLinksInspected": 2504,
+    "status": "PASS",
+    "problems": []
+  },
+  "reported732LinkOutcomes": {
+    "redirected": 8,
+    "link removed; original path retained as historical text": 723,
+    "not a hyperlink": 1
+  },
+  "visualEvidence": [
+    {
+      "file": "docs/plans/archive/BehaviorTreeManagedPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5c09510c656b6fd339902bef3d56f281b96627016f2152c6148f1485fcfb96f2",
+      "htmlSha256": "533178c6aeb68ccdd72af65751d17bf42821e7d6711cfc3db5e76da7cba6ef53"
+    },
+    {
+      "file": "docs/plans/AnimationSchedulerPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5539c3ea5ba8b215ffd641530ba825589e31a2361c8b45279778c1426975b456",
+      "htmlSha256": "b47aa17d0cdadf490b65beb97282bcd76fd280142ceb45346df26ad896f29da9"
+    },
+    {
+      "file": "docs/plans/archive/AssetResidencyPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "66eee0e27021828e349c0144e145ce239d443b84ce62c2a08ce09ba1861c8bad",
+      "htmlSha256": "d229d6afaad65596b4470f0c327b517dd091ccd1ee5e1a76b968511eda2dd84d"
+    },
+    {
+      "file": "docs/plans/archive/LifecycleRedesignPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "09ade19809bb7f9685fc0eec0532e8f0ec3cb45b645084bbb6607441eb41b73d",
+      "htmlSha256": "7ceca6b02e41141f5e178cff6233c099aaeda12de2be93c80044b5a7cbe7f934"
+    },
+    {
+      "file": "docs/plans/archive/MaterialPipelinePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "46facf6f566bf869beca4982e6f18d5b1927160b6748f571494b0703e6ec609b",
+      "htmlSha256": "ded6238e530b74eb980be899597c299c277ac97efbab8ec8dad829e5afc00b86"
+    },
+    {
+      "file": "docs/plans/archive/LivePipelineDescPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4f66761c12cd7136484c88640f30cb5b7b3c7f52b94d5ec5d056dfdd43fc7c9a",
+      "htmlSha256": "f5e7d7f064cb0fb85a5292dd4beea6926c99d863b265aa603d75c920a8d8eadd"
+    },
+    {
+      "file": "docs/plans/archive/ModelImportPipelinePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "72883025380149a98a70aea4eb5cb19b36891edd20c84ecbe3d06e567dc3c70b",
+      "htmlSha256": "84268a1f5c59a8424c45fab663fb84643adaa1fba2cb15941096e7afdbd44814"
+    },
+    {
+      "file": "docs/plans/archive/ModelAssetBigBangCutoverBaseline.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5e30d96c29d0b2092f4bca5921534a1b123c0340b20cb502c0cf5a120d667c91",
+      "htmlSha256": "9d5dbf5682b75fcd838480c0e9b27cf25d5024c94e3db55428edc68203291a5d"
+    },
+    {
+      "file": "docs/plans/archive/ModelAssetBigBangCutoverPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7ba532358863cd678f124228791607687a2a64e71060c9f18a064ca967e9bd6b",
+      "htmlSha256": "4e12a610325ac750fa2d30c6a13d57f0e30193b6e87c488c8ca0409e179f1283"
+    },
+    {
+      "file": "docs/plans/archive/Phase425ImplementationHistory.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9f4f4467014a3903ebaa8144602208cf10f1d56a6b007248c70229547cfe091a",
+      "htmlSha256": "30f08e89f34fe883a91b2f253f4993fb8a405a3bb4d7020fad59bff1115b44e6"
+    },
+    {
+      "file": "docs/plans/archive/MultiCameraRenderPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "958ad65564125e1c5443f47d534dc38b0428e5426ad6a878ef9a3281e4363b1f",
+      "htmlSha256": "61a61e0607ce7b17fb6f7781874896c59cd25d99c8ad6740d1ec514a510c8350"
+    },
+    {
+      "file": "docs/plans/archive/Phase5CouplingPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2a4ace061ef49b8dffddd3a7224eb02417b52c642f6aaa307cf14f1ea467ef9d",
+      "htmlSha256": "18b2c6032bd9293a1bb98aa6e33d6ae3ff0a887f2889bd65b9123c9d08784177"
+    },
+    {
+      "file": "docs/plans/archive/README.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "74ad395886dd28eb816218ade53ed3c23219545cc82b87de8ed772e15169af26",
+      "htmlSha256": "6e174a38fd7a2b6249e5b2e39866cca61bd81ba8e9a01949617da89f34e72284"
+    },
+    {
+      "file": "docs/plans/archive/RenderSceneViewPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8fca716e13610f6133a4a25a5d2691c815b8933ff111d6765cd9df71cf093c58",
+      "htmlSha256": "4b2f3dcc89288ffb48b23e3bac713cc4600e304a4916e2b1264f582ec0821cd6"
+    },
+    {
+      "file": "docs/plans/archive/ReflectionRedesignPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4721721ce52c6279931d7fdca23ec6abd4434fc59f10a5e19c7f79fb9d381485",
+      "htmlSha256": "f8da422e04991fba971220bd2d145ba640e1617de56d5a06dd967eae49f69733"
+    },
+    {
+      "file": "docs/plans/archive/RhiBoundaryPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "47164213d5ec6aa50fdf0f697cf60f4005e545806e6f8e43b4a265da5ae18021",
+      "htmlSha256": "3e2a8e5f0313d6086cdcb62471005016400a2bf24f52f5d2058840900074631e"
+    },
+    {
+      "file": "docs/plans/archive/SceneGraphRedesignPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ddae71cdc04ae2e34df8b6cd03d25df6c6102672d63616aae24f47a8e8f9cd40",
+      "htmlSha256": "af5c2b51d844ca27699739188509bcaf568b269da01e769d4be7aff450a8e338"
+    },
+    {
+      "file": "docs/plans/archive/ScriptApiMigrationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e38e70d6841b24ab0ab3b05badaafd361e5e59d8896122b8ac7c5ecd47835665",
+      "htmlSha256": "78821b8eefab1e6539cc22cf81f88f99c45813303c9c95e1763ec791442b39c9"
+    },
+    {
+      "file": "docs/plans/archive/ScriptLifecycleContractHardeningPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8fe9576e7923827077af2048e3f14f1b6edc07e3f4c13b4e96f92bb09b977007",
+      "htmlSha256": "cb505c3a0a4e4d77e8bed83127c8ad07d88324e2de53e12b6ac956ae2be3cdf8"
+    },
+    {
+      "file": "docs/plans/archive/TransformUpdatePipeline.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d6de10c61cb4a9bf4a242c20ea6585d24d11d36c2f79717eaa28acc0e5f30904",
+      "htmlSha256": "1a8e81dde0bd288600132a2aa8ed6fab320ce063614cf2f5c8e685473f5093cb"
+    },
+    {
+      "file": "docs/plans/archive/TransformExecutionGraphPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7ca0e5c4f79d2cfd62f6d1ddf3af63edbff30cc52f198a0c075828df8dd59ba5",
+      "htmlSha256": "4e34521f424dfc8c2cd1e68f7a96d700d3cbf1b9811e2415ac1b2a5f674bf7f6"
+    },
+    {
+      "file": "docs/plans/archive/TransformUpdatePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "51c8c4ac1652011065899268e9b4e4bc1e6a744c94adc7deceb487ff78cd92df",
+      "htmlSha256": "1a689c9969376c2696cb6b3961b9d579598b433fe4f31ccdd392a8aed049a755"
+    },
+    {
+      "file": "docs/plans/AssetDepotImplementationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5b9b0b4d302822208c37addf3009c2c88b6ce557d865c63a0d9e1f20b51d9650",
+      "htmlSha256": "eb53ea8181641da959f6bfb89edb339777154727fdae9ca0c5f5624f51aaafd9"
+    },
+    {
+      "file": "docs/plans/AudioBackendModernizationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4ddad7d4039558ef29baa796e9f998f438af194db41e70ab8548b22af8b53ef9",
+      "htmlSha256": "40ed03e7db80e382feccb89b9168cb1421f27d6291165278caa8e7ec2b00125b"
+    },
+    {
+      "file": "docs/plans/BackendParityPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "55b69b781cc62b4d39225770d43b0730a0b501587eab6d5dba3b2a93cca58103",
+      "htmlSha256": "1bdc1ef4f967a90c9ba114040c4913b9c9b59201c3d5ed1945404000f76e2f77"
+    },
+    {
+      "file": "docs/plans/BlenderMaterialGraphPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4e9c2066b2aa7e7ecb25920d350af6420eb942a00041bfe257e4afd3f12f5cb5",
+      "htmlSha256": "d675451067610209d60a2ddb1fbff0bc5993611a423d82662676435004e71673"
+    },
+    {
+      "file": "docs/plans/BuildPipelinePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a08fd6a7d5cb9b417a86f0f891042a115386bc65aab2faf4c929e362889179ea",
+      "htmlSha256": "cdd157144c1a8020ef19303c74c8035a291d6c1b6fbbbaeb01549ca5e200149c"
+    },
+    {
+      "file": "docs/plans/DxrShaderTraversalExperimentPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ed55c5635503079ac3664ab52b231fd29f8d29ed041a0e7c0a6a491d36ef017b",
+      "htmlSha256": "9193fd26d8bfe02eb713d02f9c107fd65c8fd7c6a2da5c79d569dc69e4aa87a2"
+    },
+    {
+      "file": "docs/plans/EditorAutomationCLIPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d0769802ba635472d903fdd7211d77d36f1b3db06c97407f52a9beb2536e962e",
+      "htmlSha256": "9b4d30091902c2ce5c23fd17d930c69634b2b50b1f6d123f0eba15524793176b"
+    },
+    {
+      "file": "docs/plans/EditorRenderingSurfacesPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9b962b0a81694a78691b1a2798e59bc311c8d056f09ff3e9bd887bdf98b33276",
+      "htmlSha256": "4057da469edbdaf602ad2fb923999c6933b4974999116dac3489f783b3b5deb2"
+    },
+    {
+      "file": "docs/plans/EditorWorkspaceRedesignPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ec2e8bfea4dc53779088dcb67fe93efa1198045dedc99fd18f82c4727c1afbe1",
+      "htmlSha256": "50ab06aea0c0a0c532e2643c4ba104db96819155b3d76b15f989aa63b6006f71"
+    },
+    {
+      "file": "docs/plans/EngineFeatureDemoPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ecddf3b174dd0b0839751edd66a683ecba19606b92b75c56ecbeb9bced5d7f88",
+      "htmlSha256": "3a1cd97d5ce41102ec707134a65c14204b2cce607549aade220f8a0a3e98c1d3"
+    },
+    {
+      "file": "docs/plans/EngineDistributionAndLauncherPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "00336516fde3a8e2c35cce6e1b47294d72ab2280956c9041a6b7648c1f3af6c0",
+      "htmlSha256": "f8614fe1b003fcb915c4e65e8f657a9bce0e7b067395b4a000523e5c17cf35ac"
+    },
+    {
+      "file": "docs/plans/EngineLayerSeparationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d73490ab3d7645f79f224418060eb222d8affe86e39be291da951e6cf114ebbe",
+      "htmlSha256": "8181a1778c2fe360cb44b1691400d238a97125ea7338184d3436beae0e73951e"
+    },
+    {
+      "file": "docs/plans/EnvironmentRenderingPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e78915e319f0917a4279cd19ecbec6b8f78610f8ca795b0194e3a0664ae48118",
+      "htmlSha256": "cedc2638eed97d49a17455e563d34d13030f81790d24cc327cbdff23b0b4a11d"
+    },
+    {
+      "file": "docs/plans/EnginePackagingPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "76d547d3b8e032bbd533c918401215c2dbe75b28c7af67ee0721faf4571c03f5",
+      "htmlSha256": "2900b9df86ff7ce852fd8166ed11ff070dac6c4ab4e039c1c38560d67a0a3b68"
+    },
+    {
+      "file": "docs/plans/GpuDrivenGeometryImplementationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "35a20c1ca6ededa39d48a867e913efb0f3f5fdf33a38a4c7c2fff667fcc62b53",
+      "htmlSha256": "e27a3f20f08778b9dbf0f7376710934fcaa8a0629c4d57915061354231090153"
+    },
+    {
+      "file": "docs/plans/LatticeAdoptionPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2ef40b9dc1e99f4048b790bf5bc3ebcd5351498231d385a3f3f66a19004bbe15",
+      "htmlSha256": "000dd68d01bff6774b91256f42b8ef9d675df569ce2beae7fcd2f13c437c0a40"
+    },
+    {
+      "file": "docs/plans/GpuFeaturePlanningPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "021576850de6e238e11398d44196f0d30eb93030a56c50f0cbafafd35acf7ec7",
+      "htmlSha256": "ec77789213b25f1e74f1bc435543c720ea4018d7aa1a7603cf24bdd4a7f7e651"
+    },
+    {
+      "file": "docs/plans/LightmapBakerPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7e1222485906aa40e098049698d7788a6f03423b96912adf00f4a6fdb175ceb2",
+      "htmlSha256": "e95c3c11d93f1cca7d1d4f607b3b69057fce7d65c4a88f93b99976a93437a3a2"
+    },
+    {
+      "file": "docs/plans/MemoryProfilerPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "46bb06378478d3f0dfa2104f0d337d159fc651d1e9f19b9aec917342da2b79b3",
+      "htmlSha256": "231e79acd93e808889fca7cd5e1d334977e98f939b9c4c4babe802684438ed4a"
+    },
+    {
+      "file": "docs/plans/MathematicsMigrationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "af9bbfbc790809f30d3cebc41f126e2f5297993cf6bc0b0f47f668c383540b78",
+      "htmlSha256": "f4d8679cab93398d0e01905424185aa187ee7788b581c108d36d9e7c8214d1de"
+    },
+    {
+      "file": "docs/plans/ModelGeometryTextureImprovementPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "40e15afaa2a287d64ba0d8e6409b0e6f0cbe5b70f4790a363f98036b5823994e",
+      "htmlSha256": "dbc52ac38df8d479143dca3cce9da8c840d69629c9d502a62b28b47d92579efb"
+    },
+    {
+      "file": "docs/plans/NativeObjectMemoryPolicyPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d42abaf3cb834260ac14e6ba890185443bf9c49bd26cc9de895b079497e1657c",
+      "htmlSha256": "093b6cd175a664f9a2b96fc6f27cc31aed64fe3d023a981d223da481842b470b"
+    },
+    {
+      "file": "docs/plans/NetworkFrameworkPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ff94d310fe971f42ee441a4c84ac4c111f618b13313bf29f8acb453cfbf3894a",
+      "htmlSha256": "eef08514f345b62bbdcd1d13ccd42278a1a39195b65ac7902b8602f0a919e944"
+    },
+    {
+      "file": "docs/plans/PathTracingHybridPipelinePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c533261d6464919270a94f7fe51297dbf97868f4b95285d04df67182c96b3e8c",
+      "htmlSha256": "47a17178adced144c9329f18b8e4d8a64bd006ea7d607b9d487ed80c6965aa01"
+    },
+    {
+      "file": "docs/plans/Phase4UnifiedPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8dad443c37a8d0f8bd7270c5dd74ed57a81487f9a926e425f08879073795defb",
+      "htmlSha256": "93a5085fe2b650fa239983dcd8393a4a662d749681622f1a65e7e09fad7c8f65"
+    },
+    {
+      "file": "docs/plans/PBRWiringStabilizationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "599437f7af4d051cc8068359e230b04560972b7f81258dc025ec9c89c4d595a5",
+      "htmlSha256": "28ff11c3f8ccfc8b05f889c0444a042a16f870ab1bc0a18c0babd327be9694e6"
+    },
+    {
+      "file": "docs/plans/PhysicsRedesignPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e7e9040980da261f0a01587ab5a95fb88eb806390b459ba887d9d48cc9bf3412",
+      "htmlSha256": "269dc393afc48abb9d8eb3e68c23a086107e1b1719a5fd678c56eb3a50885626"
+    },
+    {
+      "file": "docs/plans/ProfilingCapturePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a644eb59bca4f1a354393e9d1045d78f10af61875e901cc53c6c0c3d192c9e36",
+      "htmlSha256": "98b42f1a2c74fdf458727f760d2045425a3bd88f8e1c682dff2a4785dc547190"
+    },
+    {
+      "file": "docs/plans/RendererQualityPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "066bc7b04e5b28d9e08d494a5d49801249446c45908fc5fe91569d3611ddc13e",
+      "htmlSha256": "13c7c95e88f43d05ba65d0f4513c307c549b9d1742c7fce257efe98c89606dd9"
+    },
+    {
+      "file": "docs/plans/RenderFrameDebuggerPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "35371b470812b56afdfb74d0f8bd2b331a145597ac76e1b7f99809c94b2f4f05",
+      "htmlSha256": "d11a235f73fe5c78642a6195f971f371b498e68862327bc2d8f102449933da68"
+    },
+    {
+      "file": "docs/plans/RenderGraphDependencySchedulingPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "17768ec6f69a9551919a6e70cf4d81fbdceae6e756adc272b76d049373bedf17",
+      "htmlSha256": "e23f0cee9f261a8c8e09af77911bdd47e2a77175e558a54978f28955a4aee728"
+    },
+    {
+      "file": "docs/plans/RenderPhaseEffortEstimate.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3d6cc213df0bd59b5091965e2954a45b63b093708e67775dac323f3591a4c7ef",
+      "htmlSha256": "99ac6a51896a0c39d721b02211dbbcaaa3fce9c19d75a29318d52b121756e194"
+    },
+    {
+      "file": "docs/plans/RenderPhaseRoadmap.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "560e571c46d0559142c78354f750e5738413bc3a957ad2e1cef28dd474e8a76d",
+      "htmlSha256": "ba28b32e93d75a7a23b39757400c363720969ad9cba73709d50a4846a5763620"
+    },
+    {
+      "file": "docs/plans/RenderRg8UnifiedExecution20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "cb23a148b7699683bc928c50ccb97b183c23a8b954c60b7a4764a2b3dccef3d2",
+      "htmlSha256": "07ea047f03ba060f86a86556d69f88f4f1ecbbb15356d2bc6f774044cbc883a6"
+    },
+    {
+      "file": "docs/plans/ScriptSurfacePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "843e9d25b5c2c1705fcf0ff0619037dc8b9179175f03a23350809bb8fa445721",
+      "htmlSha256": "ca3046431221fd5c822c0f54158aac21442e6174da302c0244ad03c8356f97f4"
+    },
+    {
+      "file": "docs/plans/SerializationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f94d6fb170ff8dec403e60f3433c9d552a88608795281e95fcbd6a157917752c",
+      "htmlSha256": "46af91a8e4a166195165dde64e87bf04aa10dabcea871c99f8e2fefb15340f0c"
+    },
+    {
+      "file": "docs/plans/ShadowMeshletGpuCullingPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4977dca4b6060ddd318eddc081ef6da95c481a3ca0e8292279b785ed046b5110",
+      "htmlSha256": "de05da9294ae44c81e63e53c375868a00f4d528b1131bf618b65872c4e4cc450"
+    },
+    {
+      "file": "docs/plans/SimulationEffectContractPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b722dbf9161761ada5da25bbd7c635f27069a91c09a82bb2f4586434c75ded8b",
+      "htmlSha256": "60c6489f1af9c3f75af44339f04383f9d4b6d79bf2417cc59469fbc863ce0146"
+    },
+    {
+      "file": "docs/plans/TaskSchedulerUnificationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e8713d25aab50ed0ecd6d90778ea784a0a2deb079e59e06f778240a330d5070e",
+      "htmlSha256": "a13211a8545f092cd163f355c8852234a32917b1c86b7e66f240ed9beefb2de7"
+    },
+    {
+      "file": "docs/plans/TemporalReconstructionPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "fe0bd3c8f3b3118914510d7aa3b6b4b6f2989c9e72abe3d1b5eb95a1458b6466",
+      "htmlSha256": "352d5037e5750378ca7337a1169cc16aedf3036db13afdb20121083cfcb0dcd2"
+    },
+    {
+      "file": "docs/plans/TemporalVendorIntegration20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "fbb6e057c750fb54d4177bd20e70f03a32bb1790963ffb82bbefd88e011bd8c7",
+      "htmlSha256": "99df2118d661818aa223d528a663259a27c5623596ebdad34e36b29b93fa5611"
+    },
+    {
+      "file": "docs/plans/TexturePipelinePlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "95f168a3169a5a377a2630765ee3f78fb3ca21ca4f081c45cee6c0ac976fcb26",
+      "htmlSha256": "5e13becf3f5147a0951abd78b82a758a03a9980572dcddac5844e5643a590faf"
+    },
+    {
+      "file": "docs/plans/UtilityFrameworkModernizationPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "92585a5f2ad897f162617436eccebebdcda572c1370ce3e1d1416920dbcd436a",
+      "htmlSha256": "01d56cc6cdd7fa5d673825a517cfda1c8fd53ba6f35f888f7b755c9f26e7edbe"
+    },
+    {
+      "file": "docs/plans/UISystemRedesignPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "611cf47d08386f9db70ecca20c3e845c0cfe7067a770ed88222506e651a22e2e",
+      "htmlSha256": "2e9c119eea7f16c6d83f2fb80d5339b0f5075e74e52f3789b107301f1ae70ad2"
+    },
+    {
+      "file": "docs/plans/MasterPlanAudit20261020.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "6655c53426939c2270ba015819185c0f7bfaaad89bbe1b0224ad4e3a50c7b60d",
+      "htmlSha256": "e259b4223ece0b3b812c792d3c2bae4075c6de70b70d644000d781ff9f1c88cb"
+    },
+    {
+      "file": "docs/analysis/ArtifactRetention20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d50cff6b79633f7b31fa7676a43e64a589618250b1945aa752978ed1dc3dd9cd",
+      "htmlSha256": "e4eb5229ebfb1861d82c70a0c26fa8b21ea5d35e9ee521e08723d6296819fe6f"
+    },
+    {
+      "file": "docs/analysis/AutomaticResourceEditingValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f8acf8fd5146758c9ead977de3d2b2a996dc678f2940b5f8af0850dcd5021120",
+      "htmlSha256": "74aad5c820363bdc22b4f0c1fc7094303f09e593cf4e8613094184a7af5fa1e3"
+    },
+    {
+      "file": "docs/analysis/ClosedPlanCommandletRetirement.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "cbb3a76dc905f65603afa0fd78708b9e9e95741d00622f071d56ce30e1e88671",
+      "htmlSha256": "0e0415257d9330bc016a249085e10d79c57b481f4db245ab4a9b1cba452237cd"
+    },
+    {
+      "file": "docs/analysis/CommandletRetirementAudit.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "76616890d0fb539be9ea3cbafb008a10a223ef63836c25d0ba3b50457226ac92",
+      "htmlSha256": "5b427780ead9adb1626b1b76e052a4690c1083f6f701a7982ceb6bb783192123"
+    },
+    {
+      "file": "docs/analysis/CommandRegistryAudit.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "689fd81fe054d86bfe0d54274e136d9351938c85a22d87955cf29345b9828001",
+      "htmlSha256": "cd66f306bb3ce47a1737680cf80384ce53c04445023751cb34aab59512174fa8"
+    },
+    {
+      "file": "docs/analysis/CommandSurfaceImplementation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1e25cfa4221db0f2848c690d2355043131254521794b2c32c5f6487e12805c49",
+      "htmlSha256": "cc279daef48383c64af51a0c142f3a61182b90fe5a44cddd466b4f9d19ca2d5e"
+    },
+    {
+      "file": "docs/analysis/CommandSurfaceTable.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "74fb88650e165fe27d7a5f793e2f8b498fe908ea97e5e6b1835359aeb32cb343",
+      "htmlSha256": "6dda9d5c1e36aa35015273470765dd8ce842d0dbe5d15badd1784b757d8ec96b"
+    },
+    {
+      "file": "docs/analysis/ConditionalAssetPublishValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1a46c21cb092c6a7b7f0b7e30b1f5e7d9525bf6e6c55aefb2904f911e4bab7ea",
+      "htmlSha256": "7f193a1d9e7af303b2cea650e529c312757cd780dc05a9f95653f7b9bc4d9335"
+    },
+    {
+      "file": "docs/analysis/ConditionalPublishActualInspectorValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "6d44202de558c575099710e04f8c9bab019f3aff43c2d90146f73b215acddb65",
+      "htmlSha256": "bfa8bff98ca059712d62e94a91578894d5b434065a0fb2b846685d4eb85c4e0e"
+    },
+    {
+      "file": "docs/analysis/CreatorBuildToolValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f7316373e94bf41fc72b540209c3c429c5ae2f7c727dd81fe4df99cc75c0b16a",
+      "htmlSha256": "2b4496513f16ee62aa5aca226e808746fb2bbaaf6ce26b2335b173c3782d561d"
+    },
+    {
+      "file": "docs/analysis/CsmCorrectnessOptimization.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "aff99b0f95ea3cfd2afb066703876dbef162f06788cdc0871f8bde9d7f9200c6",
+      "htmlSha256": "e7fdbdafd26b26aecc44b9a21364ced08c6208335ca2ce5a3ebd46fcb0b04815"
+    },
+    {
+      "file": "docs/analysis/EditorAddComponentBrowserValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "0df999cad78c43f4c77817eb2564e12da7b7c8926c31507f7a8e470f49ad53bf",
+      "htmlSha256": "0fde5ae641d2ee72c954b2b7b8d43adb52fab743a5b06a99b99efa244058270b"
+    },
+    {
+      "file": "docs/analysis/EditorContentBrowserLayoutValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "bc7d7e14821aabdf80032a8e24d6bf7500b0cc2d0d2e8516916fede70daf07a3",
+      "htmlSha256": "72d9053b345d50d19f256d995aac5fa3e67eac0c32523a9e79816a3e46f1e89f"
+    },
+    {
+      "file": "docs/analysis/EditorControlDensityValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "874e070c4937c7970b050a97c76b6aa322a825545ebe47a8de48c08c3d1196a1",
+      "htmlSha256": "c47765a25ac0c98b8ae452b593e530a18aaeaf33f63ac11af237bf777a557f45"
+    },
+    {
+      "file": "docs/analysis/EditorEntityHeaderPolishValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c28058baa48b7ec880d164b866d7eeea78b94dfdcd69b4458b6cd8ba414ba0d6",
+      "htmlSha256": "03ef22d6064b4c68053d71810d969e9d26a1fe6cae7915e61558137b33955fe2"
+    },
+    {
+      "file": "docs/analysis/EditorEntityNavigationValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e42ce7eef838f922bf8c4bf01f67f1a32825311745076fa0906ccd0e84b06972",
+      "htmlSha256": "63623d901d6a6f4b9e30baf2bd195fb8cccc13e4cc876ff130ff740652c51131"
+    },
+    {
+      "file": "docs/analysis/EditorFluentEmojiValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3503adb552079342f71878ae7ed0a52aec7578065d2d1985227474fab80e37fc",
+      "htmlSha256": "9c9eefa9271e60f45c0e1341501cd94b255d1078c4b2d86f2b2f716f77a9ca34"
+    },
+    {
+      "file": "docs/analysis/EditorHierarchyStyleValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "24f8d1463afe2a971010f048e313c98208f847bbe2d95f73c7a7ec4a66d9e234",
+      "htmlSha256": "414d0cca7cfc49f324ef94b5219af2151b659e640a7b3669df0a8c16aa36d27b"
+    },
+    {
+      "file": "docs/analysis/EditorIconAlignmentValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "803a210614c5d2e1e78f8b8fd974e91515a21301769ca6a2fbc8ad250b6674ba",
+      "htmlSha256": "8e46392a56e05170cfd5ed64d372c5e8430bb887fe79d14b355d47007b5deb19"
+    },
+    {
+      "file": "docs/analysis/EditorIconSelectionStudy.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "793be46d74bb6fc98e47a64bc2d1b33b8eb9cda3cffb2b76cab0f4cd6456386f",
+      "htmlSha256": "c4450514113491484e4cea58f58b9248093767581c2f184e154f456627537994"
+    },
+    {
+      "file": "docs/analysis/EditorInspectorLayoutW2I.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5e180c41032d04f710d9a0c6e5240661822be0d40c40cc0fc06e03160d0d27a7",
+      "htmlSha256": "5bf6baea79f194289b476afad9a5b13a074d5ce494d5fd1e760074931ee1adce"
+    },
+    {
+      "file": "docs/analysis/EditorInspectorStyleValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "fd9df9996f12e8b643bba4f9b9d4d45e33d72cebc047e967d964fcf54271e50d",
+      "htmlSha256": "0b17f623ef50e867ff367f7520c0f84f240759452d2e0459272726f4c8dd8396"
+    },
+    {
+      "file": "docs/analysis/EditorLogStorageValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ae379d48f86534331db935c747ba7285ec9de3573628da670aff125c5dfdc4c7",
+      "htmlSha256": "2d557fa15c07f23328dd8c842907bb46d1b665e480c4f765947b0720e678990d"
+    },
+    {
+      "file": "docs/analysis/EditorMaterialSymbolsW1Validation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2fff4eeaca95b3872f72257f73c3c5f9c0309ad758b65def7f12de4ef56c563c",
+      "htmlSha256": "5599ba7193ea0e6855ea34f86df5211ff167e07e8c31a7985cae60daaddef9fc"
+    },
+    {
+      "file": "docs/analysis/EditorMenuSurfaceAndPhase21Preflight.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "01ec93b13aa35cb54d5bd6a57fe25b6503dd40f51c418d2096745cb27709d06e",
+      "htmlSha256": "9f0f19c97b25556c18ffb0d861eed1320186277301ce5781cf7e98aec99feb42"
+    },
+    {
+      "file": "docs/analysis/EditorPanelCostBaselineW7.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d83d812b16f405ace611e9db22b2f395687003f1aa214df700b2b87bfd48dd04",
+      "htmlSha256": "e1d86fc6f39e8328ac85b5e718b4b9a0f9c817455d990afd480977bf43011b0f"
+    },
+    {
+      "file": "docs/analysis/EditorRenderingSurfacesValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a0f110201662f1abf081ebd23a906cdb3c5f4e9abb60a4eab547b725983dc1c2",
+      "htmlSha256": "d2228443251f58d19dc344bc5064b56a91ba7b24a8663b64eb42aaf4fab95619"
+    },
+    {
+      "file": "docs/analysis/EditorSceneCropValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "183d9742d2d1ee04d0e899af9fd3de1911698c1005b841dc74a647c20a171bd8",
+      "htmlSha256": "f27fa6cfd518ccd2b89408dc70c709b6e71728d68927d3e8634d7512154fbac5"
+    },
+    {
+      "file": "docs/analysis/EditorSceneViewportOverlayValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5b998524a6b9c08da93de9ce1e89ac5e24df994ffb97bccf18d609c387f3a53d",
+      "htmlSha256": "53e2f8c8a3dcf913ce884c38a1fa6eb64f133795fc3c1932ab841cea19b516ca"
+    },
+    {
+      "file": "docs/analysis/EditorThemeW1Validation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "6167f64008d641698c40482b16f3fd648250e4b404dcdd589e3c5f5e5c256134",
+      "htmlSha256": "8cdd64b760cb9f5d13259d261daf99878643fa4fdaa9f6ae806cc40c264280f0"
+    },
+    {
+      "file": "docs/analysis/EditorTitleBarValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1c67f1cc19e33c80f3857a4a7dfc174015c2ed56b4b6793685bc459a4cf105f5",
+      "htmlSha256": "468842f1816dad56578d6f6038ca7f7ffbec890fb4dcf4f2b607888ad6dfc2d5"
+    },
+    {
+      "file": "docs/analysis/EditorW1DpiResizeRootCauseAndFixPlan.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1b3d0b892abe69b2a81a5b39494cff0611f23ad4914637ef0971152c4294b3c6",
+      "htmlSha256": "8fe34098a33239fbe5eae7e5e32a06598af6fc808136acd1efaf6e85f9b00e47"
+    },
+    {
+      "file": "docs/analysis/EditorW1Dx12ResizeValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "0bc23d5be05ae5e4c3d975fb165f8d0aeeacd4ebbad2a58afe64e5860645fd59",
+      "htmlSha256": "c0685295b817aacd587018ca07d024b9d5af9a787803b1e8b17a1d065d698972"
+    },
+    {
+      "file": "docs/analysis/EditorW1InteractiveValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b9a6d87c0eb85f059ba7066e9f3e06eff78090439fa206d8c0fcb4dc474d84f0",
+      "htmlSha256": "325221fb4b09f68f275c364b18afd371051baf6c07b3871bf0338afffe76a2d1"
+    },
+    {
+      "file": "docs/analysis/EditorWidgetInheritanceW2.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1d1f04d69cb29bed2291e7d10f30c8ca0d992c6c76652caa1c6312f41153346b",
+      "htmlSha256": "80b1cb624b503cd1152ec2a7e37963b541e77a48960f7b128f4ce4f300932f75"
+    },
+    {
+      "file": "docs/analysis/EditorWorkspaceW0Baseline.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5c41c6df2e7aa3208877f546564773bf75d188fad116f0252ea16d8654ce9a59",
+      "htmlSha256": "8bbf3ef34e51d1f8faeea7a7115d9e7daa66c2db0b6c49439af1311fba020fb2"
+    },
+    {
+      "file": "docs/analysis/EngineSynchronizationArchitecture.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ef91e90c984706e548e7c12d1d8a609431cc4f9a5a3932c0f74be7c19c3d2e88",
+      "htmlSha256": "b2d41ad664eab09841187e2daa74b8d0d9f67ec88128316529c59db039668380"
+    },
+    {
+      "file": "docs/analysis/GCCEValidation20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "02062b4a84db5e0faec275caaf7e1f9ba890d6aebea7e099241e9a9a96afec85",
+      "htmlSha256": "59a6e9c209ccbaefa4b9fa77cf7dad02b66cfbe494798f858d4ee7f859800673"
+    },
+    {
+      "file": "docs/analysis/GitHubIssueRemediation20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "da7fcf743fbcb2148dd15f241bba77be3e18b52f8fbc8c672e1d4ae1d617e9c7",
+      "htmlSha256": "d2c1ee7703ed8faa0d61421d898f4031aa004204a1ec86973bb7a68bffd4d28f"
+    },
+    {
+      "file": "docs/analysis/GpuDrivenGeometryStaticReview.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "332366b5b0dd0b8ecdf92d2d50bb9f2c5acd3cde2f5148db3f171b07d53e8ebb",
+      "htmlSha256": "1fa4de205e992e6db56ec4e057c31521cb9d1712fcf30049b299396fcc2ab562"
+    },
+    {
+      "file": "docs/analysis/GpuDrivenMaterialCoverage.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a005ae4260f87d40bebf0b33061d3fab35beffb4770de3e9130497b4e8117af9",
+      "htmlSha256": "35ebadc31b62d736be72acc15b8b4b4cadb24e2378567021f081f7630712d961"
+    },
+    {
+      "file": "docs/analysis/GpuDrivenRenderGraphTransition.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e38e59b44d9154a0a2613132a5066b0fdf585d4ca8e5a177b9f83c00b7673935",
+      "htmlSha256": "91025877786e55e322340bfa03ff34b9bb26186ec7d7b1b0cd2d843c2e1e43b9"
+    },
+    {
+      "file": "docs/analysis/GraphDeclarationReuse20261020.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d61d4f5a9beea13cbae515dca4f382177b6b3686976b284d970eb5d39b954382",
+      "htmlSha256": "bfe0cfe4deed669d13e21d2387749a280d0a600422d215ca30b537276a03d148"
+    },
+    {
+      "file": "docs/analysis/GraphOnlyMaterialCleanup20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c260454199cc9270d2dc60c4f3ceb3f4dca0c61f272b6402e85bd0c148ff1246",
+      "htmlSha256": "8aa7803ed421e829c7cf097486756cd2e1ee4ca79886102c332c64d68264d8ac"
+    },
+    {
+      "file": "docs/analysis/GraphOnlyMaterialPasses20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4f1561b71f7d4c59ab708ad2ef9c6553bbaf577cd70d13032dcb8041e7d27eea",
+      "htmlSha256": "7c87296f85fbd23d59daaf81da6b7303b45d3ca6e9334894b2e38ab2585148fc"
+    },
+    {
+      "file": "docs/analysis/GraphRecoveryRgV20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "04bf6734597901c3042ec6e120e853382e3e80b6c24405910b340338cf4908eb",
+      "htmlSha256": "cfeb97336a581f8cc03ff2c767198ccc57be31f56d504b45222147a4a9d9be03"
+    },
+    {
+      "file": "docs/analysis/HierarchyOrder20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "0f29324eca2c64ad483608df9ca6be243ee60a32e20d16205ac608b26205de00",
+      "htmlSha256": "c28d66bca291768399cc2cad749eadcacd678da76cc6a458f644762942e5f0e8"
+    },
+    {
+      "file": "docs/analysis/JobSystemFeasibilityAnalysis.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9bfb5c3ac8ea20c8775c517461c314acf78525ec336ba5eb312de88fbe88008d",
+      "htmlSha256": "54a69b7a93a4be454b10476824897f3901a9ddaaccd28fe40de6299322f6021c"
+    },
+    {
+      "file": "docs/analysis/LatticeGeometryIntegration20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a8f52cf8056e3786a1f05a278635a64c1a211f0d290c6aab082f939fb1ab7bc3",
+      "htmlSha256": "54ad694685bb43e92596c6472233782c9f8e809a6602b4843561caee959cf6eb"
+    },
+    {
+      "file": "docs/analysis/LatticeMeshletRendering20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "642141eff86a5d8a6155ca7fb628298596504703953eabed73904488fff22d8e",
+      "htmlSha256": "5f88a227c653baa1962371d78d40bd422112b856465310c3951b017e0e87bed6"
+    },
+    {
+      "file": "docs/analysis/LxHdrCutover20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3f3d0fac53fac1ff507c6a8f51ae20fcef3090091d35e7f9a5869eab420aade1",
+      "htmlSha256": "43beb36079e6504778ae085867780dcff5c8b04985c34721a79fa9711ef7a6a9"
+    },
+    {
+      "file": "docs/analysis/LxMeshletGeometryContract20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9c0cbd6c234c01ffba1c6b1c5f6337c6552f6df5fd9ba8bd09d707927d1d3b5b",
+      "htmlSha256": "ee7b9b90eb9548a4a03c7ca47665322336dc83ecec5725251a8b0e722a3b638e"
+    },
+    {
+      "file": "docs/analysis/LxSceneBigBangCutover20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7d7fb1fd6236e71c50a65227f50ca485604a182f775119762371aef5a76e99f6",
+      "htmlSha256": "5f52e27c801cb700db466bb2e7df67c4da870324f28cbed95fb11c48d1ed33df"
+    },
+    {
+      "file": "docs/analysis/LxShadowBaseline20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "38b0edcf0dd2d2f1992b57689c663fdbf31e21496479a9669614001ccb430ab0",
+      "htmlSha256": "9a02e1aed9d5ebd1674dbd7ceb4146a7ea023c49fd7be769b703f080c3d10c3f"
+    },
+    {
+      "file": "docs/analysis/LxShadowCases20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "bdb65b28c35b4886054fb216618e9b2b8b70232f0f47b02c2f759d344c8ea00f",
+      "htmlSha256": "995b65981679fc426030e919276d45302d327fa43a5365d5279bd0989a70d777"
+    },
+    {
+      "file": "docs/analysis/LxShadowEquivalence20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1288e2481db3b40783cb6206ecde4dc5db81ee91d73ded51aab1adc10514537f",
+      "htmlSha256": "c0bd26a047c12b5be1525caef9bb1b0656682e5a93e1b48ac4a83e123f7e56ed"
+    },
+    {
+      "file": "docs/analysis/LxShadowMeshletOmission20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "02d4f9f6ce3c51aacbcd20f75f51925edeb11b71da67a85a3218b7fe355be132",
+      "htmlSha256": "68e301995cf6b3cd7c5d20108c4bfed5e545f84fd79e18300694e304c70f6b5e"
+    },
+    {
+      "file": "docs/analysis/LxShadowRepeatedPerformance20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "16fbead0233b32f4331d4070cc16dbeb546eae06360f1f41515c1e192bd44703",
+      "htmlSha256": "0d4a3048692102feed6fecf981e55999f7ae7461ee61d26c41641ceba134b7fc"
+    },
+    {
+      "file": "docs/analysis/LxTransformDispatch20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "88888484dcae737fa9a7c0dd6ad5a50eee2044e29d592e0301aa42b08c32e5c9",
+      "htmlSha256": "f6e1af8ddc2eecb2aac9c5dc1d426bab23796ecb8be2ce7f22d27d7d652bfed6"
+    },
+    {
+      "file": "docs/analysis/LxTransformResidency20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "61e7b2f8d728b1176a22e61a4107c0db3b13113e32a70a75ae16c75446bbb4a9",
+      "htmlSha256": "c8a1fb659ea24058438f89b66424037b944c9ea9bd1315ff75f0ec512cee2cbf"
+    },
+    {
+      "file": "docs/analysis/MAT7CodeToLXRuntime.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a7bee1140a365c3ec41dc602d1c43e4f8206d11da73866fa2c626aa42baa5dd8",
+      "htmlSha256": "a4a9d8c400bd7c838440a22c1d0541e3a757efb63d2e2165576887af62228f0f"
+    },
+    {
+      "file": "docs/analysis/MAT7CommonForwardBlend.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "305da4c01fc28d198e131a677523ca0756572d45f96e44537a922e771a360252",
+      "htmlSha256": "d903a61d5166a2309a3857d734bad837a6b789f7987a7e52cea6c13003b95e64"
+    },
+    {
+      "file": "docs/analysis/MAT7CommonMaterialConsumption.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2681e3fcc4f5fe1cd38e282bb6c9499a82b84250ad35c6dd21d3f705f3c4d128",
+      "htmlSha256": "4e6afb55afd2906147240839c14931d6c3c63a0d8582a75d7f03fb37869eb1cc"
+    },
+    {
+      "file": "docs/analysis/MAT7ComputePipelineOwnership.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "22b1677715058701045118300cca9d73790d12275c4a2901a91e945a39ba3d7f",
+      "htmlSha256": "336ac406d9ab2d52257c85ddf1734f539d95f1f21bdb562fe0b8c41924adf6c8"
+    },
+    {
+      "file": "docs/analysis/MAT7ForwardTransportComposition.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1e954d2d22732c9634feb399ccd2867ab5e26f1998babb05e66fd2d47c013594",
+      "htmlSha256": "2c38dfc6c46c7be4aadf90c4b0a7b92a2faf9bf3b0f51803814cf5632ad9c0b3"
+    },
+    {
+      "file": "docs/analysis/MAT7GraphicsPipelineOwnership.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "66f74bc81b093638b5dd6d67321fd3fd04a2c457dac744c3c4f4b7b1e65bca22",
+      "htmlSha256": "776297e95d6942e675c418f668b5b7245dccc85c278b73b943a77a12ba6f84e5"
+    },
+    {
+      "file": "docs/analysis/MAT7ProductEditingRecovery.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d4c1ea53c6ee21ee7ac3690a965a63e0e07881951e04ccd5f0b61ee8b6f80bb6",
+      "htmlSha256": "37dcf0421992ebff981c12aee364fca893cf059e398fc85de2007d5ddd18d762"
+    },
+    {
+      "file": "docs/analysis/MAT7ShaderMetaAdapter.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "545c99f5bd2fe0c5ab55cfc0f58c4226af5498012649607b2ed172aa841877c9",
+      "htmlSha256": "6af4c3eba312954eb912819db21c47bbeab6c82d35ee6d54440685b7788540da"
+    },
+    {
+      "file": "docs/analysis/MAT9BlenderImageComparison.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d5b6bfce76a230e5e762a21c3b35e416710dabcc3ffc0799355ca9dcfc9febed",
+      "htmlSha256": "37f97888521336cdc2b12cb291570ba4d1d0ac477348efd2c0f17936065c55af"
+    },
+    {
+      "file": "docs/analysis/MAT9GgxClosureComparison.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "42f04df319dcd48223cc9807dee27536bf6bc5dcc1fa7b8299928572549748d5",
+      "htmlSha256": "1324ce17e4c2787b745dc1efdb58e8dcc9577ebde9c379127289fc0add9bbe22"
+    },
+    {
+      "file": "docs/analysis/MAT9HdriConvergence.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "612168255e02535c995e00c7c318b094a26f572ba28fd639a86fa05f95c9bac9",
+      "htmlSha256": "348a59ec7af432df11b21c3a378ff923daa4b904766b5c3cf51f2315a6939118"
+    },
+    {
+      "file": "docs/analysis/MAT9HdriImageComparison.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "558776a0260a761161a53379f2c3c4e1adec5914b7ff5af258a82e40c74ba22d",
+      "htmlSha256": "6d2c25b3656782d25fdc48b82d8944261055a048947f8695688fc2c2b4c74c08"
+    },
+    {
+      "file": "docs/analysis/MAT9HdriMis.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b6cb77d0bb7dc1bcbd9915e769bd99a12fca538356ae28de3c8a7961498c8531",
+      "htmlSha256": "23974c74c0b3254654ab54b7018e0e388a8c8c40d967b5808a0212c188314146"
+    },
+    {
+      "file": "docs/analysis/MAT9HdriRange.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b506d41f284e8340ebdaa966306c2338b874f05864ad37594fe89b9b14e82c46",
+      "htmlSha256": "b4f07dd0c598caf36b5724beaef537984e60ae4251181244bee2ca1e6d2887e4"
+    },
+    {
+      "file": "docs/analysis/MAT9IntegrationCheckpoint20261001.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "030b12cc7e06aa3b1a3575aae6dd81b6d9d3f18df9be9653ea0e6040f77310d4",
+      "htmlSha256": "b741f670846323f3e29846a9fb83da25a089435b8d4432e2c801f8ff5a7838da"
+    },
+    {
+      "file": "docs/analysis/MAT9MaterialScenePerformance.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f7a39e3c513ad9da059b61695a53e45bd42d1679350f502c3b110e9201392afc",
+      "htmlSha256": "fc37a45a700501eadbd3876fa41387f62499ff8c63c9d22c0a6cd8b1c23e3b03"
+    },
+    {
+      "file": "docs/analysis/MAT9MirrorSampling.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f5bafc6c1f1b466cfe74fa5e94ad44f36c5418521fecd38e6eb67c2fc8d95c07",
+      "htmlSha256": "79690ca57ae8b0665571637d432f69c2a46b2e6667010097bbf899688b8e8eff"
+    },
+    {
+      "file": "docs/analysis/MAT9NearCameraPerformance.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e86db76f202431633bdc5b66fa992ee560468f7217763e7e61d4c1a0140ded29",
+      "htmlSha256": "afb4d3482c1780fd967f69ba1a72e070577950ab330c70f70e75fb2ce32daeed"
+    },
+    {
+      "file": "docs/analysis/MAT9NodeEditorPerformance.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "0afd41ff5d837fe47824d0436ded5d4891537fe24f2b40a045bacc3de4410c46",
+      "htmlSha256": "7727a1ff3187513e8c9d7f2e9fed3b652e1c21c212a1898ed32b06f7e6fea992"
+    },
+    {
+      "file": "docs/analysis/MAT9SpecialProfileCorrection.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3b6096d6437ba23bfae2fe337ceef2581492a9e93b3d6584b2bb5ed7fa05742f",
+      "htmlSha256": "80b7f3be7f05a911be69eabf614df3be97086d6184e3fd13062ef4c9e9850205"
+    },
+    {
+      "file": "docs/analysis/MAT9SpecialTransportComparison.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7351280a58899236bdd387d9d4d4bb7b579af4b0ca1cc272c064e28d72d4c6fb",
+      "htmlSha256": "fd21429ac96b9d8ded2e6f8d451cd53f7e981504d9ea69485c720336a5a81f74"
+    },
+    {
+      "file": "docs/analysis/MAT9SplitSumLiveLookupDifference.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "65dfef17572e8b3c8a9fc208a53ffaf3efc622f5bea0e43d9e6ea73cb8e9ccf1",
+      "htmlSha256": "8318fd268417c88f555aa01654f6cf2ad1f63fddf347bd4faa39bceb73ec53e2"
+    },
+    {
+      "file": "docs/analysis/MAT9ThinFilmAcceptance.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "6140617f5cc91caec82a1d818c53a2296221271db2387cc6daed8637cf9e0499",
+      "htmlSha256": "ca1c6acf866a34180f9efb3d90bc124c0f30b700bfe8c77d4613e051c28b9e24"
+    },
+    {
+      "file": "docs/analysis/MAT9ThinFilmAndEnvironment.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2ac93f0462d87592ad92c1c0e8481de3d14a0d8aa62819904f6d8718f4bdb23c",
+      "htmlSha256": "d8ea563327bda9b0045576952a1242e922ca0fee312ba0000f895c8b4d77f662"
+    },
+    {
+      "file": "docs/analysis/MaterialGraphScenePrepare20261019.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d97e49cd9fe6e294070aa747760b948f73db781fb7ad13ae0b74d4e09f5fb445",
+      "htmlSha256": "cb75e27b7c7dcb4e5ed13b8821d9e7f9dd4f0ea4d447ce87fca214170c2eaffb"
+    },
+    {
+      "file": "docs/analysis/measurements/20261019-remeasure-10/README.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "baa81b6be84d6158da3e8ed71419c5cd6f332d2bc33fe4da58d5fd5b718f5403",
+      "htmlSha256": "89438b038f3b18d11b22f8ed73cad76e4f5781354973cc9458399e6c8306e76f"
+    },
+    {
+      "file": "docs/analysis/MergedPrReview20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5746b206b9b5d985e726d6d27b8263cff30ae0fa840448d9fed2a6744cf22b08",
+      "htmlSha256": "34a9cbccca894537b00b605b448bd0f3fe272b96acb14aadee7e7618cc2f3b4e"
+    },
+    {
+      "file": "docs/analysis/MeteorCameraMeshletCulling20261013.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5c1440ca1366ebccf9549b7969b72e89153f63130c5187d6a1871b690bde0c83",
+      "htmlSha256": "ed83adaece1e7a9a9d4474b75d619c6051fa4e679619fbb6f54e8dc9cf4e4fac"
+    },
+    {
+      "file": "docs/analysis/Phase14_5Closure.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e4350cf6a26aa08ddef9154a912e977d7ed2fb265228d9d5154da5033cf08bdf",
+      "htmlSha256": "c5fbf776184cee583c2ccf23915ebbd27141a03eb0d1154575726bd46a0c1906"
+    },
+    {
+      "file": "docs/analysis/Phase14_5ManualGuiChecklist.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "cf5eaf2cf4913c479f0ac049f31f761a41124278fc89bf3990a4f8b60314680f",
+      "htmlSha256": "217ce544f81d4d4c44274fd93212e18e8aab75492ebed6aeaf0a4f9f787b0673"
+    },
+    {
+      "file": "docs/analysis/Phase14_5MergePreparation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8658e78acfdbd75270ac680255e640e610387016eb34fddcad27f4904cc19c17",
+      "htmlSha256": "4862415480b7f0b6cb8f2ec6860d1b6c45f5a7436f287efa3e7caf5fc98476f3"
+    },
+    {
+      "file": "docs/analysis/Phase22AudioCloudValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4e41f54035215c6c6d34a89ca176fa54b4b5f1622f7a2de7a4127b95ae20266b",
+      "htmlSha256": "1a90730d08b5ff539516d759c1ba9599f24a18339497ae4c7b4b0339e26d8d59"
+    },
+    {
+      "file": "docs/analysis/Phase22AudioPreflight.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ba8602933927cd33039e81c400d67cc0aefb736f98a637604b4063826d501d53",
+      "htmlSha256": "bbb32ab1818397cf2b7d708a815fd70f8fdd0ba5c497502041c155d1295b4196"
+    },
+    {
+      "file": "docs/analysis/Phase22AudioWindowsAcceptance20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "553ea2c9eb54deb625c441759af3f0c69573f822c7e57327efb2ce4478761896",
+      "htmlSha256": "a7340ebf133cc042bd8390c3f5ec7baa93ad7450e4c1ffa4ce16f0400b79c886"
+    },
+    {
+      "file": "docs/analysis/Phase23LauncherReadiness.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "09659bf942236a86107ecbb0f668344ecca3d212706e61048908c768da6d646c",
+      "htmlSha256": "8f3a8124bcead17db6f97333124da47dcabd64726f25bde08492ac0c2cf1c77c"
+    },
+    {
+      "file": "docs/analysis/Phase475AxisClassification.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "72c77cbc5ab9cb8ac3990e3a6cf2bd812419fbd0033afd859ca5151cbe247901",
+      "htmlSha256": "221aaac106808e16813f661a6f40c588da60a3fef7d6d9c433a4565fc0280259"
+    },
+    {
+      "file": "docs/analysis/PhysicsCutoverAudit.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c7b960d8341dc2da07b0b8d4e4f80acedc37d9e72fe414be63b09f8780032f58",
+      "htmlSha256": "0d9a7b71ce6821531bbcac3d68388fce54b04153e95f53226d0a6496bbbd292f"
+    },
+    {
+      "file": "docs/analysis/PlayerModuleBoundaryAnalysis.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "65457bab6fd950e55536c4a8dd6d5ceca8f90ada39c19c4bb6da14cb78b74d91",
+      "htmlSha256": "4a308f65ede0c8b07913a9b0f7cb288f08d754e0ebd9eadcc2b54187cfd98d55"
+    },
+    {
+      "file": "docs/analysis/PPLContainerMigrationAnalysis.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c9c3aec63b1a2b6355ad1d65695828f4bead12120c6468e60eb85081481c650e",
+      "htmlSha256": "1a42d042cb9fc08085e03c3c47b7be74e68202d6213c31a222629f15d0a9aed1"
+    },
+    {
+      "file": "docs/analysis/reac-20261019/baseline/provenance/README.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "08fdc409d27379d2560acc8dcb8a8e6367d69e0c57cfb38686019c60468c3416",
+      "htmlSha256": "a66a4bd034a3bbaccb3789e29c57d2770c94516c74e60d8d468c1ba876ba0438"
+    },
+    {
+      "file": "docs/analysis/REACPipelineImplementation20261019.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2b71ac360b2b55127796877a8ad3e60c4fdffdefda70f50e87c2b2c5b04fbbd2",
+      "htmlSha256": "81557716e7d2fedc4bbe2d7e3358a376db7cb44980112d23251a4fab5b2e6a97"
+    },
+    {
+      "file": "docs/analysis/ReflectionSystemAnalysis.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8dc2b0e093bcc5682e449ad2ef11c2d9f573f5ef77fcd4be62b9dce88e808b30",
+      "htmlSha256": "9c53b57009a74dc4d48de764b4da854cce1142e971fd011544374a53705e2d15"
+    },
+    {
+      "file": "docs/analysis/ReflgenPhase425Integration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b5600b5ae8e778dca5da3e6347a5993e3e6a800313e62d311f3b61a9349f871c",
+      "htmlSha256": "19832641a25daa329f223c76f9669a913e3b3cbb822c7bdd75df769b12109b3a"
+    },
+    {
+      "file": "docs/analysis/RenderBase0Baseline.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "94760476bceb791bdd841f8015ef36df3b9f0ee006819c7ca96a3974f27ab84f",
+      "htmlSha256": "b65d456ea3582de1018c4ce385ac22b4695b3cc335eac09f65d8a349481872bb"
+    },
+    {
+      "file": "docs/analysis/RenderGraphDeclareParallel20261019.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "402b23ebca22df13e4f7d38b05697fca545e22152c5a32fc55bef0bfe5cf2c35",
+      "htmlSha256": "1584c71766a2d9a4e9278a025a16fcd420a9531d46696b6aa0489a61233fa1e1"
+    },
+    {
+      "file": "docs/analysis/RenderingPipelineMermaid20261016.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d4e533971e5cfc1bca3849cfc694c0f207952a590a6e1e97a0ea2ddbc9bf4b12",
+      "htmlSha256": "39411a51782fb504f757d999001d15e18c80cde10e0e7117020a9a4ac04f7340"
+    },
+    {
+      "file": "docs/analysis/RenderProfileAutomaticSaveConflictValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d3ff9e0cbfa17c7a1ecc0bed2c4595d96c70fb3596c8463fd820f0e5ba51964b",
+      "htmlSha256": "3d1b1f3ade53b5d1cfef8cc41a5848153ca33d7174d9772106ce656c4d2eeb34"
+    },
+    {
+      "file": "docs/analysis/RenderRg1Scheduling.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3a13affaabf72cea7a9452a35915ac996cff42692d398207c0adf7e22b2d410d",
+      "htmlSha256": "0f118a4c55c7749422d06e4892dc81d27a91d8c6dbf66ee2974efa8e07a2ea31"
+    },
+    {
+      "file": "docs/analysis/RenderRg2Versions.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5ee496af532016bbf550d97298ac8b584c6f69e065f0ab73adc60ee30022ccbd",
+      "htmlSha256": "5715ea3630809d136b0beabe5c0d5fe4dc9da360648f2f0b964ade9fbbdae7d2"
+    },
+    {
+      "file": "docs/analysis/RenderRg3LifetimeBarriers.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5600b1f8e458c1dbb499f0fe1c6d64d25517d0c09fc5a4646d38bb2b91cc5936",
+      "htmlSha256": "99a6437de2a89169d5332098b4b15822aa5d7e992fd0e83cfb31b896472accbc"
+    },
+    {
+      "file": "docs/analysis/RenderRg4RecordingWaves.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5c0b7f4f53822c5e67f7d427cff01af3dc48c012d5beb46ba5213d06f0f2f93c",
+      "htmlSha256": "51858615dc68ba580e28485db4339817cf8119fb48685b7af3e552dfb4a031bf"
+    },
+    {
+      "file": "docs/analysis/RenderRg5Closure20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5186d04ab49cc562d8c49185a56bdd5a76809cdf0b7dfe9a117b4df3b1cd5467",
+      "htmlSha256": "4d8574e9dea64e55e47c460fb5c14e7e7a5f1743269f74227f3d373910c0d0e5"
+    },
+    {
+      "file": "docs/analysis/RenderRg5ConsumerMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "29eec679f92e489e8d36a17746c47fa900b578241676fc74df8714507bdff730",
+      "htmlSha256": "1a419c218af3f9eaa6f1a4cc23bdfc590ad10b1fcab2a009d1e82929127bad81"
+    },
+    {
+      "file": "docs/analysis/RenderRg5DecalMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7f6909451edeaa7117e88c1b6a5156f83c83dc13354931909a9d53aa6a9177b3",
+      "htmlSha256": "aeba18f3fbf81448ff23238c722d671aa16854fd3bf1232e8b61a4e48aa658a9"
+    },
+    {
+      "file": "docs/analysis/RenderRg5FinalAcceptance20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "29fea4c978e5cede0ebb4d9e197d304529d0c6000ac7a8392eac15c7f5ffe509",
+      "htmlSha256": "4782fb185776e7ee2cd7e3fce58586ac74e2836a12ea1003af28bd5c875e5bb7"
+    },
+    {
+      "file": "docs/analysis/RenderRg5ForwardCodeMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "afcee8ef93fd3d576db3cf0933f5290ba4951300937b84bba9a3570e36278ff3",
+      "htmlSha256": "093ea51336b475ae9b6a7d65c62ff103df6cb609b7b483212de48ffb0b9b30f9"
+    },
+    {
+      "file": "docs/analysis/RenderRg5IndirectMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c26bed3d57a2b7efd76d7f69ed94c74b3d83c6d2aab7e05ec6568b84c866c89a",
+      "htmlSha256": "8e265f44503510b4692d5030e4219efcb76045ab6d3a7e08c092abd1441249f8"
+    },
+    {
+      "file": "docs/analysis/RenderRg5IntegrationBaseline.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3f3522b51f4a9abe5c49345b245bc3cacebd5213023a2cd830b9d1cc2c65e78e",
+      "htmlSha256": "3d376479ce6f4b064d65bbb5f9be8c530c28d51a08b0dc5a40075812e81cb9ea"
+    },
+    {
+      "file": "docs/analysis/RenderRg5LookupMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1eadd4130db7606cd3278d174625ddf71fd5ce10c603aa3bf4dee2d1f94cbf11",
+      "htmlSha256": "855d73c90deeed2714598dc6d2fd6c1f10252f5932e26f3fc0723f5c79381694"
+    },
+    {
+      "file": "docs/analysis/RenderRg5MixedGpuAcceptance.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "46be7acbb2cf8fa10ea397681cdd2deaf26bd8106eb25eade610952c8b0ab3fe",
+      "htmlSha256": "affb67f4ef17a8620fbea7001bac1d468a05574702699fda5393f97c3af2b214"
+    },
+    {
+      "file": "docs/analysis/RenderRg5OrderPolicy.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c4c83ba4f12a6b7c9654386ed256655fc5373dac425f18973d50a8d27e748b74",
+      "htmlSha256": "da71b11737bce3bedc3f7612ea3f4629fa119ada9f8cc1d57b6a3e86ed7f8cf6"
+    },
+    {
+      "file": "docs/analysis/RenderRg5ProducerMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "81d4b1c30679dcb26a3e962e482ab5fa737e3cb24d116657d23b92d005555e90",
+      "htmlSha256": "b3fb7f5866451326a63eca806845a68746cf25d18de6d56de40430a28f8d458e"
+    },
+    {
+      "file": "docs/analysis/RenderRg5ReferenceMigration20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8b95f92853fde90e69aea71ec8920505089be7dcd0ee88d4b1a06b803c2b8837",
+      "htmlSha256": "70780cb55c9ffce1915af1350fe5830309302e3293a59be09f90098b02c2e256"
+    },
+    {
+      "file": "docs/analysis/RenderRg5ScreenMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d9dffda97e9086ecd74f9eca99bb0bd445e7d5c9f4e811c9c9af8c1801c23e00",
+      "htmlSha256": "2d25885f42c832432c5971aebf0436875eee102634704940ee902f9d578ffb28"
+    },
+    {
+      "file": "docs/analysis/RenderRg5SpecialMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "48b5c03eb575a757df3ef2debd1244a81fb85d36f81052918efe66fcc257ff41",
+      "htmlSha256": "a81551886460631efce1190940494ae50d3f36a371b1cd24a271658b66a1c998"
+    },
+    {
+      "file": "docs/analysis/RenderRg5SpriteMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a7f0a18dd799a7c37999c7f65cfc78238b34edd1cec33316eb02e1553891ba49",
+      "htmlSha256": "8d7af26617b8ed8941aa2086ad0e5910084a4d4a0af56b09e16d39175d83b2f7"
+    },
+    {
+      "file": "docs/analysis/RenderRg5SurfaceMigration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e452a8c515ac3770068ef012c1ea3f0d40096f81a1280e17b90a0e19d77d47cb",
+      "htmlSha256": "d949c5ad7a6229e35a1f99727768a3901aafe01f9dbc80e818028a8e791f3f14"
+    },
+    {
+      "file": "docs/analysis/RenderRg6Acceptance20261007.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8e0fc02ad02c6c9609d13cf8e091d30648492e5325361b73db36a722fd7211b2",
+      "htmlSha256": "f5bf933fee53af6eb2bfa6fed30dacaae1820ab507aab5eb908181457e844975"
+    },
+    {
+      "file": "docs/analysis/RenderRg7Closure20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4ae5d32096ed4f7602f5a60478b4406810f309bd47624400cb8a6577ff05a058",
+      "htmlSha256": "3d17d162fd7b4c853fdb843e832d6db41d97e1fccdb1f166b0b09e842e919969"
+    },
+    {
+      "file": "docs/analysis/RenderRg7Implementation20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c48e639a65ee1006cb0ae788d085f03d5df5b217315b01fd3313c3525fa027b4",
+      "htmlSha256": "940400fbd956aaa3efef7f1b6da15c9049dee9d656a1a180891032390b779126"
+    },
+    {
+      "file": "docs/analysis/RenderRg7Rg8StructuralAudit20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "fa22aa3fb358ee11157ec53aedf134511b07e46228f8a9db8ff2deebc112ea98",
+      "htmlSha256": "ad6fb6726240d3be5e4bf9d510740d2b824de0ec7568cd864d5d8e5836549a1f"
+    },
+    {
+      "file": "docs/analysis/RenderRg8Barriers20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "926f7fbd1b7a004ea8c6a463da5ef08b12fe4e4f448a9e422dee90de63b6e268",
+      "htmlSha256": "575ac256a749dfcaf2556a0d07fbfb741b3395971d65e4b1f065b359e0427259"
+    },
+    {
+      "file": "docs/analysis/RenderRg8Batching20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "713eed1839999093de0693d65b772c3d8daf497fd9bdf8dbeb8f7dc23273351b",
+      "htmlSha256": "f8212e8a8ae2498b5022f47d3032b7f311b0307c69c19fe30f81b982abbd1952"
+    },
+    {
+      "file": "docs/analysis/RenderRg8Closure20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ac72feb12b226354f73c3e986f36943d041bb5919ee0dbe19c7a3880266cdb27",
+      "htmlSha256": "3cab6a2df7399a9d96704030ce380fcceae30919e883524b4c883271bcfff068"
+    },
+    {
+      "file": "docs/analysis/RenderRg8GraphicsRetention20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8180b5bf7129b3ece89bbf9c55866a199a15c9210febef1266fd9ae5458980b7",
+      "htmlSha256": "f7d824a5f7a337811401e34ad1f44103e3e32719a8d48f1c5508115181968cfd"
+    },
+    {
+      "file": "docs/analysis/RenderRg8HistoryFix20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5505598d2e99128fa14e1ed47f66d2ba845a050ba6eb99d27de098dc490bbac0",
+      "htmlSha256": "886ef2789be48ffd046b5675bb464b592fd25d51865094ae71ec0027413ffff3"
+    },
+    {
+      "file": "docs/analysis/RenderRg8OrderSearch20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "66f7ebc1a2a5fd01b4f2588d3c4b0a71f0bbd347ae1bc7051f663d81f8e38978",
+      "htmlSha256": "766a9c7bba92357e3bf12f906d7598b1a5c3287eb503578d3785344a762e3ac0"
+    },
+    {
+      "file": "docs/analysis/RenderRg8Pr167Followup20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4488ff7475fbe76b7890773433bd7590fa9795055f70fee7c45657f19a8169e1",
+      "htmlSha256": "1cee2e6409be20128507896e29a353786dc2cb064649d09ec18abf71b347e0ae"
+    },
+    {
+      "file": "docs/analysis/RenderRg8Pr168Measurement20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ef0a63f4929155d4d2ab2440eda5c9355cab6a47a9dcc476497cbbf54c431a7a",
+      "htmlSha256": "89b5be78034c673dc639daff3277a6d75b691a7094e93dccb64444ca9312115e"
+    },
+    {
+      "file": "docs/analysis/RenderRg8QueueExecution20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a6d30e3a0234a5a147a94135a69a95c9e08d35fcd234c359f55bfe8c17087d3f",
+      "htmlSha256": "fef34e5486bcbe8adce945bb04ff9bf4709237dda64cadb79dda4f9b6ac7fca8"
+    },
+    {
+      "file": "docs/analysis/RenderRg8QueueSchedule20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4651b8d9ff40d5b999e7f70dda251b7119461b7c741a0da209737e8366169c85",
+      "htmlSha256": "aee3e9e7f78714a2cb1bb55d8db0e9927710178c250bf2a4368ad624059ade26"
+    },
+    {
+      "file": "docs/analysis/RenderRg8SchedulerCost20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "817f829c87c85077fd86fb154ee4d35573c871aac625a7619365e141fd96fc13",
+      "htmlSha256": "84b569d662155850fe2dbd76125b277cc8536cb5064b0dec1a7035e2ba3d255b"
+    },
+    {
+      "file": "docs/analysis/RenderRg8UnifiedExecution20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "af6bf861c8a7fabdfa26489eb9aa47d63e63eada9eec35c239a1d4471e969b48",
+      "htmlSha256": "7578b2d9a19cfc6e4b681e17e06759bce6c52328c1d7f53b74344bbfe8f3dfc6"
+    },
+    {
+      "file": "docs/analysis/RhiQueueContractQ0_20261008.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "480209e7ded130cbac87fd14b3f39ff4c6fb15a0807f55c574a04873a62c4f0c",
+      "htmlSha256": "e0621893460074b619656aeed24963e10a88e52949f185680f3a2dbfc0180298"
+    },
+    {
+      "file": "docs/analysis/RhiSoftwareArenaOptimization20261020.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "627ab1ed1b226ee2da9b11d04c2070f420fa2b58d43f96fb9f9e77c3081d3903",
+      "htmlSha256": "6dc0b58a74f1d9d006b3c5c5dba80770cb53afe87eb0bd54de6fa8bb3185069d"
+    },
+    {
+      "file": "docs/analysis/RhiSoftwareFollowup20261020.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b95809d53a1915445c89e1014b81dd598f7e072666f79da25c42a153044ba456",
+      "htmlSha256": "43c03e73af5d50555cf7a45070505debe41bcbb7cd390fce386c32671114faf2"
+    },
+    {
+      "file": "docs/analysis/ScriptBinderSplitAnalysis.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2e9c0e7b0bf39b14970b0578f42fd96100cccc493577546a9e0d395e358bb2bc",
+      "htmlSha256": "8b896d89b1a8589690f52f6f1a50ab6873e611fe050624038d14cfd48027e419"
+    },
+    {
+      "file": "docs/analysis/SharedRuntimeDistributionValidation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "97c70df572e0d7453d4e6dd647090cbb1bb986a31f26cadbb81e59794f23bb1f",
+      "htmlSha256": "9c8f0411464f83319cf676ce737cffb7486fdf27443b767ad8cba848c1cddb7d"
+    },
+    {
+      "file": "docs/analysis/SharedVisibilityInputs20261020.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5de38afef1966b6521b731f17daa52ed0188f78afad711179dceacac364b4197",
+      "htmlSha256": "87b0cfef23005e38e9d816072fa8c80153418c08b89586fc2918732884618995"
+    },
+    {
+      "file": "docs/analysis/TemporalBalancedHierarchyRace20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b7c5306ac01f0c7dff2579ce6d7a187ed17859776ec30ee2bb451759d7c91a18",
+      "htmlSha256": "8e4b0353c1fecd4a84c3cea5d882231347c995a5182109ef142976dff3aa161d"
+    },
+    {
+      "file": "docs/analysis/TemporalBase0ConsumerWorkload20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "191aff73619dfbe1bf806a41020869757b6ab2b958feecf6a00c559aef0fa0ec",
+      "htmlSha256": "da5d5932705db7e8e0b9e0cd32f11360200b3428ad770c25415183737a2ca90b"
+    },
+    {
+      "file": "docs/analysis/TemporalClosureCheckpoint20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2a07e1f094fb2c7aa441ad171efcf3280f7bf9114715e0299dc0163fb094c71e",
+      "htmlSha256": "5c8d48d898e561f8f14d8c75687a33d826db899649d10f1df9882b2c51a8ea67"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssDisocclusion20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e1cc8f1df092141a0c470db5fb2f3e84b523cdaae3aff277e09de8e40e755633",
+      "htmlSha256": "e51ff98da9068e702d16781e4bc9720e6428f680b09d84a84bbc1e27b753cfd5"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssFinalBuild20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "53c4109948942ced6da792d20f833cc3b32fc2546e86ed287e70f7b4224a616e",
+      "htmlSha256": "bd0f0a83f6bcf50ff21894cbe5416497616f59e80fc13021bcd2733d20335fde"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssLens20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "780476f782854e8c51a09037aa78bbbb45aa1077a3df5248e72b1e03a7ea4a18",
+      "htmlSha256": "28bce8286f00f98bf0afb191a524c3a736c8ab92d4e0df9eed645b74883275a8"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssNativeAA20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "da01551c66db863d4df3fbd2fff271d653a4aded55b9124b7cdeecf0c77e36ed",
+      "htmlSha256": "4eade926a46121d8ca005e7fe9f475ec687acd329c1f92f0b7528301964d9a85"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssPerformance20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e7e0303efa9df23d8ad4a888e3db8332feab7a8d4f04a16a11dcb616716e685b",
+      "htmlSha256": "baa5f098acdd7a02f559f883f510c4077e5218fa0c21856c095cf671562061f3"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssStartup20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "68b5e38c0f0163c6dfab08493f6f17e34008d709e8ed87c3f608458c6544eecc",
+      "htmlSha256": "f8d4a2d822d4d248bb11a12a11f444f0c573577a9a351a41bf6bacd055a3621b"
+    },
+    {
+      "file": "docs/analysis/TemporalDlssTransitions20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ed32be0c9cf80ee8296757f02e9cfa955db15bc8c2e58ed817c93ac0fcf2c773",
+      "htmlSha256": "61e7858dcb4e36b6f390e5173490fe88325522177f6b1d89657f5b89af691218"
+    },
+    {
+      "file": "docs/analysis/TemporalMeasurementCheckpoint20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4fb14871e70c86e71372d1782dbe03dc99bb7be5953d55b354bc13580c3ad26b",
+      "htmlSha256": "04541d40b22265d6f4213ea26d9b70396f3b8648e157e5862fb569acb946737e"
+    },
+    {
+      "file": "docs/analysis/TemporalMeasurementConsumers20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c45a9cc7601808a19412ef97d344c7340739535b3fa8b4f438461c5eb0b56f0c",
+      "htmlSha256": "6c0f809af088e1df57146155cd841392aafa547740bc8b093c127df5063e8214"
+    },
+    {
+      "file": "docs/analysis/TemporalMeasurementSurfaces20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a66022d7f3e392d35960e96d76e21710f36eca4808dbfc37b670b9d15ab4dff0",
+      "htmlSha256": "b962d9cdbb975c7b0a2af02efe9f40c34d6f412b71e2ca40b39556e79a79844c"
+    },
+    {
+      "file": "docs/analysis/TemporalPhase45Closure20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "24d00415dda1a53761ce30928d7063a9b18636e18f72e10ef0426e27541b6ddf",
+      "htmlSha256": "1d09f3dca77ca7afef4ccb32ab4853ee3c3651309255ca961119b46b0da17019"
+    },
+    {
+      "file": "docs/analysis/TemporalRg6ABAcceptance20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7a6a5f351fbc099e566aba55c113b3268afd47746e77efd5a33daf630f4571b6",
+      "htmlSha256": "10e83e4f0f71376ac993be8b343d03522b23f350413808d26c1342444be43db4"
+    },
+    {
+      "file": "docs/analysis/TemporalRg6CpuRecording20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "37c1f2f7fe50dab9e3f65154f13ea69d2a2f1fb983d7e928fb800c987d07e347",
+      "htmlSha256": "68456328369651afc1fc9ca176dd0eae6d5cde41a9e693fdb2ab9128c97d5e54"
+    },
+    {
+      "file": "docs/analysis/TemporalRg6CpuRecordingTail20261011.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c4d42440e85e48fd4f5212e1be52810c3291cd61ce8712dda05d950004af2cdc",
+      "htmlSha256": "688f1a8e6fcb08a95378bb7f2258185df23aa8c9a0fe9844f1ae74c9cdf4ea97"
+    },
+    {
+      "file": "docs/analysis/TextureActualInspectorShutdownRepeatValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9ab6dbd244e37eef097532849d6b3b853cf460350740d2de69b5300416488f15",
+      "htmlSha256": "66e22a7d8a7eb2b9df3b4755e7115a03a655e6038ed9bcd4e95a5f3569c6aa66"
+    },
+    {
+      "file": "docs/analysis/TextureAutomaticInspectorConflictValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "cd107957e5c883b6361ce4661494efcef2d329594acc55c4738184b9b4dae708",
+      "htmlSha256": "59783a4c25439b4259b25e745e08556947b18f3d1d0163bef857725fdd8f4e57"
+    },
+    {
+      "file": "docs/analysis/TextureAutomaticInspectorDebugFailureValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2d7f5236bd7c8233bce496b047b46ebe4f6348bd19048d17f6f1ad1ab142c3ec",
+      "htmlSha256": "768b93d34429f538feb1dcc0f2d2a362942a7ab72f703fc953d5e77b9b37f58b"
+    },
+    {
+      "file": "docs/analysis/TextureAutomaticInspectorReleaseValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "07e0a9dddadd41aa9023b83beee7afd36d6b76c5b632234be8c36c9050a0420a",
+      "htmlSha256": "740f97b9e06378569c11e755f386d50962c86dfcd37aa4b15037e285c2439f4d"
+    },
+    {
+      "file": "docs/analysis/TextureAutomaticInspectorUiValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a041137b23bdbbbf19a5b540c46ad06ade9043177dd3a958a831614fadce0a86",
+      "htmlSha256": "26794c6e21f1c6d9f39999acfeb924fc4c1bf2e11d583bd9507453bc9c8622d8"
+    },
+    {
+      "file": "docs/analysis/TextureAutomaticSaveSoakValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d4afc6bd595c374143dd952e55cacafbbe350df8dcaecdbfd1032306a2021b46",
+      "htmlSha256": "a4dd6eba75c974af2641ba0a59024ac172e7e86a37f4858bad22088a46487ac9"
+    },
+    {
+      "file": "docs/analysis/TextureCookedGpuValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "05f77078ccf4b958e1995c657869d0ae8789a2ed88b62da94b4ad87d29e87e8b",
+      "htmlSha256": "2412447a865f7e536a10e3996086cb83c1d17353c945322df31a5f3dcdaa32e0"
+    },
+    {
+      "file": "docs/analysis/TextureCookedVulkanValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "25afc571062d96efd2d40de11757cd8efefe54a9645814366e8c633b21a6ca73",
+      "htmlSha256": "1126b15e0c136029d3ee05b7cd38025b740a9d67f22c8a8d3fdd9dbe19f707e6"
+    },
+    {
+      "file": "docs/analysis/TextureImportLifecycleValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "72fe27488c3b01d8d14d6c858dcbfccc31a5f34a437e301bc537ffbeee3b5e84",
+      "htmlSha256": "4ac0ffd27791624e4637c402e71f0495613b387bb9817370709652498b843d95"
+    },
+    {
+      "file": "docs/analysis/TextureInspectorScaleDockValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "081554f3c48434ec7e6eb08109644d1b04c9eda823037778435deb693f589f0b",
+      "htmlSha256": "6666cbfa174eb1d8b93d9b64f8cde691e1ca1241b732adc7194e93af93c66c55"
+    },
+    {
+      "file": "docs/analysis/TextureInspectorUiValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "32a2f667b4b42d379fe8bba37bea5985c1a927d033eaeb7184340872f80f1c4d",
+      "htmlSha256": "b0363984b4dcaa19f7ecf0b94887d66e58b73a1ce11aea8981ab4420bad0d5e0"
+    },
+    {
+      "file": "docs/analysis/TexturePendingMetadataShutdownValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "faa792ed287e58aa99e09ca40aa6730ee552db5828bcd2c5c05c1d07aa33c935",
+      "htmlSha256": "5bf806673df8eccbe24ed4c4fb31d398d47d253a8e841c1c34e15d4a5b02dd04"
+    },
+    {
+      "file": "docs/analysis/TexturePendingMetadataValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "096769d444091fb6af048fc0cafac0c65400e3fdf04d4d2cecf95452d317a46f",
+      "htmlSha256": "441019f7e834a093e781892ff0cfe52a03a20ae1e819e4cfd3149d4df912aa38"
+    },
+    {
+      "file": "docs/analysis/TexturePendingNativeCloseValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a89a0747ffe31ba4c12e475604dd86507b6220bc996faeb849b0a86c66e9c785",
+      "htmlSha256": "f3a8a4c32ad0f75d9eb74203dea93a41fca03cd600a0d90b6fde896c93866647"
+    },
+    {
+      "file": "docs/analysis/TexturePipelineValidation20261009.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "880167eb7aca6d4cef267f09325a6791c5ee2356cf0a08adbaefe67f9c12b157",
+      "htmlSha256": "18379fc9af44f765fc21c9a99923231acec7306c46db05113231c694cb089431"
+    },
+    {
+      "file": "docs/analysis/TextureReimportSceneValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "0de4d482a0f83759c7a165835635d31c323520cbd21f6a08ec6fb967842775a5",
+      "htmlSha256": "b50be356862e028c6d4c308538678227d1fae12b9b3ae22544ae4e9db1fbf296"
+    },
+    {
+      "file": "docs/analysis/TextureSceneReloadValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ff19f73514cc0fd874a261ea9120448482dabef7d55580a79990d83c9d7b0449",
+      "htmlSha256": "a30440daebf0e2d6e08fa78e495aa732c47d776703fa2d744f8c2c3147c80cb7"
+    },
+    {
+      "file": "docs/analysis/TextureShippingArtifactFailureValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d7929c8650ced9882d02bf15ee588e81d1e0659a9fa40901c2c1adc06a394feb",
+      "htmlSha256": "7a84f63ab52bef887d58656e311c138bd41142bb58cdc864b2dd8757f997308f"
+    },
+    {
+      "file": "docs/analysis/TextureShippingCoreValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9a5baed2f56c44c8a0f2b03277c1c0cf1bb19f5d7c40ea3fdf763d85f3f42bac",
+      "htmlSha256": "31e1427c50de04407b706c694b63b8d8874bf122fb00f22f89f1b40cbe55e8ac"
+    },
+    {
+      "file": "docs/analysis/TextureSidecarDiagnosticsValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "6fcc16f0f80791fcc279208089615078c7c5ddeb7ab10364d614c0feb8978b8d",
+      "htmlSha256": "24caca3935d6889f8e63aeef11656d82cd73a7a24fa872ed3145df1036af6d2c"
+    },
+    {
+      "file": "docs/analysis/TextureSpriteReimportValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "38943f5c9ed5a6f35bce6ac5f11db2efa97636a924844a8238fbf27a8f33c92d",
+      "htmlSha256": "5e31ca9ffde109ffb8eaf890ba6bab1a66a83367413d0654c002a10f3e361d3c"
+    },
+    {
+      "file": "docs/analysis/TextureStagedPublishConflictValidation20261010.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5b12ec2c3e9df4ab665000b58dddf360749d747e12d6879ea736c25c16b9d390",
+      "htmlSha256": "82b72a8b721cb4d9617a45ba3b84fef89d6c861786addb84dd11fcd8bcf95fde"
+    },
+    {
+      "file": "docs/design/ArtifactStoreLeaseProtocol.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ee91e96492366b1bb34fd57e6297afb521a4c790db36319900ab8554c7fb7c5a",
+      "htmlSha256": "86fd4548851995e3c3517af7682d66d422f2234de3d79431682f3905337ec493"
+    },
+    {
+      "file": "docs/design/AssetSetImportReceipts.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "963952b2b565c2269dfe3a24016c09151f39de5d90dfcdb4e56be5b4d1d24a31",
+      "htmlSha256": "556317510cecd0ef20b331b23ee45b1e654b388a5e27bfc7b29a64132c796729"
+    },
+    {
+      "file": "docs/design/AsyncAssetPreparation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e0c5778bd95b0f06d48e3378bba3a99c3ae45200e92ef29d55fa5207d1d79805",
+      "htmlSha256": "e5ea28e5126d4fa07b221ac0c3d52fc9a77c573fff74f46e9f5698abbbde32f2"
+    },
+    {
+      "file": "docs/design/CodeMaterialAssetSet.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "979331f803a01b65d2734782fbce7c268a9ae398e1a9ede1b6bd5ea23160030d",
+      "htmlSha256": "04916e0b16f86c3a2ba6d2e09c65631768b6c41ed29f7cb8df02091629952e51"
+    },
+    {
+      "file": "docs/design/CodingConventions.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "abbd327b9de5a6f9466c07732d96040e87a45c0e54439e36240350e4ad110375",
+      "htmlSha256": "b10b329150dd96699d3f2e1d855a79df96755cb61562d47c8f4c31f0a24715de"
+    },
+    {
+      "file": "docs/design/ContainerLibraryDesign.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "98e4d3494141f5206362c4ca1a8d9fcb29682bb1d182cd3a05c8594bfd6c0cd4",
+      "htmlSha256": "b930e52b7791859c2b25b726e85a583071f98e82d16740b256d139f45ff59daa"
+    },
+    {
+      "file": "docs/design/Dx12DeepCapture.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8047e1a94691bc075d8f0823fb702ea33bec68a000220171868524da143c43f3",
+      "htmlSha256": "a86322ee86174aecaf0fbc3a36ba2dc694f5bf265a1e16e3e624b5899aa8cdbb"
+    },
+    {
+      "file": "docs/design/EngineVersionPolicy.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "23fb1aeceba5621d9544c87e54df4c75765595efb1d535a35b07d59a772a3839",
+      "htmlSha256": "8cd2c5ea65d4cbb25901c63fdce1b3fffe17c6b1100d1969c70ab60bb8c892fa"
+    },
+    {
+      "file": "docs/design/FoliageAssetDepot.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2a60accb4ff37d2511fd1d6d7ffaef4278c973bb24a7fc1cbc965e38ddd1d1d8",
+      "htmlSha256": "ea83a7b0dd5f2041f6b3caa6f0ab59a2eea337cd7353f5a9d3e254fe8cccbb69"
+    },
+    {
+      "file": "docs/design/GCCEIntegration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "9cb6ccb3ba0a4968575e80cb243048b31970fb3ad7e354f6ed3a28f7f1d16f8a",
+      "htmlSha256": "eaa6d51d78b4e519e6c04524f9fd533db857c8ac75d22e6f0edf538c277ab734"
+    },
+    {
+      "file": "docs/design/GpuDrivenMeshletDxrWiring.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "09bd3d49da0bf9bae8e784961e99d3779681b149f4e90718ad3481fdad1bcdcd",
+      "htmlSha256": "48942ff18b88f81acece7c6df322239a017d0e62aeb43734fa5cdec5c819f372"
+    },
+    {
+      "file": "docs/design/JobSchedulerDesign.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7a8c2ea60aceb4ff8690552df6c86aec11aadf247a1ad24e8058d13e0faed875",
+      "htmlSha256": "fdac3468af7c1e943a4cad5be3f94060b6d7150981b264d88e4a28c088f48219"
+    },
+    {
+      "file": "docs/design/LatticeMaterialBlenderParity.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a4c37684d56c9926c437f509ab1bfb352dd0607ac269a976f62dd181dad773fb",
+      "htmlSha256": "d2cf29e360fa29393ca44090c12837b7a4faca94b8412b6d6e9458337c0e284f"
+    },
+    {
+      "file": "docs/design/LatticeNodeSystem.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "83b30d83cc17b22c07cd81436aa89a9616fb12905e1676afeee4ca7fc778a348",
+      "htmlSha256": "a7963deaa17747f7550727774a5e9cd822ccf2315e76245495db635863e1714a"
+    },
+    {
+      "file": "docs/design/MaterialAssetAuthoring.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e83b1bc275868070d8920a5099eaec5b9792822f320f59297db89a1b4990903f",
+      "htmlSha256": "6fc885bc55ffeacbd3a5f0eaff2e184b8f9e4906dcd33571b138eac406d521a8"
+    },
+    {
+      "file": "docs/design/MaterialGraphMeshSurface.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e8d1a533a6284a4491680b350387036515bb872b141b985dfeae622c8580c317",
+      "htmlSha256": "b817d75d3581eb74249ecda4d248ee9053dc2a4aa43e8fdb09bb207a59f91c7a"
+    },
+    {
+      "file": "docs/design/MaterialGraphPassRecording.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "021c31206fedd8f9f6d18c9f6d9499dfe6903fe42e05cb57c35f413c22681321",
+      "htmlSha256": "1b7591274dade4220e65458252d0277219592b69fed01afef2b88dcbf573a4f1"
+    },
+    {
+      "file": "docs/design/MaterialGraphProduct.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "612e74ce6abeae9486ae1082b36e8bdcdc2b42f9788c3d9cc4eabe4b51b28ac8",
+      "htmlSha256": "eab24651f3daf3d60b6cc9b915ae85883f732710638fd56d228771ea5c036b65"
+    },
+    {
+      "file": "docs/design/MaterialGraphProductIntegration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "5698ddef6b7954434129d2eb740920c987c2c6cd4deb9eb10c995c8f3bee0e81",
+      "htmlSha256": "c9c07fd2dfa748f476035fbc48b1a5a6b78ebf42acefce879650a5327e1b7af3"
+    },
+    {
+      "file": "docs/design/MaterialGraphRasterSurface.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c0e054d0efa9295c55765e91f6ca1f05e2a2a6e956f53ae9a293d54b2623dd22",
+      "htmlSha256": "da186de96ce12616ad997c2b9667dba333608c8aa8793b4316ddb5e9fbeaba10"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneCook.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "57b4387f5e9b414dc7bf7e5b51c02b453927cb1701cde31aa7fae9ae17e3eb3b",
+      "htmlSha256": "a03a852380804a5a00875a6240268dc84e9ef1ea52b3378fde74b4ae31fb36b8"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneGeneration.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c80c5d01726c39347a12966fe4da1300e44d8c78ee5c24fe556e7828f1311428",
+      "htmlSha256": "c8e1e7ee278e27be0dbeddd0b51d3453bfdb960d62a84f94cf58512a4cb81bd6"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneHost.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b459c8bd8d8c858015265d95d38fb30b3845fba7204c91d6cb2e97dd06242805",
+      "htmlSha256": "1d237fa618b2ed5f50f14d06d4ec55013012489c9b97fc61647c4923d9d02ec3"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneInput.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "3a1bf3ad03535ae1ac0ba213185e0806aec5a940604d215da4e0fde44edff5a0",
+      "htmlSha256": "97f1dfaf982cb105b1aa5d55a19053c1ce537e77c637baf7913f7da2a12769c4"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneLookup.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a5c0ce93a2307cd2e66b6e670b5588dfb6b3368d7e0b2104371e699541b6c91d",
+      "htmlSha256": "0c203532258984bb4a42f31b3c82c2ba24081ba6b949629ec58d1598eab3c0c6"
+    },
+    {
+      "file": "docs/design/MaterialGraphScenePacket.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a882295d8609a6b406dccba19d8cdfa2053ba9288a62577283ca29b307800f75",
+      "htmlSha256": "7775c610af4489bf350726425c0c8c43f6125e04acc2674a45a0793c6c9f6e25"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneRefraction.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "165c06c0ec467e651bebb0f94181e61755460f61541e71beb2137e3f29a16764",
+      "htmlSha256": "2f42c066dc25e4a110978096e876cc323d5bb7b31c0e9f456e1fce8e603532fa"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneShadowDecal.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "623bdcf392400b575ee276c65872ec4cdf11fc9802762774e2b6e48a36640daa",
+      "htmlSha256": "57be44e0d12e649166e4c5d1cb37b13b64947439ffcb36ad5d9ce95a11af52a9"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneSubsurface.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "e8b52149c63e134dfb6cabb5181cd1f633c77e709f6b811af26b08f9c027ebb2",
+      "htmlSha256": "b7bcce3adbab4f102dd6e4802bd7a78cca0b74d19e195a9a90d8f3e9386634c5"
+    },
+    {
+      "file": "docs/design/MaterialGraphSceneVolume.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ad5ada499d22865a8850d3e8ca66358ef0a0682a1038c519061f1b9a21f1cee4",
+      "htmlSha256": "a586ace58d749006db1266d24587ca91c14edce09c894101e6cb783fa0d87d10"
+    },
+    {
+      "file": "docs/design/MaterialGraphSchema.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2fa927ee512468928463e79cd9cac198dbc0fc7f0bf672aa92c524d7f7e4cae8",
+      "htmlSha256": "c9387ed880faf91f17b59e6fae5b196840ee1b3a99c676317ae86092c74f3cfc"
+    },
+    {
+      "file": "docs/design/MaterialGraphSharedDepth.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "cec8f24c64c4f261914000f2bae4faa7b4ee0916fece36d22e0a91d2cb5b8d24",
+      "htmlSha256": "dcc94ec32e80224236e6cafe2e2cd9711a75853d0dac1e4c93685c09be2c4ae4"
+    },
+    {
+      "file": "docs/design/MaterialGraphSurfaceBatch.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7662a483878a8b113eb944119dcbe8162c02246057a3f8babb7f2b8e8f548639",
+      "htmlSha256": "7381e6e2d087a2d018384fd3c1ac739297488a79d71e1b5b2ec43554b961c84d"
+    },
+    {
+      "file": "docs/design/MaterialGraphTextureFootprints.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "657e2b77807b408d899e4d870e126f70d14a5b4559894b486b4910de539592d5",
+      "htmlSha256": "bd94e146b0ecbd218b34bb5cb84380fbd79e36584f50293279383f18d0b5b8fd"
+    },
+    {
+      "file": "docs/design/MaterialNodeEditor.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "33cd89bc0788f12edb8f732b909ea78edd3bb50ece69e43e922a92d07090a989",
+      "htmlSha256": "20c202eb26c4f23a508546bb2cb1eee06029b758f98fc1c13c186d2a5d0a7c71"
+    },
+    {
+      "file": "docs/design/MaterialSlangCodegen.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "8ad5b3bc4b9737595e73f8e030db00410ad2eb703a0f8346c1426620306567b3",
+      "htmlSha256": "2eaed8b6bc1c7691a8e837f77d728edfd92e015400d4bb9b0761d2c43a0a68d7"
+    },
+    {
+      "file": "docs/design/ModelAnimationStorageSharing.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f44ab5c86973fd57340d15da23f550fe5ccfa1e56c021d2d75ec0100734f54ed",
+      "htmlSha256": "e7b104b4cd542109861c4f29cc4c1b67701130ef061f6b6e2aa06359b82ac5df"
+    },
+    {
+      "file": "docs/design/OwnedBoundedPresentation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "08c6a78f6974c351951b5f3c53ad3bcd176261e54b7fa65f4a9e659f44e010b8",
+      "htmlSha256": "b286fc35fcf733f49d3ad093b400bb6e4cd622c37c8c7460a7b82cabfdf0ef57"
+    },
+    {
+      "file": "docs/design/PhysicsAPIContract.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "4ce048df63306a62ce818f2833add564c2896041cee689fb3c1cab222a136635",
+      "htmlSha256": "e8e19cbf8cab718ed2f9be4bd28751100763ac747ce10c3eb3832bc2b68dffe0"
+    },
+    {
+      "file": "docs/design/PhysicsComponentDesign.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c4cab25a827136c0482f83ccee262da16e762c6648ffbd46164cc156d56808a0",
+      "htmlSha256": "ad8da565d76bebdb88e5564d95c40e408f305fa5996bc4a22cbbc8ef97e00984"
+    },
+    {
+      "file": "docs/design/PhysicsContactExecutionContract.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ab915c96a7795b5cc2c24898684cb1b90e57f97903324556134f0de171605c53",
+      "htmlSha256": "9ac643efae982253a37d1977a5a850e316e6bfb7ba519fc21592d5536d99b00d"
+    },
+    {
+      "file": "docs/design/PlayerNativePresentation.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "43b1cf68a29d4b2d1595abe80ec23c0d2112a9828ff79c772014382bb34c78cf",
+      "htmlSha256": "ef2412d9e5575fdb13503e7e3414ee035ea25fa6a3795cc91d044fb3dd772c6f"
+    },
+    {
+      "file": "docs/design/PrincipledCoreSemantics.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1276052f70cbbb8345180b3a9de3f7bd3af8a787c04f039a0fbf06723e78a181",
+      "htmlSha256": "e1043ac057640f02289a44b8061d29538c86d35e996fc63feb05f209111abfdb"
+    },
+    {
+      "file": "docs/design/PrincipledIblBake.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "255f259d9817a38b63b6f3b307b4c1084bdadf871bb0a3d196532a43f9a7db32",
+      "htmlSha256": "cfcb14b875e0ae2cd65700dd04a3c2d5ee0fbcb5f0e0804fda9816cb1a1e8f4d"
+    },
+    {
+      "file": "docs/design/PrincipledLayeredSemantics.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a254c12d3858332c50e3328852d042e0c624ec19c3f5bf02c9baa4753f130a0a",
+      "htmlSha256": "2b38e5bc7ef247fb468fd789dba3b0f243388306657a45fdbb23c4b89b68b191"
+    },
+    {
+      "file": "docs/design/PrincipledMaterialAbi.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "cf9466f34eeacdf423f29c1ce7e6168706b09dafab45ad9c71b7c755c3dbc5f8",
+      "htmlSha256": "101871bba416ba5c9f32dd89f0f0749f050b0557865f0f57f41edd53286971a9"
+    },
+    {
+      "file": "docs/design/PrincipledSpecialSemantics.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "440216f945885adb081e88569ed4f11bb716faca1c2bbfbc7f076b71b001e21c",
+      "htmlSha256": "abc01cacbf696f3359f019b29ecb7031a2154142753ca397a0255f338ce18b98"
+    },
+    {
+      "file": "docs/design/ProfilerContinuousRecording.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "6f90fe5bb5d056ee0b175c34b3a9369b71a4dfba1c0e574f68eed9198b7b05a2",
+      "htmlSha256": "2ed806ef23040dde863730188f949e16711f1d97d41b3a9d9812dac1e1860fc0"
+    },
+    {
+      "file": "docs/design/ProfilerViewerProcess.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "250b135b3a095fd25a0f63b9c416a8196dab6c6383fb12264cfa359da3f145ad",
+      "htmlSha256": "0a0387ee2260c7ff068bb397c8d33e4c54690f3b2a15efd9a6e4e3775361337b"
+    },
+    {
+      "file": "docs/design/ReflectionDesign.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "b279d577dc099bb2093e9208444e8344302589611d9b69e044dab7ab0f38f92b",
+      "htmlSha256": "8d5693ddb08324ad8744c22ab522fdde1369482f10d6c06fc594885aa7c36f1a"
+    },
+    {
+      "file": "docs/design/ReflectionRetentionDecision.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "ba24d10627509aa11a2bdaaca4658a8f32d042b4e3e9d86b98d29bb055976e03",
+      "htmlSha256": "5ccbd2881c866a9262ce9f5b00ea65614047a9d9efedd23c9d8b2d2cd1fb67ec"
+    },
+    {
+      "file": "docs/design/RenderPipelineTargetArchitecture.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "dd0241eede0bdc57bea202a84a64c0e230134c556f83568a2991c64bd10d1462",
+      "htmlSha256": "61d0490d45d6ab31bed2ff3fac6500375c3a1e298c2aac75eb802e6cf884d405"
+    },
+    {
+      "file": "docs/design/RhiGpuMemoryLifetimeDesign.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "f93adf7aa45a5141bf4967daa17a6bfd964e3b5961e5c9c55e4701063dcec5b8",
+      "htmlSha256": "7dc9904557a725c063d13cc2131b786700e53ede05272fdcfe53ae1e144e1543"
+    },
+    {
+      "file": "docs/design/RHISoftwareCommandListSpecification.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2a2e258aeac36403b272b7edc2c3aec1c21babc393dacdc661f914d1bf3aec3a",
+      "htmlSha256": "98599e0ffc4967602a150fb9c52a3714158070f863721596883abd6526b4e4ad"
+    },
+    {
+      "file": "docs/design/SdfTextRendering.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "c20388c2469db03a030f512fa39217f34668023a2146b372238f70674eb4873f",
+      "htmlSha256": "c4f8f79d75c17fb2d7151566f4a62a4dace5e402c536fc1a47addad29f1f7421"
+    },
+    {
+      "file": "docs/design/SourceFreeAssetSetPackaging.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "d52ea7a89f1f71620bd26a74f38b88e422ba6941b86334e8416dac16bd5a7e2f",
+      "htmlSha256": "6019a88952d5c42cf176280638f1d0f3f7b473ea26ebce12db0ea6ceaa970549"
+    },
+    {
+      "file": "docs/design/TextureCodecBoundaryDesign.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "fb300192f253db38bc1080d0873831a9a707ff2c076699fe12d17d33237b82d2",
+      "htmlSha256": "37dc0f999184d01982e8584dea061837086adb97572ada3b6c224ca89ce09479"
+    },
+    {
+      "file": "docs/README.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "7a6e1de54f219c946c0a532950b771d8bd35dada57b84d8d2f50bbf635092640",
+      "htmlSha256": "f9e466b527a51290642b1191eda46212b8e289c3aac804055cd0d797c120e635"
+    },
+    {
+      "file": "docs/analysis/LxShadowComputeCulling20261012.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "41f4067fd46e2ece3b55bac2460b29693cdf920fc9e05073ba16e6232e54ffae",
+      "htmlSha256": "188dad8def668c2ad2a0b65b7f499962a971fdc379fb850d2fd50e75aa560dd5"
+    },
+    {
+      "file": "docs/WEBSITE.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "13b15e52b957e85eba11664b6bf3e383f08295dde09aaef823d7eb046fbb046d",
+      "htmlSha256": "6e063c1564c9b60ba7b882c77baf12e355cd861f24a523acfeba8673b7e4b955"
+    },
+    {
+      "file": "docs/analysis/MasterDocumentationAudit20261020.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "a51200283a856a4b119a6c0d004a1ec49f32467f903749ad83a502d227b221d2",
+      "htmlSha256": "0d06db879ddf263b157c2ef21b773519cbd02eaa05e808abd0e686a8b8a4f444"
+    },
+    {
+      "file": "docs/analysis/RenderPipelineFlow.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "2117b4664503bab02c49b2b3436a34131acfd634fe2363e9c9829cb68d62db28",
+      "htmlSha256": "d4c4287c733cc9e017874ed3deb9f546f50c78de57e8e8864c98409da1696d42"
+    },
+    {
+      "file": "docs/TechnicalGuide.src.html",
+      "attempts": 1,
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "212b3276aa8e997dd3a0cdbdaf3fefd85bbbd0c59d5bbebc7e4f7baab2cca431",
+      "htmlSha256": "0e686004592aa47fad833dafa3278904fce0f6645f63c9ba0ea1bcc734af61f4"
+    },
+    {
+      "file": "docs/analysis/EngineWiringAudit20261020.src.html",
+      "html": "docs/analysis/EngineWiringAudit20261020.html",
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "dd703f97e678544d5f8ab5f0603ad5ce6b0a9177e055b1c455b4bd04c29f9e49",
+      "htmlSha256": "41b4949afdc5506edcfb24c60fef3e0257a50129c1f203f3e8fa48d945e95e7d"
+    },
+    {
+      "file": "docs/analysis/MasterStructureReduction20261020.src.html",
+      "html": "docs/analysis/MasterStructureReduction20261020.html",
+      "passed": true,
+      "visualChecked": true,
+      "sourceSha256": "1038072506588b68efe8c27b72346b0f86a6d75dda8a5d1fb4a185941d26d398",
+      "htmlSha256": "d6c1338d164b44e401746164f63cc5aed25577aafbca48533c31a69d4c197e11"
+    }
+  ],
+  "visualInspection": {
+    "sheetFiles": 325,
+    "contactSheets": 11,
+    "method": "upstream visual-explainer 390/1280 viewport checks; generated sheet review and representative full-size review"
+  },
+  "scope": "Existing plans, authored API/design/analysis documentation and standalone reports. Source declarations, document/link/visual integrity and documentation application/build are verified. Dated engine/GPU/SDK/performance acceptance remains historical; the separate object-by-object engine audit is not marked complete."
+}

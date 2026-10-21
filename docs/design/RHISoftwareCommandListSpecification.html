@@ -1,0 +1,1258 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>소프트웨어 RHI 명령 목록과 네이티브 번역 계층 구현 스펙</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
+
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
+
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
+
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
+
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
+
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
+
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
+
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
+
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
+
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RHISoftwareCommandListSpecification.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/RHISoftwareCommandListSpecification.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>소프트웨어 RHI 명령 목록과 네이티브 번역 계층 구현 스펙</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Live pipeline</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Versions</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">DAG</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Record tasks</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Queue submit</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Completion</text></g></svg></div><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h3>2026-10-21 기존 제품 경로 연결과 수용 상태</h3>
+<p>요청 기준 <code>09df9a16</code>의 문서를 master <code>088ea7b</code>의 구현·계측과 대조했다. 아래 본문은 전체 수용 계약이며, **구현된 경로와 실행으로 검증한 범위는 <a href="../analysis/RHISoftwareCompletion20261021.html">구현·최적화 보고서</a>**에서 구분한다. 기본 경로 전환은 수용 전까지 보류한다.</p>
+<ul>
+<li><code>RHISoftwareQueueRecorder</code> / <code>RHISoftwareCommandQueue</code> / <code>RHISoftwareQueueFactory</code>와 owned translator를 추가했다. DX12 owned graphics/compute는 같은 native identity·timeline에서 소프트웨어 기록, 독립 target의 병렬 번역, native 제출을 한 owner transaction으로 수행한다. 실제 worker 수를 사용하며, 중복 alias 제출과 실패 후 replay를 거절한다.</li>
+<li>Vulkan의 기존 graphics parallel-pool 제품 경로를 <code>CREATOR_RHI_SOFTWARE_COMMANDS=1</code>에 연결했다. immutable metadata snapshot, upload/resource/pipeline lease, 전용 descriptor recycler와 device 공통 pool budget을 사용한다. Vulkan native owned/multiqueue backend 자체를 신규 구현한 것은 아니다.</li>
+<li>DX12/Vulkan device incarnation을 공통 발급하고 frozen translator가 실제 장치 identity를 확인한다. owner lifecycle generation을 장치 고유 ID로 재사용하지 않는다.</li>
+<li>활성 target 수와 보관 capacity를 분리해 8→1→8 기록 시 encoder/list/budget 객체를 재사용한다. DX12 owned encoder를 native allocator/list와 함께 GPU retirement 뒤 재사용하며, 제출 목록은 고정 배열 또는 owner 멤버 scratch를 사용한다.</li>
+<li>bool 명령 예산 거절 시 opcode·payload·logical state·sticky error를 바꾸지 않도록 수정했다. 복사 span을 갖는 간접 batch도 하나의 예약으로 기록하며 fallback이 계속 가능하다. Vulkan graphics/compute의 독립 pipeline 상태와 rendering 상태도 보존한다.</li>
+<li>기존 FIFO의 queued+running software arena에 기본 256MiB admission을 추가했다. owned 경로는 같은 기본 한도에서 <code>Finish</code> 초과를 대기 없이 거절한다. CPU 저장소 해제와 GPU resource retirement는 별도이며, 아직 밀봉하지 않은 callback이나 전체 heap의 hard cap으로 해석하지 않는다.</li>
+<li><code>RHICommandFailure</code>의 stage/원래 opcode 위치/backend generation/<code>executionUncertain</code>을 graph execution, owner handoff 및 submission ticket까지 전달한다. 실제 native 실행 시도와 실행 전 거부를 구분하고 기존 quarantine을 유지한다.</li>
+<li>record/seal/admission/translate/join/native-submit/retire 및 native query에 recording/frame/view/queue/target/backend identity를 연결했다. CPU 이벤트는 64B를 유지하고 100B sidecar를 snapshot 8/streaming 9에서 소비한다. ProfilerViewer와 Python 분석 도구는 exact/ambiguous/unmatched를 구분하며 RHI sidecar를 FPS 분모에 넣지 않는다. Vulkan offline raw timestamp와 기존에 없는 live calibrated timing producer는 구분한다.</li>
+</ul>
+<p>실제 공용 RHI와 scheduler/allocator를 사용한 CPU 회귀, source-hash 고정, sanitizer 검사 및 <code>CE_SHIPPING=0</code> profiler core/codec 검사를 수행한다. DX12 native 두 프레임 readback·owned queue·timeline·pool 재사용 회귀는 추가했으나 이 Linux 호스트에서 실행하지 않았다. Vulkan CPU native-boundary 검사를 Vulkan GPU validation으로 간주하지 않는다. 따라서 §12의 제품 수용·기본 전환은 실제 Windows/GPU 실행 전까지 보류한다. <code>RenderGraphDeclare</code> 전체 노드 callback 병렬화도 별도다.</p>
+<blockquote>
+<p>위 2026-10-21 상태를 우선한다. 다음 2026-10-20 대조는 고정 커밋의 감사 스냅샷이다.</p>
+</blockquote>
+<h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISoftwareBatch.h#L6">Engine/RenderEngine/RHI/RHISoftwareBatch.h:6</a> — <code>class RHISoftwareRecorder;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISoftwareBatch.h#L9">Engine/RenderEngine/RHI/RHISoftwareBatch.h:9</a> — <code>struct RHISoftwareRecordingStorage</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISoftwareBatch.h#L51">Engine/RenderEngine/RHI/RHISoftwareBatch.h:51</a> — <code>bool IsValid() const { return m_state == RHISoftwareBatchState::Sealed; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L54">Engine/RenderEngine/RHI/IRHICommandTranslator.h:54</a> — <code>virtual bool Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L64">Engine/RenderEngine/RHI/IRHICommandTranslator.h:64</a> — <code>RHICommandTranslator(IRHIParallelCommandPool&amp; pool, IRenderDeviceServices&amp; services, RHIQueueIdentity queue)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHICommandTranslator.h#L68">Engine/RenderEngine/RHI/IRHICommandTranslator.h:68</a> — <code>bool Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1050">Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1050</a> — <code>bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1113">Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1113</a> — <code>!pool-&gt;GetTranslationRecording(recordingId, descriptorVersion) ||</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp#L1184">Engine/RenderEngine/RHI/RHISubmissionThread.cpp:1184</a> — <code>bool RHISubmissionThread::EnqueueTranslatedBatch(const void* owner,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L6">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:6</a> — <code>bool RHICommandTranslator::Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L27">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:27</a> — <code>if (!m_pool.GetTranslationRecording(uploadRecordingId, descriptorVersion))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L32">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:32</a> — <code>if (!input.GetDesc().uploadRecordingId || !input.GetDesc().descriptorVersion ||</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L215">Engine/RenderEngine/RHI/RHIEncoder.h:215</a> — <code>virtual bool DrawIndexedIndirect(RHIBufferHandle, uint64_t = 0)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L231">Engine/RenderEngine/RHI/RHIEncoder.h:231</a> — <code>virtual bool DispatchMeshIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h#L236">Engine/RenderEngine/RHI/RHIEncoder.h:236</a> — <code>virtual bool DrawIndexedIndirectBatch(RHIBufferHandle, uint64_t, uint32_t,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L5">Engine/RenderEngine/RHI/IRHIGpuProfiler.h:5</a> — <code>class RHIEncoder;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L10">Engine/RenderEngine/RHI/IRHIGpuProfiler.h:10</a> — <code>struct GpuPassTimingIdentity</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h#L65">Engine/RenderEngine/RHI/IRHIGpuProfiler.h:65</a> — <code>class IRHIGpuProfiler</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L68">Engine/RenderEngine/RHI/RHIRecordedBatch.h:68</a> — <code>bool IsValid() const { return RHIRecordedBatchState::Empty != m_state; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L69">Engine/RenderEngine/RHI/RHIRecordedBatch.h:69</a> — <code>bool IsReadyForSubmit() const { return RHIRecordedBatchState::Recorded == m_state; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h#L70">Engine/RenderEngine/RHI/RHIRecordedBatch.h:70</a> — <code>bool IsSubmitted() const { return RHIRecordedBatchState::Submitted == m_state; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h#L22">Engine/RenderEngine/RHI/RHIQueueRecorder.h:22</a> — <code>class IRHIQueueRecorder</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h#L25">Engine/RenderEngine/RHI/RHIQueueRecorder.h:25</a> — <code>explicit IRHIQueueRecorder(job_scheduler&amp; scheduler = ce::get_job_scheduler())</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h#L27">Engine/RenderEngine/RHI/RHIQueueRecorder.h:27</a> — <code>virtual &amp;#126;IRHIQueueRecorder() = default;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-10-20 shared visibility 입력 후속: shared descriptor scratch를 독점 non-pmr 아레나로 바꾸고, 고정 8뷰 메타데이터와 밀봉 count 입력을 재사용한다. 최종 shared 생성 평균 0.09636→0.09200ms(-4.52%), 기록 OFF 완료 처리량 55.35→57.02뷰/초(+3.00%)다. Game CPU p50은 13.41405→13.46990ms이며 120 FPS 목표는 미달이다. 32프레임·7212픽셀·shared queue header 224개 및 제품 출력 재생을 검증했다. <a href="../analysis/SharedVisibilityInputs20261020.html">계측·검증</a>.</p>
+<p>작성일: 2026-10-19. 상태: 기존 제품 경로 연결 및 CPU 계약 검증, native 제품 수용 대기. 초기 기준: CreatorEngine <code>2935f29452698d08f4c0cf720c255ae383c3ca3f</code> 및 작업 트리, 로컬 UE 5.6.1 소스. 본문은 전체 구현 계약이며 현재 추가된 범위는 아래 진행 기록으로 구분한다.</p>
+<p>GraphDeclare 후속은 선언 데이터·callback 소유자를 비-pmr 그래프 아레나에 묶고, 기하·패킷·하이브리드 가시성의 임시 목록을 재사용한다. 평균 선언 5.3156→5.0129ms, 기하 선언 0.4685→0.3563ms, Game CPU 중앙값 13.8340→13.4333ms다. 기록 OFF 완료 뷰 처리량은 54.21→54.38뷰/초이며 120 FPS 예산은 미달이다. <a href="../analysis/GraphDeclarationReuse20261020.html">선언 재사용 계측·검증</a>.</p>
+<p>이전 후속(권장 1→2→4→5)은 작업 그래프·입력·segment 객체·네이티브 상태를 재사용한다. 이번 동일 조건 비교에서 Game CPU 중앙값 14.1255→13.6965ms, 기록 평균 2.1666→1.9426ms, 번역 평균 1.9076→1.7150ms다. 120 FPS 예산은 미달이다. <a href="../analysis/RhiSoftwareFollowup20261020.html">후속 계측·검증</a>.</p>
+<p>이전 비-pmr·lock-free 후속의 Game CPU 중앙값은 14.1133→13.9197ms이며, 기록 OFF 완료 뷰 처리량은 51.62→53.26뷰/초다. RHI 번역 평균은 1.8541→1.8589ms로 개선되지 않았고 120 FPS 목표는 미달이다. <a href="../analysis/RhiSoftwareArenaOptimization20261020.html">최종 계측·검증</a>. 이전 기록·번역 검증은 기록·번역 재사용 검증 (<code>../../Artifacts/rhi-record-reuse-20261020/index.html</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 기록한다. Debug CreatorRobot의 Game CPU 중앙값은 17.3454→14.1648ms, ETW RHI 번역 평균은 4.3492→2.7257ms다. 초기 배선 검증은 비동기 제품 배선 검증 (<code>../../Artifacts/rhi-async-20261019/index.html</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 보존한다. DX12 parallel-pool 제품 RDG는 소프트웨어 기록과 RHI 스레드 직렬 번역·제출까지 연결됐다. <code>CREATOR_RHI_SOFTWARE_COMMANDS=1</code>로 명시적으로 사용한다. 기록 저장소·진단 문자열·번역 풀 재사용으로 초기 성능 회귀를 줄였다. 120 FPS의 8.333ms CPU 예산은 미달이며 기본 경로 전환 보류는 유지한다. 이 초기 기록 당시 owned/multiqueue, Vulkan 제품 전환과 병렬 번역은 후속 단계였다. 현재 연결 범위와 미완료 수용 항목은 문서 상단의 2026-10-21 기록을 따른다.</p>
+<h3>2026-10-19 구현 API와 수명</h3>
+<ul>
+<li><code>EnhancedRenderGraph::RecordSoftware</code>: 기존 기록 topology·barrier 계획·패스 콜백을 공유하고, native target을 열지 않고 <code>RHISoftwareBatch</code>를 밀봉한다. <code>RecordParallelInternal</code>이 두 기록 경로의 공통 실행 계획을 사용한다.</li>
+<li><code>DX12DeviceResources::CaptureRecordingResources</code>: shader-visible descriptor page와 upload segment를 pin하고 추가 할당을 밀봉한다. RTV·DSV는 <code>DX12TargetViewHeap::Snapshot</code>으로 복사한다. UAV clear는 고정 page의 미사용 tail 및 전용 CPU heap을 사용한다.</li>
+<li><code>DX12CommandListPool::CreateTranslationPool</code>: 현재 frame slot의 native target COM 소유권과 별도 encoder 상태, 고정 recording 자원을 묶는다. 제출 접수 전에 producer recording이 바뀌면 거절한다.</li>
+<li><code>RHISubmissionThread::EnqueueSoftwareBatch(owner, completionSource, pool, translator, batch, ticket, error)</code>: 기존 용량 3의 FIFO를 공유한다. producer에서 완료점을 예약하고 다음 upload·descriptor recording을 연다. RHI 스레드에서 번역 후 native batch를 제출한다. 전체 패스 콜백을 다시 실행하지 않는다.</li>
+<li><code>RHISubmissionTicket::GetIdentity</code>: <code>{frameId, recordingId, completion}</code>을 접수 시 불변 값으로 제공한다. 소프트웨어 ticket의 <code>GetRecordedBatch()</code>는 null이며 native 기록 완료를 위장하지 않는다. ticket 완료는 CPU 번역·native 제출 결과이고 GPU 완료는 completion fence로 따로 판정한다.</li>
+<li><code>DX12SoftwareCommandValidator</code>: bool 반환 명령의 자원 범위·파이프라인 종류·간접 명령 signature·mesh capability를 기록 전에 검사한다.</li>
+<li><code>RHISoftwareEncoder::RecordGpuQuery</code>: DX12 profiler가 기록 시 예약한 query 번호를 payload에 담고 RHI 번역 시 해당 번호에 timestamp 명령을 기록한다. tail resolve는 같은 FIFO에서 본문 뒤에 실행된다.</li>
+</ul>
+<p>완료·취소되어 Available 상태가 된 descriptor page와 upload segment도 CPU lease가 남으면 재사용·trim 대상에서 제외한다. page·upload COM 자원, 복사한 CPU descriptor, native target 및 graph owner는 GPU completion retirement가 유지한다. 실패 시 자동 native fallback은 없다. 명시적 native 기준 경로와 software 경로는 같은 바이너리에서 비교한다.</p>
+<h3>2026-10-20 비-pmr·lock-free 재사용 후속</h3>
+<ul>
+<li><code>render_arena_resource</code>에서 pmr 상속과 가상 호출을 제거했다. Draw·RDG·제품 GPU 수명 테스트는 <code>render_arena_vector</code>/<code>render_arena_map</code>과 명시적 writer domain을 사용한다.</li>
+<li><code>RenderArenaPool</code>의 mutex를 제거했다. 마지막 lease가 독점 상태로 reset한 뒤 release CAS로 게시하고, acquire exchange가 소유권과 초기화를 인수한다. 원시 포인터/size_t atomic의 lock-free 여부는 static assertion으로 고정한다. 이 보장은 풀 슬롯 경로이며, cold mimalloc 할당과 shared_ptr 수명 관리까지 wait-free라고 부르지 않는다.</li>
+<li>소프트웨어 명령 헤더는 payload 포인터를 바이트 오프셋으로 바꿔 32→24바이트, Draw 기록은 48→40바이트가 됐다. <code>arenaBlocks</code>/<code>allocatedBytes</code>는 활성 저장소를, <code>arenaCacheHits</code>는 새 backing 할당 없이 활성화한 retained block 수를 센다.</li>
+<li><code>DX12GpuProfiler::MergeSlices</code>는 재사용하는 연속 해시 버킷과 인덱스로 이름을 묶는다. 매 프레임 해시 노드를 할당·삭제하지 않는다. 합산 시간·span·첫 등장 순서·분할 suffix와 호출 종료 전 borrowed name 해제는 유지한다.</li>
+<li>측정·검증과 120 FPS 예산 비교는 <a href="../analysis/RhiSoftwareArenaOptimization20261020.html">최적화 실행 기록</a>에 기록한다.</li>
+</ul>
+<h3>2026-10-20 GraphDeclare 소유 데이터</h3>
+<ul>
+<li><code>render_arena_objects</code>는 성공적으로 생성한 객체와 배열의 소멸 기록을 보관한다. 배열 복사 실패 시 부분 생성물을 즉시 해제하며 Reset은 역순 소멸 후 블록을 재사용한다.</li>
+<li>그래프의 <code>RetainDeclaration/CopyDeclaration/StoreExecute</code>가 선언 데이터와 큰 callback의 수명을 소유한다. 패스 callback 제거 후 선언 아레나를 Reset하며, 큐 기록이 점유한 그래프의 변경은 기존 idle 검사로 거절한다.</li>
+<li>visibility stage는 공유 frame 배열을 한 번 보관하고 stage별로 포인터를 캡처한다. packet stage는 owner/pipeline/binding 함수를 한 번 보관한다. 기하 callback은 그래프가 소유하는 연속 owner 배열을 참조한다.</li>
+<li>기하 선언 scratch는 thread와 선언 깊이별로 독립된다. 합류 보조 실행의 재진입이 외부 선언 저장소를 덮지 않는다. 성공·실패·예외 반환 시 소유자와 borrowed pointer를 비운다. 중복 producer 집합은 용량을 유지하는 연속 pointer hash 슬롯을 사용한다.</li>
+<li>GPU 버전·자원 상태·패스 순서와 프레임별 view/world/bone 정보는 기존 선언 계약을 따른다. <a href="../analysis/GraphDeclarationReuse20261020.html">전후 측정과 회귀</a>.</li>
+</ul>
+<h3>2026-10-20 작업 그래프·입력·기록 객체·네이티브 상태 재사용</h3>
+<ul>
+<li><code>RHIRunCommandRecordingTaskGraph</code>는 thread-local 변환 배열과 dependency 배열 용량을 유지한다. native scheduler는 노드 수와 모든 predecessor 목록이 같은 완료 그래프를 재사용한다. 최대 8개, 그래프당 4096노드·16384 dependency를 보관하며 acquire exchange/release CAS로 독점 소유권을 전달한다. 마지막 enki callback 참조 해제 뒤 사용자 캡처·실패 상태를 비우고 풀에 게시한 다음 완료를 통지한다. scheduler 접수·종료 mutex는 유지한다.</li>
+<li><code>SceneViewInput::Seal</code>은 temporal identity와 이전 draw lookup을 정렬한 thread-local 연속 배열로 처리한다. 정확한 object/incarnation/instance/mesh 조합, 중복 거절, 이전 view 일치, topology/pose 확인 계약을 유지한다. 함수 종료 시 이전 draw 포인터를 모두 비운다. geometry hash 충돌 검사도 복사한 신원 배열을 정렬하며 draw 포인터를 보관하지 않는다.</li>
+<li><code>RHISoftwareRecordingStorage</code>는 target별 segment 목록·budget·encoder와 target 순서의 용량을 보관한다. 전역 풀은 최대 8개·객체 및 배열 용량 합계 16MiB이며 원자적 슬롯으로 반환한다. 명령 backing 블록은 기존 <code>RenderArenaPool</code> 한도를 별도로 따른다. 활성 segment prefix만 밀봉·집계·번역한다. recorder에서 batch로 저장소 소유권을 이동하고 마지막 CPU 번역·취소 소비 뒤 초기화하여 반환한다. 재사용 encoder는 현재 recorder의 validator를 다시 연결한다.</li>
+<li><code>AcquireTranslationEncoder</code>는 frozen software 번역 풀에서 첫 segment의 native 상태를 초기화하고 이후 segment는 논리적 pipeline 바인딩만 비운다. 알려진 root signature·descriptor heaps·PSO 캐시를 유지해 같은 native 설정의 반복 호출을 생략한다. 일반 native callback 및 native command-list reset은 전체 캐시를 초기화한다. 각 패스의 Draw/Dispatch는 해당 패스의 유효 pipeline 바인딩을 여전히 요구한다.</li>
+<li><a href="../analysis/RhiSoftwareFollowup20261020.html">후속 실행 결과</a>.</li>
+</ul>
+<h3>2026-10-20 Draw·RDG 수명별 아레나</h3>
+<ul>
+<li><code>ce::render_arena_resource</code>: mimalloc에서 64KiB 이상 원시 블록을 받고, 블록 안에서는 정렬된 오프셋을 증가시키는 비가상·비-pmr 아레나다. <code>render_arena_allocator&lt;T&gt;</code>가 STL 할당자 계약과 중첩 컨테이너·map value의 동일 writer domain 전달을 담당한다. 개별 <code>deallocate</code>는 저장소를 반납하지 않는다. <code>reset()</code>은 블록 주소·용량을 유지하고 사용 오프셋만 되돌린다.</li>
+<li><code>ce::RenderArenaSet::Resource(domain)</code>: 세트당 4개 독립 writer 영역이다. 같은 영역의 할당은 단일 writer가 수행한다.</li>
+<li><code>ce::RenderArenaPool::Acquire()</code>: <code>RenderArenaLease</code>를 반환한다. 마지막 lease가 해제될 때 세트를 reset하고 풀에 반환한다. 풀마다 유휴 세트 최대 8개·원시 블록 예약 용량 합계 16MiB를 보관한다. 한도를 넘는 저장소는 해제한다. 풀 facade보다 lease가 오래 살아도 공유 State가 반환을 처리한다.</li>
+<li>CPU 준비 <code>PreparationScratch::Work</code>와 RDG 컴파일·기록 임시 배열은 작업 합류 후 컨테이너·객체를 먼저 소멸시키고 lease를 반환한다. 중첩 RDG 호출과 병렬 패킷 작업은 별도 lease를 사용한다.</li>
+<li>프레임 Draw/그림자 Draw/입력 범위/정렬 순서는 <code>FrameInput::m_cpuStorage</code>에 속한다. lease 필드를 컨테이너보다 먼저 선언해 마지막에 소멸시킨다. 그래프 callback과 RHI batch의 기존 lifetime token이 FrameInput을 유지하며, GPU retirement 및 마지막 CPU 소유자 해제 뒤 reset한다. 물리적인 Present 시점을 강제 reset 경계로 사용하지 않는다.</li>
+<li>영속 구조 캐시, 업로드 버퍼, descriptor/native command pool은 기존 수명 계약을 유지한다. 소프트웨어 명령 아레나는 같은 비-pmr 풀을 사용하고 마지막 CPU 번역·취소 소비 뒤 블록을 재사용한다.</li>
+<li>회귀 검사는 안정 주소·4096바이트 정렬·병렬 writer 영역·지연 CPU/GPU 소유자·반환 주소 재사용·보관 한도·조기 예외 종료와 실제 RHI 게이트/GPU retirement를 검사한다. 전후 측정 (<code>../../Artifacts/render-arena-20261020/index.html</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</li>
+</ul>
+<h3>2026-10-20 렌더 할당자와 오류 관리</h3>
+<ul>
+<li><code>ce::render_allocator&lt;T&gt;</code> / <code>render_vector&lt;T&gt;</code>: 렌더 소유 CPU 저장소를 <code>mi_malloc_aligned</code> / <code>mi_free</code>로 관리한다. <code>make_render_unique&lt;T&gt;</code>는 객체와 예외 시 해제를, <code>make_render_shared&lt;T&gt;</code>는 객체·control block의 같은 할당자를 제공한다.</li>
+<li>명령 list·encoder·공유 예산·target/segment/order 컨테이너와 RDG Resource/Pass 저장소·시그니처 오프셋에 적용했다. 공개 vector API와 중첩 컨테이너의 CRT 저장소는 유지한다. 전역 malloc/new를 대체하지 않는다.</li>
+<li>소스는 <code>ThirdParty/mimalloc</code>의 고정 커밋으로 벤더링한다. C <code>src/static.c</code>만 unity/PCH 밖에서 O2로 컴파일하고 Debug에는 upstream <code>MI_DEBUG=2</code>를 유지한다. vcpkg를 사용하지 않는다.</li>
+<li><code>RHISoftwareCommandList::GetError()</code>는 고정 리터럴을 참조하는 <code>string_view</code>다. <code>RHICommandFailure::Reset()</code>은 진단 문자열 용량을 보존하고 나머지 필드를 기본값으로 돌린다. translator는 segment 오류 객체를 배치 내 재사용한다.</li>
+<li>private heap을 파괴하지 않으며 생산 스레드 종료 뒤 소비 스레드가 해제할 수 있다. descriptor/upload/native target의 GPU retirement와 제출 FIFO 계약은 유지한다.</li>
+<li>실행 근거: 할당자 전후 측정 (<code>../../Artifacts/render-mimalloc-20261020/index.html</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).</li>
+</ul>
+<h3>2026-10-20 기록 저장소와 번역 풀 재사용</h3>
+<ul>
+<li><code>RHISoftwareCommandArena</code>: 같은 target의 pass segment가 하나의 arena를 공유한다. 64KiB 이상 블록은 vendored mimalloc v3.5.3에서 받고 마지막 CPU 소비 뒤 아레나 풀에 반환한다. 풀은 최대 8세트·16MiB를 유지하고 초과 저장소를 <code>mi_free</code>로 반환한다. 획득은 atomic pointer exchange, 반환은 빈 슬롯 CAS로 수행하며, 슬롯에서 소유권을 획득한 스레드만 블록을 읽는다. 공용 intrusive next pointer가 없어 ABA 링크 재사용이 없다. 블록을 0으로 초기화하지 않고 payload를 생성·복사한 범위만 읽는다.</li>
+<li><code>RHISoftwareRecorder::AcquireEncoder</code>: 성공 경로의 <code>Seal</code> 진단 문자열은 스레드별로 재사용해 패스마다 Debug STL proxy를 생성·소멸하지 않는다. 실패한 세션의 오류가 다음 세션에 남지 않는 회귀 검사를 포함한다.</li>
+<li><code>RHISoftwareEncoder::Reset(list)</code>: target encoder를 재사용하고 pass 상태는 비운다. native <code>AcquireEncoder</code>의 pass 상태 초기화도 유지한다.</li>
+<li><code>RHICommandRecordingStats::arenaBlocks/arenaCacheHits</code>: target arena가 획득한 블록 수와 과거 엔진 캐시 적중 수다. mimalloc 경로에서 <code>arenaCacheHits</code>는 항상 0이며 mimalloc 내부 재사용 횟수를 뜻하지 않는다. <code>allocatedBytes</code>는 이 블록들의 예약 용량이며 실제 malloc 바이트 수가 아니다.</li>
+<li><code>DX12CommandListPool::CreateTranslationPool</code>: producer의 frame slot별 fork를 캐시한다. 외부 shared owner가 모두 사라진 fork만 재사용한다. pending CPU 번역·GPU retirement가 소유 중이면 별도 fork를 만든다. native encoder와 barrier scratch를 유지하며, 재사용 가능한 CPU RTV·DSV·UAV clear heap에 새 descriptor를 복사한다. upload·shader-visible descriptor lease와 recording ID는 매번 새 recording에서 캡처한다.</li>
+<li>명령 arena는 마지막 CPU 소비·취소 시 반환한다. GPU upload·descriptor·자원 수명은 기존 retirement가 유지한다. 순회는 컨테이너를 변경하지 않는 구간에서 pointer/count span을 사용하며 전역 iterator debug 설정은 변경하지 않는다.</li>
+</ul>
+<p>수정 전후의 양쪽 실행은 <code>CREATOR_RHI_SOFTWARE_COMMANDS=1</code>을 사용한다. 기록·번역 최적화 검증 (<code>../../Artifacts/rhi-record-reuse-20261020/index.html</code> — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 결과를 기록한다.</p>
+<h2>1. 목표와 적용 범위</h2>
+<p>RDG 실행 콜백은 백엔드 중립 소프트웨어 명령을 기록한다. 번역 계층이 이를 네이티브 command list/buffer에 기록하고 기존 RHI 제출 소유자가 큐에 제출한다. RDG 선언, 의존성 분석, 패스 컬링, 배리어 계획, 구조 재사용은 유지한다. 전체 패스 콜백을 RHI 스레드로 옮겨 실행하는 방식은 사용하지 않는다.</p>
+<p>이 작업은 고정 2프레임 지연 정책을 도입하지 않는다. GT publication, RT recording, RHI translation, native submission, GPU completion, presentation은 각각 다른 사건이다. 프레임 publication 하나에서 여러 뷰 제출이 만들어질 수 있으므로 제출 수를 프레임 지연으로 환산하지 않는다. 기존 최신 입력 병합과 in-flight 제한은 별도 정책으로 유지한다.</p>
+<p>제품 전환 범위는 DX12와 Vulkan의 기존 제품 소비 경로다. DX12부터 직렬 번역을 수용하고 Vulkan 어댑터를 구현한 뒤 각 백엔드별 검증을 수행한다. Vulkan 미지원 명령을 성공으로 처리하거나 DX12 검증을 Vulkan 수용으로 확대하지 않는다. 성능 목표는 CreatorRobot Debug 120 FPS이지만, 명령 기록과 번역의 추가 비용이 있으므로 목표 달성을 이 설계의 결과로 가정하지 않는다.</p>
+<h2>2. 현재 구조와 전환 구조</h2>
+<pre><code class="language-mermaid">flowchart LR
+    A[RDG Declare and Compile] --&gt; B[RDG callback on RT or workers]
+    B --&gt; C[RHISoftwareEncoder]
+    C --&gt; D[RHISoftwareBatch sealed]
+    D --&gt; E[RHISubmissionThread admission]
+    E --&gt; F[IRHICommandTranslator]
+    F --&gt; G[DX12Encoder or VulkanEncoder]
+    G --&gt; H[Native recorded batch]
+    H --&gt; I[Native queue submit]
+    I --&gt; J[GPU completion and retirement]
+</code></pre>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>현재 경계</th>
+<th>변경 계약</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RHIEncoder</code> 호출이 바로 네이티브 기록</td>
+<td>패스 API는 유지하고 <code>RHISoftwareEncoder</code>로 수집</td>
+</tr>
+<tr>
+<td>RT가 <code>IRHIParallelCommandPool</code>의 네이티브 target을 열고 닫음</td>
+<td>RT는 소프트웨어 target을 소유하고 번역기가 네이티브 풀을 소유</td>
+</tr>
+<tr>
+<td><code>RHIRecordedBatch</code>는 네이티브 기록 결과</td>
+<td>의미 유지. 소프트웨어 결과에는 별도 <code>RHISoftwareBatch</code> 사용</td>
+</tr>
+<tr>
+<td><code>RHISubmissionThread</code>는 제출·수명 처리</td>
+<td>소프트웨어 batch 번역 및 기존 네이티브 제출을 하나의 순서 계약으로 처리</td>
+</tr>
+<tr>
+<td><code>IRHIQueueRecorder</code>의 독립 큐 기록</td>
+<td>software adapter도 구현하여 owned/multiqueue 경로까지 전환</td>
+</tr>
+<tr>
+<td>GPU profiler가 native encoder를 직접 확인</td>
+<td>소프트웨어 marker/query 명령을 기록하고 번역 위치에서 네이티브 query를 발생</td>
+</tr>
+</tbody></table></div>
+<h2>3. 파일과 타입 명칭</h2>
+<p>신규 엔진 타입은 기존 RHI 표기와 <code>CodingConventions.md</code>를 따른다. 타입·메서드는 PascalCase, 필드는 camelCase, 비공개 멤버는 <code>m_</code> 접두사를 사용한다. 범용 컨테이너는 기존 라이브러리를 사용한다. <code>vector&lt;bool&gt;</code>은 사용하지 않고 비트 집합에는 기존 bitset을 사용한다. 모든 if/for 본문은 여러 줄 중괄호로 작성하고 namespace 내부를 들여쓴다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>신규 파일 <code>Engine/RenderEngine/RHI/</code> 기준</th>
+<th>타입 및 책임</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>RHISoftwareCommandTypes.h</code></td>
+<td><code>RHISoftwareCommandType</code>, <code>RHISoftwareBatchState</code>, <code>RHICommandRecordingStats</code>, <code>RHICommandTranslationStats</code>, <code>RHICommandFailure</code></td>
+</tr>
+<tr>
+<td><code>RHISoftwareCommandList.h/.cpp</code></td>
+<td>이동 전용 <code>RHISoftwareCommandList</code>, 단일 writer, 명령 arena 및 payload 소유</td>
+</tr>
+<tr>
+<td><code>RHISoftwareEncoder.h/.cpp</code></td>
+<td><code>RHISoftwareEncoder final : public RHIEncoder</code></td>
+</tr>
+<tr>
+<td><code>RHISoftwareBatch.h/.cpp</code></td>
+<td>이동 전용 <code>RHISoftwareBatch</code>, <code>RHISoftwareBatchDesc</code>, target 순서와 의존성</td>
+</tr>
+<tr>
+<td><code>RHISoftwareRecorder.h/.cpp</code></td>
+<td><code>RHISoftwareRecorder</code>, <code>RHISoftwareRecordingDesc</code>, RT 기록 세션</td>
+</tr>
+<tr>
+<td><code>IRHICommandTranslator.h</code></td>
+<td><code>IRHICommandTranslator</code>, <code>RHICommandTranslationOptions</code>, <code>RHITranslatedBatch</code></td>
+</tr>
+<tr>
+<td><code>RHISoftwareQueueRecorder.h/.cpp</code></td>
+<td><code>RHISoftwareQueueRecorder final : public IRHIQueueRecorder</code>, 독립 큐 어댑터</td>
+</tr>
+<tr>
+<td><code>DX12/DX12CommandTranslator.h/.cpp</code></td>
+<td><code>DX12CommandTranslator final : public IRHICommandTranslator</code></td>
+</tr>
+<tr>
+<td><code>Vulkan/VulkanCommandTranslator.h/.cpp</code></td>
+<td><code>VulkanCommandTranslator final : public IRHICommandTranslator</code></td>
+</tr>
+</tbody></table></div>
+<p>기존 <code>RHIEncoder</code>, <code>RHIRecordedBatch</code>, <code>IRHIQueueCommandBatch</code>, <code>RHISubmissionTicket</code>, <code>RHICompletionPoint</code>, <code>RHITimelinePoint</code>를 같은 뜻의 신규 타입으로 복제하지 않는다. 기존 <code>RHIRecordedBatch::GetCommandCount()</code>는 native target 수를 뜻하므로 소프트웨어 opcode 수로 재해석하지 않는다.</p>
+<h2>4. 공개 API 계약</h2>
+<p>아래는 선언 계약이다. 기존 프로젝트의 include/forward declaration 및 소유권 도구에 맞춘 헤더 분할은 구현 단계에서 수행한다. API 이름과 반환 의미는 유지한다.</p>
+<h3>4.1 기록 세션</h3>
+<pre><code class="language-cpp">struct RHISoftwareRecordingDesc
+{
+    RHIQueueIdentity queue;
+    uint32_t targetCount{ 0 };
+    uint64_t maxCommandBytes{ 0 };
+    uint64_t maxPayloadBytes{ 0 };
+};
+
+class RHISoftwareRecorder final
+{
+public:
+    bool BeginRecording(const RHISoftwareRecordingDesc&amp; desc, std::string&amp; outError);
+    RHIEncoder&amp; AcquireEncoder(uint32_t target);
+    bool FinishRecording(std::span&lt;const uint32_t&gt; targetOrder,
+        const RHISoftwareBatchDesc&amp; desc, RHISoftwareBatch&amp; outBatch,
+        std::string&amp; outError);
+    void CancelRecording();
+    RHICommandRecordingStats GetRecordingStats() const;
+};
+</code></pre>
+<ul>
+<li><code>BeginRecording</code>는 비활성 세션에서만 성공한다. targetCount와 두 예산은 0보다 커야 한다. 이 호출로 네이티브 allocator/list를 reset하거나 upload prefix를 제출하지 않는다.</li>
+<li>초기 recorder는 총 예산을 target 수로 균등 분할하고 나머지 byte를 앞 target부터 배정한다. 같은 target의 여러 pass segment는 예산을 공유한다. 다른 target끼리는 명령별 공용 atomic 카운터를 갱신하지 않는다. target별로 독점 기록한 뒤 owner가 합류하여 통계를 합산한다. 두 예산이 target 수보다 작으면 시작을 거부한다.</li>
+<li><code>AcquireEncoder</code>는 활성 세션의 유효 target에서만 호출한다. 새 pass/slice 상태를 시작하며 같은 target에 동시에 두 writer가 접근하면 계약 위반이다. worker 번호는 물리 스레드 번호가 아니다. 범위 오류는 기존 엔진 assertion 계약으로 진단하고 해당 세션을 실패시킨다.</li>
+<li>target당 opcode 순서는 기록 순서다. 서로 다른 target은 독립적으로 기록할 수 있다. <code>FinishRecording</code> 전에 모든 writer가 합류해야 한다. 이전 encoder 참조는 다음 acquire 또는 finish/cancel 이후 사용할 수 없다.</li>
+<li><code>FinishRecording</code>은 출력이 비어 있고 targetOrder가 유효하며 중복이 없을 때만 성공한다. 비어 있지 않은 target을 누락하면 실패한다. 빈 target은 제출 목록에서 제외할 수 있다. 의존성은 RDG compiled execution 계획에서 복사하며 임의의 target 완료 순서를 실행 순서로 사용하지 않는다.</li>
+<li>실패하면 부분 batch를 출력하지 않는다. <code>CancelRecording</code>은 합류 이후에만 호출하며, 아직 네이티브로 실행되지 않은 payload를 정확히 한 번 해제한다.</li>
+</ul>
+<h3>4.2 소프트웨어 목록과 batch</h3>
+<p><code>RHISoftwareCommandList</code>의 엔진 내부 API는 <code>GetCommandCount()</code>, <code>GetCommandBytes()</code>, <code>GetPayloadBytes()</code>, <code>IsSealed()</code>이다. 명령 추가는 friend인 <code>RHISoftwareEncoder</code>에만 허용하며 임의 lambda를 등록하는 공개 API는 제공하지 않는다.</p>
+<p><code>RHISoftwareBatchDesc</code>에는 <code>frameId</code>, <code>sourceEngineFrame</code>, <code>sourceEngineFrameAvailable</code>, <code>renderViewId</code>, <code>backendGeneration</code>, <code>displayToken</code>, <code>uploadRecordingId</code>, <code>descriptorVersion</code>, <code>queue</code>, 조건부 <code>captureContext</code>, <code>lifetimeToken</code>을 둔다. <code>queue</code>는 기존 <code>RHIQueueIdentity</code>이며 device incarnation을 함께 검증한다. GPU query의 실제 fence/submission 번호는 native admission에서 연결한다. CPU 프레임과 capture provenance는 기록 시 동결한다.</p>
+<p><code>RHISoftwareBatch</code> 공개 API는 <code>IsValid()</code>, <code>GetState()</code>, <code>GetDesc()</code>, <code>GetRecordingId()</code>, <code>GetTargetCount()</code>, <code>GetRecordingStats()</code>다. <code>GetDesc()</code>는 const 참조를 반환하며 이동·파괴 이후 보관할 수 없다. 외부 상태 변경 setter는 두지 않는다. recorder, translator, submission owner만 상태를 전이한다.</p>
+<h3>4.3 번역</h3>
+<pre><code class="language-cpp">enum class RHICommandTranslationMode : uint8_t
+{
+    Serial,
+    Parallel
+};
+
+struct RHICommandTranslationOptions
+{
+    RHICommandTranslationMode mode{ RHICommandTranslationMode::Serial };
+    uint32_t maxTranslationJobs{ 1 };
+    uint64_t minCommandsPerJob{ 0 };
+};
+
+class IRHICommandTranslator
+{
+public:
+    virtual &amp;#126;IRHICommandTranslator() = default;
+    virtual bool Translate(RHISoftwareBatch&amp;&amp; softwareBatch,
+        const RHICommandTranslationOptions&amp; options,
+        RHITranslatedBatch&amp; outBatch, RHICommandFailure&amp; outFailure) = 0;
+};
+</code></pre>
+<p><code>Translate</code>는 호출 직후 입력을 소비한다. 실패해도 재제출·재번역할 수 없다. 출력은 성공 시에만 유효하며 번역 실패는 GPU 제출 성공을 뜻하지 않는다. <code>RHITranslatedBatch</code>는 이동 전용 tagged container로 기존 단일 풀 <code>RHIRecordedBatch</code> 또는 독립 큐 <code>IRHIQueueCommandBatch</code>와 번역 통계를 소유한다. 태그 이름은 <code>RHITranslatedBatchKind::ParallelPool</code>과 <code>OwnedQueue</code>다. 독립 큐 batch는 기존 인터페이스가 요구하는 shared ownership을 유지하되 wrapper의 제출 권한은 단일 소유한다.</p>
+<p><code>RHITranslatedBatch</code>에는 <code>GetKind()</code>, <code>IsValid()</code>, <code>GetTranslationStats()</code>만 공개한다. 내부 native payload 접근·소비는 제출 소유자에 한정한다. software batch를 native batch인 것처럼 기존 enqueue에 넘기는 형변환은 금지한다.</p>
+<p>초기 <code>RHICommandTranslator</code>는 준비된 native pool, <code>IRenderDeviceServices</code>, 실제 대상 <code>RHIQueueIdentity</code>를 생성자에서 받는다. <code>DX12CommandTranslator</code>와 <code>VulkanCommandTranslator</code>는 typed pool/resources 어댑터다. 직렬 번역은 batch에 저장한 upload/descriptor 버전과 현재 준비 버전이 다르면 거부한다. 비동기 버전 lease가 구현되기 전에는 이 검사를 제거하거나 현재 버전으로 바꿔 실행하지 않는다.</p>
+<p><code>IRHISoftwareCommandValidator::Validate(type, arguments, argumentBytes, state)</code>는 bool 명령의 사전 검증 API다. <code>RHISoftwareEncoderState</code>의 <code>boundPipeline/bindPoint</code>는 해당 encoder의 성공한 <code>SetPipeline</code> 기록을 반영한다. 여러 target의 pipeline 상태를 validator 내부 mutable 전역 값으로 공유하지 않는다.</p>
+<h3>4.4 제출 진입점</h3>
+<p><code>RHISubmissionThread</code>에 다음 API를 추가한다.</p>
+<pre><code class="language-cpp">bool EnqueueSoftwareBatch(const void* owner,
+    RHISoftwareBatch&amp;&amp; batch,
+    const RHICommandTranslationOptions&amp; options,
+    RHISubmissionTicket&amp; outTicket, std::string&amp; outError);
+</code></pre>
+<p>반환 false는 큐 admission 거부이며 ticket은 유효하지 않다. <strong>입력 소유권은 성공할 때만 큐로 이동한다.</strong> 이 규칙은 입력을 항상 소비하는 <code>Translate</code>와 다르다. 큐 예산·owner generation·backend generation을 먼저 검사하고 이동한다. 반환 true는 작업을 받았다는 뜻이며 번역이나 native 제출의 성공이 아니다.</p>
+<p>RHI 소유자는 등록된 디바이스의 translator를 사용한다. producer가 translator raw pointer나 참조를 lambda에 캡처하지 않는다. backend 등록 수명은 owner drain까지 보장한다. RHI 스레드 내부에서 기존 공개 enqueue를 다시 호출하고 ticket을 기다리는 재진입은 금지한다. native batch 제출용 private helper <code>SubmitTranslatedBatch</code>를 호출한다.</p>
+<p><code>RHISubmissionTicket</code>의 완료는 CPU native 제출 결과를 뜻하도록 유지한다. 번역 완료 시 ticket을 성공 처리하지 않는다. GPU 완료는 기존 <code>RHICompletionPoint</code> 또는 큐별 <code>RHITimelinePoint</code>로 판단한다. 아직 발행되지 않은 timeline value를 외부 queue wait의 유효 ready point로 노출하지 않는다.</p>
+<p>직렬 번역의 native 수용 검사는 중간 API <code>EnqueueTranslatedBatch(owner, completionSource, translatedBatch, outTicket, outError)</code>를 사용한다. 이 함수는 이미 native 기록을 마친 <code>ParallelPool</code> 결과를 기존 <code>EnqueueRecordedBatch</code>에 넘긴다. 소프트웨어 기록을 RHI 스레드에서 번역하는 <code>EnqueueSoftwareBatch</code>와 구분하며, 이 중간 API의 사용을 비동기 전환 완료로 판정하지 않는다.</p>
+<h3>4.5 독립 큐 어댑터</h3>
+<p><code>RHISoftwareQueueRecorder</code>는 기존 <code>Record</code>, <code>BeginRecording</code>, <code>GetWorkerCount</code>, <code>DeviceServices</code>, <code>ExecuteSubmission</code> 시그니처를 구현한다. 여기서 <code>GetWorkerCount</code>는 software target 수다. <code>IRHIQueueRecording::Finish</code>는 소프트웨어 payload를 담은 <code>RHISoftwareQueueCommandBatch final : public IRHIQueueCommandBatch</code>를 생성한다. 실제 native queue 소비 지점이 이 payload를 번역하여 기존 native batch로 대체한다.</p>
+<p><code>RHISoftwareQueueCommandBatch</code>는 기존 batch 인터페이스의 <code>GetQueueIdentity()</code>와 <code>GetRecordingId()</code>를 구현한다. 실제 실행 진입점은 batch가 아니라 <code>IRHICommandQueue::Submit</code>이다. 이 경계를 감싸는 <code>RHISoftwareCommandQueue final : public IRHICommandQueue</code>를 <code>RHISoftwareQueueRecorder.h/.cpp</code>에 함께 추가한다. <code>GetIdentity</code>, <code>Signal</code>, <code>Wait</code>, <code>Submit</code>, <code>CollectCompleted</code>, <code>GetPendingBatchCount</code>의 기존 서명을 유지한다. 생성은 <code>RHISoftwareQueueFactory final : public IRHICommandQueueFactory</code>로 감싸고 <code>QueryQueueCapabilities/CreateQueue</code>를 위임한다. native queue와 software queue의 논리 identity는 동일하며 새 GPU 큐를 만들지 않는다.</p>
+<p>software queue의 <code>Submit</code>은 제출 소유자에서 software payload를 번역하고 native queue에 제출한 뒤 발행된 timeline point를 반환한다. <code>ExecuteSubmission</code>은 이 전체 transaction을 소유자에게 한 번 전달하고 CPU admission 결과까지 반환하되 GPU 완료는 기다리지 않는다. 기존 <code>Submit</code>의 동기 반환 계약을 유지하기 위해 이 경로는 번역 전에 가짜 issued point를 반환하지 않는다. 비동기 <code>EnqueueSoftwareBatch</code>의 ticket 경로와 구별한다. 동일 software queue에서 pending translation을 건너뛰고 후속 <code>Wait/Signal/Submit</code>이 실행되지 않도록 transaction 순서를 직렬화한다.</p>
+<p>native 명령이 없는 소프트웨어 batch를 네이티브 완료 상태로 위장하지 않는다. cross-queue wait/signal, queue family ownership은 compiled queue 계획을 보존한다. <code>CollectCompleted/GetPendingBatchCount</code>는 wrapper가 소유한 admission과 native retirement의 일관된 집계를 제공하고 같은 batch를 두 번 세지 않는다.</p>
+<h2>5. 명령 목록과 인자 소유권</h2>
+<p>초기 내부 명령은 <code>RHISoftwareCommandList::Command</code>의 <code>type/next/replay/payload</code>와 typed payload로 구성한다. payload는 trivially destructible로 제한하고 명령별 소멸 콜백을 두지 않는다. 재배치하지 않는 target arena block에 저장하므로 header와 복사한 span의 주소를 유지한다. alignment와 byte 예산을 확인하고 크기 덧셈·배열 크기 곱셈이 overflow하기 전에 거부한다. payload는 저장소가 직접 만들고 외부 offset을 받지 않는다. 이 레이아웃은 프로세스 내부 전용이며 파일 직렬화 ABI가 아니다.</p>
+<p><code>RHISoftwareCommandType</code>은 아래 기존 API 이름과 동일한 열거자를 가진다. 각 opcode 구현은 양 백엔드가 아니라 <strong>현재 RHIEncoder 전체 인터페이스</strong>를 기준으로 coverage 검사한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>범주</th>
+<th>유지하는 RHIEncoder API 및 대응 opcode</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>상태</td>
+<td><code>SetViewportAndScissor</code>, <code>SetViewport</code>, <code>SetScissor</code>, <code>SetPipeline</code>, <code>SetPrimitiveTopology</code></td>
+</tr>
+<tr>
+<td>바인딩</td>
+<td><code>SetBindings</code>, <code>SetSamplers</code>, <code>SetConstantBuffer</code>, <code>SetRootBuffer</code>, <code>SetRootUnorderedBuffer</code>, <code>SetVertexBuffer</code>, <code>SetIndexBuffer</code></td>
+</tr>
+<tr>
+<td>draw</td>
+<td><code>Draw</code>, <code>DrawIndexed</code>, <code>DrawIndirect</code>, <code>DrawIndexedIndirect</code>, <code>DrawIndexedIndirectBatch</code></td>
+</tr>
+<tr>
+<td>dispatch</td>
+<td><code>Dispatch</code>, <code>DispatchIndirect</code>, <code>DispatchMesh</code>, <code>DispatchMeshIndirect</code>, <code>DispatchMeshIndirectBatch</code></td>
+</tr>
+<tr>
+<td>raster</td>
+<td><code>BeginRasterWithoutAttachments</code>, <code>BindRenderTargets</code>, <code>ClearRenderTargets</code>, <code>ClearDepthTarget</code>, <code>ClearRenderTargetRect</code></td>
+</tr>
+<tr>
+<td>barrier</td>
+<td><code>ResourceBarriers</code>, <code>UavBarrier</code>, <code>UavBarrierBuffers</code></td>
+</tr>
+<tr>
+<td>copy</td>
+<td><code>CopyResource</code>, <code>CopyTexture</code>, <code>CopyBuffer</code>, <code>ClearUnorderedAccess</code></td>
+</tr>
+<tr>
+<td>readback copy</td>
+<td><code>CopyToReadback</code>, <code>CopyVolumeToReadback</code>, <code>CopyPartialToReadback</code>, <code>CopyBufferToReadback</code></td>
+</tr>
+<tr>
+<td>계측 추가 opcode</td>
+<td><code>BeginGpuPass</code>, <code>EndGpuPass</code>, <code>ResolveGpuQueries</code>, <code>BeginDebugEvent</code>, <code>EndDebugEvent</code></td>
+</tr>
+</tbody></table></div>
+<p><code>GetComputeDispatchCount</code>는 query이므로 opcode가 아니다. 향후 RHIEncoder에 메서드를 추가하면 coverage manifest와 recorder/translator/회귀 검사를 함께 변경한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>인자</th>
+<th>기록 시 규칙</th>
+<th>해제 시점</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>정수·enum·rect·색상</td>
+<td>값 복사</td>
+<td>번역 후</td>
+</tr>
+<tr>
+<td>span·barrier 배열·root slot 배열·문자열</td>
+<td>arena에 깊은 복사, 호출자 주소 보관 금지</td>
+<td>번역 후</td>
+</tr>
+<tr>
+<td>texture/buffer/pipeline handle</td>
+<td>값과 generation 검증 + 실제 객체 소유 pin</td>
+<td>GPU 완료 후</td>
+</tr>
+<tr>
+<td>descriptor/sampler table</td>
+<td>table 값 복사 + 해당 heap/version lease 유지</td>
+<td>GPU 완료 후</td>
+</tr>
+<tr>
+<td><code>RHIBufferSlice</code></td>
+<td>handle/offset/size 복사, cpuAddress는 재생에 사용하지 않음</td>
+<td>allocation/upload page는 GPU 완료 후</td>
+</tr>
+<tr>
+<td>readback 대상</td>
+<td>descriptor 복사 + readback allocation pin</td>
+<td>GPU 완료 및 기존 CPU reader 계약까지</td>
+</tr>
+<tr>
+<td>query heap 및 결과 저장소</td>
+<td>query slot 예약 + profiler 세대 pin</td>
+<td>GPU 완료·수집/폐기까지</td>
+</tr>
+</tbody></table></div>
+<p>handle generation은 소유권이 아니다. <code>lifetimeToken</code>은 모든 참조 자원과 descriptor/upload version을 실제로 붙잡아야 한다. 목록 단위 pin 집합을 재사용하고 같은 자원 pin을 중복 증가시키지 않는다. 명령마다 shared_ptr나 std::function을 생성하지 않는다. non-trivial payload는 실행 성공·실패·취소 모두 destructor가 정확히 한 번 호출되도록 등록한다.</p>
+<h2>6. 반환값과 오류 계약</h2>
+<p>bool-returning encoder API의 true는 입력 검증 및 software 기록 수락이다. false면 명령 추가와 encoder 상태 변화가 모두 없어야 하며 기존 fallback 호출이 안전해야 한다. capability, offset/alignment, argument size, pipeline/queue 지원 여부처럼 기록 전에 판단 가능한 조건은 즉시 검사한다.</p>
+<p>void API의 할당·검증 실패는 recording session에 sticky failure로 저장한다. 이후 명령을 성공으로 처리하지 않고 <code>FinishRecording</code>이 실패한다. 일부 유효 명령만 골라 제출하지 않는다. 네이티브 resource 생성 실패나 device loss처럼 번역 때 드러나는 오류는 batch 실패이며, 기록 당시 bool 결과를 소급 변경하지 않는다.</p>
+<p><code>RHICommandFailure</code> 필드는 <code>stage</code>, <code>recordingId</code>, <code>targetIndex</code>, <code>commandIndex</code>, <code>commandType</code>, <code>backendGeneration</code>, <code>message</code>다. <code>stage</code> enum은 <code>Recording</code>, <code>Admission</code>, <code>Translation</code>, <code>Submission</code>, <code>Retirement</code>다. 아직 opcode가 없는 실패에는 index sentinel을 쓴다. GPU 실행 여부를 알 수 없는 native 실패는 별도 <code>executionUncertain</code> 플래그로 기록하고 자원을 quarantine한다. 재시도로 같은 draw를 중복 실행하지 않는다.</p>
+<p>기존 <code>GetComputeDispatchCount()</code>는 software encoder에서 <code>UINT64_MAX</code>를 반환한다. 기존 native count를 논리 기록 수로 바꾸지 않는다. 논리 개수는 <code>RHICommandRecordingStats::computeDispatchCommands</code>, 실제 emit 수는 <code>RHICommandTranslationStats::nativeComputeDispatches</code>로 분리하고 소비처를 명시적으로 이관한다.</p>
+<h2>7. 상태와 스레드 소유권</h2>
+<p><code>RHISoftwareBatchState</code>: <code>Empty</code>, <code>Sealed</code>, <code>Queued</code>, <code>Translating</code>, <code>Translated</code>, <code>Failed</code>, <code>Cancelled</code>. recorder의 활성 writer는 batch 밖의 Recording 상태다. 번역 입력이 소비된 후 software batch 객체는 비며 native 완료 상태는 <code>RHITranslatedBatch</code>와 기존 native batch가 소유한다. <code>Translated</code>는 진단 이력이며 software 객체를 GPU 완료까지 보관해야 한다는 의미가 아니다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구간</th>
+<th>소유자</th>
+<th>허용 작업</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기록</td>
+<td>RT 및 target별 worker</td>
+<td>CPU payload 기록, 미리 준비된 서비스 데이터 사용</td>
+</tr>
+<tr>
+<td>밀봉</td>
+<td>모든 writer 합류 후 RT</td>
+<td>target 순서/의존성 동결, 소유권 전달</td>
+</tr>
+<tr>
+<td>admission</td>
+<td>제출 큐 잠금 경계</td>
+<td>예산 예약, 세대 확인, batch 이동</td>
+</tr>
+<tr>
+<td>직렬 번역</td>
+<td>RHI 소유자</td>
+<td>native target 준비·기록·닫기</td>
+</tr>
+<tr>
+<td>병렬 번역</td>
+<td>전용 target lease를 가진 공용 scheduler job</td>
+<td>독립 native context만 사용</td>
+</tr>
+<tr>
+<td>제출</td>
+<td>RHI 소유자</td>
+<td>queue wait/execute/signal 및 ticket 결과 확정</td>
+</tr>
+<tr>
+<td>retirement</td>
+<td>기존 fence 수집 경로</td>
+<td>native allocator, transient 및 pin 퇴거</td>
+</tr>
+</tbody></table></div>
+<p>RT가 계속 recording하더라도 RHI 번역기의 native pool frame slot을 reset할 수 없다. native pool 재사용은 해당 GPU fence 완료 이후다. 여러 frame의 descriptor/upload 버전이 동시에 살아 있어야 하며 전역 mutable currentFrame 값을 번역 시 다시 읽지 않는다.</p>
+<h2>8. 업로드와 자원 준비 경계</h2>
+<p>자원 생성, map, descriptor 생성, CPU 데이터 채움, PSO 준비는 초기 단계에서 기존 준비 서비스에 남긴다. 소프트웨어 encoder는 이 작업을 임의로 지연시키지 않는다. 기존 <code>IRHIParallelCommandPool::Prepare</code>의 upload prefix 제출과 upload/descriptor version 시작은 다음처럼 분해한다.</p>
+<ol>
+<li>CPU 준비 단계 <code>PrepareRecordingResources</code>: 필요한 lease/version을 얻고 CPU 채움을 끝낸다.</li>
+<li>번역/제출 소유자 <code>SubmitUploadPrefix</code>: prefix를 정확히 한 번 실행하고 같은 큐 순서 또는 명시적 timeline dependency를 확보한다.</li>
+<li>본문 번역 및 native 제출: 고정된 version만 참조한다.</li>
+</ol>
+<p>두 이름은 backend 내부 helper다. prefix를 이미 제출했다면 이후 본문 번역 실패를 &#39;프레임의 GPU 작업이 전혀 실행되지 않음&#39;으로 기록하지 않는다. prefix 자원도 완료점까지 보존한다. 준비 서비스가 RHI 스레드에서만 허용되는 경우에는 선행 작업 dependency로 분리하며 recording worker가 RHI ticket을 잡고 순환 대기하지 않게 한다.</p>
+<h2>9. 프로파일러와 타임라인</h2>
+<p>기존 <code>IRHIGpuProfiler::BeginPass/EndPass</code>는 유지한다. software 경로에서는 query slot과 이름·<code>GpuPassTimingIdentity</code>를 기록 시 예약하고 <code>BeginGpuPass/EndGpuPass</code>를 추가한다. <code>ResolveGpuQueries</code>는 마지막 query 쓰기 이후의 native 위치에 emit한다. <code>DX12Encoder</code> dynamic_cast 성공에 의존하는 경로는 profiler backend adapter로 분리한다. query 공간 부족은 명시적 timing-unavailable로 표시하며 draw 실패와 구별한다.</p>
+<p>신규 CPU 스코프 이름은 <code>RHISoftwareRecord</code>, <code>RHISoftwareSeal</code>, <code>RHISoftwareAdmissionWait</code>, <code>RHICommandTranslate</code>, <code>RHICommandTranslateJoin</code>, <code>RHINativeSubmit</code>, <code>RHIBatchRetire</code>로 고정한다. 기존 <code>RenderGraphDeclare</code>, compile, scene prepare 스코프를 포함해 겹침을 보존한다. command별 CPU 스코프는 기본 OFF이며 동일 계측 조건 비교에서만 활성화한다.</p>
+<p>모든 이벤트에 recordingId, sourceEngineFrame availability, frameId, viewId, queue identity, targetIndex, backend generation을 연결한다. CPU record/translate/submit 시간, ETW Running/Ready/Waiting, GPU timestamp, Present를 별도 lane으로 표시한다. trace에 정보가 없으면 unknown으로 표시하고 Running으로 추정하지 않는다. 프레임 지연은 publication/record/submit/present의 동일 provenance 매칭으로 측정한다.</p>
+<h2>10. backpressure와 종료</h2>
+<p>큐 entry 제한, 소프트웨어 arena byte 제한, GPU in-flight slot 제한을 함께 적용한다. 소프트웨어 큐와 기존 네이티브 큐에 각각 최대 용량을 추가해 총 지연을 두 배로 늘리지 않는다. admission부터 retirement까지 공유되는 제출 credit을 사용하고 CPU arena byte credit은 번역·폐기 완료 시 별도로 반환한다. 제출 credit은 GPU 완료 또는 미제출 확정 취소 때 반환한다.</p>
+<p>현재 구현의 CPU 제한은 <code>RHISubmissionThread::kSoftwareByteCapacity</code>와 owned domain의 <code>RHISoftwareQueueOptions::maxPendingArenaBytes</code>로 각각 선택한 소비 경로에 적용한다. 한 software batch를 두 큐에 중복 접수하지 않는다. 전자는 기존 용량 3 FIFO의 대기 조건이며, 후자는 그래프가 기록을 먼저 모으는 계약 때문에 <code>Finish</code>에서 대기 없이 거절한다. <code>allocatedBytes</code>의 queued/sealed+running 합계를 세고 CPU 저장소 소멸 뒤 반환한다. 기존 backend frame slot·completion retirement가 GPU 자원 수명을 제한한다. 아직 Finish하지 않은 모든 producer 기록의 순간 arena peak나 전체 process RSS 상한을 추가한 것은 아니다.</p>
+<p>resize/reload/backend 교체는 이전 generation의 신규 admission을 차단하고, 미번역 batch를 취소하거나 명시적으로 drain한다. 이미 제출한 자원은 GPU 완료까지 보존한다. shutdown은 producer 중지 → recording jobs 합류 → admission 차단 → 번역/제출 drain → GPU retirement → profiler/native pool 해체 순서다. device loss 또는 실행 불명확 실패는 기존 quarantine 정책을 따른다.</p>
+<h2>11. 병렬 번역</h2>
+<p>공용 <code>RHICommandTranslationOptions</code>의 기본은 Serial이다. 현재 소프트웨어 제품 선택 경로는 독립 target이 있는 pool/owned recorder에서 Parallel을 사용하되 작은 명령 묶음은 RHI 소유자가 직접 번역한다. <code>minCommandsPerJob</code>는 조정 가능한 측정 파라미터다. 연결부의 256은 master의 기존 정책을 유지한 값이며, 실제 장면에서 최적인 임계값으로 확정하거나 CPU fixture만으로 기본 경로 전환을 승인하지 않는다.</p>
+<p>분할 단위는 RDG가 허용한 독립 target/context 경계다. 한 stateful command stream을 임의 명령 번호에서 잘라 상태를 잃지 않는다. 앞 상태가 필요한 target은 명시적 state prologue 또는 동일 context 순차 실행으로 보장한다. native list 완료 순서와 제출 순서는 구별하고 compiled dependency/order를 제출 시 복원한다. 자원/descriptor registry 조회는 번역 중 안전한 immutable snapshot 또는 lease를 사용한다.</p>
+<p>번역 job은 기존 엔진 scheduler를 사용한다. 새 thread pool을 추가하지 않는다. target별 predecessor만 기다리고 불필요한 전체 wave barrier를 만들지 않는다. 합류 보조 실행은 scheduler의 허용된 task만 수행하며 thread-affine native 조작을 임의 worker에 넘기지 않는다. queue wait와 GPU fence는 CPU 번역 dependency를 대체하지 않는다.</p>
+<h2>12. 변경 파일과 구현 순서</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>작업</th>
+<th>완료 조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>API/command coverage와 반환값 소비처 inventory</td>
+<td><code>RHIEncoder</code> 모든 메서드·native cast·직접 서비스 명령·양 RDG 기록 경로 목록 확보</td>
+</tr>
+<tr>
+<td>2</td>
+<td>타입·arena·list·batch·recorder</td>
+<td>이동·밀봉·취소·overflow·alignment·destructor 검사 통과</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>RHISoftwareEncoder</code> 전체 명령</td>
+<td>borrowed payload 파괴 후에도 동일 기록 재생, false의 무부작용 검증</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>DX12CommandTranslator</code> 직렬</td>
+<td>clear/bind/draw/dispatch/barrier/readback 전 과정 및 전체 명령 coverage 통과</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>RHISubmissionThread.h/.cpp</code> 연결</td>
+<td>admission/ticket/fence 의미, stale generation, 취소·실패·quarantine 검사 통과</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>EnhancedRenderGraph.h/.cpp</code> 전환</td>
+<td><code>PrepareParallel/RecordParallel</code>에서 software target 사용, callback 1회 실행</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>RHIQueueRecorder</code> adapter 및 queue 소비처</td>
+<td>owned/multiqueue wait/signal과 deterministic 제출 순서 검증</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>IRHIGpuProfiler</code>, DX12/Vulkan profiler·capture</td>
+<td>CPU/GPU identity 및 query resolve 위치, recording ON/OFF 검사</td>
+</tr>
+<tr>
+<td>9</td>
+<td><code>VulkanCommandTranslator</code> 및 생명주기</td>
+<td>백엔드별 validation, resize/reload/종료 및 pool 재사용 검증</td>
+</tr>
+<tr>
+<td>10</td>
+<td>병렬 번역 및 작은 batch 직렬 처리</td>
+<td>serial 대비 동일 출력, target 독점, 순서·상태·수명 검사</td>
+</tr>
+<tr>
+<td>11</td>
+<td>제품 수용 및 기본 경로 전환</td>
+<td>CreatorRobot Debug 정확성·ON/OFF·ETW/GPU 전후 비교와 회귀 통과</td>
+</tr>
+</tbody></table></div>
+<p>각 신규 .h/.cpp는 <code>RenderEngine.vcxproj</code>와 <code>.filters</code>에 등록한다. 기존 네이티브 직접 기록은 별도 진단 빌드 설정에서만 A/B 기준으로 보존한다. 제품 software 경로 실패 시 자동 native fallback하여 오류를 숨기지 않는다. 수용 전에는 기존 제품 기본 경로를 바꾸지 않는다.</p>
+<h2>13. 회귀 검사와 수용 기준</h2>
+<p>회귀 도구 예정 경로는 <code>Tools/regression/rhi_software_commands_probe.cpp</code>와 <code>Tools/regression/verify-rhi-software-commands.ps1</code>이다. 실제 엔진 API를 사용하고 mock 기록 성공만으로 native 수용을 판정하지 않는다.</p>
+<ul>
+<li>명령·payload 경계: 임시 문자열/배열 파괴, arena 성장, 0개/대용량, 잘못된 offset, 예산 초과, bool false 후 fallback, destructor 횟수, 이동 후 원본 무효화.</li>
+<li>수명: 자원 소유자를 기록 직후 해제, descriptor/upload ring wrap, scene reload, resize, backend generation 변경, submit 직전 실패, 제출 후 timeout/device loss. GPU 완료 전 allocator 재사용이 없어야 한다.</li>
+<li>실행: 기존 direct와 software serial/parallel의 색상·깊이·readback 비교. 기존 허용 오차를 사용하고 tolerance를 이 변경을 위해 완화하지 않는다. indirect/mesh/copy/UAV 및 queue handoff를 포함한다.</li>
+<li>순서: callback 한 번, 명령 순서 보존, target 간 dependency, 동일 frame 여러 view, native submit 이전 ticket 성공 금지, 미발행 fence wait 거부, RHI 재진입 교착 부재.</li>
+<li>계측: GPU pass 수·identity·query 구간과 CPU provenance가 일치한다. unavailable query는 누락 사유와 수량을 남긴다.</li>
+<li>제품: CreatorRobot Debug 플레이 시작·정상 진행·장면 재로드·플레이 종료·정상 shutdown을 실행한다. DX12/Vulkan 검증 결과는 독립 기록한다.</li>
+</ul>
+<p>성능 비교는 같은 소스·장면·해상도·worker 수·전경 상태·워밍업·측정 구간·계측 옵션으로 direct/serial/parallel을 순서를 바꾸어 반복한다. 기록 ON/OFF와 ETW를 분리하고 GPU validation은 정확성 실행과 구별한다. 평균/p50/p95/p99 및 spike, FPS 산출 구간, full-frame critical path, CPU Running/Ready/Waiting, arena/allocator 메모리, in-flight 및 입력→표시 지연을 함께 보고한다. RenderGraphDeclare 개선으로 귀속할 수 없는 번역 효과를 선언 비용 감소로 표기하지 않는다.</p>
+<h2>14. 근거 소스와 UE 대응</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>근거</th>
+<th>확인 대상</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIEncoder.h">RHIEncoder.h</a></td>
+<td>현재 패스 명령 표면과 bool/count 계약</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIRecordedBatch.h">RHIRecordedBatch.h</a></td>
+<td>native batch, generation, lifetime token</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIParallelCommandPool.h">RHIParallelCommandPool.h</a></td>
+<td>native target 준비·기록·밀봉</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIQueueRecorder.h">RHIQueueRecorder.h</a></td>
+<td>owned queue의 두 번째 기록 경로</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp">RHISubmissionThread.cpp</a></td>
+<td>FIFO admission, native 제출, retirement</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRHIGpuProfiler.h">IRHIGpuProfiler.h</a></td>
+<td>query identity와 frame/submission 구분</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp">EnhancedRenderGraph.cpp</a></td>
+<td>graph recording 전환 지점</td>
+</tr>
+<tr>
+<td><a href="CodingConventions.html">CodingConventions.md</a></td>
+<td>타입·API 표기와 코드 형식</td>
+</tr>
+</tbody></table></div>
+<p>UE 기준 루트: <code>C:/Program Files/Epic Games/UE_5.6/Engine</code>, 버전 5.6.1 CL44394996.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>UE 상대 경로</th>
+<th>대응 설계</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Source/Runtime/RHI/Public/RHICommandList.h</code>의 <code>FRHICommandBase</code>, <code>AllocCommand</code>, <code>AllocCopy</code></td>
+<td>typed software command, arena와 인자 소유</td>
+</tr>
+<tr>
+<td><code>Source/Runtime/RHI/Private/RHICommandList.cpp</code>의 <code>FinishRecording</code>, <code>Execute</code></td>
+<td>밀봉과 명령 재생 분리</td>
+</tr>
+<tr>
+<td>같은 파일의 <code>FTranslateState</code>, <code>EnqueueTranslateTask</code>, <code>EnqueueSubmitTask</code>, <code>Finalize</code></td>
+<td>번역 task와 순서화된 native 제출 분리</td>
+</tr>
+<tr>
+<td><code>Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp</code>의 <code>SetupParallelExecute</code></td>
+<td>RDG 실행 분할과 context 경계 유지</td>
+</tr>
+</tbody></table></div>
+<p>UE의 명령 분리 원칙을 현재 RHI 경계에 적용한다. UE의 allocator 구현, linked-list 저장 형식, task thread 배치, 모든 RDG 기능을 동일하게 복제하는 계약은 아니다. UE식 명령 목록 도입과 고정 프레임 지연 설정은 별도다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
+
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
+</script>
+</body></html>
