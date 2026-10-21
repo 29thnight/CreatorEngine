@@ -1,5 +1,52 @@
 # Source-free AssetSet package composition
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [BuildTool/Tests/Program.cs:238](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Tests/Program.cs#L238) — `var project = Path.Combine(root, "game 한글 & spaces"); Directory.CreateDirectory(Path.Combine(project, "ProjectSetting")); Directory.CreateDirectory(Path.Combine(project, "Assets/Script"));`
+- [BuildTool/Tests/Program.cs:239](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Tests/Program.cs#L239) — `File.WriteAllText(Path.Combine(project, "Assets/Script/Example.cs"), "public class Example {}");`
+- [BuildTool/Tests/Program.cs:390](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Tests/Program.cs#L390) — `var source = Path.Combine(project, "Assets/Script/Example.cs"); File.WriteAllText(source, "public static class Example { public static int Value => 42; }");`
+- [Tools/regression/runtime_bootstrap_probe.cpp:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/runtime_bootstrap_probe.cpp#L55) — `set.assetSetId = Id(3); set.revision = 1; set.targetPlatform = "win-x64"; set.targetAbi = CreatorContentAbi::Token;`
+- [Tools/regression/runtime_bootstrap_probe.cpp:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/runtime_bootstrap_probe.cpp#L68) — `scene.byteSize = 1; scene.artifactPath = cooked::MakeDerivedSceneArtifactPath(scene.assetId);`
+- [Tools/regression/runtime_bootstrap_probe.cpp:160](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/runtime_bootstrap_probe.cpp#L160) — `Text(source, "m_Material: {schema: 1, assetId: " + Uuid::ToString(Id(6).value)`
+- [Tools/regression/asset_set_activation_probe.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/asset_set_activation_probe.cpp#L17) — `throw std::runtime_error(failure);`
+- [Tools/regression/asset_set_activation_probe.cpp:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/asset_set_activation_probe.cpp#L109) — `const auto good = std::string("CEAS1\nwin-x64\n") + CreatorContentAbi::Token + "\n" + manifestHash + "\n";`
+- [Tools/regression/asset_set_activation_probe.cpp:126](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/asset_set_activation_probe.cpp#L126) — `Text(policy, std::string("CEAS1\nwin-x64\n") + CreatorContentAbi::Token + "\n../outside\n");`
+- [ScriptCore/Audio.cs:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L8) — `public readonly struct AudioAssetId : IEquatable<AudioAssetId>`
+- [ScriptCore/Audio.cs:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L46) — `public readonly struct AudioParameter`
+- [ScriptCore/Audio.cs:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L83) — `public struct AudioPlaySettings`
+- [ScriptCore/Prefab.cs:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L10) — `public readonly struct Prefab`
+- [ScriptCore/Prefab.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L12) — `private readonly string? _name;`
+- [ScriptCore/Prefab.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Prefab.cs#L14) — `private Prefab(string name) => _name = name;`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [ScriptCore/Bootstrap.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Bootstrap.cs#L14) — `public static class Bootstrap`
+- [ScriptCore/Bootstrap.cs:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Bootstrap.cs#L16) — `private static readonly Diagnostics.ProfilerMarker PrePhysicsProfile = new("ScriptCore.PrePhysicsTick");`
+- [ScriptCore/Bootstrap.cs:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Bootstrap.cs#L17) — `private static readonly Diagnostics.ProfilerMarker PostPhysicsProfile = new("ScriptCore.PostPhysicsTick");`
+- [BuildTool/GameCompiler.cs:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/GameCompiler.cs#L7) — `internal static class GameCompiler`
+- [BuildTool/GameCompiler.cs:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/GameCompiler.cs#L53) — `Paths.Disjoint(output, engine.Root); Paths.Disjoint(output, Paths.Canonical(Path.Combine(project, "Assets"), true));`
+- [BuildTool/GameCompiler.cs:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/GameCompiler.cs#L54) — `Paths.Disjoint(output, Paths.Canonical(Path.Combine(project, "ProjectSetting"), true));`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Status: source implementation and unrun fixtures. No build, package, smoke test, shader compilation, or performance result is claimed.
 
 ## Two explicit package paths
@@ -73,3 +120,5 @@ Build-record hashes provide local provenance and integrity, not a cryptographic 
 - Tools/regression/asset_set_activation_probe.cpp: installed ABI rejection even when both policy and manifest assert the same incorrect token
 
 Windows build, end-to-end source-free package/smoke, all supported rendered kinds, failure injection and shader/backend runtime checks remain unrun.
+
+</details>

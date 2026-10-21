@@ -1,5 +1,34 @@
 # LX 그림자 검증 장면 확대 (2026-10-12)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 후속 5번의 검증 장면을 `dx12.skinning` 선택 모드에 추가했다. SceneHost·실제 DX12 GPU readback에서 12개 장면 × 두 포즈 × 캐스케이드 3장, 구성당 72개 indexed/meshlet 깊이·행렬 비교를 수행한다. 기본 테스트는 기존 동작을 유지하며, `-ShadowCaseSuite`에서만 확대 장면을 실행한다.
 
 ## 장면과 독립 대조 조건
@@ -55,13 +84,13 @@ const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowVi
 
 변이는 새 출력 디렉터리에서 `-ExpectedVisibleMeshletRejection`을 추가한다. Release는 구성을 바꾼다. 디스크 30GiB 하한을 확인하고 격리 프로젝트·설정을 사용한다. 깊이 파일은 `captures/<case>/{indexed,meshlet}-{bind,posed}-C{0,1,2}.f32`, 행 우선 little-endian float32다. 구성당 정상 대표 원본 144개(2.25GiB)를 보관한다. 예상 거부한 변이 픽셀은 삭제 기록을 남기고, 로그·판정·행렬·manifest·해시·변이 셰이더는 보존한다.
 
-- [실행 스크립트](../../Tools/regression/verify-lx-shadow-baseline.ps1), [오프라인 검증기](../../Tools/regression/assess-lx-shadow-cases.ps1)
-- [Debug 정상 판정](../../Build/Verification/ShadowCases-20261012/Normal-Debug/verdict.json), [72쌍·대조 조건 상세](../../Build/Verification/ShadowCases-20261012/Normal-Debug/cases.json), [원본 해시](../../Build/Verification/ShadowCases-20261012/Normal-Debug/capture-manifest.json)
-- [Release 정상 판정](../../Build/Verification/ShadowCases-20261012/Normal-Release/verdict.json), [72쌍·대조 조건 상세](../../Build/Verification/ShadowCases-20261012/Normal-Release/cases.json), [원본 해시](../../Build/Verification/ShadowCases-20261012/Normal-Release/capture-manifest.json)
-- [Debug 변이 판정](../../Build/Verification/ShadowCases-20261012/Mutant-Debug/verdict.json), [누락·대조 조건 상세](../../Build/Verification/ShadowCases-20261012/Mutant-Debug/cases.json), [변이 규칙·해시](../../Build/Verification/ShadowCases-20261012/Mutant-Debug/mutation.json)
-- [Release 변이 판정](../../Build/Verification/ShadowCases-20261012/Mutant-Release/verdict.json), [누락·대조 조건 상세](../../Build/Verification/ShadowCases-20261012/Mutant-Release/cases.json), [변이 규칙·해시](../../Build/Verification/ShadowCases-20261012/Mutant-Release/mutation.json)
-- [전체 판정·원본 대조](../../Build/Verification/ShadowCases-20261012/overall.json)
-- [Debug 빌드](../../Build/Verification/ShadowCases-20261012/build-Debug.log), [Release 빌드](../../Build/Verification/ShadowCases-20261012/build-Release.log)
+- 실행 스크립트 (`../../Tools/regression/verify-lx-shadow-baseline.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조), 오프라인 검증기 (`../../Tools/regression/assess-lx-shadow-cases.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)
+- Debug 정상 판정 (`../../Build/Verification/ShadowCases-20261012/Normal-Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 72쌍·대조 조건 상세 (`../../Build/Verification/ShadowCases-20261012/Normal-Debug/cases.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 원본 해시 (`../../Build/Verification/ShadowCases-20261012/Normal-Debug/capture-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 정상 판정 (`../../Build/Verification/ShadowCases-20261012/Normal-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 72쌍·대조 조건 상세 (`../../Build/Verification/ShadowCases-20261012/Normal-Release/cases.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 원본 해시 (`../../Build/Verification/ShadowCases-20261012/Normal-Release/capture-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 변이 판정 (`../../Build/Verification/ShadowCases-20261012/Mutant-Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 누락·대조 조건 상세 (`../../Build/Verification/ShadowCases-20261012/Mutant-Debug/cases.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 변이 규칙·해시 (`../../Build/Verification/ShadowCases-20261012/Mutant-Debug/mutation.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 변이 판정 (`../../Build/Verification/ShadowCases-20261012/Mutant-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 누락·대조 조건 상세 (`../../Build/Verification/ShadowCases-20261012/Mutant-Release/cases.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 변이 규칙·해시 (`../../Build/Verification/ShadowCases-20261012/Mutant-Release/mutation.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 전체 판정·원본 대조 (`../../Build/Verification/ShadowCases-20261012/overall.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 빌드 (`../../Build/Verification/ShadowCases-20261012/build-Debug.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Release 빌드 (`../../Build/Verification/ShadowCases-20261012/build-Release.log` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 각 실행의 `identity-before.json`·`identity-after.json`은 소스·실행 스크립트·오프라인 검증기·exe/runtime·실제 격리 셰이더 해시를 기록한다. `fixture-inputs.json`은 복사·변이 적용 후 프로젝트 입력을 기록한다. 원본·변이 저장소 셰이더가 아니라 실제 사용하는 격리 셰이더까지 실행 전후 일치를 요구한다.
 
@@ -74,3 +103,5 @@ const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowVi
 선택한 합성 장면에서 정책이 실제 깊이에 영향을 주고, indexed/meshlet 경로가 동치이며 보이는 메시렛 누락을 거부하는 기능 검사다. 텍스처의 공간 알파 패턴·mip·샘플러, 임의 실제 캐릭터, 모든 변환과 모든 캐스케이드 경계, 독립 정답 형상 전체를 수용한 것은 아니다. 새로운 compute 생존 목록 검증도 아니다.
 
 GPU validation 활성·문제 0·누락 메시지 0, 정상 quit와 소스·binary 안정성을 별도로 요구한다. 레이어 메시지 1건은 활성 안내다. 기존 profiler 종료 진단은 해결 범위 밖이며 검증 실행 시간은 성능 수용에 사용하지 않는다. Vulkan 실행·교차 비교는 PHASE 4.9다. 다음 목록 항목은 7번의 계측 누락 해결·반복 성능 측정이다.
+
+</details>

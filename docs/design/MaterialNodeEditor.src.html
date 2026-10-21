@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Material Node Editor</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MaterialNodeEditor.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/MaterialNodeEditor.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Material Node Editor</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L132">Tools/regression/material_codegen_probe.cpp:132</a> — <code>Case Surface(const LXMaterialDefinitions&amp; definitions, std::string name)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L566">Tools/regression/material_codegen_probe.cpp:566</a> — <code>ExpectError(target, &quot;material_output_target&quot;, target.activeOutput);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/material_codegen_probe.cpp#L868">Tools/regression/material_codegen_probe.cpp:868</a> — <code>fails([](const auto&amp;, auto&amp;, auto&amp;) -&gt; bool { throw std::runtime_error(&quot;compiler exception&quot;); }, &quot;exception&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-node-editor.ps1#L182">Tools/regression/verify-material-node-editor.ps1:182</a> — <code>Assert ($state.requestSucceeded -ne [bool]$Reject) &quot;Material request failed expectation: $($state.requestError)&quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-node-editor.ps1#L214">Tools/regression/verify-material-node-editor.ps1:214</a> — <code>Assert (!$initial.automaticPreview -and !$initial.requestPending -and $initial.requestSerial -eq 0) &#39;New drafts must wait for an explicit compile or save request&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-node-editor.ps1#L282">Tools/regression/verify-material-node-editor.ps1:282</a> — <code>Assert ((Doc).sourceRevision -eq $layoutSource -and (Doc).preparedSourceKey -eq $layoutKey) &#39;Layout-only save must preserve the compiled source key&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14">ScriptCore/Animator.cs:14</a> — <code>public sealed class Animator : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18">ScriptCore/Animator.cs:18</a> — <code>public void SetBool(string name, bool value) =&gt; Native.AnimatorSetBool(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19">ScriptCore/Animator.cs:19</a> — <code>public void SetFloat(string name, float value) =&gt; Native.AnimatorSetFloat(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4">ScriptCore/BlackBoard.cs:4</a> — <code>public enum BlackBoardType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28">ScriptCore/BlackBoard.cs:28</a> — <code>public sealed class BlackBoard</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30">ScriptCore/BlackBoard.cs:30</a> — <code>private readonly struct Value(BlackBoardType type, object boxed)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXDocument.h#L278">Lattice/Core/LXDocument.h:278</a> — <code>bool HasActivePreview() const { return previewActive_; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXDocument.h#L282">Lattice/Core/LXDocument.h:282</a> — <code>bool PreviewNodePositions(const std::vector&lt;NodePosition&gt;&amp; positions);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXDocument.h#L283">Lattice/Core/LXDocument.h:283</a> — <code>LXCommandResult FinishNodePositionPreview(const std::vector&lt;NodePosition&gt;&amp; start,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13">ScriptCore/MeshRenderer.cs:13</a> — <code>public sealed class MeshRenderer : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15">ScriptCore/MeshRenderer.cs:15</a> — <code>public string MaterialName =&gt; Native.MeshGetMaterialName(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24">ScriptCore/MeshRenderer.cs:24</a> — <code>public void InstantiateMaterial(string newName) =&gt; Native.MeshInstantiateMaterial(OwnerHandle, newName);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81">Engine/SceneRuntime/Animator.h:81</a> — <code>own::shared_owner&lt;const assets::ModelAnimationPayload&gt; payload{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86">Engine/SceneRuntime/Animator.h:86</a> — <code>own::shared_owner&lt;const assets::ModelAnimationDescriptor&gt; descriptor{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L142">Engine/SceneRuntime/Animator.h:142</a> — <code>[[nodiscard]] bool IsDirectEditorPreview() const;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>1. Editor 진입과 저작 흐름</h2>
+<p>2026-09-29부터 MeshRenderer Inspector의 재질 이름과 More 메뉴의
+<code>Open Material Node Editor</code>가 같은 Lattice 창을 연다. 창은 선언 기반 Editor
+window registry에 <code>###Editor.MaterialGraph</code>로 등록되며 일반 docking/workspace
+수명과 메뉴를 사용한다.</p>
+<ul>
+<li>기존 graph 재질은 GUID가 가리키는 <code>.shadergraph</code>를 읽는다.</li>
+<li>모델 재질은 import 시 실제 PBR 값과 텍스처를 연결한 graph를 만들고, 기본 배치부터
+그 graph로 렌더링한다. 이전 모델 generation에 graph가 없으면 Editor가 source에서 재저작한다.</li>
+<li>모델 외의 graph 없는 재질은 Principled BSDF → Material Output의 새 문서를 만든다.
+이 경우 Apply 전까지 기존 바인딩을 유지한다.</li>
+<li>중앙 재질 드롭다운의 <code>New Material Graph</code>와 새 문서 아이콘은 별도 자산 초안을 만든다.
+새 자산을 만드는 데 MeshRenderer 선택은 필요하지 않다.</li>
+<li>같은 드롭다운의 <code>Open Materials</code> 목록은 열린 문서들을 전환한다. 창을 숨겨도 미저장 문서를 유지한다.</li>
+</ul>
+<p>모델 재질의 SoT는 프로젝트
+<code>Assets/Materials/Models/&lt;model UUIDv8&gt;/&lt;material UUIDv8&gt;.shadergraph</code>다.
+model material ID와 source graph ID는 별개의 결정적 UUIDv8이며 <code>.meta</code>가 graph ID를 등록한다.
+model generation의 PBR 데이터는 최초 graph 생성의 seed이고, 재import는 기존 graph 내용을
+덮어쓰지 않는다. graph와 meta는 모델 저작 transaction에서 함께 게시하며 실패 시 신규 파일만 회수한다.</p>
+<p>Base Color factor × sRGB Base Color Texture, ORM의 Green/Blue × Roughness/Metallic factor,
+data Normal Texture → Normal Map, Emission factor × sRGB Emission Texture를 연결한다.
+AO는 명시적인 Occlusion Texture의 Red와 strength를 사용한다. ORM의 Red만으로 AO를 추정하지 않는다.
+Opaque/Masked/Transparent 정책과 texture alpha, alpha cutoff도 graph에 보존한다.
+sampler의 min/mag·mip filter와 U/V address 및 UV0 offset/scale/rotation을 유지한다.
+현재 Scene graph transport에는 UV0만 있으므로 UV1 재질의 자동 생성은 명시적으로 실패한다.</p>
+<p>모델 parameter node는 <code>valueSource=socket</code>을 사용한다. 노드의 output socket 값이
+컴파일된 기본값이며 Blackboard는 ID/타입/표시 이름을 제공한다. 같은 ID의 서로 다른
+socket 기본값은 진단으로 거부하며 group 내부의 parameter도 같은 규칙을 적용한다.
+기존 <code>valueSource</code> 없는 graph parameter는 Blackboard 기본값을 계속 사용한다.</p>
+<p>MeshRenderer Inspector는 graph 재질 이름과 source, 연결된 texture의 이름·thumbnail,
+노출된 color/scalar/vector/bool/int parameter를 표시한다. Inspector 변경은 instance override이며
+global Undo/Redo와 Scene 저장에 포함된다. 기존 C# Material API도 identifier로 같은 graph parameter를
+변경한다. 캔버스는 source 기본값을 편집하고, 같은 GUID의 Apply는 instance override를 보존한다.
+별도 sphere preview는 마지막으로 준비된 instance를 같은 Scene shader 경로로 렌더한다.
+새 문서를 여는 것만으로 초안을 컴파일하지 않으며, 미리보기 바닥도 표시 수요가 생길 때 준비한다.</p>
+<p>model cooking은 material graph를 자동으로 포함한다. model/mesh/material의 manifest 의존성이
+graph와 graph resource에 이어지며, BuildTool은 graph가 빠진 오래된 model library를 재저작한다.</p>
+<p>2026-10-18 변경의 기본 저작 흐름은 <strong>초안 편집 → 명시적 Apply 또는 Save</strong>다.
+자동 미리보기는 기본적으로 꺼져 있다. 노드 편집·idle·창 숨김·종료만으로 자산을 적용하거나 저장하지 않는다.
+새 자산을 MeshRenderer에 처음 연결할 때는 Save 완료 후 Assign하고 Scene을 저장한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>동작</th>
+<th>저장/게시하는 내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Apply / Compile</td>
+<td>현재 초안의 입력 키·컴파일 환경·의존성을 확인하고 필요한 경우만 컴파일한 뒤 material 자산과 그 사용처에 게시. 디스크에는 저장하지 않음</td>
+</tr>
+<tr>
+<td>Save</td>
+<td>같은 준비 단계를 거친 뒤 graph·material과 각각의 <code>.meta</code>를 저장하고 런타임에 게시. 별도 Apply 선행 불필요</td>
+</tr>
+<tr>
+<td>Automatic Preview</td>
+<td>사용자가 켠 세션에서만 초안 미리보기 준비를 허용. 자산 게시·저장은 수행하지 않음</td>
+</tr>
+<tr>
+<td>Assign to Selected Mesh</td>
+<td>저장·적용한 material 자산 참조를 선택한 MeshRenderer에 연결. global Editor Undo의 한 변경으로 기록</td>
+</tr>
+<tr>
+<td>Save Scene</td>
+<td>MeshRenderer의 material 자산 참조와 instance override를 Scene에 저장</td>
+</tr>
+</tbody></table></div>
+<p>새 graph의 기본 경로는 프로젝트 <code>Assets/Materials/Material_&lt;GUID&gt;.shadergraph</code>다.
+<code>.meta</code>는 GUID 등록에 계속 사용하며 graph 내용은 <code>.shadergraph</code>가 소유한다.
+graph의 <code>.meta</code>에는 <code>materialGraph.sourceKeyVersion</code>과 <code>materialGraph.sourceKey</code>도 기록한다.
+이 값은 저장한 소스의 참고 정보이며, 값이 같다는 이유만으로 캐시를 신뢰하지 않는다.
+저장 후에도 문서 Undo 이력을 유지하고 저장된 snapshot과 같은 내용으로 Redo하면
+dirty가 해제된다. 외부 파일 변경 충돌과 진행 중인 drag preview는 저장을 거부한다.
+미저장 문서의 Reload는 UI에서 명시적 버리기 확인을 받으며 HTTP에서는 거부한다.</p>
+<h2>2. Blender형 표현과 LX 경계</h2>
+<p>상단은 한 줄로 구성한다. 왼쪽에 Editor/Object 선택과 View/Select/Add/Node 메뉴,
+중앙에 slot/material 선택·이름·Save/New/Close 아이콘 묶음과 Apply·자동 미리보기 아이콘,
+오른쪽에 스냅과 overlay 토글·드롭다운을 배치한다. Reload는 재질 드롭다운,
+Frame All은 View 메뉴와 Home 키에 둔다. Close는 창만 숨기며 문서를 유지한다.
+Object → 실제 mesh 이름 → Material breadcrumb는
+점 격자 캔버스 위에 투명하게 표시하며 별도 도구줄 높이를 차지하지 않는다.
+Principled BSDF는 녹색, Material Output은 붉은색 헤더와 선택 테두리를 사용한다.</p>
+<p>헤더는 자체 ImGui child가 소유한다. 메뉴줄과 child 배경은 현재 LXCanvasStyle의
+<code>background</code>를 공유하고 메뉴줄 경계선과 바깥 여백을 제거한다. 외부 스타일로
+배경을 바꾸면 헤더와 캔버스가 같은 색으로 이어진다. 콤보 조작은 표준 BeginCombo를
+유지하되 큰 삼각형 대신 작은 꺾쇠를 그린다. 글꼴은 16 논리 픽셀이고 ImGui가
+사용자 배율과 monitor DPI를 한 번 적용한다. 아이콘·간격·테두리도 같은 배율이다.</p>
+<p>스냅 버튼은 노드 이동의 격자 스냅을 켠다. 여러 노드를 이동하면 드래그한 노드만
+격자에 맞추고 같은 이동량을 전체 선택에 적용해 서로의 상대 위치를 보존한다.
+스냅 설정은 세션 UI 상태이며 graph 데이터는 기존 이동/Undo transaction을 사용한다.</p>
+<p>상단바·breadcrumb·꺾쇠는 공통 Material Symbols Outlined 폰트의 글리프를 사용한다.
+Save 메뉴는 <code>save</code>, 헤더 저장은 <code>shield</code>, 새 문서는 <code>content_copy</code>, Apply는 <code>push_pin</code>,
+overlay는 <code>join_inner</code>, 편집기 선택은 <code>blur_circular</code>다. 기존 <code>contrast</code>, <code>deployed_code</code>,
+<code>view_in_ar</code>, <code>close</code>, <code>expand_more</code>, <code>chevron_right</code>도 재사용한다. 스냅에는 기존
+<code>grid_on</code>을 사용하며 고정한 원본 폰트에는 자석 글리프가 없다.
+아이콘은 실제 glyph bounds를 기준으로 중앙에 놓고 DPI/사용자 배율을 한 번 적용한다.
+Apply·Save·자동 미리보기는 기존 공통 아이콘 버튼과 툴팁을 사용한다. 동작을 설명하는
+텍스트 버튼이나 별도 도구줄을 추가하지 않는다.
+독립 예제도 Inter와 같은 subset을 실행 파일 옆에 배포하고 공통 merge helper를 사용한다.</p>
+<p>Material Node Editor의 창 제목에도 기존 <code>EditorIcon::Material</code> 글리프를 표시한다.
+표시 이름만 바꾸고 docking/workspace 식별자 <code>###Editor.MaterialGraph</code>는 유지한다.</p>
+<p>Add 메뉴의 Reroute는 Bool/Int/Float/Vector/Color/Normal/Texture/Sampler/Closure의
+9가지 실제 등록 타입이다. 같은 이름을 반복 표시하지 않고 하나의 <code>Reroute</code> 하위 메뉴에서
+타입을 선택한다. Multiply는 <code>Multiply (Float)</code>와 <code>Multiply (Color)</code>로 구분한다.
+검색은 표시 이름과 등록 타입을 모두 사용하며 각 항목의 ImGui ID는 등록 타입으로
+분리한다. 정의 이름이나 저장 파일의 타입은 바꾸지 않는다. 독립 ImGui 예제도 같은
+메뉴 함수를 사용한다.</p>
+<p><code>MaterialGraphPresentation</code>은 실제 <code>LXMaterialDefinitions</code>의 소켓 순서와 타입으로
+항목을 등록한다. 색상 picker, float slider, vector, bool, integer, enum, text와
+texture preview를 제공한다. 핀의 Y 위치·항목 rect·노드 높이·hit test는 같은
+<code>LXNodeRow</code> 목록을 사용한다. 연결된 입력의 값 위젯은 비활성화된다.
+Principled의 Diffuse/Subsurface/Specular/Transmission/Coat/Sheen/Emission/Thin Film은
+개별 펼침 항목이며 연결된 고급 소켓은 자동으로 표시된다.</p>
+<p>Material Output에는 Blender의 All/Cycles/Eevee 대상 선택 위젯을 표시하지 않는다.
+현재 제품 Scene의 렌더러는 <code>EnhancedSceneRenderer</code>다. 참조 schema의 <code>target=ALL</code>은
+Blender 자료와의 대응을 위한 metadata이며 엔진 렌더러 선택이 아니다.
+외부 문서가 지원하지 않는 <code>target</code> 값을 넣으면 compiler가 <code>material_output_target</code>으로 거부한다.</p>
+<p>노드 헤더 접힘과 view는 저장하지만 내부 고급 section 펼침은 세션 UI 상태다.
+서로 다른 노드/핀/연결선 스타일은 LXStyleSheet를 사용한다. 창의 기본 스타일은
+Blender형으로 통일하며 오른쪽 overlay 드롭다운에서 다음 외부 파일을 Export/Reload한다.</p>
+<p><code>RuntimeDataRoot/Editor/Styles/Material.lxstyle</code></p>
+<p>이 파일은 Scene이나 <code>.shadergraph</code> 안에 저장하지 않는다. 기본 스타일을 생성한 뒤
+외부 파일이 있으면 읽는다. LX의 항목·캔버스는 Engine 타입을 링크하지 않으며
+Editor adapter가 texture GUID 해석과 asset drag payload를 연결한다.
+이 새 창은 <code>imgui-node-editor</code>를 사용하지 않는다. 기존 BT/Animator 창의 의존성
+제거는 각 창의 재작성 이후인 LX-4&#126;6 범위다.</p>
+<p>Material의 기본 배경은 30 논리 픽셀 간격의 작은 점이다. LXCanvasStyle의
+<code>gridPattern</code>과 <code>gridDotRadius</code>도 <code>LXS 6</code> 외부 스타일에 정확히 저장한다.
+기존 LXS 1&#126;5 파일은 계속 읽으며, Material 창은 점 패턴 필드가 없던 이전 파일을
+점 배경으로 적용한다. 다른 LX 창의 이전 선 격자 기본값은 유지한다.</p>
+<h2>3. 문서·제품 자원 소유권</h2>
+<pre><code class="language-mermaid">flowchart TD
+    Document[&quot;LXDocument 초안&quot;] --&gt; Request[&quot;Apply 또는 Save 요청&quot;]
+    Request --&gt; Prepare[&quot;입력 키·환경 확인 / 필요한 경우 컴파일&quot;]
+    Prepare --&gt; Apply[&quot;Apply: 런타임 게시&quot;]
+    Prepare --&gt; Save[&quot;Save: 파일 저장 후 런타임 게시&quot;]
+    Apply --&gt; Accepted[&quot;수락된 material generation&quot;]
+    Save --&gt; Accepted
+</code></pre>
+<p>세션은 편집 중인 자산과 마지막으로 수락한 material owner를 보관한다. Mesh 할당은
+EntityHandle과 component instance ID로 대상을 다시 해석하고 잠금·삭제 여부를 검사한다.
+Apply/Save 요청은 document ID, 소스 revision, instance 설정 revision, 요청 serial과
+수락된 owner를 고정한다. 이후 의미 변경이나 새 요청으로 낡아진 결과는 게시하지 않는다.
+노드 이동·접힘·view 변경은 유효한 셰이더 준비 결과를 폐기하지 않는다.</p>
+<p><code>EditorAssetDatabase::SaveMaterialGraph</code>는 준비된 material과 저장할 graph의 소스 키를
+비교한다. <code>.shadergraph</code>, <code>.shadergraph.meta</code>, <code>.asset</code>, <code>.asset.meta</code>의 원본을 보관한 뒤
+네 파일을 쓰고, 예상 owner가 여전히 현재 자산일 때 런타임에 게시한다. 파일 쓰기나 게시가
+실패하면 실패한 파일까지 포함해 복구한다. 복구 실패는 오류에 명시한다. 파일 저장과 런타임
+게시 뒤의 catalog 등록 오류는 별도 경고로 반환하므로 이미 성공한 저장을 실패 상태로 표시하지 않는다.
+이 경계는 실패 시 복구를 제공하며, 네 파일을 한 번에 바꾸는 filesystem transaction은 아니다.</p>
+<p>새 graph는 Editor authoring 경로에서 결정적 Slang과 Scene target bytecode를 생성한다.
+Editor를 재시작해도 저장한 source를 authoring compile로 읽을 수 있다.
+Player는 기존 cooked catalog/bytecode 경로를 유지한다. 이 저작 fallback은
+Player source compile 허용이나 MAT-7의 쿠킹 경계 변경을 의미하지 않는다.</p>
+<h3>변경 판별과 컴파일 재사용</h3>
+<p><code>LXDocument::Revision()</code>은 기존 편집 충돌·Undo·dirty 계약을 유지하고,
+<code>ContentRevision()</code>은 셰이더 의미가 바뀐 편집만 추적한다. 배치·view·접힘·frame 변경은
+후자를 증가시키지 않는다. 세션은 graph/metadata의 소스 변경과 instance 기본값·표시 설정을
+구분한다. 평상시 owner tick은 revision과 진행 중인 요청만 확인하며 graph 직렬화·전체 해시·
+검증·IR 생성·Slang 생성·의존 파일 해시를 매 프레임 수행하지 않는다.</p>
+<p><code>ComputeMaterialSourceKey</code>는 코드 생성 전에 SHA-256 입력 키를 만든다. 키에는 노드와 연결,
+컴파일에 영향을 주는 소켓 값·property·group 본문·Blackboard·active output·schema가 들어간다.
+노드 위치·접힘·frame·pan/zoom과 다음 ID 할당값은 제외한다. 따라서 배치 정리만으로 컴파일
+캐시를 무효화하지 않는다. 유효하지 않은 graph도 키를 만들 수 있으므로 키 계산 성공은 컴파일
+성공을 뜻하지 않는다.</p>
+<p>명시적 Apply/Save는 한 번의 worker 요청에서 이전 검증 결과를 확인한다. 소스 키가 같아도
+host/adapter, 컴파일 정책, 컴파일러 identity, 의존 파일 또는 include 해석이 달라지면 재사용하지 않는다.
+include 가림 검사는 공통 include 디렉터리와 실제 생성 소스의 검색 위치, 다음 요청의 cache 위치를
+함께 확인한다. 임시 디렉터리의 무작위 이름은 키에 넣지 않아 캐시를 매번 무효화하지 않는다.
+유효한 메모리 결과 또는 <code>.scene-cache</code>는 <code>GenerateSlang</code>보다 먼저 확인한다. cache hit을
+확인하기 위해 Slang global session을 새로 만들지 않는다. 실제 bytecode와 dependency 검증은 유지한다.
+Save의 최종 소스 일치 검사는 키 비교이며 코드 생성을 다시 호출하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>변경 또는 상태</th>
+<th>수행하는 작업</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>새 문서 열기, 요청 없는 idle</td>
+<td>기본 2노드·1연결 초안 유지. 셰이더 준비 작업을 예약하지 않음</td>
+</tr>
+<tr>
+<td>노드 위치·접힘·view·frame 편집</td>
+<td>문서 revision/dirty만 갱신. Save 시 동일 소스와 현재 환경을 worker에서 확인</td>
+</tr>
+<tr>
+<td>노드·연결·컴파일용 기본값 변경</td>
+<td>초안만 변경. Apply/Save 또는 사용자가 켠 자동 미리보기에서 준비</td>
+</tr>
+<tr>
+<td>편집기 instance 기본값 변경</td>
+<td>초안만 변경. Apply/Save 또는 자동 미리보기 요청 시 기존 generation을 재사용할 수 있음</td>
+</tr>
+<tr>
+<td>컴파일 실패</td>
+<td>마지막 정상 material 유지. 같은 실패 초안을 idle에서 자동 재시도하지 않음</td>
+</tr>
+<tr>
+<td>창 숨김·종료</td>
+<td>새 컴파일·자산 게시·저장 요청을 만들지 않음. 이미 수락한 작업의 수명만 정리</td>
+</tr>
+</tbody></table></div>
+<p>authoring source/environment 증명은 runtime-only 데이터다. cooked 파일 포맷과 런타임
+<code>contentDigest</code>에는 넣지 않는다. 다른 소스가 동일한 제품을 만들면 기존 generation 공유를
+유지하면서 세션이 검증한 authoring 결과는 별도로 보관한다. parameter 기본값 lookup은 소스
+revision마다 한 번 구성하며, 각 위젯을 그릴 때 graph/group을 반복 순회하지 않는다.
+동일한 준비 결과를 재검증한 경우에는 instance와 preview revision도 유지하므로 Apply 뒤 Save가
+변하지 않은 미리보기의 GPU 결과를 무효화하지 않는다.
+Material Status도 준비된 program 또는 해당 요청의 실패 진단을 사용한다.</p>
+<h2>4. 열린 문서의 HTTP 편집</h2>
+<p>실행 중인 Editor의 인증된 CommandService에서 <code>material.editor</code>를 사용한다.
+UI와 HTTP가 같은 LXDocument와 명령 큐를 소비한다.</p>
+<pre><code class="language-text">material.editor open &lt;object&gt;
+material.editor new &lt;object&gt;
+material.editor state
+material.editor &lt;operation&gt; &lt;document-id&gt; &lt;revision&gt; &lt;args...&gt;
+</code></pre>
+<p><code>state</code>는 document ID, revision, dirty, uiFrames, graph GUID, path,
+node/pin/link 목록과 표시 geometry를 반환한다. <code>sourceRevision</code>과 <code>instanceRevision</code>은
+준비 결과의 의미 변경 경계를 구분한다. 수정 요청은 <strong>문서 ID와 revision을
+모두 일치시켜야</strong> 한다. Reload는 새 문서 ID를 발급해 이전 요청을 무효화한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>operation</th>
+<th>args</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>save / apply / compile / reload / undo / redo</td>
+<td>없음 (<code>compile</code>은 <code>apply</code>의 별칭)</td>
+</tr>
+<tr>
+<td>add</td>
+<td>node type</td>
+</tr>
+<tr>
+<td>connect</td>
+<td>output pin ID, input pin ID</td>
+</tr>
+<tr>
+<td>disconnect</td>
+<td>link ID</td>
+</tr>
+<tr>
+<td>delete</td>
+<td>node ID</td>
+</tr>
+<tr>
+<td>collapse</td>
+<td>node ID, true/false</td>
+</tr>
+<tr>
+<td>property</td>
+<td>node ID, key, value</td>
+</tr>
+<tr>
+<td>value</td>
+<td>pin ID, 타입에 맞는 성분들</td>
+</tr>
+</tbody></table></div>
+<p>타입 불일치, 잘못된 document/revision, 비유한 수, 존재하지 않는 ID는 무변경 오류다.
+변경은 Undo transaction, revision과 dirty를 갱신하며 자동 저장하지 않는다.</p>
+<p><code>apply</code>/<code>compile</code>/<code>save</code>의 성공 응답은 비동기 요청 수락이다. 반환된 <code>requestSerial</code>을
+보관하고 <code>state</code>에서 <code>requestSerial</code>이 여전히 그 값인지 확인한다. <code>requestPending</code>이 false이고
+<code>completedRequestSerial</code>도 같은 값일 때 <code>requestSucceeded</code>와 <code>requestError</code>로 완료 결과를 판정한다.
+다른 요청이 교체했다면 그 결과로 이전 요청의 성공을 판정하지 않는다. <code>requestPending</code>과
+<code>requestAction</code>은 현재 요청 상태이고, <code>lastPreparationReused</code>는 마지막 준비 결과의 재사용 여부다.
+<code>catalogRegistered</code>와 <code>saveWarning</code>은 저장·게시 후 catalog 등록 결과를 구분한다.
+자동 미리보기는 <code>material.editor auto-preview on|off</code>로 설정하며 <code>automaticPreview</code>로 확인한다.
+<code>preview on|off|refresh</code>는 미리보기 수요/명시적 새로고침이며 자동 적용·저장 명령이 아니다.</p>
+<h2>5. 검증과 남은 범위</h2>
+<h3>2026-10-18 변경의 검증 상태</h3>
+<p>소스 비교로 revision 분리, 명시적 요청 수명, source/environment 증명, 저장 실패 복구,
+단일 owner tick과 미리보기 지연 준비의 연결을 검토했다. 사용자 지시에 따라 이 변경에서는
+빌드·셰이더 컴파일·회귀 테스트·분석기·GPU 실행·성능 측정을 실행하지 않았다.</p>
+<p><code>material_codegen_probe.cpp</code>에는 배치/ID 할당 제외, 의미 변경·group·schema invalidation과
+document/content revision의 Undo/Redo·drag 사례를 추가했다. 세 Editor 회귀 스크립트에는
+명시적 요청 완료 대기, 자동 적용/저장 금지, 배치 편집 재사용, 잘못된 초안의 기존 결과 보존과
+파일 쓰기 실패 복구 사례를 갱신했다. 이들은 다음 허가된 Windows 검증에서 실행할 코드이며
+이번 변경의 통과 결과가 아니다. 아래 과거 실행 기록도 이번 변경의 실행 증거로 사용하지 않는다.</p>
+<h3>이전 구현의 검증 기록</h3>
+<p><code>Tools/regression/verify-material-node-editor.ps1</code>는 격리한 프로젝트의 실제 Editor를
+숨긴 창으로 실행하고 인증 HTTP로 조작한다. 실제 창의 ImGui frame 진행,
+typed 연결/거부, document/revision 충돌, 정확한 저장 bytes 왕복,
+저장 후 Undo/Redo, 접힘 왕복, 외부 변경 보존, compiler 실패의 accepted generation
+보존, MeshRenderer Apply의 실제 GBuffer 변화와 새 Editor 재개방을 검사한다.
+GPU validation과 정상 종료, Engine/Editor/Lattice source hash 변경 여부도 기록한다.</p>
+<p>독립 예제의 <code>--capture-material &lt;png&gt;</code>는 같은 MaterialGraphPresentation/LXCanvas를
+실제 ImGui/D3D11 backbuffer에서 캡처한다. 이는 스타일 미리보기이며 제품 Editor 창의
+스크린샷으로 취급하지 않는다. 예제 자체 검사는 항목/핀 Y 정렬, section 접힘,
+compact header와 저장 snapshot/Undo 관계를 검사한다.</p>
+<p>2026-09-29 최초 연결의 Editor Debug/Release 빌드와 LX 예제 Debug 빌드/자체 검사를 통과했다.
+예제의 view 검사는 DPI 1.0/1.5에서 사용자 배율 1.35 변경도 검사한다.
+상단바·점 배경 수정 전 최초 연결의 native DX12 Editor 결과는 다음과 같다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성</th>
+<th align="right">검사</th>
+<th align="right">실제 Scene capture</th>
+<th>source SHA-256 변경</th>
+<th>GPU 문제 / 정상 종료</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td align="right">1,298</td>
+<td align="right">3</td>
+<td>1,132개 중 0</td>
+<td>0 / exit 0</td>
+</tr>
+<tr>
+<td>Release</td>
+<td align="right">1,298</td>
+<td align="right">3</td>
+<td>1,132개 중 0</td>
+<td>0 / exit 0</td>
+</tr>
+</tbody></table></div>
+<p>증거는 <code>Build/Obj/material-node-editor-{debug,release}-gate-final.log</code>,
+<code>Build/Obj/MaterialProductProbe/node-editor-{Debug,Release}-root.txt</code>가 가리키는
+격리 프로젝트의 <code>source-hashes.json</code>, <code>responses.jsonl</code>, <code>validation.json</code>과 capture에 있다.
+최종 Debug 검사에는 Scene 활성화 직후 카메라/Editor rig 준비 실패의 명시적
+<code>camera.unavailable</code>을 최대 30초 기다리는 절차를 추가했다. 다른 실패는 계속 거부한다.
+Release는 같은 최종 Editor/LX source에서 이 대기를 추가하기 전에 통과했다.</p>
+<p>같은 날 상단바·점 배경 수정본은 Editor Debug/Release 빌드와 독립 ImGui 캡처를
+확인했다. 예제 자체 검사는 LXS 6 점 패턴/반경 왕복과 LXS 5/4/3 읽기를 통과했다.
+실제 숨긴 DX12 Debug Editor에서도 새 상단바가 포함된 Material 창의 ImGui frame
+3회를 확인했고 basic validation 문제 0·정상 종료 exit 0이었다.
+이 확인은 위 1,298개 제품 렌더 회귀 전체를 다시 실행한 증거는 아니다.
+로그는 <code>Build/Obj/material-header-dots-{editor-debug-build,editor-release-build,selftest,editor-ui}.log</code>와
+<code>Build/Obj/MaterialNodeEditorPreview.png</code>다.</p>
+<p>그 뒤 헤더의 꺾쇠·아이콘 묶음·자석/overlay 형태와 캔버스 배경 연결도 수정했다.
+수정본 Editor Debug/Release 빌드와 숨긴 DX12 Debug Editor의 ImGui frame 3회,
+GPU validation 문제 0·정상 종료 exit 0을 확인했다. 예제 자체 검사에서는 스냅 시
+다중 선택의 상대 위치 보존과 Undo를 DPI 1.0/1.5 및 LXDocument 경로에서 통과했다.
+독립 ImGui 캡처의 빈 헤더와 빈 캔버스 픽셀은 모두 RGB (28, 28, 28)이었다.
+증거는 <code>Build/Obj/material-header-reference-{editor-debug-build,editor-release-build,selftest,editor-ui}.log</code>,
+<code>Build/Obj/MaterialHeaderReferencePreview.png</code>와 헤더 영역 발췌
+<code>Build/Obj/MaterialHeaderReferenceBar.png</code>다.</p>
+<p>같은 날 Material Symbols에 Save·Shield·Duplicate·Pin·Overlays·NodeEditor·FrameAll
+역할을 추가하고 상단바·경로 표시·꺾쇠를 실제 폰트 글리프로 교체했다.
+73개 역할/68개 글리프의 누락 0, 기존 아이콘 정렬 289개 검사 실패 0,
+Editor Debug/Release 및 독립 예제 Debug 빌드를 확인했다. 배포된 세 폰트 사본의
+SHA-256은 원본과 같았다. 숨긴 DX12 Debug Editor에서 Material 창 ImGui frame 3회,
+basic GPU validation 문제 0·정상 종료 exit 0을 확인했다.
+로그는 <code>Build/Obj/material-font-icons-{editor-debug-build,editor-release-build,example-build,alignment,editor-ui,preview}.log</code>,
+독립 ImGui 미리보기와 헤더 발췌는 <code>Build/Obj/MaterialFontIconsPreview.png</code>와
+<code>Build/Obj/MaterialFontIconsBar.png</code>다. 이 검사는 전체 제품 렌더 회귀의 재실행이 아니다.</p>
+<p>대시보드 전체 JavaScript 파싱, LX-3/LX-3H 진행 중·MAT-7 완료·MAT 총 34일 유지 검사와
+Vite 문서 빌드도 통과했다. 이후 진행률 조사에서 LX-3/LX-3H의 잘못된 <code>doing</code> 상태를
+정식 <code>progress</code>로 수정했다. 알 수 없는 가중치와 미산정 0일의 곱도 NaN이므로 전체 집계가
+오염되었던 문제다. checker도 <code>days:null</code>을 미산정으로 읽고 실제 페이지 script의 전체·진행 중·
+각 phase 진행률을 실행 검사한다. TASKS 435항목, shape 오류 0, meta 불일치 0,
+전체 진행률 유한성 검사를 통과했고 <code>doing</code>을 주입한 사본은 실패했다.</p>
+<p>제품 Editor에서 실제 마우스로 모든 제스처를 다시 조작한 결과와 Vulkan Editor UI
+검증은 이 작업의 증거에 포함하지 않는다. 기존 group/Blackboard metadata는 보존하지만
+전용 interface/Blackboard 저작 패널은 후속이다. Artist preview/cost badge와 rendered
+parity/performance 수용은 기존 MAT-8/MAT-9 범위다.</p>
+<h2>6. Material 창 CPU 비용과 도킹 조사 (2026-09-29)</h2>
+<p><code>PinPosition</code>의 조건식 <code>items ? *items : LXNodeItemRegistry{}</code>는 임시 객체 때문에
+정의·문자열·predicate를 가진 레지스트리 전체를 핀마다 복사했다. 양쪽을 lvalue로 바꿔
+복사를 제거했다. 이후에도 핀 위치·항목 rect·노드 높이가 같은 visible row 목록을 반복
+계산하므로 <code>RowCacheScope</code>에서 캔버스 draw 동안 재사용한다. section 변경은 해당 노드를,
+등록/predicate 변경과 입력 처리 뒤에는 전체 목록을 무효화한다. scope 종료 시 지워 다음
+프레임에 opaque predicate를 다시 평가하며, 저장 문서에는 cache를 포함하지 않는다.</p>
+<p>숨긴 native DX12 Editor와 격리한 동일 재질 fixture(노드 6개, 연결 6개)를 인증 HTTP로
+열고 닫았다. 각 표본은 ImGui 창 CPU draw 비용이며 실제 사용자 화면의 FPS 측정이 아니다.
+Editor 자체의 <code>editor.panelcost</code>로 180개 이상 게시 프레임의 평균과 P95를 읽었다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성</th>
+<th align="right">수정 전 평균 / P95 (ms)</th>
+<th align="right">수정 후 평균 / P95 (ms)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Debug</td>
+<td align="right">355.294 / 477.433</td>
+<td align="right">17.973 / 24.638</td>
+</tr>
+<tr>
+<td>Release</td>
+<td align="right">10.8564 / 13.2444</td>
+<td align="right">0.91418 / 1.3194</td>
+</tr>
+</tbody></table></div>
+<p>수정 전 Release 표본 중에는 별도 Debug 빌드가 진행되어 CPU 경합이 수치에 영향을 줄 수
+있다. 수정 후 측정은 빌드 종료 뒤 실행했다. Debug 복사 제거만 적용한 중간 표본은
+239.133ms로, row 계산 재사용이 추가로 필요한 근거였다. 전체 Scene GPU 비용이나 MAT-9의
+최종 성능 수용을 이 UI 비용으로 대신 판정하지 않는다.</p>
+<p>Debug/Release Editor 빌드와 독립 Debug 예제 자체 검사를 통과했다. 자체 검사는 반복 핀
+위치 계산 중 registry 복사 0회, draw scope 내부 predicate 재평가 없음, section 무효화와
+다음 프레임 재평가, Output의 대상 선택 항목 부재를 확인한다. 양쪽 비용 측정 실행은 창을
+닫은 뒤 UI 비용이 돌아왔으며 정상 종료 exit 0이었다.</p>
+<p>도킹 금지 flag나 window class 제한은 현재 Content Browser/Material 선언에 없다.
+기본 레이아웃의 숨긴 Debug Editor에서 <code>editor.nav</code>로 실제 title drag/drop을 주입해
+Material과 Content Browser가 같은 dock node 6에 들어갔다. 사용자 Debug 저장 workspace는
+사본만 별도 프로젝트에 복원했다. 큰 창의 dock root 2880×1662, Content Browser 1952×518,
+UI 배율 1.2에서도 같은 node 6의 탭 도킹이 성공했다. 사용자 원래 DPI/배율 및 실제 OS
+마우스 이동과 동일한 검사는 아니며, 처음 보고된 표시 누락의 직접 원인은 재현으로 특정하지
+못했다. 수정본 빌드 뒤 사용자가 &quot;이제 잘 된다&quot;고 확인했다. 작업 공간을 초기화하거나
+사용자 파일을 수정하지 않았다.</p>
+<p><code>editor.dock</code>는 <code>movingWindow</code>, <code>hoveredWindowUnderMoving</code>, <code>dockingPayload</code>,
+<code>dockNodes[].flags</code>를 추가로 반환해 이동 payload와 대상의 금지 여부를 읽을 수 있다.
+숨긴 창의 큰 해상도 검사에 필요했던 <code>window.resize</code>도 활성/보이는 창 검색 대신
+엔진 <code>CoreWindow</code> 핸들을 사용하도록 수정했다. DPI/창틀 때문에 요청과 실제 client 크기가
+다르면 기존 응답에 실제 크기를 계속 보고한다.</p>
+<p>증거는 <code>Build/Obj/material-editor-investigation-{debug-before-valid,debug-after-copy, debug-after-cache,release-before,release-after-cache}.log</code>,
+<code>Build/Obj/material-editor-investigation-user-layout2.log</code>와 대응하는
+<code>Build/Obj/MaterialInvestigation-*</code>의 비용·도킹 JSON이다. 최종 예제 검사는
+<code>Build/Obj/material-investigation-selftest-final.log</code>, 대시보드 정상/변이 검사는
+<code>Build/Obj/material-dashboard-nan-{validation,mutation}.log</code>다.</p>
+<p>최종 빌드 후 추가 Release 측정은 사용자의 일반 Debug Editor 실행을 확인해 조사용
+프로세스만 종료했다. <code>release-after-final</code> 실행은 측정 완료로 세지 않으며 위 표는
+정상 종료한 <code>release-after-cache</code> 표본이다.</p>
+<h2>7. 창 제목과 Add 메뉴 수정 검증 (2026-09-29)</h2>
+<p>Material 제목 아이콘과 Add 메뉴 수정본의 제품 Editor Debug 빌드, 독립 예제 Debug
+빌드와 자체 검사를 통과했다. 메뉴 목록 검사는 등록 타입과 표시 이름의 유일성,
+Reroute 9개, Multiply 2개와 검색 후 타입 보존을 확인했다. 실제 ImGui popup에서
+Reroute 9개를 각각 눌러 선택된 등록 타입을 확인했고 각 hover ID의 항목 수는 1이었다.
+검사 입력은 격리한 ImGui context에만 주입하며 OS 마우스는 조작하지 않았다.</p>
+<p>숨긴 native DX12 Debug Editor는 격리 프로젝트의 graph(노드 6개)를 열어 Material 창
+ImGui frame 15회를 확인했고 GPU validation 문제 0, 정상 종료 exit 0이었다.
+이 검사는 기존 모델 재질의 변환이나 전체 제품 렌더 회귀를 검증한 결과가 아니다.</p>
+<p>증거는 <code>Build/Obj/material-node-menu-editor-debug-build.log</code>,
+<code>Build/Obj/material-node-menu-example-interaction-final-build.log</code>,
+<code>Build/Obj/material-node-menu-selftest.log</code>, <code>Build/Obj/material-node-menu-editor-ui.log</code>와
+<code>Build/Obj/MaterialHeader-Debug-98747e8e</code>의 격리 프로젝트다.</p>
+<h2>8. 모델 graph SoT 검증 (2026-09-29)</h2>
+<ul>
+<li>Editor·AssetCooker Debug와 C# BuildTool 빌드 통과. Release는 이번 변경으로 검증하지 않았다.</li>
+<li>LX 자체 검사 통과: Material graph 102개, compiler 21개. group 안의 socket parameter 기본값,
+서로 충돌하는 기본값 거부, 기존 Blackboard parameter와 정확한 archive 왕복을 포함한다.</li>
+<li>모델 저작 transaction의 7가지 주입 실패, UUIDv8 identity 충돌 거부, 재import 시 편집된 graph
+byte 보존과 신규 graph/meta rollback 통과.</li>
+<li>격리 프로젝트의 숨긴 native DX12 Editor에서 94개 검사 통과. CreatorRobot의 graph 4개를 만들고
+실제 배치했으며, Plane의 embedded texture·Inspector/canvas frame·named property 변경과 Undo/Redo,
+graph 저장 왕복·재import 보존·Scene 저장 후 새 Editor 재개방을 확인했다.</li>
+<li>위 94개 검사의 실제 렌더 대상은 Plane이었다. CreatorRobot은 배치만 검사해, 스킨 모델의
+렌더 정지 회귀를 검출하지 못했다.</li>
+<li>Plane Scene capture 2회에서 graph identity와 effective uniform을 실제 draw에 대조했고 nonfinite·GPU
+validation 문제는 0개였다. 두 Editor 세션 모두 정상 종료했다.</li>
+<li>source-only cook staging에서 모델 2개·재질 graph program 5개·embedded texture 13개·Scene 1개를
+게시했다. <code>--shadergraph</code>를 지정하지 않고 모델의 의존성에서 graph를 자동으로 발견했으며
+<code>unproducedGuidRefs=0</code>이었다. DXIL/SPIR-V 제품 컴파일과 게시 전 cooked program 재읽기를 통과했다.</li>
+</ul>
+<p>검증 중 <code>material.override</code>가 graph 재질에 없는 구형 <code>MaterialInstance::Revision()</code>을 참조해
+ACCESS_VIOLATION을 일으켰다. 응답 생성의 null 참조를 수정하고 같은 named property 변경·Undo를 재검증했다.
+모델에서 파생한 graph UUIDv8은 source identity scan과 loose/PAK material program path 검증에서도 허용한다.</p>
+<p>증거는 <code>Build/Obj/model-material-graph-{editor-build-final,cooker-build,lattice-test,authoring-test, native-test,cook-test,dashboard-test}.log</code>와 <code>Build/Obj/MaterialProductProbe/model-sot-Debug-root.txt</code>가
+가리키는 격리 프로젝트에 있다. OS 마우스는 조작하지 않았다. Blender 외형 parity와 Release 수용,
+UV1 transport, sphere preview·cost badge는 이 검증의 완료 범위에 포함하지 않는다.</p>
+<h3>모델 배치 후 Scene 렌더 정지 회귀 (2026-09-30)</h3>
+<p>CreatorRobot 배치 후 ImGui는 계속 실행되지만 Scene의 completed frame이 멈추는 증상을 재현했다.
+그래프 geometry sealing이 두 제품 입력을 잘못 거부했다: 가중치 0의 미사용 본 인덱스 <code>255</code>,
+그리고 기하 법선은 유효하지만 탄젠트가 0인 정점 3개다. 본 팔레트는 양의 가중치에 대해서만
+검사하고 GPU에서도 그때만 읽는다. T/B가 모두 없는 프레임은 기존 Normal Map의 기하 법선
+fallback을 사용한다. 유효하지 않은 가중치·양의 가중치의 범위 밖 본 인덱스·단일 축이 없는
+모호한 프레임·비유한 값·view 방향 0은 계속 거부한다.</p>
+<p>Debug GPU mesh probe는 8개 vertex mask·3개 pose, 621,152개 검사·286,140개 GPU 성분 대조를
+통과했다. 미사용 <code>255</code>, 단일/다중 influence, T/B 없음, mirrored seam 취소와 실패 시 마지막
+정상 packet 보존을 포함한다. native model 회귀는 Robot만 남긴 Scene의 4개 graph draw,
+실제 depth·유한 capture·completed frame 증가, 저장 후 새 Editor 재개방을 필수로 검사한다.</p>
+<p>실제 native DX12 Debug Editor에서 Robot 배치 후 4개 graph draw와 프레임 97→102 증가를
+확인했다. 저장한 Scene을 새 Editor에서 재개방한 후에도 4개 graph draw·프레임 49→53 증가,
+GPU validation 문제 0·nonfinite 0·정상 종료를 확인했다. 재개방 추가 검사 35개가 통과했다.
+클라이언트 창을 2884×1666으로 키운 별도 native Debug 세션에서도 Scene 1828×992의
+4개 graph draw·프레임 48→51→53 증가·validation 문제 0·nonfinite 0·정상 종료를
+확인했다(추가 검사 39개, basic validation). 실제 표시 이미지는 <code>robot-large-6/display.png</code>다.
+Scene 전환의 초기 component 등록이 끝나기 전에는 primary camera가 없을 수 있어,
+회귀 harness는 카메라 준비를 확인한 후 follow를 설정한다.</p>
+<p>증거는 <code>Build/Obj/model-render-{editor-build,mesh-build,mesh-gpu,reopen-test,large-test}.log</code>와
+<code>Build/Obj/MaterialProductProbe/ModelSoT-Debug-2d3854bad9/{robot-placed-6,robot-reopened-6,robot-large-6}</code>다.
+Release 빌드·성능 수용을 이번 Debug 기능 회귀의 결과로 간주하지 않는다.</p>
+<h3>MAT-8 artist 상태 표시 (2026-09-30)</h3>
+<p>MeshRenderer Inspector의 Surface는 적용된 material generation이 선택한 Standard/Layered/Special
+tier와 Deferred/Forward/Volume 경로를 색상 배지로 보여 준다. 같은 generation의 정적 texture
+sample 수와 texture resource 수, 현재 하나의 graph specialization도 표시한다. Layered와
+Special은 추가 조명·화면 점유 비용을 문장으로 설명하고 Transparent 재질에는 중첩 위험을 알린다.
+내부 register, descriptor, MRT, PSO 선택은 노출하지 않는다.</p>
+<p>Material Node Editor의 Material Status는 준비된 program의 tier·route·샘플 수를 보여 준다.
+2026-10-18 변경부터 상태 표시를 위해 <code>GenerateSlang</code>을 별도로 호출하지 않는다. 현재 초안이
+아직 준비되지 않았으면 Apply/Save가 필요하다고 표시하고, 실패한 요청은 원인과 수정 방향을
+표시한다. 실패한 초안을 조용히 다른 재질로 대체하지 않는다.</p>
+<p>Material Preview는 별도의 논리 live view(viewId=3)에서 내장 UV sphere를 렌더한다. Scene Material의
+실제 적용 instance/texture owner/generation을 그대로 밀봉하고 동일 Scene shader 경로를 사용한다.
+Scene object·sprite·decal·UI는 제외하고 고정 key light와 현재 Scene의 환경을 사용한다.
+Surface의 조명·형상은 Scene object와 다르므로 픽셀 일치를 뜻하지 않는다.
+기본 모드에서 초안은 Apply/Save 요청 뒤 준비된다. 사용자가 자동 미리보기를 켰거나 명시적으로
+미리보기를 새로고침하면 저장·게시 없이 준비할 수 있다. 완료된 요청 instance의 GPU 결과를 캐시하고,
+재질/coverage 변경·Refresh·리사이즈 때 갱신한다. 숨긴 뒤 다시 열면 동일 결과를 재게시한다.
+Transparent coverage에는 아직 제품 Scene graph replacement가 없어 지원 한계를 설명한다.
+Apply/import 실패는 마지막 정상 재질을 유지하며 원인과 수정 방향을 표시한다.</p>
+<p>미리보기는 노드 창의 초안 패널과 MeshRenderer Inspector의 기본 접힘 <code>Preview</code> 섹션에서
+요청할 수 있다. 구체와 격자 바닥을 표시하며 노드 창을 닫아도 Inspector의 수요가 유지된다.
+새 초안을 여는 것만으로 바닥 graph 컴파일을 요청하지 않고, 준비된 표시 소스가 실제로 필요할 때
+한 번 준비한다. 노드 창의 보조 패널은 선택 노드 설명과 소켓 정보도 표시한다.
+초기 노드 창 미리보기 UI를 이 구성으로 변경한 실제 실행 증거는
+<a href="../analysis/MAT9NodeEditorPerformance.html">MAT9NodeEditorPerformance</a>에 보존한다.</p>
+<p>HTTP <code>material.editor preview on|off|refresh</code>는 별도 고정 preview 수요를 고정/해제/무효화하며,
+<code>material.editor state</code>의 preview는 요청 revision·완료 revision/frame·ready·renders를 제공한다.
+<code>render.live.capture &lt;directory&gt; material controlled</code>는 독립 구체의 실제 GPU attachment를 기록한다.</p>
+<p>Debug CreatorEditor 전체 빌드와 기존 Material Node Editor 제품 회귀가 통과했다.
+후자는 열린 문서의 편집·저장·재개방 및 실제 Scene/독립 구체 capture 5회에 대한
+1,337개 검사(<code>LX_MATERIAL_NODE_EDITOR_OK</code>, source drift 0, 정상 종료)다.
+구체의 실제 draw/픽셀 변경·완료 이미지 재사용·숨김 후 재게시·실패한 Apply의 정상 generation 보존을 검사했다. 실제 Windows UI로 File Load Scene→Ground Inspector→노드 창 진입과 preview 열기/Refresh를 확인했다. 메뉴는 씬 소유 스레드에 scene.switch를 큐잉하며, 작은 창의 상태/preview 설명은 줄바꿈한다. 증거: Build/Obj/mat8-preview-regression4.log, mat8-preview-menu-build.log, mat8-preview-wrap-build.log 및 MaterialProductProbe/NodeEditor-Debug-5736845a10e7의 5개 최종 capture. Release·성능·Blender rendered parity는 MAT-9에서 판정한다.</p>
+<h2>Scene context와 자산 문서</h2>
+<p>현재 문서는 자산이 소유한다. Scene 선택 없이 새 material 자산을 만들거나 기존 자산을 열 수 있다.
+Scene context guard는 active Scene ID가 달라지면 Inspector 미리보기와 세션의 이전 Mesh 대상
+handle/component를 해제한다. 열린 자산 문서와 미저장 초안은 유지하고 새 Scene에 자동 할당하지 않는다.
+Assign은 현재 선택한 MeshRenderer를 다시 검사한다. 종료는 별도의 Apply/Save를 만들지 않으므로
+보존할 변경은 종료 전에 Save를 요청해야 한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-editor-진입과-저작-흐름"></span><span id="2-blender형-표현과-lx-경계"></span><span id="3-문서제품-자원-소유권"></span><span id="4-열린-문서의-http-편집"></span><span id="5-검증과-남은-범위"></span><span id="6-material-창-cpu-비용과-도킹-조사-2026-09-29"></span><span id="7-창-제목과-add-메뉴-수정-검증-2026-09-29"></span><span id="8-모델-graph-sot-검증-2026-09-29"></span><span id="mat-8-artist-상태-표시-2026-09-30"></span><span id="scene-context-변경-2026-10-01"></span><span id="sec-1-editor-진입과-저작-흐름"></span><span id="sec-2-blender형-표현과-lx-경계"></span><span id="sec-3-문서제품-자원-소유권"></span><span id="sec-4-열린-문서의-http-편집"></span><span id="sec-5-검증과-남은-범위"></span><span id="sec-6-material-창-cpu-비용과-도킹-조사-2026-09-29"></span><span id="sec-7-창-제목과-add-메뉴-수정-검증-2026-09-29"></span><span id="sec-8-모델-graph-sot-검증-2026-09-29"></span><span id="sec-scene-context-변경-2026-10-01"></span><span id="모델-배치-후-scene-렌더-정지-회귀-2026-09-30"></span></details></main></body></html>

@@ -1,5 +1,40 @@
 # TR0 — golden 강제 제외와 실제 profiler wire 검증 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/base0_artifacts.py:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L13) — `import struct`
+- [Tools/regression/base0_artifacts.py:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L20) — `raise ValueError(message)`
+- [Tools/regression/base0_artifacts.py:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/base0_artifacts.py#L44) — `expected_order = [i for i, p in enumerate(passes) if not truth(p["culled"])]`
+- [Tools/regression/test-render-measurement-wire.py:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/test-render-measurement-wire.py#L7) — `import struct`
+- [Tools/regression/test-render-measurement-wire.py:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/test-render-measurement-wire.py#L11) — `spec = importlib.util.spec_from_file_location('profile_summary', Path(__file__).with_name('summarize-material-profile.py'))`
+- [Tools/regression/test-render-measurement-wire.py:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/test-render-measurement-wire.py#L17) — `if data[:8] != b'CEPROF\0\0' or struct.unpack_from('<II', data, 8) != (7, 0):`
+- [Tools/regression/TemporalPerformanceEvidenceTests.py:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/TemporalPerformanceEvidenceTests.py#L85) — `class TemporalPerformanceEvidenceTests(unittest.TestCase):`
+- [Tools/regression/TemporalPerformanceEvidenceTests.py:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/TemporalPerformanceEvidenceTests.py#L92) — `body = source.split('void profiler_service::publish_presenter_return(', 1)[1].split(`
+- [Tools/regression/TemporalPerformanceEvidenceTests.py:93](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/TemporalPerformanceEvidenceTests.py#L93) — `'void profiler_service::retire_gpu_lane()', 1)[0]`
+- [Tools/regression/verify-temporal-golden-exclusion.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-temporal-golden-exclusion.ps1#L11) — `$root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-temporal-golden-exclusion.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-temporal-golden-exclusion.ps1#L13) — `$run=Join-Path ([IO.Path]::GetFullPath($Work)) ('tr0-golden-'+$Config+'-'+[guid]::NewGuid().ToString('N'))`
+- [Tools/regression/verify-temporal-golden-exclusion.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-temporal-golden-exclusion.ps1#L14) — `[IO.Directory]::CreateDirectory($run)|Out-Null`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정
 
 TR0의 golden·profiler 계약 검증을 보완했다. TR0는 progress·기성 0을 유지하며 PHASE 4.5의 완료 집계는 TR1/TU5의 12/71(17%) 그대로다. 이번 결과를 모든 Player/성능 예산/계측 표면 또는 실제 FG 출력 신원의 전수 수용으로 확대하지 않는다.
@@ -29,3 +64,5 @@ Debug 첫 변이 실행은 검사기의 `display capture requires produced versi
 1. 현재 사용되는 golden/timing/profiler/성능 예산/Player 계측 소비자 목록을 고정하고, 각 소비자가 누락 provenance와 실/생성 혼합을 거부하는 실행 증거를 연결한다. 이번 두 표면만으로 '모든 측정 표면' 완료를 선언하지 않는다.
 2. Player actual real/generated 출력 신원과 presenter 기록의 관련 계약을 실행 수용한다. CPU Present 반환·aggregate interpolated count만으로 개별 generated 출력 신원이나 물리 표시 시각을 만들지 않는다.
 3. 지원하는 계측 입력을 전수 검사한 후 TR0 3인일 종료를 판정한다. SDK 화질·실제 FG pacing/latency·master 동조건 성능 비교는 각 후속 행의 수용 범위를 유지한다.
+
+</details>

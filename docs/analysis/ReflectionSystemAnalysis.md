@@ -1,5 +1,42 @@
 # 네이티브 리플렉션 시스템 분석 — 구조 변경·성능 향상
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.
+- 모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Component.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L26) — `static gc::root_ref<T> CreateManaged(gc::domain& domain, Args&&... args)`
+- [Engine/SceneRuntime/Component.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L29) — `static_assert(std::is_same_v<decltype(&T::gc_trace), void (T::*)(gc::tracer&) const>,`
+- [Engine/SceneRuntime/Component.h:154](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L154) — `virtual void OnPropertyChanged(std::string_view propertyName,`
+- [Engine/Utility_Framework/TypeTrait.h:297](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L297) — `static inline HashedGuid GetTypeID()`
+- [Engine/Utility_Framework/TypeTrait.h:407](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L407) — `static inline const Uuid::Uuid16* FindByName(std::string_view typeName)`
+- [Engine/Utility_Framework/TypeTrait.h:416](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L416) — `static inline const std::string* FindNameByUUID(const Uuid::Uuid16& uuid)`
+- [Engine/Utility_Framework/Core.Minimal.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Core.Minimal.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/Reflection.hpp:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Reflection.hpp#L1) — `#pragma once`
+- [Engine/Utility_Framework/ReflectionYml.h:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L60) — `inline const reflgen::type_descriptor* FindTypeByInstance(void* instance)`
+- [Engine/Utility_Framework/ReflectionYml.h:241](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L241) — `if (const std::string* typeName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))`
+- [Engine/Utility_Framework/ReflectionYml.h:303](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L303) — `Debug::PrintLog(spdlog::level::warn, std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")`
+- [Engine/Utility_Framework/ReflectionType.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionType.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/ReflectionRegister.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionRegister.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/ReflectionFunction.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionFunction.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-08-16. 근거: 소스 전수 실측(호출 지점 grep count · 코어 헤더 11종 정독 ·
 등록 배선 추적). [ReflectionRetentionDecision.md](../design/ReflectionRetentionDecision.md)(존치 결정)의
 후속 문서다 — "존치한다"는 결론은 유지하되, **존치한 것을 어떻게 고칠 것인가**를
@@ -450,3 +487,5 @@ P2996이 오면 ②의 표기가 자동으로 접히는 방향이다.
   왕복(Serialize→재로드→Deserialize) 회귀를 함께 밟아야 한다.
 - **문서 근거의 부패** — F-7처럼 결정 문서의 근거가 소스보다 늦게 늙는다. 큰 결정
   전 근거 재실측은 이번에도 유효했다.
+
+</details>

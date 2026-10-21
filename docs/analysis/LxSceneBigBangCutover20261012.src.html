@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>LX Scene 단일 배선 전환 — 2026-10-12</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="LxSceneBigBangCutover20261012.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/LxSceneBigBangCutover20261012.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>LX Scene 단일 배선 전환 — 2026-10-12</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L24">Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:24</a> — <code>class GraphSceneFixture</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L27">Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:27</a> — <code>GraphSceneFixture() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h#L28">Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.h:28</a> — <code>GraphSceneFixture(const GraphSceneFixture&amp;) = delete;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h#L7">Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h:7</a> — <code>class SceneSurfaceTargets final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h#L9">Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h:9</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h#L12">Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.h:12</a> — <code>struct Outputs {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28">Engine/RenderEngine/ShaderMeta.cpp:28</a> — <code>outError = std::string(context) + &quot;: &quot; + std::string(detail);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65">Engine/RenderEngine/ShaderMeta.cpp:65</a> — <code>const bool known = std::any_of(allowed.begin(), allowed.end(),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102">Engine/RenderEngine/ShaderMeta.cpp:102</a> — <code>else return Fail(context, std::string(&quot;&#39;&quot;) + key + &quot;&#39;는 true|false여야 한다&quot;, outError);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L36">Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:36</a> — <code>bool GraphSceneFixture::Initialize(const EnhancedFrameContext&amp; context, std::string&amp; error, float alpha)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L101">Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:101</a> — <code>std::uint32_t GraphSceneFixture::AddMesh(const std::vector&lt;Vertex&gt;&amp; vertices,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp#L148">Editor/RenderTests/RHI/DX12/Tests/Geometry/GraphSceneFixture.cpp:148</a> — <code>void GraphSceneFixture::CookMesh(uint32_t index)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp#L4">Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp:4</a> — <code>RHIFormat SceneSurfaceTargets::GetRenderTargetFormat(uint32_t index)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp#L9">Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp:9</a> — <code>void SceneSurfaceTargets::Declare(EnhancedRenderGraph&amp; graph, const EnhancedFrameContext&amp; context)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp#L15">Engine/RenderEngine/Render/Passes/Geometry/SceneSurfaceTargets.cpp:15</a> — <code>void SceneSurfaceTargets::DeclareVisibility(EnhancedRenderGraph&amp; graph, const EnhancedFrameContext&amp; context)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<blockquote>
+<p>HDR 후속 전환: <a href="LxHdrCutover20261012.html">LX HDR 최초 발행 전환</a>. 일반 Deferred 패스·셰이더를 삭제하고 HDR 생성·초기화를 LX로 옮겼다.</p>
+</blockquote>
+<p>사용자 지시: 일반 GBuffer 표면 구현과 관련 구경로 테스트를 제거한다. 신규 LX 배선만 사용하며 old/new A/B는 사용자가 수행한다. 호환 변환·구경로 폴백을 만들지 않고 필요한 리소스는 강제 리임포트·재쿠킹한다.</p>
+<p>메시렛 데이터 계약 후속에서는 <a href="LxMeshletGeometryContract20261012.html">Scene ABI 22·CEMC 13과 단일 쿠킹 topology</a>로 갱신했다. 아래 ABI 21·CEMC 12 및 실행 결과는 일반 GBuffer 제거 시점의 기록이다.</p>
+<h2>실제 제거와 새 책임</h2>
+<ul>
+<li><code>EnhancedGBufferPass.cpp/.h</code> 전체 삭제. 배치·ShaderMeta PSO·일반 표면 기록·일반 컬링 코드는 타깃 생성 코드에 남기지 않았다.</li>
+<li><code>GpuMeshletVisibility.cpp/.h</code>, <code>GeometryMeshletVisibility.slang</code>, <code>GBuffer.slang</code>, <code>GBuffer.shadermeta</code> 삭제 및 프로젝트 등록 제거.</li>
+<li><code>SceneSurfaceTargets</code>는 MRT5·깊이 생성과 클리어만 담당한다. geometry·material·PSO·culling·draw·호환 API가 없는 리소스 계약이다. 실제 표면 기록은 LX SceneHost가 소유한다.</li>
+<li><code>CREATOR_LX_MESHLETS</code>, <code>CREATOR_LX_SHADOW_MESHLET_COMPUTE</code>, <code>allowMeshlets</code>와 Temporal fixture 표면 경로 선택을 제거했다. 불투명 LX 표면과 그림자는 지원되는 meshlet indirect 배선을 요구한다. 투명·Temporal 전용 LX 소비자는 해당 기능의 GPU 배선을 사용한다.</li>
+<li>그림자는 compute 생존 목록만 소비한다. 기존 그림자 인스턴스 가시성 버퍼·패스와 전체 메시렛/indexed 대체 dispatch를 제거했다.</li>
+<li>Scene ABI는 21. 이전 Scene ABI 제품은 검증기와 SceneHost가 거부하며 런타임 Scene 재컴파일·변환 경로도 삭제했다. authoring Scene cache의 ABI 불일치는 새 제품 생성으로 이어지고, Player는 새 제품 재쿠킹이 필요하다.</li>
+</ul>
+<p>모델 쿠킹 형식은 CEMC 12로 올렸다. 기존 GBuffer/Forward ShaderMeta 참조를 제거하고 같은 임포트 트랜잭션이 발행하는 실제 LX 재질 그래프 ID를 기록한다. 이전 캐시는 강제 리임포트·재쿠킹 대상이다.</p>
+<h2>테스트 변경</h2>
+<p>일반 GBuffer를 실행하던 <code>RunGBufferTest</code>, <code>RunSceneBindingTest</code>, Vulkan geometry/PBR shader parity 및 구 IBL shade 테스트 본문과 등록을 제거했다. 성공을 반환하는 대체 함수를 두지 않았다. 해당 일반 경로에 의존한 Vulkan forward/deferred/decal/SSAO/SSGI 테스트도 함께 퇴역했다. Vulkan 신규 배선 검증은 PHASE 4.9에 남는다.</p>
+<p>필요한 스키닝·그림자 검사는 <code>GraphSceneFixture</code>가 실제 LX SceneHost의 seal/prepare/declare/publish를 실행하도록 변경했다. 구 일반 카메라 표면은 사용하지 않는다. GPU 인자·ID·변환 정점 리드백에 대한 CPU clip oracle와 ID 범위·중복·필수 항목 누락 검사는 유지한다. 포즈 변화·정적 형상 유지 검사는 신규 경로의 기능 검사다. 구 Deferred 색상 및 A/B 계약에 의존하던 EnhancedShadowQualityTest는 본문·명령·프로젝트 등록까지 제거했다. 그림자 검증은 LX compute 목록·간접 인자·변환 정점·깊이 기록 검사로 유지한다.</p>
+<p>구경로 A/B 스크립트 7개와 indexed/meshlet 깊이 맵 동치 실행 본문을 제거했다. 삭제된 일반 GBuffer 명령을 호출하던 FT primitives·model scene consumption·PBR wiring 스크립트도 퇴역했다. 이들의 전체 과거 시나리오를 새 검사에서 재현했다고 주장하지 않는다. 명령 목록 검사는 LX skinning/rendergraph 등록을 요구하도록 변경했고, geometry identity 검사는 LX 밀봉 geometryKey 소비를 확인한다. 새 <code>verify-lx-scene-cutover.ps1</code>와 <code>verify-lx-scene-capture.py</code>는 LX 스키닝·그림자·그래프·실제 표시·유한한 비어 있지 않은 깊이/HDR 픽셀 및 GPU validation을 검사한다. 이전 원본 로그·판정·프로파일은 역사적 자료로 보존한다.</p>
+<h2>현재 배선</h2>
+<pre><code class="language-mermaid">flowchart TB
+  A[&quot;장면·쿠킹된 LX 재질·geometry&quot;] --&gt; S[&quot;SceneViewInput 밀봉&quot;]
+  S --&gt; G[&quot;LX geometry 변환·스키닝&quot;]
+  S --&gt; V[&quot;카메라 GPU 가시성&quot;]
+  T[&quot;SceneSurfaceTargets 생성·클리어&quot;] --&gt; B[&quot;LX Scene GBuffer&quot;]
+  G --&gt; B
+  V --&gt; B
+  B --&gt; L[&quot;Deferred·LX Color&quot;]
+  P[&quot;광원·cascade 행렬&quot;] --&gt; C[&quot;Shadow reset/cull&quot;]
+  G --&gt; C
+  C --&gt; I[&quot;생존 원래 ID·indirect 인자&quot;]
+  I --&gt; M[&quot;LX Shadow MS&quot;]
+  M --&gt; D[&quot;그림자 깊이 3장&quot;]
+  D --&gt; L
+</code></pre>
+<h2>검증 상태</h2>
+<p>Release·Debug 빌드 통과. 최종 판정은 <code>Build/Verification/SceneSurfaceCutover-20261012</code>에 기록했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구성</th>
+<th align="right">LX GPU 목록 검사</th>
+<th>실제 Scene 캡처</th>
+<th align="right">깊이/HDR 픽셀</th>
+<th align="right">GPU validation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Release</td>
+<td align="right">144건, 필수 누락 0</td>
+<td>frame 1021, mesh shader indirect 1건</td>
+<td align="right">252/252</td>
+<td align="right">문제 0</td>
+</tr>
+<tr>
+<td>Debug</td>
+<td align="right">12건, 필수 누락 0</td>
+<td>frame 932, mesh shader indirect 1건</td>
+<td align="right">252/252</td>
+<td align="right">문제 0</td>
+</tr>
+</tbody></table></div>
+<p>두 실행 모두 LX 스키닝·rendergraph·모델 강제 리임포트/로드/배치·캡처·정상 종료를 통과했고 실행 중 소스/바이너리 신원이 일치했다. 캡처의 command recording은 <code>LX.Scene.GBuffer</code>, meshShader=true, indirect=true다. 픽셀 oracle는 두 결과에 별도로 실행해 통과했고 최종 검증 스크립트에도 연결했다. 픽셀 oracle 통합 후 Release 라이브 검증도 다시 실행해 통과했다(<code>Release-Integrated</code>, frame 1037, 깊이/HDR 252/252, mesh indirect 1, validation 0). 명령 목록에서 퇴역 명령 17개가 제거된 것을 실제 실행으로 확인했다. 정적 신원 검사와 문서 구조/링크 검사도 통과했다.</p>
+<p>실패한 중간 실행도 보존했다. 캡처의 게임/에디터 대상 오류와 LX 프로그램 준비 전 캡처를 수정했으며, CPU 프레임 대기는 예열일 뿐 합격 근거는 GPU 캡처와 리드백이다. GPU 기반 validation의 초기 준비 시간은 성능 판정으로 사용하지 않는다. old/new A/B는 사용자 몫이며 Vulkan 실행 검증은 PHASE 4.9에 남는다.</p>
+<p>변경 전 소스는 해당 디렉터리의 <code>Before</code>에 보존했다. 이는 삭제한 활성 구현의 복구용 기록이며 프로젝트·런타임 배선에 등록하지 않는다. 작업 전부터 존재한 다른 변경은 유지한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증-상태"></span><span id="sec-실제-제거와-새-책임"></span><span id="sec-테스트-변경"></span><span id="sec-현재-배선"></span><span id="검증-상태"></span><span id="실제-제거와-새-책임"></span><span id="테스트-변경"></span><span id="현재-배선"></span></details></main></body></html>

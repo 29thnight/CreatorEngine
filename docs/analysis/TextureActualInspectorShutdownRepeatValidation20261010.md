@@ -1,5 +1,34 @@
 # PHASE 12 — 수정 runtime의 실제 Inspector 입력·종료 반복 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/start-texture-auto-ui.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L9) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/start-texture-auto-ui.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L10) — `$fixture=[IO.Path]::GetFullPath($FixtureProject)`
+- [Tools/regression/start-texture-auto-ui.ps1:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/start-texture-auto-ui.ps1#L13) — `$root=Join-Path $repo ('Build/TAUI-'+$Configuration+'-'+$Mode+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 게시 직전 원본 비교 보강 이후의 Debug/Release runtime에서 실제 숫자 입력과
 저장 대기 중 외부 설정 변경·종료를 각각3회, 총6개의 독립 Editor 프로세스로 검증했다.
 이번 실행에는 제품 소스 변경이나 추가 빌드가 없으며 직전 빌드 산출물을 사용했다.
@@ -34,9 +63,9 @@ Finalize와 DX12 pending task/batch/retirement0/0/0, 실행 전후 runtime hash 
 
 전6회에서 위 보존/종료 판정을 통과했다. age는 관찰값이며 성능 수용값이 아니다.
 
-- [최종 receipt·소스 hash](../../Build/TextureActualUiRepeat/result.json)
-- [Debug 1 입력 화면](../../Build/TAUI-Debug-conflictshutdown-bf370847/before-input.png), [Debug 2](../../Build/TAUI-Debug-conflictshutdown-4ac654a3/before-input.png), [Debug 3](../../Build/TAUI-Debug-conflictshutdown-be41f9fe/before-input.png)
-- [Release 1 입력 화면](../../Build/TAUI-Release-conflictshutdown-6dac6d47/before-input.png), [Release 2](../../Build/TAUI-Release-conflictshutdown-247dcd1e/before-input.png), [Release 3](../../Build/TAUI-Release-conflictshutdown-2c343db8/before-input.png)
+- 최종 receipt·소스 hash (`../../Build/TextureActualUiRepeat/result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 1 입력 화면 (`../../Build/TAUI-Debug-conflictshutdown-bf370847/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Debug 2 (`../../Build/TAUI-Debug-conflictshutdown-4ac654a3/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Debug 3 (`../../Build/TAUI-Debug-conflictshutdown-be41f9fe/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 1 입력 화면 (`../../Build/TAUI-Release-conflictshutdown-6dac6d47/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Release 2 (`../../Build/TAUI-Release-conflictshutdown-247dcd1e/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), Release 3 (`../../Build/TAUI-Release-conflictshutdown-2c343db8/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 각 루트에 launch.json, commands.jsonl, editor.out/err, exit.json과 격리 프로젝트를 보관했다.
 receipt의 root를 따라 개별 로그와 파일을 확인할 수 있다. Build 산출물은 로컬 실행 증거다.
@@ -50,3 +79,5 @@ receipt의 root를 따라 개별 로그와 파일을 확인할 수 있다. Build
 다른 실패 유형·붙여넣기·네이티브 닫기 버튼의 반복, 다중 창/배율, 장시간·성능/누수와
 전체 소비자/GPU는 추가 범위다. 마지막 디스크 비교 이후 동시 쓰기도 미해결이다.
 12-0-D 후속 검증으로 추가 공수를 중복 계상하지 않으며66.25%(표시66%)를 유지한다.
+
+</details>

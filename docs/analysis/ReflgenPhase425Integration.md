@@ -1,5 +1,46 @@
 # reflgen와 PHASE 4.25 통합 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.
+- 모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/ReflgenRegistration.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ReflgenRegistration.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/AuthoringRymlErrorPolicy.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringRymlErrorPolicy.h#L29) — `void EnsureRymlErrorPolicy();`
+- [Engine/Utility_Framework/AuthoringRymlErrorPolicy.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringRymlErrorPolicy.h#L38) — `struct RymlErrorPolicyProbe`
+- [Engine/Utility_Framework/AuthoringRymlErrorPolicy.h:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringRymlErrorPolicy.h#L77) — `[[nodiscard]] RymlErrorPolicyProbe ProbeRymlErrorPolicy();`
+- [ScriptCore/MeshRenderer.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13) — `public sealed class MeshRenderer : NativeComponent`
+- [ScriptCore/MeshRenderer.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15) — `public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);`
+- [ScriptCore/MeshRenderer.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24) — `public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/MeshRenderer.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19) — `class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>`
+- [Engine/SceneRuntime/MeshRenderer.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/MeshRenderer.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25) — `Component::gc_trace(tracer);`
+- [Engine/RenderEngine/SceneRenderProfile.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/SceneRenderProfile.h#L5) — `struct [[reflgen::reflect]] SceneRenderProfile`
+- [Engine/RenderEngine/SceneRenderProfile.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/SceneRenderProfile.h#L7) — `public:`
+- [Engine/RenderEngine/SceneRenderProfile.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/SceneRenderProfile.h#L8) — `SceneRenderProfile() = default;`
+- [Engine/RenderEngine/Interfaces/FoliageType.h:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/FoliageType.h#L53) — `own::shared_owner<const assets::ModelAnimationDescriptor> m_modelDescriptor{};`
+- [Engine/RenderEngine/Interfaces/FoliageType.h:55](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/FoliageType.h#L55) — `own::shared_owner<const assets::ModelMeshDescriptor> m_meshDescriptor{};`
+- [Engine/RenderEngine/Interfaces/FoliageType.h:57](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Interfaces/FoliageType.h#L57) — `own::shared_owner<const Material> m_material{};`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-30. [PR #114](https://github.com/29thnight/CreatorEngine/pull/114)의 reflgen 도입을
 master에 병합하고, 기존 PHASE 4.25 변경과 다른 세션의 편집기 성능 개선을 함께 통합한다.
 MAT-9 렌더 결과 대조의 잔여 작업은 이 통합 검증과 별도로 유지한다.
@@ -82,3 +123,5 @@ Debug/Release GPU validation 문제·누락 메시지는 각각 0이다. 기동 
 Special·텍스처/조명 입력 및 경로별 대조·최종 성능 수용은 남아 있다.
 최초 ImGui scale 0.8 원인 분석도 사용자가 미룬 후속 항목으로 유지한다.
 원시 `Dynamic_CPP/2026-09-30-1135.ceprof`는 로컬에 보존하고 소스 커밋에 넣지 않는다.
+
+</details>

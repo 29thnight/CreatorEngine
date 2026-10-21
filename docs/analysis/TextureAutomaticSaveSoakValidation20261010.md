@@ -1,5 +1,34 @@
 # PHASE 12 — 실제 Editor의 5분 자동 저장 경합 반복 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-texture-auto-ui-soak.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-auto-ui-soak.ps1#L8) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-texture-auto-ui-soak.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-auto-ui-soak.ps1#L9) — `$root=[IO.Path]::GetFullPath($Root)`
+- [Tools/regression/verify-texture-auto-ui-soak.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-texture-auto-ui-soak.ps1#L10) — `$fixture=[IO.Path]::GetFullPath($FixtureProject)`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 방법과 수용 경계
 
 격리된 Tiny4/SavedFixture 프로젝트에서 실제 Inspector 숫자0→2 입력의 저장 대기를
@@ -37,9 +66,9 @@ exit0·Finalize·DX12 pending0/0/0·PNG/GUID/저장 씬/runtime 및 검증 입�
 Debug 라이브러리/runtime/launcher 빌드 및 sourceDrift0을 확인했다.
 
 - Runtime SHA-256: `297C0E8DCC16C3554B60CFC37322502B8DCDF3445A6F9E52939B6CC2554B2905`
-- [최종 판정](../../Build/TexturePendingMetadata/soak-debug-result.json)
-- [명령 receipt](../../Build/TAUI-Debug-soak-585d7732/commands.jsonl), [로그](../../Build/TAUI-Debug-soak-585d7732/editor.out)
-- [실제 초기 입력](../../Build/TAUI-Debug-soak-585d7732/before-input.png), [실행 중](../../Build/TAUI-Debug-soak-585d7732/during-soak.png), [완료 후](../../Build/TAUI-Debug-soak-585d7732/after-soak.png)
+- 최종 판정 (`../../Build/TexturePendingMetadata/soak-debug-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 명령 receipt (`../../Build/TAUI-Debug-soak-585d7732/commands.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 로그 (`../../Build/TAUI-Debug-soak-585d7732/editor.out` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 실제 초기 입력 (`../../Build/TAUI-Debug-soak-585d7732/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 중 (`../../Build/TAUI-Debug-soak-585d7732/during-soak.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 완료 후 (`../../Build/TAUI-Debug-soak-585d7732/after-soak.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 ## Release 결과
 
@@ -53,9 +82,9 @@ Debug 라이브러리/runtime/launcher 빌드 및 sourceDrift0을 확인했다.
 Release 라이브러리/runtime/launcher 빌드와 sourceDrift0을 확인했다.
 
 - Runtime SHA-256: `FCECFB6A4FF18CE0D0BE05AEDE74CB7B883DB39E1E79FE106FB4E4695D6029EE`
-- [최종 판정](../../Build/TexturePendingMetadata/soak-release-result.json)
-- [명령 receipt](../../Build/TAUI-Release-soak-6a76283d/commands.jsonl), [로그](../../Build/TAUI-Release-soak-6a76283d/editor.out)
-- [실제 초기 입력](../../Build/TAUI-Release-soak-6a76283d/before-input.png), [실행 중](../../Build/TAUI-Release-soak-6a76283d/during-soak.png), [완료 후](../../Build/TAUI-Release-soak-6a76283d/after-soak.png)
+- 최종 판정 (`../../Build/TexturePendingMetadata/soak-release-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 명령 receipt (`../../Build/TAUI-Release-soak-6a76283d/commands.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 로그 (`../../Build/TAUI-Release-soak-6a76283d/editor.out` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 실제 초기 입력 (`../../Build/TAUI-Release-soak-6a76283d/before-input.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 실행 중 (`../../Build/TAUI-Release-soak-6a76283d/during-soak.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 완료 후 (`../../Build/TAUI-Release-soak-6a76283d/after-soak.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 두 구성 합계1,050회로 정상263·유효 충돌263·삭제262·손상262회다.
 강제 flush 합계522회는1,050회에 포함된다. 회차 수 차이를 처리 성능 비교로 사용하지 않는다.
@@ -69,3 +98,5 @@ sourceDrift0은 각 root의 `inputs.json`에 기록한 자산 서비스·pending
 최종 디스크 비교 이후 쓰기 경합의 수용으로 확대하지 않는다.
 Build 증거는 로컬 산출물이며 청소 시 제거될 수 있다.
 기존12-0-D 후속 보강으로 추가 공수를 중복 계상하지 않고66.25% (표시66%)를 유지한다.
+
+</details>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Commandlet 정리 결과 — 2026-09-06</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="CommandletRetirementAudit.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/CommandletRetirementAudit.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Commandlet 정리 결과 — 2026-09-06</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L69">Tools/regression/verify-editor-command-surface.ps1:69</a> — <code>Assert (-not ($results[0].data.names -contains &#39;object.rename&#39;)) &#39;Product editing leaked into Commandlet discovery&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L184">Tools/regression/verify-editor-command-surface.ps1:184</a> — <code>Assert ((Invoke-Cmd &#39;undo.state&#39;).data.editUndo -eq $depth+1) &#39;Rename must create one undo record&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-command-surface.ps1#L188">Tools/regression/verify-editor-command-surface.ps1:188</a> — <code>Assert ((Read-Object $id).data.name -eq &#39;After name&#39;) &#39;Redo did not restore the edit&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14">ScriptCore/Animator.cs:14</a> — <code>public sealed class Animator : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18">ScriptCore/Animator.cs:18</a> — <code>public void SetBool(string name, bool value) =&gt; Native.AnimatorSetBool(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19">ScriptCore/Animator.cs:19</a> — <code>public void SetFloat(string name, float value) =&gt; Native.AnimatorSetFloat(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81">Engine/SceneRuntime/Animator.h:81</a> — <code>own::shared_owner&lt;const assets::ModelAnimationPayload&gt; payload{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86">Engine/SceneRuntime/Animator.h:86</a> — <code>own::shared_owner&lt;const assets::ModelAnimationDescriptor&gt; descriptor{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87">Engine/SceneRuntime/Animator.h:87</a> — <code>own::shared_owner&lt;const assets::ModelSkeletonPayload&gt; skeleton{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.h#L3">Editor/EngineEntry/EditorDiagnostics.h:3</a> — <code>class Scene;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.h#L6">Editor/EngineEntry/EditorDiagnostics.h:6</a> — <code>CommandCore::CommandResult ValidateHierarchy(Scene* scene);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.h#L7">Editor/EngineEntry/EditorDiagnostics.h:7</a> — <code>CommandCore::CommandResult AnimatorStatus(Scene* scene);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.h#L8">Editor/EngineEntry/EditorProjectOperations.h:8</a> — <code>CommandCore::CommandResult Layers();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.h#L9">Editor/EngineEntry/EditorProjectOperations.h:9</a> — <code>CommandCore::CommandResult AddLayer(const std::string&amp; name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.h#L10">Editor/EngineEntry/EditorProjectOperations.h:10</a> — <code>CommandCore::CommandResult RenameLayer(const std::string&amp; name, const std::string&amp; replacement);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L26">Engine/SceneRuntime/Animator.cpp:26</a> — <code>Animator::Animator() : m_instance(AnimatorSystems-&gt;CreateInstance()) {}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L28">Engine/SceneRuntime/Animator.cpp:28</a> — <code>AnimInstance&amp; Animator::GetInstance() noexcept</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L31">Engine/SceneRuntime/Animator.cpp:31</a> — <code>::ce::contracts::assert_that(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.cpp#L29">Editor/EngineEntry/EditorDiagnostics.cpp:29</a> — <code>std::printf(&quot;[CLI] 활성 씬 없음\n&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.cpp#L85">Editor/EngineEntry/EditorDiagnostics.cpp:85</a> — <code>if (Entity::IsInvalidIndex(obj-&gt;GetParentIndex())) ++topLevelInvalid;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDiagnostics.cpp#L98">Editor/EngineEntry/EditorDiagnostics.cpp:98</a> — <code>std::printf(&quot;[scene.hierarchycheck] 오브젝트 %zu · 최상위(0표기) %zu · 최상위(-1표기) %zu&quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.cpp#L17">Editor/EngineEntry/EditorProjectOperations.cpp:17</a> — <code>class TagDefinitionsCommand final : public Meta::IUndoableCommand</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.cpp#L21">Editor/EngineEntry/EditorProjectOperations.cpp:21</a> — <code>: m_before(std::move(before)), m_after(std::move(after))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorProjectOperations.cpp#L35">Editor/EngineEntry/EditorProjectOperations.cpp:35</a> — <code>throw std::runtime_error(&quot;Cannot persist project tags&quot;);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<blockquote>
+<p>master 병합 후보: <code>6b9c2b79</code>의 <code>light.proxy</code> 제품 조회와 텍스처 Commandlet 4개를 보존했다. 통합 검증 및 원본 작업 보존은 <a href="Phase14_5MergePreparation.html">병합 준비 기록</a>을 따른다.</p>
+</blockquote>
+<p>기준 HEAD <code>55374f16</code>의 미커밋 작업 트리에 적용했다. 현재 런타임 discovery는
+<strong>제품 명령 99개(이름 106개), Commandlet 107개</strong>다. 이번 후속 정리 전의
+95/111에서 제품 진단·태그 기능을 옮기고 종료된 비교 벤치를 제거했다.
+<a href="CommandSurfaceDisposition.tsv">처분표</a>는 실제 이름 집합과 대조했으며,
+<a href="CommandSurfaceImplementation.html">전체 구조</a>에 앞선 CLI/Commandlet 분리 기록이 있다.</p>
+<h2>이번 마무리 반영</h2>
+<p><code>assets.scenemodel</code>을 Commandlet으로 이동했고 사용하지 않는 <code>animator.state/exit</code>를 제거했다.
+제품 99개 모두 결과를 반환하며 named JSON 입력 59개·Undo 선언 21개다.
+<code>animator.param</code>·<code>render.matmode</code>는 GUI 공통 Undo 경로를 사용한다.
+미보고 상태와 void/직접 exit 어댑터, 한국어 verdict 소비자 13개 및 명령 소스 존재 소비자 6개를 정리했다.
+최신 실행 결과 및 전체 종결을 보류하는 검증 경계는 <a href="Phase14_5Closure.html">Phase14_5Closure.md</a>를 본다.</p>
+<h2>제거한 명령과 코드</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>제거한 Commandlet</th>
+<th>종료 근거와 실제 제거 범위</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dx12.bench11</code></td>
+<td>완료된 DX11/DX12 API 비용 비교. 벤치 구현·등록·빌드 항목 제거.</td>
+</tr>
+<tr>
+<td><code>dx12.encoderbench</code></td>
+<td>R3/3-16 encoder 선택을 위한 비교 종료. 구현·등록·빌드 항목 제거.</td>
+</tr>
+<tr>
+<td><code>dx12.ssaoscale</code></td>
+<td>완료된 3-6 알고리즘 시간 비교. 벤치와 제품 SSAO의 옛 참조 경로·PSO·셰이더 제거.</td>
+</tr>
+<tr>
+<td><code>dx12.postscale</code></td>
+<td>완료된 Uber/분리 패스 시간 비교. 벤치 제거, <code>vk.post</code>가 쓰는 분리 패스 보존.</td>
+</tr>
+<tr>
+<td><code>dx12.forwardscale</code></td>
+<td>완료된 Forward+ 광원 수 경계 측정. 벤치 제거, <code>dx12.forwardshade</code>의 출력 동등성 비교 보존.</td>
+</tr>
+<tr>
+<td><code>perf.reflect</code></td>
+<td>완료된 CT7 측정. 명령과 golden 소비자의 측정 전용 프리팹 준비·반복 생성·파서 제거.</td>
+</tr>
+</tbody></table></div>
+<p>벤치 C++ 5개, 전용 HLSL 4개와 프로젝트 등록을 제거했다. SSAO는 참조 셰이더의
+컴파일/PSO 준비에 더 이상 의존하지 않는다. <code>reflect.golden</code>의 실제 타입 직렬화
+대조는 유지한다. 과거 성능 수치로 현재 성능 향상을 주장하지 않는다.
+종료 판단은 <code>RhiBoundaryPlan.md</code> R3, <code>RefactoringPlanDashboard.html</code> 3-6/3-16,
+<code>ReflectionRedesignPlan.md</code> CT7에 근거한다.</p>
+<h2>제품 기능으로 이전</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>기존 Commandlet</th>
+<th>현재 제품 명령</th>
+<th>공통 구현</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>experiment.animlive</code></td>
+<td><code>animator.status</code></td>
+<td><code>EditorDiagnostics::AnimatorStatus</code>; Animator 목록·팔레트 digest·제품 publication 지표를 JSON으로 반환.</td>
+</tr>
+<tr>
+<td><code>scene.hierarchycheck</code></td>
+<td><code>scene.hierarchycheck</code></td>
+<td><code>EditorDiagnostics::ValidateHierarchy</code>; 활성 씬의 계층 불변식 검사.</td>
+</tr>
+<tr>
+<td><code>tag.authoring.probe</code></td>
+<td><code>tag.list/has/add/remove</code></td>
+<td><code>EditorProjectOperations</code>; Inspector와 동일한 태그 편집·저장·Undo/Redo.</td>
+</tr>
+</tbody></table></div>
+<p>구 이름 두 개는 별칭으로 남기지 않았다. HTTP discovery에서 입력 스키마와 결과를
+조회할 수 있다. 태그 변경은 성공 즉시 저장하며 Undo/Redo도 디스크에 반영한다.
+동일 값은 이력을 늘리지 않고, 예약 태그·잘못된 이름·현재 사용 중인 태그 삭제를
+거부한다. 저장 실패는 메모리 정의를 복구하고 성공으로 보고하지 않는다.
+Animator 진단은 제품이 게시한 스냅샷을 읽으며 pose를 다시 게시하지 않는다.</p>
+<h2>숨은 에셋 선택 제거</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>명시적 입력</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>experiment.foliage</code></td>
+<td><code>seed &lt;asset-directory&gt; &lt;model-path&gt;</code> 또는 <code>verify</code></td>
+</tr>
+<tr>
+<td><code>scene.transformbulk</code></td>
+<td><code>probe &lt;pose-model-path&gt; &lt;rebind-model-path&gt;</code></td>
+</tr>
+<tr>
+<td><code>dx12.selftest</code></td>
+<td><code>&lt;texture-path&gt; [output]</code></td>
+</tr>
+<tr>
+<td><code>vk.selftest</code></td>
+<td><code>&lt;model-path&gt; &lt;texture-path&gt; [output]</code></td>
+</tr>
+<tr>
+<td><code>rhi.uploadsegments</code></td>
+<td><code>&lt;model-path&gt; &lt;texture-path&gt;</code></td>
+</tr>
+<tr>
+<td><code>experiment.matruntime</code></td>
+<td><code>seed &lt;asset-directory&gt; &lt;texture-path&gt;</code>, <code>edit</code> 또는 현재 상태 검사</td>
+</tr>
+</tbody></table></div>
+<p>Gunner/SU/scene.glb/Cube 텍스처를 명령 본문이 임의로 선택하던 부분을 입력으로 바꿨다.
+필요한 조건은 유지한다. bulk 검사는 서로 다른 skeleton 모델과 최소 2개 bone을,
+upload 검사는 16 MiB를 넘는 실제 mesh 업로드 입력을 요구한다. 재질 seed의 결과도
+성공·실패·입력 오류를 반환하며 검사할 재질이 없으면 통과로 처리하지 않는다.</p>
+<p>소비 PowerShell은 모델·씬·텍스처 경로를 인자로 받는다. typed consumer의
+<code>ExpectedPoseDigest</code>는 독립 기준이며, 다른 모델/씬을 지정하면 반드시 함께
+제공해야 한다. 실행 결과를 새로운 기대값으로 자동 채우지 않는다.</p>
+<p><strong>의도적으로 남긴 코퍼스 의존성:</strong> <code>assets.generationcorpus</code>는 Gunner/SU의
+메시·재질·텍스처·애니메이션 수를, <code>assets.scenemodel</code>은 Gunner를 포함한 씬에서
+embedded texture 수를 추가로 대조한다. 특정 그림의 coverage·pose digest를 재는
+시각 회귀 스크립트도 전용 코퍼스 검사다. 이들은 HTTP 제품 명령이 아니며,
+임의의 프로젝트에서 입력 없이 실행 가능한 검사로 간주하지 않는다.
+기본 셰이더/자가 검사 셰이더는 엔진 계약을 검증하는 내장 fixture로 남는다.</p>
+<h2>이전 101/108 표면의 검증 이력과 한계</h2>
+<ul>
+<li>Debug/Release Editor, Debug Player 빌드 통과. 기존 LNK4229 경고는 남는다.</li>
+<li>Debug/Release <code>verify-editor-command-surface.ps1</code> 각각 <strong>230개 단정 통과</strong>.
+삭제 명령 부재, 입력 누락 거부, HTTP 진단, 태그 저장·Undo/Redo·정의 순서를 검사했다.</li>
+<li>Debug/Release 재질 fixture 입력 집중 검증 각각 <strong>3개 통과</strong>: 입력 누락 거부,
+검사 대상 부재 거부, 명시적 텍스처로 자산 게시. 임시 자산은 제거했다.</li>
+<li>Debug/Release 제품 registry golden <strong>101/108, problems 0</strong> 일치.
+처분표의 97 api + 3 split + 1 batch, Commandlet 102, 제거 12가 discovery와 일치한다.</li>
+<li>reflection golden <strong>75개 타입 diff 0</strong>, 태그 read <strong>21개/레이어 16개</strong> 및 원본 보존,
+hierarchy mutation 회귀 통과. MBC freeze 정적 검사와 CLI consumer 계약 검사도 통과.</li>
+<li><code>dx12.ssao</code>, <code>dx12.post</code>, <code>dx12.forwardshade</code>, <code>vk.post</code> 통과.
+<code>vk.post</code>는 Uber/분리 패스의 DX12/Vulkan 픽셀 비교를 포함하며 validation 0건이다.</li>
+<li><code>dx12.selftest</code>는 <strong>실패가 남는다</strong>. 앞선 단계부터 발생한 예외를 이번에
+<code>material authoring round trip</code> 단계로 좁혔다. 텍스처 입력 처리 이전이다.
+이제 누적 로그와 실패 단계가 JSON <code>data.log</code>에 남고 suite는 실패 종료한다.
+재질 저장·복원 예외의 근본 원인이 해결됐다는 뜻은 아니다.</li>
+<li>모델 typed consumer, transform bulk, skinned proxy의 긍정 회귀는
+작업 폴더에 <code>Gunner_F_Mythic.glb</code>/<code>SU_Mythic.glb</code>가 없어 완료하지 못했다.
+<code>vk.selftest</code>/<code>rhi.uploadsegments</code>의 유효 대형 모델 입력 검증도 미확인이다.
+누락된 코퍼스를 통과나 미구현으로 바꾸지 않는다.</li>
+<li>전체 102개 Commandlet의 모든 모드·코퍼스를 실행한 결과는 아니다.
+처분표의 다른 일반적 유지 문구도 개별 종료 검토가 완료됐다는 증거가 아니다.</li>
+</ul>
+<p>로그는 <code>artifacts/commandlet-cleanup/</code>에 있다. Debug/Release의 surface 결과,
+<code>debug-gates/render/verdicts.csv</code>, <code>vulkan-post/results.jsonl</code>,
+<code>debug-selftest-diagnostics/dx12.selftest.result.jsonl</code>,
+<code>material-input-debug.log</code>/<code>material-input-release.log</code>로 판정 근거를 확인할 수 있다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-숨은-에셋-선택-제거"></span><span id="sec-이번-마무리-반영"></span><span id="sec-이전-101108-표면의-검증-이력과-한계"></span><span id="sec-제거한-명령과-코드"></span><span id="sec-제품-기능으로-이전"></span><span id="숨은-에셋-선택-제거"></span><span id="이번-마무리-반영"></span><span id="이전-101108-표면의-검증-이력과-한계"></span><span id="제거한-명령과-코드"></span><span id="제품-기능으로-이전"></span></details></main></body></html>

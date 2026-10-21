@@ -1,5 +1,48 @@
 # W7-0 패널 비용 기준선 (2026-09-14)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/measure-panel-cost.ps1:66](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-panel-cost.ps1#L66) — `$script:assetsRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../Dynamic_CPP/Assets'))`
+- [Tools/regression/measure-panel-cost.ps1:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-panel-cost.ps1#L96) — `$assetName = 'W7ScaleAssets_' + [guid]::NewGuid().ToString('N').Substring(0, 8)`
+- [Tools/regression/measure-panel-cost.ps1:128](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-panel-cost.ps1#L128) — `if ($WithAssets) { $lines.Add("editor.browser go $assetName"); $lines.Add('wait 120') }`
+- [Tools/regression/verify-hierarchy-flatten-contract.ps1:94](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hierarchy-flatten-contract.ps1#L94) — `Remove-CodeNoise ([IO.File]::ReadAllText($full))`
+- [Tools/regression/verify-hierarchy-flatten-contract.ps1:109](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hierarchy-flatten-contract.ps1#L109) — `$m = [regex]::Match($code, $pattern)`
+- [Tools/regression/verify-hierarchy-flatten-contract.ps1:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hierarchy-flatten-contract.ps1#L130) — `$m = [regex]::Match($line, '^(?<type>.+?)\s+(?<name>[A-Za-z_]\w*)$')`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/RenderEngine/AssetBundle.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetBundle.h#L5) — `struct [[reflgen::reflect]] AssetBundle`
+- [Engine/RenderEngine/AssetBundle.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetBundle.h#L8) — `AssetBundle() = default;`
+- [Engine/RenderEngine/AssetBundle.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetBundle.h#L9) — `AssetBundle(const std::string& name, const file::path& path)`
+- [Editor/EngineGUIWindow/ContentsBrowserWindow.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.h#L22) — `class ContentsBrowserWindow`
+- [Editor/EngineGUIWindow/ContentsBrowserWindow.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.h#L24) — `public:`
+- [Editor/EngineGUIWindow/ContentsBrowserWindow.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.h#L40) — `enum class CreateKind : std::uint8_t { folder, render_profile, SoundGraph, SoundPreset };`
+- [Editor/EngineGUIWindow/BrowserDirectorySnapshot.h:42](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BrowserDirectorySnapshot.h#L42) — `struct browser_directory_entry`
+- [Editor/EngineGUIWindow/BrowserDirectorySnapshot.h:60](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BrowserDirectorySnapshot.h#L60) — `struct browser_directory_listing`
+- [Editor/EngineGUIWindow/BrowserDirectorySnapshot.h:67](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BrowserDirectorySnapshot.h#L67) — `struct browser_cache_stats`
+- [Editor/EngineGUIWindow/ContentsBrowserWindow.cpp:843](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.cpp#L843) — `editor::windows::add_panel_units(editor::windows::panel_cost_slot::browser_tree, 1);`
+- [Editor/EngineGUIWindow/ContentsBrowserWindow.cpp:945](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.cpp#L945) — `editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_tree,`
+- [Editor/EngineGUIWindow/ContentsBrowserWindow.cpp:1331](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.cpp#L1331) — `required += ImGui::CalcTextSize(i == 0 ? "Assets" : browser_utf8(chain[i].filename()).c_str()).x`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 PHASE 21 W7 의 완료 기준은 *"p95 CPU·allocation 개선 수치를 기록한다. 캐시만 추가하고
 실측 이득이 없으면 제거한다"* 다. 이 문서가 그 **대조군**이다. 캐시가 들어가기 전의
 수치이고, 뒤에 오는 W7-1~W7-3 은 이 표와 맞대어 증명한다.
@@ -224,3 +267,5 @@ clipping 이 하겠다고 한 일의 전부다. p95 30.427 → 0.041 ms(742 배)
 남은 비용의 성격도 다시 바뀌었다. 이제 Hierarchy 의 0.04 ms 는 **보이는 14 줄**의
 비용이고, 씬을 더 키워도 이 수는 오르지 않는다. 다음에 붉어질 칸은 브라우저의
 `browser_tree` p95 2 ms(노드 24 개의 ImGui 그리기)이지 Hierarchy 가 아니다.
+
+</details>

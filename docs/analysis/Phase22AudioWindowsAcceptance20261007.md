@@ -1,5 +1,52 @@
 # PHASE 22 Windows 제품 acceptance — 2026-10-07
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- AudioHost/PlaybackService·clip directory와 miniaudio/Null backend가 재생 수명을 소유한다. resident/stream 및 개별 PlaybackHandle을 구분한다.
+- FMOD 채택을 필수 선행으로 재도입하지 않는다. 과거 선택 씬의 종료/stream 수용과 현재 CI·설치 제품 수용은 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h:38](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h#L38) — `assets::TryParseCanonicalUuidV8(path.substr(lastSlash + 1, path.size() - lastSlash - 12),`
+- [Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h:103](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h#L103) — `own::shared_owner<const ArtifactByteSource> exactBytes_{};`
+- [Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h#L127) — `own::shared_owner<const ArtifactByteSource> exactBytes;`
+- [Tools/regression/verify-audio-player-exits.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-audio-player-exits.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-audio-player-exits.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-audio-player-exits.ps1#L8) — `$package = [IO.Path]::GetFullPath($PackageDirectory)`
+- [Tools/regression/verify-audio-player-exits.ps1:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-audio-player-exits.ps1#L20) — `$root = Join-Path $repo ('Build/Validation/Phase22Closure/player-exits-' + [guid]::NewGuid().ToString('N'))`
+- [ScriptCore/Audio.cs:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L8) — `public readonly struct AudioAssetId : IEquatable<AudioAssetId>`
+- [ScriptCore/Audio.cs:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L46) — `public readonly struct AudioParameter`
+- [ScriptCore/Audio.cs:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L83) — `public struct AudioPlaySettings`
+- [ScriptCore/SoundComponent.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L4) — `public sealed class SoundComponent : NativeComponent`
+- [ScriptCore/SoundComponent.cs:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L6) — `public void Play() => Native.SoundPlay(OwnerHandle);`
+- [ScriptCore/SoundComponent.cs:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L7) — `public void Stop() => Native.SoundStop(OwnerHandle);`
+- [Engine/SceneRuntime/SoundComponent.h:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L37) — `class [[reflgen::reflect]] SoundComponent : public meta::identity<SoundComponent, Component>`
+- [Engine/SceneRuntime/SoundComponent.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L41) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/SoundComponent.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L43) — `Component::gc_trace(tracer);`
+- [Engine/SceneRuntime/Audio/SoundGraph.h:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Audio/SoundGraph.h#L12) — `enum class ParameterType : std::uint8_t { Boolean, Integer, Float, String };`
+- [Engine/SceneRuntime/Audio/SoundGraph.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Audio/SoundGraph.h#L13) — `enum class SoundNodeKind : std::uint8_t { Clip, Random, Switch, Layer, GainPitch, Parameter, Output };`
+- [Engine/SceneRuntime/Audio/SoundGraph.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Audio/SoundGraph.h#L14) — `enum class SoundSourceKind : std::uint8_t { Clip, Preset, Graph };`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/SoundComponent.cpp:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.cpp#L8) — `SoundSystem* SoundComponent::System() const`
+- [Engine/SceneRuntime/SoundComponent.cpp:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.cpp#L13) — `SoundComponentSettings SoundComponent::ReadSettings() const`
+- [Engine/SceneRuntime/SoundComponent.cpp:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.cpp#L49) — `void SoundComponent::WriteSettings(const SoundComponentSettings& settings)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 이 보고서는 VS 2026(v18) MSVC v145 x64로 수행한 현재 Windows 검증을 기록한다.
 구현 착지, 독립 native probe, 실제 제품 실행, 실제 장치 관찰을 구별한다.
 2026-10-08 최종 정산: **AU0~AU9 및 PHASE22 완료.** 최종 clean native generation의
@@ -311,3 +358,5 @@ Dynamic_CPP 및 최종 배포본·package·검증 로그는 그대로 보존했�
 검증 Editor/Player/ETW capture는 없다. root HEAD는 `3afe1daa`로 유지했으며
 root commit/push는 수행하지 않았다. 대시보드 AU0~AU9 10/10 done, JavaScript
 syntax 및 관련 문서/runner diff formatting 검사를 통과했다.
+
+</details>

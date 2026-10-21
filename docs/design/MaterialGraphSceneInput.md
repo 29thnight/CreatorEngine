@@ -1,5 +1,52 @@
 # Material Graph 실제 Scene 입력 밀봉
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/ProxyCommand.cpp:97](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ProxyCommand.cpp#L97) — `? material_graph::SceneMaterialSource::Capture(*update.material) : nullptr;`
+- [Engine/SceneRuntime/ProxyCommand.cpp:104](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ProxyCommand.cpp#L104) — `auto effective = own::make_shared<experiment::Material>();`
+- [Engine/SceneRuntime/ProxyCommand.cpp:224](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ProxyCommand.cpp#L224) — `? material_graph::SceneMaterialSource::Capture(*type.m_material) : nullptr;`
+- [Engine/SceneRuntime/PrimitiveProxyBridge.cpp:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrimitiveProxyBridge.cpp#L82) — `m_graphMaterialSource = material_graph::SceneMaterialSource::Capture(*m_Material);`
+- [Engine/SceneRuntime/PrimitiveProxyBridge.cpp:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrimitiveProxyBridge.cpp#L90) — `auto effective = own::make_shared<experiment::Material>();`
+- [Engine/SceneRuntime/PrimitiveProxyBridge.cpp:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/PrimitiveProxyBridge.cpp#L177) — `? material_graph::SceneMaterialSource::Capture(*type.m_material) : nullptr;`
+- [Tools/regression/verify-material-raster-surface.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/verify-material-raster-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-raster-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:86](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86) — `own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};`
+- [Engine/SceneRuntime/Animator.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};`
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:62](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L62) — `struct ShaderMaterialSampler`
+- [Engine/RenderEngine/ShaderMeta.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L71) — `struct ShaderGeneratedMaterial`
+- [Engine/RenderEngine/ProxyCommand.h:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommand.h#L63) — `own::shared_owner<const Material> material{};`
+- [Engine/RenderEngine/ProxyCommand.h:68](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommand.h#L68) — `own::shared_owner<const material_graph::SceneMaterialSource> graphMaterialSource;`
+- [Engine/RenderEngine/ProxyCommand.h:72](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommand.h#L72) — `own::shared_owner<const experiment::Material> authoredMaterial{};`
+- [Engine/RenderEngine/FrameCameraSnapshot.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FrameCameraSnapshot.h#L14) — `struct FrameCameraSnapshot`
+- [Engine/RenderEngine/FrameCameraSnapshot.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FrameCameraSnapshot.h#L16) — `math::matrix4x4 view{};`
+- [Engine/RenderEngine/FrameCameraSnapshot.h:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/FrameCameraSnapshot.h#L44) — `bool HasSameTemporalHistory(const FrameCameraSnapshot& previous) const noexcept`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1. 이번 설치 범위
 
 `EnhancedSceneRenderer`의 실제 draw pool과 per-view 선택에 LX 입력을 연결했다.
@@ -112,3 +159,5 @@ legacy/Masked 가림·draw ownership·공유 depth·직접광/HDR 합성의 설�
 Vulkan 전체 Scene 검증으로 세지 않는다. Vulkan native PSO 준비·기본 draw/readback은
 [Scene generation §6](MaterialGraphSceneGeneration.md)에서 별도로 검증한다.
 MAT-7은 progress이며 완료 공수를 늘리지 않는다.
+
+</details>

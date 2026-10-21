@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>CreatorEngine 문서</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="RefactoringPlanDashboard.html">대시보드</a> · <a href="analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="README.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/README.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>CreatorEngine 문서</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Settings</ve-node><ve-node id="n1" at="2 1">Build</ve-node><ve-node id="n2" at="3 1" key>Cook</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Bootstrap</ve-node><ve-node id="n5" at="1 2">Player</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.</li>
+<li>로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.</li>
+<li>구 SRP 및 C# pipeline 저작 전환 제안은 취소됐다. 필요한 Pass는 현재 C++ 계약으로 작성하며, 별도 저작 체계는 실제 요구가 생기면 새 미래 계획으로 검토한다. 아래 원래 제안은 활성 계획이 아니다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13">ScriptCore/Physics.cs:13</a> — <code>public struct PhysicsHit</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41">ScriptCore/Physics.cs:41</a> — <code>public readonly struct PhysicsQueryRequest</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65">ScriptCore/Physics.cs:65</a> — <code>public readonly struct PhysicsBatchResult</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14">ScriptCore/Animator.cs:14</a> — <code>public sealed class Animator : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18">ScriptCore/Animator.cs:18</a> — <code>public void SetBool(string name, bool value) =&gt; Native.AnimatorSetBool(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19">ScriptCore/Animator.cs:19</a> — <code>public void SetFloat(string name, float value) =&gt; Native.AnimatorSetFloat(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81">Engine/SceneRuntime/Animator.h:81</a> — <code>own::shared_owner&lt;const assets::ModelAnimationPayload&gt; payload{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L86">Engine/SceneRuntime/Animator.h:86</a> — <code>own::shared_owner&lt;const assets::ModelAnimationDescriptor&gt; descriptor{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87">Engine/SceneRuntime/Animator.h:87</a> — <code>own::shared_owner&lt;const assets::ModelSkeletonPayload&gt; skeleton{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L26">Engine/SceneRuntime/Animator.cpp:26</a> — <code>Animator::Animator() : m_instance(AnimatorSystems-&gt;CreateInstance()) {}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L28">Engine/SceneRuntime/Animator.cpp:28</a> — <code>AnimInstance&amp; Animator::GetInstance() noexcept</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L31">Engine/SceneRuntime/Animator.cpp:31</a> — <code>::ce::contracts::assert_that(</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>엔지니어링 문서 트리. 루트에 흩어져 있던 30개 문서를 2026-08-17에 여기로 옮겼다.</p>
+<ul>
+<li><p><strong><a href="TechnicalGuide.html">TechnicalGuide.md</a></strong> — 커밋된 master 기준의 기술설명서.
+엔진 구조·소유권·렌더링·콘텐츠·스크립팅·빌드 흐름과 구현·검증 경계를 설명한다.</p>
+</li>
+<li><p><strong><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/CONTRIBUTING.md">CONTRIBUTING.md</a></strong> · <strong><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/CODE_OF_CONDUCT.md">CODE_OF_CONDUCT.md</a></strong> — 기여 절차와 참여 기준.</p>
+</li>
+<li><p><strong><a href="RefactoringPlanDashboard.html">RefactoringPlanDashboard.html</a></strong> — 전체 리팩터링 페이즈 색인.
+진행 상태·의존 관계·슬라이스 단위를 한 눈에 본다. <strong>여기서 시작하는 것이 빠르다.</strong></p>
+</li>
+</ul>
+<h2>구성</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>디렉터리</th>
+<th>성격</th>
+<th>판별 기준</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="plans"><code>plans/</code></a></td>
+<td>활성·미래 계획</td>
+<td>진행·대기·차단·미래 범위를 갱신한다</td>
+</tr>
+<tr>
+<td><a href="plans/archive/README.html"><code>plans/archive/</code></a></td>
+<td>종료·대체 계획</td>
+<td>완료·선택 중단·승계 근거와 검증 한계를 보존한다</td>
+</tr>
+<tr>
+<td><a href="design"><code>design/</code></a></td>
+<td>설계 결정</td>
+<td>무엇을 왜 그렇게 짓는가. 결정과 기각 근거가 본문이다</td>
+</tr>
+<tr>
+<td><a href="analysis"><code>analysis/</code></a></td>
+<td>실측·분석</td>
+<td>특정 시점의 측정 기록. 사후 갱신하지 않는다</td>
+</tr>
+</tbody></table></div>
+<p><code>index.html</code>·<code>style.css</code>는 GitHub Pages 소개 페이지, <code>generate_scriptbinder_docs.py</code>는
+ScriptBinder API 문서 생성기(출력은 <code>API_DOCS/</code>)로 위 셋과 무관하다.</p>
+<h2>plans/</h2>
+<p>현재 계획과 이력 문서. 진행 상태는 <a href="RefactoringPlanDashboard.html#doc-index">대시보드</a>를 함께 본다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>문서</th>
+<th>대상</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="plans/PBRWiringStabilizationPlan.html">PBRWiringStabilizationPlan.md</a></td>
+<td>PHASE 4 · DX12 완료 — W0&#126;W9 제품 배선·실장면 게이트. Vulkan 교차 판정은 PHASE 4.9.</td>
+</tr>
+<tr>
+<td><a href="plans/BlenderMaterialGraphPlan.html">BlenderMaterialGraphPlan.md</a></td>
+<td>PHASE 4.25 · MAT-0 완료 — Blender 5.1.1 재질 기준 장면과 선형 HDR golden 고정. Principled ABI와 Material Graph 제품 작업은 후속.</td>
+</tr>
+<tr>
+<td><a href="plans/RenderPhaseRoadmap.html">RenderPhaseRoadmap.md</a></td>
+<td>PHASE 4 계열 · 정본 — DAG 우선 순서, 분리 완료선, 현재 공수 원장.</td>
+</tr>
+<tr>
+<td><a href="plans/RenderGraphDependencySchedulingPlan.html">RenderGraphDependencySchedulingPlan.md</a></td>
+<td>PHASE 4.3 · RG — 공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환.</td>
+</tr>
+<tr>
+<td><a href="plans/LightmapBakerPlan.html">LightmapBakerPlan.md</a></td>
+<td>PHASE 4.7 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약.</td>
+</tr>
+<tr>
+<td><a href="plans/RendererQualityPlan.html">RendererQualityPlan.md</a></td>
+<td>PHASE 4.75 · RND — probe/AO·shadow·display/post의 독립 품질 게이트.</td>
+</tr>
+<tr>
+<td><a href="plans/GpuFeaturePlanningPlan.html">GpuFeaturePlanningPlan.md</a></td>
+<td>PHASE 4.8 · GPU — GPU-driven·확률 조명·DXR 설계 및 구현 공수 확정.</td>
+</tr>
+<tr>
+<td><a href="plans/LatticeAdoptionPlan.html">LatticeAdoptionPlan.md</a></td>
+<td>LX-0&#126;6 · 공수 미산정 — LX-2 독립 게이트 통과, Material Editor·열린 문서 HTTP 제품 연결 진행. MAT-0&#126;8 완료, LX-3/3H의 전체 조작 게이트·새 BT/Animator 창·<code>imgui-node-editor</code> 제거는 후속.</td>
+</tr>
+<tr>
+<td><a href="plans/BackendParityPlan.html">BackendParityPlan.md</a></td>
+<td>PHASE 4.9 — DX12/Vulkan 교차 판정 복귀. 공수 미산정.</td>
+</tr>
+<tr>
+<td><a href="plans/EditorAutomationCLIPlan.html">EditorAutomationCLIPlan.md</a></td>
+<td>PHASE 14.5 · LC0&#126;LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류.</td>
+</tr>
+<tr>
+<td><a href="plans/ScriptSurfacePlan.html">ScriptSurfacePlan.md</a></td>
+<td>PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계.</td>
+</tr>
+<tr>
+<td><a href="plans/EnginePackagingPlan.html">EnginePackagingPlan.md</a></td>
+<td>PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지.</td>
+</tr>
+<tr>
+<td><a href="plans/ModelGeometryTextureImprovementPlan.html">ModelGeometryTextureImprovementPlan.md</a></td>
+<td>비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분</td>
+</tr>
+<tr>
+<td><a href="plans/TexturePipelinePlan.html">TexturePipelinePlan.md</a></td>
+<td>PHASE 12 · 구현·부분 수용 — 텍스처 import 설정·mip·cook·Player 소비와 편집 자동 처리. 전체 품질·성능 및 잔여 게이트는 계획과 검증 기록 참조.</td>
+</tr>
+<tr>
+<td><a href="plans/BuildPipelinePlan.html">BuildPipelinePlan.md</a></td>
+<td>PHASE 12.5 · 진행 — 게임 빌드·cook·stage·managed·CI 파이프라인. B/L 잔여 유지.</td>
+</tr>
+<tr>
+<td><a href="plans/EngineLayerSeparationPlan.html">EngineLayerSeparationPlan.md</a></td>
+<td>E0&#126;E7 · 잔여 있음 — Runtime Core·Editor·Host 경계. E2 writer와 E7 잔여 유지.</td>
+</tr>
+<tr>
+<td><a href="plans/AnimationSchedulerPlan.html">AnimationSchedulerPlan.md</a></td>
+<td>PHASE 13 — 애니메이션 스케줄러·LOD·CPU 버짓 재설계.</td>
+</tr>
+<tr>
+<td><a href="plans/TaskSchedulerUnificationPlan.html">TaskSchedulerUnificationPlan.md</a></td>
+<td>PHASE 13 S0.5·S6 부속 — 태스크 스케줄러 enkiTS 이관의 실태 조사·측정. fork-join만 옮기고 장기 블로킹 스레드 18곳은 존치.</td>
+</tr>
+<tr>
+<td><a href="plans/ProfilingCapturePlan.html">ProfilingCapturePlan.md</a></td>
+<td>PHASE 14 P0&#126;P6 · 진행 — CPU/GPU/GC 시간축 수집·녹화·구간 분석.</td>
+</tr>
+<tr>
+<td><a href="plans/MemoryProfilerPlan.html">MemoryProfilerPlan.md</a></td>
+<td>PHASE 14 MP0&#126;MP6 · 진행 — Memory 탭 수동 스냅샷·A/B 분석과 객체별 네이티브/관리/GPU 계측 확장.</td>
+</tr>
+<tr>
+<td><a href="plans/RenderFrameDebuggerPlan.html">RenderFrameDebuggerPlan.md</a></td>
+<td>14-7 독립 트랙 · 미착수 — 원하는 뷰의 다음 완료 제출 하나를 수동 캡처하고 이벤트/상태/리소스·출력을 조사(RF0&#126;RF7).</td>
+</tr>
+<tr>
+<td><a href="plans/UtilityFrameworkModernizationPlan.html">UtilityFrameworkModernizationPlan.md</a></td>
+<td>PHASE 15 · 진행 — 유틸리티의 실제 소비·계약을 기준으로 정리.</td>
+</tr>
+<tr>
+<td><a href="plans/MathematicsMigrationPlan.html">MathematicsMigrationPlan.md</a></td>
+<td>구조 완료 · 검증 잔여 — 수학 라이브러리 이주. pixel·Physics runtime gate가 남아 있다.</td>
+</tr>
+<tr>
+<td><a href="plans/UISystemRedesignPlan.html">UISystemRedesignPlan.md</a></td>
+<td>PHASE 16 · 진행 — Scene 소유 UI Runtime과 값 타입 렌더 제출. 9-15 개정에서 텍스트 렌더(트랙 T)가 U1 앞으로 서고, UI 저작의 소유 레이어를 C++로 확정했다(D-5).</td>
+</tr>
+<tr>
+<td><a href="plans/SerializationPlan.html">SerializationPlan.md</a></td>
+<td>PHASE 17 · 진행 — 저작 텍스트·쿠킹 바이너리 경계와 잔여 성능 판정.</td>
+</tr>
+<tr>
+<td><a href="plans/PhysicsRedesignPlan.html">PhysicsRedesignPlan.md</a></td>
+<td>PHASE 19 — 물리 컴포넌트·backend·스레딩 전면 재설계.</td>
+</tr>
+<tr>
+<td><a href="plans/NetworkFrameworkPlan.html">NetworkFrameworkPlan.md</a></td>
+<td>PHASE 20 — 네트워크 신원·fixed tick·replication 기반.</td>
+</tr>
+<tr>
+<td><a href="plans/EditorWorkspaceRedesignPlan.html">EditorWorkspaceRedesignPlan.md</a></td>
+<td>PHASE 21 — 테마·도킹·ViewportHost와 편집·플레이 전환.</td>
+</tr>
+<tr>
+<td><a href="plans/AudioBackendModernizationPlan.html">AudioBackendModernizationPlan.md</a></td>
+<td>PHASE 22 — FMOD 은퇴와 miniaudio 통합·오디오 회귀.</td>
+</tr>
+<tr>
+<td><a href="plans/EngineDistributionAndLauncherPlan.html">EngineDistributionAndLauncherPlan.md</a></td>
+<td>PHASE 23 — 엔진 배포·Launcher·프로젝트 관리와 설치 회귀.</td>
+</tr>
+<tr>
+<td><a href="plans/SimulationEffectContractPlan.html">SimulationEffectContractPlan.md</a></td>
+<td>PHASE 24 · 현재 리팩토링 이후의 미래 계획 · 구현 미착수</td>
+</tr>
+</tbody></table></div>
+<p>이전 PHASE 4 계열 원장과 Asset-first SRP 판단은
+<a href="plans/Phase4UnifiedPlan.html">Phase4UnifiedPlan.md</a>,</p>
+<h2>plans/archive/</h2>
+<p>완료·중단·대체된 <strong>19개 문서</strong>는 <a href="plans/archive/README.html">보관 색인</a>으로 옮겼다.
+대시보드의 <a href="RefactoringPlanDashboard.html#closed-phases">종료 페이즈 이력</a>은 기본으로 접혀 있으며,
+기존 페이즈 링크를 열면 해당 이력이 펼쳐진다. 열린 페이즈 요약 집계에서는 종료 페이즈를 제외한다.</p>
+<p>보관 원문에는 과거 측정·폐기된 제안·미검증 범위가 남아 있다. 보관일을 새 구현·검증일로 해석하지 않는다.</p>
+<h2>design/</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>문서</th>
+<th>대상</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="design/RenderPipelineTargetArchitecture.html">RenderPipelineTargetArchitecture.md</a></td>
+<td>기존 C++ Pass·LivePipelineDesc·RenderGraph 실행 경계. SRP/C# 저작 전환 취소 반영</td>
+</tr>
+<tr>
+<td><a href="design/LatticeNodeSystem.html">LatticeNodeSystem.md</a></td>
+<td>Lattice(LX) 공통 그래프 계약·편집 UI 초안과 <a href="design/LatticeEditorWireframe.svg">화면 와이어프레임</a></td>
+</tr>
+<tr>
+<td><a href="design/EngineVersionPolicy.html">EngineVersionPolicy.md</a></td>
+<td>확정 — 제품 세대·기능 릴리스·네 자리 엔진 빌드·API 계약·채널. 적용은 PHASE 23 DL5·DL6·DL10</td>
+</tr>
+<tr>
+<td><a href="design/ContainerLibraryDesign.html">ContainerLibraryDesign.md</a></td>
+<td><code>ce::dynamic_array</code> — 자체 컨테이너 설계와 기각 근거</td>
+</tr>
+<tr>
+<td><a href="design/RhiGpuMemoryLifetimeDesign.html">RhiGpuMemoryLifetimeDesign.md</a></td>
+<td>RHI GPU 메모리 수명</td>
+</tr>
+<tr>
+<td><a href="design/ResourceOwnershipDesign.html">ResourceOwnershipDesign.html</a></td>
+<td>자원 소유권</td>
+</tr>
+<tr>
+<td><a href="design/ReflectionDesign.html">ReflectionDesign.md</a></td>
+<td>리플렉션 현재 설계 정본 — reflgen 서술·빌드 연동·런타임 등록소·소비자와 기각 근거</td>
+</tr>
+<tr>
+<td><a href="design/ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a></td>
+<td>리플렉션 존치 결정</td>
+</tr>
+</tbody></table></div>
+<h2>analysis/</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>문서</th>
+<th>대상</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="analysis/Phase475AxisClassification.html">Phase475AxisClassification.md</a></td>
+<td>분리 전 PHASE 4.75의 22개 활성 행을 분류한 당시 정적 점검(2026-09-23)</td>
+</tr>
+<tr>
+<td><a href="analysis/CreatorBuildToolValidation.html">CreatorBuildToolValidation.md</a></td>
+<td>독립 BuildTool EXE·private runtime·패키징 검증과 기존 모델 씬 제한(2026-09-13)</td>
+</tr>
+<tr>
+<td><a href="analysis/EngineStructureAnalysis.html">EngineStructureAnalysis.html</a></td>
+<td>엔진 구조 전반</td>
+</tr>
+<tr>
+<td><a href="analysis/ReflectionSystemAnalysis.html">ReflectionSystemAnalysis.md</a></td>
+<td>리플렉션 시스템 실측</td>
+</tr>
+<tr>
+<td><a href="analysis/MAT9BlenderImageComparison.html">MAT9BlenderImageComparison.md</a></td>
+<td>Core/Layered 동일 입력 24장·Debug/Release 일치·박막 잔여 차이와 기준 노이즈(2026-09-30)</td>
+</tr>
+<tr>
+<td><a href="analysis/MAT9MaterialScenePerformance.html">MAT9MaterialScenePerformance.md</a></td>
+<td>모델 배치 후 Debug/Release 렌더 CPU 회귀와 청크·LOD·binding 개선(2026-09-30)</td>
+</tr>
+<tr>
+<td><a href="analysis/MAT9NodeEditorPerformance.html">MAT9NodeEditorPerformance.md</a></td>
+<td>다른 세션의 캔버스·Scene 잠금 대기·Inspector preview 실측 통합(2026-09-30)</td>
+</tr>
+<tr>
+<td><a href="analysis/ReflgenPhase425Integration.html">ReflgenPhase425Integration.md</a></td>
+<td>reflgen PR #114·VS 확장 설치, 4.25 충돌 해결과 통합 검증(2026-09-30)</td>
+</tr>
+<tr>
+<td><a href="analysis/PPLContainerMigrationAnalysis.html">PPLContainerMigrationAnalysis.md</a></td>
+<td>PPL 컨테이너 이관</td>
+</tr>
+<tr>
+<td><a href="analysis/RectTransformAnalysis.html">RectTransformAnalysis.html</a></td>
+<td>RectTransform</td>
+</tr>
+<tr>
+<td><a href="analysis/RendererPortingLog.html">RendererPortingLog.html</a></td>
+<td>렌더러 포팅 이력</td>
+</tr>
+<tr>
+<td><a href="analysis/EditorMenuSurfaceAndPhase21Preflight.html">EditorMenuSurfaceAndPhase21Preflight.md</a></td>
+<td>에디터 메뉴 표면 CLI↔GUI 대조 · 메뉴 확장성 · PHASE 21 재정찰(2026-09-10)</td>
+</tr>
+<tr>
+<td><a href="analysis/EditorWidgetInheritanceW2.html">EditorWidgetInheritanceW2.md</a></td>
+<td>PHASE 21 W2 승계 결정표 확정 — ImGuiHelper 자산의 소비자 실측(2026-09-11)</td>
+</tr>
+</tbody></table></div>
+<h2>문서를 추가할 때</h2>
+<ul>
+<li><strong>계획</strong>이면 <code>plans/</code>. 슬라이스와 완료 기준, 판정 수치를 반드시 넣는다.</li>
+<li><strong>계획이 종료·대체</strong>되면 <code>plans/archive/</code>로 이동하고 보관 색인·내부 상대 링크·대시보드를 함께 갱신한다. 보류·차단·미래 계획은 종료로 처리하지 않는다.</li>
+<li><strong>결정</strong>이면 <code>design/</code>. 채택뿐 아니라 <strong>기각한 대안과 그 근거</strong>를 함께 적는다 —
+이 저장소는 같은 후보를 반복해서 재검토하는 비용이 컸다.</li>
+<li><strong>측정</strong>이면 <code>analysis/</code>. 측정 시점을 명시하고 이후 갱신하지 않는다.</li>
+<li>어느 쪽이든 <strong>틀린 것으로 드러난 판단은 지우지 말고 정정 이력으로 남긴다.</strong>
+이 저장소의 관례이며, 실제로 그 기록이 재실수를 막았다.</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="analysis"></span><span id="design"></span><span id="plans"></span><span id="plansarchive"></span><span id="sec-analysis"></span><span id="sec-design"></span><span id="sec-plans"></span><span id="sec-plansarchive"></span><span id="sec-구성"></span><span id="sec-문서를-추가할-때"></span><span id="구성"></span><span id="문서를-추가할-때"></span></details></main></body></html>

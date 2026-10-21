@@ -1,5 +1,31 @@
 # LX 변환 결과의 활성 장면 수명 — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 사용 중인 월드 변환 결과를 256개·32MiB FIFO 한도로 퇴출하던 정책을 제거했다. LX 단일 커널·작업 목록·메시별 출력 UAV는 그대로 사용한다. 호환 경로, 이전 커널, A:B 선택지는 추가하지 않았다.
 
 ## 수명과 메모리
@@ -44,13 +70,15 @@ Release, GPU validation off, native real 프레임, 현재 소스·runtime SHA �
 
 ## 증거와 재현
 
-- [최종 통합 판정](../../Build/Verification/LxTransformResidency-20261012/final-verdict.json)
-- [Debug GPU 판정](../../Build/Verification/LxTransformResidency-20261012/Debug-Accepted/transform-verdict.json)
-- [Release GPU 판정](../../Build/Verification/LxTransformResidency-20261012/Release-Accepted/transform-verdict.json)
-- [실제 장면 재사용 판정](../../Build/Verification/LxTransformResidency-20261012/Production512/residency-verdict.json)
-- [최초 변환 측정](../../Build/Verification/LxTransformResidency-20261012/Production512/performance-verdict.json)
-- [소스 검사](../../Build/Verification/LxTransformResidency-20261012/source-audit.json) · [변경 SHA](../../Build/Verification/LxTransformResidency-20261012/scope-manifest.json)
+- 최종 통합 판정 (`../../Build/Verification/LxTransformResidency-20261012/final-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug GPU 판정 (`../../Build/Verification/LxTransformResidency-20261012/Debug-Accepted/transform-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release GPU 판정 (`../../Build/Verification/LxTransformResidency-20261012/Release-Accepted/transform-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 실제 장면 재사용 판정 (`../../Build/Verification/LxTransformResidency-20261012/Production512/residency-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 최초 변환 측정 (`../../Build/Verification/LxTransformResidency-20261012/Production512/performance-verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 소스 검사 (`../../Build/Verification/LxTransformResidency-20261012/source-audit.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조) · 변경 SHA (`../../Build/Verification/LxTransformResidency-20261012/scope-manifest.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 `verify-lx-transform-dispatch.ps1`로 Debug/Release를 검사한다. 실제 장면 검사는 `measure-lx-transform-dispatch.ps1 -Counts 512 -Iterations 1 -RequireWarmReuse`로 실행한다. 이어 `verify-lx-transform-performance.py --iterations 1 --counts 512`와 `verify-lx-transform-residency.py`를 같은 측정 디렉터리에 실행한다. 프로젝트·출력 디렉터리는 명시하며 출력은 새 디렉터리를 사용한다.
 
 다음 우선순위는 최초 변환 CPU 비용의 작업 수집·입력 복사·할당·descriptor·그래프 기록 분리 측정이다. Vulkan 실행 수용은 예정대로 Phase 4.9다.
+
+</details>

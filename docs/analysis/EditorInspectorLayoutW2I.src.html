@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>W2-I0 — 인스펙터 배치 실측과 공통 계약</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorInspectorLayoutW2I.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorInspectorLayoutW2I.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>W2-I0 — 인스펙터 배치 실측과 공통 계약</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L90">Engine/SceneRuntime/Entity.h:90</a> — <code>void AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L297">Engine/SceneRuntime/Entity.h:297</a> — <code>bool HasTransform() const { return nullptr != m_pTransformComponent; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L301">Engine/SceneRuntime/Entity.h:301</a> — <code>static Transform&amp; MissingTransformFallback(const Entity* who);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L19">Engine/SceneRuntime/LightComponent.h:19</a> — <code>class [[reflgen::reflect]] LightComponent : public meta::identity&lt;LightComponent, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L94">Engine/SceneRuntime/LightComponent.h:94</a> — <code>const auto&amp; position = m_pOwner-&gt;Transform_().GetPositionValue();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/LightComponent.h#L96">Engine/SceneRuntime/LightComponent.h:96</a> — <code>math::vector3{ position.x, position.y, position.z },</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/CameraComponent.h#L59">Engine/SceneRuntime/CameraComponent.h:59</a> — <code>const auto&amp; position = m_pOwner-&gt;Transform_().GetPositionValue();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/CameraComponent.h#L71">Engine/SceneRuntime/CameraComponent.h:71</a> — <code>resolved.m_eyePosition = m_pOwner-&gt;Transform_().GetWorldPosition();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/CameraComponent.h#L72">Engine/SceneRuntime/CameraComponent.h:72</a> — <code>const math::quaternion rotation = math::normalize(</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L6">Editor/EngineGUIWindow/ICustomEditor.h:6</a> — <code>virtual &amp;#126;ICustomEditor() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ICustomEditor.h#L8">Editor/EngineGUIWindow/ICustomEditor.h:8</a> — <code>virtual void OnInspectorGUI() = 0;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L185">Engine/SceneRuntime/RegisterReflectManual.h:185</a> — <code>failures += &quot;\n  &quot; + std::string(type.name()) + (type.is_serializable() ? &quot;&quot; : &quot; [쓰기 불가]&quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L191">Engine/SceneRuntime/RegisterReflectManual.h:191</a> — <code>failures += &quot; &quot; + std::string(field.name()) + &quot;(&quot; + std::string(field.type_name()) + &quot;)&quot;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RegisterReflectManual.h#L204">Engine/SceneRuntime/RegisterReflectManual.h:204</a> — <code>Debug::PrintLog(spdlog::level::critical, &quot;reflgen 서술자가 쓰거나 읽지 못하는 타입(필드의 serializer 가 등록 함수에&quot;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L186">Editor/EngineGUIWindow/ReflectionTypedDraw.h:186</a> — <code>ImGui::CalcTextSize(label).x), state);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L460">Editor/EngineGUIWindow/ReflectionTypedDraw.h:460</a> — <code>ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionTypedDraw.h#L940">Editor/EngineGUIWindow/ReflectionTypedDraw.h:940</a> — <code>ImGui::Text(&quot;%s: nullptr [For GUI Debug]&quot;, name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L126">Editor/EngineGUIWindow/ReflectionImGuiHelper.h:126</a> — <code>if (nullptr == address) throw std::invalid_argument(&quot;method &#39;&quot; + std::string(method.name()) + &quot;&#39;: argument is not set&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L145">Editor/EngineGUIWindow/ReflectionImGuiHelper.h:145</a> — <code>: ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ReflectionImGuiHelper.h#L146">Editor/EngineGUIWindow/ReflectionImGuiHelper.h:146</a> — <code>ImGui::PushStyleColor(ImGuiCol_Text, color);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L165">Engine/SceneRuntime/Entity.cpp:165</a> — <code>void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L451">Engine/SceneRuntime/Entity.cpp:451</a> — <code>Transform&amp; Entity::MissingTransformFallback(const Entity* who)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.cpp#L460">Engine/SceneRuntime/Entity.cpp:460</a> — <code>&quot;Transform requested on UI Entity &#39;&quot; + who-&gt;m_name.ToString()</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<ul>
+<li>작성: 2026-09-12</li>
+<li>2026-09-13 상태 정정: I0는 완료. 아래는 착수 당시 실측과 추가 범위 제안이며 §5의 9일안은 현재 채택 견적이 아니다. 정본은 <a href="../plans/EditorWorkspaceRedesignPlan.html#phase21-current-status">최신 완료·잔여</a>의 W2-I 6일·I0 완료 공수 0.5일을 따른다. 현재 외관은 사용자 승인으로 고정했다.</li>
+<li>대상: <code>docs/plans/EditorWorkspaceRedesignPlan.md</code> 의 <a href="../plans/EditorWorkspaceRedesignPlan.html#w2-inspector-layout">W2-I</a></li>
+<li>범위: W2-I0 이 요구한 &quot;content 폭·공통 열·줄 전환과 표시 정책 정의&quot;, 그리고 계획서가
+I0 으로 미룬 <strong>전용 드로어 전수 이관량</strong>과 <strong>개별 활성 변경 진입점</strong>의 재계수</li>
+</ul>
+<p>계획서는 W2-I 의 근거를 &quot;현재 소스 분석&quot; 이라고 적고, 실제 폭별 캡처·빌드·런타임 결과로
+표기하지 말라고 못 박았다. 이 글은 그 경계를 지킨다 — 아래 계수는 소스에서 센 것이고,
+Transform 중복과 라벨 배치 두 양식은 <strong>실제 에디터 화면으로도</strong> 확인했다. 어느 쪽인지 항목마다
+적었다. 폭별·배율별 검증은 W2-I5 의 일이며 여기서 하지 않았다.</p>
+<hr>
+<h2>1. 인스펙터 렌더 경로 전수</h2>
+<p><code>InspectorWindow::RenderImGui</code> 가 선택된 엔티티를 그리는 경로는 셋이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>자리</th>
+<th>라벨 배치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>기본 렌더</td>
+<td><code>InspectorWindow.cpp:1718-1726</code> — 기본 정보 + 공간 컴포넌트</td>
+<td>라벨 <strong>왼쪽</strong> (<code>Text</code> + <code>SameLine</code>)</td>
+</tr>
+<tr>
+<td>전용 드로어</td>
+<td>컴포넌트 순회의 <code>type_guid</code> 분기 11개</td>
+<td>드로어마다 제각각</td>
+</tr>
+<tr>
+<td>일반 리플렉션</td>
+<td><code>Meta::DrawObject</code> → <code>ReflectionTypedDraw.h</code></td>
+<td>라벨 <strong>오른쪽</strong> (ImGui 기본)</td>
+</tr>
+</tbody></table></div>
+<p><strong>라벨이 두 방향으로 갈린다는 것은 화면으로 확인했다.</strong> 같은 인스펙터 안에서 전용 드로어의
+<code>Position</code>·<code>Rotation</code>·<code>Scale</code> 은 라벨이 왼쪽에 서고, 그 아래 일반 리플렉션의 <code>m_name</code>·<code>position</code>·
+<code>rotation</code>·<code>scale</code>·<code>m_parentID</code>·<code>m_nearPlane</code> 은 라벨이 오른쪽에 선다. 값 열도 맞지 않는다.</p>
+<h3>1.1 전용 드로어의 실제 분량</h3>
+<p>계획서가 &quot;전용 드로어 전수 이관량은 I0 에서 재계수한다&quot; 고 한 항목이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>드로어</th>
+<th align="right">줄</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ImGuiDrawHelperSoundComponent</code></td>
+<td align="right">836</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperGameObjectBaseInfo</code></td>
+<td align="right">206</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperVolume</code></td>
+<td align="right">201</td>
+</tr>
+<tr>
+<td><code>DrawManagedScripts</code></td>
+<td align="right">169</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperTransformComponent</code></td>
+<td align="right">162</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperImageComponent</code></td>
+<td align="right">152</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperDecal</code></td>
+<td align="right">87</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperBT</code></td>
+<td align="right">65</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperSpriteRenderer</code></td>
+<td align="right">28</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperFSM</code></td>
+<td align="right">22</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperCanvas</code></td>
+<td align="right">13</td>
+</tr>
+<tr>
+<td><strong><code>InspectorWindow.cpp</code> 안 소계</strong></td>
+<td align="right"><strong>1,941</strong></td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperMeshRenderer.cpp</code></td>
+<td align="right">477</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperTerrainComponent.cpp</code></td>
+<td align="right">371</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperRectTransformComponent.cpp</code></td>
+<td align="right">328</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperAnimator.cpp</code></td>
+<td align="right">88</td>
+</tr>
+<tr>
+<td><code>ImGuiDrawHelperPlayerInput.cpp</code></td>
+<td align="right">39</td>
+</tr>
+<tr>
+<td><strong>바깥 파일 소계</strong></td>
+<td align="right"><strong>1,303</strong></td>
+</tr>
+<tr>
+<td><code>DrawYamlNodeEditor.cpp</code> (자산 Import Settings)</td>
+<td align="right">143</td>
+</tr>
+<tr>
+<td><code>ReflectionTypedDraw.h</code> (일반 경로 정본)</td>
+<td align="right">499</td>
+</tr>
+<tr>
+<td><code>ReflectionImGuiHelper.h</code></td>
+<td align="right">232</td>
+</tr>
+</tbody></table></div>
+<p><strong>한 드로어가 전체의 4분의 1이다.</strong> <code>SoundComponent</code> 836줄이 전용 드로어 3,244줄 중 26%이고,
+계획서가 &quot;Sound 의 Bus/Params·Spatial 같은 허용된 하위 묶음&quot; 을 따로 언급한 이유가 이 분량이다.
+W2-I4 의 초기 추정 1.5일은 이 한 드로어를 상수로 보고 세운 값이 아니다 — §5 에서 다시 잰다.</p>
+<h3>1.2 죽어 있는 분기 하나</h3>
+<p><code>InspectorWindow.cpp:1908</code> 이 <code>dynamic_cast&lt;ICustomEditor*&gt;</code> 로 사용자 정의 인스펙터를 찾고
+<code>OnInspectorGUI()</code> 를 부른다. <strong>그 인터페이스를 구현하는 클래스가 저장소에 0 개다.</strong>
+<code>ICustomEditor</code> 라는 이름이 나오는 파일은 인터페이스 정의(<code>ICustomEditor.h</code>, 9줄), 이 호출부,
+프로젝트 파일 둘, 계획 문서 둘뿐이다. 상속하는 타입이 없으므로 <code>dynamic_cast</code> 는 언제나
+<code>nullptr</code> 이고 실행은 늘 <code>else</code> 의 <code>Meta::DrawObject</code> 로 간다.</p>
+<p>이관 계획에서 이 분기를 &quot;전용 드로어 경로 하나&quot; 로 세면 안 된다. 지금은 이관할 소비자가 없다.
+W2-I3 에서 이 분기의 처리(유지·제거·실제 소비자 도입)를 명시적으로 정한다.</p>
+<hr>
+<h2>2. Transform 이 두 번 그려진다</h2>
+<p>계획서가 &quot;Transform 이 다시 일반 리플렉션으로 내려갈 수 있다&quot; 고 적은 항목이다. <strong>가능성이
+아니라 현재 동작이다.</strong> 소스와 화면 양쪽으로 확인했다.</p>
+<h3>2.1 소스</h3>
+<ul>
+<li><code>Entity</code> 의 <code>Transform</code> 은 값 멤버가 아니라 <strong><code>m_components</code> 안에 있다.</strong> S1-b 에서 저장소가
+옮겨졌고 <code>m_pTransformComponent</code> 는 그 슬롯을 가리키는 캐시다(<code>Entity.h:197-199</code>).</li>
+<li>기본 렌더는 RectTransform 이 있으면 RectTransform 드로어를, 없으면 Transform 드로어를
+부른다(<code>InspectorWindow.cpp:1719-1726</code>).</li>
+<li>그 뒤 컴포넌트 순회는 <strong><code>RectTransformComponent</code> 만</strong> 건너뛴다(<code>InspectorWindow.cpp:1756</code>).</li>
+<li><code>Transform</code> 은 리플렉션 등록 목록에 있다(<code>RegisterReflectManual.h</code> 의 <code>X(Transform)</code>).
+따라서 <code>Meta::Find</code> 가 성공하고 <code>Meta::DrawObject</code> 가 돈다.</li>
+</ul>
+<h3>2.2 화면</h3>
+<p>일반 엔티티(Main Camera)를 선택하면 <code>Transform</code> 헤더가 <strong>두 개</strong> 나온다. 위는 전용 드로어라
+체크박스가 없고 축 badge 가 붙은 Position·Rotation·Scale 을 그린다. 아래는 일반 리플렉션이라
+체크박스가 있고 <code>m_name</code>·<code>position</code>(4값)·<code>rotation</code>(4값 quaternion)·<code>scale</code>(4값)·<code>m_parentID</code> 를
+그린다. 즉 <strong>회전이 quaternion 원시값으로 한 번 더 편집 가능하다.</strong></p>
+<h3>2.3 엔티티 종류별 현재 동작</h3>
+<p>공간 컴포넌트 조합은 <code>Entity::AttachSpatialComponent</code>(<code>Entity.cpp:60-77</code>)가 정한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>종류</th>
+<th>Transform</th>
+<th>RectTransform</th>
+<th>지금 인스펙터가 하는 일</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>일반 · Empty</td>
+<td>있음</td>
+<td>없음</td>
+<td>Transform 드로어 1 + 일반 리플렉션 1 → <strong>헤더 2개</strong></td>
+</tr>
+<tr>
+<td>UI</td>
+<td><strong>없음</strong></td>
+<td>있음</td>
+<td>RectTransform 드로어 1, 순회에서 제외 → 1개 (정상)</td>
+</tr>
+<tr>
+<td>Canvas</td>
+<td>있음</td>
+<td>있음</td>
+<td>RectTransform 드로어 1 + Transform 일반 리플렉션 1 → <strong>Transform 의 전용 편집이 없다</strong></td>
+</tr>
+</tbody></table></div>
+<p>Canvas 가 둘 다 갖는 것은 의도된 예외다. rect 는 자식 레이아웃의 기준이고 Transform 은 월드
+공간 배치용이며, <code>CanvasRenderMode::WorldSpace</code> 경로가 그 월드 행렬을 읽는다(<code>Entity.cpp</code> 의
+<code>AttachSpatialComponent</code> 주석). 그런데 지금 인스펙터는 <code>else</code> 분기 때문에 Canvas 에서 Transform
+드로어를 <strong>부르지 않는다.</strong> 계획서의 &quot;Canvas 에서는 각각 한 번 표시한다&quot; 는 이 자리를 고치라는
+뜻이다.</p>
+<hr>
+<h2>3. 개별 활성·제거 진입점 재계수</h2>
+<p>계획서: &quot;개별 조작과 엔티티 전이를 구분해 UI·개별 활성 변경 진입점에 같은 정책을 적용한다.&quot;
+그 진입점을 셌다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>진입점</th>
+<th>자리</th>
+<th>대상</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>인스펙터 컴포넌트 체크박스</td>
+<td><code>InspectorWindow.cpp:1791</code></td>
+<td><strong>임의 컴포넌트</strong></td>
+<td>공간 컴포넌트 정책이 필요한 <strong>유일한 개별 조작 진입점</strong></td>
+</tr>
+<tr>
+<td>엔티티 활성 전이</td>
+<td><code>Entity.cpp:554</code> (<code>Entity::SetEnabled</code> → 각 컴포넌트)</td>
+<td>모든 컴포넌트·자식</td>
+<td><strong>막으면 안 된다</strong> — 계획서가 명시적으로 금지</td>
+</tr>
+<tr>
+<td>C# 스크립트 활성</td>
+<td><code>ClrHost.cpp:458</code> (<code>Api_Script_SetEnabled</code>)</td>
+<td><code>ScriptComponent</code> 한정</td>
+<td>대상이 고정이라 무관</td>
+</tr>
+<tr>
+<td>C# 엔티티 활성</td>
+<td><code>ClrHost.cpp:429</code> (<code>Api_Entity_SetEnabled</code>)</td>
+<td>엔티티 전체</td>
+<td>엔티티 전이라 무관</td>
+</tr>
+<tr>
+<td>CLI</td>
+<td><code>ConsoleCommandSystem.cpp:2262·3612·3618</code></td>
+<td>MeshRenderer·Animator 한정</td>
+<td>대상이 고정이라 무관</td>
+</tr>
+<tr>
+<td>역직렬화·생성 시 강제 활성</td>
+<td><code>CameraComponent.h:18</code> · <code>LightComponent.h:38</code> · <code>MeshRenderer.cpp:516</code> · <code>FoliageComponent.cpp:428</code> · <code>ModelSceneInstantiation.cpp</code> 3곳</td>
+<td>각자 고정</td>
+<td>공간 컴포넌트를 건드리지 않음</td>
+</tr>
+</tbody></table></div>
+<p><strong>정책을 적용할 자리는 하나다.</strong> 나머지는 대상 타입이 이미 고정돼 있어 공간 컴포넌트에 닿지
+않는다. 계획서가 경고한 &quot;공용 <code>SetEnabled(false)</code> 를 무조건 거부하는 구현&quot;은 <code>Entity.cpp:554</code>
+를 막는 구현이고, 그 줄은 엔티티 전이의 전파 경로다.</p>
+<p><strong>제거 쪽은 이미 서 있다.</strong> <code>EditorObjectOperations.cpp:497</code> 이
+<code>dynamic_cast&lt;::Transform*&gt; || dynamic_cast&lt;RectTransformComponent*&gt;</code> 로 공간 컴포넌트 제거를
+거부한다. W2-I1 은 이 거부를 재구현하지 않고 그대로 쓴다.</p>
+<hr>
+<h2>4. 폭 계산과 전환 조건 — 정본 계약</h2>
+<p>I0 의 완료 기준은 &quot;폭 계산·정책이 한 정본을 소비하고 전환 조건이 고정됨&quot; 이다. 아래가 그
+고정이다. 구현은 <code>EditorPropertyRow</code> 의 배치 책임을 넓혀 담고, 새 입력 체계나 매크로 선언을
+만들지 않는다(계획서 계약 1).</p>
+<h3>4.1 폭의 출처는 하나다</h3>
+<p>가용 폭은 <strong><code>ImGui::GetContentRegionAvail().x</code></strong> 하나만 읽는다. 지금 <code>InspectorWindow.cpp</code> 는
+<code>GetWindowSize()</code> 를 한 번, <code>GetContentRegionAvail()</code> 을 두 번 쓴다. 둘은 스크롤바 폭만큼 다르고,
+<code>Add Component</code> 버튼이 <code>GetWindowSize().x</code> 로 중앙을 잡아 스크롤바가 선 폭에서 오른쪽으로 밀린다.
+화면에서 그 버튼의 라벨이 잘리는 것으로 보인다.</p>
+<p>창 전체 폭이나 GPU 타깃 크기를 배치 기준으로 쓰지 않는다.</p>
+<h3>4.2 열 구성</h3>
+<pre><code>[ 라벨 열 ][ gap ][ 값 열 ..................... ][ gap ][ 보조 버튼 예약 ]
+</code></pre>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>양</th>
+<th>정의</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>label_max</code></td>
+<td><code>ThemePixels(160)</code> — 라벨 열의 <strong>상한</strong>. 남는 폭은 값 열이 가져간다</td>
+</tr>
+<tr>
+<td><code>label_ratio</code></td>
+<td>가용 폭의 <code>0.40</code> — 상한에 닿기 전까지의 비율</td>
+</tr>
+<tr>
+<td><code>label_min</code></td>
+<td><code>CalcTextSize(&quot;MMMMM...&quot;).x</code> — 말줄임 뒤 최소 판독 폭</td>
+</tr>
+<tr>
+<td><code>value_min</code></td>
+<td><code>CalcTextSize(&quot;-0000.000&quot;).x + FramePadding.x * 2</code> — 대표 최악 문자열</td>
+</tr>
+<tr>
+<td><code>aux_reserve</code></td>
+<td>보조 버튼이 있는 줄만 <code>GetFrameHeight()</code> × 버튼 수</td>
+</tr>
+<tr>
+<td><code>gap</code></td>
+<td><code>ThemePixels(EditorThemeTokens::ItemGapX)</code></td>
+</tr>
+</tbody></table></div>
+<p><code>value_min</code> 을 <strong>현재 값이 아니라 고정 대표 문자열</strong>로 재는 것이 핵심이다. 계획서가 &quot;현재 숫자
+값이나 매 프레임 라벨 최대값 변화로 열과 모드가 흔들리지 않게 한다&quot; 고 한 자리다. 같은 이유로
+<code>label_max</code> 도 실제 라벨 길이의 최대값을 매 프레임 다시 재어 정하지 않는다.</p>
+<p>치수는 전부 W1 의 <code>ThemePixels</code> 를 <strong>한 번만</strong> 통과한다. 폰트에서 재는 값(<code>CalcTextSize</code>)은
+이미 배율이 반영돼 있으므로 다시 곱하지 않는다.</p>
+<h3>4.3 전환 조건</h3>
+<p>세 모드를 둔다. 조건은 가용 폭 <code>W</code> 에 대해 판정한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>모드</th>
+<th>조건</th>
+<th>배치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Inline</code></td>
+<td><code>W - label_col - gap - aux ≥ value_min</code></td>
+<td>라벨 왼쪽, 값 오른쪽 (기본)</td>
+</tr>
+<tr>
+<td><code>Stacked</code></td>
+<td>위가 거짓</td>
+<td>라벨 한 줄, 값 다음 줄</td>
+</tr>
+<tr>
+<td>축 <code>AxisStacked</code></td>
+<td>축 슬롯 하나가 <code>badge_w + value_min</code> 미만</td>
+<td>X·Y·Z 를 세로로</td>
+</tr>
+</tbody></table></div>
+<p>축 판정은 값 열을 셋으로 나눈 뒤에 한다. 축 슬롯 = <code>(value_col - gap × 2) / 3</code>.</p>
+<p><strong>완충 폭을 둔다.</strong> 전환한 모드에서 되돌아오려면 임계값보다 <code>ThemePixels(ItemGapX)</code> 만큼 더
+넓어져야 한다. 경계에서 한 픽셀 왕복이 모드를 진동시키면 열 위치가 매 프레임 바뀐다.</p>
+<p><strong>편집 중에는 전환을 보류한다.</strong> <code>ImGui::IsAnyItemActive()</code> 가 참인 동안 직전 모드를 유지하고,
+편집이 끝난 프레임에 다시 판정한다. 드래그 중에 값 칸이 다른 줄로 이동하면 드래그가 끊긴다.</p>
+<h3>4.4 ID 는 배치를 모른다</h3>
+<p>ID 씨앗은 엔티티·컴포넌트 인스턴스·필드·축의 안정 신원이다. 열 위치, 표시 라벨, 모드
+(<code>Inline</code>/<code>Stacked</code>/<code>AxisStacked</code>)는 ID 에 들어가지 않는다. 이미 선 규약이 둘 있다 —
+<code>EditorPropertyRow</code> 의 필드 ID 는 열 인덱스로 고정한 표이고 <code>EditorAxisField3</code> 의 것은 축마다
+고정이다. 모드 전환으로 이 값이 달라지지 않는다.</p>
+<h3>4.5 넘침 처리</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>종류</th>
+<th>처리</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>긴 라벨</td>
+<td>말줄임 + 전체 이름 tooltip. 지금은 <code>m_nearPlane</code> 이 그냥 잘린다</td>
+</tr>
+<tr>
+<td>설명·읽기 전용 경로</td>
+<td>줄바꿈</td>
+</tr>
+<tr>
+<td>편집 문자열</td>
+<td>표준 입력칸의 탐색·스크롤 유지. 보조 버튼이 밖으로 밀리지 않게 폭을 먼저 예약</td>
+</tr>
+<tr>
+<td>세로</td>
+<td>스크롤. 높이가 남아도 행 간격을 늘려 채우지 않는다</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2>4.6 배치만으로는 리플렉션 경로가 전용 드로어를 대신하지 못한다</h2>
+<p><strong>이 절은 첫 판 이후에 더했다.</strong> §4 가 폭과 열 전환만 정해 두었는데, 그것만으로는
+&quot;리플렉션이 그리는 컴포넌트를 볼 만하게 만들려면 결국 컴포넌트마다 전용 창구를 하나씩
+만들어야 하지 않느냐&quot; 는 물음에 답이 되지 않는다. 실제로 저장소가 걸어온 길이 그쪽이고,
+그래서 전용 드로어가 3,244줄 쌓였다. 아래가 그 물음에 대한 답이다.</p>
+<h3>4.6.1 갈리는 것은 테마가 아니다</h3>
+<p>색과 치수는 <code>ImGuiStyle</code> 이 전역으로 입힌다. 리플렉션 경로도 이미 같은 테마를 쓰고 있고,
+화면에서 두 경로의 색·프레임 모양은 같다. 전용 드로어가 생겨난 이유는 테마가 아니라 셋이다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>축</th>
+<th>지금 상태</th>
+<th>전용 드로어 없이 풀 수 있나</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>배치</strong> — 라벨 방향, 열 정렬, 폭</td>
+<td>기본 렌더는 라벨 왼쪽, 리플렉션은 오른쪽</td>
+<td>풀 수 있다. §4 의 공통 계층을 리플렉션 경로가 소비하면 된다</td>
+</tr>
+<tr>
+<td><strong>의미</strong> — 표시 이름, 범위, 숨김</td>
+<td>아래 실측대로 <strong>거의 비어 있다</strong></td>
+<td>풀 수 있다. 단 §4 의 범위 밖이라 이 절에서 정한다</td>
+</tr>
+<tr>
+<td><strong>편집 의미</strong> — 쿼터니언↔오일러, 앵커 프리셋, 에셋 참조 선택</td>
+<td>전용 드로어가 든다</td>
+<td><strong>풀 수 없다.</strong> 여기는 전용으로 남는다</td>
+</tr>
+</tbody></table></div>
+<h3>4.6.2 의미 축의 실측</h3>
+<p><code>MetaSchema.h</code> 에 멤버 속성 셋이 있다 — <code>display_name_attr</code>, <code>range_attr&lt;V&gt;</code>, <code>units_attr</code>.
+<code>ReflectionTypedDraw.h:170-180</code> 이 앞의 둘을 소비한다. 그런데 선언 쪽이 비어 있다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>속성</th>
+<th align="right">선언</th>
+<th>소비</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>display_name_attr</code></td>
+<td align="right"><strong>0</strong></td>
+<td>있음</td>
+<td>소비만 있고 생산이 0. 라벨은 언제나 원시 필드명이다</td>
+</tr>
+<tr>
+<td><code>range_attr&lt;float&gt;</code></td>
+<td align="right">3</td>
+<td>있음</td>
+<td>셋 다 <code>BoxColliderComponent.h</code> 한 파일</td>
+</tr>
+<tr>
+<td><code>units_attr</code></td>
+<td align="right"><strong>0</strong></td>
+<td><strong>없음</strong></td>
+<td>양쪽 다 0. 죽은 속성</td>
+</tr>
+</tbody></table></div>
+<p>숨김·읽기 전용 속성은 <strong>아예 없다.</strong> 인스펙터에서 필드를 거르는 규칙은
+<code>ReflectionTypedDraw.h:159</code> 의 <code>std::strcmp(name, &quot;m_isEnabled&quot;) == 0</code> 하나뿐이고 문자열
+비교다. 그래서 <code>m_name</code>·<code>m_parentID</code> 같은 내부 필드가 그대로 화면에 나온다 — 실제로 나온다.</p>
+<p>전체 규모는 <strong>필드 416개 · 타입 77개</strong>이고 그중 <strong>181개가 <code>m_</code> 접두</strong>다.</p>
+<h3>4.6.3 그래서 이렇게 푼다</h3>
+<p><strong>컴포넌트마다 전용 창구를 만들지 않는다.</strong> 그 길은 컴포넌트를 하나 더할 때마다 드로어를
+하나 더하게 만들고, 이미 그렇게 쌓인 것이 §1.1 의 3,244줄이다. 대신 축마다 다르게 푼다.</p>
+<p><strong>① 배치는 공통 계층이 든다.</strong> 계획서 계약 1 의 &quot;배치와 값 편집을 분리한다&quot; 가 이것이다.
+<code>ReflectionTypedDraw.h</code> 의 각 타입 분기는 값 편집만 남기고, 라벨 열·값 열·줄 전환은 §4 의
+계층에서 받는다. 이 하나로 리플렉션이 그리는 <strong>모든</strong> 컴포넌트가 기본 렌더와 같은 열에 선다.
+전용 드로어를 하나도 더 만들지 않고 얻는다.</p>
+<p><strong>② 이름은 규칙으로 유도하고 속성은 예외에만 붙인다.</strong> 416개 필드에 손으로 <code>displayName</code> 을
+붙이는 길은 택하지 않는다. 분량도 분량이지만 붙이지 않은 필드가 조용히 원시 이름으로 나오는
+것을 막을 수단이 없다 — 지금 선언이 0건인 이유가 그것이다. 드로어가 식별자에서 표시 이름을
+유도한다.</p>
+<pre><code>m_nearPlane  → &quot;Near Plane&quot;
+m_isPrimary  → &quot;Is Primary&quot;
+position     → &quot;Position&quot;
+</code></pre>
+<p>규칙은 <code>display_label(identifier)</code> 한 자리에 두고, <code>m_</code> 접두 제거 · camelCase 분리 ·
+첫 글자 대문자 · 연속 대문자 보존(<code>m_fov</code> → &quot;FOV&quot; 는 예외 표로)만 한다. 유도가 틀리는 자리에
+<code>meta::displayName</code> 을 붙인다 — 그때는 속성이 <strong>예외 표기</strong>라 안 붙은 필드가 기본값으로 잘
+나온다. 규칙 자체는 검사가 대표 입력 몇 개로 단정한다.</p>
+<p><strong>③ 숨김 속성을 더한다.</strong> <code>m_isEnabled</code> 문자열 비교를 속성으로 옮기고, 내부 전용 필드에 붙인다.
+<strong>기본은 &quot;보임&quot; 이다.</strong> 반대로 두면 새 필드가 인스펙터에서 조용히 사라지고, 그 사라짐은 빌드도
+검사도 붉게 만들지 않는다. 이 저장소가 이미 겪은 실패 양식이다.</p>
+<p><strong>④ 전용 드로어는 편집 의미가 진짜 다른 것만 남긴다.</strong> 쿼터니언을 오일러로 보여 주는 것,
+앵커 프리셋 팝업, 에셋 참조 선택이 그것이다. 이들도 헤더와 배치는 공통 계층이 들고 본문만
+그린다(계획서 W2-I1 의 &quot;공통 헤더 / 전용 본문 분리&quot;). 이름이 읽히고 배치가 맞는다고 해서
+쿼터니언 4칸이 좋은 편집기가 되지는 않으므로, 이 축은 줄이는 것이 목표가 아니다.</p>
+<h3>4.6.4 이 절이 계획서를 넘는 부분</h3>
+<p>계획서 W2-I 의 여섯 계약은 <strong>배치</strong> 축만 다룬다. 의미 축(표시 이름·숨김·범위)은 계획서에
+없고, 그것이 비어 있다는 사실도 적혀 있지 않다. W2-I3 의 &quot;일반 리플렉션·중첩 필드·공유
+드로어 이관 1일&quot; 은 배치 이관만 센 값이다.</p>
+<p>의미 축을 같은 슬라이스에 넣으면 I3 은 1일이 아니다. §5 에서 다시 잰다.</p>
+<h2>5. 공수 재계수</h2>
+<p>계획서는 I0 에서 재계수하고 &quot;초기 추정이 달라지면 본문과 대시보드의 공수를 함께 갱신한다&quot; 고
+정했다. 계수 결과 <strong>둘을 조정하고 넷은 유지한다.</strong></p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>단계</th>
+<th align="right">계획서</th>
+<th align="right">재계수</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>W2-I0</td>
+<td align="right">0.5일</td>
+<td align="right">0.5일 (소진)</td>
+<td>이 문서</td>
+</tr>
+<tr>
+<td>W2-I1</td>
+<td align="right">1일</td>
+<td align="right">1일</td>
+<td>중복은 한 자리(<code>:1756</code> 의 제외 조건)에서 갈린다. 제거 거부는 이미 서 있다</td>
+</tr>
+<tr>
+<td>W2-I2</td>
+<td align="right">1일</td>
+<td align="right">1일</td>
+<td>대상 셋, 그중 RectTransform 의 표는 이미 <code>EditorPropertyRow</code> 위에 있다</td>
+</tr>
+<tr>
+<td>W2-I3</td>
+<td align="right">1일</td>
+<td align="right"><strong>2.5일</strong></td>
+<td>배치 이관은 한 파일(499줄)이라 1일이다. §4.6 의 의미 축(표시 이름 유도·숨김 속성·죽은 <code>units_attr</code> 처리)이 416필드·77타입에 걸쳐 +1.5일</td>
+</tr>
+<tr>
+<td>W2-I4</td>
+<td align="right">1.5일</td>
+<td align="right"><strong>2.5일</strong></td>
+<td>전용 드로어 3,244줄 중 <code>SoundComponent</code> 한 드로어가 836줄이고 고정 폭·중첩 묶음이 가장 많다</td>
+</tr>
+<tr>
+<td>W2-I5</td>
+<td align="right">1일</td>
+<td align="right"><strong>1.5일</strong></td>
+<td>검증 행렬이 폭 4단 × 배율 4단 × 엔티티 4종이고, 변이 주입 항목이 넷이다</td>
+</tr>
+<tr>
+<td><strong>합</strong></td>
+<td align="right"><strong>6일</strong></td>
+<td align="right"><strong>9일</strong></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<p>I4 의 증가분이 대부분 <code>SoundComponent</code> 한 드로어다. 이 드로어만 별도 슬라이스로 떼는 선택지도
+있으나, 계획서가 &quot;일반 리플렉션만 바꾸고 전용 드로어를 남겨 두면 전체 이관 완료로 세지
+않는다&quot; 고 했으므로 I4 안에 둔다.</p>
+<p>I3 의 증가분은 성질이 다르다 — 계획서에 <strong>없던 축</strong>이다(§4.6.4). 배치만 이관하고 의미 축을
+남기면 리플렉션이 그리는 컴포넌트는 열은 맞되 이름이 <code>m_nearPlane</code> 인 채로 남는다. 그 상태를
+&quot;공통 규칙을 사용한다&quot; 로 판정하면, 남은 차이를 메우려고 컴포넌트마다 전용 드로어를 만드는
+길이 다시 열린다. 그래서 같은 슬라이스에 둔다.</p>
+<p><strong>의미 축을 W2-I 밖의 별도 슬라이스로 빼는 선택지도 있다.</strong> 그 경우 W2-I 는 6일 + I4·I5 조정분
+으로 7.5일이 되고, 의미 축 1.5일이 별도로 선다. 어느 쪽이든 총량은 같다.</p>
+<hr>
+<h2>6. 착수 순서와 걸림돌</h2>
+<p>I1 부터는 <code>InspectorWindow.cpp</code>·<code>ReflectionTypedDraw.h</code>·<code>ImGuiDrawHelper*.cpp</code> 를 고쳐야 한다.
+이 글을 쓰는 시점에 <strong>다른 세션이 그 파일들을 미커밋으로 들고 있다</strong>(아이콘을 Material Symbols
+로 바꾸는 작업, 작업 트리에 64개 파일). 같은 파일을 두 세션이 동시에 고치면 한쪽이 사라진다.
+I0 은 새 파일 하나라 충돌하지 않지만, I1 착수는 그 세션이 커밋한 뒤로 미룬다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-인스펙터-렌더-경로-전수"></span><span id="11-전용-드로어의-실제-분량"></span><span id="12-죽어-있는-분기-하나"></span><span id="2-transform-이-두-번-그려진다"></span><span id="21-소스"></span><span id="22-화면"></span><span id="23-엔티티-종류별-현재-동작"></span><span id="3-개별-활성제거-진입점-재계수"></span><span id="4-폭-계산과-전환-조건--정본-계약"></span><span id="41-폭의-출처는-하나다"></span><span id="42-열-구성"></span><span id="43-전환-조건"></span><span id="44-id-는-배치를-모른다"></span><span id="45-넘침-처리"></span><span id="46-배치만으로는-리플렉션-경로가-전용-드로어를-대신하지-못한다"></span><span id="461-갈리는-것은-테마가-아니다"></span><span id="462-의미-축의-실측"></span><span id="463-그래서-이렇게-푼다"></span><span id="464-이-절이-계획서를-넘는-부분"></span><span id="5-공수-재계수"></span><span id="6-착수-순서와-걸림돌"></span><span id="sec-1-인스펙터-렌더-경로-전수"></span><span id="sec-2-transform-이-두-번-그려진다"></span><span id="sec-3-개별-활성제거-진입점-재계수"></span><span id="sec-4-폭-계산과-전환-조건--정본-계약"></span><span id="sec-46-배치만으로는-리플렉션-경로가-전용-드로어를-대신하지-못한다"></span><span id="sec-5-공수-재계수"></span><span id="sec-6-착수-순서와-걸림돌"></span></details></main></body></html>

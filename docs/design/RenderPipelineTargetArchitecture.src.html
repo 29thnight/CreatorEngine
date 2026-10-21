@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Render Pipeline — C++ Pass 확장과 실행 경계</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderPipelineTargetArchitecture.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/RenderPipelineTargetArchitecture.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Render Pipeline — C++ Pass 확장과 실행 경계</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+<li>구 SRP 및 C# pipeline 저작 전환 제안은 취소됐다. 필요한 Pass는 현재 C++ 계약으로 작성하며, 별도 저작 체계는 실제 요구가 생기면 새 미래 계획으로 검토한다. 아래 원래 제안은 활성 계획이 아니다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<blockquote>
+<p>2026-10-20 사용자 결정: 구 SRP 및 C# Pipeline 저작 전환을 취소했다. 필요한 기능은 기존 C++ Pass 경로로 작성한다. 별도 저작 체계는 구체적인 필요가 생길 때 미래 계획으로 다시 검토한다.</p>
+</blockquote>
+<p><a href="../plans/RenderGraphDependencySchedulingPlan.html">현재 렌더 그래프 잔여</a> · <a href="../plans/MasterPlanAudit20261020.html#cancelled-srp">취소 범위와 전체 문서 대조</a></p>
+<h2>유지하는 실행 경계</h2>
+<p>C++ Pass는 기존 LivePipelineDesc와 sealed frame 입력을 소비한다. EnhancedRenderGraph가 리소스 버전·DAG·수명·배리어·기록 스케줄을 소유하고 RHI가 backend 제출을 수행한다. EnhancedSceneRenderer의 멀티뷰·in-flight·완료/표시 승격 수명은 유지한다.</p>
+<h2>제거한 목표</h2>
+<p>C# RenderPipeline.Build, Roslyn Pipeline builder, authored Pipeline Asset 전환과 고정 C++ 조립 제거는 실행 계획이 아니다. 기존 compiled graph viewer는 읽기 전용 진단으로 유지한다.</p>
+<details><summary>이전 절 링크</summary>
+
+<p><span id="passschema와-c-표면"></span>
+<span id="sec-passschema와-c-표면"></span>
+<span id="sec-단계와-완료-증거"></span>
+<span id="sec-리소스-의미와-순서"></span>
+<span id="sec-무엇을-대체하는가"></span>
+<span id="sec-책임-경계"></span>
+<span id="단계와-완료-증거"></span>
+<span id="리소스-의미와-순서"></span>
+<span id="무엇을-대체하는가"></span>
+<span id="이전-srp-계획과의-비교"></span>
+<span id="책임-경계"></span></p>
+</details>
+
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-유지하는-실행-경계"></span><span id="sec-제거한-목표"></span><span id="유지하는-실행-경계"></span><span id="제거한-목표"></span></details></main></body></html>

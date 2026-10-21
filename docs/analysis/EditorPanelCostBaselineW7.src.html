@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>W7-0 패널 비용 기준선 (2026-09-14)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorPanelCostBaselineW7.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorPanelCostBaselineW7.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>W7-0 패널 비용 기준선 (2026-09-14)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-panel-cost.ps1#L66">Tools/regression/measure-panel-cost.ps1:66</a> — <code>$script:assetsRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../../Dynamic_CPP/Assets&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-panel-cost.ps1#L96">Tools/regression/measure-panel-cost.ps1:96</a> — <code>$assetName = &#39;W7ScaleAssets_&#39; + [guid]::NewGuid().ToString(&#39;N&#39;).Substring(0, 8)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-panel-cost.ps1#L128">Tools/regression/measure-panel-cost.ps1:128</a> — <code>if ($WithAssets) { $lines.Add(&quot;editor.browser go $assetName&quot;); $lines.Add(&#39;wait 120&#39;) }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hierarchy-flatten-contract.ps1#L94">Tools/regression/verify-hierarchy-flatten-contract.ps1:94</a> — <code>Remove-CodeNoise ([IO.File]::ReadAllText($full))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hierarchy-flatten-contract.ps1#L109">Tools/regression/verify-hierarchy-flatten-contract.ps1:109</a> — <code>$m = [regex]::Match($code, $pattern)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hierarchy-flatten-contract.ps1#L130">Tools/regression/verify-hierarchy-flatten-contract.ps1:130</a> — <code>$m = [regex]::Match($line, &#39;^(?&lt;type&gt;.+?)\s+(?&lt;name&gt;[A-Za-z_]\w*)$&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetBundle.h#L5">Engine/RenderEngine/AssetBundle.h:5</a> — <code>struct [[reflgen::reflect]] AssetBundle</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetBundle.h#L8">Engine/RenderEngine/AssetBundle.h:8</a> — <code>AssetBundle() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/AssetBundle.h#L9">Engine/RenderEngine/AssetBundle.h:9</a> — <code>AssetBundle(const std::string&amp; name, const file::path&amp; path)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.h#L22">Editor/EngineGUIWindow/ContentsBrowserWindow.h:22</a> — <code>class ContentsBrowserWindow</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.h#L24">Editor/EngineGUIWindow/ContentsBrowserWindow.h:24</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.h#L40">Editor/EngineGUIWindow/ContentsBrowserWindow.h:40</a> — <code>enum class CreateKind : std::uint8_t { folder, render_profile, SoundGraph, SoundPreset };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BrowserDirectorySnapshot.h#L42">Editor/EngineGUIWindow/BrowserDirectorySnapshot.h:42</a> — <code>struct browser_directory_entry</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BrowserDirectorySnapshot.h#L60">Editor/EngineGUIWindow/BrowserDirectorySnapshot.h:60</a> — <code>struct browser_directory_listing</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/BrowserDirectorySnapshot.h#L67">Editor/EngineGUIWindow/BrowserDirectorySnapshot.h:67</a> — <code>struct browser_cache_stats</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.cpp#L843">Editor/EngineGUIWindow/ContentsBrowserWindow.cpp:843</a> — <code>editor::windows::add_panel_units(editor::windows::panel_cost_slot::browser_tree, 1);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.cpp#L945">Editor/EngineGUIWindow/ContentsBrowserWindow.cpp:945</a> — <code>editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_tree,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ContentsBrowserWindow.cpp#L1331">Editor/EngineGUIWindow/ContentsBrowserWindow.cpp:1331</a> — <code>required += ImGui::CalcTextSize(i == 0 ? &quot;Assets&quot; : browser_utf8(chain[i].filename()).c_str()).x</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>PHASE 21 W7 의 완료 기준은 <em>&quot;p95 CPU·allocation 개선 수치를 기록한다. 캐시만 추가하고
+실측 이득이 없으면 제거한다&quot;</em> 다. 이 문서가 그 <strong>대조군</strong>이다. 캐시가 들어가기 전의
+수치이고, 뒤에 오는 W7-1&#126;W7-3 은 이 표와 맞대어 증명한다.</p>
+<p>측정 도구는 <code>Tools/regression/measure-panel-cost.ps1</code> 이고 관측 창구는
+<code>editor.panelcost</code> 다. 둘 다 <code>f7edc952</code> 에서 섰다.</p>
+<h2>잰 조건</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>구성</td>
+<td><strong>Release</strong> (<code>Bin/x64-Release/Editor/CreatorEditor.exe</code>, 커밋 <code>f7edc952</code>)</td>
+</tr>
+<tr>
+<td>창</td>
+<td>2400x1400</td>
+</tr>
+<tr>
+<td>씬</td>
+<td><code>scene.new</code> + <code>scene.populate &lt;N&gt; 0</code> — 루트 아래 평평한 목록</td>
+</tr>
+<tr>
+<td>표본</td>
+<td>슬롯마다 512 프레임(링 용량 가득)</td>
+</tr>
+<tr>
+<td>브라우저</td>
+<td>프로젝트 <code>Assets</code> 실물. 열린 폴더 24 개 · 현재 폴더 파일 23 개</td>
+</tr>
+</tbody></table></div>
+<p>Release 로만 잰다. Debug 로 재면 CPU 비용이 재려는 축을 덮는다 — 같은 날
+해상도 축에서 그 함정을 밟았다([perf-measure-release-only]).</p>
+<p>fixture 는 저작 <code>.creator</code> 가 아니라 <code>Scene::CreateEntity</code>(= <code>object.create</code> 가 타는
+그 함수)로 만들고, 만든 직후 <code>scene.hierarchycheck</code> 가 초록인 것을 확인한 뒤에만
+수치를 읽는다.</p>
+<h2>기준선</h2>
+<h3>Hierarchy</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th align="right">lastMs</th>
+<th align="right">avgMs</th>
+<th align="right"><strong>p95Ms</strong></th>
+<th align="right">maxMs</th>
+<th align="right">units(그린 행)</th>
+<th align="right">scans</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td align="right">0.777</td>
+<td align="right">0.799</td>
+<td align="right"><strong>1.214</strong></td>
+<td align="right">5.157</td>
+<td align="right">1,000</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td align="right">10,000</td>
+<td align="right">6.016</td>
+<td align="right">6.960</td>
+<td align="right"><strong>10.330</strong></td>
+<td align="right">20.034</td>
+<td align="right">10,000</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td align="right">26.657</td>
+<td align="right">25.920</td>
+<td align="right"><strong>33.270</strong></td>
+<td align="right">54.915</td>
+<td align="right">50,000</td>
+<td align="right">0</td>
+</tr>
+</tbody></table></div>
+<p><code>units</code> 가 엔티티 수와 <strong>정확히 같다.</strong> 화면에 50 줄쯤 보이는데 50,000 줄을 다
+그린다는 뜻이다. 행당 약 0.52 µs 로 선형이고, 50k 의 p95 33.3 ms 는 Hierarchy
+하나가 에디터를 30 fps 로 묶는다는 뜻이다.</p>
+<h3>Content Browser — 폴더 트리</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th align="right">lastMs</th>
+<th align="right">avgMs</th>
+<th align="right"><strong>p95Ms</strong></th>
+<th align="right">maxMs</th>
+<th align="right">units(노드)</th>
+<th align="right"><strong>scans</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td align="right">7.456</td>
+<td align="right">4.603</td>
+<td align="right"><strong>7.563</strong></td>
+<td align="right">29.751</td>
+<td align="right">24</td>
+<td align="right"><strong>24</strong></td>
+</tr>
+<tr>
+<td align="right">10,000</td>
+<td align="right">2.921</td>
+<td align="right">4.309</td>
+<td align="right"><strong>6.829</strong></td>
+<td align="right">15.688</td>
+<td align="right">24</td>
+<td align="right"><strong>24</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td align="right">2.717</td>
+<td align="right">3.305</td>
+<td align="right"><strong>4.359</strong></td>
+<td align="right">8.306</td>
+<td align="right">24</td>
+<td align="right"><strong>24</strong></td>
+</tr>
+</tbody></table></div>
+<p>씬에 무엇이 들었든 <strong>상관없다.</strong> 열린 폴더 하나마다 <code>directory_iterator</code> 한 번을
+프레임마다 돌린다(<code>ContentsBrowserWindow::ShowDirectoryTree</code>). 노드 24 = 스캔 24 다.</p>
+<p><strong>엔티티 1,000 일 때 브라우저가 Hierarchy 의 5.8 배다</strong>(4.60 vs 0.80 ms). 실제
+프로젝트 규모에서 더 비싼 쪽이 이쪽이고, 그 비용은 사용자가 아무것도 하지 않아도
+계속 나간다.</p>
+<h3>Content Browser — 현재 폴더 목록</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th align="right">lastMs</th>
+<th align="right">avgMs</th>
+<th align="right">p95Ms</th>
+<th align="right">maxMs</th>
+<th align="right">units(항목)</th>
+<th align="right">scans</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td align="right">0.426</td>
+<td align="right">0.308</td>
+<td align="right">0.426</td>
+<td align="right">3.134</td>
+<td align="right">23</td>
+<td align="right">1</td>
+</tr>
+<tr>
+<td align="right">10,000</td>
+<td align="right">0.169</td>
+<td align="right">0.293</td>
+<td align="right">0.440</td>
+<td align="right">2.466</td>
+<td align="right">23</td>
+<td align="right">1</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td align="right">0.179</td>
+<td align="right">0.224</td>
+<td align="right">0.316</td>
+<td align="right">0.497</td>
+<td align="right">23</td>
+<td align="right">1</td>
+</tr>
+</tbody></table></div>
+<p>작다. 다만 그 이유는 <strong>이 폴더에 파일이 23 개뿐</strong>이기 때문이지 이 경로가 싸기
+때문이 아니다 — 여기도 매 프레임 <code>directory_iterator</code> 와 항목마다 <code>is_directory</code>
+(stat)·<code>browser_utf8</code>(문자열 할당)·정렬을 한다. 자산이 많은 폴더의 fixture 는
+W7-1 에서 따로 세운다.</p>
+<h3>fixture 생성 비용 (참고)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th align="right"><code>scene.populate</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td align="right">6.2 ms</td>
+</tr>
+<tr>
+<td align="right">10,000</td>
+<td align="right">38.7 ms</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td align="right">364.1 ms</td>
+</tr>
+</tbody></table></div>
+<h2>이 표를 읽는 법 — 시간이 아니라 <code>scans</code> 를 본다</h2>
+<p><code>browser_tree</code> 의 p95 가 7.56 → 6.83 → 4.36 으로 흔들린다. 씬이 커져서 브라우저가
+빨라진 것이 아니라 <strong>OS 파일 캐시 온도</strong>가 달라진 것이다. 파일시스템을 재는 수치는
+이렇게 흔들린다.</p>
+<p>그래서 <code>scans</code> 를 따로 센다. 시간에 노이즈가 있어도 &quot;프레임당 24 번&quot; 은 흔들리지
+않고, 캐시가 그것을 0 으로 만들었는지는 그 수로 <strong>명확히</strong> 판정된다. 시간만 재는
+계측이었다면 W7-1 의 이득을 노이즈와 구별하지 못했을 것이다.</p>
+<p>같은 이유로 <code>units</code> 를 센다. clipping 의 판정은 &quot;빨라졌다&quot; 가 아니라 <strong>&quot;그리는 행이
+보이는 행으로 줄었다&quot;</strong> 다.</p>
+<h2>계측을 세우면서 드러난 것 둘</h2>
+<p><strong>① 탭으로 겹친 창은 CLI 가 닿을 수 없었다.</strong> 처음 측정에서 브라우저 두 슬롯이
+0 이었다. Content Browser 가 <code>AssetBundle</code>·<code>ResourceCounter</code> 와 같은
+<code>dock_slot::bottom</code> 이라 탭으로 겹치고, 열려 있어도 <strong>선택되지 않으면 ImGui 가 본문을
+돌리지 않는다</strong> — 181 프레임 중 1 프레임만 잡혔다. <code>editor.windows</code> 는 표를 읽기만
+하고 여닫는 자리는 메뉴뿐이었다. <code>editor.window &lt;안정식별자&gt; &lt;open|close|focus&gt;</code> 를
+세워서 열었다.</p>
+<p><strong>② 브라우저는 자기 폭이 560 logical px 미만이면 폴더 트리를 통째로 숨긴다.</strong>
+창 1600x1400 에서는 아래 도크가 그 밑으로 떨어져 <code>browser_tree</code> 가 0 이었다. 측정
+기본 창이 2400x1400 인 것은 그래서다. 0 을 &quot;비용이 없다&quot; 로 읽지 않으려면 슬롯이
+<strong>그려지기는 했는지</strong>(<code>frames</code>)를 함께 봐야 한다.</p>
+<h2>W7-1 전후 (2026-09-15)</h2>
+<p>Browser 스냅샷 캐시(<code>BrowserDirectorySnapshot</code>)를 얹고 <strong>같은 경로에서 연달아</strong> 쟀다.
+<code>Bin/x64-Release/Editor</code> 의 바이너리를 <code>f7edc952</code> 판으로 되돌려 before 를 재고, 곧바로
+지금 판으로 바꿔 after 를 쟀다. 날짜가 다른 두 측정을 맞대지 않은 이유는 위에 적은
+대로다 — 파일시스템을 재는 시간은 OS 캐시 온도로 흔들린다.</p>
+<h3>Content Browser — 폴더 트리</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th></th>
+<th align="right">avgMs</th>
+<th align="right"><strong>p95Ms</strong></th>
+<th align="right">maxMs</th>
+<th align="right">units</th>
+<th align="right"><strong>scans</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td>before</td>
+<td align="right">3.618</td>
+<td align="right"><strong>5.132</strong></td>
+<td align="right">8.276</td>
+<td align="right">24</td>
+<td align="right"><strong>24</strong></td>
+</tr>
+<tr>
+<td align="right">1,000</td>
+<td>after</td>
+<td align="right">1.352</td>
+<td align="right"><strong>2.000</strong></td>
+<td align="right">2.512</td>
+<td align="right">24</td>
+<td align="right"><strong>0</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>before</td>
+<td align="right">3.017</td>
+<td align="right"><strong>4.164</strong></td>
+<td align="right">6.183</td>
+<td align="right">24</td>
+<td align="right"><strong>24</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>after</td>
+<td align="right">1.406</td>
+<td align="right"><strong>2.009</strong></td>
+<td align="right">3.605</td>
+<td align="right">24</td>
+<td align="right"><strong>1</strong></td>
+</tr>
+</tbody></table></div>
+<h3>Content Browser — 현재 폴더 목록</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th></th>
+<th align="right">avgMs</th>
+<th align="right"><strong>p95Ms</strong></th>
+<th align="right">maxMs</th>
+<th align="right">units</th>
+<th align="right"><strong>scans</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td>before</td>
+<td align="right">0.258</td>
+<td align="right"><strong>0.385</strong></td>
+<td align="right">1.311</td>
+<td align="right">23</td>
+<td align="right"><strong>1</strong></td>
+</tr>
+<tr>
+<td align="right">1,000</td>
+<td>after</td>
+<td align="right">0.094</td>
+<td align="right"><strong>0.141</strong></td>
+<td align="right">0.396</td>
+<td align="right">23</td>
+<td align="right"><strong>0</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>before</td>
+<td align="right">0.213</td>
+<td align="right"><strong>0.314</strong></td>
+<td align="right">1.860</td>
+<td align="right">23</td>
+<td align="right"><strong>1</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>after</td>
+<td align="right">0.088</td>
+<td align="right"><strong>0.128</strong></td>
+<td align="right">0.378</td>
+<td align="right">23</td>
+<td align="right"><strong>0</strong></td>
+</tr>
+</tbody></table></div>
+<h3>Hierarchy — 대조군(건드리지 않았다)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th></th>
+<th align="right">avgMs</th>
+<th align="right">p95Ms</th>
+<th align="right">units</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td>before</td>
+<td align="right">0.588</td>
+<td align="right">0.925</td>
+<td align="right">1,000</td>
+</tr>
+<tr>
+<td align="right">1,000</td>
+<td>after</td>
+<td align="right">0.513</td>
+<td align="right">0.865</td>
+<td align="right">1,000</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>before</td>
+<td align="right">23.711</td>
+<td align="right">32.062</td>
+<td align="right">50,000</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>after</td>
+<td align="right">22.895</td>
+<td align="right">29.025</td>
+<td align="right">50,000</td>
+</tr>
+</tbody></table></div>
+<h3>읽는 법</h3>
+<p><strong>판정은 <code>scans</code> 다.</strong> 24 → 0 이고 50k 표본에서 1 인 것은 그 프레임에 나이 1 초가
+지난 폴더 하나를 예산대로 다시 훑었다는 뜻이다 — 설계한 그대로다. 시간은
+p95 5.13 → 2.00 ms(2.6 배) · 4.16 → 2.01 ms(2.1 배)이고 목록 쪽은 0.385 → 0.141 ms
+(2.7 배)인데, <strong>이 배수는 부차적인 증거다.</strong> 같은 날 같은 자로 연달아 쟀어도
+파일시스템 시간은 흔들리고, 흔들리지 않는 것은 &quot;디스크를 몇 번 만졌는가&quot; 다.</p>
+<p><strong>Hierarchy 는 <code>units</code> 가 그대로다</strong>(1,000 / 50,000). W7-1 은 브라우저만 건드렸으므로
+이것이 맞다. 이 칸이 움직였다면 측정이 다른 것을 재고 있다는 뜻이다.</p>
+<p><strong>남은 비용의 성격이 바뀌었다.</strong> after 의 browser_tree 는 스캔 0 인데도 p95 2.0 ms 다.
+이제 그것은 syscall 이 아니라 노드 24 개의 ImGui 그리기(TreeNodeEx · 라벨 · tooltip)다.
+줄이려면 W7-3 의 clipping 이 필요하고, 폴더가 24 개뿐이라 지금은 급하지 않다.</p>
+<h2>W7-2 · W7-3 전후 (2026-09-15)</h2>
+<p><code>Bin/x64-Release/Editor</code> 의 바이너리를 W7-1 착지본(<code>e790b678</code>)으로 되돌려 before 를
+재고 곧바로 지금 판으로 바꿔 after 를 쟀다. Hierarchy 는 파일시스템을 만지지 않으니
+브라우저만큼 흔들리지는 않지만, 같은 자로 연달아 재는 규칙은 그대로 지켰다.</p>
+<h3>① W7-2 만 얹었을 때 — <strong>이득이 없다</strong></h3>
+<p>(중간 빌드로 잰 것이다. 이 판은 커밋하지 않았고, 아래 ②가 착지한 판이다.)</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th></th>
+<th align="right">avgMs</th>
+<th align="right">p95Ms</th>
+<th align="right"><strong>units</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td>before (W7-1)</td>
+<td align="right">0.448</td>
+<td align="right">0.751</td>
+<td align="right">1,000</td>
+</tr>
+<tr>
+<td align="right">1,000</td>
+<td>after (W7-2)</td>
+<td align="right">0.460</td>
+<td align="right">0.718</td>
+<td align="right">1,000</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>before (W7-1)</td>
+<td align="right">22.754</td>
+<td align="right">28.506</td>
+<td align="right">50,000</td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>after (W7-2)</td>
+<td align="right">23.213</td>
+<td align="right">28.606</td>
+<td align="right">50,000</td>
+</tr>
+</tbody></table></div>
+<p>평탄 목록만 세우고 재면 <strong>아무것도 나아지지 않는다.</strong> 당연하다 — 그리는 행이 그대로
+50,000 이고, 사라진 것은 순회 방식뿐이다(재귀 → 스택, 그리고 계층이 그대로면 순회
+자체를 건너뛴다). 그 순회는 애초에 그리기 비용에 묻히는 크기였다.</p>
+<p>W7 의 완료 기준은 <em>&quot;캐시만 추가하고 실측 이득이 없으면 제거한다&quot;</em> 다. 이 표만 보면
+W7-2 는 그 기준에 걸린다. 그래서 <strong>W7-2 는 홀로 착지시키지 않았다.</strong> 이것은 캐시가
+아니라 clipping 이 설 <strong>자리</strong>이고, 자리의 값은 그 위에 무엇이 서는지로만 매겨진다.</p>
+<h3>② W7-2 + W7-3 — 그리는 행이 보이는 행으로 떨어진다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">엔티티</th>
+<th></th>
+<th align="right">avgMs</th>
+<th align="right"><strong>p95Ms</strong></th>
+<th align="right">maxMs</th>
+<th align="right"><strong>units</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">1,000</td>
+<td>before (W7-1)</td>
+<td align="right">0.551</td>
+<td align="right"><strong>0.822</strong></td>
+<td align="right">1.591</td>
+<td align="right"><strong>1,000</strong></td>
+</tr>
+<tr>
+<td align="right">1,000</td>
+<td>after</td>
+<td align="right">0.027</td>
+<td align="right"><strong>0.037</strong></td>
+<td align="right">0.193</td>
+<td align="right"><strong>14</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>before (W7-1)</td>
+<td align="right">23.999</td>
+<td align="right"><strong>30.427</strong></td>
+<td align="right">37.820</td>
+<td align="right"><strong>50,000</strong></td>
+</tr>
+<tr>
+<td align="right">50,000</td>
+<td>after</td>
+<td align="right">0.032</td>
+<td align="right"><strong>0.041</strong></td>
+<td align="right">0.148</td>
+<td align="right"><strong>14</strong></td>
+</tr>
+</tbody></table></div>
+<p><strong>판정은 <code>units</code> 다.</strong> 50,000 → 14 이고, 1,000 에서도 14 다 — 씬이 50 배로 커져도 같은
+수다. 그리는 일이 <strong>씬 크기에서 떨어져 나와</strong> 패널 높이에만 매인다는 뜻이고, 이것이
+clipping 이 하겠다고 한 일의 전부다. p95 30.427 → 0.041 ms(742 배)는 그 결과로 따라온
+수치다. <code>before</code> 의 p95 는 세 번 재는 동안 28.5 · 29.0 · 30.4 로 흔들렸고 <code>after</code> 는
+0.034&#126;0.041 이었다 — 배수의 끝자리는 의미가 없고, <code>units</code> 는 세 번 다 정확히 14 였다.</p>
+<p><code>maxMs</code> 도 함께 본다. 50k 의 37.8 → 0.148 ms 다. 옛 경로는 <strong>매 프레임</strong> 30 ms 를
+썼으므로 최댓값이 아니라 상시값이 그랬다 — Hierarchy 하나가 에디터를 30 fps 로 묶고
+있었다.</p>
+<h3>대조군 — 브라우저는 건드리지 않았다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>슬롯</th>
+<th align="right">before avgMs</th>
+<th align="right">after avgMs</th>
+<th align="right">scans</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>browser_tree (1k)</td>
+<td align="right">1.465</td>
+<td align="right">1.354</td>
+<td align="right">0 / 0</td>
+</tr>
+<tr>
+<td>browser_tree (50k)</td>
+<td align="right">1.520</td>
+<td align="right">1.523</td>
+<td align="right">1 / 1</td>
+</tr>
+<tr>
+<td>browser_files (1k)</td>
+<td align="right">0.103</td>
+<td align="right">0.094</td>
+<td align="right">0 / 0</td>
+</tr>
+</tbody></table></div>
+<p>움직이지 않았다. 움직였다면 측정이 다른 것을 재고 있다는 뜻이다.</p>
+<h3>그림이 그대로인지는 픽셀로 확인했다</h3>
+<p>같은 fixture(<code>scene.populate 60 3</code> — 깊이 있는 트리)로 before/after 창을 각각 찍어
+전 픽셀을 맞댔다: <strong>392,888 픽셀 중 다른 픽셀 0.</strong> 들여쓰기·화살표·홀짝 띠·아이콘
+위치가 한 점도 달라지지 않았다. 들여쓰기를 <code>TreePush</code> 에서 <code>Indent</code> 로 옮기고 띠
+번호를 그리는 순서가 아니라 목록이 주게 바꾼 것이 바로 이 확인을 받기 위해서다.</p>
+<h2>다음이 겨냥하는 것</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>슬라이스</th>
+<th>이 표에서 붉어져야 할 칸</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&#126;&#126;W7-1 Browser 스냅샷&#126;&#126;</td>
+<td><strong>착지(2026-09-15)</strong> — <code>browser_tree.scans</code> 24 → 0, <code>browser_files.scans</code> 1 → 0</td>
+</tr>
+<tr>
+<td>&#126;&#126;W7-2 flatten cache&#126;&#126;</td>
+<td><strong>착지(2026-09-15)</strong> — 홀로는 이득 0. W7-3 과 함께만 뜻이 있다</td>
+</tr>
+<tr>
+<td>&#126;&#126;W7-3 clipping&#126;&#126;</td>
+<td><strong>착지(2026-09-15)</strong> — <code>hierarchy.units</code> 50,000 → 14, p95 30.4 → 0.041 ms</td>
+</tr>
+<tr>
+<td>&#126;&#126;W7-4 정본 불변식 source gate&#126;&#126;</td>
+<td><strong>착지(2026-09-15)</strong> — <code>verify-hierarchy-flatten-contract.ps1</code>, 72 단정 · 변이 12 종</td>
+</tr>
+<tr>
+<td>W7 비동기 썸네일</td>
+<td>별도 산정. 아이콘 → 썸네일, 무효화/예산/퇴출/늦은 완료</td>
+</tr>
+</tbody></table></div>
+<p>남은 비용의 성격도 다시 바뀌었다. 이제 Hierarchy 의 0.04 ms 는 <strong>보이는 14 줄</strong>의
+비용이고, 씬을 더 키워도 이 수는 오르지 않는다. 다음에 붉어질 칸은 브라우저의
+<code>browser_tree</code> p95 2 ms(노드 24 개의 ImGui 그리기)이지 Hierarchy 가 아니다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="content-browser--폴더-트리"></span><span id="content-browser--폴더-트리-1"></span><span id="content-browser--현재-폴더-목록"></span><span id="content-browser--현재-폴더-목록-1"></span><span id="fixture-생성-비용-참고"></span><span id="hierarchy"></span><span id="hierarchy--대조군건드리지-않았다"></span><span id="sec-w7-1-전후-2026-09-15"></span><span id="sec-w7-2--w7-3-전후-2026-09-15"></span><span id="sec-계측을-세우면서-드러난-것-둘"></span><span id="sec-기준선"></span><span id="sec-다음이-겨냥하는-것"></span><span id="sec-이-표를-읽는-법--시간이-아니라-scans-를-본다"></span><span id="sec-잰-조건"></span><span id="w7-1-전후-2026-09-15"></span><span id="w7-2--w7-3-전후-2026-09-15"></span><span id="①-w7-2-만-얹었을-때--이득이-없다"></span><span id="②-w7-2--w7-3--그리는-행이-보이는-행으로-떨어진다"></span><span id="계측을-세우면서-드러난-것-둘"></span><span id="그림이-그대로인지는-픽셀로-확인했다"></span><span id="기준선"></span><span id="다음이-겨냥하는-것"></span><span id="대조군--브라우저는-건드리지-않았다"></span><span id="이-표를-읽는-법--시간이-아니라-scans-를-본다"></span><span id="읽는-법"></span><span id="잰-조건"></span></details></main></body></html>

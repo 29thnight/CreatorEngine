@@ -1,5 +1,43 @@
 # PHASE 12 — 자동 처리 Inspector 실제 입력 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/ImageComponent.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L14) — `class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent, UIComponent>`
+- [Engine/SceneRuntime/ImageComponent.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L19) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/ImageComponent.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.h#L21) — `UIComponent::gc_trace(tracer);`
+- [Engine/SceneRuntime/SpriteRenderer.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L11) — `class [[reflgen::reflect]] SpriteRenderer : public meta::identity<SpriteRenderer, Component>`
+- [Engine/SceneRuntime/SpriteRenderer.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L16) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/SpriteRenderer.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.h#L18) — `Component::gc_trace(tracer);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/SceneRuntime/ImageComponent.cpp:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L19) — `ImageComponent::ImageComponent()`
+- [Engine/SceneRuntime/ImageComponent.cpp:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L24) — `bool ImageComponent::ReplaceTextureOwner(const Texture* previous,`
+- [Engine/SceneRuntime/ImageComponent.cpp:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ImageComponent.cpp#L25) — `const own::shared_owner<const Texture>& replacement)`
+- [Engine/SceneRuntime/SpriteRenderer.cpp:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.cpp#L9) — `void SpriteRenderer::OnInitialized()`
+- [Engine/SceneRuntime/SpriteRenderer.cpp:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.cpp#L20) — `void SpriteRenderer::OnAddedToScene()`
+- [Engine/SceneRuntime/SpriteRenderer.cpp:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SpriteRenderer.cpp#L31) — `void SpriteRenderer::OnRemovingFromScene()`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 기준일: 2026-10-10 KST. [TexturePipelinePlan](../plans/TexturePipelinePlan.md) §16 후속.
 작은 격리 프로젝트 `Build/TAUI-Debug-534117b3/Project`에서 현재 Debug Editor를 실행했다.
 runtime DLL SHA-256: `4F776088C80F6B3275536526AB374736FA95FC64EC441EC5017334406A8DB22F`.
@@ -53,3 +91,5 @@ T0/T1a/T2 진행 중, earnedDays 0, T1b 대기, T3 중단은 유지한다.
 
 종료 버튼 조작 후 stdout의 Finalize 완료 및 DX12 잔여 작업 0/0/0을 확인했다.
 계획/대시보드 변경의 공백 검사는 통과했다. 최초 구조 검사에서 보고한 문자열 140건·항목 14건은 PHASE 4.85의 정상 따옴표 키를 인식하지 못한 검사기의 오탐이었다. 검사기를 수정한 뒤 전체 JavaScript 파싱·렌더/진행률·457개 항목 구조·대상 phase-meta 8개 문장 산수 검사가 모두 통과했다. 따옴표 키 수용과 값 내부의 잘못된 따옴표·ID 누락·알 수 없는 상태 거부도 별도 변형 입력으로 확인했다.
+
+</details>

@@ -1,5 +1,43 @@
 # MAT-9 HDRI 대조와 Scene IBL 필터 수정 — 2026-10-01
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/blender/material_matched_reference.py:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L11) — `import struct`
+- [Tools/blender/material_matched_reference.py:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L16) — `ROOT = Path(__file__).resolve().parents[2]`
+- [Tools/blender/material_matched_reference.py:123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L123) — `raise RuntimeError('Requires the fixed forest/autumn environment pair')`
+- [Tools/regression/assess-hdri-material-images.py:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-hdri-material-images.py#L16) — `SPEC = importlib.util.spec_from_file_location('images', Path(__file__).with_name('compare-material-blender-images.py'))`
+- [Tools/regression/assess-hdri-material-images.py:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-hdri-material-images.py#L22) — `parser = argparse.ArgumentParser(description=__doc__)`
+- [Tools/regression/assess-hdri-material-images.py:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-hdri-material-images.py#L27) — `reference, native, repeat = (Path(measured[k]) for k in ('reference', 'native', 'reference_repeat'))`
+- [Tools/regression/measure-material-blender-images.ps1:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/measure-material-blender-images.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15) — `$Reference=[IO.Path]::GetFullPath($Reference)`
+- [Tools/regression/measure-material-blender-images.ps1:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49) — `if($ReferenceRepeat) { $comparisonArguments+=@('--reference-repeat',[IO.Path]::GetFullPath($ReferenceRepeat)) }`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/AssetCooker/EnvironmentCooker.cpp:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/EnvironmentCooker.cpp#L20) — `if (!valid) throw std::runtime_error(error);`
+- [Tools/AssetCooker/EnvironmentCooker.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/EnvironmentCooker.cpp#L29) — `Authoring::InstallTextureSourceProcessing();`
+- [Tools/AssetCooker/EnvironmentCooker.cpp:32](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/EnvironmentCooker.cpp#L32) — `~TextureSourceScope() { Authoring::UninstallTextureSourceProcessing(); }`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정과 범위
 
 **HDRI 전체 수용은 미달이다.** 앞선 방향광/단색 환경의 GGX 32조건 통과를 실제 HDRI로
@@ -158,3 +196,5 @@ C:/Python313/python.exe Tools/regression/assess-hdri-material-images.py `
 
 판정 exit 2는 측정 성공이지만 image target 미달이다. exit 1은 입력/출력 동일성 또는 실행 오류다.
 모든 출력은 새 디렉터리에 생성하고 기존 reference/native 증거를 덮어쓰지 않는다.
+
+</details>

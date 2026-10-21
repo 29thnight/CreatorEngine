@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG8 실제 큐 기록·제출 연결 — 2026-10-09</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg8QueueExecution20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg8QueueExecution20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG8 실제 큐 기록·제출 연결 — 2026-10-09</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L3">Tools/regression/verify-rg8-live-queues.ps1:3</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string]$Configuration = &#39;Debug&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L13">Tools/regression/verify-rg8-live-queues.ps1:13</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-rg8-live-queues.ps1#L14">Tools/regression/verify-rg8-live-queues.ps1:14</a> — <code>$out = [IO.Path]::GetFullPath($OutputDirectory)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L142">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:142</a> — <code>bool EndFrame(std::string&amp; outError) override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L172">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:172</a> — <code>bool JoinQueueFrame(const RHITimelinePoint&amp; completion, std::string&amp; outError);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h#L236">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:236</a> — <code>uint32_t DrainDebugMessages(std::string&amp; outMessages) override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L78">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:78</a> — <code>enum class RGMeasurementDomain : uint8_t { Normal, Capture };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L79">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:79</a> — <code>enum class RGQueueFallbackReason : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L108">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:108</a> — <code>enum class RGQueuePlacement : uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L5">Tools/build.ps1:5</a> — <code>[ValidateSet(&#39;Debug&#39;,&#39;Release&#39;)][string]$Config = &#39;Debug&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L359">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:359</a> — <code>std::printf(&quot;[DX12 검증] DebugLayer=%s GPUValidation=%s DRED=%s BreakOnError=%s\n&quot;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1229">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1229</a> — <code>bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr&lt;IRHICommandQueue&gt;&amp; graphics, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1272">Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1272</a> — <code>bool DX12DeviceResources::JoinQueueFrame(const RHITimelinePoint&amp; completion, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L34">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:34</a> — <code>std::free(value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L43">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:43</a> — <code>const auto path = prefix + &quot;.&quot; + std::to_string(++serial);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L67">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:67</a> — <code>std::copy_n(source.data(), source.size(), destination.data());</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>후속 구조 감사 우선:</strong> <a href="RenderRg7Rg8StructuralAudit20261009.html">RG7·RG8 상세 감사</a>에 따라 RG8 제품 완료 판정을 철회하고 progress·기성 0으로 되돌렸다. 아래 실행/정확성 증거는 보존하되 다음의 최종 종료 문구는 현재 상태가 아니다.</p>
+<p><strong>같은 날 최종 종료:</strong> <a href="RenderRg8Closure20261009.html">RG8 종료·기본 OFF 판정</a>의 Release 1496×692 336출력·일반 GPU 192프레임·연속 메모리 비교와 최신 Release 전체 회귀로 기존 채택 판정을 마쳤다. RG8 done·기성 16이며 성능 개선 미입증으로 기본 OFF를 유지한다. 아래 진행 문구는 최종 측정 전 이력이다.</p>
+<p>RG8 고정 순서의 두 번째 단계다. 첫 단계의 compiled queue plan을 Q0 native queue 서비스에 연결했다. RG7·Q0는 종료 상태를 유지한다. RG8 전체 수용과 제품 기본 활성화는 아직 아니다.</p>
+<h2>구현 범위</h2>
+<ul>
+<li><code>IRHIQueueRecorder</code>와 DX12 구현은 큐 종류에 맞는 새 allocator/list와 RHIEncoder를 만들고 닫힌 기록을 Q0 batch로 밀봉한다. allocator와 외부 저장소 보관 토큰은 해당 큐의 GPU 완료까지 batch가 소유한다.</li>
+<li><code>EnhancedRenderGraph::SubmitQueues</code>는 owned ExplicitVersioned 그래프의 모든 패스를 먼저 기록한다. 기록 중 예외, 인코더가 보고한 dropped command와 큐 상태 불일치는 제출 전 실패한다.</li>
+<li>graphics prologue가 초기 상태를 COMMON으로 맞추고, 각 패스는 COMMON → 요구 상태 → COMMON으로 기록한다. 반복 패스는 내부 phase 상태/UAV 순서를 별도로 기록한다. split callback은 한 slice로 실행한다.</li>
+<li>compiled queue plan의 큐 간 간선을 Q0 GPU Wait/Submit으로 연결한다. compute의 첫 작업은 prologue를 기다린다. 최종 graphics epilogue는 compute 마지막 완료점까지 합류한 뒤 모든 사용 자원의 계획 최종 상태를 복구한다.</li>
+<li>최종 상태 writeback은 epilogue 제출 수락 뒤 반영한다. 반환된 completion은 두 큐 전체의 완료점이다. graphics/compute의 <code>CollectCompleted</code>로 보관된 batch를 회수한다.</li>
+<li>batch가 shared graph와 외부 owner 토큰을 보관하므로 호출자가 graph 참조를 놓아도 자원은 남는다. 보관 중 Reset/선언 변경/다시 실행은 거부한다. 한 그래프의 큐 제출은 Reset 전 한 번만 허용한다.</li>
+<li>부분 제출 실패는 <code>recoveryRequired</code>로 반환하고 재사용 pool 반환을 차단한다. Q0는 실행 후 fence 없는 실패도 격리한다. 이 상태에서는 fallback 재실행을 하지 않고 큐 drain/장치 손실 처리를 거친다.</li>
+<li>compute encoder에서 ShaderResource는 NON_PIXEL_SHADER_RESOURCE로 변환한다. graphics 전용 상태의 compute 전이는 기록 시 거부한다.</li>
+</ul>
+<p>COMMON 경유는 초기 구현의 보수적인 계약이며 모든 direct/compute 전환에 필수인 규칙으로 설명하지 않는다. 불필요한 COMMON 전이를 피하라는 <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/using-resource-barriers-to-synchronize-resource-states-in-direct3d-12">Microsoft 자원 배리어 문서</a>와 <a href="https://microsoft.github.io/DirectX-Specs/d3d/D3D12EnhancedBarriers.html">compute 큐 상태 제약</a>을 확인했다. 패스별 새 allocator와 전이의 비용은 제품 수용 측정 대상이다.</p>
+<h2>현재 호출 계약과 다음 소비 범위</h2>
+<p>Imported DEFAULT 자원은 진입 전에 이 큐에서 사용 가능해야 한다. owner는 imported storage·pipeline·descriptor·transient pool 등 callback이 참조하는 저장소를 GPU 완료까지 보관해야 한다. device services는 큐 회수보다 오래 살아 있어야 한다. 프레임 upload/descriptor ring을 회수 전에 reset하면 안 된다.</p>
+<p>초기 native 단계는 RG7 aliasing과 기존 단일 큐 profiler가 없는 owned graph를 지원했다. 아래 후속 단계에서 프레임 회수와 실제 live graphics graph의 재질 캐시/profiler/owner를 연결했다. 후속 SSAO compute 소비까지 아래에 기록했으며 기본 OFF를 유지한다. 제품 연결 후 기존 기준인 픽셀/validation/GPU critical path/peak memory 비교로 채택을 결정한다. 이는 새로운 종료 조건 추가가 아니라 기존 2·3단계의 남은 소비 및 수용 범위다.</p>
+<h2>검증 구성</h2>
+<p>기존 Editor 명령 <code>dx12.rendergraph queue-execution</code>:</p>
+<ul>
+<li>실제 Produce/Transform compute 셰이더로 64개 정수 값을 만들고 단일/다중 큐 readback과 수식 결과 비교.</li>
+<li>graphics → compute → graphics 의존성, 독립 imported RT의 최종 ShaderResource 복구 및 후속 native 상태 검사.</li>
+<li>GPU gate 지연 중 graph 참조 해제, Reset/중복 제출 거부, 무관한 높은 fence 값으로 조기 회수되지 않음, 합류 후 graph 회수.</li>
+<li>기록 callback 예외의 제출 전 거부와 실행 후 실패 격리/안전한 drain 후 해제.</li>
+<li><code>--smoke-offscreen</code>, GPU validation, 별도 테스트 프로젝트 없음.</li>
+</ul>
+<p>실제 빌드·검사 결과는 완료 산출물 확인 후 아래에 기록한다.</p>
+<p>첫 Debug 실행에서 테스트의 UAV를 읽기 전용 SetRootBuffer에 연결한 오류가 validation으로 검출됐다. 계산 결과와 수명 검사는 통과했어도 이 실행은 수용 실패다. 기존 UAV table/CreateBindings/SetBindings 경로로 fixture를 수정했다. 실패 산출물은 RG8QueueExecution/Debug에 보존하고, 최종 수용은 수정 뒤 DebugFinal·ReleaseFinal만 사용한다.</p>
+<h2>최종 수용 결과</h2>
+<ul>
+<li>VS 2026(v18) Debug·Release 최종 빌드 통과.</li>
+<li>두 구성 각각 native 실행 65검사, 기존 큐 배치 24검사, Editor 전체 RenderGraph 회귀 통과.</li>
+<li>실제 Produce/Transform 셰이더의 단일/다중 큐 정수 결과 오차 0, GPU validation 오류 0, 정상 종료 코드 0.</li>
+<li>지연 GPU의 graph 보관, 무관한 높은 fence와 회수 분리, 완료 후 보관 해제, imported texture 최종 상태, 기록 예외 및 실행 후 격리/회수 확인.</li>
+<li>Debug native 검사 1631.9ms / 기존 전체 회귀 83080.3ms, Release 790.288ms / 14513ms. 셰이더 준비·gate·검증·대기를 포함하는 검사 소요 시간이며 제품 GPU 성능 수치가 아니다.</li>
+<li><code>Build/Verification/Phase43/RG8QueueExecution/{DebugFinal,ReleaseFinal}</code>: 명령별 결과, 실행 로그, 빌드 대상/runtime/source 해시. 집계는 <code>execution-acceptance.json</code>.</li>
+<li>최종 engine graph/recorder/provider/encoder/test/shader와 실행 바이너리 해시 일치, 변경 공백 및 PowerShell 문법 검사 통과.</li>
+</ul>
+<p>이번 연결은 owned graph의 native 실행 기반으로 수용한다. RG8 전체 상태는 진행 중·기성 0이다. 프레임 회수 기반의 후속 결과는 아래에 기록한다. 이후 기존 제품 픽셀/GPU critical path/peak memory 기준으로 채택 여부를 판정한다. RG7 기본 OFF와 RG7/Q0 종료 상태를 유지한다.</p>
+<h2>2026-10-09: DX12 프레임 회수 연결</h2>
+<p><code>DX12DeviceResources::BeginQueueFrame</code>은 즉시 리스트의 upload prefix를 제출하고 CPU 제출 ticket의 성공을 확인한 뒤, 같은 Q0 서비스의 timeline으로 graphics 큐에 GPU Wait를 건다. CPU ticket 확인은 native 큐 호출 수락 확인이며 GPU drain이 아니다.</p>
+<p>prefix를 제출해도 현재 upload recording과 descriptor version은 봉인하지 않는다. prefix 전에 준비한 상수·descriptor를 그래프가 나중에 읽을 수 있기 때문이다. <code>JoinQueueFrame</code>은 owned graph의 graphics/compute 합류 완료점을 primary DIRECT 큐에 연결한다. 이후 기존 <code>EndFrame</code>의 fence가 모든 큐의 사용을 포함하여 upload·descriptor·프레임 allocator 슬롯을 회수한다. 완료점이 연결되지 않은 EndFrame, BeginFrame, 중간 flush, 기존 parallel submission은 거부한다.</p>
+<p>취소 또는 EndFrame admission 거부는 먼저 Q0 큐와 primary prefix를 drain한 뒤 할당을 반환한다. 완료/장치 손실을 증명하지 못하면 메모리를 반환하지 않는다. 취소한 Q0 서비스는 admission을 철회하며, 큐 실행 재개에는 backend 재초기화가 필요하다. 기존 single-queue 프레임은 재개할 수 있다. primary Wait의 fence는 중복 없이 보관하고 서비스 teardown에서 primary 큐까지 완료를 확인하여 해제한다.</p>
+<p>기존 Editor queue-execution 검사에 실제 primary prefix 셰이더 → COMPUTE의 상수·descriptor 읽기 → DIRECT readback → primary frame fence 연결을 추가했다. gate로 3프레임을 지연시켜 pending upload/descriptor 보관과 4번째 슬롯의 대기, 64개 정수 결과, 완료 후 graph 해제, 다른 서비스 completion 거부, 미합류 취소의 drain/revocation과 single-queue 복구를 확인한다. 별도 테스트 프로젝트와 화면 차단 실행은 사용하지 않는다.</p>
+<p>이 연결은 제품 DX12 frame lifecycle을 사용하는 회수 기반이다. <strong>이 프레임 회수 검사 당시에는 실제 live scene 그래프의 queue cutover를 하지 않았다.</strong> live 준비/재질 캐시의 제출 transaction·profiler·pipeline owner 연결 결과는 아래 후속 절을 따른다. 그 뒤 기존 3단계의 제품 픽셀/validation/GPU critical path/peak memory 수용을 수행한다. RG8 진행 중·기성 0, RG7/Q0 완료 및 RG7 기본 OFF는 유지한다.</p>
+<h3>프레임 회수 최종 검증</h3>
+<ul>
+<li>VS 2026(v18/v145) Debug·Release 최종 빌드 통과. 최종 로그는 <code>rg8-frame-debug-final-build.log</code>, <code>rg8-frame-release-final-build.log</code>.</li>
+<li>각 구성 owned/native+frame 122검사(기존 65 + 프레임 57), 큐 계획 24검사, 기존 Editor 전체 RenderGraph 회귀 통과.</li>
+<li>실제 primary prefix → compute → readback 3프레임의 64개 정수 값 오차 0. GPU validation 오류 0, 종료 코드 0.</li>
+<li>Debug native/frame 1176.65ms·전체 RG 53735.7ms, Release 989.775ms·13028.8ms. gate·shader 준비를 포함한 검사 시간이며 제품 GPU 성능으로 해석하지 않는다.</li>
+<li><code>Build/Verification/Phase43/RG8FrameRetirement/{DebugFinal,ReleaseFinal}</code>에 명령 결과·로그·소스/runtime 해시 보관. <code>frame-retirement-acceptance.json</code>은 두 구성의 결과와 현재 소스/바이너리 해시 일치를 확인한다. 이전 <code>Debug</code>는 중간 구현 검사이며 최종 수용은 Final 두 구성이다.</li>
+<li>Release 빌드는 <code>Utility_Framework.pdb</code>의 LNK4020 형식 레코드 경고가 있다. 일부 디버거 기호/형식 정보가 제한될 수 있으며, 빌드 성공·GPU validation 0과 구분한다.</li>
+<li>장치 손실 분기를 기존 recovery 경로로 전달하도록 보완했으나 새 queue-frame 자체의 실제 RemoveDevice 실행을 이번 결과로 주장하지 않는다. 전체 RG 회귀에 포함된 기존 장치 손실 검사와 구분한다.</li>
+<li>PowerShell 구문·변경 공백·dashboard 스크립트 구문 검사 통과. RG8 기성/기본 설정과 RG7/Q0 종료 상태 변경 없음.</li>
+</ul>
+<h2>2026-10-09: 실제 live scene 소비 연결</h2>
+<p><code>CREATOR_RENDERGRAPH_QUEUE_EXECUTION=1</code>로 실제 DX12 씬 그래프를 Q0 owned graphics 큐에서 실행한다. 기본 OFF이며, 이번 소비 연결은 compute 분산을 하지 않는다. 기존 프로파일러는 단일 큐 시계 계약이므로 해당 graphics 큐의 timestamp frequency/clock calibration으로 초기화하고 pass timestamp를 같은 큐에 기록한다. primary 큐의 Resolve는 graph join 뒤 실행한다. compute endpoint와 단일 큐 profiler를 함께 사용하는 SubmitQueues는 계속 거부한다.</p>
+<p>재질 residency·palette·visibility·material packet 준비가 성공한 뒤 prefix를 제출한다. 비동기 재질 준비에서 반환되는 정상 deferred 상태는 큐 서비스를 철회하지 않는다. prefix의 upload/descriptor recording을 그대로 유지하고, EndFrame의 CPU 제출 ticket 성공과 primary 합류 fence를 확인한 뒤 같은 recording의 재질 캐시를 게시한다. 이는 CPU native 제출 수락 확인이며 GPU drain이 아니다.</p>
+<p>LivePipeline을 shared owner로 보관하여 Q0 batch가 pipeline·pass·transient pool 저장소와 graph를 유지한다. 프레임 시작과 정상 lifecycle drain에서 완료 batch를 수집하고, backend 해체/장치 손실 처리에서 Q0 서비스까지 정리한 뒤 pass/cache를 파괴한다. 큐가 철회된 실행 실패는 기존 renderer 실패 경로로 전달한다. GPU에서 일부 실행한 그래프를 fallback으로 다시 제출하지 않는다.</p>
+<p>SubmitQueues의 기록 시간은 native queue admission과 분리하여 CPU 기록 계측에 전달한다. 기존 compiled graph 진단과 제품 capture 경로는 유지한다. aliasing 동시 선택은 거부한다. RG7 기본 OFF와 종료 판정은 바꾸지 않는다.</p>
+<p>제품 검증은 기존 Editor의 OFF/ON 제어 캡처·scene/game/preview·씬 교체·리사이즈·재질 소스 복구/편집/게시와 GPU validation을 사용한다. <code>verify-rg8-live-queues.ps1</code>는 현재 바이너리의 native/full 회귀를 재사용하며 모든 제품 실행은 <code>--smoke-offscreen</code>이다. 실제 실행 결과는 아래와 같다.</p>
+<h3>live graphics 최종 검증</h3>
+<ul>
+<li>VS 2026(v18/v145) Debug·Release 빌드, 각 native/frame 122검사·큐 계획 24검사·Editor 전체 RenderGraph 회귀 통과.</li>
+<li>각 구성 OFF/ON 독립 Editor 실행으로 scene/game/preview, 재질 소스 복구·편집·저장/재로드·게시, 씬 교체·리사이즈 검증. 모든 실행은 비표시 모드이며 별도 C++ 테스트 프로젝트를 만들지 않았다.</li>
+<li>Debug: ON 실제 graph 제출 298회. OFF/ON 각각 GPU profiler 65구간 measured, query overflow/drop 0. 332×182 제어 캡처 7개 첨부의 최대 절대 오차 0. GPU validation 0·drop 0·정상 exit 0.</li>
+<li>Release: ON 실제 graph 제출 324회. OFF/ON 각각 GPU profiler 65구간 measured, query overflow/drop 0. 332×182 제어 캡처 7개 첨부의 최대 절대 오차 0. GPU validation 0·drop 0·정상 exit 0.</li>
+<li><code>Build/Verification/Phase43/RG8LiveQueues/{NativeDebug,NativeRelease,Debug,Release}</code>에 명령 결과·로그·출력 비교·실행 바이너리/소스 해시 보관. <code>live-acceptance.json</code>은 현재 소스 및 바이너리 일치를 재확인한 집계다. 빌드 로그는 <code>rg8-live-debug-build-fixed.log</code>, <code>rg8-live-release-build.log</code>.</li>
+<li>Release의 기존 <code>Utility_Framework.pdb</code> LNK4020 경고는 남아 있다. 일부 디버거 형식 정보 제한이며 GPU 검증 결과와 구분한다.</li>
+<li>이 결과는 live graphics 소비 수용이다. 332×182 출력 동일성과 GPU timestamp 수집을 성능 개선이나 전체 제품 해상도 수용으로 확대하지 않는다.</li>
+</ul>
+<p>이 graphics-only 수용 시점의 후속 순서는 compute 분산과 큐별 profiler 연결 → 기존 제품 픽셀/validation/GPU critical path/peak memory 비교에 따른 채택 판정이었다. 새 종료 조건을 추가하지 않는다. RG8 진행·기성 0·기본 OFF와 RG7/Q0 완료 상태를 유지한다.</p>
+<h2>2026-10-09: SSAO compute 분산과 큐별 profiler</h2>
+<p><code>CREATOR_RENDERGRAPH_QUEUE_EXECUTION=2</code>는 기존 owned graphics 실행에 compute 큐를 더하는 명시적 진단 선택이다. 기본 OFF와 <code>1</code>의 graphics-only 경로는 유지한다. SSAO.Compute/SSAO.Filter 작성자가 compute 호환성을 선언하고, 같은 view의 완료된 GPU 측정값이 1μs 이상인 패스만 배치한다. 측정값 없는 첫 프레임은 graphics에서 실행한다. 1μs는 이 파일럿의 배치 하한이며 성능 채택 기준이나 최적 임계값으로 주장하지 않는다.</p>
+<p>두 큐는 별도 DX12GpuProfiler의 query heap/readback/주파수/clock calibration을 사용한다. RenderGraph endpoint에 연결한 profiler로 각각 기록하고, 합류 뒤 primary 리스트에서 두 질의를 resolve한다. 프레임 fence가 두 큐와 resolve를 모두 포함하므로 기존 슬롯 회수 계약을 유지한다. 같은 profiler를 두 큐에 붙이는 요청은 제출 전에 거부한다.</p>
+<p>각 큐의 raw timestamp는 해당 큐의 calibration으로 QPC에 변환한다. 통합 span과 busy는 변환된 구간의 범위와 합집합이며, 큐별 raw tick을 직접 빼거나 겹치는 구간을 두 번 합산하지 않는다. 패스 시간 합계는 별도 값이다. compute 구간은 queueId=1로 기존 EngineDiagnostics sink에 전달한다. 어느 큐의 calibration도 유효하지 않으면 통합 시간을 정상 측정으로 게시하지 않는다. 이 원칙은 <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/timing">Microsoft의 큐별 timestamp/clock calibration 계약</a>을 따른다.</p>
+<p>기존 Editor native 검사에 작성자 선언·동일 profiler 거부·graphics/compute 구간 수와 귀속·각 시계의 calibration 확인을 추가했다. 제품 OFF/ON 검사는 실제 compute 제출과 SSAO 두 구간, 통합 busy≤span, 기존 출력/재질/세 뷰/수명 검사를 함께 확인한다. 최종 실행 결과는 아래와 같다.</p>
+<h3>SSAO compute 최종 검증</h3>
+<ul>
+<li>VS 2026(v18/v145) Debug·Release 최종 빌드 통과. 빌드 로그는 <code>RG8Compute/debug-final-build.log</code>, <code>RG8Compute/release-build.log</code>.</li>
+<li>구성별 native/frame/profiler 135검사·계획 24검사·Editor 전체 RenderGraph 회귀 통과. 신규 13검사는 큐별 profiler 초기화, 작성자 선언, 공유 profiler의 제출 전 거부, query resolve/collect, 큐별 구간 수·귀속/calibration을 확인한다.</li>
+<li>Debug OFF/ON: ON graph 제출 286회·compute batch 560회. 캡처 65구간 중 SSAO compute 2구간, query overflow/drop 0·busy≤span. 332×182 제어 출력 7개 최대 절대 오차 0. GPU validation 0·exit 0.</li>
+<li>Release OFF/ON: ON graph 제출 310회·compute batch 608회. 캡처 65구간 중 SSAO compute 2구간, query overflow/drop 0·busy≤span. 332×182 제어 출력 7개 최대 절대 오차 0. GPU validation 0·exit 0.</li>
+<li>최종 수용한 제품 실행에서 scene/game/preview·재질 소스 복구/편집/게시·저장/재로드·씬 교체/리사이즈 통과. 기존 Editor를 비표시 모드로 사용했다.</li>
+<li><code>Build/Verification/Phase43/RG8Compute/{NativeDebug,NativeRelease,Debug,Release,ReleaseRetry}</code>에 원본 결과·로그·비교 보관. <code>compute-acceptance.json</code>은 결과와 현재 소스/바이너리 해시 일치를 확인한 집계다.</li>
+<li>최초 Release/On은 재질 편집 Apply의 생성 쌍 디렉터리 rename에서 <code>Access is denied</code>로 실패했다. GPU 검증 통과로 세지 않으며 결과를 보존했다. 생성 캐시 영역의 후속 create/write/read/rename/delete probe는 통과했지만 최초 원인은 미확정이다. 엔진 바이너리 변경 없이 실패한 ON만 ReleaseRetry/On에서 다시 실행했고, 동일 exe/runtime 해시를 확인한 Release/Off를 재사용했다. 이 결과로 파일 게시 실패가 수정됐다고 주장하지 않는다.</li>
+<li>Release의 기존 <code>Utility_Framework.pdb</code> LNK4020 형식 정보 경고는 남아 있다. 이번 결과는 Vulkan runtime이나 프로파일러 뷰어의 별도 compute 레인 UI 수용을 주장하지 않는다. 기존 sink에 queueId를 전달하며 이 검증의 계측 범위는 backend/capture다.</li>
+</ul>
+<p>이번 제품 OFF/ON은 기존 기본 경로(0)와 compute 파일럿(2)의 정확성 비교다. owned graphics(1)도 유지하므로 후속 성능 분석에서 1↔2의 큐 분산 효과와 0 대비 실행 구조 전환 비용을 구분한다.</p>
+<p>SSAO 파일럿의 제품 compute 소비와 큐별 계측 연결을 수용한다. 332×182 제어 출력 검사를 전체 해상도·GPU critical path 개선·peak memory 채택 판정으로 확대하지 않는다. 남은 작업은 기존 3단계 제품 비교와 채택 판정이며 RG8 진행·기성 0·기본 OFF, RG7/Q0 완료를 유지한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="2026-10-09-dx12-프레임-회수-연결"></span><span id="2026-10-09-ssao-compute-분산과-큐별-profiler"></span><span id="2026-10-09-실제-live-scene-소비-연결"></span><span id="live-graphics-최종-검증"></span><span id="sec-2026-10-09-dx12-프레임-회수-연결"></span><span id="sec-2026-10-09-ssao-compute-분산과-큐별-profiler"></span><span id="sec-2026-10-09-실제-live-scene-소비-연결"></span><span id="sec-검증-구성"></span><span id="sec-구현-범위"></span><span id="sec-최종-수용-결과"></span><span id="sec-현재-호출-계약과-다음-소비-범위"></span><span id="ssao-compute-최종-검증"></span><span id="검증-구성"></span><span id="구현-범위"></span><span id="최종-수용-결과"></span><span id="프레임-회수-최종-검증"></span><span id="현재-호출-계약과-다음-소비-범위"></span></details></main></body></html>

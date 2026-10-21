@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 HDRI 대조와 Scene IBL 필터 수정 — 2026-10-01</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9HdriImageComparison.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9HdriImageComparison.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 HDRI 대조와 Scene IBL 필터 수정 — 2026-10-01</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L11">Tools/blender/material_matched_reference.py:11</a> — <code>import struct</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L16">Tools/blender/material_matched_reference.py:16</a> — <code>ROOT = Path(__file__).resolve().parents[2]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/blender/material_matched_reference.py#L123">Tools/blender/material_matched_reference.py:123</a> — <code>raise RuntimeError(&#39;Requires the fixed forest/autumn environment pair&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-hdri-material-images.py#L16">Tools/regression/assess-hdri-material-images.py:16</a> — <code>SPEC = importlib.util.spec_from_file_location(&#39;images&#39;, Path(__file__).with_name(&#39;compare-material-blender-images.py&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-hdri-material-images.py#L22">Tools/regression/assess-hdri-material-images.py:22</a> — <code>parser = argparse.ArgumentParser(description=__doc__)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/assess-hdri-material-images.py#L27">Tools/regression/assess-hdri-material-images.py:27</a> — <code>reference, native, repeat = (Path(measured[k]) for k in (&#39;reference&#39;, &#39;native&#39;, &#39;reference_repeat&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12">Tools/regression/measure-material-blender-images.ps1:12</a> — <code>$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15">Tools/regression/measure-material-blender-images.ps1:15</a> — <code>$Reference=[IO.Path]::GetFullPath($Reference)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49">Tools/regression/measure-material-blender-images.ps1:49</a> — <code>if($ReferenceRepeat) { $comparisonArguments+=@(&#39;--reference-repeat&#39;,[IO.Path]::GetFullPath($ReferenceRepeat)) }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/EnvironmentCooker.cpp#L20">Tools/AssetCooker/EnvironmentCooker.cpp:20</a> — <code>if (!valid) throw std::runtime_error(error);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/EnvironmentCooker.cpp#L29">Tools/AssetCooker/EnvironmentCooker.cpp:29</a> — <code>Authoring::InstallTextureSourceProcessing();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/EnvironmentCooker.cpp#L32">Tools/AssetCooker/EnvironmentCooker.cpp:32</a> — <code>&amp;#126;TextureSourceScope() { Authoring::UninstallTextureSourceProcessing(); }</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>판정과 범위</h2>
+<p><strong>HDRI 전체 수용은 미달이다.</strong> 앞선 방향광/단색 환경의 GGX 32조건 통과를 실제 HDRI로
+확대하지 않는다. 고정 Core/Layered 상수 재질 10종을 <code>forest</code>와 기존 MAT-0의 <code>autumn</code>
+환경에서 각각 비교했다. 발광·흰색 확산·거울 제어를 포함한 <strong>26장</strong>이며, 원래 MAT-0
+EEVEE 텍스처/면광원 grid를 수정하거나 이 측정으로 대체하지 않았다.</p>
+<p>동일한 scene-linear RMS 1%·p95 normalized 1%·max normalized 5%·독립 reference noise
+0.25% 목표를 사용한다. 선형 필터 수정 후 <strong>재질 1/20, 제어 3/6</strong>이 모든 목표를 통과했다.
+다수 조건의 4,096-sample reference noise가 목표를 넘으므로 작은 잔여 차이의 수용 판정은
+추가 수렴 확인이 필요하다. 큰 차이 역시 단순한 렌더 노이즈로 처리하지 않는다.</p>
+<ul>
+<li><a href="MAT9HdriBaselineComparison.json">수정 전 비교</a>, <a href="MAT9HdriLinearComparison.json">선형 필터 후 비교</a>.</li>
+<li><a href="MAT9HdriAcceptance.json">픽셀을 재계산한 판정</a>. 변경된 입력/이미지/조명/cook는 거부한다.</li>
+<li>MAT-9 progress 및 완료 공수 <strong>32/34일</strong>을 유지한다. FPS/최초 준비 시간 수용 자료가 아니다.</li>
+</ul>
+<h2>동일 입력 계약</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th>조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Blender</td>
+<td>5.1.1 <code>b70da489d7f4</code>, Cycles CPU, seed 0/11, adaptive/denoise off</td>
+</tr>
+<tr>
+<td>원래 MAT-0와 구분</td>
+<td>MAT-0는 EEVEE, 800×480 텍스처/디스크 면광원 grid. 이번 것은 추가 Cycles 상수 재질 fixture</td>
+</tr>
+<tr>
+<td>캡처</td>
+<td>64×64, 같은 구체 triangle corner/normal/UV tangent, perspective eye (0,0,3), FOV 45°</td>
+</tr>
+<tr>
+<td>색공간</td>
+<td>linear Rec.709, Raw, exposure 0, metrics에는 표시 OETF/톤맵 미적용</td>
+</tr>
+<tr>
+<td>밝기</td>
+<td>두 환경 모두 radiance ×0.35. 직접광 없음. native는 cook 조명 맵 RGB에 한 번 적용</td>
+</tr>
+<tr>
+<td>Native</td>
+<td>실제 Scene graph 생성·컴파일·instance·GBuffer·lookup·합성, AO white, shadow/decal/post off</td>
+</tr>
+<tr>
+<td>Cook</td>
+<td>제품 EnvironmentCooker, cube 512/7 mip, irradiance 64, specular 6 mip, BRDF 512, RGBA16F</td>
+</tr>
+<tr>
+<td>Mask</td>
+<td>emission 공통 interior 345픽셀, 2픽셀 침식, 모든 재질에 동일 적용</td>
+</tr>
+</tbody></table></div>
+<p><code>forest</code> source SHA는 <code>bdf2298244affa0f85509380fd130ac6d4dfaa3c856df065998f7f4c1a93dc0d</code>,
+<code>autumn</code>은 <code>e60470d3a0f219585df1d74c393b472361c5400a7ff8d071ebe6eca29b7fe2b0</code>다.
+Source와 cooked artifact SHA를 모두 manifest에 고정했다. Autumn cook의 네 맵 GPU 왕복은 exact다.
+이번 실행은 <code>Resources/Environment/forest.ceibl</code>을 변경하지 않았다.</p>
+<p>공유 geometry의 좌표를 유지하면서 Blender World에 outgoing <code>(x,-z,y)</code>를 전달한다.
+엔진의 longitude <code>atan2(z,x)</code>/Y-up/top-down 행과 Cycles의 bottom-up 좌표를 맞춘다.
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/camera/projection.h">Cycles equirectangular 정의</a>와
+<a href="https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/svm/image.h">environment texture 평가</a>를 확인했다.
+같은 HDRI 파일을 지정했다는 사실만으로 좌표/필터/IBL/BRDF/색관리 일치를 주장하지 않는다.</p>
+<h2>수정한 실제 문제</h2>
+<p>Scene lookup의 s0는 material field texture를 위한 <strong>point</strong> sampler다.
+<code>BakeRadiance</code>도 그 sampler를 공유해 HDR 큐브를 point-filter했다. Scene 경로의 radiance는
+이미 있는 linear s1 <code>gIblSampler</code>를 사용하도록 바꿨다. Material field texture 샘플러는 유지한다.
+독립 IblBaker의 기존 진단 fixture 계약은 이번에 변경하지 않았다.</p>
+<p>SceneHost identity <strong>4→5</strong>로 기존 cooked Scene shader 재사용을 거부한다.
+IBL point/sample ABI와 resource binding 슬롯, product 기본 적분 <strong>1,024 samples</strong>는 유지했다.
+코드 수정은 필터 차이를 줄였으며 큰 HDRI 오차 전체를 해결한 것은 아니다.</p>
+<h2>결과 — relative RMS</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">forest point</th>
+<th align="right">forest linear</th>
+<th align="right">autumn point</th>
+<th align="right">autumn linear</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Core base</td>
+<td align="right">1.2908%</td>
+<td align="right">1.2842%</td>
+<td align="right">28.6327%</td>
+<td align="right">26.1698%</td>
+</tr>
+<tr>
+<td>Core metal</td>
+<td align="right">2.9803%</td>
+<td align="right">3.0335%</td>
+<td align="right">36.9344%</td>
+<td align="right">27.2087%</td>
+</tr>
+<tr>
+<td>Core rough</td>
+<td align="right">1.0527%</td>
+<td align="right">1.0454%</td>
+<td align="right">8.0634%</td>
+<td align="right">7.9319%</td>
+</tr>
+<tr>
+<td>Core normal input=geometry</td>
+<td align="right">1.0543%</td>
+<td align="right">1.0292%</td>
+<td align="right">16.0015%</td>
+<td align="right">14.6983%</td>
+</tr>
+<tr>
+<td>Core emission</td>
+<td align="right">0.0962%</td>
+<td align="right">0.0959%</td>
+<td align="right">1.3951%</td>
+<td align="right">1.4363%</td>
+</tr>
+<tr>
+<td>Coat</td>
+<td align="right">1.2457%</td>
+<td align="right">1.2055%</td>
+<td align="right">23.1551%</td>
+<td align="right">23.0449%</td>
+</tr>
+<tr>
+<td>Sheen</td>
+<td align="right">1.7815%</td>
+<td align="right">1.7755%</td>
+<td align="right">34.9040%</td>
+<td align="right">34.1491%</td>
+</tr>
+<tr>
+<td>Anisotropy</td>
+<td align="right">11.4086%</td>
+<td align="right">10.8817%</td>
+<td align="right">74.8181%</td>
+<td align="right">70.4064%</td>
+</tr>
+<tr>
+<td>Thin film</td>
+<td align="right">7.1893%</td>
+<td align="right">7.1833%</td>
+<td align="right">80.3491%</td>
+<td align="right">84.2521%</td>
+</tr>
+<tr>
+<td>Mixed layers</td>
+<td align="right">1.4800%</td>
+<td align="right">1.4628%</td>
+<td align="right">25.3326%</td>
+<td align="right">24.2309%</td>
+</tr>
+<tr>
+<td>Emission control</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td>Diffuse white control</td>
+<td align="right">0.5811%</td>
+<td align="right">0.5811%</td>
+<td align="right">5.5984%</td>
+<td align="right">5.5984%</td>
+</tr>
+<tr>
+<td>Mirror control</td>
+<td align="right">8.2410%</td>
+<td align="right">2.6332%</td>
+<td align="right">0.7838%</td>
+<td align="right">0.5034%</td>
+</tr>
+</tbody></table></div>
+<p>4,096-sample seed RMS 최대는 forest <strong>0.8201%</strong>, autumn **1.2633%**다.
+Mirror seed RMS는 **0.2361% / 0.0139%**다. 거울 결과에는 cube 재투영·해상도/필터 차이도
+남으므로 모든 반사 오차를 재질 BRDF에 귀속하지 않는다.</p>
+<h2>고샘플 분리 진단</h2>
+<p>가장 큰 autumn film 조건과 발광/거울 제어만 별도 고정 subset으로 <strong>131,072 samples</strong>,
+seed 0/11을 렌더했다. 같은 공통 mask 정책으로 344픽셀을 사용한다. 이 subset은 전체
+26장 case-set 게이트를 통과할 수 없고 전체 HDRI 수용 결과를 대체하지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>autumn film</th>
+<th align="right">Relative RMS</th>
+<th align="right">p95 normalized</th>
+<th align="right">max normalized</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>제품 1,024 environment samples</td>
+<td align="right">84.1182%</td>
+<td align="right">37.5236%</td>
+<td align="right">518.6446%</td>
+</tr>
+<tr>
+<td>진단 snapshot 32,768 samples</td>
+<td align="right">13.7322%</td>
+<td align="right">9.5771%</td>
+<td align="right">29.5575%</td>
+</tr>
+</tbody></table></div>
+<p>고샘플 기준의 seed 간 RMS는 **0.1587%**다. 두 native 경로의 거울 결과는 동일하며 RMS
+0.5093%, emission은 exact다. 환경 적분 수만 바꿔 큰 오차가 줄어드는 것을 확인했으므로
+현재 적분 샘플링의 기여는 실측 근거가 있다. 남은 13.73%를 전부 샘플 수에 귀속하지 않는다.
+Source→cube 투영/필터와 방향 분포/정규화 오차도 분리해야 한다.</p>
+<ul>
+<li><a href="MAT9HdriDenseCurrentComparison.json">현재 제품 고샘플 대조</a>.</li>
+<li><a href="MAT9HdriSamplingStudyComparison.json">진단 샘플 수 대조</a>.</li>
+<li><code>Build/Obj/Mat9Hdri-sampling-study/contract.json</code>에 원본/진단 shader SHA와 샘플 수를 고정했다.
+<code>-ShaderRoot</code>는 probe 전용이며 <code>shader-root.txt</code>에 실제 경로를 기록한다.
+전체 수용 판정기는 diagnostic shader snapshot을 거부한다.</li>
+<li>진단 snapshot은 Build/Obj에만 있다. product shader의 적분 수/작가 설정/기본 cook는 변경하지 않았다.</li>
+</ul>
+<h2>검증 증거</h2>
+<ul>
+<li>Release DX12 기본/linear 각 <strong>433,367개 검사</strong>, 26장, GPU validation 0건, 정상 종료.</li>
+<li>Host identity 5를 포함한 현재 제품 고샘플 subset <strong>55,892개</strong>, 진단 snapshot <strong>55,893개</strong> 검사,
+각각 3장·validation 0건·정상 종료.</li>
+<li>Scene raster/shared depth/composition/texture/cache-generation 회귀 <strong>21,067,374개</strong> 검사,
+DXIL/SPIR-V 24개 컴파일, validation 0건, 정상 종료.</li>
+<li>CreatorEditor Debug 전체 빌드 및 최신 shader resource 배치 성공.</li>
+<li>Dashboard full parse 439행, 유한 progress. MAT-9 상태와 완료 공수는 변경하지 않았다.</li>
+<li>독립 reference noise/입력/cook SHA와 진단 subset·snapshot 거부를 확인했다.</li>
+</ul>
+<p>GPU validation을 켠 정확도 실행이다. 이 로그의 준비 시간이나 샘플 수를 늘린 진단 실행을
+실제 Scene FPS 또는 GPU 비용 수용으로 사용하지 않는다.</p>
+<h2>후속 순서와 면광원 경계</h2>
+<ol>
+<li>고샘플 reference에서 큰 박막 오차를 분리한다. 진단 shader snapshot의 샘플 수를 바꿔
+environment integration 수렴을 측정하며 product 기본값은 높이지 않는다.</li>
+<li>고주파 HDR의 환경 분포와 BRDF를 함께 표집하는 방향별 MIS를 검토·수정한다. 현재
+GGX/Sheen 1,024 샘플은 환경 밝기의 중요도 분포를 사용하지 않는다. Cube radiance/PDF,
+prepared owner/fence, cook/cache generation과 constant environment 보존 gate를 함께 다룬다.</li>
+<li>확산은 제품의 MIS-convolved 64 cube를 쓰므로 방향별 반사 변경만으로 해결됐다고 세지 않는다.
+white diffuse 제어 및 source→cube→importance grid→irradiance의 차이를 따로 측정한다.</li>
+<li>같은 target과 수렴한 reference로 HDRI 재대조 후 Special·texture/normal-map·route parity·성능 순서로 진행한다.</li>
+</ol>
+<p><strong>면광원은 현재 미지원이다.</strong> <code>EnhancedLight.position.w</code> ABI와 실제 Scene light consumer는
+directional/point/spot 세 타입만 지원한다. MAT-0의 energy 850/직경 4 disk area를 point light나
+작가가 지정하지 않은 다중 point 묶음으로 바꾸고 원래 fixture 통과로 기록하지 않는다.
+MAT-9 내 미충족 조명 gate로 유지하며 emission 면적/방향/PDF·단위·extent, product direct lobe
+평가와 고정 disk 수렴 기준을 구현해야 원래 grid의 area 조건을 수용할 수 있다.
+새 완료 행이나 추정 공수를 추가하지 않는다.</p>
+<h2>후속 MIS 구현</h2>
+<p>2026-10-01 Scene 환경/BRDF MIS와 CEIBL002의 중요도 맵 쿠킹을 적용했다.
+최종 dense autumn 박막 RMS는 3.6083%이며 전체 target은 여전히 미달이다.
+이 문서의 baseline/linear 자료는 v1 cook 측정으로 유지한다. v1 cook은
+<code>Build/Obj/Mat9Hdri-frozen-cooks/&lt;SHA&gt;.ceibl</code>에 보존하고, 원본 조명 맵과
+byte-identical인 v2 cook metadata를 가진 <code>Build/Obj/Mat9Hdri-v2-*</code> reference를 생성했다.
+Blender pixels는 재사용했으며 재렌더로 보고하지 않는다.
+<a href="MAT9HdriMis.html">후속 구현·수치·준비 비용·잔여</a>를 참조한다.</p>
+<h2>재현</h2>
+<p><code>material_matched_reference.py --lighting hdri --environment-config &lt;json&gt;</code>은 두 source/cook의
+경로·SHA와 strength 0.35를 검증한다. <code>--only-case</code>는 명시된 진단 subset이며 전체 수용 판정기가
+26장 고정 case set을 요구하므로 subset을 전체 통과로 제출할 수 없다.</p>
+<pre><code class="language-powershell"># Build/Obj/Mat9Hdri-environments.json: current frozen source/cook identities
+&amp; &#39;C:/Program Files/Blender Foundation/Blender 5.1/blender.exe&#39; --background --factory-startup `
+  --python Tools/blender/material_matched_reference.py -- --output Build/Obj/NewHdriReference `
+  --lighting hdri --samples 4096 --environment-config Build/Obj/Mat9Hdri-environments.json
+# Repeat into another new directory with --seed 11 and the same samples/config.
+Tools/regression/measure-material-blender-images.ps1 -Configuration Release -Label hdri-recheck `
+  -Reference Build/Obj/NewHdriReference -ReferenceRepeat Build/Obj/NewHdriRepeat
+C:/Python313/python.exe Tools/regression/assess-hdri-material-images.py `
+  Build/Obj/Mat9Images-Release-hdri-recheck/comparison.json Build/Obj/hdri-recheck-acceptance.json
+</code></pre>
+<p>판정 exit 2는 측정 성공이지만 image target 미달이다. exit 1은 입력/출력 동일성 또는 실행 오류다.
+모든 출력은 새 디렉터리에 생성하고 기존 reference/native 증거를 덮어쓰지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-검증-증거"></span><span id="sec-결과--relative-rms"></span><span id="sec-고샘플-분리-진단"></span><span id="sec-동일-입력-계약"></span><span id="sec-수정한-실제-문제"></span><span id="sec-재현"></span><span id="sec-판정과-범위"></span><span id="sec-후속-mis-구현"></span><span id="sec-후속-순서와-면광원-경계"></span><span id="검증-증거"></span><span id="결과--relative-rms"></span><span id="고샘플-분리-진단"></span><span id="동일-입력-계약"></span><span id="수정한-실제-문제"></span><span id="재현"></span><span id="판정과-범위"></span><span id="후속-mis-구현"></span><span id="후속-순서와-면광원-경계"></span></details></main></body></html>

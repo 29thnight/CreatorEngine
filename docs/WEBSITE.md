@@ -1,5 +1,43 @@
 # Creator Engine 브랜드·API 사이트
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- Editor/Player Host와 build/cook·manifest/pak·bootstrap을 분리한다. runtime 소비와 Editor authoring writer를 같은 책임으로 합치지 않는다.
+- 로컬 package 생성은 Launcher/MSI·서명 update/rollback·clean VM 제품 수용의 증거가 아니다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [Engine/SceneRuntime/Canvas.h:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L14) — `class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>`
+- [Engine/SceneRuntime/Canvas.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L18) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/Canvas.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.h#L20) — `Component::gc_trace(tracer);`
+- [Engine/SceneRuntime/BlackBoard.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L8) — `class Entity;`
+- [Engine/SceneRuntime/BlackBoard.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L9) — `class Transform;`
+- [Engine/SceneRuntime/BlackBoard.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L10) — `class MenuBarWindow;`
+- [Engine/SceneRuntime/Canvas.cpp:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L14) — `Canvas::Canvas()`
+- [Engine/SceneRuntime/Canvas.cpp:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L18) — `void Canvas::OnPropertyChanged(`
+- [Engine/SceneRuntime/Canvas.cpp:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Canvas.cpp#L34) — `float Canvas::ComputeScaleFactor(const math::rect& screenRect) const`
+- [Engine/SceneRuntime/BlackBoard.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.cpp#L17) — `"BehaviorTree\\" + std::string(name) + ".blackboard");`
+- [Engine/SceneRuntime/BlackBoard.cpp:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.cpp#L21) — `BlackBoardValue& BlackBoard::GetOrCreate(const std::string& key)`
+- [Engine/SceneRuntime/BlackBoard.cpp:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.cpp#L26) — `const BlackBoardValue& BlackBoard::GetChecked(const std::string& key, BlackBoardType expected) const`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 브랜드 홈페이지 `index.html`과 `api/` 문서를 같은 로고·색상·내비게이션으로 연결한다.
 HTML/CSS/JavaScript와 직접 작성한 Canvas 2D 조명 코드만 사용한다. React Bits·PrSM의
 효과 컴포넌트, 레거시 영상, 외부 CDN 스크립트·폰트는 포함하지 않는다. PrSM은 정보 배치만 참고했다.
@@ -144,3 +182,5 @@ API 페이지는 Canvas를 생성하지 않는다.
 변경은 웹사이트 파일과 읽기 권한의 배포 workflow에 한정된다. 엔진 C++/C# 소스,
 사용자 스크린샷 원본, 기존 계획서와 대시보드는 포함하거나 덮어쓰지 않는다.
 문서 소스 기준은 `b503b57`이며, `4d6122e`까지의 비교에서 문서화한 API 소스 변경은 없었다.
+
+</details>

@@ -1,5 +1,37 @@
 # PHASE 4.5 — PR #169 종료 체크포인트 (2026-10-10)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- camera cut revision·성공한 submission의 history·provider 설정과 profiler provenance를 보존한다. saved intent와 실제 지원/활성 결과를 구분한다.
+- SDK/CPU Present 반환은 생성 프레임 신원이나 물리 표시 시각이 아니다. 과거 일부 품질 통과를 현재 모든 route·장치·FG/지연 수용으로 확대하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/Utility_Framework/Sha256.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28) — `class Sha256`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40) — `std::memcpy(m_buffer + m_bufferUsed, p, take);`
+- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.h#L7) — `class EnhancedTemporalUpscalePass final : public EnhancedRenderPass`
+- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.h#L9) — `public:`
+- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.h#L10) — `const char* GetName() const override { return "Temporal.Upscale"; }`
+- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp:3](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp#L3) — `void EnhancedTemporalUpscalePass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)`
+- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp#L5) — `if (!m_host || !m_applied) throw std::runtime_error("Temporal upscale pass has no view owner.");`
+- [Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/PostProcess/EnhancedTemporalUpscalePass.cpp#L10) — `throw std::runtime_error("Native temporal fallback must render at display resolution.");`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정과 범위
 
 DX12 RTX 2080 Ti의 SDK 활성 Debug/Release 실행을 기준으로 TR1(8인일)과 TU5(4인일)를 종료한다. 활성 16행 중 2행 완료, 추정 71·기성 12·잔여 59인일(17%)이다. 전체 원장은 추정 563·기성 138·잔여 425인일이며 별도 미산정은 유지한다. 다른 14행은 소스 구현과 부분 실행 증거가 있어도 완료선 전체를 통과하지 않았으므로 progress·기성 0이다.
@@ -69,3 +101,5 @@ master의 동일 조건 capture는 없다. 원래 사용자 `.ceprof`는 incompl
 5. **TFG9**: NVIDIA/AMD/Intel/통합 GPU 지원 행렬, 동일 조건 master/현재 성능 반복 비교, 외부 물리 pacing/latency 측정. 필요한 다른 GPU/측정 장비 없이 완료로 표시하지 않는다.
 
 Vulkan 실행 비교는 PHASE 4.9가 소유한다. 과거 계획/실행 기록은 당시 스냅샷으로 보존하며 현재 판정은 본 체크포인트와 현행 공수 원장을 따른다.
+
+</details>

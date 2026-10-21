@@ -1,5 +1,50 @@
 # Lattice Material × Blender Shader Editor 대응표 초안
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:297](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L297) — `const auto layout = LayoutEditorTitleBar(ImGui::GetWindowWidth(), ImGui::GetWindowHeight(), scale);`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:315](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L315) — `const bool compact = ImGui::GetCursorScreenPos().x + menuWidth + 24.f * scale > rowMin.x + layout.playLeft;`
+- [Editor/EngineGUIWindow/MenuBarWindow.cpp:588](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MenuBarWindow.cpp#L588) — `EditorWindowChrome::Get().DrawTitleBarTail(layout, menuEnd);`
+- [Editor/EngineGUIWindow/AnimatorEditorWindows.cpp:534](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/AnimatorEditorWindows.cpp#L534) — `GetControllerNodeEditor(controller)->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);`
+- [Editor/EngineGUIWindow/AnimatorEditorWindows.cpp:538](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/AnimatorEditorWindows.cpp#L538) — `GetControllerNodeEditor(controller)->DrawLink(&linkIndex);`
+- [Editor/EngineGUIWindow/AnimatorEditorWindows.cpp:579](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/AnimatorEditorWindows.cpp#L579) — `GetControllerNodeEditor(controller)->MakeNewLink(&targetNodeIndex);`
+- [Tools/LatticeExample/ExportBlenderShaderSchema.py:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/ExportBlenderShaderSchema.py#L45) — `def enum_variants(node, default_sockets):`
+- [Tools/LatticeExample/ExportBlenderShaderSchema.py:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/ExportBlenderShaderSchema.py#L54) — `for item in prop.enum_items:`
+- [Tools/LatticeExample/ExportBlenderShaderSchema.py:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/ExportBlenderShaderSchema.py#L81) — `raise SystemExit("Expected exactly one output JSON path after --")`
+- [Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json#L5) — `"variant_rule": "Each writable enum changes alone from the node default; enum combinations are not enumerated.",`
+- [Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json:7318](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json#L7318) — `"label": "Mix (Legacy)",`
+- [Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json:8497](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/LatticeExample/fixtures/blender-5.1.1-shader-nodes.json#L8497) — `"label": "Squeeze Value (Legacy)",`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [Lattice/Core/LXGraph.h:103](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L103) — `struct LXLayout`
+- [Lattice/Core/LXGraph.h:112](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L112) — `struct Link`
+- [Lattice/Core/LXGraph.h:200](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Lattice/Core/LXGraph.h#L200) — `const LXLayout& Layout() const { return layout_; }`
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-10-02 현재 지원 재평가 · LX-0 실측 기준선은 2026-09-24 보존.** 비교 기준은 Blender 5.1.1 Shader Editor다.
 기준 자료는 Blender의 [Shader Nodes 설명](https://docs.blender.org/manual/en/5.1/render/shader_nodes/introduction.html),
 [노드 편집 동작](https://docs.blender.org/manual/en/5.1/interface/controls/nodes/editing.html),
@@ -150,3 +195,5 @@ Slang으로 낮추고 실제 texture/sampler GPU와 DXIL/SPIR-V로 검증했다.
 해석한다. 엔진의 `LXMultiply*`·`LXTextureSample`·6입력 `LXPrincipledVolume`을 추가했다.
 이 정의를 Blender Math/Mix/full Volume의 1:1 구현으로 표시하지 않는다.
 Editor 위젯/preview·HTTP 기본 연결은 구현돼 있다. 전체 저작/수명 마감은 LX-3/LX-3H, 제품 ShaderMeta·공통 재질 소비는 MAT-7, 전체 rendered parity/성능은 MAT-9에 남는다.
+
+</details>

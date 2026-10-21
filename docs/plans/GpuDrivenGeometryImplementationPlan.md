@@ -1,221 +1,56 @@
 # GPU-driven geometry implementation slices
 
-Baseline: `ef829373c41138b8f47dd4011b076e1ec4d5829f` (2026-10-06).
-Merged to master by PR #123 (`5ca4e82a`, 2026-10-06). Only the narrow DX12 checks listed in
-[merge and first execution](#merge-and-first-execution-2026-10-06) ran; it is not a completed
-or broadly runtime-validated feature.
+> 2026-10-20 정리 · master `27de3f5a02aadde7456aab680db3184c36ee735e` · 잔여 구현·수용 계획
 
-## Goal and boundaries
+판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
 
-2026-10-09 lattice follow-up: opaque/masked SceneHost camera/shadow consumers now
-have a capability-gated mesh shader route with the existing GPU draw visibility.
-Release DX12 TestShadow produced 64 byte-identical indexed/mesh attachment comparisons
-and mesh-route GPU validation reported zero problems. See
-[implementation and exact acceptance scope](../analysis/LatticeMeshletRendering20261009.md).
-Lattice meshlet-level compaction/culling, LOD, broader backend/material acceptance and
-performance remain unearned; this does not close GPU-1.
+[전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/GpuDrivenGeometryImplementationPlan.md)
 
-Later on 2026-10-09, LX gained posed-vertex per-meshlet frustum rejection,
-CPU selection/submission of authored geometric LODs, independent LOD0 shadow
-geometry, current-frame LX depth followed by draw HZB, and cache admission before
-topology construction. Debug/Release passed 8 combinations / 192 frames with GPU
-validation 0; Release TestShadow had 32 byte-identical attachment comparisons.
-GPU LOD selection, visible-meshlet compaction, per-meshlet HZB, light-space LOD,
-LOD-scene quality and pressure/performance/Vulkan gates remain unearned. See
-[LX integration and evidence](../analysis/LatticeGeometryIntegration20261009.md).
+## 남은 작업과 완료 판정
 
-For supported production opaque/masked geometry, the GPU selects visibility and LOD,
-compacts bounded work, and produces draw/dispatch arguments. CPU scene publication,
-material/PSO bins and command submission remain explicit responsibilities. Existing
-indexed rendering remains the capability and authoring-contract fallback. Arbitrary
-custom vertex deformation and sorted transparency are not implicitly supported.
-No DXR, Work Graphs, shadow-cache resurrection or frame-pacing changes are included.
+- GD 소스 구현·첫 장면 증거 이후 CPU 정답 가시 집합, 용량 초과·카메라 cut/resize·material route 동등성과 Release 비용/VRAM을 수용한다.
+- 현재 resident scene packets·visibility arenas·REAC primitive cache/instance admission을 기준으로 검증한다. 과거 CPU 전체 재작성 전제를 재도입하지 않는다. Vulkan 제품 비교는 BackendParityPlan에 남긴다.
 
-## Reviewed incremental sequence
+## 적용할 구조와 경계
 
-1. Build meshlets from the finalized authoring ModelDraft, before CEMC serialization,
-   hashing and staging. Store descriptor/bounds, uint32 vertex remap, byte triangle
-   indices and source primitive remap in the same immutable model generation.
-   Preserve indexed geometry. Version the builder/profile and bind derived data to
-   the finalized vertex/index content. Never rebuild model geometry in player cook.
-2. Extend indexed GPU visibility coherently to supported skinned geometry in Enhanced
-   and LX GBuffer. Carry conservative animated bounds and bone offsets; an instance-ID
-   resource declaration alone is not a custom shader semantic contract.
-3. Add GPU LOD selection and conservative occlusion as separate graph-owned stages.
-   Current depth/history validity must cover camera cuts, resize, device/view/scene
-   generations and disocclusion. Invalid/near-plane/uncertain cases remain visible.
-4. Add capability-gated mesh shader compilation, pipelines, generation-owned uploads
-   and bounded dispatch to both DX12 and Vulkan. Preserve indexed fallback. Disable
-   unsafe bind-pose cone tests for skinned/deformed/mirrored/non-uniform geometry.
-5. Independently review all producer/consumer ABI, resource lifetime, bounds, barriers,
-   counters/overflow and fallback contracts before treating the slices as integrated.
+`material document → compiled program → sealed scene inputs → material graph stages → RHI submission`
 
-LOD0-only meshlet authoring is infrastructure, not GPU LOD selection. Indexed indirect
-is already implemented at the baseline; it is not evidence of mesh shader/HZB support.
-The existing design document is a proposal and includes stale pre-indirect observations.
+위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.
 
-## Authoring and storage contract
+## master 소스 근거
 
-- Model identity stays unchanged; no standalone meshlet GUID or global DDC is added
-- Editor publishes `Library/ModelAssetGenerations/<ModelId>/<generation>/model.cemc`
-- Cook validates/exports that generation to `Derived/Models/<xx>/<ModelId>/<generation>/`
-- Meshlets never cross mesh/material or LOD boundaries
-- The pinned vcpkg baseline `9e593bb18ea69cc5095e012465dcd675a822ed0d`
-  selects meshoptimizer 1.2. Its API supports the 64-vertex/126-triangle profile
-- Bad or unavailable derived meshlet data must never be interpreted as valid GPU work
-- CEMC v11 is the only accepted cooked model format. The v9 (indexed-only) and v10
-  (meshlet) readers were removed in `bf3fe4f3`; older generations are rejected as
-  "reimport required". No source fallback at runtime or silent replacement of an
-  immutable published generation is introduced
+모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.
 
-## Verification status
+- [Engine/RenderEngine/Experiment/MaterialResolver.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/MaterialResolver.cpp#L23) — `bool NormalizeMaterialKeywordSelections(const Material& material,`
+- [Engine/RenderEngine/LXMaterialPipeline.h:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/LXMaterialPipeline.h#L18) — `std::string dependencies, sealedProgramIdentity;`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:90](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L90) — `using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;`
+- [Engine/RenderEngine/RenderScene.h:59](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L59) — `bool BeginProxyFrame(uint64_t sceneEpoch);`
 
-Historical (before merge; superseded by the merge section below). Only source inspection and static diff/contract reviews are authorized for this task.
-Builds, shader compilation, automated tests, executable probes, GPU captures and runtime
-measurements are deliberately unrun. Review findings and these unrun acceptance gates
-must accompany each published slice. No merge or runtime verification is implied.
+## 검증 경계
 
-## Initial meshlet authoring usage
+이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.
 
-Meshlet generation is explicitly opt-in and defaults off for existing and new assets.
-At merge, all 11 tracked model sidecars were republished with `buildMeshlets=true` and
-`lodLevels=3` (`bf3fe4f3`); skinned meshes skip coarse levels and unreducible meshes keep
-LOD0 with a cooker warning.
-The choice is persisted as `importSettings.buildMeshlets` in the model sidecar. In the
-Content Browser, a model source offers `Model import / Enable meshlets and reimport`
-and the corresponding disable action. Both use the game-thread command service and
-the same atomic authoring transaction. CLI authoring accepts `--build-meshlets true`
-or `false` with `--author-model-asset`; ordinary cook rejects this authoring override.
-Reimport without an override retains the persisted setting. Enabling/disabling creates
-a new immutable generation; it never patches or silently rebuilds an existing one.
-The profile/builder/library versions and all finalized vertex/index bytes are included
-in the meshlet digest. Each enabled authoring transaction rebuilds before CEMC hashing,
-so source timestamps and stable model identity cannot make old acceleration data fresh.
+<details><summary>이전 절 링크 호환</summary>
 
-## Runtime checkpoint 1 (source integrated, execution unverified)
+이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.
 
-- Exact standard static opaque GBuffer generations can use capability-gated DX12/Vulkan
-  mesh pipelines and GPU meshlet frustum compaction with bounded indirect dispatch
-- Opt-in static coarse LODs retain the original vertices/indices and material boundary;
-  each coarse meshlet primitive remap names that level's own finalized triangle ordinal
-- GPU selection uses the stored simplification metric, transformed/projection-scaled to
-  a one-pixel threshold. This is not a certified Hausdorff error or measured quality guarantee
-- All level frames publish atomically; one unsupported level falls back to indexed LOD0
-- Standard skinned Enhanced/LX geometry uses indexed GPU visibility with sealed pose
-  validation. Unknown custom deformation stays conservative/direct; custom indexed ID
-  indirection requires the explicit versioned ShaderMeta semantic contract
-- LX has current-frame HZB from the earlier native depth version. Native HZB is the next
-  separate slice; it requires depth and main draws to use the same selected LOD topology
-- Shadows retain the original independent caster set and raster path at this checkpoint
-- Skinned, masked, custom/generated-special mesh shading/LOD, and sorted transparent
-  rendering retain existing paths. No unsafe deformation error or cone test is invented
-- The existing debug view reports prepared mesh batches and a fallback diagnostic. These
-  are CPU route observations, not GPU-visible counts or performance measurements
+<span id="authoring-and-storage-contract"></span>
+<span id="goal-and-boundaries"></span>
+<span id="initial-meshlet-authoring-usage"></span>
+<span id="material-coverage-extension-current-source-checkpoint"></span>
+<span id="merge-and-first-execution-2026-10-06"></span>
+<span id="reviewed-incremental-sequence"></span>
+<span id="runtime-checkpoint-1-source-integrated-execution-unverified"></span>
+<span id="runtime-checkpoint-2-source-integrated-execution-unverified"></span>
+<span id="sec-authoring-and-storage-contract"></span>
+<span id="sec-goal-and-boundaries"></span>
+<span id="sec-initial-meshlet-authoring-usage"></span>
+<span id="sec-material-coverage-extension-current-source-checkpoint"></span>
+<span id="sec-merge-and-first-execution-2026-10-06"></span>
+<span id="sec-reviewed-incremental-sequence"></span>
+<span id="sec-runtime-checkpoint-1-source-integrated-execution-unverified"></span>
+<span id="sec-runtime-checkpoint-2-source-integrated-execution-unverified"></span>
+<span id="sec-verification-status"></span>
+<span id="verification-status"></span>
 
-Coarse LOD authoring is opt-in (`importSettings.lodLevels`, 0 by default, at most 7).
-The Content Browser offers three-level generation/reimport and disabling coarse LODs;
-CLI authoring accepts `--lod-levels 0..7`. Positive requests enable meshlets too; disabling
-meshlets disables coarse generation. Skinned/unreducible meshes retain LOD0 with authoring
-warnings. The default simplifier locks borders and uses direct-from-base reductions.
-
-Static reviews corrected pose overflow and shared-palette mismatches, conservative camera
-admission, optional payload range/count amplification, typed PSO binding checks, and
-recording-owner teardown. These reviews do not substitute for the deliberately unrun
-C++/Slang builds, backend validation, image parity, animation/camera-cut/resize cases or
-GPU timing and memory measurements.
-
-## Runtime checkpoint 2 (source integrated, execution unverified)
-
-Native GBuffer now has a separate current-frame D32 occluder pass and one shared
-farthest-depth pyramid. Only proved standard opaque depth writers donate depth;
-masked/custom/ordered geometry does not silently become an opaque occluder. Depth and
-color use the same vertex evaluation and fragment discard logic. For mesh-shader LOD
-batches, color visibility filters the exact prior GPU-selected pair list/count, so the
-donor silhouette cannot differ because another shader recomputed LOD. The original
-GBuffer clear/depth comparison remains unchanged. Invalid bounds, near-plane/W crossings,
-nonfinite depth and ambiguous boundary comparisons retain geometry. Nonstandard/custom
-pixel-depth semantics bypass occlusion. Missing optional prerequisites restore the whole
-view's frustum route; failures after donor recording abort rather than leave phantom depth.
-
-Native directional shadows now compact independent LOD0 caster candidates per cascade
-and produce indexed indirect arguments on the GPU. The receiver-cylinder selection,
-cascade fitting, alpha coverage, sidedness and independent LX shadow modification remain.
-Camera-visible lists/HZB are never used to choose shadow casters. Unproven skin/custom
-bounds stay conservative; submitted candidates/bins are labeled separately from unknown
-GPU-visible counts. Existing cascade fit behavior for malformed legacy skin is not a
-correctness guarantee for unsupported deformation data.
-
-Both production backends establish the existing upload-prefix boundary before preparing
-recording-owned visibility and refresh the already-sealed animation palette into that
-consuming recording. Native skin shaders bounds-check active bone indices and never fetch
-zero-weight sentinel influences. Invalid legacy skin is a compatibility/diagnostic path,
-not a new promise of equivalent malformed-data animation.
-
-Coverage limits remain explicit:
-
-- GPU LOD is enabled only for eligible mesh-shader assets/devices; indexed compatibility
-  retains GPU instance visibility and LOD0
-- Skinned LOD/mesh shading, arbitrary custom deformation, ordered transparency and DXR
-  are not implemented by this milestone
-- Cone rejection is disabled; nonuniform/mirrored/deformed geometry is never rejected
-  using an unsafe bind-pose cone
-- The depth prepass itself processes selected geometry. No saved vertex work, speedup,
-  memory reduction or visual parity has been measured
-- Extreme finite source coordinates may exceed meshoptimizer's useful floating-point
-  conditioning before post-build bounds checks; normalized authoring inputs are a future
-  robustness extension, not a verified capability of this profile
-
-Completed verification here consists only of independent source-contract reviews,
-whitespace/diff checks, and reading project XML/source registrations. No compiler, shader
-compiler, tests, executable probe, renderer, capture or GPU timing was run.
-
-## Material coverage extension (current source checkpoint)
-
-Material-based direct submission gates have been removed from accepted native and LX
-scene geometry routes. Transparency, refraction, custom/skinned Forward, special captures,
-independent shadows, decals and simple world sprites now use GPU-produced arguments on
-capable backends while preserving original shaders, order and effects. Unknown semantics
-use conservative preserved-stream indirect commands. Hardware compatibility remains.
-See [material coverage](../analysis/GpuDrivenMaterialCoverage.md) for exact route semantics,
-pre-existing unsupported features, diagnostics and deliberately unrun acceptance.
-
-## Merge and first execution (2026-10-06)
-
-PR #123 merged the six reviewed slices plus `bf3fe4f3` (v9/v10 reader removal and a
-meshlet/LOD recook of every tracked model) as `5ca4e82a`. The checks recorded at merge are
-the first executed evidence for this milestone:
-
-- `experiment.cooked` 466/466 passed on the v11-only codec
-- Editor with the native route forced, DX12: meshlet GBuffer is bit-identical to the indexed
-  route on the tested scene, distant geometry switches to coarse LODs, and HZB on/off images
-  match. DX12 debug-layer validation errors: 0
-
-Historical red at merge (resolved by the 2026-10-07 fixture repair below): the `dx12.decal` and `dx12.rendergraph` checks drive passes
-directly without GPU visibility preparation and end in an exception.
-
-Mapping to the design slices in [GpuDrivenMeshletDxrWiring.md](../design/GpuDrivenMeshletDxrWiring.md#11-구현-슬라이스와-회귀-게이트):
-
-| Slice | Source | Executed evidence | Still open |
-|---|---|---|---|
-| GD0 | Integrated | DX12 runs the capability-gated path; validation 0 | Unsupported-combination/bad-slice rejection tests; Vulkan run |
-| GD1 | Integrated | Bit-identical meshlet vs indexed GBuffer (one scene, DX12) | Depth/coverage/material comparison over the required fixture set |
-| GD2 | Integrated | Implied by GD1 image only | CPU oracle visible set, capacity limit/overflow fallback |
-| GD3 | Integrated (current-frame HZB) | HZB on/off image identical (static view) | Camera cut, resize, moving occluder, near plane: zero missing geometry |
-| HY1 | Partial: static LOD, indexed skinned visibility | Coarse LOD switch observed | LOD error budget, skinned mesh-shader LOD, masked mesh shading, deformation |
-| RT0, RT1, HY0 | Not started | none | all |
-
-Material coverage routes (transparent, refraction, special captures, decals, sprites,
-independent shadows) have no executed parity check beyond the scenes above.
-
-Next work, in order:
-
-1. Completed 2026-10-07: direct pass fixtures prepare GPU visibility; `dx12.decal` and
-   `dx12.rendergraph` pass in Debug/Release with GPU validation 0 and normal exit.
-   See [RG5 closure inspection](../analysis/RenderRg5Closure20261007.md). This repairs the
-   harness; it does not close GPU-driven material parity or the full RG5 migration
-2. Fixture-backed GD2/GD3 acceptance: CPU-oracle visible set, capacity overflow, cut/resize/
-   moving occluder, multiple views and two in-flight frames
-3. Material route parity for transparency/refraction/decal/sprite/shadow scenes
-4. Release performance and memory: CPU prepare/record, cull/bin, prepass and raster p50/p95,
-   peak VRAM, upload bytes, against the indexed route on the same binary and assets
-5. Vulkan execution belongs to PHASE 4.9 (the editor is DX12-only)
+</details>

@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>Principled Material 공용 Slang ABI — MAT-1 / MAT-3 / MAT-4 / MAT-5</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="../analysis/MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="PrincipledMaterialAbi.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/design/PrincipledMaterialAbi.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>Principled Material 공용 Slang ABI — MAT-1 / MAT-3 / MAT-4 / MAT-5</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="../analysis/MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L7">Tools/regression/verify-material-abi.ps1:7</a> — <code>$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..\..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L8">Tools/regression/verify-material-abi.ps1:8</a> — <code>if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-abi.ps1#L9">Tools/regression/verify-material-abi.ps1:9</a> — <code>$vswhere = Join-Path ${env:ProgramFiles(x86)} &#39;Microsoft Visual Studio\Installer\vswhere.exe&#39;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L135">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:135</a> — <code>MaterialInputs DefaultMaterialInputs(float3 geometricNormal = float3(0.0, 0.0, 1.0),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L280">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:280</a> — <code>PrincipledSurface EvaluateStandardMaterial(MaterialInputs inputs)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang#L297">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang:297</a> — <code>PrincipledSurface UnpackStandardSurface(float4 baseColor, float4 orm,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang#L1">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang:1</a> — <code>#pragma once</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p><strong>2026-09-28 · 공용 평가 경계와 core/Layered/Special Principled 의미</strong></p>
+<p>정본 코드는
+<a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang"><code>PrincipledSurface.slang</code></a>이다.
+이 계약은 <a href="../plans/BlenderMaterialGraphPlan.html"><code>BlenderMaterialGraphPlan.md</code></a>의
+<code>MAT-1</code>에서 시작했다. <code>MAT-3</code>의 값·Fresnel·IBL 계약과 검증은
+<a href="PrincipledCoreSemantics.html">PrincipledCoreSemantics.md</a>에 기록한다.
+<code>MAT-4</code>의 coat/sheen/anisotropy/thin film 의미·비용·검증은
+<a href="PrincipledLayeredSemantics.html">PrincipledLayeredSemantics.md</a>가 소유한다.
+<code>MAT-5</code>의 transmission/subsurface/별도 Volume closure와 Forward 자원 요구 조건은
+<a href="PrincipledSpecialSemantics.html">PrincipledSpecialSemantics.md</a>가 소유한다.</p>
+<h2>1. 평가와 소비</h2>
+<pre><code class="language-text">core 입력 / 이후 generated graph 값
+    → DefaultMaterialInputs → EvaluateMaterial → PrincipledSurface
+    → BuildPbrSurface / EvaluatePrincipledIbl(PrincipledIblIntegral)
+
+Layered 정적 mask의 generated 값
+    → EvaluateMaterial → PrincipledSurface + prepared PrincipledLayeredIntegral
+    → BuildPbrSurface / EvaluateLayeredIbl
+
+Special 정적 mask의 generated 값 + 별도 VolumeInputs
+    → EvaluateMaterial / EvaluateVolume
+    → BuildSpecialForwardSurface(prepared integral)
+    → 분리된 local/subsurface/transmission + prepared medium segment 합성
+
+현행 glTF texture sample × property
+    → MakeStandardMaterialInputs → EvaluateStandardMaterial → PrincipledSurface
+        ├─ GBuffer 기존 MRT → UnpackStandardSurface → Deferred
+        └─ Forward
+    → BuildPbrSurface / EvaluateStandardIbl(float2 DFG)
+</code></pre>
+<ul>
+<li><code>MaterialInputs</code>는 재질의 값 입력이다. 현재 <code>MakeStandardMaterialInputs</code>가
+texture×factor와 emission strength를 현행 규칙대로 합성한다.</li>
+<li><code>PrincipledSurface</code>는 평가 결과다. 직접광의 위치·시선·DFG·광원 목록은 포함하지 않는다.
+해당 조명 상태는 <code>PbrSurface</code>가 갖는다.</li>
+<li>GBuffer와 Forward가 같은 <code>EvaluateStandardMaterial</code> 호환 어댑터를 호출한다. Deferred는 기존 MRT의
+값을 <code>UnpackStandardSurface</code>로 복원하고 Forward와 같은 직접광·IBL 어댑터를 쓴다.</li>
+<li>두 형식은 셰이더 내부의 논리 값이다. C++ cbuffer나 자산 파일의 byte layout으로
+직렬화하지 않는다. 현행 b2 숫자 offset, texture register와 MRT 형식은 유지한다.</li>
+</ul>
+<h2>2. 값의 의미</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>필드</th>
+<th>현재 계약</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>baseColor</code></td>
+<td>scene-linear RGB. Alpha와 별도</td>
+</tr>
+<tr>
+<td><code>alpha</code></td>
+<td>core는 saturate된 opacity. Standard는 기존 coverage 적용 결과. Transmission과 별도</td>
+</tr>
+<tr>
+<td><code>normal</code></td>
+<td>world-space 단위 normal. core의 미연결·무효 값은 geometric normal을 사용</td>
+</tr>
+<tr>
+<td><code>roughness</code>, <code>metallic</code></td>
+<td>core는 saturate. Standard는 원래 texture×factor를 MRT에서 보존하고 조명 경계에서 saturate</td>
+</tr>
+<tr>
+<td><code>emissionColor</code>, <code>emissionStrength</code> → <code>emission</code></td>
+<td>scene-linear HDR RGB와 scalar 입력을 곱한 평가 결과. 1.0 초과 값 보존</td>
+</tr>
+<tr>
+<td><code>occlusion</code></td>
+<td>독립 AO.R과 strength로 평가한 값. Deferred의 화면 AO는 복원 후 곱함</td>
+</tr>
+<tr>
+<td><code>ior</code>, <code>specularIorLevel</code>, <code>specularTint</code></td>
+<td>core는 F0·유효 IOR·금속 F82 Tint로 평가. Standard는 기존 F0=0.04와 Schlick/DFG 유지</td>
+</tr>
+<tr>
+<td><code>coatWeight/Roughness/Ior/Tint/Normal</code>, <code>sheenWeight/Roughness/Tint</code></td>
+<td>MAT-4의 레이어 입력·평가 값. 별도 Normal과 에너지 감쇠</td>
+</tr>
+<tr>
+<td><code>anisotropy/Rotation</code>, <code>tangent</code>, <code>thinFilmThickness/Ior</code></td>
+<td>MAT-4의 방향 프레임과 nm 단위 film. RGB 파장 근사</td>
+</tr>
+<tr>
+<td><code>transmissionWeight/Ior/F0/FilmIor</code></td>
+<td>MAT-5 glass 비중과 authored IOR·tint, front/back 상대 IOR</td>
+</tr>
+<tr>
+<td><code>subsurfaceWeight/Radius/Scale/Ior/Anisotropy</code></td>
+<td>MAT-5 RGB 확산 profile과 local/nonlocal 비중</td>
+</tr>
+<tr>
+<td><code>VolumeInputs</code> → <code>PrincipledVolume</code></td>
+<td>별도 Output closure. scattering/absorption/emission 계수. Surface의 density 필드로 직렬화하지 않음</td>
+</tr>
+</tbody></table></div>
+<p><code>DefaultMaterialInputs</code>는 Blender core 기본값(base=0.8, roughness=0.5)을 사용한다.
+<code>DefaultStandardMaterialInputs</code>는 현행 glTF white/roughness=1 호환 기본값이다.
+이 구조를 Blender 전체 소켓 schema로 사용하지 않는다. 그 schema는 LX 대응표와 MAT-2가
+소유하며, layered 의미는 MAT-4, special 공용 의미는 MAT-5에서 구현했다.</p>
+<h2>3. 정적 기능 마스크</h2>
+<p><code>MaterialFeatureMask</code>는 <code>uint</code>이며 <code>LX_MATERIAL_FEATURE_MASK</code>의 숫자 literal에서
+셰이더 컴파일 때 고정된다. <code>PrincipledSurface</code>에 runtime mask 필드를 넣지 않는다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th align="right">bit</th>
+<th>기능</th>
+<th>현재 평가 모듈 지원</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="right">0</td>
+<td>Base Color</td>
+<td>지원</td>
+</tr>
+<tr>
+<td align="right">1</td>
+<td>Metallic/Roughness</td>
+<td>지원</td>
+</tr>
+<tr>
+<td align="right">2</td>
+<td>Normal</td>
+<td>지원</td>
+</tr>
+<tr>
+<td align="right">3</td>
+<td>Alpha</td>
+<td>지원</td>
+</tr>
+<tr>
+<td align="right">4</td>
+<td>Emission</td>
+<td>지원</td>
+</tr>
+<tr>
+<td align="right">5</td>
+<td>Occlusion</td>
+<td>지원</td>
+</tr>
+<tr>
+<td align="right">6</td>
+<td>Specular/IOR</td>
+<td>MAT-3 지원, 고정 Standard pass binding은 MAT-7 후속</td>
+</tr>
+<tr>
+<td align="right">7&#126;10</td>
+<td>Coat, Sheen, Anisotropy, Iridescence</td>
+<td>MAT-4 지원. 제품 route/binding은 MAT-7 후속</td>
+</tr>
+<tr>
+<td align="right">11&#126;13</td>
+<td>Transmission, Subsurface, Volume</td>
+<td>MAT-5 공용 평가·Forward 요구 조건 지원. 제품 binding은 MAT-7 후속</td>
+</tr>
+</tbody></table></div>
+<p>공용 모듈의 알려진 마스크는 <code>0x3FFF</code>다. Layered·Transmission·Subsurface bit에는
+core Specular/IOR bit가 필요하다. Volume-only는 그 의존성이 없다.
+Special은 <code>LX_MATERIAL_ROUTE=2</code>와 별도 consumer를 요구한다.
+현행 고정 Standard 경로는 <code>0x003F</code>를 선언한다.
+<code>StandardMaterialRoute.slang</code>은 고정 pass에 bit 6&#126;13을 요청하면 아직 없는
+MRT/IBL lookup 또는 Special Forward binding을 지목해 거부한다.
+Generic <code>PbrSurface</code>도 Special을 거부하고, 공용 모듈은 unknown bit와 잘못된
+feature 의존성을 컴파일 오류로 거부한다. 지원하지 않는 lobe를 Standard 출력으로
+조용히 바꾸지 않는다. Graph feature 추출, sample/lobe 제거와 자동 route 선택은
+<code>MAT-6/MAT-7</code>의 작업이며 이 마스크 선언만으로 구현 완료로 세지 않는다.</p>
+<h2>4. 검증 결과</h2>
+<p>아래는 MAT-1의 최초 결과다. MAT-5의 현재 ABI 게이트는 기존 70개 엔트리와
+unknown 4건, 미배선 core/Layered 고정 route 30건, Special 고정 route 24건,
+총 <strong>58건 거부</strong>를 검사한다.
+core DXIL/SPIR-V·실제 GPU 의미 검사는 <a href="PrincipledCoreSemantics.html#%EA%B2%80%EC%A6%9D">MAT-3 결과</a>를 따른다.
+Layered DXIL/SPIR-V 14개·의존 mask 거부 8개와 독립 GPU/numeric golden은 <a href="PrincipledLayeredSemantics.html#%EA%B2%80%EC%A6%9D">MAT-4 결과</a>를 따른다.
+Special DXIL/SPIR-V CS/PS 28개·route/의존 mask 거부 22개와 GPU/numeric golden은
+<a href="PrincipledSpecialSemantics.html#%EA%B2%80%EC%A6%9D">MAT-5 결과</a>를 따른다.</p>
+<h3>MAT-1 최초 검증 기록</h3>
+<ul>
+<li><code>Tools/regression/verify-material-abi.ps1</code>: VS18 MSVC로 독립 프로브를 빌드하고
+저장소의 <strong>Slang 2026.14·고정 DXC</strong>만 적재했다. 설치된 SDK 컴파일러를 대체 경로로 쓰지 않는다.</li>
+<li>DXIL·SPIR-V의 GBuffer, Deferred, Forward, Water/Wind, full/reduced,
+legacy/packed UV1·color·skinning과 reference 경로 <strong>70개 엔트리 컴파일 통과</strong>.
+Vulkan binding shift와 DX cbuffer layout, warnings-as-errors는 제품 설정을 따른다.</li>
+<li>MAT-1 당시 Coat <code>0x80</code>과 unknown <code>0x40000000</code>을 양 backend에서 넣은
+<strong>4개 실패 사례가 지정한 미지원 마스크 진단으로 거부</strong>됐다.</li>
+<li>기존 Debug Editor host에 <code>--development-project</code>로 이 작업 공간을 지정해
+변경한 Slang을 제품의 컴파일러·PSO·GPU readback 경로에서 검증했다.
+C++ 엔진 전체를 새로 빌드한 결과로 보고하지 않는다.</li>
+</ul>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>GPU 검사</th>
+<th>결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dx12.gbuffer</code></td>
+<td>Diffuse=(0.2,0.4,0.6), ORM=(1,0.75,0.25), Normal=(0.5,0.5,0), Emission=(0,0,0), Bitmask=43981 기대값 통과</td>
+</tr>
+<tr>
+<td><code>dx12.forwardshade</code></td>
+<td>Water/Wind b2·texture reflection·variant·실패 거부 통과. Forward+/reference 16,384 픽셀 불일치 0</td>
+</tr>
+<tr>
+<td><code>dx12.iblshade</code></td>
+<td>환경 방향·매끈 금속·AO 소비 통과. 직접광 AO 변경 차이 0.0</td>
+</tr>
+</tbody></table></div>
+<p>이는 공용 ABI의 컴파일·현행 Standard 동작 검증이다. Blender golden과의 수치 일치,
+실제 제품 씬의 Deferred/Forward 교차 허용 오차와 성능 상한은 <code>MAT-9</code>에서 판정한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-평가와-소비"></span><span id="2-값의-의미"></span><span id="3-정적-기능-마스크"></span><span id="4-검증-결과"></span><span id="mat-1-최초-검증-기록"></span><span id="sec-1-평가와-소비"></span><span id="sec-2-값의-의미"></span><span id="sec-3-정적-기능-마스크"></span><span id="sec-4-검증-결과"></span></details></main></body></html>

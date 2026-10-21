@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG8 구조 수정 1 — 큐 배치·기록 저장소 재사용</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg8Batching20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg8Batching20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG8 구조 수정 1 — 큐 배치·기록 저장소 재사용</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L25">Tools/regression/audit-rg8-adoption.py:25</a> — <code>raise ValueError(message)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L56">Tools/regression/audit-rg8-adoption.py:56</a> — <code>&quot;skybox&quot;: Path(manifest[&quot;skyBoxPath&quot;]).name}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/audit-rg8-adoption.py#L121">Tools/regression/audit-rg8-adoption.py:121</a> — <code>assignment = {p: (i, b[&quot;queue&quot;]) for i, b in enumerate(batches) for p in b[&quot;passes&quot;]}</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L28">Engine/Utility_Framework/Sha256.h:28</a> — <code>class Sha256</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30">Engine/Utility_Framework/Sha256.h:30</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L40">Engine/Utility_Framework/Sha256.h:40</a> — <code>std::memcpy(m_buffer + m_bufferUsed, p, take);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>후속: <a href="RenderRg8Barriers20261009.html">구조 수정 2</a>에서 단일 큐 compiled barrier 재사용과 다중 큐 배치 내부 상태 유지를 적용했다. 아래 수치는 수정 1 바이너리의 기록이다.</p>
+<p><a href="RenderRg7Rg8StructuralAudit20261009.html">구조 감사</a>의 패스별 native allocator/list 생성과
+제출 문제를 먼저 수정한다. RG8은 progress·기성 0·기본 OFF를 유지한다.
+COMMON 왕복/상태 계획 단일화, overlap에 따른 후보 선택, RG7 조합은 이번 변경의 완료 범위가 아니다.</p>
+<h2>변경</h2>
+<ul>
+<li>같은 큐의 연속 패스를 하나의 command list로 기록한다. 교차 의존의 producer 뒤와
+consumer 앞은 끊어서 독립 작업이 불필요하게 대기하지 않게 한다.</li>
+<li>같은 producer queue의 더 높은 timeline 값이 낮은 값을 포함한다는 계약으로 중복/지배된
+Wait를 제거한다. 각 패스의 완료점은 소속 batch의 완료점으로 게시한다.</li>
+<li>DX12 queue endpoint가 기록 저장소 풀을 소유한다. DIRECT와 COMPUTE 및 서로 다른 queue/device의
+저장소를 섞지 않는다. 기존 DIRECT 전용 frame/worker pool을 COMPUTE 큐와 억지로 공유하지 않는다.</li>
+<li>GPU 완료 후 pending 소유권과 호출자 소유권이 모두 해제된 저장소만 allocator/list Reset에 재사용한다.
+캐시는 native allocator/list만 보관하며 graph/descriptor/resource 소유권을 보관하지 않는다.
+큐당 반환 저장소 32개를 상한으로 두고 나머지는 해제한다.</li>
+<li>callback/Close 실패한 저장소는 캐시하지 않는다. 제출 후 Signal 실패로 격리된 batch는
+검증된 shutdown까지 대여 상태를 유지하며, shutdown은 캐시 재진입을 닫고 보유 저장소를 해제한다.</li>
+<li>제품 종료 로그에 created/reused/leased/cached를 기록한다. 단순 GPU 시간뿐 아니라
+실제 native 저장소 생성과 batch 수 감소를 검증한다.</li>
+</ul>
+<p>이 단계는 native 생성/제출 비용 수정이다. graphics 기록의 기존 worker 분할을 owned 실행기와
+통합하거나 compiled barrier 계획을 통합한 단계는 아니다.</p>
+<h2>검사</h2>
+<p>기존 Editor의 queue execution 검사에 다음을 추가했다.</p>
+<ul>
+<li>지연 GPU의 저장소가 반환되지 않는지 확인.</li>
+<li>완료된 저장소 재사용에서 생성 수가 증가하지 않는지 확인.</li>
+<li>GPU가 완료돼도 호출자가 batch를 잡고 있으면 독점 대여가 유지되는지 확인.</li>
+<li>Signal 실패 격리와 shutdown 이후 leased/cache 해제를 확인.</li>
+<li>교차 의존 전후의 독립 패스를 추가해 batch 병합이 대기 경계를 넘지 않는지 확인.</li>
+</ul>
+<p>VS 2026 Debug·Release 빌드와 각 구성 native/frame/profiler <strong>147검사</strong>, queue plan <strong>24검사</strong> 및 전체 RenderGraph 회귀가
+GPU validation 오류 0·exit 0으로 통과했다. 별도 테스트 프로젝트를 만들지 않고 기존 Editor를 사용했다.
+증거: <code>Build/Verification/Phase43/RG8Batching20261009/NativeDebug</code>, <code>NativeRelease</code>.</p>
+<h2>TestShadow 제품 결과</h2>
+<p>동일 Release 바이너리·1496×692·7 draw, 정방향 0→1→2 / 역방향 2→1→0으로
+각각 독립 Editor를 실행했다. 모드 0은 기존 기본 경로, 1은 owned 단일 큐, 2는 SSAO compute 큐다.
+RG7 aliasing은 OFF다. 캡처 6프로세스 × 8표본의 입력을 대조하고 336개 출력을 비교해 최대 오차 0을 확인했다.
+별도 일반 프레임 6프로세스 × 32표본은 캡처 패스 없이 같은 뷰·해상도·56개 profiler slice를 확인했다.
+제품 성능 실행은 validation OFF이며, validation 0은 위 D/R 회귀의 결과다. 12프로세스 모두 exit 0.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>순서</th>
+<th>경로</th>
+<th align="right">일반 GPU span 중앙값 / p95 (ms)</th>
+<th align="right">그래프 / batch</th>
+<th align="right">native pair 생성 / 재사용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>정방향</td>
+<td>기본 0</td>
+<td align="right">2.3946 / 2.7986</td>
+<td align="right">기존 경로</td>
+<td align="right">기존 경로</td>
+</tr>
+<tr>
+<td>정방향</td>
+<td>단일 큐 1</td>
+<td align="right">2.5027 / 2.7126</td>
+<td align="right">627 / 1881</td>
+<td align="right">6 / 1875</td>
+</tr>
+<tr>
+<td>정방향</td>
+<td>다중 큐 2</td>
+<td align="right">2.6947 / 3.1191</td>
+<td align="right">618 / 3088</td>
+<td align="right">10 / 3078</td>
+</tr>
+<tr>
+<td>역방향</td>
+<td>다중 큐 2</td>
+<td align="right">2.8954 / 3.1263</td>
+<td align="right">598 / 2988</td>
+<td align="right">10 / 2978</td>
+</tr>
+<tr>
+<td>역방향</td>
+<td>단일 큐 1</td>
+<td align="right">2.7039 / 3.1611</td>
+<td align="right">618 / 1854</td>
+<td align="right">6 / 1848</td>
+</tr>
+<tr>
+<td>역방향</td>
+<td>기본 0</td>
+<td align="right">3.1278 / 3.5205</td>
+<td align="right">기존 경로</td>
+<td align="right">기존 경로</td>
+</tr>
+</tbody></table></div>
+<p>기존 RG8 실행 알고리즘의 일반 56패스+prologue/epilogue <strong>58 batch</strong>가 단일 큐 <strong>3</strong>,
+다중 큐 <strong>5</strong>로 감소했다. 다중 큐 첫 워밍업 그래프는 compute 후보가 아직 없어 3이며 이후 5다.
+캡처의 기존 74 batch도 다중 큐 5로 감소했다. 각 프로세스에서 <code>created + reused == batches</code>,
+<code>batches == graphs * 3 + computeBatches * 2</code>를 확인했고 종료 시 leased/cache 모두 0이다.
+각 compute pass profiler slice는 유지하므로 2개 SSAO pass를 1개 compute batch로 제출해도 계측은 분리된다.</p>
+<p><strong>생성·제출 작업량 감소는 확인했다. 기본 경로 대비 GPU 가속은 확인하지 못했다.</strong>
+정방향에서는 수정 경로가 느리고 역방향에서는 빠르므로 환경/시간 경과의 영향을 배제할 수 없다.
+이전 5&#126;10ms대 RG8 실행과 이번 2.5&#126;2.9ms를 순수 코드 개선율로 계산하지 않는다.
+또한 이 배치 수정이 TestShadow에 graphics/compute 독립 작업을 새로 만들지는 않는다.
+진단 캡처 CPU record는 readback/진단 패스가 포함되므로 일반 프레임 CPU 성능으로 해석하지 않는다.</p>
+<p>DXGI 연속 메모리 1836표본(일반 측정 구간 839표본)을 수집했다.
+이는 장치 예산 사용량 표본이며 정확한 물리 VRAM peak 또는 이번 allocator 풀의 고유 메모리 비용이 아니다.
+메모리 절감이나 제품 전면 채택을 주장하지 않는다.</p>
+<p>검증 스크립트: <code>Tools/regression/audit-rg8-adoption.py</code>의 <code>--require-pooling</code> 검사 통과.
+수치/분포: <code>Build/Verification/Phase43/RG8Batching20261009/Normal/adoption-measurements.json</code>.
+캡처/일반 측정/Release 회귀의 exe 및 runtime SHA256 일치:</p>
+<ul>
+<li>runtime: <code>B9C64402537630AD91B74342571A5420F8A02EF425003C05962E2977B0A9C703</code></li>
+<li>exe: <code>B88F346F3310919A2C52C0DB384885C59FA233AD65F3201FDB75F758F7241561</code></li>
+</ul>
+<h2>다음 수정</h2>
+<ol>
+<li>패스마다 COMMON으로 왕복하는 실행 상태와 compiled barrier 계획을 단일화한다.</li>
+<li>실제 독립 작업과 전환 비용을 기준으로 compute 후보를 선택한다. 이득이 없는 그래프는 기존 경로를 사용한다.</li>
+<li>RG7 조합의 수명 계약과 캐시 보유 정책을 해결한다.</li>
+</ol>
+<p>이번 수정은 첫 번째 구조 결함 묶음에 대한 완료다. RG8 전체는 progress·기성 0·기본 OFF,
+PHASE 4.3 기성 74·잔여 26, 전체 기성 126·잔여 437을 유지한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-testshadow-제품-결과"></span><span id="sec-검사"></span><span id="sec-다음-수정"></span><span id="sec-변경"></span><span id="testshadow-제품-결과"></span><span id="검사"></span><span id="다음-수정"></span><span id="변경"></span></details></main></body></html>

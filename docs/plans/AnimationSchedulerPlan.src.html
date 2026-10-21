@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>애니메이션 스케줄러 · LOD · CPU 버짓 재설계 (PHASE 13)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="AnimationSchedulerPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/AnimationSchedulerPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>애니메이션 스케줄러 · LOD · CPU 버짓 재설계 (PHASE 13)</h1><p>AG0~AG5: 불변 Graph 정의와 AnimInstance 상태를 분리하고 기존 AnimTaskList에 Clip/Blend/Layer/Slot 레시피를 연결한다. 기존 스케줄러·LOD·소켓·클립 이벤트는 재구현하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Animator</ve-node><ve-node id="n1" at="2 1">AnimInstance</ve-node><ve-node id="n2" at="3 1" key>Pose tasks</ve-node><ve-node id="n3" at="3 2">Scheduler</ve-node><ve-node id="n4" at="2 2">Palette</ve-node><ve-node id="n5" at="1 2">Render frame</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>AG0&#126;AG5: 불변 Graph 정의와 AnimInstance 상태를 분리하고 기존 AnimTaskList에 Clip/Blend/Layer/Slot 레시피를 연결한다. 기존 스케줄러·LOD·소켓·클립 이벤트는 재구현하지 않는다.</li>
+<li>Graph 저장/cook/재바인딩, 100체 상태 격리, 세대 교체·DDOL·Player와 이벤트 동등성을 수용한다. VM·일반 IK·Root Motion·Notify 기능 구현은 AG5의 계약·산정 이후 별도 결정한다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>Animator → shared definition/instance → scheduled pose tasks → palette → render frame</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>13-AG0</code> · PHASE 13</td>
+<td>AG0 — Graph 기준선·자산 계약</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG1</code> · PHASE 13</td>
+<td>AG1 — Clip PoseSource 어댑터</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG2a</code> · PHASE 13</td>
+<td>AG2a — 불변 Graph 정의·자산 경계</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG2b</code> · PHASE 13</td>
+<td>AG2b — 인스턴스 노드 상태·재바인딩</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG3</code> · PHASE 13</td>
+<td>AG3 — ParameterId·전이 조건 바인딩</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG4a</code> · PHASE 13</td>
+<td>AG4a — Blend1D/2D Pose 소스</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG4b</code> · PHASE 13</td>
+<td>AG4b — LayerBlend·BoneMask·Additive</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG4c</code> · PHASE 13</td>
+<td>AG4c — Slot·one-shot 재생</td>
+<td>todo</td>
+</tr>
+<tr>
+<td><code>13-AG5</code> · PHASE 13</td>
+<td>AG5 — 후속 노드 계약·Compiler 판정</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L108">Engine/SceneRuntime/Animator.h:108</a> — <code>class [[reflgen::reflect]] Animator : public meta::identity&lt;Animator, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationScheduler.cpp#L1867">Engine/SceneRuntime/AnimationScheduler.cpp:1867</a> — <code>std::uint32_t AppendClipTasks(animation::task_list&amp; tasks,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14">ScriptCore/Animator.cs:14</a> — <code>public sealed class Animator : NativeComponent</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="1-현재-코드-기준선-2026-09-20"></span>
+<span id="10-s1-제품-경로-비용-기선-2026-09-20"></span>
+<span id="11-s2-첫-슬라이스--채널-캐시평가-버퍼-재사용-2026-09-24"></span>
+<span id="11-호출-사슬"></span>
+<span id="12-s2-두-번째-슬라이스--trs-포즈전이-블렌드-2026-09-24"></span>
+<span id="12-정확성--기존-결함과-s0-잔여를-구분한다"></span>
+<span id="13-s2-세-번째-슬라이스--인스턴스-키-커서-2026-09-24"></span>
+<span id="13-남은-비용"></span>
+<span id="14-s2-네-번째-슬라이스--dense-layer-mask짧은-채널-분기-2026-09-24"></span>
+<span id="14-기반과-의존"></span>
+<span id="15-s2-마무리--가중-레이어스케일배속-핸들임시-저장소-2026-09-24"></span>
+<span id="15-다른-엔진-대조--2026-08-19-당시-기록-현행-판정은-1114"></span>
+<span id="16-s3-진행--고정-포즈-배열-제거와-인스턴스-핸들-2026-09-24"></span>
+<span id="17-s3-후속--animator-재생-시간커서평가-저장소-이관-2026-09-24"></span>
+<span id="18-s3-후속--controller-재생-상태의-인스턴스-소유-2026-09-24"></span>
+<span id="19-s3-후속--animator-비직렬화-제어-상태-이관-2026-09-24"></span>
+<span id="2-설계--포즈-정본--관측-본--레시피-강등"></span>
+<span id="20-s3-후속--직렬화-클립-인덱스와-실행-선택값-분리-2026-09-24"></span>
+<span id="20-다섯-개의-결정-2026-08-19-개정"></span>
+<span id="21-s3-후속--controller-fsm전이-실행-상태-이관-2026-09-24"></span>
+<span id="21-원리-언리얼-aba에서-가져오는-것"></span>
+<span id="22-s3-후속--주소-고정-연속-페이지-저장소-2026-09-24"></span>
+<span id="22-구성-요소"></span>
+<span id="23-s3-후속--controller-재생-슬롯의-연속-페이지-2026-09-24"></span>
+<span id="23-이-엔진에-맞춘-결정"></span>
+<span id="24-s3-후속--ddol-animator의-잡-등록-수명-2026-09-24"></span>
+<span id="25-s3-후속--등록부의-게임-스레드-소유-계약-2026-09-24"></span>
+<span id="26-s3-후속--creatorrobot-player-제품-경로-2026-09-24"></span>
+<span id="27-s35-첫-슬라이스--배치-팔레트-저장소와-실제-본-수-2026-09-24"></span>
+<span id="28-s35-후속--평면-태스크-목록과-출력-도달성-실행-2026-09-24"></span>
+<span id="29-s35-후속--샘플블렌드fk-태스크-분리-2026-09-24"></span>
+<span id="3-단계"></span>
+<span id="30-s35-후속--animator-전체의-준비실행-병렬-구간-2026-09-24"></span>
+<span id="31-s35-후속--마스크-레이어의-평면-태스크-분리-2026-09-25"></span>
+<span id="32-s35-후속--가산-레이어의-재생-계약과-태스크-연결-2026-09-25"></span>
+<span id="33-s35-후속--비활성-분기-실측과-사용하지-않는-이전-포즈-제거-2026-09-25"></span>
+<span id="34-s35-후속--레이어-포즈-저장소-공유와-즉시-합성-2026-09-25"></span>
+<span id="35-s35-후속--작업자별-포즈-저장소와-레이어-소유권-이전-2026-09-25"></span>
+<span id="36-s35-완료--최종-포즈-이전과-벌크-스키닝-업로드-2026-09-25"></span>
+<span id="37-s36-완료--관측-본-물질화-2026-09-25"></span>
+<span id="38-s4-진행--중요도-입력과-첫-강등-레시피-2026-09-25"></span>
+<span id="39-수동-목표-두-본-ik--첫-구현-2026-09-27"></span>
+<span id="4-페이즈-완료-기준"></span>
+<span id="40-s4-l1-준비--ik-자손-재계산과-가중치-감쇠-2026-09-27"></span>
+<span id="41-s4-l1-자동-선택--두-본-ik-연속-화면-게이트-2026-09-27"></span>
+<span id="42-s4-l4-전이-레시피와-승격-복귀-2026-09-27"></span>
+<span id="43-s4-마무리--l0l7-선택복귀비용-2026-09-27"></span>
+<span id="44-s5-완료--태스크-비용-모델과-cpu-예산-2026-09-27"></span>
+<span id="45-s6-완료--워커-수-기준-청크와-sceneruntime-소유-2026-09-27"></span>
+<span id="46-s7-완료--실시간-예산-hud와-제품-회귀-묶음-2026-09-27"></span>
+<span id="47-phase-13-animationgraph-확장-계획-및-공수-2026-09-27"></span>
+<span id="471-현재-코드와-제안의-차이"></span>
+<span id="472-후속-구조-결정"></span>
+<span id="473-phase-13-확장-이행-슬라이스와-공수"></span>
+<span id="5-다른-계획과의-관계"></span>
+<span id="6-리스크"></span>
+<span id="7-s0-실행-기록-2026-09-20"></span>
+<span id="71-제품-실행-검증"></span>
+<span id="72-실제-렌더링-회귀"></span>
+<span id="8-s05-공용-workerpool-이관--중간-기록-2026-09-20"></span>
+<span id="9-s05-공용-실행-기반-통일-2026-09-20"></span>
+<span id="dense-mask-범위"></span>
+<span id="release-결과"></span>
+<span id="sec-1-현재-코드-기준선-2026-09-20"></span>
+<span id="sec-10-s1-제품-경로-비용-기선-2026-09-20"></span>
+<span id="sec-11-s2-첫-슬라이스--채널-캐시평가-버퍼-재사용-2026-09-24"></span>
+<span id="sec-12-s2-두-번째-슬라이스--trs-포즈전이-블렌드-2026-09-24"></span>
+<span id="sec-13-s2-세-번째-슬라이스--인스턴스-키-커서-2026-09-24"></span>
+<span id="sec-14-s2-네-번째-슬라이스--dense-layer-mask짧은-채널-분기-2026-09-24"></span>
+<span id="sec-15-s2-마무리--가중-레이어스케일배속-핸들임시-저장소-2026-09-24"></span>
+<span id="sec-16-s3-진행--고정-포즈-배열-제거와-인스턴스-핸들-2026-09-24"></span>
+<span id="sec-17-s3-후속--animator-재생-시간커서평가-저장소-이관-2026-09-24"></span>
+<span id="sec-18-s3-후속--controller-재생-상태의-인스턴스-소유-2026-09-24"></span>
+<span id="sec-19-s3-후속--animator-비직렬화-제어-상태-이관-2026-09-24"></span>
+<span id="sec-2-설계--포즈-정본--관측-본--레시피-강등"></span>
+<span id="sec-20-s3-후속--직렬화-클립-인덱스와-실행-선택값-분리-2026-09-24"></span>
+<span id="sec-21-s3-후속--controller-fsm전이-실행-상태-이관-2026-09-24"></span>
+<span id="sec-22-s3-후속--주소-고정-연속-페이지-저장소-2026-09-24"></span>
+<span id="sec-23-s3-후속--controller-재생-슬롯의-연속-페이지-2026-09-24"></span>
+<span id="sec-24-s3-후속--ddol-animator의-잡-등록-수명-2026-09-24"></span>
+<span id="sec-25-s3-후속--등록부의-게임-스레드-소유-계약-2026-09-24"></span>
+<span id="sec-26-s3-후속--creatorrobot-player-제품-경로-2026-09-24"></span>
+<span id="sec-27-s35-첫-슬라이스--배치-팔레트-저장소와-실제-본-수-2026-09-24"></span>
+<span id="sec-28-s35-후속--평면-태스크-목록과-출력-도달성-실행-2026-09-24"></span>
+<span id="sec-29-s35-후속--샘플블렌드fk-태스크-분리-2026-09-24"></span>
+<span id="sec-3-단계"></span>
+<span id="sec-30-s35-후속--animator-전체의-준비실행-병렬-구간-2026-09-24"></span>
+<span id="sec-31-s35-후속--마스크-레이어의-평면-태스크-분리-2026-09-25"></span>
+<span id="sec-32-s35-후속--가산-레이어의-재생-계약과-태스크-연결-2026-09-25"></span>
+<span id="sec-33-s35-후속--비활성-분기-실측과-사용하지-않는-이전-포즈-제거-2026-09-25"></span>
+<span id="sec-34-s35-후속--레이어-포즈-저장소-공유와-즉시-합성-2026-09-25"></span>
+<span id="sec-35-s35-후속--작업자별-포즈-저장소와-레이어-소유권-이전-2026-09-25"></span>
+<span id="sec-36-s35-완료--최종-포즈-이전과-벌크-스키닝-업로드-2026-09-25"></span>
+<span id="sec-37-s36-완료--관측-본-물질화-2026-09-25"></span>
+<span id="sec-38-s4-진행--중요도-입력과-첫-강등-레시피-2026-09-25"></span>
+<span id="sec-39-수동-목표-두-본-ik--첫-구현-2026-09-27"></span>
+<span id="sec-4-페이즈-완료-기준"></span>
+<span id="sec-40-s4-l1-준비--ik-자손-재계산과-가중치-감쇠-2026-09-27"></span>
+<span id="sec-41-s4-l1-자동-선택--두-본-ik-연속-화면-게이트-2026-09-27"></span>
+<span id="sec-42-s4-l4-전이-레시피와-승격-복귀-2026-09-27"></span>
+<span id="sec-43-s4-마무리--l0l7-선택복귀비용-2026-09-27"></span>
+<span id="sec-44-s5-완료--태스크-비용-모델과-cpu-예산-2026-09-27"></span>
+<span id="sec-45-s6-완료--워커-수-기준-청크와-sceneruntime-소유-2026-09-27"></span>
+<span id="sec-46-s7-완료--실시간-예산-hud와-제품-회귀-묶음-2026-09-27"></span>
+<span id="sec-47-phase-13-animationgraph-확장-계획-및-공수-2026-09-27"></span>
+<span id="sec-5-다른-계획과의-관계"></span>
+<span id="sec-6-리스크"></span>
+<span id="sec-7-s0-실행-기록-2026-09-20"></span>
+<span id="sec-8-s05-공용-workerpool-이관--중간-기록-2026-09-20"></span>
+<span id="sec-9-s05-공용-실행-기반-통일-2026-09-20"></span>
+<span id="검증과-재현"></span>
+<span id="계측-경계"></span>
+<span id="단일-클립-비용-확인"></span>
+<span id="비용-확인과-미해결-범위"></span>
+<span id="제품-워커-비용-분리"></span>
+<span id="최종-코드-3회-비교"></span></p>
+</details>
+</main></body></html>

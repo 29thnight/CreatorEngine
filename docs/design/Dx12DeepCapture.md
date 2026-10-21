@@ -1,5 +1,37 @@
 # DX12 deep capture: separate ETW collector
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- CPU engine frame·render submission·GPU pass·presenter 관측은 서로 다른 식별 축이다. bounded producer 기록과 손실/출처를 보존한다.
+- 집계 메모리 표본은 객체별 native/CLR/GPU 소유 그래프가 아니다. 과거 .ceprof/ETW 기록은 그 실행 신원에만 유효하다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/DxCaptureFileTests.cpp:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/DxCaptureFileTests.cpp#L21) — `std::fprintf(stderr, "DxCaptureFileTests: %s\n", message);`
+- [Tools/regression/DxCaptureFileTests.cpp:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/DxCaptureFileTests.cpp#L22) — `std::abort();`
+- [Tools/regression/DxCaptureFileTests.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/DxCaptureFileTests.cpp#L29) — `std::memcpy(bytes.data() + offset, &value, sizeof(value));`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/DxCaptureHelper/DxCaptureHelper.cpp:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/DxCaptureHelper/DxCaptureHelper.cpp#L17) — `if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))`
+- [Tools/DxCaptureHelper/DxCaptureHelper.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/DxCaptureHelper/DxCaptureHelper.cpp#L23) — `const bool queried = GetTokenInformation(token, TokenElevation, &elevation, bytes, &bytes) != FALSE;`
+- [Tools/DxCaptureHelper/DxCaptureHelper.cpp:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/DxCaptureHelper/DxCaptureHelper.cpp#L24) — `CloseHandle(token);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## Scope and status
 
 This is an optional Windows x64 development feature. The ordinary Editor keeps its renderer,
@@ -152,3 +184,5 @@ releases `ProcessTrace`, but an upstream callback that stalls can delay its thre
 uses a bounded client shutdown and marks a nonterminal result incomplete. Cleanup of an ETW session
 after a helper process crash has not been established; no code guesses or stops other sessions to
 hide that residual. These are open acceptance items, not verified guarantees.
+
+</details>

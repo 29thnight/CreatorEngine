@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 21 W1 — DX12 DPI/resize 수정 검증</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EditorW1Dx12ResizeValidation.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EditorW1Dx12ResizeValidation.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 21 W1 — DX12 DPI/resize 수정 검증</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-screen-resize-snapshot.ps1#L1">Tools/regression/verify-screen-resize-snapshot.ps1:1</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-screen-resize-snapshot.ps1#L3">Tools/regression/verify-screen-resize-snapshot.ps1:3</a> — <code>[ValidateSet(&#39;Debug&#39;, &#39;Release&#39;, &#39;All&#39;)][string]$Configuration = &#39;All&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-screen-resize-snapshot.ps1#L8">Tools/regression/verify-screen-resize-snapshot.ps1:8</a> — <code>$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;../..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24">Engine/RenderEngine/ShaderMeta.h:24</a> — <code>enum class ShaderPropertyType : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98">Engine/RenderEngine/ShaderMeta.h:98</a> — <code>enum class ShaderPassQueue : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106">Engine/RenderEngine/ShaderMeta.h:106</a> — <code>enum class ShaderBlendMode : std::uint8_t</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L58">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:58</a> — <code>class EnhancedSSGIPass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L87">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:87</a> — <code>bool PrepareFrame(const EnhancedFrameContext&amp; context, std::string&amp; outError) override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L88">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:88</a> — <code>void Declare(EnhancedRenderGraph&amp; graph, const EnhancedFrameContext&amp; context) override;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L28">Engine/RenderEngine/ShaderMeta.cpp:28</a> — <code>outError = std::string(context) + &quot;: &quot; + std::string(detail);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L65">Engine/RenderEngine/ShaderMeta.cpp:65</a> — <code>const bool known = std::any_of(allowed.begin(), allowed.end(),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L102">Engine/RenderEngine/ShaderMeta.cpp:102</a> — <code>else return Fail(context, std::string(&quot;&#39;&quot;) + key + &quot;&#39;는 true|false여야 한다&quot;, outError);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L326">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:326</a> — <code>bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext&amp; context, std::string&amp; outError)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L381">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:381</a> — <code>void EnhancedSSGIPass::ReleaseHistory(const EnhancedFrameContext&amp; context)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L398">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:398</a> — <code>void EnhancedSSGIPass::Declare(EnhancedRenderGraph&amp; graph, const EnhancedFrameContext&amp; context)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-09-12, HEAD <code>3efbb23f</code> 위의 W1 작업 트리. 사용자 요청에 따라 DX12를 먼저 수정했다.
+<a href="EditorW1DpiResizeRootCauseAndFixPlan.html">이전 원인 분석</a> ·
+<a href="../plans/EditorWorkspaceRedesignPlan.html">정본 W1</a>.</p>
+<h2>원인과 수정</h2>
+<p>DX12는 창 크기가 바뀔 때 완료된 표시 결과를 무효화한 뒤 <code>LivePipeline</code>을 해체하고
+모든 패스를 다시 초기화했다. 화면 크기와 무관한 셰이더 준비, ShaderMeta 적용과 IBL 생성도 반복됐다.
+캐시를 유지해도 셰이더 컴파일 경로는 캐시 조회 전에 Slang 세션과 소스 모듈을 준비하므로
+패스 재초기화 자체가 무료가 아니다. 표시 수명 잠금을 잡은 구축 구간과 새 결과 대기가 겹쳐
+Scene에 오랫동안 준비 배경이 남았다.</p>
+<p>크기 snapshot 동기화만 적용한 진단 실행에서도 DPI 150→100% 뒤 <code>result_pending</code>이
+<strong>8,578.926ms</strong> 지속됐다. IBL만 유지한 후보에서도 <strong>14,649ms</strong>로 재현됐다.
+후자는 Release 빌드와 동시에 실행해 시간의 직접 성능 비교에는 쓰지 않는다.
+따라서 데이터 경쟁이나 IBL 생성 하나를 단독 원인으로 판정하지 않았다.</p>
+<p>최종 수정은 다음과 같다.</p>
+<ul>
+<li><code>ScreenResizeBus</code>: width/height/generation을 잠금 아래 한 번에 읽고 쓰며 동일 크기는 generation을 올리지 않는다.
+프레임 패킷·카메라 크기·진단의 width/height 소비자는 같은 snapshot을 사용한다.</li>
+<li><code>LiveState::ResizePipeline</code>: GPU 완료를 기다린 뒤 표시 슬롯, 완료 그래프의 transient 풀,
+뷰별 SSGI 히스토리를 해제하고 새 크기의 표시 슬롯을 만든다. 패스 인스턴스·PSO·ShaderMeta·IBL은 유지한다.
+각 패스는 기존 <code>PrepareFrame</code>/<code>Declare</code> 경로에서 새 크기를 반영한다.</li>
+<li><code>EnhancedSSGIPass::ReleaseHistory</code>: 옛 해상도의 히스토리 핸들을 실제로 해제하고 시간축 누적을 초기화한다.
+GPU 완료 뒤에만 호출하며 다음 준비에서 새 크기의 히스토리를 만든다.</li>
+<li><code>dx12.live</code>: GPU 완료 generation과 UI가 실제 조회한 generation/frame, 텍스처 미준비 횟수·시간,
+IBL 생성 횟수를 함께 관측한다. <code>[LiveResize]</code>는 크기 자원 교체 시간을 기록한다.</li>
+</ul>
+<p>최종 경로에서는 리사이즈가 ShaderMeta 재적용이나 IBL 재생성을 유발하지 않았다.
+패스 전체 재구축 제거 전후의 소스 경로와 표시 지연 변화를 해결 근거로 삼는다.
+개별 셰이더 함수의 비용을 따로 측정한 결과는 아니다.</p>
+<h2>최종 검증</h2>
+<p>VS18/v145, <code>Editor/CreatorEditor.vcxproj</code>, x64 Debug/Release 빌드가 모두 통과했다.
+Release에는 기존 <code>LNK4229 /DELAYLOAD:vulkan-1.dll</code> 경고가 남는다.
+최종 실행은 빌드 완료 후 각 구성의 새 실행 파일로 수행했다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th align="right">Debug</th>
+<th align="right">Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>연속 창 크기 변경</td>
+<td align="right">10/10 통과</td>
+<td align="right">10/10 통과</td>
+</tr>
+<tr>
+<td>해당 변경의 Scene 텍스처 공백 최대</td>
+<td align="right">73.920ms</td>
+<td align="right">39.447ms</td>
+</tr>
+<tr>
+<td>실제 OS DPI 100→150% 공백</td>
+<td align="right">118.401ms</td>
+<td align="right">95.969ms</td>
+</tr>
+<tr>
+<td>실제 OS DPI 150→100% 공백</td>
+<td align="right">118.492ms</td>
+<td align="right">62.719ms</td>
+</tr>
+<tr>
+<td>리사이즈 후 IBL 생성 누적</td>
+<td align="right">1회 유지</td>
+<td align="right">1회 유지</td>
+</tr>
+<tr>
+<td>GBuffer/Forward ShaderMeta 적용 누적</td>
+<td align="right">각각 1회 유지</td>
+<td align="right">각각 1회 유지</td>
+</tr>
+</tbody></table></div>
+<p>Release 종료 전 원래 150%로 복원하는 추가 100→150% 전환도 통과했으며 공백은 124.179ms였다.</p>
+<p>Scene을 계속 표시한 상태에서 1440×900, 1100×700, 1600×900, 1000×640, 1280×800을
+두 차례 요청했다. 실제 client 크기는 명령 응답과 display snapshot에 기록했다.
+각 단계에서 새 generation의 GPU 완료 결과와 UI 텍스처 조회를 확인했다.
+명령 호출부터 확인 응답까지의 시간과 표의 텍스처 공백은 서로 다른 지표다.</p>
+<p>사용자 배율은 1.5로 유지했다. OS 100/150%에서 본문은 24/36px이며
+<code>editor.theme</code> clean, Material Symbols 59역할·누락 0을 확인했다.
+Scene의 하늘·그리드·기즈모와 Game의 하늘 표시를 화면으로 확인했다.
+정상 종료까지의 로그에서 device loss, D3D12 error, assertion, 렌더 프레임 실패를 찾지 못했고 stderr는 0바이트다.</p>
+<p>추가로 <code>verify-screen-resize-snapshot.ps1 -Configuration All</code>이 통과했다.
+각 구성에서 두 writer의 40만 쓰기와 세 reader의 60만 읽기로 크기 쌍·generation 일관성을 확인하고,
+중복 크기·콜백 재진입·높이 0의 종횡비도 검사했다.</p>
+<h2>증거와 범위</h2>
+<p>실행 산출물은 <code>Artifacts/phase21-w1-dx12-fix/</code>에 보관한다.</p>
+<ul>
+<li><code>build-verified-debug.*</code>, <code>build-verified-release.*</code>: 최종 빌드 기록.</li>
+<li><code>verified-debug-resize.json</code>, <code>verified-release-resize.json</code>: 단계별 크기·generation·표시 확인.</li>
+<li><code>verified-*-dpi150.json</code>, <code>verified-*-dpi100-return.json</code>: 실제 DPI 전환의 표시 관측.</li>
+<li><code>verified-*-theme*.json</code>, <code>verified-*-dpi*.png</code>, <code>verified-*-game*</code>: 폰트·Scene/Game 화면 증거.</li>
+<li><code>verified-debug.out/.err</code>, <code>verified-release.out/.err</code>: 실행과 종료 로그.</li>
+<li><code>restore-proof.json</code>: 설정 파일과 두 구성의 imgui.ini를 원래 바이트로 복원한 결과.</li>
+<li><code>diagnostic-dpi100-recovered.json</code>, <code>fixed-debug-dpi100-display-late.json</code>: 해결 전과 IBL 단독 후보의 실패 증거.</li>
+</ul>
+<p><code>lastMissingTextureMs</code>는 UI 텍스처 조회 사이의 공백이다. GPU present 시간이나 픽셀 단위 무검정 보장은 아니다.
+숨겨진 탭은 조회가 중단되므로 시작 generation의 최대 공백을 resize 결과에 포함하지 않았다.
+검증 씬은 기본 SampleScene이며 무거운 모델·모든 후처리 조합·장시간 실행의 성능 보장은 범위 밖이다.
+최초 기동의 셰이더/IBL 준비 지연은 이번 크기 변경 수정과 별개다.</p>
+<p>Windows 1번 모니터 배율은 원래 150%로 복원했고 2번 모니터 설정은 변경하지 않았다.
+<code>EngineSettings.asset</code>과 Debug/Release <code>imgui.ini</code> 3개 파일 모두 실행 전 바이트와 일치한다.
+검증용 Editor·설정·제어판 창은 종료했다.</p>
+<p>DX12의 장시간 Scene 표시 지연은 이 재현 조건에서 해결됐다.
+<strong>후속 사용자 결정(2026-09-12): Vulkan 대응은 우선 보류하고 W1을 DX12 기준 <code>done</code>으로 판정한다.</strong>
+Vulkan 모니터 경계 resize 후 device loss는 미수정·미재검증으로 별도 보류한다.
+이번 상태 변경은 완료 범위의 조정이며 Vulkan 오류 해결이나 새 검증 결과를 뜻하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-원인과-수정"></span><span id="sec-증거와-범위"></span><span id="sec-최종-검증"></span><span id="원인과-수정"></span><span id="증거와-범위"></span><span id="최종-검증"></span></details></main></body></html>

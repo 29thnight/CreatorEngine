@@ -1,11 +1,47 @@
 # RG6 제품 cutover 수용 — 2026-10-07
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-render-base0.ps1:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L25) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-render-base0.ps1:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L26) — `$output = [IO.Path]::GetFullPath($OutputDirectory)`
+- [Tools/regression/verify-render-base0.ps1:64](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-render-base0.ps1#L64) — `if ($ExecutablePath) { $exe=[IO.Path]::GetFullPath($ExecutablePath) }`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:216](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L216) — `const auto started = std::chrono::steady_clock::now();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:230](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L230) — `std::chrono::steady_clock::now() - started).count();`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:307](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L307) — `const uint64_t generation = std::exchange(token.captureGeneration, 0);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31) — `enum class EnhancedLiveDisplayTarget : uint8_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L39) — `enum class EnhancedLiveViewFlags : uint32_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:177](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L177) — `own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 RG6를 완료하고 계획 기성 4인일을 회수한다. 같은 현재 소스·씬·재질·셰이더에서 별도 진단 DeclarationOrder 빌드와 제품 기본 ExplicitVersioned/DependencyOrder 빌드를 Debug/Release 각각 독립 2프로세스로 비교했다. 최종 색상, 중간 첨부, 그래프 결정성, validation, 정상 종료 및 CPU/GPU 비용 기록이 정본 RG6 게이트를 통과했다. **Release CPU 기록 중앙값은 1.20→2.69 ms(+124.8%)로 증가했다. 구조·회귀 수용이며 성능 개선 완료가 아니다.** RG-V UI, MAT-9 품질/성능, Vulkan 교차 수용은 올리지 않는다.
 
 ## 비교 계약과 구현
 
 - `CreatorRg6ReferenceBuild=true`는 EnhancedSceneRenderer.cpp 하나에 `CE_RG6_REFERENCE_DECLARATION_ORDER`를 정의하는 별도 진단 빌드다. 런타임 전환 스위치가 없으며 일반 빌드는 두 RHI live 생성자에서 ExplicitVersioned/DependencyOrder를 사용한다.
-- 동일 소스 해시 목록으로 네 빌드를 검증했다. reference 실행 파일/runtime DLL은 보관된 사본의 해시로 확인하고 제품 파일은 현재 기본 배포 파일로 확인했다. 제품 Debug/Release를 기본 옵션으로 재빌드한 뒤 실행했다. [공동 BASE-0 완료](../../Build/Verification/RG6Acceptance20261007/v2/baseline-phase-complete.json).
+- 동일 소스 해시 목록으로 네 빌드를 검증했다. reference 실행 파일/runtime DLL은 보관된 사본의 해시로 확인하고 제품 파일은 현재 기본 배포 파일로 확인했다. 제품 Debug/Release를 기본 옵션으로 재빌드한 뒤 실행했다. 공동 BASE-0 완료 (`../../Build/Verification/RG6Acceptance20261007/v2/baseline-phase-complete.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 - 동일 LX_CookFixture, 준비 완료된 lattice 재질, 카메라·world·lights·해상도 64×64, 정지 clock/history restart, IBL 1024/4096을 고정했다. 입력 identity는 모든 구성/정책/프로세스에서 `7f3cd805e8720609af9f14c8f11af20377358623d6c2dff565a5ad3e7e31e999`다. GPU validation은 켠 상태다.
 - 모드에 따라 제품 Geometry Occlusion mip 6개 및 CullOcclusion이 생기고 기존 Cull이 대체된다. GizmoIcon의 명시 texture read 2개도 추가된다. reference 59 pass/51 resource, 제품 65 pass/59 resource다. 따라서 전체 비용 차이를 순수 스케줄러 overhead나 역사적 PR 전체 비용으로 귀속하지 않는다. 수용 도구는 이 정해진 graph delta만 허용하며 예상 밖 pass/resource 변경을 거부한다.
 - 포인터/슬롯·풀 초기 상태·generation을 topology identity로 오인하지 않고, 생산/소비 버전·실행 순서·dependency hash·lifetime·wave·접근 선언을 별도로 감사한다.
@@ -29,7 +65,7 @@ RG6를 완료하고 계획 기성 4인일을 회수한다. 같은 현재 소스�
 | Release-process-0 | 0 | 0.00256198645 | 0.000491265455 | 256 | 0 |
 | Release-process-1 | 0 | 0.00256198645 | 0.000491265455 | 256 | 0 |
 
-legacy는 Grid의 깊이 갱신 후 GBuffer 깊이를 readback한다. 버전 경로의 캡처는 지정된 GBuffer.Depth v1을 읽고 Grid는 v2를 쓰므로 WAR edge에 따라 캡처가 Grid 앞에 실행된다. 이 읽기 의미와 순서 차이는 그래프에 기록돼 있다. 깊이까지 비트 동일이라고 보고하지 않는다. 모든 원본/차영상 PNG와 선형 오차는 [최종 수용 JSON](../../Build/Verification/RG6Acceptance20261007/v2/final-result.json)에 연결된 구성별 비교 폴더에 있다.
+legacy는 Grid의 깊이 갱신 후 GBuffer 깊이를 readback한다. 버전 경로의 캡처는 지정된 GBuffer.Depth v1을 읽고 Grid는 v2를 쓰므로 WAR edge에 따라 캡처가 Grid 앞에 실행된다. 이 읽기 의미와 순서 차이는 그래프에 기록돼 있다. 깊이까지 비트 동일이라고 보고하지 않는다. 모든 원본/차영상 PNG와 선형 오차는 최종 수용 JSON (`../../Build/Verification/RG6Acceptance20261007/v2/final-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)에 연결된 구성별 비교 폴더에 있다.
 
 ## 비용 측정
 
@@ -54,4 +90,6 @@ Release live CPU median은 1.1975→2.6925 ms(+124.8%)다. capture record/GPU에
 
 RG6 done/earnedDays 4, PHASE 4.3 100/기성 50/잔여 50, PHASE 4 계열 355/기성 102/잔여 253(+미산정)으로 맞춘다. RG-V는 progress/기성 0, RG7~RG9/Q0는 미착수다. 코드/문서는 로컬 변경이며 commit/push는 하지 않았다.
 
-근거: [RenderGraph 정본](../plans/RenderGraphDependencySchedulingPlan.md), [로드맵](../plans/RenderPhaseRoadmap.md), [공수 원장](../plans/RenderPhaseEffortEstimate.md), [최종 증거](../../Build/Verification/RG6Acceptance20261007/v2/final-result.json).
+근거: [RenderGraph 정본](../plans/RenderGraphDependencySchedulingPlan.md), [로드맵](../plans/RenderPhaseRoadmap.md), [공수 원장](../plans/RenderPhaseEffortEstimate.md), 최종 증거 (`../../Build/Verification/RG6Acceptance20261007/v2/final-result.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
+
+</details>

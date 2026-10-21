@@ -1,5 +1,48 @@
 # MAT-9 노드 편집기·인스펙터 성능 측정
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineGUIWindow/MaterialGraphWindow.cpp:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.cpp#L53) — `own::shared_owner<const material_graph::Generation> previousGeneration;`
+- [Editor/EngineGUIWindow/MaterialGraphWindow.cpp:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.cpp#L54) — `own::shared_owner<const material_graph::Generation> generation;`
+- [Editor/EngineGUIWindow/MaterialGraphWindow.cpp:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.cpp#L77) — `std::ranges::any_of(name, [](unsigned char value) { return value < 32; }))`
+- [Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp#L52) — `ImGui::PushID(label);`
+- [Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp#L53) — `ImGui::SetNextItemWidth(sheet.line(label));`
+- [Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp#L54) — `ImGui::InputText("##Value", &value, ImGuiInputTextFlags_ReadOnly);`
+- [ScriptCore/MeshRenderer.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13) — `public sealed class MeshRenderer : NativeComponent`
+- [ScriptCore/MeshRenderer.cs:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15) — `public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);`
+- [ScriptCore/MeshRenderer.cs:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24) — `public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/SceneRuntime/MeshRenderer.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19) — `class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>`
+- [Engine/SceneRuntime/MeshRenderer.h:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23) — `void gc_trace(gc::tracer& tracer) const override`
+- [Engine/SceneRuntime/MeshRenderer.h:25](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25) — `Component::gc_trace(tracer);`
+- [Editor/EngineGUIWindow/MaterialGraphWindow.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.h#L6) — `class MeshRenderer;`
+- [Editor/EngineGUIWindow/MaterialGraphWindow.h:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.h#L7) — `struct EnhancedLiveViewRequest;`
+- [Editor/EngineGUIWindow/MaterialGraphWindow.h:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MaterialGraphWindow.h#L11) — `bool Open(MeshRenderer& renderer, std::string& error);`
+- [Engine/SceneRuntime/MeshRenderer.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L28) — `own::shared_owner<const material_graph::Instance> observed;`
+- [Engine/SceneRuntime/MeshRenderer.cpp:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L39) — `const auto authored = std::ranges::find(instance.description.parameters, id,`
+- [Engine/SceneRuntime/MeshRenderer.cpp:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.cpp#L46) — `const auto parameter = std::ranges::find(parameters, id, &LX::LXMaterialParameter::id);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 측정일: **2026-09-30**. 별도 세션 「프로파일링으로 프레임 급감 원인 찾기」의
 실제 창 조작·HTTP·프로파일 결과를 PHASE 4.25 기록으로 통합한다.
 수치는 reflgen 병합 **전** 측정이며, 병합 후 재측정 결과로 해석하지 않는다.
@@ -57,3 +100,5 @@ GPU/GBuffer/tier별 최종 성능 상한과 이동 카메라 수용을 대신하
 보존한 집계·소스 identity·회귀 종료값은
 [MAT9NodeEditorPerformance.json](MAT9NodeEditorPerformance.json)에 있다.
 원시 `.ceprof` 및 임시 workspace·검증 에셋은 제품 소스 커밋에 넣지 않는다.
+
+</details>

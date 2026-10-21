@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>PHASE 22 오디오 백엔드 사전 정찰 (2026-09-16)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="Phase22AudioPreflight.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/Phase22AudioPreflight.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>PHASE 22 오디오 백엔드 사전 정찰 (2026-09-16)</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">AudioSource</ve-node><ve-node id="n1" at="2 1">AudioHost</ve-node><ve-node id="n2" at="3 1" key>Playback</ve-node><ve-node id="n3" at="3 2">Clip store</ve-node><ve-node id="n4" at="2 2">Miniaudio</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>AudioHost/PlaybackService·clip directory와 miniaudio/Null backend가 재생 수명을 소유한다. resident/stream 및 개별 PlaybackHandle을 구분한다.</li>
+<li>FMOD 채택을 필수 선행으로 재도입하지 않는다. 과거 선택 씬의 종료/stream 수용과 현재 CI·설치 제품 수용은 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L261">ScriptCore/Native.cs:261</a> — <code>public delegate* unmanaged&lt;ulong, AudioAssetId, int, int, Float3, ObjectHandle, AudioPlaySettings*, Native.AudioParameterABI*, int, ulong&gt; Audio_Play;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L270">ScriptCore/Native.cs:270</a> — <code>public delegate* unmanaged&lt;ObjectHandle, AudioAssetId*, int&gt; Sound_GetSource;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L271">ScriptCore/Native.cs:271</a> — <code>public delegate* unmanaged&lt;ObjectHandle, AudioAssetId, int, void&gt; Sound_SetSource;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L4">ScriptCore/SoundComponent.cs:4</a> — <code>public sealed class SoundComponent : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L6">ScriptCore/SoundComponent.cs:6</a> — <code>public void Play() =&gt; Native.SoundPlay(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L7">ScriptCore/SoundComponent.cs:7</a> — <code>public void Stop() =&gt; Native.SoundStop(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L30">BuildTool/EnginePublisher.cs:30</a> — <code>if (shipping &amp;&amp; project.StartsWith(&quot;Player/&quot;)) arguments.Add(&quot;/p:EngineShipping=true&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L56">BuildTool/EnginePublisher.cs:56</a> — <code>var source = name == &quot;Player&quot; &amp;&amp; shipping ? Path.Combine(repository, $&quot;Bin/x64-{config}-Shipping&quot;) : binarySource;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L63">BuildTool/EnginePublisher.cs:63</a> — <code>Metadata.AssertSourceOnlyAudio(entries.Select(entry =&gt; entry.Path));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Uuid.h#L146">Engine/Utility_Framework/Uuid.h:146</a> — <code>struct Uuid16</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Uuid.h#L167">Engine/Utility_Framework/Uuid.h:167</a> — <code>inline constexpr Uuid16 Nil() noexcept { return Uuid16{}; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Uuid.h#L170">Engine/Utility_Framework/Uuid.h:170</a> — <code>inline std::string ToString(const Uuid16&amp; u)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L495">Engine/RenderEngine/DataSystem.h:495</a> — <code>own::shared_owner&lt;const Texture&gt; LoadTextureGUID(FileGuid guid);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L515">Engine/RenderEngine/DataSystem.h:515</a> — <code>own::shared_owner&lt;const Material&gt; FindCachedMaterial(FileGuid guid);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L541">Engine/RenderEngine/DataSystem.h:541</a> — <code>[[nodiscard]] own::shared_owner&lt;const Material&gt; LoadMaterialByGuid(FileGuid guid);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundSystem.h#L19">Engine/SceneRuntime/SoundSystem.h:19</a> — <code>void Register(SoundComponent* sound);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundSystem.h#L20">Engine/SceneRuntime/SoundSystem.h:20</a> — <code>void Unregister(SoundComponent* sound);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundSystem.h#L34">Engine/SceneRuntime/SoundSystem.h:34</a> — <code>[[nodiscard]] size_t GetCount() const noexcept { return m_sounds.size(); }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L52">Engine/Utility_Framework/Paklib.hpp:52</a> — <code>[[noreturn]] inline void fail(std::string_view msg) { throw WinError{ std::string(msg) }; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L269">Engine/Utility_Framework/Paklib.hpp:269</a> — <code>explicit Builder(std::filesystem::path outPak, BuildOptions opt = {}) : m_out(std::move(outPak)), m_opt(opt) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L398">Engine/Utility_Framework/Paklib.hpp:398</a> — <code>explicit Archive(std::filesystem::path pak, OpenOptions opt = {}) : m_path(std::move(pak)), m_key(std::move(opt.key)) {</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L8">Engine/SceneRuntime/SoundComponent.h:8</a> — <code>struct SoundComponentSettings final</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L37">Engine/SceneRuntime/SoundComponent.h:37</a> — <code>class [[reflgen::reflect]] SoundComponent : public meta::identity&lt;SoundComponent, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L71">Engine/SceneRuntime/SoundComponent.h:71</a> — <code>[[nodiscard]] SoundComponentSettings ReadSettings() const;</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<ul>
+<li>기준 트리: <code>81b90288</code> + 미커밋 변경(오디오 계층에는 변경 없음)</li>
+<li>대조 정본: <a href="../plans/AudioBackendModernizationPlan.html">AudioBackendModernizationPlan.md</a>(기준선 2026-08-27),
+<a href="../RefactoringPlanDashboard.html">RefactoringPlanDashboard.html</a> PHASE 22 AU0&#126;AU9,
+<a href="../plans/BuildPipelinePlan.html">BuildPipelinePlan.md</a> B5,
+<a href="../plans/EngineDistributionAndLauncherPlan.html">EngineDistributionAndLauncherPlan.md</a> DL5</li>
+<li>묻는 것 셋. ① 계획서 §1 기준선(3주 전)이 지금도 서 있는가. ② AU0&#126;AU9 가 지목한 대상이 실제로 그 자리에
+있는가. ③ 지금 착수할 수 있는가, 착수 전에 정해야 할 것은 무엇인가.</li>
+<li>방법: 소스·프로젝트·스크립트·산출물 JSON·PE import 를 직접 읽었다. 문서 간 대조는 근거로 세지 않았다.
+실행 검증(재생·장치·성능)은 하지 않았다 — §9 에 재지 않은 것을 적었다.</li>
+</ul>
+<hr>
+<h2>0. 결론</h2>
+<ol>
+<li><strong>현재 FMOD 경로는 소리를 한 번도 적재하지 못한다.</strong> 로더가 스캔하는 <code>Sounds\</code> 디렉터리가 저장소에
+존재하지 않아 <code>LoadSounds()</code> 가 영원히 실행되지 않고(§2.1), <code>sounds</code> 맵은 영구 공집합이다. 저작
+데이터의 오디오 참조도 0건, 저장소의 오디오 파일도 0개다. 계획서가 AU0/AU4 에 둔 <strong>&quot;유효 FMOD 항목
+A/B&quot; 의 유효 집합은 사실상 공집합</strong>이다 — AU0 은 &quot;기존 동작 분류&quot; 가 아니라 <strong>합성 fixture 로 새
+골든을 세우는 일</strong>로 다시 써야 한다(§2.5).</li>
+<li><strong>FMOD 표면은 계획서 목록보다 넓고, 동시에 계획서가 세지 않은 오탐 둘을 포함한다.</strong> 살아 있는 참조
+파일은 15개(계획서 7개), 그중 <code>AnimationJob.cpp</code>·<code>ImGuiDrawHelperTerrainComponent.cpp</code> 의 매치는
+C 표준 <code>fmod()</code> 와 지역변수 <code>fModes[]</code> 로 <strong>오디오와 무관</strong>하다(§1.2). 진짜 vendor 진입점은
+<code>SoundDefinition.h:5-6</code> <strong>한 곳</strong>이고 ABI 누출은 <code>ChannelPair</code> 와 <code>Get2D/3DChannel</code> <strong>둘</strong>뿐이다(§1.3).</li>
+<li><strong>AU2 는 &quot;PHASE 17 정본을 소비&quot; 가 아니라 파이프라인 신설이다.</strong> 128-bit identity 전제는 참이지만
+(<code>Uuid16</code>, <code>static_assert(sizeof==16)</code>), 오디오에는 importer·<code>RuntimeAssetType</code>·<code>CookedAssetKind</code>·
+<code>.meta</code> 오디오 필드·pak 범위 read·C# identity 타입이 <strong>전부 없다</strong>(§3.2). 확장자 allowlist 는 세 곳에
+중복 하드코딩돼 있어 한 곳만 고치면 조용히 어긋난다(§3.3).</li>
+<li><strong>AU8 이 지목한 대상이 이사했다.</strong> <code>Tools/build.ps1</code> 에 FMOD 는 0건이며(22줄짜리 호환 진입점으로
+축소), 실제 배치는 <code>Tools/runtime/deploy-runtime.ps1</code> 의 <strong>PE import 폐포</strong>가 한다(§4.1&#126;4.2).
+FMOD 는 어느 목록에도 이름으로 등록돼 있지 않다 — 소스에서 심볼이 사라지면 폐포에서 자동으로
+떨어진다. 반대로 <strong>지금 그것을 재는 게이트가 0개</strong>다(§4.4).</li>
+<li><strong>신규 발견 — 라이선스 공백.</strong> 배포본에 <code>fmodL.dll</code>(FMOD 로깅 빌드)이 실리는데
+<code>Licenses/ThirdParty/</code> 에 Fmod 항목이 없다. <code>x64-Debug-Shipping</code> 구성의 Player 매니페스트도
+<code>fmodL.dll</code> 을 싣는다(§4.3). 독점 SDK라 PHASE 23 DL5/DL9 감사 전에 이미 처분이 필요하다.</li>
+<li><strong>의존 페이즈 전제 셋 중 둘이 어긋난다.</strong> <code>PHASE 17 D2 → AU2</code> 의 D2 는 <code>stopped</code>(PHASE 3.75 이관)
+이지만 identity 실물이 있으므로 실질 무해하고, <code>PHASE 14 provider → AU5/AU9</code> 의 P5 는 <code>todo</code> 라
+<strong>발행할 provider 가 없다</strong>. <code>PHASE 12.5 B2/B3 → AU0</code> 의 B3 는 <code>todo</code> 이나 AU0 은 실측상 B2/B3 없이
+진행 가능하다(§5).</li>
+<li><strong>착수 가능하다.</strong> AU0(재정의)·AU1·AU3 은 지금 시작할 수 있다. 착수 전 결정 2건과 재추정은 §8.</li>
+</ol>
+<hr>
+<h2>1. FMOD 표면 재측정</h2>
+<h3>1.1 살아 있는 참조 15개 (계획서 §1.1 은 7개)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>건수</th>
+<th>성격</th>
+<th>계획서 §1.1</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Engine/SceneRuntime/SoundManager.cpp</code></td>
+<td>67</td>
+<td>구현 본체</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Engine/SceneRuntime/SoundManager.h</code></td>
+<td>18</td>
+<td>공개 헤더 · ABI 누출</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Editor/EngineGUIWindow/InspectorWindow.cpp</code></td>
+<td>19</td>
+<td>채널 직접 조작 5블록</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Engine/SceneRuntime/SoundComponent.h</code></td>
+<td>9</td>
+<td>공개 헤더 · ABI 누출</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Engine/SceneRuntime/SoundComponent.cpp</code></td>
+<td>6</td>
+<td>구현</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Engine/SceneRuntime/SoundDefinition.h</code></td>
+<td>2</td>
+<td><strong>vendor 헤더 유일 진입점</strong></td>
+<td><strong>없음</strong></td>
+</tr>
+<tr>
+<td><code>Engine/SceneRuntime/SoundSystem.h</code></td>
+<td>1</td>
+<td>전방 선언</td>
+<td><strong>없음</strong></td>
+</tr>
+<tr>
+<td><code>Editor/CreatorEditor.vcxproj</code></td>
+<td>10</td>
+<td>include·lib·link</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Player/Player.vcxproj</code></td>
+<td>6</td>
+<td>include·lib·link</td>
+<td>있음</td>
+</tr>
+<tr>
+<td><code>Editor/Editor.vcxproj</code></td>
+<td>2</td>
+<td>include only(솔루션 6번째 프로젝트, 오늘도 커밋됨)</td>
+<td><strong>없음</strong></td>
+</tr>
+<tr>
+<td><code>Engine/SceneRuntime/SceneRuntime.vcxproj</code></td>
+<td>2</td>
+<td>include only</td>
+<td><strong>없음</strong></td>
+</tr>
+<tr>
+<td><code>ScriptCore/SoundComponent.cs</code></td>
+<td>2</td>
+<td>주석</td>
+<td><strong>없음</strong></td>
+</tr>
+<tr>
+<td><code>Tools/regression/verify-experiment-contract.ps1</code></td>
+<td>8</td>
+<td><strong>링크 입력</strong>(동작 단정 아님)</td>
+<td><strong>없음</strong></td>
+</tr>
+<tr>
+<td><code>Tools/runtime/deploy-runtime.ps1</code></td>
+<td>1</td>
+<td>DLL 소스 루트</td>
+<td><strong>없음</strong>(build.ps1 로 적힘)</td>
+</tr>
+<tr>
+<td><code>.github/workflows/build.yml</code></td>
+<td>2</td>
+<td>제외 사유 주석</td>
+<td>있음</td>
+</tr>
+</tbody></table></div>
+<p><code>Artifacts/phase21-*/</code> 아래 4건은 UI 작업의 before 스냅샷이라 제외했다. <code>ThirdParty/Fmod</code> 자체와
+<code>vcpkg_installed</code>(<code>fmt/chrono.h</code> 등의 <code>fmod</code> 수학 함수)도 제외했다.</p>
+<p><strong>FMOD Studio 소비자는 0이다.</strong> <code>FMOD::Studio</code>·<code>EventInstance</code>·<code>EventDescription</code>·<code>.bank</code> 0건이고,
+<code>ThirdParty/Fmod/inc</code> 에 <code>fmod_studio.h</code> 가 <strong>아예 없다</strong>. 계획서의 &quot;Core 재생 계층만&quot; 판정은 유효하다.</p>
+<h3>1.2 오탐 둘 — 오디오 소비자가 아니다</h3>
+<ul>
+<li><code>Engine/SceneRuntime/AnimationJob.cpp:490,512,554,571,604,626</code> — C 표준 <code>fmod()</code>(애니메이션 시간
+랩어라운드). 같은 파일에 <code>sound</code>/<code>audio</code> 0건.</li>
+<li><code>Editor/EngineGUIWindow/ImGuiDrawHelperTerrainComponent.cpp:299</code> — foliage 모드 콤보의 지역변수
+<code>fModes[]</code>. <code>FMOD</code>/<code>Sound</code>/<code>Audio</code> 0건.</li>
+</ul>
+<p>대소문자 무시 grep 으로 FMOD 표면을 세면 이 둘이 항상 섞인다. AU8 의 &quot;symbol 0&quot; 판정은 <code>fmod(</code>
+호출과 <code>fModes</code> 를 제외하는 규칙을 명시해야 한다.</p>
+<h3>1.3 vendor 격리 실태 — 진입점 1 · ABI 누출 2 · 전이 오염 6</h3>
+<ul>
+<li><strong>유일한 vendor 헤더 진입점</strong>: <code>Engine/SceneRuntime/SoundDefinition.h:5-6</code>
+(<code>#include &quot;../../ThirdParty/Fmod/inc/fmod.hpp&quot;</code>, <code>fmod_errors.h</code>). 상대경로 하드코딩.</li>
+<li><strong>진짜 ABI 누출 둘</strong><ul>
+<li><code>SoundManager.h:8-12</code> <code>struct ChannelPair { FMOD::Channel* ch2D; FMOD::Channel* ch3D; }</code> —
+<code>playFromSourceBlended</code>(<code>:54</code>)·<code>playOneShotPooled</code>(<code>:59-64</code>) 반환 타입.</li>
+<li><code>SoundComponent.h:66-67</code> <code>Get2DChannel()</code>/<code>Get3DChannel()</code> — Editor 가 이걸로 채널을 직접 조작한다.</li>
+<li>부수: <code>setListenerAttributes(const FMOD_VECTOR&amp;, ...)</code>(<code>SoundManager.h:31-34</code>),
+<code>getListenerPosition(FMOD_VECTOR&amp;)</code>(<code>:71</code>), <code>SoundComponent.h:95-96</code> 의 <code>FMOD_VECTOR</code> 멤버.</li>
+</ul>
+</li>
+<li><strong>전이 오염</strong>: <code>SoundDefinition.h</code> 가 직렬화 enum <code>ChannelType</code>(<code>:8-16</code>)과 한 몸이라, <code>SoundComponent.h</code>
+를 include 하는 TU 가 전부 FMOD 헤더를 끌고 온다 — <code>RegisterReflectManual.h:34,146</code>,
+<code>SceneManager.cpp:23</code>, <code>InspectorWindow.cpp:37</code>, <code>InspectorIconList.h:14</code>, <code>ComponentFactory.cpp:24</code>,
+<code>LifecycleRegistry.cpp:30</code>, <code>ClrHost.cpp:11</code>.</li>
+<li><strong>managed ABI 는 깨끗하다</strong>: <code>ClrHost.cpp:142-153</code> 의 오디오 함수 12개는 전부
+<code>int/float/char*/ScriptObjectHandle</code> 다. vendor 누출은 헤더 레벨에서 멈춘다. 계획서 §3.1 의
+&quot;native pointer 를 managed 에 숫자로 노출하지 않는다&quot; 는 <strong>이미 지켜지고 있다</strong>.</li>
+</ul>
+<h3>1.4 죽은 공개 표면</h3>
+<p>호출부 0인 public API: <code>setListenerAttributes</code>(<code>SoundManager.cpp:145</code>), 외부 <code>shutdown()</code>,
+<code>unloadSound</code>(<code>:189</code>), <code>setGroupMaxVoices</code>/<code>setGroupStealPolicy</code>/<code>setGroupPreemptSameClip</code>(<code>:206-208</code>),
+<code>configureVoicePool</code>/<code>clearVoicePool</code>(<code>:341,383</code>), <code>SoundComponent::EditorSet()</code>(<code>SoundComponent.cpp:161</code>),
+<code>SoundDefinition.h:47</code> <code>ComputeEqualPower</code>(같은 수식이 <code>SoundComponent.cpp:83-84</code> 와
+<code>SoundManager.cpp:211</code> 에 각각 재구현돼 있다).</p>
+<p>AU1/AU5 가 &quot;이관&quot; 으로 계산하면 안 되는 부분이다. <strong>정책 API 는 이름만 있고 소비자가 없다.</strong></p>
+<hr>
+<h2>2. 현재 오디오 경로는 소리를 내지 못한다</h2>
+<h3>2.1 <code>Sounds\</code> 부재 → <code>LoadSounds()</code> 영구 미실행</h3>
+<p><code>SoundManager::SoundLoaderThread()</code>(<code>SoundManager.cpp:99-121</code>)는 1초마다 <code>PathFinder::Relative(&quot;Sounds\\&quot;)</code>
+를 재귀 순회해 <code>.mp3/.wav/.ogg</code> 개수를 세고, <strong>개수가 바뀐 경우에만</strong> <code>LoadSounds()</code> 를 부른다(<code>:117</code>).</p>
+<ul>
+<li><code>PathFinder::Relative(x)</code> 의 기준은 <code>DataPath = paths.assetsRoot</code>(<code>PathFinder.h:93,191</code>), 즉
+<code>Dynamic_CPP/Assets</code>(<code>App.cpp:136</code>).</li>
+<li><code>Dynamic_CPP/Assets</code> 아래에 <code>Sounds</code> 가 <strong>없다</strong>. 저장소 전 트리에 <code>Sounds</code> 디렉터리 0건이고,
+<code>PathFinder</code> 의 자동 생성 디렉터리 목록(<code>PathFinder.h:128&amp;#126;</code>)에도 없다.</li>
+<li>따라서 <code>recursive_directory_iterator</code> 가 매 초 예외를 던지고 <code>catch (...) {}</code>(<code>SoundManager.cpp:113</code>)가
+삼킨다 → <code>cnt = 0</code> 이 초기값 <code>_currSoundCount = 0</code>(<code>SoundManager.h:104</code>)과 같아 <code>LoadSounds()</code> 는
+<strong>한 번도 실행되지 않는다</strong>.</li>
+<li>그러므로 <code>sounds</code> 맵(<code>SoundManager.h:108</code>)은 영구 공집합이고, 모든 재생은
+<code>sounds.find(clipKey)</code>(<code>SoundManager.cpp:318</code>) 실패 → 에러 로그 후 return(<code>:319</code>) 이다.</li>
+</ul>
+<h3>2.2 종료는 영구 정지 조건을 품고 있다</h3>
+<p><code>_isSoundLoaderThreadRunning</code> 은 초기값 <strong>true</strong>(<code>SoundManager.h:114</code>)이고, 값을 내리는 유일한 경로가
+<code>LoadSounds()</code> 의 끝(<code>SoundManager.cpp:141</code>)이다. §2.1 로 그 경로가 닫혀 있으므로
+<code>&amp;#126;SoundManager()</code>(<code>:10-13</code>)의 <code>while (_isSoundLoaderThreadRunning) sleep(10ms)</code> 는 <strong>조건상 영원히 돈다</strong>.
+계획서 §1.3 의 &quot;초기값 true 에서 내려가지 않는다&quot; 는 맞지만, 재현 조건은 <em>폴더 부재</em> 라는 한 줄에
+달려 있다 — AU0 실패 canary 는 이 조건을 명시해야 재현된다(폴더를 만들고 파일을 넣으면 canary 가
+조용히 초록이 된다).</p>
+<p>동시에 스레드는 <code>detach()</code>(<code>:21</code>) 된 <code>while (true)</code> 라 종료 수단이 없다. 소멸자가 통과하는 경우(로드가
+한 번이라도 돌아 플래그가 내려간 경우)에는 <code>shutdown()</code> 이 <code>system-&gt;release()</code> 를 하고, 1초 뒤 깨어난
+스캔 스레드가 해제된 <code>system</code> 을 만진다. <strong>hang 과 use-after-free 가 상호배타적으로 둘 다 열려 있다.</strong></p>
+<h3>2.3 리스너 0 · Play 모드 update 0</h3>
+<ul>
+<li><code>setListenerAttributes</code> 는 리스너를 갱신하는 유일한 경로인데 호출부가 0이다(§1.4). 반면
+<code>getListenerPosition</code>(<code>SoundManager.cpp:419</code>)은 <code>SoundComponent.cpp:72</code> 가 소비해 <code>Rolloff::Custom</code>
+감쇠를 계산한다 — <strong>항상 원점 리스너 기준으로 3D 감쇠를 계산한다.</strong></li>
+<li>Editor 의 <code>Sound-&gt;update()</code> 는 <code>InputEvent</code> 람다 안에 있고(<code>EditorMain.cpp:291</code>), 그 람다는
+<code>InputOwner::Game</code> 이면 맨 앞에서 <code>return</code> 한다(<code>EditorMain.cpp:278</code>). 즉 <strong>Play 모드 동안
+<code>SoundManager::update()</code> 가 호출되지 않는다.</strong> Player 의 같은 람다에는 그 가드가 없다
+(<code>PlayerMain.cpp:218-222</code>). <code>InputEvent</code> 자체는 프레임마다 broadcast 된다(<code>SceneManager.cpp:451</code>,
+<code>RuntimeFrame.cpp:70</code>).</li>
+<li>컴포넌트 틱은 살아 있다: <code>Scene.cpp:2688,2747</code> → <code>SoundSystem</code>(<code>SoundSystem.cpp:30-68</code>).</li>
+</ul>
+<h3>2.4 저작 데이터의 오디오 참조 0건</h3>
+<p><code>Dynamic_CPP</code> 의 <code>.creator</code> 14개·<code>.prefab</code> 9개에서 <code>clipKey</code>·<code>SoundComponent</code> 출현 <strong>0건</strong>. 저장소에서
+<code>clipKey</code> 를 담은 파일 둘은 리플렉션 골든 스냅샷이지 저작 데이터가 아니다. 오디오 파일도 전 트리
+<strong>0개</strong>(<code>.wav/.mp3/.ogg/.flac</code>).</p>
+<h3>2.5 그래서 AU0 의 A/B 축이 무너진다</h3>
+<p>계획서 AU0 은 기존 동작을 <code>유효 / 고장 / 미검증</code> 으로 나누고 <strong>유효 항목에만</strong> FMOD A/B 를 쓰라고
+적었다. 실측 결과 분류는 이렇게 된다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>계획서 분류</th>
+<th>항목</th>
+<th>실측</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>유효(A/B 근거)</td>
+<td>play/stop/loop/stream/bus</td>
+<td><strong>관측 불가</strong> — 클립이 적재되지 않아 실행 경로가 첫 줄에서 끊긴다</td>
+</tr>
+<tr>
+<td>고장</td>
+<td>shutdown/lifetime</td>
+<td>확정(§2.2), + Play 모드 update 미호출(§2.3)</td>
+</tr>
+<tr>
+<td>미검증</td>
+<td>listener/spatial/reverb</td>
+<td>확정 — listener 호출부 0, reverb 는 Inspector 람다에만 있고 재생 시 재적용 경로 없음</td>
+</tr>
+</tbody></table></div>
+<p><strong>조치</strong>: AU0 의 판정문에서 &quot;유효 FMOD 항목 A/B&quot; 를 빼고, ① 합성 fixture ② offline/golden 기대값
+③ 실패 canary ④ 절대 성능 예산만 남긴다. FMOD 와의 비교는 <em>참고 수치</em> 로 강등하고, 비교를 하려면
+먼저 <code>Sounds\</code> 를 만들고 fixture 를 넣어 <strong>현재 코드가 처음으로 소리를 내게 하는 작업</strong>이 선행돼야
+한다는 것을 AU0 안에 명시한다.</p>
+<hr>
+<h2>3. 자산 파이프라인 전제 (AU2)</h2>
+<h3>3.1 서 있는 전제 — canonical 128-bit identity</h3>
+<p><code>Engine/Utility_Framework/Uuid.h:151-170</code> <code>Uuid::Uuid16 { std::array&lt;uint8_t,16&gt; }</code> +
+<code>static_assert(sizeof(Uuid16) == 16)</code>. 저작/런타임 래퍼는 <code>TypeTrait.h:117</code> <code>FileGuid</code>, 쿠킹 경계는
+<code>Experiment/ModelData.h:80-86</code> <code>AssetId</code>. v4 생성(<code>TypeTrait.h:130-158</code>)과 v5 유도(<code>Uuid.h:190-204</code>)가
+모두 있다. 계획서 §3.1 의 &quot;D2 가 확정한 중립 asset identity&quot; 는 <strong>실물로 존재한다</strong>.</p>
+<h3>3.2 없는 것 — 여섯 축이 전부 신설이다</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>축</th>
+<th>현재</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>오디오 importer</td>
+<td>없음. <code>IAssetImporter</code> 구현은 glTF·FBX 둘뿐</td>
+<td><code>Experiment/Import/ImportedScene.h:519-526</code>, <code>GltfImporter.h:23</code>, <code>FbxImporter.h:17</code></td>
+</tr>
+<tr>
+<td>런타임 자산 타입</td>
+<td><code>RuntimeAssetType</code> 에 오디오 없음 → <code>.wav</code> 는 <code>CatalogOnly</code> 로 떨어진다</td>
+<td><code>DataSystem.h:33-43</code>, <code>DataSystem.cpp:118-145</code></td>
+</tr>
+<tr>
+<td>쿠킹 종류</td>
+<td><code>CookedAssetKind{Model,Material,Texture,ShaderMeta,Scene,Prefab}</code> — 오디오 없음</td>
+<td><code>Cooked/CookedAssetManifest.h:31-39</code>, <code>Tools/AssetCooker/AssetCooker.cpp:329</code></td>
+</tr>
+<tr>
+<td><code>.meta</code> 오디오 필드</td>
+<td>스키마는 <code>guid</code> + <code>importSettings.{extension,timestamp}</code> 3필드뿐</td>
+<td><code>EditorAssetDatabase.cpp:1542-1560</code>, 실물 <code>Dynamic_CPP/Assets/Cloud/Cloud.png.meta</code></td>
+</tr>
+<tr>
+<td>pak 범위 read</td>
+<td><code>readAll()</code>/<code>readByIndex()</code> 전량 읽기만. 내부 청크 인덱스는 있으나 범위 API 미노출</td>
+<td><code>Paklib.hpp:392,425-445</code>, 청크 <code>:255,263</code></td>
+</tr>
+<tr>
+<td>C# identity 타입</td>
+<td>없음. 오디오 managed 표면은 <strong>문자열 clipKey</strong></td>
+<td><code>Native.cs:97-98,677-688</code></td>
+</tr>
+</tbody></table></div>
+<p><code>.wav</code> 가 Assets 에 들어오면 <code>.meta</code> 사이드카는 받지만(<code>EditorAssetDatabase.cpp:1493-1592</code>) importer 는
+돌지 않고 런타임 등록도 되지 않는다. <strong>AU2 는 &quot;PHASE 17 정본을 소비&quot; 가 아니라 위 여섯 축의 신설이고,
+그중 pak bounded reader 는 오디오 밖(스트리밍 일반)에도 영향을 준다.</strong> 7일 추정은 이 폭을 반영하지
+않았다.</p>
+<h3>3.3 확장자 allowlist 는 3중 미러다</h3>
+<p>정본은 <code>Editor/EngineEntry/EditorAssetDatabase.cpp:1716-1733</code> 의 하드코딩 집합
+(<code>.wav</code>, <code>.mp3</code>, <code>.ogg</code> 등록 · <code>.flac</code> 없음). 같은 목록이 두 곳에 복제돼 있다.</p>
+<ul>
+<li><code>Tools/regression/verify-asset-guid-contract.ps1:181-193</code> — 주석이 &quot;<code>m_registeredFiles</code> 와 같은
+범위여야 한다&quot; 고 명시</li>
+<li><code>Tools/migration/Repair-AssetSidecarIdentities.ps1:55</code></li>
+</ul>
+<p>AU2 의 &quot;allowlist 를 WAV/MP3/FLAC 으로 고정하고 OGG 를 명시 거부&quot; 는 <strong>세 곳을 함께 바꾸는 일</strong>이며,
+어긋남을 잡는 게이트가 <code>verify-asset-guid-contract.ps1</code> 하나뿐이라는 것도 같이 확인했다(이미 <code>.slang</code>
+누락으로 drift 가 나 있다 — 오디오와 무관한 기존 결함).</p>
+<p>표시 계층에도 구멍이 있다: <code>EditorAssetPresentation.cpp:262-277</code> 의 <code>m_extensionTypes</code> 에 <code>.wav</code>·<code>.mp3</code>
+만 있고 <strong><code>.ogg</code> 가 빠져</strong> <code>FileType::Unknown</code> 아이콘으로 보인다.</p>
+<hr>
+<h2>4. 빌드 · 배포 · 게이트 (AU8/AU9)</h2>
+<h3>4.1 AU8 이 지목한 대상이 이사했다</h3>
+<ul>
+<li><code>Tools/build.ps1</code> 은 22줄 호환 진입점으로 축소됐고 FMOD 0건이다(<code>:1</code>, <code>:18</code>, <code>:22</code> — <code>BuildTool/ CreatorBuildTool.csproj</code> 로 포워딩). 계획서 AU8 의 &quot;<code>Tools/build.ps1</code> 의 fmodL.dll stage 제거&quot; 는
+<strong>대상이 없다</strong>.</li>
+<li>실제 배치는 <code>Tools/runtime/deploy-runtime.ps1:30-31</code> 이 <code>ThirdParty\Fmod\bin\x64</code> 를 소스 루트로
+등록하고, 그룹 판정(<code>:75-79</code>)에서 Common 으로 떨어뜨려 <code>Bin/x64-&lt;Config&gt;/Runtime/Common/fmod.dll</code>
+(Debug 는 <code>fmodL.dll</code>)로 복사한다.</li>
+<li><code>BuildTool/</code>(GamePackager·PlayerVerification·PackageInputs·AssetCooking)에 <code>fmod|audio|sound</code> 0건 —
+<strong>패키징 코드는 FMOD 를 이름으로 알지 못한다.</strong></li>
+</ul>
+<h3>4.2 폐포는 PE import 가 닫는다</h3>
+<p><code>deploy-runtime.ps1:54-86</code> 이 호스트 exe 의 import 를 시드로 BFS 를 돌려 의존을 닫고, 파서는
+<code>Tools/runtime/RuntimeLayout.psm1:33-74</code> <code>Get-EnginePeImports</code>(import·delay import 양쪽 순회)다.
+FMOD 는 <code>SceneRuntime</code> → 호스트 import 로 폐포에 들어온다. 실측:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>바이너리</th>
+<th>fmod import</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Bin/x64-Release/Editor/CreatorEditor.runtime.dll</code></td>
+<td><code>fmod.dll</code> (import 44개 중)</td>
+</tr>
+<tr>
+<td><code>Bin/x64-Debug/Editor/CreatorEditor.runtime.dll</code></td>
+<td><code>fmodL.dll</code> (import 35개 중)</td>
+</tr>
+<tr>
+<td><code>Bin/x64-Release/Editor/CreatorEditor.exe</code></td>
+<td>없음(얇은 런처, import 2개)</td>
+</tr>
+</tbody></table></div>
+<p><strong>따라서 AU8 의 실제 작업은 &quot;목록에서 FMOD 를 지우는 일&quot; 이 아니라 &quot;소스에서 심볼을 없애는 일&quot;이고,
+폐포·매니페스트는 자동으로 따라온다.</strong> 반대로 그것을 확인해 주는 게이트는 지금 없다(§4.4).</p>
+<h3>4.3 ★ 라이선스 공백 — 배포본이 FMOD 로깅 빌드를 싣고 있다</h3>
+<ul>
+<li>발행본 <code>Build/Distributions/local-0.0.0.0-win-x64-Debug-.../Bin/x64-Debug/Runtime/Common/fmodL.dll</code>
+이 실물로 들어 있다.</li>
+<li>같은 배포본 <code>Licenses/ThirdParty/</code> 는 <code>DotNetHost · ImViewGuizmo · Mathematics · Slang · fastgltf · mikktspace · ufbx · README.md</code> 로 <strong>Fmod 항목이 없다</strong>. 수집 규칙이
+<code>^(LICENSE|COPYING|NOTICE|README)</code> 파일명 기준인데(<code>BuildTool/EnginePublisher.cs:108-109</code>)
+<code>ThirdParty/Fmod/</code> 에는 그런 파일이 하나도 없기 때문이다.</li>
+<li><code>x64-Debug-Shipping</code> 구성의 <code>Runtime/Manifests/Player.json:50</code> 도 <code>Runtime/Common/fmodL.dll</code> 을
+싣는다 — <strong>출하 구성에 개발용 로깅 빌드가 들어간다.</strong></li>
+<li>저장소에 SBOM 파일은 없다. FMOD 를 문장으로 언급하는 곳은 <code>ThirdParty/README.md:10</code>(독점 SDK 명시,
+이 README 가 규칙에 걸려 배포본에 복사되는 유일한 FMOD 표기)과 <code>Tools/distribution/README.md:72</code>
+(&quot;현재 오디오 closure 는 FMOD 를 포함하며 PHASE 22 완료를 뜻하지 않는다&quot;) 둘이다.</li>
+</ul>
+<p>이건 PHASE 22 완료를 기다릴 사안이 아니다. <strong>AU8 을 기다리지 말고 지금 처분해야 한다</strong>(§8.2 결정 B).</p>
+<h3>4.4 게이트 0 · CI 제외 타깃</h3>
+<ul>
+<li><code>Tools/regression/</code> 202개 엔트리 중 오디오를 재는 게이트 <strong>0개</strong>. <code>run-all.ps1</code> 의 <code>Run-Step</code> 115개
+중 오디오 축 <strong>0개</strong>(등록은 배열이 아니라 소스 하드코딩 나열, <code>run-all.ps1:19-24</code>).</li>
+<li><code>verify-experiment-contract.ps1:205-214</code> 의 FMOD 는 <strong>링크 전제</strong>다 — 단정은 &quot;라이브러리 파일이
+존재하는가&quot; 한 줄(<code>:211-213</code>)이고 오디오 동작 단정은 없다. AU8 이 FMOD 를 지우면 <strong>이 게이트의
+링크 인자도 같이 손봐야 한다</strong>(계획서에 없는 항목).</li>
+<li><code>.github/workflows/build.yml</code> 은 엔진 라이브러리 4종(<code>Utility_Framework</code>·<code>Physics</code>·<code>SceneRuntime</code>·
+<code>RenderEngine</code>, <code>:102-107</code>)만 빌드한다. 제외 대상은 <strong>exe 타깃 전부와 게임 패키지 레그</strong>이며 사유는
+<code>ThirdParty/Fmod/lib/x64/*.lib</code> 가 <code>.gitignore</code>(<code>:88 x64/</code>, <code>:94 [Bb]in/</code>)로 저장소에 없다는 것이다
+(<code>build.yml:6-13</code>). 추적되는 FMOD 파일은 <code>inc/*</code> 헤더 11개뿐.</li>
+<li>즉 <strong>B5 차단은 &quot;FMOD 라이선스 때문에 lib 을 저장소에 못 넣는다&quot; 이고, AU8 이 그것을 푼다</strong>는
+계획서 기술이 지금도 정확하다.</li>
+</ul>
+<hr>
+<h2>5. 의존 페이즈 전제</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>계획서 의존</th>
+<th>대시보드 실측</th>
+<th>판정</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PHASE 17 D2/D5 → AU2</code></td>
+<td>D2 <code>stopped</code>(PHASE 3.75 이관) · D5 <code>done</code></td>
+<td><strong>문장은 어긋났으나 실질 무해</strong> — identity 실물이 있다(§3.1). 계획서의 &quot;D2 가 확정한&quot; 표현을 <code>Uuid16</code>/<code>FileGuid</code> 실물 참조로 바꾼다</td>
+</tr>
+<tr>
+<td><code>PHASE 12.5 B2/B3 → AU0</code></td>
+<td>B2 <code>progress</code>(잔여에 &quot;FMOD-free Release&quot; 명시) · B3 <code>todo</code></td>
+<td><strong>AU0 은 B2/B3 없이 가능</strong> — AU0 산출물은 fixture·canary·예산이며 패키징에 의존하지 않는다. 의존을 AU8 로 옮긴다</td>
+</tr>
+<tr>
+<td><code>AU8/AU9 → PHASE 12.5 B5</code></td>
+<td>B5 <code>blocked</code>(사유가 AU8 을 지목)</td>
+<td>순환이 아니라 정상 — B5 가 AU8 을 기다린다</td>
+</tr>
+<tr>
+<td><code>AU5/AU9 → PHASE 14 provider</code></td>
+<td>P1 <code>progress</code> · <strong>P5 <code>todo</code></strong></td>
+<td><strong>발행처가 없다.</strong> AU5 판정에서 &quot;counter 를 provider 에 발행&quot; 을 분리해 P5 이후로 미루고, AU5 는 backend-neutral counter 의 <em>값</em> 까지만 판정한다</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2>6. 외부 기준 재확인 (miniaudio)</h2>
+<ul>
+<li>최신 안정 릴리스 <strong>0.11.25</strong>(2026-03-03 발행). 계획서가 적은 후보값이 지금도 최신이다.</li>
+<li>저장소에 miniaudio 흔적 <strong>0건</strong>(소스·ThirdParty·vcpkg 매니페스트 전부).</li>
+<li>라이선스는 GitHub API 상 <code>NOASSERTION</code>(public domain / MIT-0 이중 선택이라 SPDX 단일 식별자가 붙지
+않는다) — AU3 에서 <strong>둘 중 어느 쪽을 택했는지 파일로 남기는</strong> 절차가 필요하다.</li>
+</ul>
+<hr>
+<h2>7. 계획서 정정 목록</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>계획서 문장</th>
+<th>실측</th>
+<th>조치</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>§1.1 &quot;<code>Tools/build.ps1</code> 이 fmodL.dll stage&quot;</td>
+<td>build.ps1 FMOD 0건. 배치는 <code>deploy-runtime.ps1</code> + <code>Runtime/Manifests</code></td>
+<td>AU8 대상 교체</td>
+</tr>
+<tr>
+<td>§1.1 FMOD 소비 파일 7개</td>
+<td>살아 있는 참조 15개(오탐 2 별도)</td>
+<td>§1.1 표로 교체</td>
+</tr>
+<tr>
+<td>§1.1 &quot;Editor/Player 프로젝트&quot;</td>
+<td>프로젝트 4개(<code>CreatorEditor</code>·<code>Editor</code>·<code>SceneRuntime</code>·<code>Player</code>)</td>
+<td>AU8 목록 보정</td>
+</tr>
+<tr>
+<td>§1.2 &quot;<code>.flac</code> 은 등록 목록에 없다&quot;</td>
+<td>맞다. 추가로 <strong>allowlist 가 3중 미러</strong>이고 <code>.ogg</code> 는 아이콘 맵에서 누락</td>
+<td>AU2 에 미러 동기화 항목 추가</td>
+</tr>
+<tr>
+<td>§1.2 &quot;실파일 0개&quot;</td>
+<td>맞다. 추가로 <strong><code>Sounds</code> 디렉터리 자체가 없다</strong></td>
+<td>AU0 canary 재현 조건 명시</td>
+</tr>
+<tr>
+<td>§1.3 &quot;플래그가 내려가지 않는다&quot;</td>
+<td>맞다. 단 원인은 폴더 부재 → <code>LoadSounds</code> 미실행</td>
+<td>canary 기술 보정</td>
+</tr>
+<tr>
+<td>§1.4 &quot;listener 호출부 확인 안 됨&quot;</td>
+<td><strong>호출부 0 확정</strong>. 반대편 <code>getListenerPosition</code> 은 소비자 있음</td>
+<td>&quot;미검증&quot; → &quot;부재&quot; 로 확정</td>
+</tr>
+<tr>
+<td>§6 &quot;PHASE 17 D2 → AU2&quot;</td>
+<td>D2 <code>stopped</code> · identity 는 실재</td>
+<td>참조를 실물 타입으로 교체</td>
+</tr>
+<tr>
+<td>§6 &quot;PHASE 12.5 B2/B3 → AU0&quot;</td>
+<td>AU0 은 독립 가능</td>
+<td>의존을 AU8 로 이동</td>
+</tr>
+<tr>
+<td>AU0 &quot;유효 FMOD 항목 A/B&quot;</td>
+<td>유효 집합이 사실상 공집합</td>
+<td>A/B 를 참고로 강등, 합성 골든 중심으로 재작성</td>
+</tr>
+<tr>
+<td>AU5 &quot;counter 를 PHASE 14 provider 에 발행&quot;</td>
+<td>P5 <code>todo</code></td>
+<td>판정에서 분리</td>
+</tr>
+<tr>
+<td>(없음)</td>
+<td>Editor Play 모드에서 <code>update()</code> 미호출</td>
+<td>AU0 &quot;고장&quot; 목록에 추가</td>
+</tr>
+<tr>
+<td>(없음)</td>
+<td>배포본 FMOD 라이선스 미등재 · Shipping 에 로깅 빌드</td>
+<td>§8.2 결정 B 로 분리 착수</td>
+</tr>
+<tr>
+<td>(없음)</td>
+<td><code>verify-experiment-contract.ps1</code> 이 FMOD lib 을 링크</td>
+<td>AU8 항목 추가</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2>8. 착수 판정과 순서</h2>
+<h3>8.1 지금 착수 가능한 것</h3>
+<ul>
+<li><strong>AU0(재정의)</strong> — 합성 fixture(WAV/MP3/FLAC) 생성기, 실패 canary(폴더 부재 조건 포함), 절대 성능
+예산, <strong>오디오 회귀 게이트 한 축 신설</strong>(현재 0개). FMOD A/B 는 참고로만.</li>
+<li><strong>AU1</strong> — backend-neutral 계약과 Null backend. 현재 정책 API 가 죽어 있으므로(§1.4) 이관이 아니라
+설계 신설로 잡는다.</li>
+<li><strong>AU3</strong> — miniaudio 0.11.25 벤더링과 미배선 구현. 제품 경로를 건드리지 않는다.</li>
+</ul>
+<h3>8.2 착수 전 결정 2건</h3>
+<ul>
+<li><strong>결정 A — AU2 의 폭.</strong> pak bounded byte source(<code>Paklib</code> 범위 read)는 오디오 전용이 아니다. ①
+AU2 안에서 오디오가 여는가, ② 별도 슬라이스로 떼어 스트리밍 일반으로 여는가. 선택에 따라 AU2 가
+7일에서 크게 벌어진다.</li>
+<li><strong>결정 B — FMOD 라이선스 처분 시점.</strong> 배포본이 <code>fmodL.dll</code> 을 라이선스 등재 없이 싣고 있다(§4.3).
+① PHASE 22 밖에서 지금 처분(등재 또는 배포 제외), ② AU8 까지 현상 유지. 독점 SDK라 ②는
+PHASE 23 감사까지 위험을 끌고 간다.</li>
+</ul>
+<h3>8.3 재추정</h3>
+<p>초기 45 인일 대비 방향만 적는다(정밀 수치는 AU0 스파이크 뒤 갱신).</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>슬라이스</th>
+<th>초기</th>
+<th>재추정</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>AU0</td>
+<td>3</td>
+<td><strong>4&#126;5</strong></td>
+<td>게이트 축 신설이 없던 일로 추가(§4.4). A/B 축 소멸로 분류 작업은 줄어든다</td>
+</tr>
+<tr>
+<td>AU2</td>
+<td>7</td>
+<td><strong>10&#126;13</strong></td>
+<td>여섯 축 신설 + allowlist 3중 미러(§3.2&#126;3.3). 결정 A 에 따라 상단</td>
+</tr>
+<tr>
+<td>AU5</td>
+<td>6</td>
+<td>6</td>
+<td>provider 발행분만 분리(§5)</td>
+</tr>
+<tr>
+<td>AU7</td>
+<td>5</td>
+<td><strong>4</strong></td>
+<td>managed ABI 가 이미 깨끗하고(§1.3) 죽은 표면이 많다(§1.4)</td>
+</tr>
+<tr>
+<td>AU8</td>
+<td>3</td>
+<td><strong>3&#126;4</strong></td>
+<td>대상 이사(§4.1) + <code>verify-experiment-contract</code> 링크 + 라이선스(결정 B 가 ②면 여기)</td>
+</tr>
+<tr>
+<td>합계</td>
+<td>45</td>
+<td><strong>≈ 50&#126;54</strong></td>
+<td></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2>9. 이 정찰이 재지 않은 것</h2>
+<ul>
+<li><strong>실행 검증 0.</strong> 재생·장치·성능·종료를 실제로 돌리지 않았다. §2 의 &quot;소리가 나지 않는다&quot; 는 코드
+경로 판정이며, 에디터를 띄워 확인한 것이 아니다. AU0 의 첫 작업이 이 판정을 실측으로 확정하는 것이다.</li>
+<li><strong><code>SoundComponent::Play()</code> 의 equal-power 재작성 의혹</strong>(계획서 §1.4)은 읽지 않았다. 클립이 없어
+어차피 실행되지 않으므로 AU0 fixture 이후에 판정한다.</li>
+<li><strong>Debug/Release 링크 구성 차이</strong>를 링크 로그로 확인하지 않았다. PE import 로만 확인했다.</li>
+<li><strong><code>Editor/Editor.vcxproj</code> 와 <code>CreatorEditor.vcxproj</code> 의 FMOD 경로 중복</strong>이 의도된 분업인지
+(lib 프로젝트는 include only, exe 는 link) 확인만 했고, 정리 필요 여부는 판정하지 않았다.</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="0-결론"></span><span id="1-fmod-표면-재측정"></span><span id="11-살아-있는-참조-15개-계획서-11-은-7개"></span><span id="12-오탐-둘--오디오-소비자가-아니다"></span><span id="13-vendor-격리-실태--진입점-1--abi-누출-2--전이-오염-6"></span><span id="14-죽은-공개-표면"></span><span id="2-현재-오디오-경로는-소리를-내지-못한다"></span><span id="21-sounds-부재--loadsounds-영구-미실행"></span><span id="22-종료는-영구-정지-조건을-품고-있다"></span><span id="23-리스너-0--play-모드-update-0"></span><span id="24-저작-데이터의-오디오-참조-0건"></span><span id="25-그래서-au0-의-ab-축이-무너진다"></span><span id="3-자산-파이프라인-전제-au2"></span><span id="31-서-있는-전제--canonical-128-bit-identity"></span><span id="32-없는-것--여섯-축이-전부-신설이다"></span><span id="33-확장자-allowlist-는-3중-미러다"></span><span id="4-빌드--배포--게이트-au8au9"></span><span id="41-au8-이-지목한-대상이-이사했다"></span><span id="42-폐포는-pe-import-가-닫는다"></span><span id="43--라이선스-공백--배포본이-fmod-로깅-빌드를-싣고-있다"></span><span id="44-게이트-0--ci-제외-타깃"></span><span id="5-의존-페이즈-전제"></span><span id="6-외부-기준-재확인-miniaudio"></span><span id="7-계획서-정정-목록"></span><span id="8-착수-판정과-순서"></span><span id="81-지금-착수-가능한-것"></span><span id="82-착수-전-결정-2건"></span><span id="83-재추정"></span><span id="9-이-정찰이-재지-않은-것"></span><span id="sec-0-결론"></span><span id="sec-1-fmod-표면-재측정"></span><span id="sec-2-현재-오디오-경로는-소리를-내지-못한다"></span><span id="sec-3-자산-파이프라인-전제-au2"></span><span id="sec-4-빌드--배포--게이트-au8au9"></span><span id="sec-5-의존-페이즈-전제"></span><span id="sec-6-외부-기준-재확인-miniaudio"></span><span id="sec-7-계획서-정정-목록"></span><span id="sec-8-착수-판정과-순서"></span><span id="sec-9-이-정찰이-재지-않은-것"></span></details></main></body></html>

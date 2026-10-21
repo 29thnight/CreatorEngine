@@ -1,5 +1,45 @@
 # Separate profiler analysis and viewer process
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- CPU engine frame·render submission·GPU pass·presenter 관측은 서로 다른 식별 축이다. bounded producer 기록과 손실/출처를 보존한다.
+- 집계 메모리 표본은 객체별 native/CLR/GPU 소유 그래프가 아니다. 과거 .ceprof/ETW 기록은 그 실행 신원에만 유효하다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/EngineDiagnostics/ProfileCaptureFile.cpp:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.cpp#L23) — `enum class chunk_type : std::uint32_t`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.cpp:84](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.cpp#L84) — `std::memcpy(m_bytes.data() + at, &value, sizeof(T));`
+- [Engine/EngineDiagnostics/ProfileCaptureFile.cpp:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfileCaptureFile.cpp#L92) — `std::memcpy(m_bytes.data() + at, value.data(), value.size());`
+- [Tools/regression/ProfilerRenderingDiagnosticsTests.cpp:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ProfilerRenderingDiagnosticsTests.cpp#L15) — `std::fprintf(stderr, "FAIL: %s\n", name);`
+- [Tools/regression/ProfilerRenderingDiagnosticsTests.cpp:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ProfilerRenderingDiagnosticsTests.cpp#L63) — `original.gpuTemporalProvenance.publicationFrameId = 73;`
+- [Tools/regression/ProfilerRenderingDiagnosticsTests.cpp:245](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/ProfilerRenderingDiagnosticsTests.cpp#L245) — `std::string(maximum_rendering_message_bytes, 'M'));`
+- [BuildTool/Paths.cs:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L9) — `internal static class Paths`
+- [BuildTool/Paths.cs:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L11) — `public static readonly StringComparer Comparer = StringComparer.OrdinalIgnoreCase;`
+- [BuildTool/Paths.cs:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/Paths.cs#L12) — `[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern SafeFileHandle CreateFileW(string name, uint access, uint share, nint security, uint creation, uint flags, nint template);`
+- [Editor/ImGuiHelper/ImGui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1) — `#pragma once`
+- [Player/ForbiddenIncludes/imgui.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1) — `#pragma once`
+- [Engine/Utility_Framework/Ownership.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Ownership.h#L1) — `#pragma once`
+- [Editor/EngineGUIWindow/EditorTheme.h:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L5) — `struct ImGuiStyle;`
+- [Editor/EngineGUIWindow/EditorTheme.h:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L6) — `struct ImVec4;`
+- [Editor/EngineGUIWindow/EditorTheme.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorTheme.h#L10) — `enum class ThemeColor`
+- [Editor/EngineGUIWindow/EditorFontResources.h:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorFontResources.h#L36) — `struct ImFont;`
+- [Editor/EngineGUIWindow/EditorFontResources.h:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/EditorFontResources.h#L41) — `struct loaded_font`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Status: implementation/source review only. Builds, tests, Windows execution,
 visual comparison, captures, benchmarks and failure injection are **UNEXECUTED**.
 This stage is layered on the unpublished DX capture-process commit `605a204`.
@@ -220,3 +260,5 @@ Source fixtures and checklists live in `Tools/ProfilerViewer/Tests`,
 `ProfilerRenderingDiagnosticsTests.cpp`. The updated profiling Window gate also
 remains unexecuted. Static review and whitespace inspection are not build, test,
 visual or performance passes.
+
+</details>

@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>네이티브 리플렉션 시스템 분석 — 구조 변경·성능 향상</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="ReflectionSystemAnalysis.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/ReflectionSystemAnalysis.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>네이티브 리플렉션 시스템 분석 — 구조 변경·성능 향상</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Reflgen schema</ve-node><ve-node id="n1" at="2 1">Authoring</ve-node><ve-node id="n2" at="3 1" key>Cooked data</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Reader</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>현행 서술 정본은 reflgen::schema_of/type_descriptor다. 저작 문서와 cooked archive는 공유 서술의 서로 다른 소비 정책이다.</li>
+<li>모델/AssetSet 신원은 구현된 UUIDv8/CEMF 계약을 따른다. 다른 저작 객체의 신원까지 일괄 치환하거나 과거 UUIDv4 이주 단계를 재개하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L26">Engine/SceneRuntime/Component.h:26</a> — <code>static gc::root_ref&lt;T&gt; CreateManaged(gc::domain&amp; domain, Args&amp;&amp;... args)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L29">Engine/SceneRuntime/Component.h:29</a> — <code>static_assert(std::is_same_v&lt;decltype(&amp;T::gc_trace), void (T::*)(gc::tracer&amp;) const&gt;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Component.h#L154">Engine/SceneRuntime/Component.h:154</a> — <code>virtual void OnPropertyChanged(std::string_view propertyName,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L297">Engine/Utility_Framework/TypeTrait.h:297</a> — <code>static inline HashedGuid GetTypeID()</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L407">Engine/Utility_Framework/TypeTrait.h:407</a> — <code>static inline const Uuid::Uuid16* FindByName(std::string_view typeName)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/TypeTrait.h#L416">Engine/Utility_Framework/TypeTrait.h:416</a> — <code>static inline const std::string* FindNameByUUID(const Uuid::Uuid16&amp; uuid)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Core.Minimal.h#L1">Engine/Utility_Framework/Core.Minimal.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Reflection.hpp#L1">Engine/Utility_Framework/Reflection.hpp:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L60">Engine/Utility_Framework/ReflectionYml.h:60</a> — <code>inline const reflgen::type_descriptor* FindTypeByInstance(void* instance)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L241">Engine/Utility_Framework/ReflectionYml.h:241</a> — <code>if (const std::string* typeName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionYml.h#L303">Engine/Utility_Framework/ReflectionYml.h:303</a> — <code>Debug::PrintLog(spdlog::level::warn, std::string(&quot;ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): &quot;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionType.h#L1">Engine/Utility_Framework/ReflectionType.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionRegister.h#L1">Engine/Utility_Framework/ReflectionRegister.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionFunction.h#L1">Engine/Utility_Framework/ReflectionFunction.h:1</a> — <code>#pragma once</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>2026-08-16. 근거: 소스 전수 실측(호출 지점 grep count · 코어 헤더 11종 정독 ·
+등록 배선 추적). <a href="../design/ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a>(존치 결정)의
+후속 문서다 — &quot;존치한다&quot;는 결론은 유지하되, <strong>존치한 것을 어떻게 고칠 것인가</strong>를
+다룬다. <a href="../plans/SerializationPlan.html">SerializationPlan.md</a>(PHASE 17)와
+<a href="../plans/archive/SceneGraphRedesignPlan.html">SceneGraphRedesignPlan.md</a>(트랙 E·K)의 접점을 §5·§7에서 명시한다.</p>
+<h2>0. 요약</h2>
+<ol>
+<li><strong>런타임 매 프레임 비용은 없다. 그러나 게임플레이 이벤트당 비용은 있다</strong> —
+몹 스폰·투사체 생성이 <code>InstantiatePrefab → Meta::Deserialize</code> 전체 왕복을 탄다(§2.1).</li>
+<li><strong>에디터는 매 프레임 리플렉션을 문자열로 탄다</strong> — 인스펙터가 열려 있는 동안
+문자열 맵 조회·<code>std::any</code> 박싱·벡터 전량 복사가 프레임마다 반복된다(§3.3).</li>
+<li><strong>가장 큰 병은 성능이 아니라 구조다</strong> — 리플렉션이 <code>std::vector</code>와 공유 소유를
+타입 계약 수준에서 하드코딩해서, 소유자 쪽 구조 개선(K2 SBO·unique_ptr)을
+역으로 봉쇄했다. 실측된 후퇴 2건이 그 증거다(§5).</li>
+<li><strong>컴파일 파이프라인 전체가 리플렉션을 문다</strong> — <code>Core.Minimal.h</code>가
+<code>Reflection.hpp</code>를 물어 yaml-cpp·magic_enum·<code>&lt;any&gt;</code>가 280개 TU에 전파되고,
+헤더 스코프 <code>static</code> 싱글턴 포인터 6종이 TU마다 사본으로 박힌다(§4.4).</li>
+<li>죽은 코드가 정본 자리를 차지하고 있다 — <code>consteval</code> 64비트 해시가 있는데
+<code>typeid().hash_code()</code> 32비트 절단을 쓰고, <code>InvokeMethodByMetaName</code>은 호출부
+0건, <code>ClassAutoRegistrar</code>는 인스턴스화 0건(§6).</li>
+</ol>
+<h2>1. 시스템 지도</h2>
+<h3>1.1 코어 (Utility_Framework, 11파일 · 약 2,050줄 + 에디터 994줄)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>파일</th>
+<th>줄</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ReflectionType.h</code></td>
+<td>113</td>
+<td><code>Property</code>/<code>Method</code>/<code>Type</code>/<code>EnumType</code> 정의. <code>Type::properties</code>는 <code>std::span</code> — 실배열은 각 <code>Reflect()</code>의 함수-로컬 static</td>
+</tr>
+<tr>
+<td><code>ReflectionRegister.h</code></td>
+<td>524</td>
+<td>싱글턴 5종: <code>TypeCaster</code>(any↔void*) · <code>Registry</code>(이름 맵+해시 맵) · <code>EnumRegistry</code> · <code>FactoryRegistry</code>(new/shared_alloc) · <code>UndoManager</code></td>
+</tr>
+<tr>
+<td><code>ReflectionFunction.h</code></td>
+<td>374</td>
+<td><code>MakeProperty</code>/<code>MakeMethod</code>(람다 캡처 → <code>std::function</code>) · <code>Register&lt;T&gt;</code> · <code>Find</code></td>
+</tr>
+<tr>
+<td><code>ReflectionMecro.h</code></td>
+<td>134</td>
+<td><code>ReflectionField</code>/<code>PropertyField</code>/<code>FieldEnd</code> 매크로 — 생성 헤더가 조립하는 부품</td>
+</tr>
+<tr>
+<td><code>ReflectionYml.h</code></td>
+<td>413</td>
+<td><code>Serialize</code>/<code>Deserialize</code>/<code>DeserializePrefab</code>/<code>ExtractTypeFromYAML</code></td>
+</tr>
+<tr>
+<td><code>ReflectionYamlTemplete.h</code></td>
+<td>439</td>
+<td>스칼라 직렬화 23종 + 벡터 17종 <strong>배열 테이블</strong>(선형 스캔)</td>
+</tr>
+<tr>
+<td><code>ReflectionVector{Factory,Invoker,Mapper}.h</code></td>
+<td>112</td>
+<td><code>vector&lt;T&gt;</code> 전용 팩토리·역직렬화 — <strong>컨테이너 하드코딩의 실체</strong>(§5.1)</td>
+</tr>
+<tr>
+<td><code>MetaAlias.h</code></td>
+<td>22</td>
+<td><code>GetterType = function&lt;any(void*)&gt;</code> 등 — <strong>이중 타입소거를 별칭 수준에서 고정</strong></td>
+</tr>
+<tr>
+<td><code>MetaUtility.h</code></td>
+<td>110</td>
+<td><code>typeid().name()</code> 문자열 가공(<code>ToString</code>/<code>ExtractPointee</code> 등 substr 연산)</td>
+</tr>
+<tr>
+<td><code>TypeTrait.h</code></td>
+<td>348</td>
+<td><code>GUIDCreator::GetTypeID</code> = <code>typeid().hash_code()</code> <strong>uint32 절단</strong>. 미사용 <code>consteval MakeTypeID</code>(FNV-1a 64) 동거</td>
+</tr>
+<tr>
+<td><code>EngineGUIWindow/ReflectionImGuiHelper.h</code></td>
+<td>994</td>
+<td>인스펙터 자동 그리기 — 프레임당 경로(§3.3)</td>
+</tr>
+</tbody></table></div>
+<h3>1.2 등록 흐름 (부팅 1회)</h3>
+<pre><code>[pre-build] MetaGenerator.exe (정규식 스캐너, Utility_Framework·ScriptBinder vcxproj PreBuildEvent)
+    → *.generated.h 154개 (2,547줄, 평균 16.5줄 — 매크로 블록)
+    → ScriptBinder/RegisterReflect.def (AUTO_REGISTER_CLASS 76건)
+[모듈 로드] AUTO_REGISTER_ENUM 31건 — static 전역, main 이전 등록
+[부팅] SceneManager::ManagerInitialize() (EditorMain.cpp:190 · PlayerMain.cpp:133)
+    → REFLECTION_REGISTER_EXECUTE() → Meta::Register&lt;T&gt;() ×76
+</code></pre>
+<p>등록 타입 총 107(클래스 76 + 열거형 31). 타입당 등록 비용: <code>Reflect()</code> 최초 호출로
+함수-로컬 static <code>Property</code> 배열 구축(프로퍼티당 <code>std::function</code> 2개 + typeName
+문자열), <code>Registry</code> 이름 맵·해시 맵에 <code>Type</code> <strong>값 복사 2벌</strong>(<code>ReflectionRegister.h:228-235</code>),
+TypeCaster·FactoryRegistry·Vector 계열 등록. 1회성이라 총량은 작다 — 문제는
+등록이 아니라 아래의 소비 경로다.</p>
+<h2>2. 실측 — 누가, 언제 부르는가</h2>
+<h3>2.1 직렬화: 매 프레임은 없다, 이벤트당은 있다</h3>
+<p><code>Meta::Serialize(</code> 18건(10파일) · <code>Meta::Deserialize(</code> 47건(12파일) ·
+<code>Meta::DeserializePrefab(</code> 2건. 씬 로드/저장(<code>SceneManager.cpp</code> 8건), 프리팹
+(<code>Prefab.cpp</code>·<code>PrefabUtility.cpp</code> 7건), 컴포넌트 로드(<code>ComponentFactory.cpp</code> 30건),
+BT·블랙보드·설정·머테리얼 저장 등 — 게임 루프(<code>SceneManager.cpp:242-304</code>) 내부
+직접 호출은 <strong>0건</strong>이다.</p>
+<p>단, <strong>게임플레이 이벤트 경유 반복 호출 경로</strong>가 실재한다:</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>트리거</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Object::Instantiate()</code> → Serialize+Deserialize 왕복</td>
+<td>오브젝트 복제 API 호출마다</td>
+<td><code>Object.cpp:124,126</code></td>
+</tr>
+<tr>
+<td><code>Prefab::Instantiate()</code> → 오브젝트·컴포넌트마다 Deserialize</td>
+<td>프리팹 인스턴스화마다</td>
+<td><code>Prefab.cpp:96,142</code></td>
+</tr>
+<tr>
+<td><code>MobSpawner::Update</code> → 타이머 만료 시 <code>InstantiatePrefab</code></td>
+<td><strong>스폰마다(초당 다회 가능)</strong></td>
+<td><code>Dynamic_CPP/Assets/Script/MobSpawner.cpp:99,113,150</code></td>
+</tr>
+<tr>
+<td><code>SpecialBullet::Update</code>/<code>OnTriggerEnter</code> → 폭발 이펙트 <code>InstantiatePrefab</code></td>
+<td><strong>충돌마다(전투 중 빈번)</strong></td>
+<td><code>SpecialBullet.cpp:28,129,161,170</code></td>
+</tr>
+</tbody></table></div>
+<p>즉 몹 하나 스폰할 때마다 YAML 트리 워크 + 프로퍼티당 문자열 맵 조회 + <code>std::any</code>
+박싱 + <code>std::function</code> 간접호출로 구성된 §3.1 전체 비용이 지불된다. 애니메이션
+스케줄러 계획(S 트랙)이 스폰 빈도를 실측했듯, 여기도 스폰 프로파일이 곧 리플렉션
+프로파일이다.</p>
+<h3>2.2 조회: 문자열 17 : 해시 3</h3>
+<p><code>Meta::Find(</code> 20건 중 이름 문자열 조회 17건(85%) — 그중 11건이
+<code>InspectorWindow.cpp</code>(55,171,1115-1254,1599), 3건이 <code>ImGuiDrawHelperMeshRenderer.cpp</code>
+— <strong>에디터 매 프레임 문자열 해시 계산 + 맵 조회</strong>다. typeID 조회는 3건뿐.
+해시 맵(<code>Registry::hashMap</code>)이 이미 있는데 소비자가 안 쓴다.</p>
+<h3>2.3 메서드 호출: 죽은 API</h3>
+<p><code>Meta::InvokeMethodByMetaName</code> 호출부 <strong>0건</strong>(정의 <code>ReflectionFunction.h:342</code>만 잔존).
+<a href="../design/ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a>:43의 &quot;AnimationEventBridge·ActionMap이 쓴다&quot;는
+기술은 현재 소스와 불일치 — 두 파일 모두 <code>Meta::</code> 사용 0건(CoreCLR 레거시 은퇴에서
+키프레임·입력 액션 전달 경로가 무해화된 결과로 추정). <strong><code>Method</code>/<code>Invoker</code>/
+<code>MethodParameter</code> 체계 전체가 실소비자를 잃었다.</strong> 유일한 UI 소비자는
+<code>ReflectionImGuiHelper.h</code>의 <code>DrawMethods</code>(에디터 버튼)뿐이다.</p>
+<h3>2.4 프로퍼티 순회 소비자 5곳</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>소비자</th>
+<th>빈도</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ReflectionYml.h:100,281,394</code> (Serialize/Deserialize)</td>
+<td>로드·저장·스폰 이벤트당</td>
+</tr>
+<tr>
+<td><code>ReflectionImGuiHelper.h:49</code> (<code>DrawProperties</code>)</td>
+<td><strong>에디터 프레임당</strong> × 열린 컴포넌트 × 프로퍼티</td>
+</tr>
+<tr>
+<td><code>PrefabUtility.cpp:36</code> (<code>SeedTypeOverrides</code>)</td>
+<td>프리팹 갱신 시 1회</td>
+</tr>
+</tbody></table></div>
+<h2>3. 성능 병폐 — 비용 집중 지점</h2>
+<h3>3.1 직렬화 경로: primitive 하나에 조회 3단 폴백</h3>
+<p><code>Serialize</code>/<code>Deserialize</code>는 프로퍼티마다 ① <code>MetaEnumRegistry-&gt;Find(typeName)</code>
+문자열 맵 조회(실패) → ② <code>MetaDataRegistry-&gt;Find(typeName)</code> 문자열 맵 조회(실패) →
+③ <code>FindYamlSerializer(typeID)</code> <strong>23항목 배열 선형 스캔</strong>(<code>ReflectionYamlTemplete.h:399-407</code>)
+순으로 내려간다 — <code>int</code> 하나 쓰는 데도 매번(<code>ReflectionYml.h:176-191,344-356</code>).
+<code>prop.getter</code>의 <code>std::any</code> 반환은 벡터 분기에서 <strong>결과를 쓰지 않고 버려진다</strong>
+(<code>ReflectionYml.h:102</code> → 105-151 미사용). 상속 단계마다 부모 노드 키 단위
+재복사(깊이 N이면 N번 복사, <code>ReflectionYml.h:91-97</code>)는 SerializationPlan §1.3에서
+이미 지적된 그대로다.</p>
+<h3>3.2 접근 계약: 이중 타입소거 + 값 복사</h3>
+<p><code>GetterType = std::function&lt;std::any(void*)&gt;</code>(<code>MetaAlias.h:13-15</code>) — 모든 프로퍼티
+접근이 (a) <code>std::function</code> 간접호출, (b) <code>std::any</code> 박싱(값 <strong>복사</strong>), 두 겹을
+강제로 통과한다. <code>std::string</code>·<code>Vector4</code>급은 any의 SBO(MSVC 16B)를 넘어 <strong>접근
+1회당 힙 할당 1회</strong>가 추가된다. <code>Property</code>에 <code>offset</code>이 이미 있는데도
+(구조체 중첩 경로만 offset을 쓴다, <code>ReflectionYml.h:185,346</code>) 스칼라 경로는 전부
+getter/setter 복사 왕복이다.</p>
+<h3>3.3 인스펙터: 매 프레임 반복되는 것들 (에디터 프레임당 × 인스턴스 × 프로퍼티)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>병폐</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>타입 디스패치가 해시 스위치가 아니라 <strong>정수 비교 선형 if-else 체인 25+분기</strong></td>
+<td><code>ReflectionImGuiHelper.h:47-837</code></td>
+</tr>
+<tr>
+<td><code>prop.name == &quot;m_isEnabled&quot;</code> — <code>const char*</code> <strong>포인터 비교</strong>. 리터럴 풀링에 우연히 의존</td>
+<td><code>ReflectionImGuiHelper.h:51</code></td>
+</tr>
+<tr>
+<td>정수 체인 중간에 <code>std::string</code> 비교 혼재(<code>&quot;UINT&quot;</code>·<code>&quot;bool32&quot;</code>)</td>
+<td><code>:66,99</code></td>
+</tr>
+<tr>
+<td>벡터 프로퍼티: CollapsingHeader가 <strong>접혀 있어도</strong> 가상 이터레이터로 전 원소를 임시 벡터에 매 프레임 복사</td>
+<td><code>:136-419</code></td>
+</tr>
+<tr>
+<td>포인터 프로퍼티마다 매 프레임 <code>ExtractPointee</code>+<code>RemoveObjectPrefix</code> — substr로 새 문자열 생성</td>
+<td><code>:699</code></td>
+</tr>
+<tr>
+<td><code>DrawMethods</code> 파라미터 키를 매 프레임 문자열 연결로 생성, static 맵을 전 컴포넌트가 공유</td>
+<td><code>:842,870,929</code></td>
+</tr>
+<tr>
+<td><code>vector&lt;int&gt;</code> 분기가 동일 조건으로 <strong>두 번</strong> — 두 번째는 도달 불가 죽은 분기</td>
+<td><code>:246,304</code></td>
+</tr>
+<tr>
+<td>프레임당 <code>MetaDataRegistry-&gt;Find(문자열)</code> — §2.2의 11+3건</td>
+<td><code>InspectorWindow.cpp</code> 외</td>
+</tr>
+</tbody></table></div>
+<h3>3.4 컴파일 타임: 전 TU 전파</h3>
+<ul>
+<li><code>Core.Minimal.h:9</code>가 <code>Reflection.hpp</code>를 include → <strong>280개 파일</strong>이 Core.Minimal을
+include → 리플렉션 사슬(<code>ReflectionRegister.h</code>의 <strong>yaml-cpp</strong>, <code>ReflectionFunction.h</code>의
+<strong>magic_enum</strong>, <code>&lt;any&gt;</code>/<code>&lt;functional&gt;</code>/<code>&lt;typeindex&gt;</code>)이 사실상 전 TU에 전파된다.
+직렬화를 안 하는 TU도 yaml-cpp를 파싱한다.</li>
+<li>헤더 네임스페이스 스코프 <code>static auto</code> 싱글턴 포인터 <strong>6종</strong>(<code>TypeCast</code>·
+<code>MetaDataRegistry</code>·<code>MetaEnumRegistry</code>·<code>MetaFactoryRegistry</code>·<code>UndoCommandManager</code>·
+<code>VectorFactory</code> — <code>ReflectionRegister.h:216,289,316,396,484</code> ·
+<code>ReflectionVectorFactory.h:37</code>)이 내부 링크라 <strong>TU마다 사본 + TU마다 정적 초기화
+<code>GetInstance()</code> 호출</strong>이 박힌다. 280 TU × 6 = 최대 1,680개의 정적 초기화 항목.</li>
+<li>pre-build마다 MetaGenerator가 저장소를 재귀 2회 순회하며 <code>.generated.h</code> 154개를
+재생성하고 <strong>원본 헤더를 in-place 재작성</strong>한다(<code>AutoRegisterCreateReflection.cpp:152-197</code>)
+— 내용이 같아도 타임스탬프 갱신 시 증분 빌드를 오염시킬 수 있는 구조.</li>
+<li><code>FieldEnd</code> 매크로의 <code>std::string type_name = #T;</code>(<code>ReflectionMecro.h:77-79</code>)는
+매직 스태틱 가드 <strong>밖</strong> — <code>Reflect()</code> 호출마다 무용한 문자열 생성(15자 초과
+클래스명은 힙 할당). 호출 빈도가 낮아 실해는 작지만, 생성 코드의 품질 문제다.</li>
+</ul>
+<h2>4. 정확성·안전 결함</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>심각도</th>
+<th>내용</th>
+<th>근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>F-1</td>
+<td>HIGH</td>
+<td><strong>typeID = <code>typeid().hash_code()</code>의 uint32 절단</strong> — 런타임 RTTI 의존, 모듈 간 동일성 표준 미보장(전 싱글턴이 DLL 경계 공유 구조), 타입 증가 시 충돌 확률 상승. 같은 파일의 <code>consteval MakeTypeID</code>(FNV-1a 64, 결정적)는 호출부 0</td>
+<td><code>TypeTrait.h:199-204</code> vs <code>:17-24,188-194</code></td>
+</tr>
+<tr>
+<td>F-2</td>
+<td>HIGH</td>
+<td><strong>원시 포인터 프로퍼티 재역직렬화 누수</strong> — 항상 새 인스턴스를 만들어 setter로 덮고, 기존 포인티는 해제하지 않는다(shared_ptr 프로퍼티만 대입으로 해제됨)</td>
+<td><code>ReflectionYml.h:299-311</code></td>
+</tr>
+<tr>
+<td>F-3</td>
+<td>MEDIUM</td>
+<td><strong><code>MakeAnyFromRaw</code>가 무조건 새 소유 shared_ptr 생성</strong>(<code>std::shared_ptr&lt;T&gt;(raw)</code>, 기본 deleter) — 이미 소유자가 있는 포인터에 쓰이면 이중 해제, <code>shared_alloc</code>(ManagedHeap)으로 만든 객체에 쓰이면 할당자 불일치. 현 호출처(역직렬화 신규 생성 직후)는 안전하나 계약이 위험을 내장</td>
+<td><code>ReflectionRegister.h:76-79</code></td>
+</tr>
+<tr>
+<td>F-4</td>
+<td>MEDIUM</td>
+<td><code>Registry</code>가 이름 맵·해시 맵에 <code>Type</code>을 <strong>값 복사 2벌</strong> 저장 — 메모리 2배는 사소하나 <code>UnRegister</code>가 두 맵을 따로 지워야 해 탈동기화 여지(스크립트 핫리로드 경로가 실사용)</td>
+<td><code>ReflectionRegister.h:226-237,255-270</code></td>
+</tr>
+<tr>
+<td>F-5</td>
+<td>MEDIUM</td>
+<td>인스펙터 <code>prop.name</code> 포인터 비교 — 리터럴 풀링 꺼지면(/GF 미적용 TU·DLL 경계) 조용히 오동작</td>
+<td><code>ReflectionImGuiHelper.h:51</code></td>
+</tr>
+<tr>
+<td>F-6</td>
+<td>LOW</td>
+<td>죽은 코드 4종: <code>InvokeMethodByMetaName</code>(호출 0) · <code>ClassAutoRegistrar</code>(인스턴스화 0) · <code>consteval MakeTypeID</code>/<code>fnv1a_64</code>(호출 0) · 인스펙터 <code>vector&lt;int&gt;</code> 중복 분기</td>
+<td>§2.3 · <code>ReflectionRegister.h:497</code> · <code>TypeTrait.h</code> · <code>ReflectionImGuiHelper.h:304</code></td>
+</tr>
+<tr>
+<td>F-7</td>
+<td>LOW</td>
+<td><a href="../design/ReflectionRetentionDecision.html">ReflectionRetentionDecision.md</a>:43의 문자열 디스패치 존치 근거가 소스와 불일치(스테일) — 존치 결론 자체는 여전히 유효(자산 포맷·핫리로드·인스펙터 3근거 건재)</td>
+<td><code>AnimationEventBridge.cpp</code>·<code>ActionMap.cpp</code> Meta 사용 0건</td>
+</tr>
+</tbody></table></div>
+<h2>5. 구조 병폐 — K2 후퇴 2건이 실증한 결합</h2>
+<p>SceneGraphRedesignPlan K2(컴포넌트 컨테이너 이중 구조 소멸, <code>b08ec7e4</code>)는 SBO와
+unique_ptr 전환을 <strong>리플렉션 때문에</strong> 후퇴시켰다. 이는 개별 사건이 아니라
+리플렉션 계약의 구조적 병폐 두 가지가 소유자 코드의 진화를 봉쇄한 사례다.</p>
+<h3>5.1 병폐 A — 컨테이너가 계약에 하드코딩됨 (<code>std::vector</code> 전제)</h3>
+<p>리플렉션은 &quot;순회 가능한 시퀀스&quot;를 추상화하지 않았다. <code>std::vector&lt;T&gt;</code> 구체 타입이
+네 겹으로 박혀 있다:</p>
+<ol>
+<li><code>VectorIteratorImpl&lt;T&gt;</code>가 <code>std::vector&lt;T&gt;::iterator</code>를 직접 소유 — <code>ReflectionType.h:15-39</code></li>
+<li><code>is_vector_v</code> 판별 + <code>VectorElementType</code> 추출이 vector 특수화 — <code>ReflectionFunction.h:82,100-128</code></li>
+<li><code>VectorFactoryRegistry</code>가 <code>new std::vector&lt;T&gt;()</code>를 람다로 캡처 — <code>ReflectionVectorFactory.h:18-25</code></li>
+<li>역직렬화가 <code>fromYamlVector(instance, prop.offset, node)</code>로 <strong>인스턴스 메모리의
+해당 오프셋에 vector가 있다고 전제</strong>하고 직접 채운다 — <code>ReflectionYml.h:315-341</code>,
+<code>ReflectionVectorMapper.h:11-30</code></li>
+</ol>
+<p>결과: <code>[[Property]]</code>가 붙은 멤버는 <code>std::vector</code>여야만 한다. K2가 컴포넌트
+컨테이너를 SBO 배열(소형 버퍼 + uint64 타입마스크)로 바꾸려면 ①&#126;④를 전부
+같이 바꿔야 하므로 후퇴했다(SceneGraphRedesignPlan §K2, &quot;[[Property]] 표면 유지&quot;).
+<strong>메타시스템이 소유자의 데이터 표현을 결정하는 추상화 역전</strong>이다 — 리플렉션은
+표현을 관찰해야지, 강제해서는 안 된다.</p>
+<h3>5.2 병폐 B — 소유 모델이 계약에 하드코딩됨 (공유 소유 전제)</h3>
+<p><code>TypeCaster</code>의 변환 어휘는 값·원시 포인터·<strong>shared_ptr</strong> 세 가지뿐이다
+(<code>ReflectionRegister.h:29-82</code>). <code>unique_ptr</code>는 표현 자체가 없다 — <code>std::any</code>에
+넣으려면 복사 가능해야 하는데 unique_ptr는 이동 전용이라, <strong><code>any</code> 기반 계약과
+원리적으로 충돌</strong>한다(any를 쓰는 한 unique_ptr 프로퍼티는 불가능). 여기에:</p>
+<ul>
+<li><code>FactoryRegistry::Register&lt;T&gt;</code>가 <code>Managed::HeapObject</code> 파생이면 <code>shared_alloc&lt;T&gt;</code>
+(공유 소유 전제 ManagedHeap API)를 등록 — <code>ReflectionRegister.h:328-350</code></li>
+<li><code>MakeAnyFromRaw</code>는 raw에서 새 shared_ptr을 만든다 — <code>:76-79</code></li>
+<li><code>Property::isPointer</code>는 raw와 shared_ptr을 한 플래그로 뭉뚱그린다 — <code>ReflectionType.h:50</code></li>
+</ul>
+<p>결과: K2의 컴포넌트 <code>unique_ptr</code> 소유 전환은 할당이 <code>shared_alloc/CreateShared</code>를
+경유하는 한 불가능해 감사 전 보류됐고, E5(shared_ptr 축소 — 소유는 슬롯
+<code>unique_ptr</code> 하나, 참조 99곳/23파일을 핸들로)도 같은 벽을 만난다. <strong>엔진의 소유권
+정리는 리플렉션 접근 계약을 재설계하지 않으면 완주할 수 없다.</strong></p>
+<h3>5.3 공통 뿌리</h3>
+<p>두 병폐의 뿌리는 하나다: <code>Property</code>가 &quot;<strong>구체 타입을 아는 값 복사 계약</strong>&quot;
+(getter가 <code>T</code>를 any로 복사, vector 이터레이터가 구체 iterator 소유)이지,
+&quot;<strong>레이아웃 접근 계약</strong>&quot;(offset + 크기 + 타입 태그 + 시퀀스 어댑터)이 아니라는 것.
+전자는 멤버의 실제 타입이 바뀌면 계약이 깨지고, 후자는 어댑터만 갈아끼우면 된다.
+§7의 RF3이 이 뿌리를 겨눈다.</p>
+<h2>6. 기존 결정과의 관계</h2>
+<ul>
+<li><strong>존치 결정은 유지</strong> — 자산 포맷 종속·핫리로드 상태 보존·인스펙터 자동 생성
+3근거는 여전히 실측대로다. 단 부수 근거(문자열 메서드 디스패치)는 소멸했다(F-7)
+— 오히려 <code>Method</code> 체계 축소의 근거가 된다.</li>
+<li><strong>R2(ComponentFactory 수동 분기)</strong> 는 실측이 정밀화됐다: 31건이 아니라
+<strong><code>type_guid</code> 분기 17개 + <code>Meta::Deserialize</code> 호출 30건</strong>이며, 각 분기는 단순
+중복이 아니라 <strong>애셋 로드 후처리(GUID→애셋 해석)가 리플렉션 밖에 하드코딩된
+하이브리드</strong>다(<code>ComponentFactory.cpp:111-674</code>). &quot;레지스트리 디스패치로 전환&quot;만으론
+안 되고, 후처리를 프로퍼티 어노테이션(예: 애셋 참조 타입)으로 데이터화해야
+분기가 사라진다.</li>
+<li><strong>SerializationPlan(PHASE 17) 과의 접점</strong>: 쿠킹(D-track)은 &quot;리플렉션 순회 →
+바이너리&quot;이므로 §3.1의 조회 3단 폴백과 §3.2의 이중 타입소거가 <strong>쿠킹 성능의
+상한</strong>이 된다. 포맷을 바꿔도 순회 계약이 그대로면 비용이 따라간다(같은 문서
+§1.3의 결론과 일치). RF3은 D2(쿠킹 순회) 전에 앞당길 가치가 있다.</li>
+</ul>
+<h2>7. 개선 트랙 제안</h2>
+<blockquote>
+<p><strong>승계(2026-08-16)</strong>: 본 절의 RF 트랙과 §8의 전환 평가는
+<a href="../plans/archive/ReflectionRedesignPlan.html">ReflectionRedesignPlan.md</a>(<strong>PHASE 18</strong>, 슬라이스 CT0&#126;CT7)로 실행
+계획화됐다. 착수 순서·검증 기준은 그 문서가 정본이다.</p>
+<p><strong>완결(2026-08-17)</strong>: CT0&#126;CT7 전부 이행 완료. 본 문서의 병폐 목록은 이제
+역사 기록이다 — any/function 이중 소거·vector 하드코딩·헤더툴 파이프라인·
+typeid 절단·전 TU 전파 모두 소멸했고, 표기는 매크로 프리 P2996 유사
+표면(consteval describe + meta::member/method/attribute) 한 벌이다.
+최종 수치: 무변경 빌드 1m29s→7.1s(12.6×), 스폰 경로 3.0&#126;3.8→1.37ms(&#126;2.5×),
+generated.h 154→0. 남은 미래 항목은 계획 문서의 존치 기록(어댑터 =
+이름 기반 소비자의 정본 테이블)과 P2996 착지 시의 표기 접힘뿐이다.</p>
+</blockquote>
+<p>우선순위는 (위험 대비 회수) 순. RF1·RF2는 독립 슬라이스, RF3는 E5·K2 잔여와
+한 몸, RF4는 빌드 위생, RF5·RF6은 기존 부채(R1·R2) 승계다.</p>
+<h3>RF1 — 즉효 저위험 (에디터 체감 + 코드 위생)</h3>
+<ol>
+<li>인스펙터 <code>Meta::Find(문자열)</code> 14건 → typeID 조회로(해시 맵은 이미 있다).</li>
+<li><code>FindYamlSerializer</code>/<code>FindYamlVectorEntry</code> 배열 선형 스캔 → typeID 키 해시 맵.</li>
+<li>벡터 편집 UI: CollapsingHeader 열림 검사를 복사 <strong>앞</strong>으로 — 접힌 벡터의
+프레임당 전량 복사 제거(<code>ReflectionImGuiHelper.h:136-419</code>).</li>
+<li><code>prop.name</code> 포인터 비교 → <code>strcmp</code> 또는 프로퍼티 플래그(F-5).</li>
+<li><code>FieldEnd</code>의 type_name을 매직 스태틱 안으로(생성기 수정 1곳).</li>
+<li>죽은 코드 4종 제거(F-6) + ReflectionRetentionDecision.md:43 스테일 기술 정정.
+<strong>ScriptReflect 갈래 은퇴 포함</strong> — ModuleBehavior 사망(§8.2)으로 매크로 6건·
+ScriptReflectionHeaderTool 2종이 무소비 상태. R3(위험 최상)가 삭제로 강등된다.</li>
+<li>직렬화 조회 순서 역전: <code>FindYamlSerializer(typeID)</code> <strong>먼저</strong>(스칼라가 다수),
+실패 시에만 struct/enum 문자열 조회 — 폴백 사슬을 다수 케이스에 맞춘다.</li>
+</ol>
+<h3>RF2 — typeID 정본 교체 (F-1)</h3>
+<p>죽은 <code>consteval MakeTypeID</code>(FNV-1a 64, 이름 기반 결정적)를 채택해
+<code>typeid().hash_code()</code> 절단을 은퇴시킨다. 주의 둘:</p>
+<ul>
+<li>디스크의 이름해시(씬 yaml <code>타입명: typeID</code> 헤더)와 얽힌다 — K1-b 영속 UUID가
+이미 디스크 정본을 인수했으므로, 런타임 해시 교체의 창이 열려 있다.
+SerializationPlan의 &quot;호환 무시&quot; 전제가 유일한 일괄 전환 기회라는 판단(같은 문서
+§1.5)과 같은 창이다.</li>
+<li>FNV-1a도 이름 기반이라 리네임 취약성은 동일 — 런타임 식별자로만 쓰고, 디스크는
+UUID(K1-b)라는 층 분리(SceneGraphRedesignPlan §3 원칙 6)를 유지한다.</li>
+</ul>
+<h3>RF3 — 접근 계약 재설계 (병폐 A·B의 뿌리, E5·K2 잔여의 선행 조건)</h3>
+<p><code>Property</code>를 &quot;값 복사 getter/setter + 구체 컨테이너 지식&quot;에서 &quot;레이아웃 접근&quot;으로:</p>
+<ul>
+<li>스칼라·POD: <code>offset</code> + 타입 태그로 <strong>직접 접근</strong>(이미 offset을 갖고 있다).
+<code>std::any</code> 박싱은 폴백으로 강등.</li>
+<li>시퀀스: <code>VectorIteratorFunc</code> 대신 <strong>시퀀스 어댑터 인터페이스</strong>(begin/size/
+element-at/append — 컨테이너 무지). vector·SBO 배열·span이 각자 어댑터 제공 →
+병폐 A 해소, K2 SBO 재개 가능.</li>
+<li>소유: <code>isPointer</code> 한 플래그를 소유 종별(값/관찰 포인터/unique/shared)로 분해.
+unique_ptr는 any 경유가 원리적으로 불가하므로 <strong>역직렬화 생성 경로를
+&quot;팩토리 생성 → 소유 이전 콜백&quot;으로</strong>(any를 통과하지 않는 setter 변형) → 병폐 B
+해소, E5와 같은 슬라이스로.</li>
+<li><code>Method</code> 체계는 실소비자(에디터 버튼)만 남기고 축소 또는 제거(§2.3).</li>
+</ul>
+<p>폭발 반경: 생성기(<code>AutoRegisterCreateReflection.cpp</code>) + <code>MakePropertyImpl</code> +
+<code>ReflectionYml.h</code> + <code>ReflectionImGuiHelper.h</code> + 컨슈머 5곳. 씬 로드 회귀
+(<code>Tools/regression</code>, pwsh) 필수. <strong>E5(shared_ptr 축소)와 반드시 같은 트랙으로</strong> —
+따로 하면 서로가 서로의 족쇄다.</p>
+<h3>RF4 — 헤더 전파 절단 (빌드 위생)</h3>
+<ol>
+<li><code>Core.Minimal.h</code>에서 <code>Reflection.hpp</code> 분리 — 리플렉션이 필요한 TU만 물게
+(UtilityFrameworkModernizationPlan의 전이 include 실측과 같은 수법).</li>
+<li>헤더 스코프 <code>static auto</code> 싱글턴 6종 → <code>inline</code> 함수 반환 또는 사용부 직접
+<code>GetInstance()</code> — TU당 정적 초기화 사본 제거.</li>
+<li><code>ReflectionRegister.h</code>의 yaml-cpp include 제거(직렬화 전용 헤더로 격리) —
+UndoManager·MetaStateCommand는 리플렉션 코어와 무관하므로 분리.</li>
+<li>MetaGenerator: 출력이 기존과 동일하면 파일을 다시 쓰지 않게(타임스탬프 보존) —
+증분 빌드 보호.</li>
+</ol>
+<h3>RF5 — ComponentFactory 데이터화 (R2 승계, 정밀화)</h3>
+<p>애셋 참조 후처리를 프로퍼티 메타데이터(애셋 참조 타입 태그)로 옮겨 17분기를
+공통 경로에 흡수. Animator처럼 리플렉션 진입점이 8곳인 컴포넌트가 우선 검증 대상.
+씬 로드 회귀 필수.</p>
+<h3>RF6 — 인스펙터 재배치 + 테이블화 (R1 승계)</h3>
+<p><code>ReflectionImGuiHelper.h</code>는 이미 EngineGUIWindow로 이관 완료(R1 해소 확인).
+남은 것은 선형 if-else 체인 → typeID 키 드로어 테이블, <code>DrawMethods</code> 키 캐싱.
+RF1-3·4와 같은 파일이므로 한 슬라이스로 묶는다.</p>
+<h3>순서 제안</h3>
+<pre><code>RF1(즉효) → RF4(빌드 위생, 독립) → RF2(typeID, K1-b 창구 활용)
+    → RF3+E5(접근 계약 + 소유 정리, 한 트랙) → RF5(팩토리 데이터화)
+    → SerializationPlan D2(쿠킹)는 RF3 이후가 이득
+</code></pre>
+<h2>8. 컴파일타임 리플렉션 전환 평가</h2>
+<p>질문: 헤더툴(외부 코드 분석 + 생성기) 주입을 버리고, qlibs/reflect <strong>와 유사한
+설계</strong>(라이브러리 채택이 아니라 컴파일타임·언어내 리플렉션으로의 재작성)로
+전환하면 병폐가 제거되는가.</p>
+<h3>8.1 전제 실측</h3>
+<p>qlibs/reflect: C++20 · <strong>MSVC 19.36+ 지원</strong>(현 VS 18 툴체인 충족) · 구조적
+바인딩 + <code>source_location</code> 기법 · 멤버 기본 64개(확장 가능) · P2996(C++26 표준
+리플렉션)의 원시 기능 부분집합을 선제 제공하는 브리지 성격.</p>
+<p>구조적 바인딩 <strong>기법</strong>의 제약: 집합체(aggregate)만 분해된다 — 가상 함수·
+사용자 선언 생성자·private 멤버·기반 클래스 멤버 혼합 불가. 단 이것은
+<strong>기법의 제약이지 컴파일타임 설계의 본질이 아니다</strong>(§8.3에서 우회).</p>
+<h3>8.2 갈래 정리 — 구지원 장애물은 실재하지 않는다</h3>
+<p>당초 비집합체 원인으로 꼽을 뻔한 두 가지는 실측 결과 <strong>은퇴 대상 잔재</strong>다:</p>
+<ul>
+<li><strong><code>ScriptReflect()</code> 갈래는 ModuleBehavior(네이티브 C++ 스크립트)의 잔재가
+맞다.</strong> C++ 스크립트 은퇴(9-4)로 ScriptBinder에 <code>class ModuleBehavior</code> 정의
+0건, HotLoadSystem 0건 — 남은 것은 구포맷 씬 로드 가드
+(<code>ComponentFactory.cpp:76-81</code>, InvalidScriptComponent 대체)와
+<code>ReflectionMecro.h</code>의 매크로 6건, 그리고 빌드에서 빠진 <code>Dynamic_CPP</code> 스크립트
+헤더들(데이터 보존 폴더)뿐이다. <strong>살릴 이유가 없다</strong> — R3(&quot;헤더툴 통합, 위험
+최상&quot;)는 &quot;한쪽 갈래 삭제&quot;로 강등되고, ScriptReflectionHeaderTool 2종 바이너리도
+함께 은퇴한다.</li>
+<li><code>GENERATED_BODY(T)</code>의 생성자 선언도 구지원 의무가 없다 — 재설계 시 유지할
+이유가 없는 관례다.</li>
+</ul>
+<p><strong>그러나 집합체 제약의 본체는 따로 있다</strong>: Component의 가상 생명주기 14개
+(<code>Component.h:31-54</code> — Awake/Update/OnEnable… + OnInitialized 계열)와
+<code>shared_ptr&lt;Component&gt;</code> 다형 저장이다. 이것은 잔재가 아니라 현행 실행 모델의
+정본이므로, &quot;잔재 제거&quot;만으로는 컴포넌트가 집합체가 되지 않는다. (트랙 L이
+완성되어 스크립팅이 C#으로, 네이티브 컴포넌트가 시스템이 소비하는 데이터로
+이동하면 이 가상 표면 자체가 줄어들지만 — 그건 §8.4의 종착지 이야기다.)</p>
+<h3>8.3 핵심 정정 — 기법을 바꾸면 수술 없이 성립한다</h3>
+<p>&quot;유사 설계&quot;의 목표를 정확히 잡으면: **멤버를 실제 타입으로 보는 컴파일타임
+방문(typed visitation)**이지, 구조적 바인딩이라는 특정 기법이 아니다. 자작
+설계라면 기법을 골라 쓸 수 있고, 집합체 제약이 없는 기법이 있다:</p>
+<p><strong>멤버 포인터 튜플 기반 명시 메타</strong> (선례: glaze — MSVC 포함 실전 검증):</p>
+<pre><code class="language-cpp">struct MeshRenderer : Component {
+    // ... 가상 생명주기·private 멤버 그대로 ...
+    static constexpr auto reflect = Meta::members(
+        &amp;MeshRenderer::m_Material, &amp;MeshRenderer::m_Mesh, /* ... */);
+};
+// 소비: 컴파일타임 for_each — 멤버를 실제 타입 T&amp;로 방문
+Meta::for_each(obj, [&amp;](std::string_view name, auto&amp; member) { /* ... */ });
+</code></pre>
+<ul>
+<li>멤버 포인터는 <strong>가상 함수·상속·private(클래스 내 선언 시) 무관</strong> — 현행
+다형 컴포넌트 154타입에 <strong>그대로</strong> 적용된다. 집합체 수술 불필요.</li>
+<li>멤버 이름은 NTTP <code>source_location</code> 추출(MSVC 동작, glaze 방식) 또는 매크로
+문자열화 — 현행 <code>#member</code>와 동일한 이름이 나오므로 <strong>YAML 필드명 유지 =
+자산 호환 유지</strong>.</li>
+<li>상속은 <code>Meta::members</code>에 부모 튜플 연결(concat)로 — 현행 <code>parent</code> 체인의
+키 단위 노드 재복사(§3.1)도 함께 사라진다.</li>
+<li><code>[[Property]]</code> 선택 반영 의미론도 그대로다 — 목록에 적은 멤버만 반영.
+현행은 &quot;어노테이션 + 생성 헤더&quot; 이중 표기였는데, 이제 표기가 한 곳이다.</li>
+</ul>
+<p>이 기법으로 §5의 병폐가 뿌리에서 소멸한다: 방문자가 실제 타입을 보므로
+any 박싱·function 간접호출이 없고(§3.2), 컨테이너는 제네릭 레인지로(병폐 A —
+K2 SBO 재개), unique_ptr 표현 가능(병폐 B — E5 족쇄 해제), typeID는 컴파일타임
+결정적 해시로(F-1), 헤더툴 3종·generated.h 154개·pre-build 정규식 스캔·원본
+in-place 재작성 전부 은퇴.</p>
+<p><strong>이중 경로 설계</strong>가 자연스럽다: ① 진짜 집합체(Mathf 계열·설정 구조체 등)는
+PFR/reflect식 <strong>자동 반영</strong>(표기 0), ② 다형 컴포넌트는 위의 <strong>명시 메타</strong>.
+P2996이 오면 ②의 표기가 자동으로 접히는 방향이다.</p>
+<h3>8.4 유지해야 하는 것 — 컴파일타임이 대체 못 하는 층</h3>
+<ul>
+<li><strong>런타임 레지스트리는 남는다.</strong> 씬 로드의 문자열/UUID → 타입 디스패치를 위해
+타입별 방문자를 부팅 시 등록하는 브리지(타입당 함수 포인터 수 개 — 현행
+프로퍼티당 <code>std::function</code> 2개보다 얇다)는 유지된다. C# 쪽 상태 왕복도 이
+브리지를 쓴다.</li>
+<li><strong>인스펙터도 브리지 경유</strong> — 타입당 <code>Draw(void*)</code> 하나가 컴파일타임 방문을
+인스턴스화. 디스패치가 프로퍼티당 선형 체인에서 타입당 1회 간접호출로 준다.</li>
+<li><strong>컴파일타임 비용 주의</strong>: 방문자 템플릿(직렬화·인스펙터·쿠킹 각각)이 TU마다
+인스턴스화되면 RF4(전파 절단)와 역행한다. 타입당 전용 TU 명시적 인스턴스화로
+통제할 것.</li>
+<li><strong>상태/캐시 분리(Data 집합체)는 이제 선택지다</strong> — 명시 메타 덕에 선행 조건이
+아니게 됐지만, E5·K2·트랙 L(저작/실행 분리)이 진행되면 ①의 자동 반영 경로로
+자연 승격되는 종착지로 남는다.</li>
+</ul>
+<h3>8.5 대안 비교와 권고</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경로</th>
+<th>헤더툴 제거</th>
+<th>병폐 A·B 제거</th>
+<th>컴포넌트 수술</th>
+<th>위험</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>(가) 생성기만 교체(regex→libclang 등)</td>
+<td>툴 개선일 뿐 잔존</td>
+<td>✗</td>
+<td>불필요</td>
+<td>낮음, 회수도 낮음</td>
+</tr>
+<tr>
+<td>(나) variadic 매크로로 <strong>현 계약</strong> 조립(툴만 제거)</td>
+<td>✓ (즉시)</td>
+<td>✗</td>
+<td>불필요</td>
+<td>낮음</td>
+</tr>
+<tr>
+<td>(다) <strong>명시 메타(멤버 포인터) + 컴파일타임 방문</strong> — 자작, glaze식</td>
+<td>✓</td>
+<td><strong>✓ (뿌리)</strong></td>
+<td><strong>불필요</strong></td>
+<td><strong>중간</strong> — 소비자 5곳 재작성, 회귀 필수</td>
+</tr>
+<tr>
+<td>(라) 집합체 분리 + 자동 반영(PFR/reflect식)</td>
+<td>✓</td>
+<td>✓ (뿌리)</td>
+<td>전 154타입</td>
+<td>높음 — E·K 완성 후의 종착지</td>
+</tr>
+<tr>
+<td>(마) P2996 대기</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>MSVC 미탑재, 시기 미정</td>
+</tr>
+</tbody></table></div>
+<p><strong>권고: (다)를 RF3의 구현 형태로 채택한다.</strong> 당초 평가에서 (라)만 보고 &quot;E·K와
+한 몸일 때만 성립&quot;이라 했으나, ScriptReflect 잔재 확정(§8.2)과 명시 메타
+기법(§8.3)으로 <strong>컴포넌트 수술 없이 성립</strong>함이 확인됐다 — 위험이 한 단계
+내려가고 E5·K2와 분리 가능해진다(시너지는 유지: 같은 슬라이스면 소유·컨테이너
+전환을 한 번의 회귀로 검증). 순서: RF1·RF4 선행 → ScriptReflect 갈래 삭제(R3
+강등분, 소거로 표면 축소) → (다)로 RF3 — 집합체 타입 자동 경로 파일럿 →
+컴포넌트 명시 메타 본대 전환 → 헤더툴 3종 은퇴. (라)는 트랙 L·E 완성 후
+자연 승격, (마)가 오면 표기만 접힌다.</p>
+<h2>9. 함정 기록</h2>
+<ul>
+<li><strong>자를 먼저 검증한다</strong> — 본 문서의 프레임당/이벤트당 구분은 grep 기반 정적
+추적이다. RF1 착수 전에 인스펙터 열림 상태의 프로파일 캡처(PHASE 14 P0 하네스)로
+§3.3 비용을 수치화할 것.</li>
+<li><strong>생성기와 소스의 이중 정본</strong> — <code>.generated.h</code>를 손으로 고치면 다음 pre-build가
+덮어쓴다. RF3의 계약 변경은 반드시 생성기부터.</li>
+<li><strong>핫리로드 경계</strong> — <code>ScriptRegister</code>/<code>UnRegister</code>(이름·해시 맵 2벌 동기화, F-4)는
+스크립트 DLL 교체가 실사용 경로다. RF3에서 Registry 구조를 바꿀 때 핫리로드
+왕복(Serialize→재로드→Deserialize) 회귀를 함께 밟아야 한다.</li>
+<li><strong>문서 근거의 부패</strong> — F-7처럼 결정 문서의 근거가 소스보다 늦게 늙는다. 큰 결정
+전 근거 재실측은 이번에도 유효했다.</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="0-요약"></span><span id="1-시스템-지도"></span><span id="11-코어-utility_framework-11파일--약-2050줄--에디터-994줄"></span><span id="12-등록-흐름-부팅-1회"></span><span id="2-실측--누가-언제-부르는가"></span><span id="21-직렬화-매-프레임은-없다-이벤트당은-있다"></span><span id="22-조회-문자열-17--해시-3"></span><span id="23-메서드-호출-죽은-api"></span><span id="24-프로퍼티-순회-소비자-5곳"></span><span id="3-성능-병폐--비용-집중-지점"></span><span id="31-직렬화-경로-primitive-하나에-조회-3단-폴백"></span><span id="32-접근-계약-이중-타입소거--값-복사"></span><span id="33-인스펙터-매-프레임-반복되는-것들-에디터-프레임당--인스턴스--프로퍼티"></span><span id="34-컴파일-타임-전-tu-전파"></span><span id="4-정확성안전-결함"></span><span id="5-구조-병폐--k2-후퇴-2건이-실증한-결합"></span><span id="51-병폐-a--컨테이너가-계약에-하드코딩됨-stdvector-전제"></span><span id="52-병폐-b--소유-모델이-계약에-하드코딩됨-공유-소유-전제"></span><span id="53-공통-뿌리"></span><span id="6-기존-결정과의-관계"></span><span id="7-개선-트랙-제안"></span><span id="8-컴파일타임-리플렉션-전환-평가"></span><span id="81-전제-실측"></span><span id="82-갈래-정리--구지원-장애물은-실재하지-않는다"></span><span id="83-핵심-정정--기법을-바꾸면-수술-없이-성립한다"></span><span id="84-유지해야-하는-것--컴파일타임이-대체-못-하는-층"></span><span id="85-대안-비교와-권고"></span><span id="9-함정-기록"></span><span id="rf1--즉효-저위험-에디터-체감--코드-위생"></span><span id="rf2--typeid-정본-교체-f-1"></span><span id="rf3--접근-계약-재설계-병폐-ab의-뿌리-e5k2-잔여의-선행-조건"></span><span id="rf4--헤더-전파-절단-빌드-위생"></span><span id="rf5--componentfactory-데이터화-r2-승계-정밀화"></span><span id="rf6--인스펙터-재배치--테이블화-r1-승계"></span><span id="sec-0-요약"></span><span id="sec-1-시스템-지도"></span><span id="sec-2-실측--누가-언제-부르는가"></span><span id="sec-3-성능-병폐--비용-집중-지점"></span><span id="sec-4-정확성안전-결함"></span><span id="sec-5-구조-병폐--k2-후퇴-2건이-실증한-결합"></span><span id="sec-6-기존-결정과의-관계"></span><span id="sec-7-개선-트랙-제안"></span><span id="sec-8-컴파일타임-리플렉션-전환-평가"></span><span id="sec-9-함정-기록"></span><span id="순서-제안"></span></details></main></body></html>

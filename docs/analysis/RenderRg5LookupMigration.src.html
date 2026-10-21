@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG5-6 Lookup 소유자 버전 핸들 — 완료</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg5LookupMigration.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg5LookupMigration.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG5-6 Lookup 소유자 버전 핸들 — 완료</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>SceneLookupFrame::DeclareCaptureOutputs가 범위·graph/epoch/upload/descriptor 소유권을 검사하고 캡처할 입력 맵의 Write 버전을 만들어 반환한다. SceneHost LookupCapture는 FindImportedTexture로 imported v0를 다시 찾는 대신 이 출력 핸들을 소비한다. 입력·decal 자원은 Read, 캡처 목적지는 Write를 선언한다.</p>
+<p>Lookup Bake는 graphInputs_의 최신 버전을 읽고 sample/statistic buffer를 Write로 갱신한다. GraphSamples/GraphStatistics 및 Ready는 현재 소유 핸들을 전달한다. imported 물리 자원·풀·제출 후 공개·완료 수명 계약은 유지한다.</p>
+<p>실제 SceneLookupCache::Prepare를 호출하는 계획 검사는 두 순서 정책에서 11개 입력 맵의 캡처/Bake/Ready를 두 번 선언한다. 출력 v1/v2·이전 독자 WAR·잘못된 캡처 범위 거부를 확인한다. 입력 캡처는 합성 pass이며 실제 Lookup GPU 셰이딩 실행 수용으로 계산하지 않는다.</p>
+<p>Forward Graph guard는 유지한다. 나머지 Refraction/Subsurface/Volume/GraphSurface·Draw 자원 선언·중복 읽기 정리 및 DeclareBlended 갱신 출력 계약이 남아 있다. 이후 실제 혼합 GPU 검증과 guard 제거를 수행한다. RG5 전체와 RG6 기본 전환은 열려 있다.</p>
+<p>SceneHost와 Lookup 소유자 파일의 namespace 들여쓰기 및 if/for 스코프를 함께 정리했다. 최종 Debug/Release 빌드는 모두 통과했다. Debug 제품 회귀는 독립 2회 정상 종료로 통과했다. Release-regression-v1은 native 명령 성공 후 전체 프로세스 종료 120초 제한으로 실패했으며 기록을 보존한다. Build/verify-rg5-lookup-retry.ps1은 원본 검증 스크립트의 경로와 소스 해시 대상을 유지하고 해당 종료 제한만 240초로 늘려 Release-regression-v2를 실행한다. 이미지 기준은 변경하지 않는다.</p>
+<p>최종 검증: Build/rg5-lookup-Debug-final-build.log 및 Release-final-build.log 빌드 통과. 최종 바이너리의 Debug-regression-v1과 Release-regression-v2에서 native Lookup marker와 RG1&#126;RG4 GPU 검사 통과, 각각 독립 프로세스 2회 × 캡처 2회 정상 종료·실패 0·강제 종료 없음. 변경 전후 Debug/Release 및 구성 간 비교는 각각 16개 이미지의 maxError/RMSE/changedPixels/exceededPixels가 모두 0이다. current-baseline-phase-complete-v1.json은 현행 소스·실행 파일·runtime 해시와 구성 간 identity를 확인하여 phaseComplete=true다.</p>
+<p>증거 루트: Build/Obj/RenderRG5Lookup. rg5-lookup-completion-v1.json의 sliceComplete=true, rg5Complete=false, versionedProductGpuAcceptance=false를 유지한다. declaration-inventory.json은 제품 59·게이트 209 호출이다. 대시보드 RG5는 progress/earnedDays 0, 전체 공수 355·기성 88을 유지한다.</p>
+<p>다음 구현: Refraction/Subsurface/Volume 소유자 버전 핸들 → GraphSurface 및 Draw 자원 접근 선언·중복 읽기 정리 → DeclareBlended 갱신 색상 반환 → 실제 Code/Graph 혼합 GPU 검증과 guard 제거. 이후 나머지 소비자/ReadWrite·legacy 추론 제거 및 RG6 기본 전환을 검증한다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main></body></html>

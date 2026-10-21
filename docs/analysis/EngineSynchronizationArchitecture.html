@@ -1,204 +1,355 @@
-<!DOCTYPE html>
-<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/EngineSynchronizationArchitecture.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>엔진 동기화 구조 분석</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<!doctype html>
+<html lang="ko" data-register="instrument"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>엔진 동기화 구조 분석</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M18 40V24l14-8 14 8v16l-14 8-14-8Z' fill='none' stroke='%23fbbf24' stroke-width='4' stroke-linejoin='round'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%2338bdf8'/%3E%3C/svg%3E"><meta charset="utf-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    color-scheme: dark light;
-    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
-    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
-    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
     --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
-    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
-    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
-    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
-    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
-    --r-1: 4px; --r-2: 10px;
-    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
-      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
-      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
-      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
-    }
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
   }
-  html { font-size: 17px; scroll-padding-top: var(--s-6); }
-  * { box-sizing: border-box; margin: 0; }
-  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
-  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
-    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
-    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
-  ::selection { background: var(--accent-dim); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
-  a:hover { color: var(--accent); }
-  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
-  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
-  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
-  main > *, section, figure, header { min-width: 0; }
-  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
-  .crumbs a { color: var(--text-dim); }
-  header.page { display: grid; gap: var(--s-4); }
-  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
-  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
-  h1, h2 { text-box: trim-both cap alphabetic; }
-  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
-  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
-  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
-  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
-  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
-  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
-  .meta p + p { margin-top: var(--s-1); }
-  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
-  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
-  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+}
 
-  /* figure: stage on the dot grid */
-  figure { display: grid; gap: var(--s-3); }
-  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
-  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
-  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+/* the other opener, a bare label above the h2, gets the same gaps, so the h2 never sits on the figure below */
+section > .ve-label:has(+ h2) { margin-bottom: var(--s-3); }
+section > h2 { margin-bottom: var(--s-6); }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
 
-  /* chips: shape + word, never color alone */
-  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
-  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
-  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
-  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-  .chip.risk { color: var(--risk); }
-  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
-  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
 
-  /* KPI strip: one frame, hairline cells */
-  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
-  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
-  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
-  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. kit/render.mjs sets --ve-min for a viewBox wider than 816. */
+.ve-svg { width: 100%; min-width: var(--ve-min, 700px); height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* a dashed boundary around a group, with a mono tag in its corner */
+.ve-bnd { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 6 5; }
+.ve-bnd-t { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+/* a slot in a queue or worker pool; .is-on fills it (.on is the stepper's) */
+.ve-slot { fill: var(--surface); stroke: var(--border-bright); stroke-width: 1.25; }
+.ve-slot.is-on { fill: var(--accent-dim); stroke: var(--accent); stroke-width: 1.75; }
+/* chart axes and ticks, and their labels */
+.ve-axis { fill: none; stroke: var(--border-bright); stroke-width: 1; }
+.ve-axis-t { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; font-variant-numeric: tabular-nums; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
 
-  /* stacked status bar */
-  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
-  .stack > i { display: block; min-width: 2px; }
-  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
-  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
-  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
 
-  /* prose */
-  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
-  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
-  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
-  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
-  .prose li::marker { color: var(--text-dim); }
-  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
-  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
-  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
-  .prose hr { border: 0; border-top: 1px solid var(--border); }
-  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
-  .prose strong { font-weight: 600; color: var(--text); }
-  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
 
-  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
-  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
-  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
-  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
-  .sec-head .ve-label { letter-spacing: .08em; }
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
 
-  /* tables */
-  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
-  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
-  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
-  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
-  td.num, th.num { text-align: right; }
-  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
 
-  /* code */
-  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
-  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
-  pre.mermaid { background: var(--bg); text-align: left; }
-  pre.mermaid svg { max-width: none; }
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
 
-  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
-  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
-  summary:hover { color: var(--accent); }
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
 
-  /* table of contents with scroll-spy */
-  nav.toc { display: none; }
-  @media (min-width: 75rem) {
-    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
-    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
-    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
-    nav.toc a:hover { color: var(--text); }
-    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
-    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
-  }
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
 
-  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
 
-  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
-  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
-  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+/* a table: a scroll frame, the header in the label style, row rules only; .num cells are right-aligned numbers */
+.ve-table { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+.ve-table table { border-collapse: collapse; width: 100%; font-size: var(--t-body); font-variant-numeric: tabular-nums; }
+.ve-table th, .ve-table td { padding: var(--s-3) var(--s-4); text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.ve-table thead th { background: var(--surface); font: 600 var(--t-label)/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ve-table tbody th { font-weight: 600; }
+.ve-table tbody tr:last-child > * { border-bottom: 0; }
+.ve-table .num { text-align: right; font-family: var(--font-mono); }
+.ve-table td small { display: block; color: var(--text-dim); font-size: var(--t-small); }
 
-  @media print {
-    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
-    body::before, nav.toc, .crumbs { display: none; }
-    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
-    .js-motion main > * { opacity: 1 !important; transform: none !important; }
-    svg * { filter: none !important; }
-  }
-  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
-  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
-  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
-  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
-  .map-row:hover .map-bar i { background: var(--accent); }
-  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
-  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
-</style>
-</head>
-<body>
-<div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#1-범위와-결론">1. 범위와 결론</a></li><li><a href="#2-전체-스레드-지도">2. 전체 스레드 지도</a></li><li><a href="#3-gt-프레임의-실제-순서">3. GT 프레임의 실제 순서</a></li><li><a href="#4-계산-작업과-수명-경계">4. 계산 작업과 수명 경계</a></li><li><a href="#5-gt--rt--rhi--gpu--표시">5. GT → RT → RHI → GPU → 표시</a></li><li><a href="#6-로딩명령관리-코드의-전달-구조">6. 로딩·명령·관리 코드의 전달 구조</a></li><li><a href="#7-잠금완료-계약-지도">7. 잠금·완료 계약 지도</a></li><li><a href="#8-종료-구조">8. 종료 구조</a></li><li><a href="#9-확인된-설계-문제와-추가-검증이-필요한-위험">9. 확인된 설계 문제와 추가 검증이 필요한 위험</a></li><li><a href="#10-범용-태스크-그래프-런타임에-요구되는-구조">10. 범용 태스크 그래프 런타임에 요구되는 구조</a></li><li><a href="#11-확인-방법과-검증-상태">11. 확인 방법과 검증 상태</a></li><li><a href="#12-소스-근거-지도">12. 소스 근거 지도</a></li></ol></nav>
-<main>
-<header class="page">
-<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="EngineSynchronizationArchitecture.md">원본 Markdown</a></nav>
-<p class="eyebrow">분석</p>
-<h1>엔진 동기화 구조 분석</h1>
-<div class="meta"><p>분석 기준: 2026-09-07, <code>master</code>, <code>f84f32b841a4ba7a6db9276588849fa2ebe48085</code>.</p>
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="EngineSynchronizationArchitecture.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/EngineSynchronizationArchitecture.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>엔진 동기화 구조 분석</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><div class="frame"><svg class="ve-svg ve-flow" style="--min: 600px; --max: 910px" viewBox="0 0 700 216" role="img" aria-label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><g><path class="ve-e" d="M156 48H280"/><text class="ve-el" x="218" y="39">consumes</text></g><g><path class="ve-e" d="M420 48H544"/><text class="ve-el" x="482" y="39">consumes</text></g><g><path class="ve-e" d="M614 80V136"/><text class="ve-el r" x="622" y="113">handoff</text></g><g><path class="ve-e" d="M544 168H420"/><text class="ve-el" x="482" y="159">consumes</text></g><g><path class="ve-e" d="M280 168H156"/><text class="ve-el" x="218" y="159">consumes</text></g><g class="ve-n" transform="translate(16 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Live pipeline</text></g><g class="ve-n" transform="translate(280 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Versions</text></g><g class="ve-n is-key" transform="translate(544 16)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">DAG</text></g><g class="ve-n" transform="translate(544 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Record tasks</text></g><g class="ve-n" transform="translate(280 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Queue submit</text></g><g class="ve-n" transform="translate(16 136)"><rect class="sh" width="140" height="64" rx="6"/><text x="70" y="32">Completion</text></g></svg></div><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L16">ScriptCore/Native.cs:16</a> — <code>[StructLayout(LayoutKind.Sequential)]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L84">ScriptCore/Native.cs:84</a> — <code>public delegate* unmanaged&lt;ulong&gt; Engine_GetFrameCount;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L824">ScriptCore/Native.cs:824</a> — <code>=&gt; Entered() &amp;&amp; _api.Engine_GetFrameCount != null ? _api.Engine_GetFrameCount() : 0;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L520">ScriptCore/ScriptRegistry.cs:520</a> — <code>public static void PrePhysicsTick(float dt)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L532">ScriptCore/ScriptRegistry.cs:532</a> — <code>b.Scope.Tick(dt);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs#L558">ScriptCore/ScriptRegistry.cs:558</a> — <code>public static void PostPhysicsTick(float dt)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30">Engine/RenderEngine/DataSystem.h:30</a> — <code>own::shared_owner&lt;const Texture&gt; descriptor;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L625">Engine/RenderEngine/DataSystem.h:625</a> — <code>std::size_t DrainQueuedAssetChanges();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L816">Engine/RenderEngine/DataSystem.h:816</a> — <code>void DrainAssetPreparations();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L24">Engine/RenderEngine/RenderScene.h:24</a> — <code>class RenderScene</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L46">Engine/RenderEngine/RenderScene.h:46</a> — <code>RenderScene() = default;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h#L47">Engine/RenderEngine/RenderScene.h:47</a> — <code>&amp;#126;RenderScene();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L70">Editor/EngineEntry/ProgressWindow.h:70</a> — <code>SendMessageW(m_hWnd, kProgressMessage, static_cast&lt;WPARAM&gt;(std::clamp(value, 0, 100)), 0);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L117">Editor/EngineEntry/ProgressWindow.h:117</a> — <code>std::this_thread::sleep_for(std::chrono::milliseconds(500));</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h#L343">Editor/EngineEntry/ProgressWindow.h:343</a> — <code>std::wstring(std::begin(CreatorEngineVersion::Build),</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L211">Engine/RuntimeHost/EngineBootstrap.h:211</a> — <code>ce::profile_scope_begin(ce::marker&lt;&quot;RenderBeginFrame&quot;&gt;());</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L299">Engine/RuntimeHost/EngineBootstrap.h:299</a> — <code>std::fputs(&quot;[EnginePaths] Host runtime ownership capability is invalid\n&quot;, stderr);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h#L305">Engine/RuntimeHost/EngineBootstrap.h:305</a> — <code>EngineMode::Set(config.compatibilityRunMode);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/CoreWindow.h#L1">Engine/Utility_Framework/CoreWindow.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L12">Engine/RenderEngine/ProxyCommandQueue.h:12</a> — <code>class ProxyCommandQueueController : public Singleton&lt;ProxyCommandQueueController&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L105">Engine/RenderEngine/ProxyCommandQueue.h:105</a> — <code>if (m_commands.empty()) { *this = std::move(source); return; }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h#L399">Engine/RenderEngine/ProxyCommandQueue.h:399</a> — <code>static auto ProxyCommandQueue = ProxyCommandQueueController::GetInstance();</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>분석 기준: 2026-09-07, <code>master</code>, <code>f84f32b841a4ba7a6db9276588849fa2ebe48085</code>.</p>
 <p>이 문서는 현재 실행 구조를 설명한다. 범용 JobSystem/태스크 그래프 도입을 위한 판단은 마지막 절에 구분했다. 엔진 실행 코드는 변경하지 않았다.</p>
-</div>
-</header>
-<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">6<span class="unit">곳</span></span>
-<div class="stack" role="img" aria-label="완료·통과 4, 진행·부분 2"><i class="ok" style="flex:4"></i><i class="info" style="flex:2"></i></div>
-<span class="legend"><span class="chip ok">완료·통과 4</span><span class="chip info">진행·부분 2</span></span></div></div>
-<figure>
-<div class="frame doc-map" role="img" aria-label="절 12개의 분량 막대">
-<a class="map-row" href="#1-범위와-결론"><span class="ve-label">§1</span><span class="map-name">범위와 결론</span><span class="map-bar"><i style="width:26.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#2-전체-스레드-지도"><span class="ve-label">§2</span><span class="map-name">전체 스레드 지도</span><span class="map-bar"><i style="width:81.3%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">1</span></span></a>
-<a class="map-row" href="#3-gt-프레임의-실제-순서"><span class="ve-label">§3</span><span class="map-name">GT 프레임의 실제 순서</span><span class="map-bar"><i style="width:60.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#4-계산-작업과-수명-경계"><span class="ve-label">§4</span><span class="map-name">계산 작업과 수명 경계</span><span class="map-bar"><i style="width:66.8%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
-<a class="map-row" href="#5-gt--rt--rhi--gpu--표시"><span class="ve-label">§5</span><span class="map-name">GT → RT → RHI → GPU → 표시</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#6-로딩명령관리-코드의-전달-구조"><span class="ve-label">§6</span><span class="map-name">로딩·명령·관리 코드의 전달 구조</span><span class="map-bar"><i style="width:49.6%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#7-잠금완료-계약-지도"><span class="ve-label">§7</span><span class="map-name">잠금·완료 계약 지도</span><span class="map-bar"><i style="width:43%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
-<a class="map-row" href="#8-종료-구조"><span class="ve-label">§8</span><span class="map-name">종료 구조</span><span class="map-bar"><i style="width:36.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#9-확인된-설계-문제와-추가-검증이-필요한-위험"><span class="ve-label">§9</span><span class="map-name">확인된 설계 문제와 추가 검증이 필요한 위험</span><span class="map-bar"><i style="width:72.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#10-범용-태스크-그래프-런타임에-요구되는-구조"><span class="ve-label">§10</span><span class="map-name">범용 태스크 그래프 런타임에 요구되는 구조</span><span class="map-bar"><i style="width:49.7%"></i></span><span class="map-marks"><span class="chip info" title="진행·부분">1</span> <span class="chip ok" title="완료·통과">2</span></span></a>
-<a class="map-row" href="#11-확인-방법과-검증-상태"><span class="ve-label">§11</span><span class="map-name">확인 방법과 검증 상태</span><span class="map-bar"><i style="width:18.6%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#12-소스-근거-지도"><span class="ve-label">§12</span><span class="map-name">소스 근거 지도</span><span class="map-bar"><i style="width:74.2%"></i></span><span class="map-marks"></span></a>
-</div>
-<figcaption><span class="fig-n">그림 1</span>절 12개 가운데 「5. GT → RT → RHI → GPU → 표시」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
-</figure>
-<section class="doc-sec" id="sec-1-범위와-결론">
-<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-범위와-결론">1. 범위와 결론</h2></div>
-<div class="prose"><p>조사 범위는 엔진 소유 C++ 실행 경로, Editor/Player 호스트, DX12/Vulkan 제출·표시, 자산 로딩, 물리·AI·애니메이션, 관리 코드의 엔진 진입·재개 경계, 종료 경로다. <code>Engine</code>, <code>Editor</code>, <code>Player</code>의 스레드 생성·대기·잠금·큐 사용을 검색하고 주요 생산자부터 소비자까지 추적했다. <code>ScriptCore</code>와 관련 관리 코드도 확인했다. 테스트 전용 경로와 호출이 확인되지 않은 잔존 선언은 제품의 상시 실행 경로에 합산하지 않았다.</p>
+<h2>1. 범위와 결론</h2>
+<p>조사 범위는 엔진 소유 C++ 실행 경로, Editor/Player 호스트, DX12/Vulkan 제출·표시, 자산 로딩, 물리·AI·애니메이션, 관리 코드의 엔진 진입·재개 경계, 종료 경로다. <code>Engine</code>, <code>Editor</code>, <code>Player</code>의 스레드 생성·대기·잠금·큐 사용을 검색하고 주요 생산자부터 소비자까지 추적했다. <code>ScriptCore</code>와 관련 관리 코드도 확인했다. 테스트 전용 경로와 호출이 확인되지 않은 잔존 선언은 제품의 상시 실행 경로에 합산하지 않았다.</p>
 <p>이것은 <strong>소스 기반 구조 분석</strong>이다. 모든 공유 필드의 race-free 증명이나 동적 데드락 재현 결과가 아니다. PhysX, FMOD, CoreCLR, STL 병렬 알고리즘, 그래픽 드라이버 내부 스케줄러는 외부 경계로 취급한다. 현재 바이너리의 CPU 점유·대기 시간·프레임 성능은 측정하지 않았다.</p>
 <p>핵심 결론:</p>
 <ol>
@@ -209,11 +360,8 @@
 <li><code>Core.ThreadPool</code>에는 완료 이벤트의 세대 혼합 가능성과 예외·종료 계약 부재가 있다. 워크스틸링 deque로의 교체만으로는 해결되지 않는다.</li>
 </ol>
 <p>용어: <strong>GT</strong>는 OS 메시지 루프와 시뮬레이션을 수행하는 게임 스레드, <strong>RT</strong>는 전용 Scene 렌더 스레드, <strong>PT</strong>는 PresentationThread, <strong>RHI</strong>는 프로세스 공용 제출 스레드다. 아래 실선 화살표는 호출 순서·제출·데이터 전달을 의미한다. CPU를 멈추는 대기는 노드나 간선에 명시했다. 점선은 다음 프레임/완료 신호/상호 배제 관계다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-2-전체-스레드-지도">
-<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-전체-스레드-지도">2. 전체 스레드 지도</h2></div>
-<div class="prose"><pre class="mermaid">flowchart TB
+<h2>2. 전체 스레드 지도</h2>
+<pre><code class="language-mermaid">flowchart TB
     OS[&quot;OS 메시지&quot;] --&gt; GT[&quot;GameThread&lt;br/&gt;메시지 루프 / 시뮬레이션 / 구조 변경&quot;]
     GT --&gt; AN[&quot;애니메이션 풀&lt;br/&gt;8 workers / 공유 큐&quot;]
     AN --&gt; AW[&quot;GT: 전체 풀 완료 대기&lt;br/&gt;pose / socket 반영&quot;]
@@ -243,34 +391,125 @@
     PT -. &quot;Editor만 sceneStructureMutex&quot; .-&gt; GT
     IO[&quot;Watcher / 모델 준비 / Scene 로더&lt;br/&gt;명령 서비스 / 관리 async&quot;] --&gt; GT
     WP[&quot;공용 WorkerPool&lt;br/&gt;자산 bundle 작업&quot;] --&gt; IO
-    SO[&quot;오디오 로더&lt;br/&gt;detached polling thread&quot;] --&gt; FM[&quot;FMOD / sound cache&quot;]</pre>
+    SO[&quot;오디오 로더&lt;br/&gt;detached polling thread&quot;] --&gt; FM[&quot;FMOD / sound cache&quot;]
+</code></pre>
 <p>전체 도식의 GT로 돌아가는 선은 전체 프레임이 재시작된다는 뜻이 아니라 해당 호출 지점으로 반환함을 나타낸다. 실제 GT 순서는 다음 절에 있다. DX12와 Vulkan 풀은 선택된 backend 경로에 따라 사용되며, 모든 풀이 항상 동시에 실행된다는 의미가 아니다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>실행 주체</th><th>생성·작업 단위</th><th>동기화·완료</th><th>핵심 소유권 / 근거</th></tr></thead>
-<tbody><tr><td>GT</td><td><code>CoreWindow::Then</code>의 메시지 없는 반복</td><td>일반 C++ 호출 순서</td><td>활성 Scene 구조, 시뮬레이션, packet 생산. S01–S04</td></tr>
-<tr><td>PT</td><td>호스트별 <code>StartPresentationThread</code></td><td>mutex+CV, 최신 frame id, 종료 join</td><td>ImGui 셸·표시. Editor는 구조 변경 구간과 추가 mutex. S02–S03</td></tr>
-<tr><td>RT</td><td><code>StartRenderThread</code></td><td>큐 mutex+CV, capacity 2, drain 후 join</td><td><code>TickLive</code>, render-owned 상태. S10</td></tr>
-<tr><td>RHI</td><td>첫 client 등록 때 생성</td><td>공용 FIFO, ticket CV, owner drain, 마지막 client에서 join</td><td>native queue 호출과 lifecycle. S12</td></tr>
-<tr><td>애니메이션</td><td><code>ThreadPool(8)</code></td><td>전역 task count+event</td><td>워커 계산 후 GT가 pose/socket 반영. S06–S07</td></tr>
-<tr><td>공용 CPU/로딩 풀</td><td><code>WorkerPool::Startup</code></td><td>같은 ThreadPool 구현</td><td>기본 worker 수는 active logical processor 수. 확인된 소비자는 bundle 로딩. S08</td></tr>
-<tr><td>Foliage</td><td>컴포넌트마다 범위별 async</td><td>모든 future 회수</td><td>범위별 instance 원소 갱신. S09</td></tr>
-<tr><td>AI</td><td>Scene의 단일 future</td><td>다음 FixedUpdate에서 ready poll, 구조 파괴 전 blocking get</td><td>raw component snapshot 수명. 데이터 불변 스냅샷은 아님. S15</td></tr>
-<tr><td>물리</td><td>PhysX 자체 dispatcher</td><td><code>simulate</code> 직후 <code>fetchResults(true)</code></td><td>결과 회수 후 엔진 Transform 반영. S16</td></tr>
-<tr><td>Scene 로더</td><td><code>std::async</code></td><td>future ready poll 후 활성화 예약</td><td>새 Scene 생성 외에 기존 DDOL 접근도 있음. S17</td></tr>
-<tr><td>모델 준비</td><td>저우선순위 전용 worker</td><td>mutex+CV, ready release/acquire, cancel</td><td>준비 결과를 GT가 분할 적용. S18</td></tr>
-<tr><td>directory watcher</td><td>전용 I/O worker</td><td>overlapped I/O, stop event, CancelIoEx+join</td><td>변경 알림을 GT 큐로 전달. S19</td></tr>
-<tr><td>PSO 비동기 API</td><td><code>DX12PSOManager::Request</code></td><td>shared future poll, 종료 시 회수</td><td>구현과 self-test 사용 확인. 제품 프레임의 해당 API 호출은 미확인으로 별도 분류. S20</td></tr>
-<tr><td>명령 서비스</td><td>accept thread+client workers</td><td>socket 대기, GT command queue, 결과 CV</td><td>네트워크 worker에서 엔진 명령 본문을 직접 실행하지 않도록 호스트가 중계. S21</td></tr>
-<tr><td>관리 async</td><td>CoreCLR pool 등</td><td>SynchronizationContext.Post → GT drain</td><td>기본 await 재개와 native engine API thread guard. S22</td></tr>
-<tr><td>오디오 로더</td><td><code>std::thread</code> 후 detach</td><td>1초 polling, sound cache shared_mutex</td><td>정상 stop/join 프로토콜 없음. S23</td></tr>
-<tr><td><span class="chip info">부팅 진행 창</span></td><td>Win32 전용 UI thread</td><td>Close에서 회수</td><td>엔진 메인 창 표시 전 닫는 경계. S01, S24</td></tr></tbody></table></div>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>실행 주체</th>
+<th>생성·작업 단위</th>
+<th>동기화·완료</th>
+<th>핵심 소유권 / 근거</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GT</td>
+<td><code>CoreWindow::Then</code>의 메시지 없는 반복</td>
+<td>일반 C++ 호출 순서</td>
+<td>활성 Scene 구조, 시뮬레이션, packet 생산. S01–S04</td>
+</tr>
+<tr>
+<td>PT</td>
+<td>호스트별 <code>StartPresentationThread</code></td>
+<td>mutex+CV, 최신 frame id, 종료 join</td>
+<td>ImGui 셸·표시. Editor는 구조 변경 구간과 추가 mutex. S02–S03</td>
+</tr>
+<tr>
+<td>RT</td>
+<td><code>StartRenderThread</code></td>
+<td>큐 mutex+CV, capacity 2, drain 후 join</td>
+<td><code>TickLive</code>, render-owned 상태. S10</td>
+</tr>
+<tr>
+<td>RHI</td>
+<td>첫 client 등록 때 생성</td>
+<td>공용 FIFO, ticket CV, owner drain, 마지막 client에서 join</td>
+<td>native queue 호출과 lifecycle. S12</td>
+</tr>
+<tr>
+<td>애니메이션</td>
+<td><code>ThreadPool(8)</code></td>
+<td>전역 task count+event</td>
+<td>워커 계산 후 GT가 pose/socket 반영. S06–S07</td>
+</tr>
+<tr>
+<td>공용 CPU/로딩 풀</td>
+<td><code>WorkerPool::Startup</code></td>
+<td>같은 ThreadPool 구현</td>
+<td>기본 worker 수는 active logical processor 수. 확인된 소비자는 bundle 로딩. S08</td>
+</tr>
+<tr>
+<td>Foliage</td>
+<td>컴포넌트마다 범위별 async</td>
+<td>모든 future 회수</td>
+<td>범위별 instance 원소 갱신. S09</td>
+</tr>
+<tr>
+<td>AI</td>
+<td>Scene의 단일 future</td>
+<td>다음 FixedUpdate에서 ready poll, 구조 파괴 전 blocking get</td>
+<td>raw component snapshot 수명. 데이터 불변 스냅샷은 아님. S15</td>
+</tr>
+<tr>
+<td>물리</td>
+<td>PhysX 자체 dispatcher</td>
+<td><code>simulate</code> 직후 <code>fetchResults(true)</code></td>
+<td>결과 회수 후 엔진 Transform 반영. S16</td>
+</tr>
+<tr>
+<td>Scene 로더</td>
+<td><code>std::async</code></td>
+<td>future ready poll 후 활성화 예약</td>
+<td>새 Scene 생성 외에 기존 DDOL 접근도 있음. S17</td>
+</tr>
+<tr>
+<td>모델 준비</td>
+<td>저우선순위 전용 worker</td>
+<td>mutex+CV, ready release/acquire, cancel</td>
+<td>준비 결과를 GT가 분할 적용. S18</td>
+</tr>
+<tr>
+<td>directory watcher</td>
+<td>전용 I/O worker</td>
+<td>overlapped I/O, stop event, CancelIoEx+join</td>
+<td>변경 알림을 GT 큐로 전달. S19</td>
+</tr>
+<tr>
+<td>PSO 비동기 API</td>
+<td><code>DX12PSOManager::Request</code></td>
+<td>shared future poll, 종료 시 회수</td>
+<td>구현과 self-test 사용 확인. 제품 프레임의 해당 API 호출은 미확인으로 별도 분류. S20</td>
+</tr>
+<tr>
+<td>명령 서비스</td>
+<td>accept thread+client workers</td>
+<td>socket 대기, GT command queue, 결과 CV</td>
+<td>네트워크 worker에서 엔진 명령 본문을 직접 실행하지 않도록 호스트가 중계. S21</td>
+</tr>
+<tr>
+<td>관리 async</td>
+<td>CoreCLR pool 등</td>
+<td>SynchronizationContext.Post → GT drain</td>
+<td>기본 await 재개와 native engine API thread guard. S22</td>
+</tr>
+<tr>
+<td>오디오 로더</td>
+<td><code>std::thread</code> 후 detach</td>
+<td>1초 polling, sound cache shared_mutex</td>
+<td>정상 stop/join 프로토콜 없음. S23</td>
+</tr>
+<tr>
+<td>부팅 진행 창</td>
+<td>Win32 전용 UI thread</td>
+<td>Close에서 회수</td>
+<td>엔진 메인 창 표시 전 닫는 경계. S01, S24</td>
+</tr>
+</tbody></table></div>
 <p>주의: <code>AssetLoadJob</code>에는 <code>ThreadPool(16)</code> 정의가 있지만 조사한 제품 소스에서 인스턴스 생성·소비 호출을 찾지 못했다. <code>DataSystem::m_DataThread</code>도 선언 외 사용을 찾지 못했다. 따라서 <strong>실제 활성 16-thread 자산 풀</strong>로 집계하지 않는다. 앞선 대화의 “별도 자산용 16개 풀이 존재한다”는 표현은 정의의 존재와 활성 실행을 구분하지 못한 것이므로 여기서 정정한다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-3-gt-프레임의-실제-순서">
-<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-gt-프레임의-실제-순서">3. GT 프레임의 실제 순서</h2></div>
-<div class="prose"><p><code>CoreWindow::InitializeTask().Then()</code>은 이름과 달리 태스크 그래프 실행기가 아니다. 초기화 함수를 직접 호출하고, <code>PeekMessage</code>가 비었을 때 프레임 함수를 직접 실행한다. <code>Delegate::Broadcast()</code>도 콜백 목록을 잠금 안에서 복사한 후 호출 스레드에서 순차 호출한다. 이벤트 broadcast를 비동기 작업 제출로 해석하면 안 된다. S01, S25.</p>
-<pre class="mermaid">flowchart TD
+<h2>3. GT 프레임의 실제 순서</h2>
+<p><code>CoreWindow::InitializeTask().Then()</code>은 이름과 달리 태스크 그래프 실행기가 아니다. 초기화 함수를 직접 호출하고, <code>PeekMessage</code>가 비었을 때 프레임 함수를 직접 실행한다. <code>Delegate::Broadcast()</code>도 콜백 목록을 잠금 안에서 복사한 후 호출 스레드에서 순차 호출한다. 이벤트 broadcast를 비동기 작업 제출로 해석하면 안 된다. S01, S25.</p>
+<pre><code class="language-mermaid">flowchart TD
     A[&quot;호스트 프레임 진입&quot;] --&gt; HC[&quot;Editor: queued asset changes drain&lt;br/&gt;Player: command Pump&quot;]
     HC --&gt; MODE{&quot;실행 모드&quot;}
     MODE --&gt;|&quot;Editor 편집&quot;| ED[&quot;Editor / InputEvents&lt;br/&gt;GameLogic delta 0&quot;]
@@ -293,7 +532,8 @@
     MUT --&gt; CMD[&quot;Editor만 이 위치에서 CLI Pump&quot;]
     CMD --&gt; CAP[&quot;카메라 / 필요 자산 snapshot&lt;br/&gt;BuildLiveFramePacket&quot;]
     CAP --&gt; PUB[&quot;PublishLiveFrame&lt;br/&gt;proxy delta batch 함께 캡처&quot;]
-    PUB --&gt; NOTIFY[&quot;성공 시 PT에 frame id 알림&quot;]</pre>
+    PUB --&gt; NOTIFY[&quot;성공 시 PT에 frame id 알림&quot;]
+</code></pre>
 <p>이 도식의 GameLogic 내부 상세는 재생 경로를 펼친 것이다. Editor 편집 모드의 <code>GameLogic(0)</code>도 같은 Scene Update/애니메이션/LateUpdate 호출 구조를 사용한다. <code>delta=0</code>이 작업 제출 부재를 뜻하지 않는다. 일시정지는 <code>Pausing()</code> 후 시뮬레이션을 반환하지만 호스트 프레임 끝 처리와 packet 발행은 계속된다. S02–S05.</p>
 <p>순서상 특히 중요한 점:</p>
 <ul>
@@ -302,12 +542,9 @@
 <li>managed post-physics는 native <code>GameLogic</code> 뒤다. 이를 native Update와 같은 위치로 합치거나 앞당기면 관측 순서가 바뀐다.</li>
 <li>Editor CLI는 <code>EditorMain::Update</code> 뒤, Player command Pump는 시뮬레이션 앞이다. 두 호스트의 명령 적용 시점은 동일하지 않다.</li>
 </ul>
-</div>
-</section>
-<section class="doc-sec" id="sec-4-계산-작업과-수명-경계">
-<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-계산-작업과-수명-경계">4. 계산 작업과 수명 경계</h2></div>
-<div class="prose"><h3 id="41-애니메이션">4.1 애니메이션</h3>
-<pre class="mermaid">flowchart LR
+<h2>4. 계산 작업과 수명 경계</h2>
+<h3>4.1 애니메이션</h3>
+<pre><code class="language-mermaid">flowchart LR
     SNAP[&quot;GT: Animator 목록 snapshot&lt;br/&gt;등록 mutex 해제&quot;] --&gt; ENQ[&quot;Animator별 Enqueue&quot;]
     ENQ --&gt; W1[&quot;worker: Animator A 계산&quot;]
     ENQ --&gt; W2[&quot;worker: Animator B 계산&quot;]
@@ -320,10 +557,11 @@
     WAIT --&gt; COM[&quot;GT: PublishAnimatorPose&lt;br/&gt;socket Transform 반영&quot;]
     COM --&gt; LIFE[&quot;이후 프레임 끝 실제 객체 파괴&quot;]
     W1 --&gt; MSG[&quot;애니메이션 이벤트&lt;br/&gt;QueueScriptMessage&quot;]
-    MSG -. &quot;Managed PostPhysics에서 flush&quot; .-&gt; GTM[&quot;GT: 관리 콜백&quot;]</pre>
+    MSG -. &quot;Managed PostPhysics에서 flush&quot; .-&gt; GTM[&quot;GT: 관리 콜백&quot;]
+</code></pre>
 <p>워커는 pose만 계산하는 순수 함수가 아니다. Animator 재생 시간, controller 상태, pose 버퍼를 변경하고 clip event 경로는 ScriptComponent를 찾아 관리 메시지를 큐에 넣는다. 이 때문에 raw pointer 수명과 상태 소유권을 유지해야 한다. 모델 generation은 잡 안에서 shared ownership으로 붙들지만 Animator 자체의 수명은 현재 동기 join 창에 의존한다. <code>RenderScene</code>이 AnimationJob을 멤버로 소유하고 <code>RenderScene::Finalize</code>가 animation pool을 회수한다. S06, S26, S32.</p>
-<h3 id="42-ai와-파괴">4.2 AI와 파괴</h3>
-<pre class="mermaid">flowchart TD
+<h3>4.2 AI와 파괴</h3>
+<pre><code class="language-mermaid">flowchart TD
     E[&quot;EndFramePass 진입&quot;] --&gt; D[&quot;DrainAIUpdate&lt;br/&gt;기존 future가 valid이면 get&quot;]
     D --&gt; DEST[&quot;FlushPendingDestroy&lt;br/&gt;Light / Components / Entities 파괴&quot;]
     DEST --&gt; CAM{&quot;primary camera 있음&quot;}
@@ -335,23 +573,54 @@
     FX --&gt; E
     AI --&gt; Q[&quot;managed AI tick 큐 등&quot;]
     Q -. &quot;GT flush&quot; .-&gt; M[&quot;관리 코드 실행&quot;]
-    AI -. &quot;미완료이면 여기서 기다림&quot; .-&gt; D</pre>
+    AI -. &quot;미완료이면 여기서 기다림&quot; .-&gt; D
+</code></pre>
 <p><code>DrainAIUpdate</code>는 Scene 소멸과 hierarchy detach에도 존재한다. 이것은 snapshot에 들어 있는 raw pointer의 <strong>파괴 중첩을 제한</strong>한다. 그러나 AI가 다음 GT 시뮬레이션과 겹치는 동안 Transform·bounds를 읽는 것까지 불변화하지 않는다. <code>AIManager::InternalAIUpdate</code>의 map mutex는 map 복사까지만 보호한다. 따라서 “snapshot을 썼으므로 AI가 thread-safe”라는 결론은 성립하지 않는다. 공유 값 접근 경쟁 여부는 별도 필드 단위 감사·동적 재현이 필요하다. S15.</p>
-<h3 id="43-foliage-transform-물리">4.3 Foliage, Transform, 물리</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>영역</th><th>현재 분해</th><th>필수 경계</th><th>범용 실행기로 옮길 때의 의미</th></tr></thead>
-<tbody><tr><td>Foliage</td><td>component별 범위를 최대 <code>2 * hardware_concurrency + 1</code>개로 분할, async 후 모든 get</td><td>instance 배열 변경·재할당과 계산 창 분리</td><td>persistent executor + parallel-for의 직접 후보. 현재 여러 component의 계산도 component별 join으로 끊김</td></tr>
-<tr><td>packed Transform</td><td>dirty root 정렬·겹침 병합 후 preorder range 순차 루프</td><td>부모 world 값, UI→Spatial 순서, dirty/worldChanged 전달</td><td>disjoint subtree 계산 후보. 단일 큰 chain은 의존성이 남음. 공용 metrics·dirty 쓰기를 함께 분리해야 함</td></tr>
-<tr><td>legacy Transform</td><td>root 자식에 <code>std::execution::par</code></td><td><span class="chip ok">호출 반환 시 완료</span></td><td>이미 병렬인 fallback. 주석만 보고 packed 경로도 병렬이라고 판단하면 안 됨</td></tr>
-<tr><td>물리</td><td>PhysX dispatcher 내부 작업</td><td>fetchResults 후 engine result commit</td><td>adapter로 외부 계산 완료를 연결할 수 있으나, 현재의 동기 wrapper를 분리해야 중첩 가능</td></tr>
-<tr><td>tangent 생성</td><td>메시가 여러 개면 STL <code>execution::par</code>, 이후 결과 수집</td><td>메시별 결과 후 notes/stats 병합</td><td>import CPU 그룹 후보. 하나면 직렬 실행하는 경계 유지</td></tr></tbody></table></div>
+<h3>4.3 Foliage, Transform, 물리</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>영역</th>
+<th>현재 분해</th>
+<th>필수 경계</th>
+<th>범용 실행기로 옮길 때의 의미</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Foliage</td>
+<td>component별 범위를 최대 <code>2 * hardware_concurrency + 1</code>개로 분할, async 후 모든 get</td>
+<td>instance 배열 변경·재할당과 계산 창 분리</td>
+<td>persistent executor + parallel-for의 직접 후보. 현재 여러 component의 계산도 component별 join으로 끊김</td>
+</tr>
+<tr>
+<td>packed Transform</td>
+<td>dirty root 정렬·겹침 병합 후 preorder range 순차 루프</td>
+<td>부모 world 값, UI→Spatial 순서, dirty/worldChanged 전달</td>
+<td>disjoint subtree 계산 후보. 단일 큰 chain은 의존성이 남음. 공용 metrics·dirty 쓰기를 함께 분리해야 함</td>
+</tr>
+<tr>
+<td>legacy Transform</td>
+<td>root 자식에 <code>std::execution::par</code></td>
+<td>호출 반환 시 완료</td>
+<td>이미 병렬인 fallback. 주석만 보고 packed 경로도 병렬이라고 판단하면 안 됨</td>
+</tr>
+<tr>
+<td>물리</td>
+<td>PhysX dispatcher 내부 작업</td>
+<td>fetchResults 후 engine result commit</td>
+<td>adapter로 외부 계산 완료를 연결할 수 있으나, 현재의 동기 wrapper를 분리해야 중첩 가능</td>
+</tr>
+<tr>
+<td>tangent 생성</td>
+<td>메시가 여러 개면 STL <code>execution::par</code>, 이후 결과 수집</td>
+<td>메시별 결과 후 notes/stats 병합</td>
+<td>import CPU 그룹 후보. 하나면 직렬 실행하는 경계 유지</td>
+</tr>
+</tbody></table></div>
 <p>S09, S16, S27. “후보”는 무수정 병렬화 승인이나 측정된 이득을 의미하지 않는다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-5-gt--rt--rhi--gpu--표시">
-<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-gt--rt--rhi--gpu--표시">5. GT → RT → RHI → GPU → 표시</h2></div>
-<div class="prose"><h3 id="51-frame-packet과-proxy-delta">5.1 frame packet과 proxy delta</h3>
-<pre class="mermaid">flowchart TD
+<h2>5. GT → RT → RHI → GPU → 표시</h2>
+<h3>5.1 frame packet과 proxy delta</h3>
+<pre><code class="language-mermaid">flowchart TD
     WR[&quot;GT: Transform / Material / Visibility 등 변경&quot;] --&gt; DIR[&quot;proxy dirty mask OR 및 ticket 큐&quot;]
     DIR --&gt; COM[&quot;GT: CommitRenderProxies&lt;br/&gt;세대 / handle / instance 검사&quot;]
     COM --&gt; PQ[&quot;ProxyCommand concurrent queue&quot;]
@@ -366,11 +635,12 @@
     PUSH --&gt; RT[&quot;RT: FIFO pop&quot;]
     MERGE --&gt; RT
     RT --&gt; EP[&quot;delta 적용&lt;br/&gt;미래 epoch는 defer / 과거 epoch는 drop&quot;]
-    EP --&gt; TICK[&quot;TickLive&lt;br/&gt;renderStateMutex 아래 상태 진행&quot;]</pre>
+    EP --&gt; TICK[&quot;TickLive&lt;br/&gt;renderStateMutex 아래 상태 진행&quot;]
+</code></pre>
 <p>capacity 2는 <strong>대기 큐</strong>의 상한이며 실행 중 submission은 별도다. 합친 delta가 65536을 넘을 때 큐 공간을 기다리는 분기가 있지만, 개별 입력 batch 자체의 절대 상한을 이 코드가 모두 검증한다고 확대 해석하지 않는다. proxy pending 큐도 이 capacity와 동일한 bounded 큐가 아니다.</p>
 <p>RT가 느리면 일반적으로 최신 frame을 병합한다. <strong>모든 GT frame이 RT frame·GPU frame·표시 frame과 1:1 대응하지 않는다.</strong> shutdown 검사도 published = consumed + coalesced + pending처럼 이 의미에 맞춰야 한다. S10–S11.</p>
-<h3 id="52-명령-기록과-완료의-세-단계">5.2 명령 기록과 완료의 세 단계</h3>
-<pre class="mermaid">flowchart TD
+<h3>5.2 명령 기록과 완료의 세 단계</h3>
+<pre><code class="language-mermaid">flowchart TD
     VIEW[&quot;RT: 카메라 선택&lt;br/&gt;입력 seal / render slot 선택&quot;] --&gt; BEGIN[&quot;BeginFrame&lt;br/&gt;재사용 슬롯의 이전 ticket 대기&lt;br/&gt;이전 GPU fence 또는 timeline 대기&quot;]
     BEGIN --&gt; REC[&quot;render graph 구성 / 명령 기록&quot;]
     REC --&gt; PAR{&quot;병렬 기록 경로&quot;}
@@ -388,7 +658,8 @@
     GC --&gt; PROM[&quot;RT: 완료 슬롯 승격&lt;br/&gt;display snapshot 게시&quot;]
     PROM --&gt; PT[&quot;PT: 최신 완료 화면으로 ImGui 기록&quot;]
     PT --&gt; PS[&quot;RHI에 표시 작업 제출&lt;br/&gt;Present는 ExecuteAndWait&quot;]
-    PS --&gt; SCREEN[&quot;OS / swapchain 표시 경로&quot;]</pre>
+    PS --&gt; SCREEN[&quot;OS / swapchain 표시 경로&quot;]
+</code></pre>
 <ul>
 <li><strong>기록 완료</strong>: CPU가 command list/buffer를 채웠음.</li>
 <li><strong>ticket 완료</strong>: RHI 스레드가 제출 함수를 실행했음. GPU 완료가 아니다.</li>
@@ -398,20 +669,32 @@
 <p><code>DrainSubmissions(owner)</code>는 queued/running CPU 제출만 기다리고, <code>Drain(owner)</code>는 등록된 GPU retirement도 기다린다. retirement가 붙지 않은 제출까지 <code>Drain()</code>만으로 GPU idle이 보장되는 것은 아니며, lifecycle에서는 backend의 명시 GPU drain 작업을 사용한다. S12–S14.</p>
 <p>DX12/Vulkan 명령 풀은 둘 다 단일 실행 배치의 <code>m_job</code>, <code>m_pending</code>, <code>m_generation</code>을 가진다. 임의 다중 호출자용 재진입 executor가 아니다. graph의 기록 구간은 정적으로 나누고 워커 순서로 제출 순서를 보존한다. 워크스틸링을 붙일 때에는 logical record unit과 실제 worker id를 분리하고 allocator/list의 독점 사용을 보장해야 한다.</p>
 <p>카메라별 <code>frameContext</code>가 재사용되는 draw/light 벡터를 가리키므로 현재 <code>TickLive</code>는 뷰 입력 준비와 기록을 카메라별 순차 수행한다. 카메라 노드를 그래프에 병렬 배치하려면 뷰별 입력 저장소부터 독립시켜야 한다. GPU 진행 슬롯이 차면 일부 live 경로는 대기 대신 해당 기록을 건너뛰고 기존 완료 화면을 유지한다. <code>BeginFrame</code>의 실제 슬롯 재사용 대기와 이 상위 admission 결정을 구분해야 한다.</p>
-<h3 id="53-backend별-화면-전달-비용">5.3 backend별 화면 전달 비용</h3>
-<div class="table-scroll"><table>
-<thead><tr><th>backend live 경로</th><th>GPU 완료 후 화면 전달</th><th>JobSystem으로 해결되지 않는 부분</th></tr></thead>
-<tbody><tr><td>DX12</td><td>완료 슬롯의 interop token 게시 → 표시 셸에서 공유 texture 열기</td><td>GPU 완료와 공유 texture/descriptor 수명 계약</td></tr>
-<tr><td>Vulkan</td><td>timeline 완료 → MapReadback → CPU TonemapToRgba8 → SubmitCpuFrame → 표시 셸의 texture 업로드</td><td>readback/복사/upload 비용. CPU 톤매핑을 잡으로 분리해도 전송 자체는 남음</td></tr></tbody></table></div>
+<h3>5.3 backend별 화면 전달 비용</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>backend live 경로</th>
+<th>GPU 완료 후 화면 전달</th>
+<th>JobSystem으로 해결되지 않는 부분</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DX12</td>
+<td>완료 슬롯의 interop token 게시 → 표시 셸에서 공유 texture 열기</td>
+<td>GPU 완료와 공유 texture/descriptor 수명 계약</td>
+</tr>
+<tr>
+<td>Vulkan</td>
+<td>timeline 완료 → MapReadback → CPU TonemapToRgba8 → SubmitCpuFrame → 표시 셸의 texture 업로드</td>
+<td>readback/복사/upload 비용. CPU 톤매핑을 잡으로 분리해도 전송 자체는 남음</td>
+</tr>
+</tbody></table></div>
 <p>따라서 두 backend의 PT 입력을 모두 같은 zero-copy GPU snapshot 경로로 해석하면 안 된다. Vulkan의 <code>PromoteCompleted</code>에는 완료 확인뿐 아니라 CPU 영상 변환 작업도 포함된다. 순수 완료 확인과 이 후속 계산을 분리하는 것이 외부 completion adapter 설계의 한 사례다. S30.</p>
-<h3 id="54-표시와-editor-구조-잠금">5.4 표시와 Editor 구조 잠금</h3>
+<h3>5.4 표시와 Editor 구조 잠금</h3>
 <p>Editor PT는 <code>m_sceneStructureMutex</code>를 잡고 <code>PresentFrame()</code> 전체를 호출한다. 그 안에는 ImGui 기록과 backend Present 경로가 포함된다. GT는 모델 적용·Scene 전환·파괴·EndOfFrame 구간에서 같은 mutex를 잡는다. 따라서 이 잠금은 실질적으로 UI 읽기뿐 아니라 표시 호출 지연을 GT 구조 변경에 전달할 수 있다. 반대로 GT가 이 잠금을 잡은 채 AI 회수를 기다리면 PT도 함께 지연될 수 있다.</p>
 <p>그러나 GT의 일반 시뮬레이션과 packet 캡처 전체가 이 mutex 아래 있는 것은 아니다. 그러므로 <strong>Scene 구조 수명 보호를 일반 데이터 동시 접근 보호로 확대 해석하면 안 된다.</strong> Player PT에는 같은 Editor 구조 잠금이 없고 표시 셸 위주로 움직인다. S02–S03.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-6-로딩명령관리-코드의-전달-구조">
-<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-로딩명령관리-코드의-전달-구조">6. 로딩·명령·관리 코드의 전달 구조</h2></div>
-<div class="prose"><pre class="mermaid">flowchart LR
+<h2>6. 로딩·명령·관리 코드의 전달 구조</h2>
+<pre><code class="language-mermaid">flowchart LR
     WATCH[&quot;Directory watcher&lt;br/&gt;overlapped I/O&quot;] --&gt; AQ[&quot;QueueAssetChange&lt;br/&gt;mutex / 중복 병합&quot;]
     AQ --&gt; AD[&quot;GT 프레임 시작&lt;br/&gt;DrainQueuedAssetChanges&quot;]
     NET[&quot;HTTP client worker&lt;br/&gt;또는 stdin reader&quot;] --&gt; CQ[&quot;Command queue&quot;]
@@ -427,34 +710,99 @@
     MODEL[&quot;Model preparation worker&quot;] --&gt; READY[&quot;PendingInstance&lt;br/&gt;ready release-store&quot;]
     READY --&gt; APPLY[&quot;GT Tick: acquire-load&lt;br/&gt;2ms 목표의 분할 적용&quot;]
     EXT[&quot;관리 외부 await 완료&quot;] --&gt; POST[&quot;SynchronizationContext.Post&lt;br/&gt;ConcurrentQueue&quot;]
-    POST --&gt; PRE[&quot;GT managed PrePhysics&lt;br/&gt;Scope tick 뒤 snapshot-count drain&quot;]</pre>
+    POST --&gt; PRE[&quot;GT managed PrePhysics&lt;br/&gt;Scope tick 뒤 snapshot-count drain&quot;]
+</code></pre>
 <p>Scene async loader를 완전히 분리된 불변 준비 작업으로 분류할 수는 없다. <code>LoadSceneAsyncAndWaitCallback</code>는 background lambda 안에서 active Scene의 DDOL hierarchy transaction, 역직렬화·remap·재바인딩 경로를 사용한다. atomic active Scene 포인터는 포인터 값 전달을 보호할 뿐 내부 Entity 컨테이너를 보호하지 않는다. 로딩 중 실행 가드와 실제 외부 호출 조건까지 검증해야 안전성을 단정할 수 있다. 그래프 이관 때 분리할 후보는 “자료 읽기·decode”와 “Scene/등록·이벤트 반영”이다. S17.</p>
 <p>모델 배치는 더 명확한 준비/반영 모델이다. worker는 <code>PendingInstance::Prepare</code>, GT는 ready 확인 후 적용한다. 취소는 cooperative이며 이미 실행 중인 decode 자체를 강제 중단하지 않는다. 2ms는 적용 루프의 목표 deadline이지 모든 내부 함수 실행 시간의 강제 상한은 아니다. S18.</p>
 <p>관리 코드의 <code>Post</code>는 thread-safe 큐로 재개를 보낸다. <code>Drain</code>은 진입 시 큐 건수만 처리해 재게시가 한 프레임을 무한 점유하지 않게 한다. off-GT <code>Send</code>는 교착을 피하기 위해 거부한다. <code>Task.Run</code> 본문이나 <code>ConfigureAwait(false)</code> 뒤가 자동으로 GT가 되는 것은 아니며 native API 진입 guard가 별도로 있다. native JobSystem이 CoreCLR pool까지 자동 대체하는 구조는 아니다. S22.</p>
 <p>명령 서비스의 동기 결과 대기는 client worker에 있고, GT Pump가 완료 callback을 호출한다. timeout은 작업 자체의 취소와 다르다. 비동기 operation 경로는 operation table에 완료를 기록한다. 네트워크/표준입력 대기를 일반 CPU worker에 그대로 넣으면 실행 자원이 묶인다. S21.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-7-잠금완료-계약-지도">
-<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-잠금완료-계약-지도">7. 잠금·완료 계약 지도</h2></div>
-<div class="prose"><div class="table-scroll"><table>
-<thead><tr><th>경계</th><th>보호하는 것</th><th>보호하지 않는 것 / 영향</th></tr></thead>
-<tbody><tr><td>animation registry mutex</td><td>Animator 등록 목록 복사·변경</td><td>Animator 필드 전체와 객체 생존은 별도 join 계약</td></tr>
-<tr><td>Transform dirty mutex</td><td>dirty root publication/snapshot</td><td>Scene packed 배열의 무제한 다중 작성자 접근</td></tr>
-<tr><td>render registry dirtyMutex</td><td>dirty ticket·mask·등록 metadata</td><td>commit 후 component callback의 임의 동시 실행</td></tr>
-<tr><td>AI map mutex</td><td>map 복사·등록</td><td>복사된 포인터의 필드 불변성</td></tr>
-<tr><td>sceneStructureMutex</td><td>Editor GT 구조 변경과 PT PresentFrame 상호 배제</td><td>일반 시뮬레이션 전체, 모든 GUI 필드 접근</td></tr>
-<tr><td>renderQueueMutex</td><td>packet enqueue/pop, 큐 통계</td><td>RenderScene 내부 상태; pop 후 별도 RT 소유</td></tr>
-<tr><td>renderStateMutex</td><td>TickLive 및 일부 진단·제어 접근</td><td>UI 전용 상태나 GPU 실제 실행 완료</td></tr>
-<tr><td>displayLifetimeMutex</td><td>완료 display snapshot·표시 자원 접근/무효화 경계</td><td>snapshot을 반환한 후 모든 외부 객체의 임의 사용</td></tr>
-<tr><td>RHI impl mutex</td><td>queue, owner, retirement metadata</td><td>GPU 실행; 제출 작업 본문은 잠금 밖 실행</td></tr>
-<tr><td>RHI ticket mutex+CV</td><td>해당 CPU 제출 작업의 결과</td><td>GPU completion</td></tr>
-<tr><td>backend fence/timeline</td><td><span class="chip ok">이전 제출의 GPU 완료</span></td><td>GT/RT frame 전체 일치</td></tr>
-<tr><td>cache별 mutex/shared_mutex</td><td>DataSystem, PSO, texture, sound 등 개별 저장소</td><td>하위 객체의 수명·불변성까지 자동 보장하지 않음</td></tr>
-<tr><td>Delegate spinlock</td><td>콜백 목록 복사·수정</td><td>콜백 본문과 raw subscriber 수명</td></tr>
-<tr><td>ClrHost spinlock queues</td><td>AI tick / script message 전달</td><td>enqueue 주체의 live Scene 읽기</td></tr>
-<tr><td>profiler registry mutex</td><td>등록 thread 목록·TLS 포인터 회수</td><td>worker EventBuffer 쓰기와 collector 읽기의 완전한 handoff</td></tr></tbody></table></div>
+<h2>7. 잠금·완료 계약 지도</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>경계</th>
+<th>보호하는 것</th>
+<th>보호하지 않는 것 / 영향</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>animation registry mutex</td>
+<td>Animator 등록 목록 복사·변경</td>
+<td>Animator 필드 전체와 객체 생존은 별도 join 계약</td>
+</tr>
+<tr>
+<td>Transform dirty mutex</td>
+<td>dirty root publication/snapshot</td>
+<td>Scene packed 배열의 무제한 다중 작성자 접근</td>
+</tr>
+<tr>
+<td>render registry dirtyMutex</td>
+<td>dirty ticket·mask·등록 metadata</td>
+<td>commit 후 component callback의 임의 동시 실행</td>
+</tr>
+<tr>
+<td>AI map mutex</td>
+<td>map 복사·등록</td>
+<td>복사된 포인터의 필드 불변성</td>
+</tr>
+<tr>
+<td>sceneStructureMutex</td>
+<td>Editor GT 구조 변경과 PT PresentFrame 상호 배제</td>
+<td>일반 시뮬레이션 전체, 모든 GUI 필드 접근</td>
+</tr>
+<tr>
+<td>renderQueueMutex</td>
+<td>packet enqueue/pop, 큐 통계</td>
+<td>RenderScene 내부 상태; pop 후 별도 RT 소유</td>
+</tr>
+<tr>
+<td>renderStateMutex</td>
+<td>TickLive 및 일부 진단·제어 접근</td>
+<td>UI 전용 상태나 GPU 실제 실행 완료</td>
+</tr>
+<tr>
+<td>displayLifetimeMutex</td>
+<td>완료 display snapshot·표시 자원 접근/무효화 경계</td>
+<td>snapshot을 반환한 후 모든 외부 객체의 임의 사용</td>
+</tr>
+<tr>
+<td>RHI impl mutex</td>
+<td>queue, owner, retirement metadata</td>
+<td>GPU 실행; 제출 작업 본문은 잠금 밖 실행</td>
+</tr>
+<tr>
+<td>RHI ticket mutex+CV</td>
+<td>해당 CPU 제출 작업의 결과</td>
+<td>GPU completion</td>
+</tr>
+<tr>
+<td>backend fence/timeline</td>
+<td>이전 제출의 GPU 완료</td>
+<td>GT/RT frame 전체 일치</td>
+</tr>
+<tr>
+<td>cache별 mutex/shared_mutex</td>
+<td>DataSystem, PSO, texture, sound 등 개별 저장소</td>
+<td>하위 객체의 수명·불변성까지 자동 보장하지 않음</td>
+</tr>
+<tr>
+<td>Delegate spinlock</td>
+<td>콜백 목록 복사·수정</td>
+<td>콜백 본문과 raw subscriber 수명</td>
+</tr>
+<tr>
+<td>ClrHost spinlock queues</td>
+<td>AI tick / script message 전달</td>
+<td>enqueue 주체의 live Scene 읽기</td>
+</tr>
+<tr>
+<td>profiler registry mutex</td>
+<td>등록 thread 목록·TLS 포인터 회수</td>
+<td>worker EventBuffer 쓰기와 collector 읽기의 완전한 handoff</td>
+</tr>
+</tbody></table></div>
 <p>현재 코드에서 추적된 대기 전파:</p>
-<pre class="mermaid">flowchart LR
+<pre><code class="language-mermaid">flowchart LR
     GT[&quot;GT 구조 변경&quot;] --&gt;|&quot;sceneStructureMutex&quot;| PT[&quot;Editor PT PresentFrame&quot;]
     PT --&gt;|&quot;Present ticket 대기&quot;| RHI[&quot;RHI FIFO&quot;]
     RT[&quot;RT 기록 / BeginFrame&quot;] --&gt;|&quot;이전 submission ticket 대기&quot;| RHI
@@ -462,13 +810,11 @@
     RT --&gt;|&quot;fence 재사용 대기&quot;| GPU[&quot;GPU&quot;]
     RHI --&gt;|&quot;일부 lifecycle drain&quot;| GPU
     GT --&gt;|&quot;DrainAIUpdate&quot;| AI[&quot;AI async&quot;]
-    PT --&gt;|&quot;GT가 구조 잠금 보유 시&quot;| GT</pre>
+    PT --&gt;|&quot;GT가 구조 잠금 보유 시&quot;| GT
+</code></pre>
 <p>이 그림은 <strong>조건별 대기 방향을 모은 지도</strong>다. GT↔PT의 양방향은 mutex 획득 경쟁을 뜻하며 동시에 성립하는 교착 증명이 아니다. <code>renderStateMutex → displayLifetimeMutex</code> 같은 중첩과 PT의 display 조회도 존재한다. 완전한 lock-order 증명은 별도 필드·모든 호출 경로 감사가 필요하다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-8-종료-구조">
-<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-종료-구조">8. 종료 구조</h2></div>
-<div class="prose"><pre class="mermaid">flowchart TD
+<h2>8. 종료 구조</h2>
+<pre><code class="language-mermaid">flowchart TD
     STOP[&quot;GT 메시지 루프 종료&lt;br/&gt;새 frame 발행 중단&quot;] --&gt; HOST[&quot;호스트 명령 서비스 종료&lt;br/&gt;수신 중단 / client workers 회수&quot;]
     HOST --&gt; CLR[&quot;ClrHost Shutdown&quot;]
     CLR --&gt; PT[&quot;PT stop 요청 / wake / join&lt;br/&gt;미소비 표시 요청은 종료 집계&quot;]
@@ -482,17 +828,15 @@
     RJ --&gt; BOOT[&quot;호스트 및 bootstrap 정리&lt;br/&gt;Scene / Physics / Data 등 destroy&quot;]
     KEEP --&gt; BOOT
     BOOT --&gt; EXIT[&quot;프로세스 종료&quot;]
-    AUDIO[&quot;별도 잔여 위험&lt;br/&gt;오디오 detached 무한 루프&quot;] -. &quot;정상 stop/join 경로 미연결&quot; .-&gt; EXIT</pre>
+    AUDIO[&quot;별도 잔여 위험&lt;br/&gt;오디오 detached 무한 루프&quot;] -. &quot;정상 stop/join 경로 미연결&quot; .-&gt; EXIT
+</code></pre>
 <p>호스트별 세부 순서는 동일하지 않다. 위는 공통 골격에 Editor 정리를 펼쳤다. Editor는 App::Finalize에서 CLI를 먼저 종료하고 EditorMain::Finalize로 들어간다. Player의 최종 순서는 PlayerMain::Finalize를 따르며 <code>ShutdownLive</code> 뒤에 <code>GetImGuiHost().Shutdown()</code>도 호출한다. RHI의 client 수는 Scene renderer 외 표시 셸도 포함할 수 있어, <code>ShutdownLive</code>만으로 즉시 공용 RHI thread가 사라진다고 단정하면 안 된다. <code>RenderScene::Finalize</code>에서 애니메이션 풀을 먼저 회수하고, 이후 Scene Decommissioning이 객체 파괴와 공용 WorkerPool 종료를 진행한다. S02–S03, S12, S24, S32.</p>
 <p>현재 <code>Scene::EndFramePass</code>는 기존 AI를 회수한 뒤 조건이 맞으면 새 AI를 시작한다. 이 함수가 씬 전환·Decommissioning에도 사용되므로, 종료 감사에서는 첫 drain뿐 아니라 <strong>새 AI 발행 조건과 최종 Scene destructor의 drain</strong>까지 포함해야 한다. S15.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-9-확인된-설계-문제와-추가-검증이-필요한-위험">
-<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-확인된-설계-문제와-추가-검증이-필요한-위험">9. 확인된 설계 문제와 추가 검증이 필요한 위험</h2></div>
-<div class="prose"><p>아래 “확인”은 구현/실행 순서로 확인한 설계 성질을 의미한다. 실제 실행에서 크래시나 hang을 재현했다는 뜻은 아니다.</p>
-<h3 id="91-corethreadpool-완료-이벤트-경쟁--구현상-가능-영향-큼">9.1 Core.ThreadPool 완료 이벤트 경쟁 — 구현상 가능, 영향 큼</h3>
+<h2>9. 확인된 설계 문제와 추가 검증이 필요한 위험</h2>
+<p>아래 “확인”은 구현/실행 순서로 확인한 설계 성질을 의미한다. 실제 실행에서 크래시나 hang을 재현했다는 뜻은 아니다.</p>
+<h3>9.1 Core.ThreadPool 완료 이벤트 경쟁 — 구현상 가능, 영향 큼</h3>
 <p><code>Enqueue</code>의 <code>taskCount.fetch_add</code>와 <code>ResetEvent</code>, worker의 <code>fetch_sub</code>와 <code>SetEvent</code>가 하나의 세대/상태 전이로 묶이지 않는다. 다음 실행 순서가 가능하다.</p>
-<pre class="mermaid">sequenceDiagram
+<pre><code class="language-mermaid">sequenceDiagram
     participant W as Worker: 이전 작업 A
     participant P as Producer: 새 작업 B
     participant C as Caller: Wait
@@ -503,7 +847,8 @@
     W-&gt;&gt;W: 이전 A에 대한 SetEvent
     C-&gt;&gt;C: count는 1임을 확인
     C-&gt;&gt;C: WaitForSingleObject가 즉시 반환
-    Note over P,C: B가 미완료여도 완료처럼 관측 가능</pre>
+    Note over P,C: B가 미완료여도 완료처럼 관측 가능
+</code></pre>
 <p>이는 동일 생산자가 순차로 작업을 제출하더라도 worker가 제출 사이에 count를 0으로 만들 수 있어 배제되지 않는다. atomic count와 OS event를 함께 쓴다는 사실만으로 batch barrier가 되지 않는다. 애니메이션의 수명·commit 계약이 이 완료 판단에 의존한다는 점에서 단순 성능 문제가 아니다. S07.</p>
 <p>추가 계약 문제:</p>
 <ul>
@@ -515,12 +860,12 @@
 <li>생성자에서 worker를 시작한 뒤 init/exit callback setter를 제공한다. worker 시작 전 callback 설정·동기화 계약이 없다. 제품에서 setter 사용은 검색되지 않았지만 범용 API로는 결함이다.</li>
 <li>기본 우선순위는 <code>THREAD_PRIORITY_HIGHEST</code>, 기본 worker 수는 논리 프로세서 수다. 다른 풀/전용 스레드와 공통 CPU 예산이 없다. 실제 starvation 정도는 미측정이다.</li>
 </ul>
-<h3 id="92-오디오-종료--stopjoin-부재-확인">9.2 오디오 종료 — stop/join 부재 확인</h3>
+<h3>9.2 오디오 종료 — stop/join 부재 확인</h3>
 <p>SoundLoaderThread는 <code>while(true)</code>로 돌고 detach된다. <code>_isSoundLoaderThreadRunning</code>은 thread 생존이 아니라 <code>LoadSounds</code> 함수 실행 구간에서만 토글된다. destructor의 polling은 thread 종료를 기다리는 것이 아니다. 초기값 true이고 로드가 한 번도 발생하지 않는 조건에서는 polling이 끝나지 않을 수 있고, false를 보고 destructor가 진행해도 detached loop는 계속 <code>this</code>와 FMOD 상태에 접근할 수 있다. S23.</p>
 <p>범용 런타임으로 옮길 때에는 주기적 서비스의 stop 요청, 현재 I/O 완료, 재예약 금지, 소유자 해제를 하나의 수명 계약으로 표현해야 한다.</p>
-<h3 id="93-rhi-retirement-polling--유휴-busy-loop-가능-확인">9.3 RHI retirement polling — 유휴 busy-loop 가능 확인</h3>
+<h3>9.3 RHI retirement polling — 유휴 busy-loop 가능 확인</h3>
 <p>RHI Run의 <code>wait_for(1ms, predicate)</code> predicate에 <code>!retirements.empty()</code>가 들어 있다. GPU 미완료 retirement만 있고 실행할 queue entry가 없으면 predicate가 계속 true이므로 1ms 대기를 하지 않고 완료 조회 루프를 반복할 수 있다. 단순히 “1ms polling”이라고 설명하면 부정확하다. 실제 CPU 비용은 미측정이다. S12의 213–235행.</p>
-<h3 id="94-공유-상태-위험--구조-확인-데이터-경쟁-재현은-미수행">9.4 공유 상태 위험 — 구조 확인, 데이터 경쟁 재현은 미수행</h3>
+<h3>9.4 공유 상태 위험 — 구조 확인, 데이터 경쟁 재현은 미수행</h3>
 <ul>
 <li><strong>AI live 읽기:</strong> map snapshot 이후 Entity/Transform/bounds 읽기가 GT와 중첩 가능하다. 객체 수명 barrier가 값 접근 동기화를 대체하지 않는다.</li>
 <li><strong>Editor UI:</strong> PT 구조 mutex는 GT의 일반 Update와 packet 캡처 전체를 포괄하지 않는다. GUI가 읽고 쓰는 필드별 ownership/queue 적용 여부를 확인해야 한다.</li>
@@ -529,12 +874,9 @@
 <li><strong>명령 stdin 종료:</strong> CancelSynchronousIo 후 500ms 완료 대기, 실패 시 detach fallback이 남아 있다. 선택적 stdin 경로의 잔여 수명 위험이다. S21.</li>
 </ul>
 <p>이 항목들은 이번 작업에서 수정하지 않았다. 잠금 추가나 순서 변경은 외부 동작을 바꾸므로 별도 구현·회귀 검증 대상으로 남긴다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-10-범용-태스크-그래프-런타임에-요구되는-구조">
-<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-범용-태스크-그래프-런타임에-요구되는-구조">10. 범용 태스크 그래프 런타임에 요구되는 구조</h2></div>
-<div class="prose"><p>현재 동기화 분석에서 도출되는 요구 사항이다. 아래는 <strong>제안 구조이며 현재 구현이 아니다.</strong></p>
-<pre class="mermaid">flowchart TB
+<h2>10. 범용 태스크 그래프 런타임에 요구되는 구조</h2>
+<p>현재 동기화 분석에서 도출되는 요구 사항이다. 아래는 <strong>제안 구조이며 현재 구현이 아니다.</strong></p>
+<pre><code class="language-mermaid">flowchart TB
     API[&quot;범용 API&lt;br/&gt;단일 task / task group / parallel-for&lt;br/&gt;정적 그래프 / 동적 하위 작업&quot;] --&gt; RUN[&quot;실행 인스턴스&lt;br/&gt;의존성 카운터 / 완료 / 예외 / 취소&lt;br/&gt;그래프 정의와 수명 분리&quot;]
     RUN --&gt; READY[&quot;준비된 작업 분류&quot;]
     READY --&gt; CPU[&quot;CPU executor&lt;br/&gt;고정 워커 / local deque / work stealing&quot;]
@@ -545,28 +887,77 @@
     CPU --&gt; DONE[&quot;completion publication&quot;]
     AFF --&gt; DONE
     EXT --&gt; DONE
-    DONE --&gt; RUN</pre>
-<div class="table-scroll"><table>
-<thead><tr><th>현재 경계</th><th>범용 런타임에 필요한 기능</th><th>단순 스레드 풀 교체로 해결 여부</th></tr></thead>
-<tbody><tr><td>animation/asset 전체 풀 대기</td><td>실행별 TaskGroup 완료와 정확한 publication</td><td>아니오</td></tr>
-<tr><td>Foliage async fan-out</td><td>parallel-for, grain size, persistent workers</td><td><span class="chip info">주요 부분 가능</span></td></tr>
-<tr><td>부모→자식 Transform</td><td>의존성 또는 subtree 분할, serial cutoff</td><td>작업 분해 수정 필요</td></tr>
-<tr><td>raw pointer 작업 창</td><td>structured lifetime 또는 generation/ownership token</td><td>아니오</td></tr>
-<tr><td>GT pose/Scene 반영</td><td>지정 스레드 continuation, frame-budget pump</td><td>아니오</td></tr>
-<tr><td>RT 기록 작업</td><td>작업별 command context, 논리 제출 순서</td><td>풀만 바꾸면 순서·소유권 위반 가능</td></tr>
-<tr><td><span class="chip ok">GPU 완료</span></td><td>외부 completion source, 자원 retirement</td><td><span class="chip ok">CPU 완료 카운터로 대체 불가</span></td></tr>
-<tr><td>최신 frame 병합</td><td>mailbox/admission 정책</td><td>그래프 의존성 밖의 명시 정책 필요</td></tr>
-<tr><td>RHI FIFO 및 lifecycle</td><td>serial executor, owner generation, drain</td><td>임의 stealing 대상 아님</td></tr>
-<tr><td>HTTP/I/O/managed await</td><td>외부 완료·지정 스레드 재개 adapter</td><td>CPU 워커에서 blocking하면 역효과 가능</td></tr>
-<tr><td>shutdown</td><td>admission close → drain/cancel → join → resource destroy</td><td>명시 수명 모델 필요</td></tr></tbody></table></div>
+    DONE --&gt; RUN
+</code></pre>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>현재 경계</th>
+<th>범용 런타임에 필요한 기능</th>
+<th>단순 스레드 풀 교체로 해결 여부</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>animation/asset 전체 풀 대기</td>
+<td>실행별 TaskGroup 완료와 정확한 publication</td>
+<td>아니오</td>
+</tr>
+<tr>
+<td>Foliage async fan-out</td>
+<td>parallel-for, grain size, persistent workers</td>
+<td>주요 부분 가능</td>
+</tr>
+<tr>
+<td>부모→자식 Transform</td>
+<td>의존성 또는 subtree 분할, serial cutoff</td>
+<td>작업 분해 수정 필요</td>
+</tr>
+<tr>
+<td>raw pointer 작업 창</td>
+<td>structured lifetime 또는 generation/ownership token</td>
+<td>아니오</td>
+</tr>
+<tr>
+<td>GT pose/Scene 반영</td>
+<td>지정 스레드 continuation, frame-budget pump</td>
+<td>아니오</td>
+</tr>
+<tr>
+<td>RT 기록 작업</td>
+<td>작업별 command context, 논리 제출 순서</td>
+<td>풀만 바꾸면 순서·소유권 위반 가능</td>
+</tr>
+<tr>
+<td>GPU 완료</td>
+<td>외부 completion source, 자원 retirement</td>
+<td>CPU 완료 카운터로 대체 불가</td>
+</tr>
+<tr>
+<td>최신 frame 병합</td>
+<td>mailbox/admission 정책</td>
+<td>그래프 의존성 밖의 명시 정책 필요</td>
+</tr>
+<tr>
+<td>RHI FIFO 및 lifecycle</td>
+<td>serial executor, owner generation, drain</td>
+<td>임의 stealing 대상 아님</td>
+</tr>
+<tr>
+<td>HTTP/I/O/managed await</td>
+<td>외부 완료·지정 스레드 재개 adapter</td>
+<td>CPU 워커에서 blocking하면 역효과 가능</td>
+</tr>
+<tr>
+<td>shutdown</td>
+<td>admission close → drain/cancel → join → resource destroy</td>
+<td>명시 수명 모델 필요</td>
+</tr>
+</tbody></table></div>
 <p>권장 분리는 <strong>그래프 정의 → 실행 인스턴스 → ready-task 실행기</strong>다. 단일 작업·task group은 불필요한 그래프 구성 비용 없이 제출할 수 있게 하고, 반복 그래프는 topology를 재사용하되 실행마다 카운터·결과·취소 상태를 분리한다. CPU 작업은 워크스틸링으로 배분하고 스레드 소유권·외부 완료는 adapter로 연결한다.</p>
 <p>외부 종속 축소 범위도 분리해야 한다. Core.ThreadPool의 PPL 큐를 없애더라도 <code>ProxyCommandQueue</code>와 Editor texture import queue 등의 <code>concurrency::concurrent_queue</code>, STL 병렬 실행, PhysX/CoreCLR 내부 실행 자원은 남는다. 새 런타임의 핵심을 표준 C++와 플랫폼 대기 계층으로 작성하는 일과, 엔진 전체의 기존 동시성 종속을 단계적으로 치환하는 일은 별도 범위다.</p>
 <p>성능 이득의 구조적 원천은 새 thread 생성 축소, 여러 CPU 작업군의 worker 예산 공유, 정적 분배의 긴 꼬리 완화, 불필요한 전체 완료 대기의 세분화다. 물리/Scene의 실제 선후 관계, GPU 실행 시간, 외부 I/O 대기 자체가 그래프로 사라지는 것은 아니다. 현재 소스만으로 이득의 크기나 우선순위를 수치로 확정하지 않는다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-11-확인-방법과-검증-상태">
-<div class="sec-head"><p class="ve-label">§11</p><h2 id="11-확인-방법과-검증-상태">11. 확인 방법과 검증 상태</h2></div>
-<div class="prose"><ul>
+<h2>11. 확인 방법과 검증 상태</h2>
+<ul>
 <li>PowerShell 파일 검색으로 thread/async/parallel/mutex/spinlock/CV/event/future/queue 호출을 조사하고, 위 source map의 실제 함수 본문을 읽었다.</li>
 <li><code>Tools/regression/verify-frame-orchestration.ps1</code>: <strong>PASS</strong>. Runtime 단일 프레임 순서와 두 호스트 호출 관계를 검사하는 정적 gate다. 동시성 안전성 증명은 아니다.</li>
 <li>Mermaid 블록 구문 및 source map 파일 경로는 문서 작성 후 별도 검사했다. 결과는 아래 검증 기록에 남긴다.</li>
@@ -574,84 +965,517 @@
 <li><code>verify-shutdown-order.ps1</code>의 설명에는 옛 <code>Dx11Main</code>/CB 용어가 남아 있다. 현재 호스트 RT/PT 소스와 대조해야 한다.</li>
 <li>이전 Transform 메모는 탐색 단서로만 사용했다. 현재 구조는 이 문서 기준 commit에서 다시 확인했고 과거 성능 수치를 재사용하지 않았다.</li>
 </ul>
-<h3 id="문서-검증-기록">문서 검증 기록</h3>
+<h3>문서 검증 기록</h3>
 <p>Mermaid 11개 블록 parser 검사 PASS. source map의 상대 파일 링크는 존재 여부를 검사했다. HTML/SVG 시각 렌더링 검증이나 엔진 런타임 검증을 수행했다는 뜻은 아니다. 문서 도구는 임시 디렉터리에 설치했고 저장소 패키지/빌드 설정은 변경하지 않았다.</p>
-</div>
-</section>
-<section class="doc-sec" id="sec-12-소스-근거-지도">
-<div class="sec-head"><p class="ve-label">§12</p><h2 id="12-소스-근거-지도">12. 소스 근거 지도</h2></div>
-<div class="prose"><p>행 번호는 위 기준 commit의 번호다. 링크는 저장소 내 상대 경로이며 이후 코드 변경으로 행 번호가 이동할 수 있다.</p>
-<div class="table-scroll"><table>
-<thead><tr><th>ID</th><th>소스와 위치</th><th>확인 내용</th></tr></thead>
-<tbody><tr><td>S01</td><td><a href="../../Engine/Utility_Framework/CoreWindow.h">CoreWindow.h</a> 69–98; <a href="../../Editor/EngineEntry/App.cpp">App.cpp</a> 232–325</td><td>GT 루프, asset/CLI drain, packet 발행</td></tr>
-<tr><td>S02</td><td><a href="../../Editor/EngineEntry/EditorMain.cpp">EditorMain.cpp</a> 252–468, 492–610</td><td>PT, 구조 mutex, 프레임 끝, 종료</td></tr>
-<tr><td>S03</td><td><a href="../../Player/PlayerMain.cpp">PlayerMain.cpp</a> 275–490; <a href="../../Player/PlayerApp.cpp">PlayerApp.cpp</a> 265–309</td><td>Player PT, command pump, packet 발행</td></tr>
-<tr><td>S04</td><td><a href="../../Engine/SceneRuntime/RuntimeFrame.cpp">RuntimeFrame.cpp</a> 16–91</td><td>관리 pre/post, pause, Physics/GameLogic 순서</td></tr>
-<tr><td>S05</td><td><a href="../../Engine/SceneRuntime/SceneManager.cpp">SceneManager.cpp</a> 328–547; <a href="../../Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 2557–2790</td><td>활성화·시뮬레이션·파괴 단계</td></tr>
-<tr><td>S06</td><td><a href="../../Engine/SceneRuntime/AnimationJob.cpp">AnimationJob.cpp</a> 37–193, 532–537, 645–650</td><td>Animator snapshot, fan-out/join, pose와 event</td></tr>
-<tr><td>S07</td><td><a href="../../Engine/Utility_Framework/Core.ThreadPool.h">Core.ThreadPool.h</a> 20–150; <a href="../../Engine/Utility_Framework/Core.CountingSemaphore.h">Core.CountingSemaphore.h</a>; <a href="../../Engine/Utility_Framework/Core.Thread.h">Core.Thread.h</a></td><td>task count/event, semaphore, OS thread 수명</td></tr>
-<tr><td>S08</td><td><a href="../../Engine/Utility_Framework/WorkerPool.h">WorkerPool.h</a> 27–61; <a href="../../Engine/RenderEngine/DataSystem.cpp">DataSystem.cpp</a> 1661–1692</td><td>공용 풀과 실제 bundle 소비</td></tr>
-<tr><td>S09</td><td><a href="../../Engine/SceneRuntime/FoliageSystem.cpp">FoliageSystem.cpp</a> 35–73; <a href="../../Engine/SceneRuntime/FoliageComponent.cpp">FoliageComponent.cpp</a> 315–403</td><td>매 component async 범위 분할</td></tr>
-<tr><td>S10</td><td><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">EnhancedSceneRenderer.cpp</a> 807–858, 3923–4180, 4396–4570, 4626–4654</td><td>RT 큐·epoch·발행·상태 소유</td></tr>
-<tr><td>S11</td><td><a href="../../Engine/RenderEngine/ProxyCommandQueue.h">ProxyCommandQueue.h</a> 45–173; <a href="../../Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 1895–2089; <a href="../../Engine/SceneRuntime/ProxyCommand.cpp">ProxyCommand.cpp</a></td><td>dirty commit, queue, epoch 처리</td></tr>
-<tr><td>S12</td><td><a href="../../Engine/RenderEngine/RHI/RHISubmissionThread.h">RHISubmissionThread.h</a> 117; <a href="../../Engine/RenderEngine/RHI/RHISubmissionThread.cpp">RHISubmissionThread.cpp</a> 178–297, 357–574, 591 이후</td><td>capacity 3, ticket/retirement/lifecycle</td></tr>
-<tr><td>S13</td><td><a href="../../Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp">DX12DeviceResources.cpp</a> 515–537, 598–879, 1383 이후</td><td>slot fence, submit, Present, GPU drain</td></tr>
-<tr><td>S14</td><td><a href="../../Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp">VulkanDeviceResources.cpp</a> 655–664, 759 이후, 1222–1291, 1518 이후</td><td>timeline, submit, lifecycle, Present</td></tr>
-<tr><td>S15</td><td><a href="../../Engine/SceneRuntime/AIManager.cpp">AIManager.cpp</a> 34–87; <a href="../../Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 361, 851–855, 1624, 2559–2562, 2753–2790</td><td>AI snapshot, ready poll, lifetime drain</td></tr>
-<tr><td>S16</td><td><a href="../../Engine/Physics/Physx.cpp">Physx.cpp</a> 165–173, 441–453; <a href="../../Engine/SceneRuntime/PhysicsManager.cpp">PhysicsManager.cpp</a> 76–105</td><td>dispatcher, simulate/fetch, GT 반영</td></tr>
-<tr><td>S17</td><td><a href="../../Engine/SceneRuntime/SceneManager.cpp">SceneManager.cpp</a> 387–414, 936–1268</td><td>async load, DDOL 접근, 활성화</td></tr>
-<tr><td>S18</td><td><a href="../../Editor/EngineEntry/EditorModelPlacement.cpp">EditorModelPlacement.cpp</a> 25–134, 175–315</td><td>준비/GT 적용, ready, 취소·join</td></tr>
-<tr><td>S19</td><td><a href="../../Editor/EngineEntry/EditorDirectoryWatcher.cpp">EditorDirectoryWatcher.cpp</a> 193–281, 340–365, 589 이후; <a href="../../Engine/RenderEngine/DataSystem.cpp">DataSystem.cpp</a> 1496–1528</td><td>I/O 취소, asset 전달</td></tr>
-<tr><td>S20</td><td><a href="../../Engine/RenderEngine/RHI/DX12/DX12PSOManager.cpp">DX12PSOManager.cpp</a> 275–299, 580–590, 681–727</td><td>async API, poll, 잠금 밖 future 회수</td></tr>
-<tr><td>S21</td><td><a href="../../Engine/CommandService/CommandService.cpp">CommandService.cpp</a> 133–266, 599 이후; <a href="../../Editor/EngineEntry/EditorCommandServiceHost.cpp">EditorCommandServiceHost.cpp</a> 194–250; <a href="../../Editor/EngineEntry/ConsoleCommandSystem.cpp">ConsoleCommandSystem.cpp</a> 487–510, 4594–4645; <a href="../../Player/PlayerCommandService.cpp">PlayerCommandService.cpp</a></td><td>socket/command/result, stdin 종료</td></tr>
-<tr><td>S22</td><td><a href="../../ScriptCore/GameThreadSynchronizationContext.cs">GameThreadSynchronizationContext.cs</a>; <a href="../../ScriptCore/ScriptRegistry.cs">ScriptRegistry.cs</a> 538, 690; <a href="../../ScriptCore/Native.cs">Native.cs</a> 341–393; <a href="../../Engine/SceneRuntime/ClrHost.cpp">ClrHost.cpp</a> 2984–3017, 3161–3171</td><td>관리 재개와 엔진 진입 경계</td></tr>
-<tr><td>S23</td><td><a href="../../Engine/SceneRuntime/SoundManager.cpp">SoundManager.cpp</a> 10–44, 99–141; <a href="../../Engine/SceneRuntime/SoundManager.h">SoundManager.h</a> 107–114</td><td>detached loader, 상태 flag와 종료 불일치</td></tr>
-<tr><td>S24</td><td><a href="../../Editor/EngineEntry/EngineBootstrap.h">EngineBootstrap.h</a> 178–246; <a href="../../Editor/EngineEntry/ProgressWindow.h">ProgressWindow.h</a>; <a href="../../Editor/EngineEntry/App.cpp">App.cpp</a> 168–180</td><td>bootstrap/호스트 수명</td></tr>
-<tr><td>S25</td><td><a href="../../Engine/Utility_Framework/Delegate.inl">Delegate.inl</a> 93–146</td><td>snapshot과 동기 callback</td></tr>
-<tr><td>S26</td><td><a href="../../Engine/SceneRuntime/AnimationEventBridge.cpp">AnimationEventBridge.cpp</a> 145 이후</td><td>worker clip event → 관리 메시지 큐</td></tr>
-<tr><td>S27</td><td><a href="../../Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 4119–4360, 4723 이후, 4936–5048; <a href="../../Engine/RenderEngine/Experiment/Import/TangentGeneration.cpp">TangentGeneration.cpp</a> 347–382</td><td>dirty range, fallback, targeted pull, import 병렬</td></tr>
-<tr><td>S28</td><td><a href="../../Engine/EngineDiagnostics/Profiler.cpp">Profiler.cpp</a> 52–76, 96–169, 253–300; <a href="../../Engine/EngineDiagnostics/Profiler.h">Profiler.h</a></td><td>TLS 기록과 수집, registry 잠금</td></tr>
-<tr><td>S29</td><td><a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp">EnhancedRenderGraph.cpp</a> 691–818; <a href="../../Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp">DX12CommandListPool.cpp</a> 81–184; <a href="../../Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp">VulkanCommandBufferPool.cpp</a> 93–147</td><td>정적 기록 분배, 단일 배치 join</td></tr>
-<tr><td>S30</td><td><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">EnhancedSceneRenderer.cpp</a> 587 이후, 911–1010, 4934–4994, 5095–5195, 5250–5281; <a href="../../Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp">ImGuiDx12Shell.cpp</a> 451–687; <a href="../../Editor/HostImGuiPresentation/RHI/Vulkan/ImGuiVulkanShell.cpp">ImGuiVulkanShell.cpp</a> 410–527</td><td>GPU 완료 승격, 뷰 저장소, 표시</td></tr>
-<tr><td>S31</td><td><a href="../../Engine/RenderEngine/AssetJob.cpp">AssetJob.cpp</a>; <a href="../../Engine/RenderEngine/AssetJob.h">AssetJob.h</a>; <a href="../../Engine/RenderEngine/DataSystem.h">DataSystem.h</a> 323</td><td>호출 미확인 잔존 풀/스레드 선언</td></tr>
-<tr><td>S32</td><td><a href="../../Engine/RenderEngine/RenderScene.cpp">RenderScene.cpp</a> 17–32; <a href="../../Engine/RenderEngine/RenderScene.h">RenderScene.h</a> 133</td><td>AnimationJob 소유와 풀 회수</td></tr></tbody></table></div>
-</div>
-</section>
-<section class="sources" aria-label="출처">
-<p class="ve-label">출처</p>
-<p><a href="EngineSynchronizationArchitecture.md"><code>docs/analysis/EngineSynchronizationArchitecture.md</code></a> · 마지막 커밋 2026-09-07 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
-</section>
-</main>
-</div>
-<script>
-(() => {
-  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
-  if (links.length) {
-    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
-    const spy = new IntersectionObserver(entries => {
-      for (const e of entries) if (e.isIntersecting) {
-        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
-      }
-    }, { rootMargin: '0px 0px -70% 0px' });
-    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
-  }
-  if (still) return;
-  document.documentElement.classList.add('js-motion');
-  const io = new IntersectionObserver(entries => {
-    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
-  }, { rootMargin: '0px 0px -5% 0px' });
-  for (const el of document.querySelectorAll('main > *')) io.observe(el);
-})();
-</script>
+<h2>12. 소스 근거 지도</h2>
+<p>행 번호는 위 기준 commit의 번호다. 링크는 저장소 내 상대 경로이며 이후 코드 변경으로 행 번호가 이동할 수 있다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>소스와 위치</th>
+<th>확인 내용</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>S01</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/CoreWindow.h">CoreWindow.h</a> 69–98; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp">App.cpp</a> 232–325</td>
+<td>GT 루프, asset/CLI drain, packet 발행</td>
+</tr>
+<tr>
+<td>S02</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorMain.cpp">EditorMain.cpp</a> 252–468, 492–610</td>
+<td>PT, 구조 mutex, 프레임 끝, 종료</td>
+</tr>
+<tr>
+<td>S03</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerMain.cpp">PlayerMain.cpp</a> 275–490; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerApp.cpp">PlayerApp.cpp</a> 265–309</td>
+<td>Player PT, command pump, packet 발행</td>
+</tr>
+<tr>
+<td>S04</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/RuntimeFrame.cpp">RuntimeFrame.cpp</a> 16–91</td>
+<td>관리 pre/post, pause, Physics/GameLogic 순서</td>
+</tr>
+<tr>
+<td>S05</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp">SceneManager.cpp</a> 328–547; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 2557–2790</td>
+<td>활성화·시뮬레이션·파괴 단계</td>
+</tr>
+<tr>
+<td>S06</td>
+<td>AnimationJob.cpp (<code>../../Engine/SceneRuntime/AnimationJob.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 37–193, 532–537, 645–650</td>
+<td>Animator snapshot, fan-out/join, pose와 event</td>
+</tr>
+<tr>
+<td>S07</td>
+<td>Core.ThreadPool.h (<code>../../Engine/Utility_Framework/Core.ThreadPool.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 20–150; Core.CountingSemaphore.h (<code>../../Engine/Utility_Framework/Core.CountingSemaphore.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조); Core.Thread.h (<code>../../Engine/Utility_Framework/Core.Thread.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)</td>
+<td>task count/event, semaphore, OS thread 수명</td>
+</tr>
+<tr>
+<td>S08</td>
+<td>WorkerPool.h (<code>../../Engine/Utility_Framework/WorkerPool.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 27–61; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp">DataSystem.cpp</a> 1661–1692</td>
+<td>공용 풀과 실제 bundle 소비</td>
+</tr>
+<tr>
+<td>S09</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/FoliageSystem.cpp">FoliageSystem.cpp</a> 35–73; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/FoliageComponent.cpp">FoliageComponent.cpp</a> 315–403</td>
+<td>매 component async 범위 분할</td>
+</tr>
+<tr>
+<td>S10</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">EnhancedSceneRenderer.cpp</a> 807–858, 3923–4180, 4396–4570, 4626–4654</td>
+<td>RT 큐·epoch·발행·상태 소유</td>
+</tr>
+<tr>
+<td>S11</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ProxyCommandQueue.h">ProxyCommandQueue.h</a> 45–173; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 1895–2089; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ProxyCommand.cpp">ProxyCommand.cpp</a></td>
+<td>dirty commit, queue, epoch 처리</td>
+</tr>
+<tr>
+<td>S12</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.h">RHISubmissionThread.h</a> 117; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHISubmissionThread.cpp">RHISubmissionThread.cpp</a> 178–297, 357–574, 591 이후</td>
+<td>capacity 3, ticket/retirement/lifecycle</td>
+</tr>
+<tr>
+<td>S13</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp">DX12DeviceResources.cpp</a> 515–537, 598–879, 1383 이후</td>
+<td>slot fence, submit, Present, GPU drain</td>
+</tr>
+<tr>
+<td>S14</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp">VulkanDeviceResources.cpp</a> 655–664, 759 이후, 1222–1291, 1518 이후</td>
+<td>timeline, submit, lifecycle, Present</td>
+</tr>
+<tr>
+<td>S15</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AIManager.cpp">AIManager.cpp</a> 34–87; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 361, 851–855, 1624, 2559–2562, 2753–2790</td>
+<td>AI snapshot, ready poll, lifetime drain</td>
+</tr>
+<tr>
+<td>S16</td>
+<td>Physx.cpp (<code>../../Engine/Physics/Physx.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 165–173, 441–453; PhysicsManager.cpp (<code>../../Engine/SceneRuntime/PhysicsManager.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 76–105</td>
+<td>dispatcher, simulate/fetch, GT 반영</td>
+</tr>
+<tr>
+<td>S17</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.cpp">SceneManager.cpp</a> 387–414, 936–1268</td>
+<td>async load, DDOL 접근, 활성화</td>
+</tr>
+<tr>
+<td>S18</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorModelPlacement.cpp">EditorModelPlacement.cpp</a> 25–134, 175–315</td>
+<td>준비/GT 적용, ready, 취소·join</td>
+</tr>
+<tr>
+<td>S19</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorDirectoryWatcher.cpp">EditorDirectoryWatcher.cpp</a> 193–281, 340–365, 589 이후; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp">DataSystem.cpp</a> 1496–1528</td>
+<td>I/O 취소, asset 전달</td>
+</tr>
+<tr>
+<td>S20</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PSOManager.cpp">DX12PSOManager.cpp</a> 275–299, 580–590, 681–727</td>
+<td>async API, poll, 잠금 밖 future 회수</td>
+</tr>
+<tr>
+<td>S21</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/CommandService/CommandService.cpp">CommandService.cpp</a> 133–266, 599 이후; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorCommandServiceHost.cpp">EditorCommandServiceHost.cpp</a> 194–250; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp">ConsoleCommandSystem.cpp</a> 487–510, 4594–4645; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/PlayerCommandService.cpp">PlayerCommandService.cpp</a></td>
+<td>socket/command/result, stdin 종료</td>
+</tr>
+<tr>
+<td>S22</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/GameThreadSynchronizationContext.cs">GameThreadSynchronizationContext.cs</a>; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/ScriptRegistry.cs">ScriptRegistry.cs</a> 538, 690; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs">Native.cs</a> 341–393; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.cpp">ClrHost.cpp</a> 2984–3017, 3161–3171</td>
+<td>관리 재개와 엔진 진입 경계</td>
+</tr>
+<tr>
+<td>S23</td>
+<td>SoundManager.cpp (<code>../../Engine/SceneRuntime/SoundManager.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 10–44, 99–141; SoundManager.h (<code>../../Engine/SceneRuntime/SoundManager.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 107–114</td>
+<td>detached loader, 상태 flag와 종료 불일치</td>
+</tr>
+<tr>
+<td>S24</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RuntimeHost/EngineBootstrap.h">EngineBootstrap.h</a> 178–246; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ProgressWindow.h">ProgressWindow.h</a>; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp">App.cpp</a> 168–180</td>
+<td>bootstrap/호스트 수명</td>
+</tr>
+<tr>
+<td>S25</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.inl">Delegate.inl</a> 93–146</td>
+<td>snapshot과 동기 callback</td>
+</tr>
+<tr>
+<td>S26</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/AnimationEventBridge.cpp">AnimationEventBridge.cpp</a> 145 이후</td>
+<td>worker clip event → 관리 메시지 큐</td>
+</tr>
+<tr>
+<td>S27</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp">Scene.cpp</a> 4119–4360, 4723 이후, 4936–5048; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Experiment/Import/TangentGeneration.cpp">TangentGeneration.cpp</a> 347–382</td>
+<td>dirty range, fallback, targeted pull, import 병렬</td>
+</tr>
+<tr>
+<td>S28</td>
+<td>Profiler.cpp (<code>../../Engine/EngineDiagnostics/Profiler.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 52–76, 96–169, 253–300; Profiler.h (<code>../../Engine/EngineDiagnostics/Profiler.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)</td>
+<td>TLS 기록과 수집, registry 잠금</td>
+</tr>
+<tr>
+<td>S29</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp">EnhancedRenderGraph.cpp</a> 691–818; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12CommandListPool.cpp">DX12CommandListPool.cpp</a> 81–184; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.cpp">VulkanCommandBufferPool.cpp</a> 93–147</td>
+<td>정적 기록 분배, 단일 배치 join</td>
+</tr>
+<tr>
+<td>S30</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">EnhancedSceneRenderer.cpp</a> 587 이후, 911–1010, 4934–4994, 5095–5195, 5250–5281; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp">ImGuiDx12Shell.cpp</a> 451–687; ImGuiVulkanShell.cpp (<code>../../Editor/HostImGuiPresentation/RHI/Vulkan/ImGuiVulkanShell.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조) 410–527</td>
+<td>GPU 완료 승격, 뷰 저장소, 표시</td>
+</tr>
+<tr>
+<td>S31</td>
+<td>AssetJob.cpp (<code>../../Engine/RenderEngine/AssetJob.cpp</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조); AssetJob.h (<code>../../Engine/RenderEngine/AssetJob.h</code> — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조); <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h">DataSystem.h</a> 323</td>
+<td>호출 미확인 잔존 풀/스레드 선언</td>
+</tr>
+<tr>
+<td>S32</td>
+<td><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.cpp">RenderScene.cpp</a> 17–32; <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RenderScene.h">RenderScene.h</a> 133</td>
+<td>AnimationJob 소유와 풀 회수</td>
+</tr>
+</tbody></table></div>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-범위와-결론"></span><span id="10-범용-태스크-그래프-런타임에-요구되는-구조"></span><span id="11-확인-방법과-검증-상태"></span><span id="12-소스-근거-지도"></span><span id="2-전체-스레드-지도"></span><span id="3-gt-프레임의-실제-순서"></span><span id="4-계산-작업과-수명-경계"></span><span id="41-애니메이션"></span><span id="42-ai와-파괴"></span><span id="43-foliage-transform-물리"></span><span id="5-gt--rt--rhi--gpu--표시"></span><span id="51-frame-packet과-proxy-delta"></span><span id="52-명령-기록과-완료의-세-단계"></span><span id="53-backend별-화면-전달-비용"></span><span id="54-표시와-editor-구조-잠금"></span><span id="6-로딩명령관리-코드의-전달-구조"></span><span id="7-잠금완료-계약-지도"></span><span id="8-종료-구조"></span><span id="9-확인된-설계-문제와-추가-검증이-필요한-위험"></span><span id="91-corethreadpool-완료-이벤트-경쟁--구현상-가능-영향-큼"></span><span id="92-오디오-종료--stopjoin-부재-확인"></span><span id="93-rhi-retirement-polling--유휴-busy-loop-가능-확인"></span><span id="94-공유-상태-위험--구조-확인-데이터-경쟁-재현은-미수행"></span><span id="sec-1-범위와-결론"></span><span id="sec-10-범용-태스크-그래프-런타임에-요구되는-구조"></span><span id="sec-11-확인-방법과-검증-상태"></span><span id="sec-12-소스-근거-지도"></span><span id="sec-2-전체-스레드-지도"></span><span id="sec-3-gt-프레임의-실제-순서"></span><span id="sec-4-계산-작업과-수명-경계"></span><span id="sec-5-gt--rt--rhi--gpu--표시"></span><span id="sec-6-로딩명령관리-코드의-전달-구조"></span><span id="sec-7-잠금완료-계약-지도"></span><span id="sec-8-종료-구조"></span><span id="sec-9-확인된-설계-문제와-추가-검증이-필요한-위험"></span><span id="문서-검증-기록"></span></details></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
 
-<script type="module">
-  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
-  const css = getComputedStyle(document.documentElement), v = n => css.getPropertyValue(n).trim();
-  mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict', fontFamily: v('--font-body'),
-    themeVariables: { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'),
-      lineColor: v('--text-dim'), secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') } });
-  await mermaid.run({ querySelector: 'pre.mermaid' });
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
+    }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
+  }
+
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
+  }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
+})();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/look.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
 </script>
-</body>
-</html>
+</body></html>

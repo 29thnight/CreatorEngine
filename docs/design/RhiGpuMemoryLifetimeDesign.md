@@ -1,5 +1,53 @@
 # RHI GPU 메모리·수명 관리 재설계
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.
+- 소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.
+- queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L27) — `virtual void OnUploadSubmitted(uint64_t recordingId,`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L29) — `virtual void OnUploadCompleted(uint64_t completedValue) = 0;`
+- [Engine/RenderEngine/RHI/IRenderDeviceServices.h:80](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/IRenderDeviceServices.h#L80) — `virtual RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) = 0;`
+- [Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:93](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h#L93) — `class RHIPersistentHeapPolicy`
+- [Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:96](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h#L96) — `explicit RHIPersistentHeapPolicy(`
+- [Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:99](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h#L99) — `RHIPersistentHeapPolicy(const RHIPersistentHeapPolicy&) = delete;`
+- [Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h#L15) — `class DX12PersistentHeap`
+- [Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h#L40) — `bool CreateBuffer(const D3D12_RESOURCE_DESC& desc,`
+- [Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h:43](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12PersistentHeap.h#L43) — `bool CreateTexture(const D3D12_RESOURCE_DESC& desc,`
+- [Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h#L98) — `RHIDescriptorVersionAcquire BeginRecording(uint64_t recordingId)`
+- [Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h:168](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h#L168) — `Slot* const slot = FindRecording(recordingId);`
+- [Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h:176](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h#L176) — `completion.IsValid() ? RHIDescriptorVersionState::Pending : RHIDescriptorVersionState::Quarantined;`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h#L13) — `class VulkanPersistentHeap`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h:62](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h#L62) — `bool CreateBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage,`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanPersistentHeap.h#L65) — `bool CreateTexture(const RHITextureDesc& desc,`
+- [Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp:430](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp#L430) — `void DX12UploadSegmentAllocator::SetBudgetForTesting(uint64_t softBudgetBytes, uint64_t largeCacheBudgetBytes,`
+- [Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp:446](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp#L446) — `void DX12UploadSegmentAllocator::Collect(uint64_t completedValue)`
+- [Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp:484](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12UploadRing.cpp#L484) — `bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId, std::span<const RHIUploadRequest> requests,`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1091](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1091) — `bool DX12DeviceResources::FlushCommandList(std::string& outError)`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1101) — `bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::string& outError)`
+- [Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:1371](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp#L1371) — `void DX12DeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion)`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp:446](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp#L446) — `void VulkanUploadSegmentAllocator::Collect(uint64_t completedValue)`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp:472](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp#L472) — `void VulkanUploadSegmentAllocator::BeginRecording(uint64_t recordingId)`
+- [Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp:480](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/Vulkan/VulkanFrameAllocators.cpp#L480) — `bool VulkanUploadSegmentAllocator::ReserveBatch(uint64_t recordingId,`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 작성: 2026-08-14
 
 상태: **Slice A~D 및 Slice E-a descriptor versioned recycler 완료 / SBT는 실제 소비 경로 대기**
@@ -988,3 +1036,5 @@ assetEviction.pressureProtectedRecent / pressureUploadPending
 - [Vulkan Memory Specification](https://docs.vulkan.org/spec/latest/chapters/memory.html)
 - [Vulkan Timeline Semaphores](https://docs.vulkan.org/samples/latest/samples/extensions/timeline_semaphore/README.html)
 - [참고 영상](https://youtu.be/Sew_XGPAVM4?si=LqQsSUOLymmVfqaZ)
+
+</details>

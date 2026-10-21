@@ -1,5 +1,43 @@
 # Editor 엔티티 헤더·여백 후속 조정 (2026-09-12)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-editor-theme.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-theme.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-editor-theme.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36) — `$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)`
+- [ScriptCore/Physics.cs:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L13) — `public struct PhysicsHit`
+- [ScriptCore/Physics.cs:41](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L41) — `public readonly struct PhysicsQueryRequest`
+- [ScriptCore/Physics.cs:65](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Physics.cs#L65) — `public readonly struct PhysicsBatchResult`
+- [Editor/EngineEntry/EditorObjectOperations.h:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L10) — `class Scene;`
+- [Editor/EngineEntry/EditorObjectOperations.h:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L16) — `enum class ValueType : std::uint16_t;`
+- [Editor/EngineEntry/EditorObjectOperations.h:85](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.h#L85) — `CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Editor/EngineEntry/EditorObjectOperations.cpp:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.cpp#L45) — `class EntityLayerCommand final : public Meta::IUndoableCommand`
+- [Editor/EngineEntry/EditorObjectOperations.cpp:54](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.cpp#L54) — `auto found = std::ranges::find_if(m_afterOverrides, [](const auto& item) {`
+- [Editor/EngineEntry/EditorObjectOperations.cpp:61](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorObjectOperations.cpp#L61) — `item.m_valueYaml = std::to_string(after.value);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 변경
 
 - Inspector의 별도 Tag 행을 제거하고 이름 입력칸 오른쪽 끝에 Material Symbols `sell` 태그 버튼을 통합했다.
@@ -45,10 +83,12 @@
 - 검증용 Editor 종료 후 EngineSettings.asset와 imgui.ini를 시작 전 바이트로 복원했다.
 - 변경 파일 `git diff --check`, 대시보드 JavaScript 구문 검사 통과.
 
-화면: [전체 배치](../../Artifacts/phase21-entity-tag/editor-polish.png),
-[선택 태그 체크](../../Artifacts/phase21-entity-tag/tag-selected.png),
-[좁은 Inspector](../../Artifacts/phase21-entity-tag/inspector-narrow.png),
-[Physics Layer](../../Artifacts/phase21-entity-tag/physics-layer.png),
-[분할선](../../Artifacts/phase21-entity-tag/splitter-thin.png).
+화면: 전체 배치 (`../../Artifacts/phase21-entity-tag/editor-polish.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+선택 태그 체크 (`../../Artifacts/phase21-entity-tag/tag-selected.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+좁은 Inspector (`../../Artifacts/phase21-entity-tag/inspector-narrow.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+Physics Layer (`../../Artifacts/phase21-entity-tag/physics-layer.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+분할선 (`../../Artifacts/phase21-entity-tag/splitter-thin.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 
 Vulkan 및 전체 W2-I/W2-B 완료 판정은 이번 범위에 포함하지 않는다.
+
+</details>

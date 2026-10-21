@@ -1,5 +1,41 @@
 # PHASE 12 핵심 파이프라인 검증 — 2026-10-10
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-scene-package.ps1:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-package.ps1#L12) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-scene-package.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-package.ps1#L14) — `$cookRoot = [IO.File]::ReadAllText((Join-Path $output "scene-cook-$Configuration-root.txt")).Trim()`
+- [Tools/regression/verify-material-scene-package.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-scene-package.ps1#L16) — `$caseRoot = Join-Path $output ("ScenePkg-$variant-" + [Guid]::NewGuid().ToString('N'))`
+- [Player/ForbiddenIncludes/DirectXTex.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/DirectXTex.h#L1) — `#pragma once`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Tools/AssetCooker/AssetCooker.cpp:123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L123) — `const auto size = std::filesystem::file_size(path, error);`
+- [Tools/AssetCooker/AssetCooker.cpp:139](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L139) — `while (std::getline(lines, line))`
+- [Tools/AssetCooker/AssetCooker.cpp:156](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetCooker/AssetCooker.cpp#L156) — `tokens.push_back(std::move(token));`
+- [Tools/AssetPacker/AssetPacker.cpp:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetPacker/AssetPacker.cpp#L29) — `throw std::runtime_error(message);`
+- [Tools/AssetPacker/AssetPacker.cpp:48](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetPacker/AssetPacker.cpp#L48) — `if (raw.empty()) Fail(std::string(label) + " path is empty");`
+- [Tools/AssetPacker/AssetPacker.cpp:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/AssetPacker/AssetPacker.cpp#L53) — `Fail(std::string(label) + " uses a device/extended path namespace: " +`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 판정
 
 Release Shipping의 실제 DX12 패키지 실행을 **독립 PNG/HDR 원본이 없는 범위**에서 수용한다. Inspector 배율/도킹 후속은 사용자 요청으로 보류했다. 전체 PHASE 12 완료나 모든 cooked texture의 픽셀 정확도 수용은 아니다.
@@ -30,3 +66,5 @@ Release Shipping의 실제 DX12 패키지 실행을 **독립 PNG/HDR 원본이 �
 PAK에 Prim_Plane.glb 원본은 남는다. 모델 원본 제거·모든 모델 texture 역할 소비, 새 BC5/BC7의 실제 CECT payload를 사용하는 DX12/Vulkan GPU 픽셀 비교, 전체 소비자 행렬은 잔여다. 수정 후 missing/truncated CECT 실패 주입, Debug 제품 재빌드/동일 실행도 이 결과에는 포함하지 않는다. Shipping 프레임 수는 실행 증거이며 성능/품질 측정이 아니다. 다음 우선순위는 CECT payload의 실제 GPU sampling과 실패 주입이다.
 
 기존 T2 잔여 수용 단위를 전부 닫지 않았으므로 추가 가중치 없이13.25/20일=66.25%를 유지한다. T1b 품질/시간/메모리 대기와 T3 중단도 유지한다.
+
+</details>

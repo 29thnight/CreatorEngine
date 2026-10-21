@@ -1,5 +1,50 @@
 # Compatible skeleton and clip decode storage
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- DataSystem의 typed 요청은 resolver 세대와 취소/게시 상태를 보존한다. descriptor·payload·이미지 owner와 frame pin은 분리된 수명이다.
+- ownership_cpp 기반 자원 소유와 논리적 unmount를 GC 객체 수거·GPU 완료와 혼동하지 않는다. DirectXTex cook와 GPU-ready 소비의 제품 범위는 텍스처/AssetDepot 계획에서 수용한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/model_animation_storage_probe.cpp:282](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/model_animation_storage_probe.cpp#L282) — `m_data->SetModelAnimationStorageCacheBudgets(0u, 0u);`
+- [Tools/regression/model_animation_storage_probe.cpp:285](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/model_animation_storage_probe.cpp#L285) — `&& snapshot.skeletonStorageLiveBytes == a->storage->ByteSize()`
+- [Tools/regression/model_animation_storage_probe.cpp:316](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/model_animation_storage_probe.cpp#L316) — `bool PollReplacement()`
+- [ScriptCore/Animator.cs:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L14) — `public sealed class Animator : NativeComponent`
+- [ScriptCore/Animator.cs:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18) — `public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);`
+- [ScriptCore/Animator.cs:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19) — `public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);`
+- [Engine/SceneRuntime/Animator.h:81](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L81) — `own::shared_owner<const assets::ModelAnimationPayload> payload{};`
+- [Engine/SceneRuntime/Animator.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L87) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};`
+- [Engine/SceneRuntime/Animator.h:325](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L325) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton);`
+- [Engine/RenderEngine/DataSystem.h:235](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L235) — `[[nodiscard]] own::shared_owner<const assets::ModelSkeletonPayload> TryAcquireSkeleton(`
+- [Engine/RenderEngine/DataSystem.h:237](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L237) — `[[nodiscard]] own::shared_owner<const assets::ModelAnimationPayload> TryAcquireAnimation(`
+- [Engine/RenderEngine/DataSystem.h:245](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L245) — `void SetModelAnimationStorageCacheBudgets(std::size_t skeletons, std::size_t clips);`
+- [Engine/Utility_Framework/Ownership.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Ownership.h#L1) — `#pragma once`
+- [Engine/RenderEngine/Assets/ModelSkeletonPayload.h:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelSkeletonPayload.h#L29) — `ModelSkeletonPayload(own::shared_owner<const ModelSkeletonStorage> decoded,`
+- [Engine/RenderEngine/Assets/ModelSkeletonPayload.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelSkeletonPayload.h#L34) — `origin(std::move(resolved)), decodedBytes(charge) {}`
+- [Engine/RenderEngine/Assets/ModelSkeletonPayload.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelSkeletonPayload.h#L40) — `const own::shared_owner<const ModelSkeletonStorage> storage;`
+- [Engine/RenderEngine/Assets/ModelAnimationPayload.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAnimationPayload.h#L34) — `ModelAnimationPayload(own::shared_owner<const ModelAnimationStorage> decoded,`
+- [Engine/RenderEngine/Assets/ModelAnimationPayload.h:35](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAnimationPayload.h#L35) — `own::shared_owner<const ModelSkeletonPayload> hardSkeleton,`
+- [Engine/RenderEngine/Assets/ModelAnimationPayload.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Assets/ModelAnimationPayload.h#L40) — `origin(std::move(resolved)), decodedBytes(charge) {}`
+- [Engine/SceneRuntime/Animator.cpp:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L26) — `Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}`
+- [Engine/SceneRuntime/Animator.cpp:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L28) — `AnimInstance& Animator::GetInstance() noexcept`
+- [Engine/SceneRuntime/Animator.cpp:576](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.cpp#L576) — `own::shared_owner<const assets::ModelSkeletonPayload> skeleton)`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 Approved ownership design implementation, isolated from `158479c`.
 This slice is source-only: no builds, fixtures, runtime binaries, shader compilation,
 or publication were run. The fixture below remains **unrun**.
@@ -134,3 +179,5 @@ Additional authorized-run cases for the host fault injector:
   the preparation mutex; observe source destructor/lock ownership from the host
 - Repeat the prior collider mixed positive/negative predecessor-chain fixtures to
   confirm the unchanged gate, token, cancellation and zero-budget handoff behavior
+
+</details>

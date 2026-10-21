@@ -1,5 +1,31 @@
 # LX shadow meshlet compute 사전 컬링 — 2026-10-12
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 사용자 지시로 반복 성능 근거가 부족해도 8번 구현을 착수했다. 착수 승인은 이전 측정의 성능 수용 판정을 바꾸지 않는다. Vulkan 실행·교차 비교는 PHASE 4.9에 둔다.
 
 ## 구현
@@ -68,3 +94,5 @@ GPU 목록 로그를 제거한 옛 확대 결과와 compute 타이밍 개수를 
 ## LX Scene 단일 배선 후속 — 2026-10-12
 
 일반 GBuffer 구현과 구경로 테스트·A/B 도구를 제거했다. Scene ABI 21과 모델 CEMC 12를 사용하며 이전 리소스는 강제 리임포트·재쿠킹한다. 현재 변경과 검증 판정은 [LX 전환 보고서](../analysis/LxSceneBigBangCutover20261012.md)를 따른다. Vulkan 신규 배선 실행 검증은 PHASE 4.9에 남는다.
+
+</details>

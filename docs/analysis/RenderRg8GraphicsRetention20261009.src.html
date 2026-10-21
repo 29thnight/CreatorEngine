@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG8 graphics-only texture state retention — 2026-10-09</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg8GraphicsRetention20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg8GraphicsRetention20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG8 graphics-only texture state retention — 2026-10-09</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Base: <code>d5a6a26a78da93686b8168429183ee7e0d50a8de</code> plus the recorded local history, dependency scratch and alternative-order changes. Default OFF / progress remains unchanged.</p>
+<h2>Finding and change</h2>
+<p>The queue barrier planner returned every used resource to COMMON at every batch boundary. This included textures used only by graphics, even when a boundary was unrelated to that texture and all its accesses remained on one FIFO graphics queue. Before adding a guessed cost penalty, remove this proven avoidable work.</p>
+<p><code>RHITextureInfo::retainsExplicitStateOnGraphicsQueue</code> is a conservative backend guarantee, default false. DX12 reports true only for actual texture resources without ALLOW_SIMULTANEOUS_ACCESS. The guarantee concerns explicitly transitioned states; automatic promotion is not used by this optimization. Buffers and unknown backends retain existing behavior.</p>
+<p>The selected queue plan classifies resources from all live pass and repeated-phase declarations. A texture is eligible only if the backend guarantee is present and no compute pass uses it. Eligible textures begin in their tracked initial state, keep their explicit state between graphics batches, and restore the compiled final state in the graphics epilogue. State and previous-write tracking remain continuous. All buffers, compute-only or shared textures and unverified textures continue using COMMON at boundaries. No read/read queue-sharing rule or producer/consumer edge changes.</p>
+<p>Reference: <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d12/using-resource-barriers-to-synchronize-resource-states-in-direct3d-12">Microsoft D3D12 resource state promotion and decay</a>. In particular buffers and simultaneous-access textures decay across ExecuteCommandLists even after explicit transitions, while ordinary explicitly transitioned textures do not. Excessive COMMON transitions can hurt GPU performance.</p>
+<h2>Validation scope</h2>
+<p>The native fixture now clears one graphics-only render-target texture before and after a compute batch. It checks the backend guarantee and absence of the redundant second state transition, retains the existing buffer ordering/decay checks, verifies final-state writeback and validates actual GPU execution. A native simultaneous-access texture also verifies the backend refuses the retention guarantee. Native semantic checks increase from 428 to 434; the strict wrapper is updated with the test. Planning checks remain 119.</p>
+<p>Build: VS 2026 Release, <code>Build/rg8-graphics-retention.log</code>. Evidence directory: <code>Build/Verification/Phase43/RG8GraphicsRetention20261009/</code>. Final runtime, output and timing results are appended after verification.</p>
+<p>The handoff prediction model is still uncalibrated and has not been replaced by this slice. Reducing actual boundary work is distinct from proving an accurate batch/barrier cost model or accepting async performance.</p>
+<h2>Release verification and measurements</h2>
+<p>Final VS 2026 Release build passed (<code>Build/rg8-graphics-retention-probe.log</code>; initial enum naming and per-resource probe corrections are preserved in earlier build/evidence files). Native execution 434 checks, planning 119 checks and full RenderGraph regression passed with GPU validation (<code>native-final</code>, wrapper exit 0). Existing Utility_Framework PDB LNK4020 warnings and profiler shutdown <code>abandoned=1 retained=1 foreign=0</code> diagnostic remain separate from GPU validation. Debug and Vulkan execution were not tested in this slice.</p>
+<p>The product same-process forward 0/1/2 and reverse 2/1/0 matrix collected all 192 accepted chronological normal samples (32 per segment), with complete history. Schedules, barrier accounting and calibrated GPU intervals passed the independent audit. Clocks were not locked; timings exclude GPU validation/readback and retain evidence serialization.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Order</th>
+<th align="right">Mode 0 GPU median / p95</th>
+<th align="right">Mode 1</th>
+<th align="right">Mode 2</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forward</td>
+<td align="right">2.3603 / 2.7136 ms</td>
+<td align="right">2.4914 / 2.6061 ms</td>
+<td align="right">2.7029 / 3.1129 ms</td>
+</tr>
+<tr>
+<td>Reverse</td>
+<td align="right">3.0295 / 4.1503 ms</td>
+<td align="right">3.1985 / 3.2717 ms</td>
+<td align="right">2.9543 / 4.7647 ms</td>
+</tr>
+</tbody></table></div>
+<p>Mode 2 selected compute in 64/64 frames. Only 5/64 frames had overlap above clock error (all reverse), with median zero in both orders and maximum 0.258 ms. Forward async remains slower; reverse async has a slightly lower median but a higher p95. This does not establish a consistent performance benefit. Default OFF / progress / earned 0 remains.</p>
+<p>Boundary-work reduction (both orders, median): planned barriers <strong>767 -&gt; 422</strong>, prologue <strong>109 -&gt; 49</strong>, epilogue <strong>117 -&gt; 57</strong>. The previous numbers are from the immediately preceding alternative-order run; pass assignments are cost-driven and can vary, so these are observed product counts, not a fixed per-frame savings guarantee. The changed planner removes only provably unnecessary graphics texture transitions and preserves buffer/cross-queue safety.</p>
+<p>Current mode-2 scheduling CPU median: 1.1312 / 1.1417 ms; recording 1.5160 / 1.6390 ms; submission 0.5959 / 0.5780 ms. Planned batches remain median 11 and actual waits 4. Absolute GPU-time changes across builds are not controlled A/B results, as the mode-0 baseline also moved substantially.</p>
+<p>Evidence: <code>normal/</code>, <code>performance-summary.json</code>, <code>boundary-summary.json</code>, <code>native-final/</code>, binary metadata and <code>local.patch</code> under <code>Build/Verification/Phase43/RG8GraphicsRetention20261009/</code>. No commit/push is performed by this request.</p>
+<h2>Product output and GPU validation</h2>
+<p>GPU-based validation captured forward modes 1 and 2, four samples each: two processes exited 0, both reported problems 0 / dropped messages 0. Current mode 1 versus mode 2 is bit-identical across 64 attachment/stage comparisons. This validation wrapper intentionally covers only forward modes 1/2; it is not a six-mode validation matrix.</p>
+<p>The initial comparison against the previous build mixed validation OFF baseline with validation ON current output and failed: maximum absolute difference 0.003921572 (one display quantization step). That failed result is preserved in <code>gpu-output-comparison.json</code>; it is not counted as an accepted cross-build comparison.</p>
+<p>A fresh validation-OFF capture matrix completed both orders and modes 0/1/2: six processes exited 0, 24 captures. Controlled inputs, dimensions and finite values were checked. Previous mode 0 versus current mode 0 and current mode 0 versus modes 1/2 passed <strong>384 exact comparisons, error 0</strong> (<code>output-comparison.json</code>). A separate direct previous/current mode-1 and current mode-1/2 comparison passed 128 exact comparisons, error 0 (<code>mode1-normal-comparison.json</code>). These comparison sets reuse captures and are not independent additional samples.</p>
+<p>The same current binary with validation OFF versus ON reproduced the 0.003921572 maximum difference in modes 1 and 2 (<code>validation-flag-comparison.json</code>, diagnostic only). Matching validation configurations establish output equivalence; the mixed-configuration difference does not establish a regression caused by this change. This probe does not identify the exact instrumented shader instruction responsible for the difference.</p>
+<p>Product output equivalence and GPU validation do not establish GPU performance improvement. RG8 remains progress / earned 0 / default OFF. The remaining performance work is to explain the gap between predicted and measured overlap, account for actual batch synchronization/barrier costs, and verify CPU recording/submission costs before adoption. No new phase completion condition was added by this slice.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="finding-and-change"></span><span id="product-output-and-gpu-validation"></span><span id="release-verification-and-measurements"></span><span id="sec-finding-and-change"></span><span id="sec-product-output-and-gpu-validation"></span><span id="sec-release-verification-and-measurements"></span><span id="sec-validation-scope"></span><span id="validation-scope"></span></details></main></body></html>

@@ -1,5 +1,52 @@
 # Material Graph 현재 포즈·공유 깊이
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/verify-material-raster-surface.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L4) — `[ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')`
+- [Tools/regression/verify-material-raster-surface.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-raster-surface.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-raster-surface.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Engine/RenderEngine/ShaderMeta.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L24) — `enum class ShaderPropertyType : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L98) — `enum class ShaderPassQueue : std::uint8_t`
+- [Engine/RenderEngine/ShaderMeta.h:106](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.h#L106) — `enum class ShaderBlendMode : std::uint8_t`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:160](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L160) — `bool PrepareResidency(const EnhancedFrameContext& context, const own::shared_owner<const SceneViewInput>& input,`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:162](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L162) — `bool Prepare(const EnhancedFrameContext& context, own::shared_owner<const SceneViewInput> input,`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:357](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L357) — `static void DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const FrameInput>& frame,`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L15) — `own::shared_owner<const Instance> instance;`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L21) — `static own::shared_owner<const SceneMaterialSource> Capture(const Material& material);`
+- [Engine/RenderEngine/MaterialGraphSceneInput.h:91](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneInput.h#L91) — `static bool Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:231](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L231) — `class EnhancedRenderGraph : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:451](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L451) — `explicit EnhancedRenderGraph(IRenderDeviceServices& services,`
+- [Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:467](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L467) — `bool PrepareParallel(IRHIParallelCommandPool& pool, std::string& outError);`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L31) — `enum class EnhancedLiveDisplayTarget : uint8_t`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:459](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L459) — `inline bool EnhancedGraphSnapshotMatchesView(const EnhancedRenderGraph::DiagnosticSnapshot& graph,`
+- [Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h:1209](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h#L1209) — `std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot> GetLiveGraphSnapshot(`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/ShaderMeta.cpp:382](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L382) — `else if ("less" == depthTest.Scalar()) outState.depthTest = RHICompareOp::Less;`
+- [Engine/RenderEngine/ShaderMeta.cpp:383](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L383) — `else if ("lessEqual" == depthTest.Scalar())`
+- [Engine/RenderEngine/ShaderMeta.cpp:385](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/ShaderMeta.cpp#L385) — `else return Fail(context, "depthTest는 off|less|lessEqual이어야 한다", outError);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 ## 1. 구현 범위
 
 이 문서는 독립 RHI의 공유 capture 계약이다. 실제 legacy GBuffer·Masked 가림·HDR 합성을
@@ -106,3 +153,5 @@ Vulkan은 shader 컴파일과 변환 코드 빌드 범위이며 native GPU 검�
 
 `EnhancedSceneRenderer`의 LX 미설치 거부와 MAT-7 progress 상태를 유지한다.
 전체 Editor 빌드·실제 Scene·Vulkan runtime 완료나 추가 완료 공수를 기록하지 않는다.
+
+</details>

@@ -1,5 +1,52 @@
 # PHASE 22 오디오 백엔드 사전 정찰 (2026-09-16)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- AudioHost/PlaybackService·clip directory와 miniaudio/Null backend가 재생 수명을 소유한다. resident/stream 및 개별 PlaybackHandle을 구분한다.
+- FMOD 채택을 필수 선행으로 재도입하지 않는다. 과거 선택 씬의 종료/stream 수용과 현재 CI·설치 제품 수용은 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [ScriptCore/Native.cs:261](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L261) — `public delegate* unmanaged<ulong, AudioAssetId, int, int, Float3, ObjectHandle, AudioPlaySettings*, Native.AudioParameterABI*, int, ulong> Audio_Play;`
+- [ScriptCore/Native.cs:270](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L270) — `public delegate* unmanaged<ObjectHandle, AudioAssetId*, int> Sound_GetSource;`
+- [ScriptCore/Native.cs:271](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Native.cs#L271) — `public delegate* unmanaged<ObjectHandle, AudioAssetId, int, void> Sound_SetSource;`
+- [ScriptCore/SoundComponent.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L4) — `public sealed class SoundComponent : NativeComponent`
+- [ScriptCore/SoundComponent.cs:6](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L6) — `public void Play() => Native.SoundPlay(OwnerHandle);`
+- [ScriptCore/SoundComponent.cs:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/SoundComponent.cs#L7) — `public void Stop() => Native.SoundStop(OwnerHandle);`
+- [BuildTool/EnginePublisher.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L30) — `if (shipping && project.StartsWith("Player/")) arguments.Add("/p:EngineShipping=true");`
+- [BuildTool/EnginePublisher.cs:56](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L56) — `var source = name == "Player" && shipping ? Path.Combine(repository, $"Bin/x64-{config}-Shipping") : binarySource;`
+- [BuildTool/EnginePublisher.cs:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/BuildTool/EnginePublisher.cs#L63) — `Metadata.AssertSourceOnlyAudio(entries.Select(entry => entry.Path));`
+- [Engine/Utility_Framework/Uuid.h:146](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Uuid.h#L146) — `struct Uuid16`
+- [Engine/Utility_Framework/Uuid.h:167](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Uuid.h#L167) — `inline constexpr Uuid16 Nil() noexcept { return Uuid16{}; }`
+- [Engine/Utility_Framework/Uuid.h:170](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Uuid.h#L170) — `inline std::string ToString(const Uuid16& u)`
+- [Engine/RenderEngine/DataSystem.h:495](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L495) — `own::shared_owner<const Texture> LoadTextureGUID(FileGuid guid);`
+- [Engine/RenderEngine/DataSystem.h:515](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L515) — `own::shared_owner<const Material> FindCachedMaterial(FileGuid guid);`
+- [Engine/RenderEngine/DataSystem.h:541](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L541) — `[[nodiscard]] own::shared_owner<const Material> LoadMaterialByGuid(FileGuid guid);`
+- [Engine/SceneRuntime/SoundSystem.h:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundSystem.h#L19) — `void Register(SoundComponent* sound);`
+- [Engine/SceneRuntime/SoundSystem.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundSystem.h#L20) — `void Unregister(SoundComponent* sound);`
+- [Engine/SceneRuntime/SoundSystem.h:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundSystem.h#L34) — `[[nodiscard]] size_t GetCount() const noexcept { return m_sounds.size(); }`
+- [Engine/Utility_Framework/Paklib.hpp:52](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L52) — `[[noreturn]] inline void fail(std::string_view msg) { throw WinError{ std::string(msg) }; }`
+- [Engine/Utility_Framework/Paklib.hpp:269](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L269) — `explicit Builder(std::filesystem::path outPak, BuildOptions opt = {}) : m_out(std::move(outPak)), m_opt(opt) {`
+- [Engine/Utility_Framework/Paklib.hpp:398](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L398) — `explicit Archive(std::filesystem::path pak, OpenOptions opt = {}) : m_path(std::move(pak)), m_key(std::move(opt.key)) {`
+- [Engine/SceneRuntime/SoundComponent.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L8) — `struct SoundComponentSettings final`
+- [Engine/SceneRuntime/SoundComponent.h:37](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L37) — `class [[reflgen::reflect]] SoundComponent : public meta::identity<SoundComponent, Component>`
+- [Engine/SceneRuntime/SoundComponent.h:71](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SoundComponent.h#L71) — `[[nodiscard]] SoundComponentSettings ReadSettings() const;`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 - 기준 트리: `81b90288` + 미커밋 변경(오디오 계층에는 변경 없음)
 - 대조 정본: [AudioBackendModernizationPlan.md](../plans/AudioBackendModernizationPlan.md)(기준선 2026-08-27),
   [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) PHASE 22 AU0~AU9,
@@ -363,3 +410,5 @@ FMOD 는 `SceneRuntime` → 호스트 import 로 폐포에 들어온다. 실측:
 - **Debug/Release 링크 구성 차이**를 링크 로그로 확인하지 않았다. PE import 로만 확인했다.
 - **`Editor/Editor.vcxproj` 와 `CreatorEditor.vcxproj` 의 FMOD 경로 중복**이 의도된 분업인지
   (lib 프로젝트는 include only, exe 는 link) 확인만 했고, 정리 필요 여부는 판정하지 않았다.
+
+</details>

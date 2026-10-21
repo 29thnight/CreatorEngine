@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RE ENGINE와 CreatorEngine 렌더링 배선</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderingPipelineMermaid20261016.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderingPipelineMermaid20261016.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RE ENGINE와 CreatorEngine 렌더링 배선</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L109">Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:109</a> — <code>class LiveBlackboard</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L130">Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:130</a> — <code>throw std::runtime_error(&quot;A resource-list slot requires GetList.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h#L137">Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h:137</a> — <code>void SetList(const std::string&amp; slot, std::vector&lt;RGHandle&gt; handles) { m_slots[slot] = std::move(handles); }</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L65">Editor/EngineEntry/App.cpp:65</a> — <code>enabled |= std::wstring_view(arguments[index]) == L&quot;--smoke-offscreen&quot;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L82">Editor/EngineEntry/App.cpp:82</a> — <code>result = std::filesystem::absolute(arguments[i + 1]).lexically_normal();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/App.cpp#L121">Editor/EngineEntry/App.cpp:121</a> — <code>requested |= std::wstring_view(arguments[i]) == L&quot;--warmup-check&quot;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L77">Engine/RenderEngine/GpuGeometryVisibility.cpp:77</a> — <code>error = std::move(message);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L91">Engine/RenderEngine/GpuGeometryVisibility.cpp:91</a> — <code>if (!std::isfinite(matrix.m[row][column]))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/GpuGeometryVisibility.cpp#L124">Engine/RenderEngine/GpuGeometryVisibility.cpp:124</a> — <code>const double length = std::hypot(coefficients[0], coefficients[1], coefficients[2]);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L39">Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:39</a> — <code>RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner&lt;const FrameInput&gt;&amp; frame,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L106">Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:106</a> — <code>throw std::runtime_error(&quot;Shadow raster target differs from its sealed light extent/slice.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L109">Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:109</a> — <code>? RHIDepthTargetDesc::Depth(texture, RHIFormat::D32Float)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L2">Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:2</a> — <code>SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shared_owner&lt;const FrameInput&gt;&amp; prepared,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L27">Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:27</a> — <code>throw std::runtime_error(&quot;METEOR visibility requires depth, visibility and prepared commands.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L38">Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:38</a> — <code>std::array&lt;RGHandle, 2&gt; SceneHost::MaterialWorkStage::Declare(const own::shared_owner&lt;const FrameInput&gt;&amp; prepared,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl#L2">Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:2</a> — <code>void SceneHost::HistoryStage::DeclareHistory(const own::shared_owner&lt;const FrameInput&gt;&amp; prepared,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl#L7">Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:7</a> — <code>prepared-&gt;CheckCurrent(&amp;graph);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl#L9">Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:9</a> — <code>throw std::runtime_error(&quot;METEOR history requires its final surface depth.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl#L2">Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:2</a> — <code>RGHandle SceneHost::OccluderStage::DeclareOccluder(const own::shared_owner&lt;const FrameInput&gt;&amp; prepared,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl#L10">Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:10</a> — <code>RequireStage(first.list, {}, &quot;METEOR.Scene.Occluder received a list for an empty frame.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl#L38">Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:38</a> — <code>bool SceneHost::OccluderStage::Prepare(const FrameInput&amp; frame, const EnhancedFrameContext&amp; context,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L2">Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:2</a> — <code>SceneFirstCullOutputs SceneHost::FirstCullStage::DeclareFirstCull(const own::shared_owner&lt;const FrameInput&gt;&amp; prepared,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L9">Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:9</a> — <code>RequireStage(geometry, {}, &quot;METEOR.Scene.Cull.First received geometry for an empty frame.&quot;);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl#L12">Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:12</a> — <code>frame-&gt;CheckCurrent(&amp;graph);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>기준일: 2026-10-16. 기존 저장소 문서는 열거나 재사용하지 않고 작성했다.
+RE는 Capcom RE ENGINE으로 해석했다. RE 쪽은 REAC 2025 발표의 Monster Hunter Wilds 경로를 기준으로 재구성했으며, 2026년 RE 전체 제품의 최신 구현을 뜻하지 않는다.
+CreatorEngine 쪽은 미커밋 변경을 포함한 현재 작업 디렉터리 소스의 정적 배선이다. 빌드, 실행, GPU 캡처 검증은 수행하지 않았다.</p>
+<p>실선은 입력·출력 의존 관계, 점선은 프레임 간 이력 또는 보조 입력이다. 병렬로 그린 가지는 동시 실행 보장이 아니다. 선택 기능은 설정·입력·지원 여부에 따라 생략되거나 입력을 그대로 전달할 수 있다.</p>
+<h2>1. RE ENGINE: 카메라 가시성 → 재질</h2>
+<p>근거: <a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf">Capcom, RE ENGINE Meshlet Rendering Pipeline, REAC 2025</a>, PDF 20, 26, 28–33, 40–47쪽. 아래는 설명용 재구성이며 발표 슬라이드의 배치를 그대로 복제한 그림은 아니다.</p>
+<pre><code class="language-mermaid">flowchart TB
+    Scene[&quot;Bindless Instance / Meshlet / Material&quot;] --&gt; I1[&quot;Phase 1 · Instance Culling&quot;]
+    I1 --&gt; C1[&quot;Cluster Culling&quot;]
+    I1 --&gt; RI[&quot;가려진 Instance 보류&quot;]
+    C1 --&gt; RC[&quot;가려진 Cluster 보류&quot;]
+    C1 --&gt; SW1[&quot;Software Rasterizer&quot;]
+    C1 --&gt; HW1[&quot;Hardware Visibility Rasterizers&quot;]
+    SW1 --&gt; V1[&quot;1차 Visibility / Depth&quot;]
+    HW1 --&gt; V1
+    V1 --&gt; H1[&quot;Generate HiZ&quot;]
+    RI --&gt; I2[&quot;Phase 2 · Instance 재검사&quot;]
+    H1 --&gt; I2
+    I2 --&gt; C2[&quot;Cluster 재검사&quot;]
+    RC --&gt; C2
+    H1 --&gt; C2
+    C2 --&gt; SW2[&quot;Software Rasterizer&quot;]
+    C2 --&gt; HW2[&quot;Hardware Visibility Rasterizers&quot;]
+    SW2 --&gt; VF[&quot;최종 Visibility / Depth&quot;]
+    HW2 --&gt; VF
+    V1 --&gt; VF
+    VF --&gt; H2[&quot;Generate HiZ&quot;]
+    VF --&gt; Work[&quot;가시 Primitive / Material 작업 정리&quot;]
+    Work --&gt; Sort[&quot;Shader별 정렬 / Indirect Args&quot;]
+    Sort --&gt; VT[&quot;Vertex Transform 사전 계산&quot;]
+    VT --&gt; GB[&quot;Visibility Buffer Shaders → GBuffer&quot;]
+    VF --&gt; GB
+    Scene --&gt; Special[&quot;Special Rasterizers · 예외 경로&quot;]
+    Special --&gt; GB
+</code></pre>
+<p>Wilds는 Alpha Test와 Vertex Transform을 Hardware Visibility 쪽에 통합해 2단계 컬링에 포함한다. Special Rasterizer도 남아 있으므로 모든 재질이 단일 Compute Resolve만으로 처리된다고 해석하면 안 된다. 이 발표에서 확인하지 않은 전체 조명·후처리 순서는 임의로 덧붙이지 않았다.</p>
+<h2>2. RE ENGINE: 방향광 그림자</h2>
+<p>근거: 같은 발표 PDF 54–65쪽, 특히 65쪽의 2단계 구조.</p>
+<pre><code class="language-mermaid">flowchart TB
+    CD[&quot;Camera Depth&quot;] --&gt; RP[&quot;Light Space Depth Reprojection&quot;]
+    Prev[&quot;Previous Shadow Map&quot;] -.-&gt; O1[&quot;1st Phase Occluder Map&quot;]
+    RP --&gt; O1
+    O1 --&gt; P1[&quot;1차 Instance / Cluster Culling + Draw · Static Meshlet&quot;]
+    P1 --&gt; O2[&quot;2nd Phase Occluder Map&quot;]
+    P1 --&gt; Rejected[&quot;Occluded Meshlet&quot;]
+    O2 --&gt; P2[&quot;2차 Instance / Cluster Culling + Draw&quot;]
+    Rejected --&gt; P2
+    Dynamic[&quot;Mesh / Dynamic Meshlet&quot;] --&gt; P2
+    P1 --&gt; Shadow[&quot;최종 Shadow Map&quot;]
+    P2 --&gt; Shadow
+    Shadow -.-&gt; Next[&quot;다음 프레임 Previous Shadow Map&quot;]
+</code></pre>
+<h2>3. CreatorEngine: 프레임 전달과 그래프 실행</h2>
+<pre><code class="language-mermaid">flowchart TB
+    GT[&quot;App::PublishRenderFrame · Game Thread&quot;] --&gt; Capture[&quot;View / Scene / Required Material 수집&quot;]
+    Capture --&gt; Packet[&quot;BuildLiveFramePacket · 불변 프레임 입력&quot;]
+    Packet --&gt; Publish[&quot;PublishLiveFrame&quot;]
+    Publish --&gt; RT[&quot;전용 Render Thread · TickLive&quot;]
+    RT --&gt; View[&quot;뷰별 상태 / Temporal History / SceneHost 준비&quot;]
+    View --&gt; Desc[&quot;LivePipelineDesc::DeclareAll&quot;]
+    Desc --&gt; BB[&quot;LiveBlackboard · 자원 핸들 버전 연결&quot;]
+    BB --&gt; RG[&quot;EnhancedRenderGraph&quot;]
+    RG --&gt; Compile[&quot;Compile · 자원 의존 관계로 실행 계획 생성&quot;]
+    Compile --&gt; Backend{&quot;Backend / Submission 경로&quot;}
+    Backend --&gt; DX[&quot;DX12 · RecordParallel 또는 SubmitOwnedGraph&quot;]
+    Backend --&gt; VK[&quot;Vulkan · 공통 Scene Graph 소비&quot;]
+    DX --&gt; GPU[&quot;GPU 제출 / 완료 추적&quot;]
+    VK --&gt; GPU
+    GPU --&gt; Display[&quot;완료된 View / Display 출력 게시&quot;]
+</code></pre>
+<p>LivePipelineDesc는 패스를 조립하고 슬롯을 연결한다. 프레임 실행 그래프는 EnhancedRenderGraph이며, 아래 패스 순서는 선언과 데이터 흐름을 표현한다. DX12와 Vulkan의 기능 동등성이나 실제 GPU 동작은 이 조사로 검증하지 않았다.</p>
+<h2>4. CreatorEngine: 카메라·그림자·재질 핵심 배선</h2>
+<pre><code class="language-mermaid">flowchart TB
+    G[&quot;METEOR.Scene.Geometry&quot;]
+    PrevCam[&quot;이전 유효 Camera HZB&quot;] -.-&gt; F[&quot;Scene.Cull.First&quot;]
+    G --&gt; F
+    F --&gt; O[&quot;Scene.Occluder · HW + SW Raster / Depth Resolve&quot;]
+    O --&gt; H[&quot;현재 Occluder Depth → HZB&quot;]
+    H --&gt; Final[&quot;Scene.Cull.Final · Opaque Recovery&quot;]
+    F --&gt; Final
+    G --&gt; Final
+    Final --&gt; V[&quot;Scene.Visibility · HW + SW Raster / Resolve&quot;]
+    V --&gt; IDs[&quot;Visibility IDs + Depth&quot;]
+    IDs --&gt; MW[&quot;Scene.MaterialWork · Tile / Indirect Arguments&quot;]
+    G --&gt; MW
+    MW --&gt; SR[&quot;Scene.SurfaceResolve&quot;]
+    IDs --&gt; SR
+    SR --&gt; GB[&quot;Diffuse / MetalRough / Normal / Emissive / Bitmask&quot;]
+    GB --&gt; D[&quot;Scene.Decal · Surface 버전 갱신&quot;]
+    IDs --&gt; CH[&quot;Scene.History · 다음 Camera HZB 생성&quot;]
+    CH -.-&gt; PrevCam
+
+    G --&gt; BlendCull[&quot;Blended Meshlet · Frustum Cull / 원본 순서 유지&quot;]
+    BlendCull --&gt; LW[&quot;Scene.LayerWork&quot;]
+
+    G --&gt; SC[&quot;Shadow.StaticCache · 정적 Depth 재사용 / 갱신&quot;]
+    G --&gt; SF[&quot;Shadow.Cull.First · 광원 공간 / 3 Cascades&quot;]
+    PrevS[&quot;이전 유효 Shadow HZB&quot;] -.-&gt; SF
+    SC --&gt; SO[&quot;Shadow.Occluder · Static Copy + 1차 Raster&quot;]
+    SF --&gt; SO
+    SO --&gt; SH[&quot;Cascade별 현재 HZB&quot;]
+    SH --&gt; SFinal[&quot;Shadow.Cull.Final · Recovery&quot;]
+    SFinal --&gt; Raster[&quot;Shadow.Raster · Static Merge + 최종 Raster&quot;]
+    SC --&gt; Raster
+    Raster --&gt; SM[&quot;Shadow Map · 3 D32 Array Slices&quot;]
+    SM --&gt; History[&quot;Shadow.History&quot;]
+    History -.-&gt; PrevS
+
+    D --&gt; AO[&quot;SSAO&quot;]
+    D --&gt; Color[&quot;Scene.Color · 재질 조명 / 굴절 처리 → HDR&quot;]
+    AO --&gt; Color
+    SM --&gt; Color
+    MW --&gt; Color
+    LW --&gt; Color
+    LW --&gt; Blended[&quot;Scene.Blended&quot;]
+    Color --&gt; Blended
+    SM --&gt; Blended
+</code></pre>
+<p>이 그림의 Color → Blended는 조명 결과의 흐름을 축약한 것이다. 그 사이의 SkyBox·SSGI·SSS·SSR·Volume은 다음 그림에 펼쳤다. Cull.Final은 opaque recovery 목록과 별도로 blended 목록을 발행하며, blended는 현재 HZB recovery와 동일한 경로가 아니다. 카메라 이력은 Scene.History 선언 시점의 surface depth를 사용한다.</p>
+<h2>5. CreatorEngine: HDR 합성 → 화면 출력</h2>
+<pre><code class="language-mermaid">flowchart TB
+    Color[&quot;METEOR.Scene.Color · HDR&quot;] --&gt; Sky[&quot;SkyBox&quot;]
+    Sky --&gt; GI[&quot;SSGI&quot;]
+    GI --&gt; SSS[&quot;SSS&quot;]
+    SSS --&gt; SSR[&quot;SSR&quot;]
+    SSR --&gt; Vol[&quot;METEOR.Scene.Volume&quot;]
+    Vol --&gt; Blend[&quot;METEOR.Scene.Blended&quot;]
+    Depth[&quot;Surface Depth&quot;] --&gt; Tiles[&quot;METEOR.Scene.LightTiles&quot;]
+    Tiles --&gt; Blend
+    Layers[&quot;Scene.LayerWork&quot;] --&gt; Blend
+    Shadow[&quot;Shadow Map&quot;] --&gt; Vol
+    Shadow --&gt; Blend
+    Blend --&gt; Sprite[&quot;Sprite&quot;]
+    Sprite --&gt; Fog[&quot;VolumetricFog · 조건부&quot;]
+    Fog --&gt; TU[&quot;Temporal.Upscale · Provider / 설정에 따라 처리&quot;]
+    Inputs[&quot;Temporal.Inputs · Motion / Depth / Reactive / Transparency / Responsive&quot;] --&gt; TU
+    Inputs --&gt; Motion[&quot;Temporal.SpriteMotion&quot;]
+    Sprite --&gt; Motion
+    Motion --&gt; TU
+    TU --&gt; Post[&quot;PostChain · Tone Map / 적용 가능한 AA → LDR&quot;]
+    Post --&gt; Spatial[&quot;SpatialPost · 선택적 Scaling / Sharpen / SDR Vibrance&quot;]
+    Spatial --&gt; DI[&quot;Temporal.DisplayInputs · HUD 없는 영상 / UI Layer 준비&quot;]
+    DI --&gt; UI[&quot;UI&quot;]
+    UI --&gt; Present[&quot;live_present · Display / Temporal Export&quot;]
+</code></pre>
+<p>기능 노드의 존재는 현재 프레임에서 해당 효과가 켜져 있다는 뜻이 아니다. Temporal Upscale은 HDR 합성 이후, Tone Mapping 이전에 연결되어 있다.</p>
+<h2>코드 근거</h2>
+<ul>
+<li><code>Editor/EngineEntry/App.cpp:399</code> — PublishRenderFrame, BuildLiveFramePacket, PublishLiveFrame.</li>
+<li><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:3583</code> — BuildPipelineDesc 전체 조립. 카메라 3601–3650, 그림자 3671–3755, Visibility·Material·Surface 3759–3810, HDR·합성·출력 3909–4530.</li>
+<li><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:6951</code> — DeclareAll 및 Compile, 명령 기록과 제출. <code>:8266</code>, <code>:9270</code> — Render Thread 소비와 TickLive.</li>
+<li><code>Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h</code> — 읽기·쓰기·수정 슬롯과 DeclareAll 계약.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneFirstCullStage.inl:2</code> — 1차 리스트 생산.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneOccluderStage.inl:2</code> — HW/SW Occluder와 Depth Resolve.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneFinalCullStage.inl:2</code> — 현재 Pyramid를 통한 Recovery와 Frustum-only Blended.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl:2</code> — Visibility, MaterialWork, SurfaceResolve.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneShadowStage.inl:167</code> — Cascade별 First/Occluder/Final/Raster.</li>
+<li><code>Engine/RenderEngine/MaterialGraphSceneHistoryStage.inl:2</code> — Camera History 입력.</li>
+<li><code>Engine/RenderEngine/GpuGeometryVisibility.cpp:329</code> 및 <code>:854</code> — History/Recovery 준비와 FirstStage History Import.</li>
+</ul>
+<h2>비교에서 보이는 차이</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>구간</th>
+<th>REAC 2025 RE ENGINE</th>
+<th>현재 CreatorEngine 소스</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>카메라</td>
+<td>Instance/Cluster 2단계 컬링, HW/SW Visibility</td>
+<td>First → Occluder → 현재 HZB → Final Recovery, HW/SW Visibility</td>
+</tr>
+<tr>
+<td>재질</td>
+<td>Visibility 기반 작업 정리, Shader별 정렬, Vertex Transform 사전 계산, GBuffer</td>
+<td>MaterialWork의 Tile/Args → SurfaceResolve → GBuffer → Scene.Color</td>
+</tr>
+<tr>
+<td>방향광 그림자</td>
+<td>Camera Depth Reprojection + Previous Shadow → 2단계 Cull/Draw</td>
+<td>StaticCache + 광원 공간 First → Occluder → 현재 HZB Recovery → Raster</td>
+</tr>
+<tr>
+<td>해석 한계</td>
+<td>발표에서 공개된 특정 제품·시점의 구조</td>
+<td>미커밋 변경을 포함한 정적 코드 연결, 실행 성공·성능 동등성은 미검증</td>
+</tr>
+</tbody></table></div>
+<p>우리 엔진의 Shadow 경로를 RE의 Camera Depth Reprojection 경로와 동일하게 그리지 않았다. 또한 비슷한 단계가 존재한다는 이유로 재질 처리 방식이나 성능이 동등하다고 판단하지 않았다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-re-engine-카메라-가시성--재질"></span><span id="2-re-engine-방향광-그림자"></span><span id="3-creatorengine-프레임-전달과-그래프-실행"></span><span id="4-creatorengine-카메라그림자재질-핵심-배선"></span><span id="5-creatorengine-hdr-합성--화면-출력"></span><span id="sec-1-re-engine-카메라-가시성--재질"></span><span id="sec-2-re-engine-방향광-그림자"></span><span id="sec-3-creatorengine-프레임-전달과-그래프-실행"></span><span id="sec-4-creatorengine-카메라그림자재질-핵심-배선"></span><span id="sec-5-creatorengine-hdr-합성--화면-출력"></span><span id="sec-비교에서-보이는-차이"></span><span id="sec-코드-근거"></span><span id="비교에서-보이는-차이"></span><span id="코드-근거"></span></details></main></body></html>

@@ -1,0 +1,2094 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>엔진 명령 표면 도표 — 2026-09-12 갱신</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="CommandSurfaceTable.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/CommandSurfaceTable.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>엔진 명령 표면 도표 — 2026-09-12 갱신</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Editor</ve-node><ve-node id="n1" at="2 1">Command</ve-node><ve-node id="n2" at="3 1" key>Transaction</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.</li>
+<li>Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L18">ScriptCore/Animator.cs:18</a> — <code>public void SetBool(string name, bool value) =&gt; Native.AnimatorSetBool(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L19">ScriptCore/Animator.cs:19</a> — <code>public void SetFloat(string name, float value) =&gt; Native.AnimatorSetFloat(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Animator.cs#L20">ScriptCore/Animator.cs:20</a> — <code>public void SetInt(string name, int value) =&gt; Native.AnimatorSetInt(OwnerHandle, name, value);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4">ScriptCore/BlackBoard.cs:4</a> — <code>public enum BlackBoardType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28">ScriptCore/BlackBoard.cs:28</a> — <code>public sealed class BlackBoard</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30">ScriptCore/BlackBoard.cs:30</a> — <code>private readonly struct Value(BlackBoardType type, object boxed)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/ImGuiHelper/ImGui.h#L1">Editor/ImGuiHelper/ImGui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L35">ScriptCore/EngineCallable.cs:35</a> — <code>[AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/EngineCallable.cs#L36">ScriptCore/EngineCallable.cs:36</a> — <code>public sealed class EngineCallableAttribute : Attribute</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L46">Engine/SceneRuntime/Terrain.h:46</a> — <code>void Save(const std::wstring&amp; assetRoot, const std::wstring&amp; name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L65">Engine/SceneRuntime/Terrain.h:65</a> — <code>void AddLayer(const std::wstring&amp; path, const std::wstring&amp; diffuseFile, float tilling);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L100">Engine/SceneRuntime/Terrain.h:100</a> — <code>bool LoadBrushMaskTexture(const std::wstring&amp; path, std::vector&lt;uint8_t&gt;&amp; outMask, int&amp; dataWidth, int&amp; dataHeight);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L318">Engine/SceneRuntime/Animator.h:318</a> — <code>own::shared_owner&lt;const assets::ModelAssetGeneration&gt; m_modelGeneration{};</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L396">Engine/SceneRuntime/Animator.h:396</a> — <code>inline void Animator::AddParameter(const std::string valuename, T value, ValueType vType)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Animator.h#L410">Engine/SceneRuntime/Animator.h:410</a> — <code>inline void Animator::SetParameter(const std::string valuename, T Value)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Player/ForbiddenIncludes/imgui.h#L1">Player/ForbiddenIncludes/imgui.h:1</a> — <code>#pragma once</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L41">Engine/SceneRuntime/BlackBoard.h:41</a> — <code>void RenameKey(const std::string&amp; curKey, const std::string&amp; newKey);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L52">Engine/SceneRuntime/BlackBoard.h:52</a> — <code>bool Serialize(std::string_view name);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L53">Engine/SceneRuntime/BlackBoard.h:53</a> — <code>void Deserialize(std::string_view name);</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<blockquote>
+<p>2026-09-12: 닫힌·완료 계획 소속 Commandlet 68개를 은퇴시켰다(§5). 제품 명령은 하나도 건드리지 않았다 — 아래 제품 수치는 2026-09-06 기준 그대로다.</p>
+</blockquote>
+<p>현재 작업 트리의 시드와 등록, 런타임 registry를 대조한 표다. 제품 작업은 공통 편집·진단 API로, 검증은 프로세스 범위 Commandlet으로 실행한다.
+<a href="CommandSurfaceImplementation.html">구조 및 검증</a> · <a href="CommandSurfaceDisposition.tsv">처분표</a> · <a href="Phase14_5Closure.html">종결 검토</a></p>
+<h2>1. 실행 표면</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>표면</th>
+<th align="right">정식 명령</th>
+<th align="right">별칭 포함</th>
+<th>실행 경로</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Editor 제품</td>
+<td align="right">99</td>
+<td align="right">106</td>
+<td>console·batch·HTTP/JSON; <code>wait</code>는 HTTP 실행 제외</td>
+</tr>
+<tr>
+<td>Player 제품</td>
+<td align="right">7</td>
+<td align="right">7</td>
+<td>Development Player registry; 전용 5개 + 공통 <code>help</code>·<code>quit</code></td>
+</tr>
+<tr>
+<td>등록형 Commandlet</td>
+<td align="right">45</td>
+<td align="right">45</td>
+<td><code>--commandlet</code> / <code>--commandlet-script</code></td>
+</tr>
+<tr>
+<td>독립 Commandlet</td>
+<td align="right">3</td>
+<td align="right">3</td>
+<td>같은 실행 모드, 별도 진입점 표</td>
+</tr>
+</tbody></table></div>
+<p>Editor 제품과 Commandlet 48개의 이름 집합은 겹치지 않는다. 지금까지 제거한 이름은 82개다. MCP 서버는 후속 범위이며 HTTP discovery와 결과를 연결하는 어댑터로 추가한다.</p>
+<pre><code class="language-mermaid">flowchart LR
+    GUI[GUI] --&gt; Shared[공통 편집·진단 API / Undo]
+    MCP[향후 MCP 어댑터] -.-&gt; HTTP[HTTP/JSON 제품 명령]
+    CLI[CLI] --&gt; HTTP
+    HTTP --&gt; Shared
+    Harness[Commandlet 실행 모드] --&gt; Verify[독립 검증 / 제품 API 검사]
+</code></pre>
+<h2>2. Editor 제품 명령 — 99개</h2>
+<p>모든 제품 명령이 <code>CommandResult</code>를 반환한다. JSON <code>parameters</code> 지원 59개, Undo 선언 21개다. <code>()</code>는 인자 없는 스키마다. 빈 칸은 positional <code>args</code> 사용이다. 동작에 따라 인자 구성이 달라지는 명령에 허위 스키마를 만들지 않았다.</p>
+<p><code>Immediate</code>·<code>Frames</code>·<code>Long</code>은 스케줄링 분류이며 실행 시간 보장이 아니다. Undo 선언은 편집 작업에만 적용된다. 저장·리로드·관리 코드 실행 등 서비스 작업은 별도 수명과 실패 결과를 갖는다.</p>
+<h3>ai — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ai.status</code></td>
+<td>-</td>
+<td><code>[오브젝트]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)</td>
+</tr>
+</tbody></table></div>
+<h3>animator — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>animator.param</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt; &lt;파라미터&gt; &lt;bool|float|int|trigger&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,name,type</code></td>
+<td>Animator 파라미터를 저작한다</td>
+</tr>
+<tr>
+<td><code>animator.status</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>Read live Animator palettes and product publication metrics</td>
+</tr>
+</tbody></table></div>
+<h3>assets — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>assets.modeldiag</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>모델 소비 계수를 읽는다(상태를 바꾸지 않는다)</td>
+</tr>
+<tr>
+<td><code>assets.unload</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>사용하지 않는 에셋 캐시 정리</td>
+</tr>
+</tbody></table></div>
+<h3>bt — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>bt.status</code></td>
+<td>bt.reset</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)</td>
+</tr>
+</tbody></table></div>
+<h3>camera — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>camera.editor</code></td>
+<td>-</td>
+<td><code>match | follow [on|off] | status</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>에디터 카메라를 게임 카메라와 같은 시점으로</td>
+</tr>
+</tbody></table></div>
+<h3>cli — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cli.drain.budget</code></td>
+<td>-</td>
+<td><code>[&lt;시간ms&gt; &lt;개수&gt;]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>서비스 큐 드레인 예산을 읽거나 바꾼다(LC5 · SLO 게이트의 변이용)</td>
+</tr>
+<tr>
+<td><code>cli.echo.args</code></td>
+<td>-</td>
+<td><code>&lt;인자&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>tokenizer가 만든 토큰을 길이와 함께 되비춘다(LC0 parser golden)</td>
+</tr>
+</tbody></table></div>
+<h3>commands — 3</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>commands.describe</code></td>
+<td>-</td>
+<td><code>&lt;이름&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>명령 하나의 descriptor 상세를 낸다</td>
+</tr>
+<tr>
+<td><code>commands.list</code></td>
+<td>-</td>
+<td><code>[경로]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>등록 명령 snapshot 을 TSV 로 낸다(소스 스크래핑 대체)</td>
+</tr>
+<tr>
+<td><code>commands.selftest</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>registry 무결성을 판정한다(이름 중복·요약 누락·descriptor 부재)</td>
+</tr>
+</tbody></table></div>
+<h3>component — 3</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>component.add</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트 이름&gt; &lt;컴포넌트 타입&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,type</code></td>
+<td>오브젝트에 컴포넌트를 붙인다</td>
+</tr>
+<tr>
+<td><code>component.list</code></td>
+<td>-</td>
+<td><code>[filter]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>filter=</code></td>
+<td>등록된 컴포넌트 타입을 로그에 남긴다</td>
+</tr>
+<tr>
+<td><code>component.remove</code></td>
+<td>-</td>
+<td><code>&lt;target&gt; &lt;component&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,component</code></td>
+<td>Remove an optional component with Undo</td>
+</tr>
+</tbody></table></div>
+<h3>crash — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>crash.status</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>크래시 덤프 기록자 등록 여부와 덤프 경로를 확인한다</td>
+</tr>
+</tbody></table></div>
+<h3>dump — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dump.list</code></td>
+<td>-</td>
+<td><code>[limit]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>limit:integer=10</code></td>
+<td>크래시 덤프 목록을 최대 limit개 조회한다</td>
+</tr>
+<tr>
+<td><code>dump.show</code></td>
+<td>-</td>
+<td><code>[limit]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>limit:integer=10</code></td>
+<td>덤프 목록과 최신 덤프 요약을 조회한다</td>
+</tr>
+</tbody></table></div>
+<h3>dx12 — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dx12.live</code></td>
+<td>-</td>
+<td><code>on|status|remove-device scene|host</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>action=status</code></td>
+<td>EnhancedRenderer 메인 런타임 상태</td>
+</tr>
+</tbody></table></div>
+<h3>game — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>game.pak</code></td>
+<td>-</td>
+<td>—</td>
+<td>Long</td>
+<td align="center">—</td>
+<td>—</td>
+<td>Release Player 패키지를 빌드·검증 후 Build/Staging에 게시한다</td>
+</tr>
+</tbody></table></div>
+<h3>gc — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>gc.collect</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>관리 힙 확정 수집(씬 전환이 자동으로 부르는 그 경로)</td>
+</tr>
+<tr>
+<td><code>gc.stats</code></td>
+<td>gc.delta</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>label=</code></td>
+<td>관리 힙 지표를 낸다(gc.delta는 직전 대비 증감)</td>
+</tr>
+</tbody></table></div>
+<h3>gpu — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>gpu.baseline</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>현재 상태를 기준선으로 삼는다</td>
+</tr>
+<tr>
+<td><code>gpu.census</code></td>
+<td>gpu.delta</td>
+<td><code>[라벨]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>label=</code></td>
+<td>VRAM과 엔진 에셋 수를 로그에 기록</td>
+</tr>
+</tbody></table></div>
+<h3>help — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>help</code></td>
+<td>-</td>
+<td><code>[명령]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>명령 목록 또는 명령 하나의 상세를 낸다</td>
+</tr>
+</tbody></table></div>
+<h3>lifecycle — 3</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>lifecycle.dump</code></td>
+<td>-</td>
+<td><code>[파일]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>path=lifecycle_trace.tsv</code></td>
+<td>기록을 TSV로 쓴다(기록 0건이면 실패로 끝난다)</td>
+</tr>
+<tr>
+<td><code>lifecycle.registry</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>생명주기 등록 수와 대기 중인 초기화 수를 조회한다</td>
+</tr>
+<tr>
+<td><code>lifecycle.trace</code></td>
+<td>-</td>
+<td><code>on [틱프레임]|off|clear|status</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>생명주기 호출 순서를 받아 적는다</td>
+</tr>
+</tbody></table></div>
+<h3>light — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>light.proxy</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>Read live light proxy values and publication counters</td>
+</tr>
+</tbody></table></div>
+<h3>log — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>log.flush</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>로그를 디스크에 즉시 반영</td>
+</tr>
+</tbody></table></div>
+<h3>mem — 4</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mem.delta</code></td>
+<td>-</td>
+<td><code>[라벨]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>label=</code></td>
+<td>기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)</td>
+</tr>
+<tr>
+<td><code>mem.hook</code></td>
+<td>-</td>
+<td><code>on|stack|off|top|status</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>CRT 할당 훅 — 호출 계수, stack 은 귀속까지(디버그 CRT 전용)</td>
+</tr>
+<tr>
+<td><code>mem.reset</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>churn 누계와 기준선을 0으로 — 구간 측정용</td>
+</tr>
+<tr>
+<td><code>mem.stats</code></td>
+<td>-</td>
+<td><code>[라벨]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>label=</code></td>
+<td>CRT 현재 live 블록·바이트를 찍는다(누계는 mem.hook 이 따로 센다)</td>
+</tr>
+</tbody></table></div>
+<h3>model — 3</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>model.load</code></td>
+<td>-</td>
+<td><code>&lt;경로&gt;</code></td>
+<td>Long</td>
+<td align="center">—</td>
+<td><code>path</code></td>
+<td>모델을 에셋으로 임포트한다(fbx/gltf/glb/obj)</td>
+</tr>
+<tr>
+<td><code>model.loadcached</code></td>
+<td>-</td>
+<td><code>&lt;모델 경로&gt;</code></td>
+<td>Long</td>
+<td align="center">—</td>
+<td><code>path</code></td>
+<td>에디터 드롭 경로(LoadCachedModelShared)로 모델을 연다</td>
+</tr>
+<tr>
+<td><code>model.place</code></td>
+<td>-</td>
+<td><code>&lt;이름&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>model</code></td>
+<td>임포트한 모델을 활성 씬에 배치한다</td>
+</tr>
+</tbody></table></div>
+<h3>object — 9</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>object.create</code></td>
+<td>-</td>
+<td><code>&lt;이름&gt; [타입]</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>name,type=Empty</code></td>
+<td>빈 오브젝트를 만든다(Empty/Light/Camera/Mesh)</td>
+</tr>
+<tr>
+<td><code>object.delete</code></td>
+<td>-</td>
+<td><code>&lt;target&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target</code></td>
+<td>Delete an object subtree with Undo</td>
+</tr>
+<tr>
+<td><code>object.describe</code></td>
+<td>-</td>
+<td><code>&lt;name-or-id&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>target</code></td>
+<td>Read object identity and name</td>
+</tr>
+<tr>
+<td><code>object.duplicate</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt; [새 이름]</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,name=</code></td>
+<td>오브젝트를 복제한다(에디터 Ctrl+D와 같은 원시 함수)</td>
+</tr>
+<tr>
+<td><code>object.parent</code></td>
+<td>-</td>
+<td><code>&lt;자식&gt; &lt;부모 | -&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,parent</code></td>
+<td>오브젝트의 부모를 바꾼다(-는 씬 루트로 올린다)</td>
+</tr>
+<tr>
+<td><code>object.properties</code></td>
+<td>-</td>
+<td><code>&lt;target&gt; &lt;component&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>target,component</code></td>
+<td>Read reflected component fields and values</td>
+</tr>
+<tr>
+<td><code>object.property</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt; &lt;컴포넌트&gt; &lt;필드&gt; &lt;값&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,component,field,value:value</code></td>
+<td>리플렉션으로 프로퍼티를 설정한다</td>
+</tr>
+<tr>
+<td><code>object.rename</code></td>
+<td>-</td>
+<td><code>&lt;name-or-id&gt; &lt;new-name&gt;</code></td>
+<td>Immediate</td>
+<td align="center">●</td>
+<td><code>target,name</code></td>
+<td>Rename through the shared editor undo transaction</td>
+</tr>
+<tr>
+<td><code>object.transform</code></td>
+<td>-</td>
+<td><code>&lt;이름&gt; &lt;px py pz&gt; [rx ry rz] [sx sy sz]</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,position:vec3,rotation:vec3=0 0 0,scale:vec3=1 1 1</code></td>
+<td>변환을 지정한다(회전은 도)</td>
+</tr>
+</tbody></table></div>
+<h3>pipeline — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pipeline.nodes</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>라이브 파이프라인의 노드 조립 결과를 한 줄씩 낸다</td>
+</tr>
+</tbody></table></div>
+<h3>pix — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pix.capture</code></td>
+<td>-</td>
+<td><code>begin|end|status</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>action=status</code></td>
+<td>PIX 주입 실행의 명시적 GPU 캡처 경계</td>
+</tr>
+</tbody></table></div>
+<h3>play — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>play</code></td>
+<td>stop</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>에디터의 재생·정지와 같은 동작</td>
+</tr>
+<tr>
+<td><code>play.state</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>재생 상태(gameStart·paused·씬 로드)를 낸다</td>
+</tr>
+</tbody></table></div>
+<h3>prefab — 6</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>prefab.create</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트 이름&gt; &lt;프리팹 이름&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>오브젝트로 프리팹을 만들어 저장한다</td>
+</tr>
+<tr>
+<td><code>prefab.instantiate</code></td>
+<td>-</td>
+<td><code>&lt;프리팹 이름&gt; [인스턴스 이름]</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>prefab,name=</code></td>
+<td>프리팹을 씬에 소환한다</td>
+</tr>
+<tr>
+<td><code>prefab.objectguid</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트 이름&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>오브젝트의 프리팹 objectGuid를 낸다</td>
+</tr>
+<tr>
+<td><code>prefab.overrides</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>프리팹 인스턴스에 기록된 오버라이드를 나열한다</td>
+</tr>
+<tr>
+<td><code>prefab.status</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>프리팹 등록·캐시 상태를 낸다</td>
+</tr>
+<tr>
+<td><code>prefab.update</code></td>
+<td>-</td>
+<td><code>&lt;소스 오브젝트&gt; &lt;프리팹 이름&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>기존 프리팹을 소스 오브젝트로 갱신한다</td>
+</tr>
+</tbody></table></div>
+<h3>profile — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>profile.stats</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>프로파일러 자체 비용과 용량 소진(교란 없음)</td>
+</tr>
+</tbody></table></div>
+<h3>quit — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>quit</code></td>
+<td>exit</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>호스트를 종료한다</td>
+</tr>
+</tbody></table></div>
+<h3>render — 4</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>render.backend</code></td>
+<td>-</td>
+<td><code>status</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>action=status</code></td>
+<td>Editor scene/ImGui DX12 고정 상태 조회(Player 백엔드는 Build Settings)</td>
+</tr>
+<tr>
+<td><code>render.matmode</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt; &lt;opaque|transparent&gt;</code></td>
+<td>Immediate</td>
+<td align="center">●</td>
+<td><code>target,mode</code></td>
+<td>오브젝트 재질의 렌더링 모드를 바꾼다</td>
+</tr>
+<tr>
+<td><code>render.rtinfo</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>창·뷰포트·추종 텍스처 크기를 나란히 찍는다</td>
+</tr>
+<tr>
+<td><code>render.shadowinfo</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>그림자 캐스케이드 계산 결과를 출력한다(스냅샷 검증용)</td>
+</tr>
+</tbody></table></div>
+<h3>scene — 15</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>scene.bonedump</code></td>
+<td>-</td>
+<td><code>[개수]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>대조 덤프 — 뼈 오브젝트 이름 vs 스켈레톤 뼈 이름(조회 실패 진단)</td>
+</tr>
+<tr>
+<td><code>scene.ddol</code></td>
+<td>-</td>
+<td><code>&lt;이름&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>오브젝트를 DontDestroyOnLoad로 — 씬 이송 경로 시험용</td>
+</tr>
+<tr>
+<td><code>scene.dump</code></td>
+<td>-</td>
+<td><code>[라벨]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>활성 씬의 오브젝트 계층을 로그에 남긴다</td>
+</tr>
+<tr>
+<td><code>scene.flag</code></td>
+<td>-</td>
+<td><code>[&lt;dirtytraversal|bonecache&gt; [0|1]]</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)</td>
+</tr>
+<tr>
+<td><code>scene.hierarchycheck</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)</td>
+</tr>
+<tr>
+<td><code>scene.load</code></td>
+<td>scene.switch</td>
+<td><code>&lt;경로&gt;</code></td>
+<td>Long</td>
+<td align="center">—</td>
+<td>—</td>
+<td>씬을 로드한다(활성 씬은 그대로)</td>
+</tr>
+<tr>
+<td><code>scene.new</code></td>
+<td>-</td>
+<td><code>[이름]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)</td>
+</tr>
+<tr>
+<td><code>scene.save</code></td>
+<td>-</td>
+<td><code>&lt;경로&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>활성 씬을 .creator로 저장한다</td>
+</tr>
+<tr>
+<td><code>scene.select</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트 이름&gt;</code></td>
+<td>Immediate</td>
+<td align="center">●</td>
+<td><code>target</code></td>
+<td>오브젝트를 에디터 선택으로 지정한다</td>
+</tr>
+<tr>
+<td><code>scene.selection</code></td>
+<td>-</td>
+<td><code>&lt;라벨&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>단일 선택과 복수 선택을 따로 낸다(둘의 어긋남을 드러낸다)</td>
+</tr>
+<tr>
+<td><code>scene.sparseresolver</code></td>
+<td>-</td>
+<td><code>0|1|print</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>X5 dirty-root sparse resolve·A/B 검사</td>
+</tr>
+<tr>
+<td><code>scene.transformdigest</code></td>
+<td>-</td>
+<td><code>[라벨]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>활성 씬 전체의 트랜스폼 값 다이제스트(저장·재로드 대조용)</td>
+</tr>
+<tr>
+<td><code>scene.transformpull</code></td>
+<td>-</td>
+<td><code>[print]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>X6 C# 즉시 pull 계측 스냅샷을 조회한다</td>
+</tr>
+<tr>
+<td><code>scene.transformstats</code></td>
+<td>-</td>
+<td><code>[0|1|print]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>X0 UI/Spatial·단계·구성·프레임 topology 계측</td>
+</tr>
+<tr>
+<td><code>scene.transformwritestats</code></td>
+<td>-</td>
+<td><code>[0|1|print]</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>X1 로컬 쓰기 publish 출처 계측</td>
+</tr>
+</tbody></table></div>
+<h3>script — 6</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>script.add</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt; &lt;타입&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>C# 스크립트를 오브젝트에 부착한다</td>
+</tr>
+<tr>
+<td><code>script.fields</code></td>
+<td>-</td>
+<td><code>&lt;id&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>instance:integer</code></td>
+<td>스크립트의 노출 필드와 현재 값을 확인한다</td>
+</tr>
+<tr>
+<td><code>script.invoke</code></td>
+<td>-</td>
+<td><code>&lt;타입&gt; &lt;메서드&gt; [인자]...</code></td>
+<td>Long</td>
+<td align="center">—</td>
+<td>—</td>
+<td>표식된 static 메서드를 호출한다([EngineCallable] 없는 것은 거부)</td>
+</tr>
+<tr>
+<td><code>script.reload</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>게임 스크립트 어셈블리를 다시 로드한다(핫리로드)</td>
+</tr>
+<tr>
+<td><code>script.set</code></td>
+<td>-</td>
+<td><code>&lt;id&gt; &lt;인덱스&gt; &lt;값&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>instance:integer,index:integer,value</code></td>
+<td>노출 필드 값을 바꾼다</td>
+</tr>
+<tr>
+<td><code>script.status</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>CLR 상태와 활성 스크립트 수를 확인한다</td>
+</tr>
+</tbody></table></div>
+<h3>tag — 4</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tag.add</code></td>
+<td>-</td>
+<td><code>&lt;name&gt;</code></td>
+<td>Immediate</td>
+<td align="center">●</td>
+<td><code>name</code></td>
+<td>Add and persist a project tag with Undo</td>
+</tr>
+<tr>
+<td><code>tag.has</code></td>
+<td>-</td>
+<td><code>&lt;name&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>name</code></td>
+<td>Query a project tag</td>
+</tr>
+<tr>
+<td><code>tag.list</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>Read project tags and layers</td>
+</tr>
+<tr>
+<td><code>tag.remove</code></td>
+<td>-</td>
+<td><code>&lt;name&gt;</code></td>
+<td>Immediate</td>
+<td align="center">●</td>
+<td><code>name</code></td>
+<td>Remove and persist a project tag with Undo</td>
+</tr>
+</tbody></table></div>
+<h3>ui — 7</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ui.anchor</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트&gt; &lt;minX&gt; &lt;minY&gt; &lt;maxX&gt; &lt;maxY&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,minX:number,minY:number,maxX:number,maxY:number</code></td>
+<td>앵커를 직접 지정한다</td>
+</tr>
+<tr>
+<td><code>ui.hitbox</code></td>
+<td>-</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>버튼의 rect와 클릭 판정 상자를 나란히 출력한다</td>
+</tr>
+<tr>
+<td><code>ui.pos</code></td>
+<td>-</td>
+<td><code>&lt;target&gt; &lt;x&gt; &lt;y&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,x:number,y:number</code></td>
+<td>UI anchored position을 편집한다</td>
+</tr>
+<tr>
+<td><code>ui.rect</code></td>
+<td>-</td>
+<td><code>&lt;오브젝트|*&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td>—</td>
+<td>오브젝트 이하의 worldRect·sizeDelta·앵커·배율을 출력한다</td>
+</tr>
+<tr>
+<td><code>ui.screenpos</code></td>
+<td>-</td>
+<td><code>&lt;target&gt; &lt;x&gt; &lt;y&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,x:number,y:number</code></td>
+<td>UI 화면 위치를 편집한다</td>
+</tr>
+<tr>
+<td><code>ui.size</code></td>
+<td>-</td>
+<td><code>&lt;target&gt; &lt;x&gt; &lt;y&gt;</code></td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>target,x:number,y:number</code></td>
+<td>UI 크기를 편집한다</td>
+</tr>
+<tr>
+<td><code>ui.status</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>UI 계층·캔버스 연결 상태를 낸다</td>
+</tr>
+</tbody></table></div>
+<h3>undo — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>undo</code></td>
+<td>redo</td>
+<td>—</td>
+<td>Frames</td>
+<td align="center">●</td>
+<td><code>()</code></td>
+<td>에디터의 Ctrl+Z / Ctrl+Y와 같은 호출</td>
+</tr>
+<tr>
+<td><code>undo.state</code></td>
+<td>-</td>
+<td><code>&lt;라벨&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>편집 스택과 게임 스택의 Undo 깊이를 따로 낸다</td>
+</tr>
+</tbody></table></div>
+<h3>wait — 1</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>wait</code></td>
+<td>-</td>
+<td><code>&lt;프레임&gt;</code></td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td>—</td>
+<td>지정 프레임만큼 다음 명령을 미룬다</td>
+</tr>
+</tbody></table></div>
+<h3>window — 2</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>별칭</th>
+<th>인자</th>
+<th>비용</th>
+<th align="center">Undo</th>
+<th>JSON parameters</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>window.info</code></td>
+<td>-</td>
+<td>—</td>
+<td>Immediate</td>
+<td align="center">—</td>
+<td><code>()</code></td>
+<td>엔진이 인식하는 클라이언트 크기를 출력한다</td>
+</tr>
+<tr>
+<td><code>window.resize</code></td>
+<td>-</td>
+<td><code>&lt;너비&gt; &lt;높이&gt;</code></td>
+<td>Frames</td>
+<td align="center">—</td>
+<td><code>width:integer,height:integer</code></td>
+<td>창 클라이언트 크기를 바꾼다(해상도 검증용)</td>
+</tr>
+</tbody></table></div>
+<h2>3. Commandlet — 48개</h2>
+<p>검증 완료 후 역할이 끝난 일회성 하네스는 제거한다. 현재 제품 계약을 지키는 회귀·측정 Commandlet은 유지한다. 코퍼스 요구사항과 실제 실행 성공은 별개다. 모든 정상 반환 경로는 terminal 결과를 내며, <code>crash.test</code>의 유효한 입력은 덤프 검증을 위해 프로세스를 의도적으로 종료한다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>인자</th>
+<th>비용</th>
+<th>검증</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>assets.decodeab</code></td>
+<td><code>[root] [limit]</code></td>
+<td>Long</td>
+<td>Compare PNG decoder bytes</td>
+</tr>
+<tr>
+<td><code>assets.decodeabhdr</code></td>
+<td><code>[root]</code></td>
+<td>Long</td>
+<td>Compare HDR decoder values</td>
+</tr>
+<tr>
+<td><code>assets.scenemodel</code></td>
+<td><code>[reload &lt;모델 이름&gt;]</code></td>
+<td>Frames</td>
+<td>활성 씬의 모델 소비가 typed generation handle로 서 있는지 본다</td>
+</tr>
+<tr>
+<td><code>assets.texturebench</code></td>
+<td><code>[limit]</code></td>
+<td>Long</td>
+<td>Measure texture decode mip and compression stages</td>
+</tr>
+<tr>
+<td><code>blackboard.authoring.probe</code></td>
+<td><code>&lt;이름&gt; [empty|noname]</code></td>
+<td>Frames</td>
+<td>Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다</td>
+</tr>
+<tr>
+<td><code>collisionmatrix.authoring.probe</code></td>
+<td><code>[escape]</code></td>
+<td>Frames</td>
+<td>충돌 행렬 저장·재로드 왕복과 설정 루트 이탈 거부를 본다</td>
+</tr>
+<tr>
+<td><code>crash.test</code></td>
+<td><code>[av|abort|terminate|throw]</code></td>
+<td>Immediate</td>
+<td>의도적인 프로세스 종료로 덤프 경로를 검증한다</td>
+</tr>
+<tr>
+<td><code>dx12.forward</code></td>
+<td>—</td>
+<td>Long</td>
+<td>DX12 forward 패스를 격리 씬에서 리드백으로 판정한다</td>
+</tr>
+<tr>
+<td><code>dx12.forwardshade</code></td>
+<td>—</td>
+<td>Long</td>
+<td>DX12 forward 셰이딩 결과를 리드백으로 판정한다</td>
+</tr>
+<tr>
+<td><code>dx12.gbuffer</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>GBuffer 패스 검증(입력조립·MRT5·깊이·그래프 배리어)</td>
+</tr>
+<tr>
+<td><code>dx12.gizmoscene</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>Gizmo 씬 연결 검증(밀봉 복사·4패스 체인·타깃 공유)</td>
+</tr>
+<tr>
+<td><code>dx12.post</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>DX12 후처리 패스를 리드백으로 판정한다</td>
+</tr>
+<tr>
+<td><code>dx12.scene</code></td>
+<td>—</td>
+<td>Long</td>
+<td>씬 연결 검증(카메라 스냅샷·메시 업로드·실제 드로우)</td>
+</tr>
+<tr>
+<td><code>dx12.selftest</code></td>
+<td><code>&lt;texture-path&gt; [output]</code></td>
+<td>Frames</td>
+<td>DX12 브링업 자가 검증(삼각형 렌더 → PNG)</td>
+</tr>
+<tr>
+<td><code>dx12.shadowquality</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>그림자 품질 검증(경사 비례 편향·캐스케이드 경계 블렌딩 A/B)</td>
+</tr>
+<tr>
+<td><code>dx12.skinning</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>GBuffer 스키닝 검증(본 이동·가중 혼합·비스킨드 불변)</td>
+</tr>
+<tr>
+<td><code>dx12.ui</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>DX12 UI 패스를 리드백으로 판정한다</td>
+</tr>
+<tr>
+<td><code>experiment.cooked</code></td>
+<td><code>[경로]</code></td>
+<td>Long</td>
+<td>쿠킹 포맷 왕복 무손실·거부 동작(경로를 주면 실자산 왕복까지)</td>
+</tr>
+<tr>
+<td><code>foliage.authoring.probe</code></td>
+<td><code>&lt;이름&gt; [escape]</code></td>
+<td>Frames</td>
+<td>Foliage 저작 트랜잭션 왕복과 루트 이탈 거부를 본다</td>
+</tr>
+<tr>
+<td><code>inputmap.authoring.probe</code></td>
+<td><code>&lt;save|verify&gt; &lt;이름&gt;</code></td>
+<td>Frames</td>
+<td>입력 액션맵 저장·재기동 왕복으로 payload 복원을 본다</td>
+</tr>
+<tr>
+<td><code>inputmap.corpus.probe</code></td>
+<td>—</td>
+<td>Long</td>
+<td>입력 액션맵 코퍼스를 전수로 읽어 계수를 낸다</td>
+</tr>
+<tr>
+<td><code>material.corpus.probe</code></td>
+<td><code>&lt;이름&gt; ...</code></td>
+<td>Long</td>
+<td>standalone material identity/reference 왕복</td>
+</tr>
+<tr>
+<td><code>object.rootref</code></td>
+<td><code>&lt;오브젝트&gt; [루트|-]</code></td>
+<td>Frames</td>
+<td>Bone형 same-scene root 참조를 설정/조회한다</td>
+</tr>
+<tr>
+<td><code>prefab.corpus.digest</code></td>
+<td><code>&lt;라벨&gt; &lt;이름&gt; ...</code></td>
+<td>Long</td>
+<td>prefab identity/override 왕복 digest</td>
+</tr>
+<tr>
+<td><code>profile.selftest</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>CPU 프로파일러 특성화 검사(중첩·멀티스레드·프레임경계·용량초과)</td>
+</tr>
+<tr>
+<td><code>render.livecheck</code></td>
+<td><code>[너비 높이]</code></td>
+<td>Immediate</td>
+<td>resize·다중 뷰·표시 슬롯 회전 회귀 판정</td>
+</tr>
+<tr>
+<td><code>shadermeta.probe</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>ShaderMeta 실자산 수용과 잘못된 문서 거절을 함께 판정한다</td>
+</tr>
+<tr>
+<td><code>terrain.authoring.probe</code></td>
+<td><code>&lt;이름&gt; &lt;텍스처|-&gt;</code></td>
+<td>Frames</td>
+<td>Terrain writer 트랜잭션 회귀 검사</td>
+</tr>
+<tr>
+<td><code>ui.navprobe</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>UI 내비게이션 저작 계층을 세워 탐색 결과를 판정한다</td>
+</tr>
+<tr>
+<td><code>vk.decal</code></td>
+<td>—</td>
+<td>Long</td>
+<td>Decal 공용 패스 — GBuffer snapshot·depth-read·MRT blend 대조</td>
+</tr>
+<tr>
+<td><code>vk.deferred</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>Deferred 공용 패스 — GBuffer consume·fullscreen DX12/Vulkan 대조</td>
+</tr>
+<tr>
+<td><code>vk.forward</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>Forward+ 공용 패스 — compute·buffer·blend·mesh DX12/Vulkan 대조</td>
+</tr>
+<tr>
+<td><code>vk.gbuffer</code></td>
+<td>—</td>
+<td>Long</td>
+<td>GBuffer 공용 패스 — MRT5·texture·sampler·mesh DX12/Vulkan 대조</td>
+</tr>
+<tr>
+<td><code>vk.grid</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>그리드 패스를 Vulkan 으로 — dx12.grid 와 픽셀 대조(5d)</td>
+</tr>
+<tr>
+<td><code>vk.shadow</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>Shadow 공용 패스 — depth array·mesh DX12/Vulkan 대조</td>
+</tr>
+<tr>
+<td><code>vk.texturecodec</code></td>
+<td>—</td>
+<td>Frames</td>
+<td>Validate neutral texture bytes across DX12 and Vulkan</td>
+</tr>
+<tr>
+<td><code>experiment.matmigrate</code></td>
+<td>—</td>
+<td>독립 진입점</td>
+<td>합성 검사와 실제 제품 경로 검사</td>
+</tr>
+<tr>
+<td><code>experiment.matresolve</code></td>
+<td>—</td>
+<td>독립 진입점</td>
+<td>합성 검사와 실제 제품 경로 검사</td>
+</tr>
+<tr>
+<td><code>experiment.matscript</code></td>
+<td>—</td>
+<td>독립 진입점</td>
+<td>합성 검사와 실제 제품 경로 검사</td>
+</tr>
+</tbody></table></div>
+<h2>4. Player 제품 — 7개</h2>
+<p>Shipping에서는 명령 서비스·소켓이 빌드에서 제외된다. 아래는 Development 제공 범위다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>인자</th>
+<th>동작</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>help</code></td>
+<td><code>[명령]</code></td>
+<td>명령 목록 또는 명령 하나의 상세를 낸다</td>
+</tr>
+<tr>
+<td><code>player.move</code></td>
+<td><code>&lt;이름&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;</code></td>
+<td>오브젝트의 로컬 위치를 옮긴다(재시작 없이 반영된다)</td>
+</tr>
+<tr>
+<td><code>player.object</code></td>
+<td><code>&lt;이름&gt;</code></td>
+<td>오브젝트 하나의 위치·회전·크기를 낸다</td>
+</tr>
+<tr>
+<td><code>player.objects</code></td>
+<td><code>[이름 조각]</code></td>
+<td>활성 씬의 오브젝트 이름을 나열한다</td>
+</tr>
+<tr>
+<td><code>player.scene</code></td>
+<td>—</td>
+<td>활성 씬 이름과 오브젝트 수를 낸다</td>
+</tr>
+<tr>
+<td><code>player.status</code></td>
+<td>—</td>
+<td>프레임 수·재생 상태·명령 큐 깊이를 낸다</td>
+</tr>
+<tr>
+<td><code>quit</code></td>
+<td>—</td>
+<td>호스트를 종료한다</td>
+</tr>
+</tbody></table></div>
+<h2>5. 제거 및 분리</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>이름</th>
+<th>정리 결과</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cli.probe.timing</code></td>
+<td>종료된 LC0 지연 계측 제거; HTTP 요청 timing 사용</td>
+</tr>
+<tr>
+<td><code>commands.dump</code></td>
+<td>종료된 등록 스냅샷 제거; <code>commands.list</code> 사용</td>
+</tr>
+<tr>
+<td><code>dx12.bench11</code></td>
+<td>완료된 DX11/DX12 비용 비교와 전용 구현 제거</td>
+</tr>
+<tr>
+<td><code>dx12.encoderbench</code></td>
+<td>완료된 encoder 선택 벤치와 전용 구현 제거</td>
+</tr>
+<tr>
+<td><code>dx12.forwardscale</code></td>
+<td>광원 수별 시간 비교 제거; <code>dx12.forwardshade</code> 픽셀 비교 유지</td>
+</tr>
+<tr>
+<td><code>dx12.postscale</code></td>
+<td>Uber/분리 패스 시간 비교 제거; <code>vk.post</code> 픽셀 비교 유지</td>
+</tr>
+<tr>
+<td><code>dx12.ssaoscale</code></td>
+<td>시간 비교 및 제품 SSAO의 옛 참조 PSO·셰이더 제거</td>
+</tr>
+<tr>
+<td><code>experiment.animlive</code></td>
+<td>제품 진단 <code>animator.status</code>로 이전</td>
+</tr>
+<tr>
+<td><code>experiment.matparity</code></td>
+<td>폐기된 legacy material packer의 종료된 대조 검사 제거</td>
+</tr>
+<tr>
+<td><code>perf.reflect</code></td>
+<td>종료된 CT7 측정 및 소비자의 측정 전용 준비 제거; <code>reflect.golden</code> 유지</td>
+</tr>
+<tr>
+<td><code>selftest</code></td>
+<td>통합 검증 진입점 제거; 별도 Commandlet 실행 경로 사용</td>
+</tr>
+<tr>
+<td><code>tag.authoring.probe</code></td>
+<td>제품 <code>tag.list/has/add/remove</code>로 이전</td>
+</tr>
+<tr>
+<td><code>animator.state</code></td>
+<td>사용하지 않는 상태·스크립트 강제 실행 하네스 제거; 정상 Animator 전이 경로 유지</td>
+</tr>
+<tr>
+<td><code>animator.exit</code></td>
+<td>사용하지 않는 강제 상태 종료 하네스 제거</td>
+</tr>
+</tbody></table></div>
+<h3>닫힌·완료 계획 소속 은퇴 — 2026-09-12 · 68종</h3>
+<p>기준은 둘을 함께 충족하는 것이다: (1) 그 Commandlet 을 낳은 계획이 <a href="../plans/archive/README.html">보관함</a> 에 들어갔거나 PHASE 17 처럼 폐쇄됐고, (2) 활성 계획 문서가 그 이름을 더 이상 부르지 않는다.
+활성 계획이 아직 부르는 Commandlet 은 같은 보관함 계획 소속이어도 남겨 두었다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>은퇴한 이름</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>animator.scene.probe</code></td>
+</tr>
+<tr>
+<td><code>asset.guid.rename.probe</code></td>
+</tr>
+<tr>
+<td><code>assets.generation</code></td>
+</tr>
+<tr>
+<td><code>assets.generationcorpus</code></td>
+</tr>
+<tr>
+<td><code>assets.identity</code></td>
+</tr>
+<tr>
+<td><code>assets.modelbench</code></td>
+</tr>
+<tr>
+<td><code>assets.modelrender</code></td>
+</tr>
+<tr>
+<td><code>assets.sidecar</code></td>
+</tr>
+<tr>
+<td><code>dx12.decal</code></td>
+</tr>
+<tr>
+<td><code>dx12.descriptorheap</code></td>
+</tr>
+<tr>
+<td><code>dx12.fog</code></td>
+</tr>
+<tr>
+<td><code>dx12.gizmoicon</code></td>
+</tr>
+<tr>
+<td><code>dx12.gizmoline</code></td>
+</tr>
+<tr>
+<td><code>dx12.grid</code></td>
+</tr>
+<tr>
+<td><code>dx12.ibl</code></td>
+</tr>
+<tr>
+<td><code>dx12.iblshade</code></td>
+</tr>
+<tr>
+<td><code>dx12.parallel</code></td>
+</tr>
+<tr>
+<td><code>dx12.psocache</code></td>
+</tr>
+<tr>
+<td><code>dx12.rendergraph</code></td>
+</tr>
+<tr>
+<td><code>dx12.resize</code></td>
+</tr>
+<tr>
+<td><code>dx12.skybox</code></td>
+</tr>
+<tr>
+<td><code>dx12.ssao</code></td>
+</tr>
+<tr>
+<td><code>dx12.ssgi</code></td>
+</tr>
+<tr>
+<td><code>dx12.ssr</code></td>
+</tr>
+<tr>
+<td><code>dx12.sss</code></td>
+</tr>
+<tr>
+<td><code>dx12.wireframe</code></td>
+</tr>
+<tr>
+<td><code>experiment.animevent</code></td>
+</tr>
+<tr>
+<td><code>experiment.animmask</code></td>
+</tr>
+<tr>
+<td><code>experiment.animpose</code></td>
+</tr>
+<tr>
+<td><code>experiment.animtick</code></td>
+</tr>
+<tr>
+<td><code>experiment.boneresolve</code></td>
+</tr>
+<tr>
+<td><code>experiment.catalog</code></td>
+</tr>
+<tr>
+<td><code>experiment.editorsurface</code></td>
+</tr>
+<tr>
+<td><code>experiment.foliage</code></td>
+</tr>
+<tr>
+<td><code>experiment.matcook</code></td>
+</tr>
+<tr>
+<td><code>experiment.matruntime</code></td>
+</tr>
+<tr>
+<td><code>experiment.scenecook</code></td>
+</tr>
+<tr>
+<td><code>experiment.skinbounds</code></td>
+</tr>
+<tr>
+<td><code>lifecycle.stress</code></td>
+</tr>
+<tr>
+<td><code>reflect.golden</code></td>
+</tr>
+<tr>
+<td><code>rhi.uploadsegments</code></td>
+</tr>
+<tr>
+<td><code>scene.executiongraph</code></td>
+</tr>
+<tr>
+<td><code>scene.hierarchymutation</code></td>
+</tr>
+<tr>
+<td><code>scene.proxybench</code></td>
+</tr>
+<tr>
+<td><code>scene.proxydirty</code></td>
+</tr>
+<tr>
+<td><code>scene.sparseresolver.check</code></td>
+</tr>
+<tr>
+<td><code>scene.transformbulk</code></td>
+</tr>
+<tr>
+<td><code>scene.transformdomains</code></td>
+</tr>
+<tr>
+<td><code>scene.transformpull.check</code></td>
+</tr>
+<tr>
+<td><code>scene.transformwritestats.check</code></td>
+</tr>
+<tr>
+<td><code>scene.traversalbench</code></td>
+</tr>
+<tr>
+<td><code>serialize.bench</code></td>
+</tr>
+<tr>
+<td><code>serialize.nodeequal</code></td>
+</tr>
+<tr>
+<td><code>serialize.rymlerror</code></td>
+</tr>
+<tr>
+<td><code>vk.fog</code></td>
+</tr>
+<tr>
+<td><code>vk.gizmoicon</code></td>
+</tr>
+<tr>
+<td><code>vk.gizmoline</code></td>
+</tr>
+<tr>
+<td><code>vk.ibl</code></td>
+</tr>
+<tr>
+<td><code>vk.parallel</code></td>
+</tr>
+<tr>
+<td><code>vk.post</code></td>
+</tr>
+<tr>
+<td><code>vk.selftest</code></td>
+</tr>
+<tr>
+<td><code>vk.skybox</code></td>
+</tr>
+<tr>
+<td><code>vk.ssao</code></td>
+</tr>
+<tr>
+<td><code>vk.ssgi</code></td>
+</tr>
+<tr>
+<td><code>vk.ssr</code></td>
+</tr>
+<tr>
+<td><code>vk.sss</code></td>
+</tr>
+<tr>
+<td><code>vk.ui</code></td>
+</tr>
+<tr>
+<td><code>vk.wireframe</code></td>
+</tr>
+</tbody></table></div>
+<p>은퇴와 함께 그것만 부르던 회귀 스크립트 27개와 전용 fixture 10개를 지웠고, run-all 에서 25칸이 빠졌다. Commandlet 을 불러 주던 C++ 자가검사 구현 41개는 이번 범위에 넣지 않았다 — 살아남은 검사가 같은 파일의 공용 호스트를 쓴다.</p>
+<p><code>assets.scenemodel</code>은 코퍼스 검사 및 reload 검증이므로 Commandlet으로 이동했다. <code>animator.param</code>과 <code>render.matmode</code>는 공통 GUI 편집 API 및 Undo 경로를 사용한다.</p>
+<h3>명시적 경로 입력 검사 — 1종(나머지 5종은 은퇴)</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>명령</th>
+<th>현재 입력</th>
+<th>유지한 검사 조건</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dx12.selftest</code></td>
+<td><code>&lt;texture-path&gt; [output]</code></td>
+<td>입력 텍스처의 GUID·owner 및 shader/material/RHI 계약</td>
+</tr>
+</tbody></table></div>
+<p>명령 본문이 Gunner/SU/scene.glb/Cube 텍스처를 임의로 선택하지 않는다.
+소비 스크립트의 코퍼스 기본값과 독립 기대값은 별개다. <code>verify-model-typed-consumers.ps1</code>에
+다른 모델·씬을 지정할 때는 <code>ExpectedPoseDigest</code>도 명시해야 한다.</p>
+<h3>남아 있는 코퍼스 기준</h3>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>대상</th>
+<th>현재 등록·성격</th>
+<th>의존성</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>assets.scenemodel</code></td>
+<td><strong>제품 등록에 잔존</strong></td>
+<td>Gunner를 포함한 씬의 embedded texture 추가 단정; §6 참고</td>
+</tr>
+<tr>
+<td>스킨 pose·coverage 소비 스크립트</td>
+<td>전용 회귀 시나리오</td>
+<td>지정 씬·모델 및 독립 pose/픽셀 기대값</td>
+</tr>
+<tr>
+<td>내장 shader/meta fixture</td>
+<td>엔진 계약용 검사 입력</td>
+<td>엔진의 기본 셰이더와 자가 검사 셰이더</td>
+</tr>
+</tbody></table></div>
+<p>코퍼스 파일 부재는 검사 통과나 기능 미구현의 증거가 아니다.</p>
+<h2>6. 결과 계약과 검증 경계</h2>
+<ul>
+<li>종료 상태: <code>succeeded</code>, <code>invalid_arguments</code>, <code>preconditions_failed</code>, <code>failed</code>, <code>cancelled</code>, <code>timed_out</code>, <code>internal_error</code>. 미보고 상태와 void 어댑터는 제거했다.</li>
+<li>결과는 소유형 값이다. 프로파일러·GPU·파이프라인·메모리·스크립트 필드와 검증 계수는 측정 지점에서 직접 수집하며 로그 재파싱으로 만들지 않는다.</li>
+<li>없는 CLR 인스턴스·모델·검사 코퍼스, 잘못된 숫자 및 지원하지 않는 동작은 실패 상태를 반환한다. Release에서 Debug CRT 지표를 0으로 보고하지 않는다.</li>
+<li><code>assets.identity</code>는 예상 벡터 대신 실제 계산 UUID를 반환하여 독립 언어 대조를 유지한다.</li>
+<li><code>dx12.selftest</code>의 material authoring round trip 실패와 누락된 canonical 코퍼스는 통신/명령 표면 정리 완료로 해결됐다고 간주하지 않는다. 최신 실행 판정은 <a href="Phase14_5Closure.html">종결 검토</a>에 기록한다.</li>
+</ul>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="1-실행-표면"></span><span id="2-editor-제품-명령--99개"></span><span id="3-commandlet--48개"></span><span id="4-player-제품--7개"></span><span id="5-제거-및-분리"></span><span id="6-결과-계약과-검증-경계"></span><span id="ai--1"></span><span id="animator--2"></span><span id="assets--2"></span><span id="bt--1"></span><span id="camera--1"></span><span id="cli--2"></span><span id="commands--3"></span><span id="component--3"></span><span id="crash--1"></span><span id="dump--2"></span><span id="dx12--1"></span><span id="game--1"></span><span id="gc--2"></span><span id="gpu--2"></span><span id="help--1"></span><span id="lifecycle--3"></span><span id="light--1"></span><span id="log--1"></span><span id="mem--4"></span><span id="model--3"></span><span id="object--9"></span><span id="pipeline--1"></span><span id="pix--1"></span><span id="play--2"></span><span id="prefab--6"></span><span id="profile--1"></span><span id="quit--1"></span><span id="render--4"></span><span id="scene--15"></span><span id="script--6"></span><span id="sec-1-실행-표면"></span><span id="sec-2-editor-제품-명령--99개"></span><span id="sec-3-commandlet--48개"></span><span id="sec-4-player-제품--7개"></span><span id="sec-5-제거-및-분리"></span><span id="sec-6-결과-계약과-검증-경계"></span><span id="tag--4"></span><span id="ui--7"></span><span id="undo--2"></span><span id="wait--1"></span><span id="window--2"></span><span id="남아-있는-코퍼스-기준"></span><span id="닫힌완료-계획-소속-은퇴--2026-09-12--68종"></span><span id="명시적-경로-입력-검사--1종나머지-5종은-은퇴"></span></details></main></body></html>

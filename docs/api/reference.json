@@ -1,25 +1,31 @@
 {
   "meta": {
     "schemaVersion": 1,
-    "coverage": "curated",
+    "coverage": "curated; every documented member reconciled with fixed-master declarations",
     "repository": "29thnight/CreatorEngine",
-    "revision": "b503b5728ca2f94a139e00fe01cb8c39163d3782",
+    "revision": "27de3f5a02aadde7456aab680db3184c36ee735e",
     "sourceFiles": {
-      "ScriptCore/Component.cs": "eb1678efc52a5da589a1c2ba68ca8ac28e2c88c8",
+      "README.md": "fb72523f51c24084131a6ad410fd60da59970b3e",
+      "ScriptCore/Component.cs": "3a83820801d318f4867444dfa733b1a1ce9ba820",
+      "BuildTool/README.md": "9d8c96d9332540291ca7d0b685da2e57de7afaaa",
       "ScriptCore/Entity.cs": "444574e00306a4701ad97b4997e68e61b8c28f47",
       "ScriptCore/Transform.cs": "3842220c6e855e153f8657829b88ee2f6ebd4236",
       "ScriptCore/Input.cs": "5af018ce584a748e010f2350acea8b592cf6696f",
       "ScriptCore/SimulationScope.cs": "d76ef7165b87ceaa9a04c956f561c2939d98d86b",
       "ScriptCore/Camera.cs": "64965943414b5fdcf74c66dc548f4930d812dd51",
-      "ScriptCore/CameraComponent.cs": "830e2ce40522ab3eae174ec5c229a92d6989744c",
+      "ScriptCore/CameraComponent.cs": "29ddfae22bdf9f8c149d2adbb7a9111840a1ee4d",
       "ScriptCore/Animator.cs": "af5777a49e97d2fdaed76b4cae83a173b996e45c",
       "ScriptCore/BlackBoard.cs": "25a209a6f6af4af5f5eac419778369f38c3af948",
-      "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "06bf4f15b42cddae6abf00c7479af829e4073bf9",
-      "Engine/RenderEngine/Interfaces/RenderBackend.h": "6a21f79704b64445a0329447e7c91a929541f64b",
-      "BuildTool/Program.cs": "d26dcad307cdd53794ea04d00b141435843c95d6",
-      "BuildTool/README.md": "a19a35f6ed6d982565ff7404505eb7e9464896d9",
-      "README.md": "77caa2afc8d5ccf3c170e3cbb3d62fd74cbbbf00",
-      "EngineVersion.json": "8bea737bfd59074118db7804325eeeab8eb3dfa2"
+      "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "4485815019386eb496c266cc1a44f045ef561aca",
+      "Engine/RenderEngine/Interfaces/RenderBackend.h": "2b5d3c74059efb437edd7ebc313af9c8bba49eaa",
+      "BuildTool/Program.cs": "781c70a59352576b7fee2787588cee5b6328e7f1",
+      "ScriptCore/MeshRenderer.cs": "b71ef784174bb6f61e059b982f6765e47641f67a",
+      "ScriptCore/LightComponent.cs": "3eee13ac89ab6e768785d5240ad560060556dc62",
+      "ScriptCore/SoundComponent.cs": "d2ce0290dcc34f8fd55f86f7e81236282c25e1f0",
+      "ScriptCore/Prefab.cs": "22401b56f366abc9ca01c5cabd1b87f61cf6e16e",
+      "ScriptCore/ObjectHandle.cs": "6699561bd32f1c98b4c925ea19d4375fa3d4414c",
+      "ScriptCore/Quaternion.cs": "19f68e3157f0e089920190dcd1cc603a5f75d52c",
+      "ScriptCore/Physics.cs": "730b394602976841e996cf7b803dacaf1622e249"
     },
     "screenshots": [
       {
@@ -35,8 +41,8 @@
         "blob": "2938995c518976b9bc6fc83b4b61825510b8aedd"
       }
     ],
-    "compatibilityCheckedAt": "4d6122e343f8231dc906c3661db97dcd48b4881e",
-    "reviewedDate": "2026-09-16"
+    "compatibilityCheckedAt": "27de3f5a02aadde7456aab680db3184c36ee735e",
+    "reviewedDate": "2026-10-20"
   },
   "pages": [
     {
@@ -88,7 +94,9 @@
           "엔진 pin과 검증·게시",
           "guide/packaging"
         ]
-      ]
+      ],
+      "memberEvidence": [],
+      "sourceBlob": "fb72523f51c24084131a6ad410fd60da59970b3e"
     },
     {
       "id": "guide/getting-started",
@@ -100,7 +108,7 @@
         {
           "id": "requirements",
           "title": "개발 환경",
-          "text": "Windows x64, Visual Studio C++ 워크로드와 MSVC v145, Windows SDK, x64 MSBuild가 필요합니다. .NET 10 SDK·x64 Runtime, Git, vcpkg, PowerShell 7을 준비합니다. 문서 검사에는 Python 3를 사용합니다."
+          "text": "Windows x64, Visual Studio 18 계열 C++ 워크로드·MSVC v145·Windows SDK와 x64 MSBuild, .NET 10 SDK·x64 Runtime, Git, vcpkg와 PowerShell 7을 준비합니다. 회귀 검사는 Python 3도 사용합니다."
         },
         {
           "id": "clone",
@@ -110,17 +118,16 @@
           "language": "powershell"
         },
         {
-          "id": "fmod",
-          "title": "FMOD 개발 파일",
-          "text": "FMOD Core API 2.02.26 x64 바이너리는 저장소에 없습니다. 아래 위치에 로컬 SDK의 파일을 배치합니다.",
-          "code": "ThirdParty/Fmod/lib/x64/fmod_vc.lib\nThirdParty/Fmod/lib/x64/fmodL_vc.lib\nThirdParty/Fmod/bin/x64/fmod.dll\nThirdParty/Fmod/bin/x64/fmodL.dll",
+          "id": "audio",
+          "title": "오디오 의존성",
+          "text": "현재 backend는 miniaudio/Null입니다. miniaudio 출처와 빌드 경계는 ThirdParty/miniaudio/PROVENANCE.md를 따릅니다. 구 FMOD SDK 복사는 필요하지 않습니다.",
           "language": "text"
         },
         {
           "id": "build",
           "title": "빌드와 실행",
           "text": "v145 도구가 준비된 x64 Developer PowerShell에서 실행합니다. CreatorEditor 빌드는 ScriptCore와 GameScripts도 함께 준비합니다.",
-          "code": "dotnet build .\\BuildTool\\CreatorBuildTool.csproj -c Debug\nmsbuild .\\CreatorEngine.sln /m /t:CreatorEditor /p:Configuration=Debug /p:Platform=x64 /v:minimal\n.\\Bin\\x64-Debug\\Editor\\CreatorEditor.exe",
+          "code": "dotnet build .\\BuildTool\\CreatorBuildTool.csproj -c Debug\nmsbuild .\\Editor\\CreatorEditor.vcxproj /m /t:Build /p:Configuration=Debug /p:Platform=x64 /v:minimal\n.\\Bin\\x64-Debug\\Editor\\CreatorEditor.exe",
           "language": "powershell"
         },
         {
@@ -128,7 +135,9 @@
           "title": "실행 파일 배치",
           "text": "소스 checkout의 기본 프로젝트는 Dynamic_CPP/입니다. 작은 EXE가 *.runtime.dll을 로드합니다. EXE 하나만 복사하지 말고 Runtime/, Managed/, Resources/를 포함한 출력 배치를 유지하세요."
         }
-      ]
+      ],
+      "memberEvidence": [],
+      "sourceBlob": "fb72523f51c24084131a6ad410fd60da59970b3e"
     },
     {
       "id": "guide/first-script",
@@ -159,7 +168,9 @@
           "title": "Transform이 없는 엔티티",
           "text": "UI/Canvas에는 RectTransformComponent만 있을 수 있습니다. Component.Transform은 부재 시 예외입니다. HasTransform 또는 Entity.GetComponent<Transform>()의 null 결과로 확인합니다."
         }
-      ]
+      ],
+      "memberEvidence": [],
+      "sourceBlob": "3a83820801d318f4867444dfa733b1a1ce9ba820"
     },
     {
       "id": "guide/lifecycle",
@@ -190,7 +201,9 @@
           "title": "게임 스레드 계약",
           "text": "ConfigureAwait(false)로 게임 스레드 복귀를 포기한 뒤 엔진 상태를 접근하지 마세요. Enabled 변경도 게임 스레드 밖에서는 적용하지 않고 오류를 남깁니다."
         }
-      ]
+      ],
+      "memberEvidence": [],
+      "sourceBlob": "3a83820801d318f4867444dfa733b1a1ce9ba820"
     },
     {
       "id": "guide/packaging",
@@ -202,7 +215,7 @@
         {
           "id": "publish",
           "title": "엔진 개발자: 배포본 생성",
-          "text": "--build는 네이티브 호스트·도구 빌드까지 명시적으로 요청합니다. 네이티브 개발 환경과 FMOD 개발 파일이 필요합니다.",
+          "text": "--build는 네이티브 호스트까지 빌드하여 배포본을 만들도록 요청합니다. v145 네이티브 빌드 환경과 manifest 의존성이 필요합니다. 현재 오디오 backend는 miniaudio/Null입니다.",
           "code": "dotnet build .\\BuildTool\\CreatorBuildTool.csproj -c Release\n$tool = '.\\Bin\\x64-Release\\Tools\\CreatorBuildTool\\CreatorBuildTool.exe'\n& $tool publish-engine --repository . --config Release --build",
           "language": "powershell"
         },
@@ -230,7 +243,9 @@
           "title": "런타임 포함",
           "text": "Release 게임은 .NET 10 x64와 필요한 네이티브 런타임을 함께 배치합니다. Debug는 개발 검증용입니다. Workspace/Tracked 입력은 소스 checkout의 Dynamic_CPP 전용입니다."
         }
-      ]
+      ],
+      "memberEvidence": [],
+      "sourceBlob": "9d8c96d9332540291ca7d0b685da2e57de7afaaa"
     },
     {
       "id": "script/Component",
@@ -260,7 +275,7 @@
         ],
         [
           "Enabled",
-          "public bool Enabled { get; set; }",
+          "public virtual bool Enabled { get; set; }",
           "네이티브에 활성 변경을 요청합니다. 게임 스레드 밖의 변경은 거부합니다.",
           "property"
         ],
@@ -347,47 +362,204 @@
           "public virtual bool InvokeMessage(string message)",
           "메시지 진입점. 호출 분기는 소스 제너레이터가 구현합니다.",
           "method"
-        ],
-        [
-          "OnTriggerEnter",
-          "public virtual void OnTriggerEnter(in Collision collision)",
-          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
-          "method"
-        ],
-        [
-          "OnTriggerStay",
-          "public virtual void OnTriggerStay(in Collision collision)",
-          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
-          "method"
-        ],
-        [
-          "OnTriggerExit",
-          "public virtual void OnTriggerExit(in Collision collision)",
-          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
-          "method"
-        ],
-        [
-          "OnCollisionEnter",
-          "public virtual void OnCollisionEnter(in Collision collision)",
-          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
-          "method"
-        ],
-        [
-          "OnCollisionStay",
-          "public virtual void OnCollisionStay(in Collision collision)",
-          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
-          "method"
-        ],
-        [
-          "OnCollisionExit",
-          "public virtual void OnCollisionExit(in Collision collision)",
-          "물리 콜백. 네이티브 충돌 발생과 스크립트 전달 시점을 구분합니다.",
-          "method"
         ]
       ],
-      "note": "과거 Awake/Start/Update 예제를 그대로 사용하지 마세요. 현재의 여섯 단계와 PrePhysics/PostPhysics를 기준으로 읽습니다.",
+      "note": "과거 Awake/Start/Update 예제를 그대로 사용하지 마세요. 현재의 여섯 단계와 PrePhysics/PostPhysics를 기준으로 읽습니다. 제거된 OnTrigger*/OnCollision* 훅 대신 OnBeginSimulation에서 Physics.ObserveContacts를 등록하고 PostPhysics에서 ContactStream을 읽습니다.",
       "sections": [],
-      "example": "using CreatorEngine;\n\npublic sealed partial class Mover : Component\n{\n    public override void PostPhysics(float tick)\n    {\n        if (!HasTransform) return;\n        if (Input.GetKey(KeyCode.W))\n            Transform.Translate(new Float3(0f, 0f, 2f * tick));\n    }\n}"
+      "example": "using CreatorEngine;\n\npublic sealed partial class Mover : Component\n{\n    public override void PostPhysics(float tick)\n    {\n        if (!HasTransform) return;\n        if (Input.GetKey(KeyCode.W))\n            Transform.Translate(new Float3(0f, 0f, 2f * tick));\n    }\n}",
+      "memberEvidence": [
+        {
+          "member": "Entity",
+          "matches": [
+            {
+              "signature": "public Entity Entity { get; internal set; }",
+              "line": 25,
+              "sourceDeclaration": "public Entity Entity { get; internal set; }"
+            },
+            {
+              "signature": "public virtual Entity GetObject(int index) { get; }",
+              "line": 382,
+              "sourceDeclaration": "public virtual Entity GetObject(int index) => default;"
+            },
+            {
+              "signature": "public virtual void SetObject(int index, Entity value) { get; }",
+              "line": 383,
+              "sourceDeclaration": "public virtual void       SetObject(int index, Entity value) { }"
+            }
+          ]
+        },
+        {
+          "member": "Transform",
+          "matches": [
+            {
+              "signature": "public Transform Transform { get; }",
+              "line": 46,
+              "sourceDeclaration": "public Transform Transform => _transform ?? throw new InvalidOperationException("
+            }
+          ]
+        },
+        {
+          "member": "HasTransform",
+          "matches": [
+            {
+              "signature": "public bool HasTransform { get; }",
+              "line": 51,
+              "sourceDeclaration": "public bool HasTransform => _transform is not null;"
+            }
+          ]
+        },
+        {
+          "member": "Enabled",
+          "matches": [
+            {
+              "signature": "public virtual bool Enabled { get; set; }",
+              "line": 81,
+              "sourceDeclaration": "public virtual bool Enabled"
+            }
+          ]
+        },
+        {
+          "member": "IsAlive",
+          "matches": [
+            {
+              "signature": "public bool IsAlive { get; }",
+              "line": 135,
+              "sourceDeclaration": "public bool IsAlive => !_destroyed && Entity.IsAlive;"
+            }
+          ]
+        },
+        {
+          "member": "Scope",
+          "matches": [
+            {
+              "signature": "public SimulationScope Scope { get; }",
+              "line": 296,
+              "sourceDeclaration": "public SimulationScope Scope { get; } = new();"
+            }
+          ]
+        },
+        {
+          "member": "OnInitialized",
+          "matches": [
+            {
+              "signature": "public virtual void OnInitialized()",
+              "line": 229,
+              "sourceDeclaration": "public virtual void OnInitialized() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnAddedToScene",
+          "matches": [
+            {
+              "signature": "public virtual void OnAddedToScene()",
+              "line": 230,
+              "sourceDeclaration": "public virtual void OnAddedToScene() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnBeginSimulation",
+          "matches": [
+            {
+              "signature": "public virtual void OnBeginSimulation()",
+              "line": 231,
+              "sourceDeclaration": "public virtual void OnBeginSimulation() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnEndSimulation",
+          "matches": [
+            {
+              "signature": "public virtual void OnEndSimulation()",
+              "line": 232,
+              "sourceDeclaration": "public virtual void OnEndSimulation() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnRemovingFromScene",
+          "matches": [
+            {
+              "signature": "public virtual void OnRemovingFromScene()",
+              "line": 233,
+              "sourceDeclaration": "public virtual void OnRemovingFromScene() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnUninitializing",
+          "matches": [
+            {
+              "signature": "public virtual void OnUninitializing()",
+              "line": 234,
+              "sourceDeclaration": "public virtual void OnUninitializing() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnEnable",
+          "matches": [
+            {
+              "signature": "public virtual void OnEnable()",
+              "line": 238,
+              "sourceDeclaration": "public virtual void OnEnable() { }"
+            }
+          ]
+        },
+        {
+          "member": "OnDisable",
+          "matches": [
+            {
+              "signature": "public virtual void OnDisable()",
+              "line": 239,
+              "sourceDeclaration": "public virtual void OnDisable() { }"
+            }
+          ]
+        },
+        {
+          "member": "PrePhysics",
+          "matches": [
+            {
+              "signature": "public virtual void PrePhysics(float tick)",
+              "line": 254,
+              "sourceDeclaration": "public virtual void PrePhysics(float tick) { }"
+            }
+          ]
+        },
+        {
+          "member": "PostPhysics",
+          "matches": [
+            {
+              "signature": "public virtual void PostPhysics(float tick)",
+              "line": 257,
+              "sourceDeclaration": "public virtual void PostPhysics(float tick) { }"
+            }
+          ]
+        },
+        {
+          "member": "OnSimulate",
+          "matches": [
+            {
+              "signature": "public virtual Task OnSimulate()",
+              "line": 289,
+              "sourceDeclaration": "public virtual Task OnSimulate() => Task.CompletedTask;"
+            }
+          ]
+        },
+        {
+          "member": "InvokeMessage",
+          "matches": [
+            {
+              "signature": "public virtual bool InvokeMessage(string message)",
+              "line": 306,
+              "sourceDeclaration": "public virtual bool InvokeMessage(string message) => false;"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "3a83820801d318f4867444dfa733b1a1ce9ba820"
     },
     {
       "id": "script/Entity",
@@ -501,7 +673,185 @@
         ]
       ],
       "note": "Entity 부재는 null이 아닌 무효 핸들로 표현됩니다.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "IsAlive",
+          "matches": [
+            {
+              "signature": "public bool IsAlive { get; }",
+              "line": 11,
+              "sourceDeclaration": "public bool IsAlive => Handle.IsValid && Native.IsAlive(Handle);"
+            }
+          ]
+        },
+        {
+          "member": "Name",
+          "matches": [
+            {
+              "signature": "public string Name { get; }",
+              "line": 13,
+              "sourceDeclaration": "public string Name => Native.GetName(Handle);"
+            }
+          ]
+        },
+        {
+          "member": "Transform",
+          "matches": [
+            {
+              "signature": "public Transform? Transform { get; }",
+              "line": 21,
+              "sourceDeclaration": "public Transform? Transform => GetComponent<Transform>();"
+            }
+          ]
+        },
+        {
+          "member": "SetEnabled",
+          "matches": [
+            {
+              "signature": "public void SetEnabled(bool enabled)",
+              "line": 23,
+              "sourceDeclaration": "public void SetEnabled(bool enabled) => Native.SetEnabled(Handle, enabled);"
+            }
+          ]
+        },
+        {
+          "member": "GetComponent<T>",
+          "matches": [
+            {
+              "signature": "public T? GetComponent<T>() where T : Component",
+              "line": 40,
+              "sourceDeclaration": "public T? GetComponent<T>() where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "TryGetComponent<T>",
+          "matches": [
+            {
+              "signature": "public bool TryGetComponent<T>(out T component) where T : Component",
+              "line": 60,
+              "sourceDeclaration": "public bool TryGetComponent<T>(out T component) where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "HasComponent<T>",
+          "matches": [
+            {
+              "signature": "public bool HasComponent<T>() where T : Component",
+              "line": 68,
+              "sourceDeclaration": "public bool HasComponent<T>() where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "GetComponents<T>",
+          "matches": [
+            {
+              "signature": "public List<T> GetComponents<T>() where T : Component",
+              "line": 56,
+              "sourceDeclaration": "public List<T> GetComponents<T>() where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "Parent",
+          "matches": [
+            {
+              "signature": "public Entity Parent { get; }",
+              "line": 82,
+              "sourceDeclaration": "public Entity Parent => new(Native.GetParent(Handle));"
+            }
+          ]
+        },
+        {
+          "member": "ChildCount",
+          "matches": [
+            {
+              "signature": "public int ChildCount { get; }",
+              "line": 76,
+              "sourceDeclaration": "public int ChildCount => Native.GetChildCount(Handle);"
+            }
+          ]
+        },
+        {
+          "member": "GetChild",
+          "matches": [
+            {
+              "signature": "public Entity GetChild(int index)",
+              "line": 79,
+              "sourceDeclaration": "public Entity GetChild(int index) => new(Native.GetChild(Handle, index));"
+            }
+          ]
+        },
+        {
+          "member": "Children",
+          "matches": [
+            {
+              "signature": "public IEnumerable<Entity> Children { get; }",
+              "line": 91,
+              "sourceDeclaration": "public IEnumerable<Entity> Children"
+            }
+          ]
+        },
+        {
+          "member": "GetComponentInChildren<T>",
+          "matches": [
+            {
+              "signature": "public T? GetComponentInChildren<T>(bool includeSelf = true) where T : Component",
+              "line": 119,
+              "sourceDeclaration": "public T? GetComponentInChildren<T>(bool includeSelf = true) where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "GetComponentsInChildren<T>",
+          "matches": [
+            {
+              "signature": "public List<T> GetComponentsInChildren<T>(bool includeSelf = true) where T : Component",
+              "line": 103,
+              "sourceDeclaration": "public List<T> GetComponentsInChildren<T>(bool includeSelf = true) where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "GetComponentInParent<T>",
+          "matches": [
+            {
+              "signature": "public T? GetComponentInParent<T>(bool includeSelf = true) where T : Component",
+              "line": 132,
+              "sourceDeclaration": "public T? GetComponentInParent<T>(bool includeSelf = true) where T : Component"
+            }
+          ]
+        },
+        {
+          "member": "FindByIndex",
+          "matches": [
+            {
+              "signature": "public static Entity FindByIndex(int index)",
+              "line": 88,
+              "sourceDeclaration": "public static Entity FindByIndex(int index) => new(Native.FindByIndex(index));"
+            }
+          ]
+        },
+        {
+          "member": "Destroy",
+          "matches": [
+            {
+              "signature": "public void Destroy()",
+              "line": 151,
+              "sourceDeclaration": "public void Destroy() => Native.DestroyObject(Handle);"
+            },
+            {
+              "signature": "public static void Destroy(Entity target)",
+              "line": 154,
+              "sourceDeclaration": "public static void Destroy(Entity target) => target.Destroy();"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "444574e00306a4701ad97b4997e68e61b8c28f47"
     },
     {
       "id": "script/Transform",
@@ -622,7 +972,190 @@
       ],
       "note": "현재 Transform은 struct가 아닌 sealed class입니다. Entity.Transform은 null일 수 있습니다.",
       "sections": [],
-      "example": "if (Entity.Transform is { } transform)\n    transform.LocalPosition = new Float3(0f, 1f, 0f);"
+      "example": "if (Entity.Transform is { } transform)\n    transform.LocalPosition = new Float3(0f, 1f, 0f);",
+      "memberEvidence": [
+        {
+          "member": "LocalPosition",
+          "matches": [
+            {
+              "signature": "public Float3 LocalPosition { get; set; }",
+              "line": 22,
+              "sourceDeclaration": "public Float3 LocalPosition"
+            }
+          ]
+        },
+        {
+          "member": "LocalRotation",
+          "matches": [
+            {
+              "signature": "public Quaternion LocalRotation { get; set; }",
+              "line": 28,
+              "sourceDeclaration": "public Quaternion LocalRotation"
+            }
+          ]
+        },
+        {
+          "member": "LocalScale",
+          "matches": [
+            {
+              "signature": "public Float3 LocalScale { get; set; }",
+              "line": 34,
+              "sourceDeclaration": "public Float3 LocalScale"
+            }
+          ]
+        },
+        {
+          "member": "WorldPosition",
+          "matches": [
+            {
+              "signature": "public Float3 WorldPosition { get; set; }",
+              "line": 45,
+              "sourceDeclaration": "public Float3 WorldPosition"
+            }
+          ]
+        },
+        {
+          "member": "WorldRotation",
+          "matches": [
+            {
+              "signature": "public Quaternion WorldRotation { get; set; }",
+              "line": 51,
+              "sourceDeclaration": "public Quaternion WorldRotation"
+            }
+          ]
+        },
+        {
+          "member": "WorldScale",
+          "matches": [
+            {
+              "signature": "public Float3 WorldScale { get; set; }",
+              "line": 57,
+              "sourceDeclaration": "public Float3 WorldScale"
+            }
+          ]
+        },
+        {
+          "member": "Forward",
+          "matches": [
+            {
+              "signature": "public Float3 Forward { get; }",
+              "line": 66,
+              "sourceDeclaration": "public Float3 Forward => Native.GetForward(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "Right",
+          "matches": [
+            {
+              "signature": "public Float3 Right { get; }",
+              "line": 67,
+              "sourceDeclaration": "public Float3 Right   => Native.GetRight(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "Up",
+          "matches": [
+            {
+              "signature": "public Float3 Up { get; }",
+              "line": 68,
+              "sourceDeclaration": "public Float3 Up      => Native.GetUp(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "Translate",
+          "matches": [
+            {
+              "signature": "public void Translate(Float3 delta)",
+              "line": 73,
+              "sourceDeclaration": "public void Translate(Float3 delta) => Native.AddLocalPosition(OwnerHandle, delta);"
+            }
+          ]
+        },
+        {
+          "member": "Rotate",
+          "matches": [
+            {
+              "signature": "public void Rotate(Quaternion delta)",
+              "line": 76,
+              "sourceDeclaration": "public void Rotate(Quaternion delta) => Native.AddLocalRotation(OwnerHandle, delta);"
+            }
+          ]
+        },
+        {
+          "member": "SetLocalPosition",
+          "matches": [
+            {
+              "signature": "public void SetLocalPosition(Float3 p)",
+              "line": 84,
+              "sourceDeclaration": "public void SetLocalPosition(Float3 p) => Native.SetLocalPosition(OwnerHandle, p);"
+            }
+          ]
+        },
+        {
+          "member": "SetLocalRotation",
+          "matches": [
+            {
+              "signature": "public void SetLocalRotation(Quaternion q)",
+              "line": 85,
+              "sourceDeclaration": "public void SetLocalRotation(Quaternion q) => Native.SetLocalRotation(OwnerHandle, q);"
+            }
+          ]
+        },
+        {
+          "member": "SetLocalScale",
+          "matches": [
+            {
+              "signature": "public void SetLocalScale(Float3 s)",
+              "line": 86,
+              "sourceDeclaration": "public void SetLocalScale(Float3 s) => Native.SetLocalScale(OwnerHandle, s);"
+            }
+          ]
+        },
+        {
+          "member": "SetWorldPosition",
+          "matches": [
+            {
+              "signature": "public void SetWorldPosition(Float3 p)",
+              "line": 88,
+              "sourceDeclaration": "public void SetWorldPosition(Float3 p) => Native.SetWorldPosition(OwnerHandle, p);"
+            }
+          ]
+        },
+        {
+          "member": "SetWorldRotation",
+          "matches": [
+            {
+              "signature": "public void SetWorldRotation(Quaternion q)",
+              "line": 89,
+              "sourceDeclaration": "public void SetWorldRotation(Quaternion q) => Native.SetWorldRotation(OwnerHandle, q);"
+            }
+          ]
+        },
+        {
+          "member": "SetWorldScale",
+          "matches": [
+            {
+              "signature": "public void SetWorldScale(Float3 s)",
+              "line": 90,
+              "sourceDeclaration": "public void SetWorldScale(Float3 s) => Native.SetWorldScale(OwnerHandle, s);"
+            }
+          ]
+        },
+        {
+          "member": "LookAt",
+          "matches": [
+            {
+              "signature": "public void LookAt(Float3 target)",
+              "line": 93,
+              "sourceDeclaration": "public void LookAt(Float3 target)"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "3842220c6e855e153f8657829b88ee2f6ebd4236"
     },
     {
       "id": "script/Input",
@@ -748,7 +1281,200 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "GetKeyDown",
+          "matches": [
+            {
+              "signature": "public static bool GetKeyDown(KeyCode key)",
+              "line": 20,
+              "sourceDeclaration": "public static bool GetKeyDown(KeyCode key) => Native.GetKeyState((int)key) == KeyState.Down;"
+            }
+          ]
+        },
+        {
+          "member": "GetKey",
+          "matches": [
+            {
+              "signature": "public static bool GetKey(KeyCode key)",
+              "line": 23,
+              "sourceDeclaration": "public static bool GetKey(KeyCode key)"
+            }
+          ]
+        },
+        {
+          "member": "GetKeyUp",
+          "matches": [
+            {
+              "signature": "public static bool GetKeyUp(KeyCode key)",
+              "line": 30,
+              "sourceDeclaration": "public static bool GetKeyUp(KeyCode key) => Native.GetKeyState((int)key) == KeyState.Released;"
+            }
+          ]
+        },
+        {
+          "member": "AnyKey",
+          "matches": [
+            {
+              "signature": "public static bool AnyKey { get; }",
+              "line": 33,
+              "sourceDeclaration": "public static bool AnyKey => Native.InputIsAnyKeyPressed();"
+            }
+          ]
+        },
+        {
+          "member": "GetMouseButtonDown",
+          "matches": [
+            {
+              "signature": "public static bool GetMouseButtonDown(MouseButton button)",
+              "line": 37,
+              "sourceDeclaration": "public static bool GetMouseButtonDown(MouseButton button)"
+            }
+          ]
+        },
+        {
+          "member": "GetMouseButton",
+          "matches": [
+            {
+              "signature": "public static bool GetMouseButton(MouseButton button)",
+              "line": 40,
+              "sourceDeclaration": "public static bool GetMouseButton(MouseButton button)"
+            }
+          ]
+        },
+        {
+          "member": "GetMouseButtonUp",
+          "matches": [
+            {
+              "signature": "public static bool GetMouseButtonUp(MouseButton button)",
+              "line": 46,
+              "sourceDeclaration": "public static bool GetMouseButtonUp(MouseButton button)"
+            }
+          ]
+        },
+        {
+          "member": "MousePosition",
+          "matches": [
+            {
+              "signature": "public static Float2 MousePosition { get; }",
+              "line": 50,
+              "sourceDeclaration": "public static Float2 MousePosition => Native.InputGetMousePosition();"
+            }
+          ]
+        },
+        {
+          "member": "MouseDelta",
+          "matches": [
+            {
+              "signature": "public static Float2 MouseDelta { get; }",
+              "line": 53,
+              "sourceDeclaration": "public static Float2 MouseDelta => Native.InputGetMouseDelta();"
+            }
+          ]
+        },
+        {
+          "member": "WheelDelta",
+          "matches": [
+            {
+              "signature": "public static int WheelDelta { get; }",
+              "line": 56,
+              "sourceDeclaration": "public static int WheelDelta => Native.InputGetWheelDelta();"
+            }
+          ]
+        },
+        {
+          "member": "SetCursorVisible",
+          "matches": [
+            {
+              "signature": "public static void SetCursorVisible(bool visible)",
+              "line": 58,
+              "sourceDeclaration": "public static void SetCursorVisible(bool visible) => Native.InputSetCursorVisible(visible);"
+            }
+          ]
+        },
+        {
+          "member": "IsGamepadConnected",
+          "matches": [
+            {
+              "signature": "public static bool IsGamepadConnected(int index)",
+              "line": 64,
+              "sourceDeclaration": "public static bool IsGamepadConnected(int index) => Native.InputIsControllerConnected(index);"
+            }
+          ]
+        },
+        {
+          "member": "GetButtonDown",
+          "matches": [
+            {
+              "signature": "public static bool GetButtonDown(int index, GamepadButton button)",
+              "line": 66,
+              "sourceDeclaration": "public static bool GetButtonDown(int index, GamepadButton button)"
+            }
+          ]
+        },
+        {
+          "member": "GetButton",
+          "matches": [
+            {
+              "signature": "public static bool GetButton(int index, GamepadButton button)",
+              "line": 69,
+              "sourceDeclaration": "public static bool GetButton(int index, GamepadButton button)"
+            }
+          ]
+        },
+        {
+          "member": "GetButtonUp",
+          "matches": [
+            {
+              "signature": "public static bool GetButtonUp(int index, GamepadButton button)",
+              "line": 75,
+              "sourceDeclaration": "public static bool GetButtonUp(int index, GamepadButton button)"
+            }
+          ]
+        },
+        {
+          "member": "GetTriggerLeft",
+          "matches": [
+            {
+              "signature": "public static bool GetTriggerLeft(int index)",
+              "line": 79,
+              "sourceDeclaration": "public static bool GetTriggerLeft(int index) => Native.InputIsControllerTriggerL(index);"
+            }
+          ]
+        },
+        {
+          "member": "GetTriggerRight",
+          "matches": [
+            {
+              "signature": "public static bool GetTriggerRight(int index)",
+              "line": 81,
+              "sourceDeclaration": "public static bool GetTriggerRight(int index) => Native.InputIsControllerTriggerR(index);"
+            }
+          ]
+        },
+        {
+          "member": "GetThumbLeft",
+          "matches": [
+            {
+              "signature": "public static Float2 GetThumbLeft(int index)",
+              "line": 84,
+              "sourceDeclaration": "public static Float2 GetThumbLeft(int index) => Native.InputGetControllerThumbL(index);"
+            }
+          ]
+        },
+        {
+          "member": "GetThumbRight",
+          "matches": [
+            {
+              "signature": "public static Float2 GetThumbRight(int index)",
+              "line": 86,
+              "sourceDeclaration": "public static Float2 GetThumbRight(int index) => Native.InputGetControllerThumbR(index);"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "5af018ce584a748e010f2350acea8b592cf6696f"
     },
     {
       "id": "script/SimulationScope",
@@ -790,7 +1516,65 @@
         ]
       ],
       "note": "Delay: 0 이하는 다음 프레임, 양의 무한대는 취소까지 대기, NaN은 ArgumentException. 등록 프레임에는 만기 판정하지 않습니다.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Token",
+          "matches": [
+            {
+              "signature": "public CancellationToken Token { get; }",
+              "line": 60,
+              "sourceDeclaration": "public CancellationToken Token => _cts.Token;"
+            }
+          ]
+        },
+        {
+          "member": "Delay",
+          "matches": [
+            {
+              "signature": "public Task Delay(float seconds)",
+              "line": 85,
+              "sourceDeclaration": "public Task Delay(float seconds)"
+            }
+          ]
+        },
+        {
+          "member": "Subscribe",
+          "matches": [
+            {
+              "signature": "public void Subscribe(Action<Action> add, Action<Action> remove, Action handler)",
+              "line": 123,
+              "sourceDeclaration": "public void Subscribe(Action<Action> add, Action<Action> remove, Action handler)"
+            },
+            {
+              "signature": "public void Subscribe<T>(Action<Action<T>> add, Action<Action<T>> remove, Action<T> handler)",
+              "line": 130,
+              "sourceDeclaration": "public void Subscribe<T>(Action<Action<T>> add, Action<Action<T>> remove, Action<T> handler)"
+            }
+          ]
+        },
+        {
+          "member": "Subscribe<T>",
+          "matches": [
+            {
+              "signature": "public void Subscribe<T>(Action<Action<T>> add, Action<Action<T>> remove, Action<T> handler)",
+              "line": 130,
+              "sourceDeclaration": "public void Subscribe<T>(Action<Action<T>> add, Action<Action<T>> remove, Action<T> handler)"
+            }
+          ]
+        },
+        {
+          "member": "RegisterCleanup",
+          "matches": [
+            {
+              "signature": "public void RegisterCleanup(Action cleanup)",
+              "line": 140,
+              "sourceDeclaration": "public void RegisterCleanup(Action cleanup)"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "d76ef7165b87ceaa9a04c956f561c2939d98d86b"
     },
     {
       "id": "script/Camera",
@@ -826,7 +1610,50 @@
         ]
       ],
       "note": "GetComponent<Camera>() 대상이 아닙니다. 컴포넌트 조회에는 CameraComponent를 사용하세요.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Exists",
+          "matches": [
+            {
+              "signature": "public static bool Exists { get; }",
+              "line": 11,
+              "sourceDeclaration": "public static bool Exists => Native.HasCamera();"
+            }
+          ]
+        },
+        {
+          "member": "ScreenSize",
+          "matches": [
+            {
+              "signature": "public static Float2 ScreenSize { get; }",
+              "line": 14,
+              "sourceDeclaration": "public static Float2 ScreenSize => Native.CameraGetScreenSize();"
+            }
+          ]
+        },
+        {
+          "member": "Main",
+          "matches": [
+            {
+              "signature": "public static CameraComponent? Main { get; }",
+              "line": 38,
+              "sourceDeclaration": "public static CameraComponent? Main"
+            }
+          ]
+        },
+        {
+          "member": "WorldToScreenPoint",
+          "matches": [
+            {
+              "signature": "public static Float3 WorldToScreenPoint(Float3 world)",
+              "line": 26,
+              "sourceDeclaration": "public static Float3 WorldToScreenPoint(Float3 world) => Native.CameraWorldToScreenPoint(world);"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "64965943414b5fdcf74c66dc548f4930d812dd51"
     },
     {
       "id": "script/CameraComponent",
@@ -862,7 +1689,50 @@
         ]
       ],
       "note": "실제 주 카메라는 Camera.Main으로 확인합니다. primary 후보의 활성 상태와 인스턴스 ID가 선택에 영향을 줍니다.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "FieldOfView",
+          "matches": [
+            {
+              "signature": "public float FieldOfView { get; set; }",
+              "line": 31,
+              "sourceDeclaration": "public float FieldOfView"
+            }
+          ]
+        },
+        {
+          "member": "NearPlane",
+          "matches": [
+            {
+              "signature": "public float NearPlane { get; set; }",
+              "line": 38,
+              "sourceDeclaration": "public float NearPlane"
+            }
+          ]
+        },
+        {
+          "member": "FarPlane",
+          "matches": [
+            {
+              "signature": "public float FarPlane { get; set; }",
+              "line": 45,
+              "sourceDeclaration": "public float FarPlane"
+            }
+          ]
+        },
+        {
+          "member": "IsPrimary",
+          "matches": [
+            {
+              "signature": "public bool IsPrimary { get; set; }",
+              "line": 61,
+              "sourceDeclaration": "public bool IsPrimary"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "29ddfae22bdf9f8c149d2adbb7a9111840a1ee4d"
     },
     {
       "id": "script/Animator",
@@ -940,7 +1810,120 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "SetBool",
+          "matches": [
+            {
+              "signature": "public void SetBool(string name, bool value)",
+              "line": 18,
+              "sourceDeclaration": "public void SetBool(string name, bool value) => Native.AnimatorSetBool(OwnerHandle, name, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetFloat",
+          "matches": [
+            {
+              "signature": "public void SetFloat(string name, float value)",
+              "line": 19,
+              "sourceDeclaration": "public void SetFloat(string name, float value) => Native.AnimatorSetFloat(OwnerHandle, name, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetInt",
+          "matches": [
+            {
+              "signature": "public void SetInt(string name, int value)",
+              "line": 20,
+              "sourceDeclaration": "public void SetInt(string name, int value) => Native.AnimatorSetInt(OwnerHandle, name, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetTrigger",
+          "matches": [
+            {
+              "signature": "public void SetTrigger(string name)",
+              "line": 23,
+              "sourceDeclaration": "public void SetTrigger(string name) => Native.AnimatorSetTrigger(OwnerHandle, name);"
+            }
+          ]
+        },
+        {
+          "member": "ResetTrigger",
+          "matches": [
+            {
+              "signature": "public void ResetTrigger(string name)",
+              "line": 25,
+              "sourceDeclaration": "public void ResetTrigger(string name) => Native.AnimatorResetTrigger(OwnerHandle, name);"
+            }
+          ]
+        },
+        {
+          "member": "GetBool",
+          "matches": [
+            {
+              "signature": "public bool GetBool(string name)",
+              "line": 32,
+              "sourceDeclaration": "public bool GetBool(string name) => Native.AnimatorGetBool(OwnerHandle, name);"
+            }
+          ]
+        },
+        {
+          "member": "GetFloat",
+          "matches": [
+            {
+              "signature": "public float GetFloat(string name)",
+              "line": 33,
+              "sourceDeclaration": "public float GetFloat(string name) => Native.AnimatorGetFloat(OwnerHandle, name);"
+            }
+          ]
+        },
+        {
+          "member": "GetInt",
+          "matches": [
+            {
+              "signature": "public int GetInt(string name)",
+              "line": 34,
+              "sourceDeclaration": "public int GetInt(string name) => Native.AnimatorGetInt(OwnerHandle, name);"
+            }
+          ]
+        },
+        {
+          "member": "HasParameter",
+          "matches": [
+            {
+              "signature": "public bool HasParameter(string name)",
+              "line": 36,
+              "sourceDeclaration": "public bool HasParameter(string name) => Native.AnimatorHasParameter(OwnerHandle, name);"
+            }
+          ]
+        },
+        {
+          "member": "SetUseLayer",
+          "matches": [
+            {
+              "signature": "public void SetUseLayer(int layerIndex, bool useLayer)",
+              "line": 41,
+              "sourceDeclaration": "public void SetUseLayer(int layerIndex, bool useLayer)"
+            }
+          ]
+        },
+        {
+          "member": "StopAnimation",
+          "matches": [
+            {
+              "signature": "public void StopAnimation(float duration)",
+              "line": 45,
+              "sourceDeclaration": "public void StopAnimation(float duration) => Native.AnimatorStopAnimation(OwnerHandle, duration);"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "af5777a49e97d2fdaed76b4cae83a173b996e45c"
     },
     {
       "id": "script/BlackBoard",
@@ -1072,7 +2055,210 @@
         ]
       ],
       "note": "현행 Set*는 항목을 덮어씁니다. 과거 주석의 영구 타입 고정을 가정하지 마세요. GetEntity의 부재는 null이 아닌 기본 Entity입니다.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Name",
+          "matches": [
+            {
+              "signature": "public string Name { get; internal set; }",
+              "line": 38,
+              "sourceDeclaration": "public string Name { get; internal set; } = string.Empty;"
+            }
+          ]
+        },
+        {
+          "member": "Keys",
+          "matches": [
+            {
+              "signature": "public IReadOnlyCollection<string> Keys { get; }",
+              "line": 49,
+              "sourceDeclaration": "public IReadOnlyCollection<string> Keys => _values.Keys;"
+            }
+          ]
+        },
+        {
+          "member": "HasKey",
+          "matches": [
+            {
+              "signature": "public bool HasKey(string key)",
+              "line": 40,
+              "sourceDeclaration": "public bool HasKey(string key) => _values.ContainsKey(key);"
+            }
+          ]
+        },
+        {
+          "member": "GetType",
+          "matches": [
+            {
+              "signature": "public BlackBoardType GetType(string key)",
+              "line": 42,
+              "sourceDeclaration": "public BlackBoardType GetType(string key)"
+            }
+          ]
+        },
+        {
+          "member": "RemoveKey",
+          "matches": [
+            {
+              "signature": "public void RemoveKey(string key)",
+              "line": 45,
+              "sourceDeclaration": "public void RemoveKey(string key) => _values.Remove(key);"
+            }
+          ]
+        },
+        {
+          "member": "Clear",
+          "matches": [
+            {
+              "signature": "public void Clear()",
+              "line": 47,
+              "sourceDeclaration": "public void Clear() => _values.Clear();"
+            }
+          ]
+        },
+        {
+          "member": "SetBool",
+          "matches": [
+            {
+              "signature": "public void SetBool(string key, bool value)",
+              "line": 53,
+              "sourceDeclaration": "public void SetBool(string key, bool value) => _values[key] = new Value(BlackBoardType.Bool, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetInt",
+          "matches": [
+            {
+              "signature": "public void SetInt(string key, int value)",
+              "line": 54,
+              "sourceDeclaration": "public void SetInt(string key, int value) => _values[key] = new Value(BlackBoardType.Int, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetFloat",
+          "matches": [
+            {
+              "signature": "public void SetFloat(string key, float value)",
+              "line": 55,
+              "sourceDeclaration": "public void SetFloat(string key, float value) => _values[key] = new Value(BlackBoardType.Float, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetString",
+          "matches": [
+            {
+              "signature": "public void SetString(string key, string value)",
+              "line": 56,
+              "sourceDeclaration": "public void SetString(string key, string value) => _values[key] = new Value(BlackBoardType.String, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetVector2",
+          "matches": [
+            {
+              "signature": "public void SetVector2(string key, Float2 value)",
+              "line": 57,
+              "sourceDeclaration": "public void SetVector2(string key, Float2 value) => _values[key] = new Value(BlackBoardType.Vector2, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetVector3",
+          "matches": [
+            {
+              "signature": "public void SetVector3(string key, Float3 value)",
+              "line": 58,
+              "sourceDeclaration": "public void SetVector3(string key, Float3 value) => _values[key] = new Value(BlackBoardType.Vector3, value);"
+            }
+          ]
+        },
+        {
+          "member": "SetEntity",
+          "matches": [
+            {
+              "signature": "public void SetEntity(string key, Entity value)",
+              "line": 59,
+              "sourceDeclaration": "public void SetEntity(string key, Entity value) => _values[key] = new Value(BlackBoardType.Entity, value);"
+            }
+          ]
+        },
+        {
+          "member": "GetBool",
+          "matches": [
+            {
+              "signature": "public bool GetBool(string key)",
+              "line": 63,
+              "sourceDeclaration": "public bool GetBool(string key) => Read(key, BlackBoardType.Bool, false);"
+            }
+          ]
+        },
+        {
+          "member": "GetInt",
+          "matches": [
+            {
+              "signature": "public int GetInt(string key)",
+              "line": 64,
+              "sourceDeclaration": "public int GetInt(string key) => Read(key, BlackBoardType.Int, 0);"
+            }
+          ]
+        },
+        {
+          "member": "GetFloat",
+          "matches": [
+            {
+              "signature": "public float GetFloat(string key)",
+              "line": 65,
+              "sourceDeclaration": "public float GetFloat(string key) => Read(key, BlackBoardType.Float, 0f);"
+            }
+          ]
+        },
+        {
+          "member": "GetString",
+          "matches": [
+            {
+              "signature": "public string GetString(string key)",
+              "line": 66,
+              "sourceDeclaration": "public string GetString(string key) => Read(key, BlackBoardType.String, string.Empty);"
+            }
+          ]
+        },
+        {
+          "member": "GetVector2",
+          "matches": [
+            {
+              "signature": "public Float2 GetVector2(string key)",
+              "line": 67,
+              "sourceDeclaration": "public Float2 GetVector2(string key) => Read(key, BlackBoardType.Vector2, default(Float2));"
+            }
+          ]
+        },
+        {
+          "member": "GetVector3",
+          "matches": [
+            {
+              "signature": "public Float3 GetVector3(string key)",
+              "line": 68,
+              "sourceDeclaration": "public Float3 GetVector3(string key) => Read(key, BlackBoardType.Vector3, default(Float3));"
+            }
+          ]
+        },
+        {
+          "member": "GetEntity",
+          "matches": [
+            {
+              "signature": "public Entity GetEntity(string key)",
+              "line": 71,
+              "sourceDeclaration": "public Entity GetEntity(string key) => Read(key, BlackBoardType.Entity, default(Entity));"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "25a209a6f6af4af5f5eac419778369f38c3af948"
     },
     {
       "id": "script/BlackBoardType",
@@ -1144,19 +2330,122 @@
         ]
       ],
       "note": "열거값의 존재가 모든 Set/Get 접근자 제공을 뜻하지 않습니다.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "None",
+          "matches": [
+            {
+              "signature": "None = 0",
+              "line": 6,
+              "sourceDeclaration": "None = 0"
+            }
+          ]
+        },
+        {
+          "member": "Bool",
+          "matches": [
+            {
+              "signature": "Bool = 1",
+              "line": 7,
+              "sourceDeclaration": "Bool = 1"
+            }
+          ]
+        },
+        {
+          "member": "Int",
+          "matches": [
+            {
+              "signature": "Int = 2",
+              "line": 8,
+              "sourceDeclaration": "Int = 2"
+            }
+          ]
+        },
+        {
+          "member": "Float",
+          "matches": [
+            {
+              "signature": "Float = 3",
+              "line": 9,
+              "sourceDeclaration": "Float = 3"
+            }
+          ]
+        },
+        {
+          "member": "String",
+          "matches": [
+            {
+              "signature": "String = 4",
+              "line": 10,
+              "sourceDeclaration": "String = 4"
+            }
+          ]
+        },
+        {
+          "member": "Vector2",
+          "matches": [
+            {
+              "signature": "Vector2 = 5",
+              "line": 11,
+              "sourceDeclaration": "Vector2 = 5"
+            }
+          ]
+        },
+        {
+          "member": "Vector3",
+          "matches": [
+            {
+              "signature": "Vector3 = 6",
+              "line": 12,
+              "sourceDeclaration": "Vector3 = 6"
+            }
+          ]
+        },
+        {
+          "member": "Vector4",
+          "matches": [
+            {
+              "signature": "Vector4 = 7",
+              "line": 13,
+              "sourceDeclaration": "Vector4 = 7"
+            }
+          ]
+        },
+        {
+          "member": "Entity",
+          "matches": [
+            {
+              "signature": "Entity = 8",
+              "line": 14,
+              "sourceDeclaration": "Entity = 8"
+            }
+          ]
+        },
+        {
+          "member": "Transform",
+          "matches": [
+            {
+              "signature": "Transform = 9",
+              "line": 15,
+              "sourceDeclaration": "Transform = 9"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "25a209a6f6af4af5f5eac419778369f38c3af948"
     },
     {
       "id": "native/EnhancedRenderGraph",
       "title": "EnhancedRenderGraph",
       "summary": "DX12/Vulkan 공용 렌더 그래프. 패스 검증·컬링·배리어·자원 수명을 관리하며 현재 선언 순서로 실행합니다.",
-      "signature": "class EnhancedRenderGraph",
+      "signature": "class EnhancedRenderGraph : private IRHIUploadTransactionListener",
       "group": "Native Engine API",
       "source": "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h",
       "members": [
         [
           "EnhancedRenderGraph",
-          "explicit EnhancedRenderGraph(IRenderDeviceServices& services);",
+          "explicit EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder, RGOrderPolicy orderPolicy = RGOrderPolicy::DependencyOrder);",
           "필수 백엔드 중립 디바이스 서비스.",
           "method"
         ],
@@ -1174,25 +2463,25 @@
         ],
         [
           "ImportTexture",
-          "RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,\n    const std::string& name, RHIResourceState* stateWriteback = nullptr);",
+          "RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState, const std::string& name, RHIResourceState* stateWriteback = nullptr);",
           "외부 텍스처 상태 추적. Compile이 최종 상태를 writeback에 기록.",
           "method"
         ],
         [
           "ImportBuffer",
-          "RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,\n    const std::string& name, RHIResourceState* stateWriteback = nullptr);",
+          "RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState, const std::string& name, RHIResourceState* stateWriteback = nullptr);",
           "외부 버퍼 상태 추적.",
           "method"
         ],
         [
           "AddPass",
-          "RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,\n    ExecuteCallback execute, bool hasSideEffect = false);",
+          "RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect = false);",
           "상태 사용과 기록 콜백 선언. side effect는 컬링 루트에 영향.",
           "method"
         ],
         [
           "AddSplitPass",
-          "RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,\n    SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,\n    uint32_t recordCost = 0);",
+          "RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);",
           "각 기록 조각이 상태를 직접 바인딩합니다. recordCost 단위는 배치 수.",
           "method"
         ],
@@ -1222,12 +2511,160 @@
         ]
       ],
       "note": "엔진 내부용입니다. 안정적인 외부 플러그인 ABI, 자동 위상 정렬·aliasing·async compute 완료를 뜻하지 않습니다.",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "EnhancedRenderGraph",
+          "matches": [
+            {
+              "signature": "explicit EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder, RGOrderPolicy orderPolicy = RGOrderPolicy::DependencyOrder);",
+              "line": 451,
+              "sourceDeclaration": "explicit EnhancedRenderGraph(IRenderDeviceServices& services,"
+            },
+            {
+              "signature": "~EnhancedRenderGraph();",
+              "line": 469,
+              "sourceDeclaration": "~EnhancedRenderGraph();"
+            },
+            {
+              "signature": "EnhancedRenderGraph(const EnhancedRenderGraph&);",
+              "line": 470,
+              "sourceDeclaration": "EnhancedRenderGraph(const EnhancedRenderGraph&) = delete;"
+            }
+          ]
+        },
+        {
+          "member": "Reset",
+          "matches": [
+            {
+              "signature": "void Reset();",
+              "line": 402,
+              "sourceDeclaration": "void Reset();"
+            }
+          ]
+        },
+        {
+          "member": "CreateTexture",
+          "matches": [
+            {
+              "signature": "RGHandle CreateTexture(const RGTextureDesc& desc);",
+              "line": 485,
+              "sourceDeclaration": "RGHandle CreateTexture(const RGTextureDesc& desc);"
+            }
+          ]
+        },
+        {
+          "member": "ImportTexture",
+          "matches": [
+            {
+              "signature": "RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState, const std::string& name, RHIResourceState* stateWriteback = nullptr);",
+              "line": 474,
+              "sourceDeclaration": "RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,"
+            }
+          ]
+        },
+        {
+          "member": "ImportBuffer",
+          "matches": [
+            {
+              "signature": "RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState, const std::string& name, RHIResourceState* stateWriteback = nullptr);",
+              "line": 480,
+              "sourceDeclaration": "RGHandle ImportBuffer(RHIBufferHandle resource, RHIResourceState currentState,"
+            }
+          ]
+        },
+        {
+          "member": "AddPass",
+          "matches": [
+            {
+              "signature": "RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect = false);",
+              "line": 515,
+              "sourceDeclaration": "RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,"
+            },
+            {
+              "signature": "RGPassId AddPass(const std::string& name, std::vector<RGPassUsage>&& usages, ExecuteCallback execute, bool hasSideEffect = false);",
+              "line": 517,
+              "sourceDeclaration": "RGPassId AddPass(const std::string& name, std::vector<RGPassUsage>&& usages,"
+            },
+            {
+              "signature": "RGPassId AddPass(const std::string& name, std::span<const RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect = false);",
+              "line": 519,
+              "sourceDeclaration": "RGPassId AddPass(const std::string& name, std::span<const RGPassUsage> usages, ExecuteCallback execute,"
+            },
+            {
+              "signature": "RGPassId AddPass(const std::string& name, std::initializer_list<RGPassUsage> usages, ExecuteCallback execute, bool hasSideEffect = false);",
+              "line": 523,
+              "sourceDeclaration": "RGPassId AddPass(const std::string& name, std::initializer_list<RGPassUsage> usages,"
+            }
+          ]
+        },
+        {
+          "member": "AddSplitPass",
+          "matches": [
+            {
+              "signature": "RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);",
+              "line": 570,
+              "sourceDeclaration": "RGPassId AddSplitPass(const std::string& name, const std::vector<RGPassUsage>& usages,"
+            },
+            {
+              "signature": "RGPassId AddSplitPass(const std::string& name, std::vector<RGPassUsage>&& usages, SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);",
+              "line": 573,
+              "sourceDeclaration": "RGPassId AddSplitPass(const std::string& name, std::vector<RGPassUsage>&& usages,"
+            },
+            {
+              "signature": "RGPassId AddSplitPass(const std::string& name, std::initializer_list<RGPassUsage> usages, SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);",
+              "line": 576,
+              "sourceDeclaration": "RGPassId AddSplitPass(const std::string& name, std::initializer_list<RGPassUsage> usages,"
+            }
+          ]
+        },
+        {
+          "member": "Compile",
+          "matches": [
+            {
+              "signature": "bool Compile(std::string& outError);",
+              "line": 583,
+              "sourceDeclaration": "bool Compile(std::string& outError);"
+            }
+          ]
+        },
+        {
+          "member": "Execute",
+          "matches": [
+            {
+              "signature": "bool Execute(std::string& outError);",
+              "line": 727,
+              "sourceDeclaration": "bool Execute(std::string& outError);"
+            }
+          ]
+        },
+        {
+          "member": "SetTransientPool",
+          "matches": [
+            {
+              "signature": "void SetTransientPool(RGTransientPool* pool);",
+              "line": 420,
+              "sourceDeclaration": "void SetTransientPool(RGTransientPool* pool) { RequireQueueIdle(); m_transientPool = pool; }"
+            }
+          ]
+        },
+        {
+          "member": "GetExecuteOrder",
+          "matches": [
+            {
+              "signature": "const std::vector<uint16_t>& GetExecuteOrder() const;",
+              "line": 837,
+              "sourceDeclaration": "const std::vector<uint16_t>& GetExecuteOrder() const;"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "4485815019386eb496c266cc1a44f045ef561aca"
     },
     {
       "id": "native/RGHandle",
       "title": "RGHandle",
-      "summary": "그래프 리소스 표의 인덱스 핸들입니다. GPU 리소스 핸들과 구분합니다.",
+      "summary": "리소스 index·version·kind·graph epoch를 묶는 값 핸들입니다. native GPU 리소스 핸들과 구분합니다.",
       "signature": "struct RGHandle",
       "group": "Native Engine API",
       "source": "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h",
@@ -1249,10 +2686,91 @@
           "bool IsValid() const;",
           "무효 인덱스 여부. GPU 완료·실제 자원 생존 검사가 아닙니다.",
           "method"
+        ],
+        [
+          "version",
+          "uint16_t version{0};",
+          "버전·종류·graph epoch를 보존하는 핸들 필드.",
+          "field"
+        ],
+        [
+          "kind",
+          "RGResourceKind kind{RGResourceKind::Texture};",
+          "버전·종류·graph epoch를 보존하는 핸들 필드.",
+          "field"
+        ],
+        [
+          "epoch",
+          "uint64_t epoch{0};",
+          "버전·종류·graph epoch를 보존하는 핸들 필드.",
+          "field"
         ]
       ],
-      "note": "",
-      "sections": []
+      "note": "index만으로 다른 버전이나 Reset 뒤 graph의 자원을 식별하지 않습니다. version·kind·epoch를 포함한 핸들 계약을 따릅니다.",
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "index",
+          "matches": [
+            {
+              "signature": "uint16_t index{ 0xFFFF };",
+              "line": 59,
+              "sourceDeclaration": "uint16_t index{ 0xFFFF };"
+            }
+          ]
+        },
+        {
+          "member": "kInvalid",
+          "matches": [
+            {
+              "signature": "static constexpr uint16_t kInvalid = 0xFFFF;",
+              "line": 60,
+              "sourceDeclaration": "static constexpr uint16_t kInvalid = 0xFFFF;"
+            }
+          ]
+        },
+        {
+          "member": "IsValid",
+          "matches": [
+            {
+              "signature": "bool IsValid() const;",
+              "line": 61,
+              "sourceDeclaration": "bool IsValid() const { return kInvalid != index; }"
+            }
+          ]
+        },
+        {
+          "member": "version",
+          "matches": [
+            {
+              "signature": "uint16_t version{0};",
+              "line": 62,
+              "sourceDeclaration": "uint16_t version{0};"
+            }
+          ]
+        },
+        {
+          "member": "kind",
+          "matches": [
+            {
+              "signature": "RGResourceKind kind{RGResourceKind::Texture};",
+              "line": 63,
+              "sourceDeclaration": "RGResourceKind kind{RGResourceKind::Texture};"
+            }
+          ]
+        },
+        {
+          "member": "epoch",
+          "matches": [
+            {
+              "signature": "uint64_t epoch{0};",
+              "line": 64,
+              "sourceDeclaration": "uint64_t epoch{0};"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "4485815019386eb496c266cc1a44f045ef561aca"
     },
     {
       "id": "native/RGTextureDesc",
@@ -1318,13 +2836,106 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "width",
+          "matches": [
+            {
+              "signature": "uint32_t width{ 0 };",
+              "line": 121,
+              "sourceDeclaration": "uint32_t    width{ 0 };"
+            }
+          ]
+        },
+        {
+          "member": "height",
+          "matches": [
+            {
+              "signature": "uint32_t height{ 0 };",
+              "line": 122,
+              "sourceDeclaration": "uint32_t    height{ 0 };"
+            }
+          ]
+        },
+        {
+          "member": "arraySize",
+          "matches": [
+            {
+              "signature": "uint32_t arraySize{ 1 };",
+              "line": 128,
+              "sourceDeclaration": "uint32_t    arraySize{ 1 };"
+            }
+          ]
+        },
+        {
+          "member": "format",
+          "matches": [
+            {
+              "signature": "RHIFormat format{ RHIFormat::RGBA8Unorm };",
+              "line": 130,
+              "sourceDeclaration": "RHIFormat   format{ RHIFormat::RGBA8Unorm };"
+            }
+          ]
+        },
+        {
+          "member": "allowRenderTarget",
+          "matches": [
+            {
+              "signature": "bool allowRenderTarget{ false };",
+              "line": 131,
+              "sourceDeclaration": "bool        allowRenderTarget{ false };"
+            }
+          ]
+        },
+        {
+          "member": "allowDepthStencil",
+          "matches": [
+            {
+              "signature": "bool allowDepthStencil{ false };",
+              "line": 137,
+              "sourceDeclaration": "bool        allowDepthStencil{ false };"
+            }
+          ]
+        },
+        {
+          "member": "allowUnorderedAccess",
+          "matches": [
+            {
+              "signature": "bool allowUnorderedAccess{ false };",
+              "line": 138,
+              "sourceDeclaration": "bool        allowUnorderedAccess{ false };"
+            }
+          ]
+        },
+        {
+          "member": "clearColor",
+          "matches": [
+            {
+              "signature": "float clearColor[4]{ 0.f, 0.f, 0.f, 0.f };",
+              "line": 136,
+              "sourceDeclaration": "float       clearColor[4]{ 0.f, 0.f, 0.f, 0.f };"
+            }
+          ]
+        },
+        {
+          "member": "name",
+          "matches": [
+            {
+              "signature": "std::string name;",
+              "line": 139,
+              "sourceDeclaration": "std::string name;"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "4485815019386eb496c266cc1a44f045ef561aca"
     },
     {
       "id": "native/RenderBackend",
       "title": "RenderBackend",
       "summary": "렌더 백엔드 선택과 문자열 변환의 열거형·자유 함수입니다.",
-      "signature": "enum class RenderBackend : std::uint8_t { DX12, Vulkan };",
+      "signature": "enum class RenderBackend : std::uint8_t",
       "group": "Native Engine API",
       "source": "Engine/RenderEngine/Interfaces/RenderBackend.h",
       "members": [
@@ -1336,13 +2947,36 @@
         ],
         [
           "TryParseRenderBackend",
-          "inline bool TryParseRenderBackend(std::string_view value,\n    RenderBackend& outBackend) noexcept;",
+          "inline bool TryParseRenderBackend(std::string_view value, RenderBackend& outBackend) noexcept;",
           "ASCII 대소문자 무시. 실패 시 false이며 outBackend 변경 없음.",
           "method"
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "RenderBackendName",
+          "matches": [
+            {
+              "signature": "inline const char* RenderBackendName(RenderBackend backend) noexcept;",
+              "line": 11,
+              "sourceDeclaration": "inline const char* RenderBackendName(RenderBackend backend) noexcept"
+            }
+          ]
+        },
+        {
+          "member": "TryParseRenderBackend",
+          "matches": [
+            {
+              "signature": "inline bool TryParseRenderBackend(std::string_view value, RenderBackend& outBackend) noexcept;",
+              "line": 16,
+              "sourceDeclaration": "inline bool TryParseRenderBackend(std::string_view value,"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "2b5d3c74059efb437edd7ebc313af9c8bba49eaa"
     },
     {
       "id": "tools/CreatorBuildTool",
@@ -1373,7 +3007,9 @@
           "title": "구성 명시",
           "text": "package-game 기본은 Debug, publish-engine·compile-game 기본은 Release입니다. --config와 Shipping variant를 엔진 배포본에 맞춰 명시하세요."
         }
-      ]
+      ],
+      "memberEvidence": [],
+      "sourceBlob": "781c70a59352576b7fee2787588cee5b6328e7f1"
     },
     {
       "id": "script/MeshRenderer",
@@ -1415,7 +3051,60 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "MaterialName",
+          "matches": [
+            {
+              "signature": "public string MaterialName { get; }",
+              "line": 15,
+              "sourceDeclaration": "public string MaterialName => Native.MeshGetMaterialName(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "InstantiateMaterial",
+          "matches": [
+            {
+              "signature": "public void InstantiateMaterial(string newName)",
+              "line": 24,
+              "sourceDeclaration": "public void InstantiateMaterial(string newName) => Native.MeshInstantiateMaterial(OwnerHandle, newName);"
+            }
+          ]
+        },
+        {
+          "member": "SetMaterialFloat",
+          "matches": [
+            {
+              "signature": "public bool SetMaterialFloat(string valueName, float value)",
+              "line": 33,
+              "sourceDeclaration": "public bool SetMaterialFloat(string valueName, float value)"
+            }
+          ]
+        },
+        {
+          "member": "SetMaterialInt",
+          "matches": [
+            {
+              "signature": "public bool SetMaterialInt(string valueName, int value)",
+              "line": 37,
+              "sourceDeclaration": "public bool SetMaterialInt(string valueName, int value)"
+            }
+          ]
+        },
+        {
+          "member": "BaseColor",
+          "matches": [
+            {
+              "signature": "public Color4 BaseColor { get; set; }",
+              "line": 44,
+              "sourceDeclaration": "public Color4 BaseColor"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "b71ef784174bb6f61e059b982f6765e47641f67a"
     },
     {
       "id": "script/LightComponent",
@@ -1463,7 +3152,70 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Color",
+          "matches": [
+            {
+              "signature": "public Color4 Color { get; set; }",
+              "line": 43,
+              "sourceDeclaration": "public Color4 Color"
+            }
+          ]
+        },
+        {
+          "member": "Intensity",
+          "matches": [
+            {
+              "signature": "public float Intensity { get; set; }",
+              "line": 50,
+              "sourceDeclaration": "public float Intensity"
+            }
+          ]
+        },
+        {
+          "member": "Range",
+          "matches": [
+            {
+              "signature": "public float Range { get; set; }",
+              "line": 57,
+              "sourceDeclaration": "public float Range"
+            }
+          ]
+        },
+        {
+          "member": "SpotAngle",
+          "matches": [
+            {
+              "signature": "public float SpotAngle { get; set; }",
+              "line": 64,
+              "sourceDeclaration": "public float SpotAngle"
+            }
+          ]
+        },
+        {
+          "member": "Type",
+          "matches": [
+            {
+              "signature": "public LightType Type { get; set; }",
+              "line": 74,
+              "sourceDeclaration": "public LightType Type"
+            }
+          ]
+        },
+        {
+          "member": "Status",
+          "matches": [
+            {
+              "signature": "public LightStatus Status { get; set; }",
+              "line": 81,
+              "sourceDeclaration": "public LightStatus Status"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "3eee13ac89ab6e768785d5240ad560060556dc62"
     },
     {
       "id": "script/LightType",
@@ -1493,7 +3245,40 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Directional",
+          "matches": [
+            {
+              "signature": "Directional = 0",
+              "line": 6,
+              "sourceDeclaration": "Directional = 0"
+            }
+          ]
+        },
+        {
+          "member": "Point",
+          "matches": [
+            {
+              "signature": "Point = 1",
+              "line": 7,
+              "sourceDeclaration": "Point = 1"
+            }
+          ]
+        },
+        {
+          "member": "Spot",
+          "matches": [
+            {
+              "signature": "Spot = 2",
+              "line": 8,
+              "sourceDeclaration": "Spot = 2"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "3eee13ac89ab6e768785d5240ad560060556dc62"
     },
     {
       "id": "script/LightStatus",
@@ -1523,12 +3308,45 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Disabled",
+          "matches": [
+            {
+              "signature": "Disabled = 0",
+              "line": 19,
+              "sourceDeclaration": "Disabled = 0"
+            }
+          ]
+        },
+        {
+          "member": "Enabled",
+          "matches": [
+            {
+              "signature": "Enabled = 1",
+              "line": 20,
+              "sourceDeclaration": "Enabled = 1"
+            }
+          ]
+        },
+        {
+          "member": "StaticShadows",
+          "matches": [
+            {
+              "signature": "StaticShadows = 2",
+              "line": 21,
+              "sourceDeclaration": "StaticShadows = 2"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "3eee13ac89ab6e768785d5240ad560060556dc62"
     },
     {
       "id": "script/SoundComponent",
       "title": "SoundComponent",
-      "summary": "FMOD 기반 사운드 클립의 재생과 기본 재생 속성을 제어합니다.",
+      "summary": "AudioHost/PlaybackService를 통해 오디오 클립 재생과 개별 재생 handle·기본 재생 속성을 제어합니다.",
       "group": "C# Script API",
       "source": "ScriptCore/SoundComponent.cs",
       "signature": "public sealed class SoundComponent : NativeComponent",
@@ -1580,10 +3398,157 @@
           "public float Pitch { get; set; }",
           "다음 재생에 적용할 피치입니다.",
           "property"
+        ],
+        [
+          "PlayInstance",
+          "public PlaybackHandle PlayInstance()",
+          "개별 PlaybackHandle을 받는 재생 요청.",
+          "method"
+        ],
+        [
+          "PlayOneShotInstance",
+          "public PlaybackHandle PlayOneShotInstance()",
+          "개별 one-shot 재생 핸들.",
+          "method"
+        ],
+        [
+          "Source",
+          "public AudioSource Source { get; set; }",
+          "명시적인 AudioSource 설정.",
+          "property"
+        ],
+        [
+          "Settings",
+          "public AudioPlaySettings Settings { get; set; }",
+          "AudioPlaySettings 설정.",
+          "property"
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Play",
+          "matches": [
+            {
+              "signature": "public void Play()",
+              "line": 6,
+              "sourceDeclaration": "public void Play() => Native.SoundPlay(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "Stop",
+          "matches": [
+            {
+              "signature": "public void Stop()",
+              "line": 7,
+              "sourceDeclaration": "public void Stop() => Native.SoundStop(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "Pause",
+          "matches": [
+            {
+              "signature": "public void Pause(bool pause)",
+              "line": 8,
+              "sourceDeclaration": "public void Pause(bool pause) => Native.SoundPause(OwnerHandle, pause);"
+            }
+          ]
+        },
+        {
+          "member": "IsPlaying",
+          "matches": [
+            {
+              "signature": "public bool IsPlaying()",
+              "line": 9,
+              "sourceDeclaration": "public bool IsPlaying() => Native.SoundIsPlaying(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "PlayOneShot",
+          "matches": [
+            {
+              "signature": "public void PlayOneShot()",
+              "line": 10,
+              "sourceDeclaration": "public void PlayOneShot() => Native.SoundPlayOneShot(OwnerHandle);"
+            }
+          ]
+        },
+        {
+          "member": "ClipKey",
+          "matches": [
+            {
+              "signature": "public string ClipKey { get; set; }",
+              "line": 15,
+              "sourceDeclaration": "public string ClipKey"
+            }
+          ]
+        },
+        {
+          "member": "Volume",
+          "matches": [
+            {
+              "signature": "public float Volume { get; set; }",
+              "line": 36,
+              "sourceDeclaration": "public float Volume"
+            }
+          ]
+        },
+        {
+          "member": "Pitch",
+          "matches": [
+            {
+              "signature": "public float Pitch { get; set; }",
+              "line": 41,
+              "sourceDeclaration": "public float Pitch"
+            }
+          ]
+        },
+        {
+          "member": "PlayInstance",
+          "matches": [
+            {
+              "signature": "public PlaybackHandle PlayInstance()",
+              "line": 11,
+              "sourceDeclaration": "public PlaybackHandle PlayInstance() => new(Native.SoundPlayInstance(OwnerHandle, false));"
+            }
+          ]
+        },
+        {
+          "member": "PlayOneShotInstance",
+          "matches": [
+            {
+              "signature": "public PlaybackHandle PlayOneShotInstance()",
+              "line": 12,
+              "sourceDeclaration": "public PlaybackHandle PlayOneShotInstance() => new(Native.SoundPlayInstance(OwnerHandle, true));"
+            }
+          ]
+        },
+        {
+          "member": "Source",
+          "matches": [
+            {
+              "signature": "public AudioSource Source { get; set; }",
+              "line": 20,
+              "sourceDeclaration": "public AudioSource Source"
+            }
+          ]
+        },
+        {
+          "member": "Settings",
+          "matches": [
+            {
+              "signature": "public AudioPlaySettings Settings { get; set; }",
+              "line": 31,
+              "sourceDeclaration": "public AudioPlaySettings Settings"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "d2ce0290dcc34f8fd55f86f7e81236282c25e1f0"
     },
     {
       "id": "script/Prefab",
@@ -1619,7 +3584,50 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "IsValid",
+          "matches": [
+            {
+              "signature": "public bool IsValid { get; }",
+              "line": 16,
+              "sourceDeclaration": "public bool IsValid => !string.IsNullOrEmpty(_name);"
+            }
+          ]
+        },
+        {
+          "member": "Name",
+          "matches": [
+            {
+              "signature": "public string Name { get; }",
+              "line": 18,
+              "sourceDeclaration": "public string Name => _name ?? string.Empty;"
+            }
+          ]
+        },
+        {
+          "member": "Load",
+          "matches": [
+            {
+              "signature": "public static Prefab Load(string name)",
+              "line": 24,
+              "sourceDeclaration": "public static Prefab Load(string name)"
+            }
+          ]
+        },
+        {
+          "member": "Instantiate",
+          "matches": [
+            {
+              "signature": "public Entity Instantiate(string? instanceName = null)",
+              "line": 31,
+              "sourceDeclaration": "public Entity Instantiate(string? instanceName = null)"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "22401b56f366abc9ca01c5cabd1b87f61cf6e16e"
     },
     {
       "id": "script/ObjectHandle",
@@ -1631,13 +3639,13 @@
       "members": [
         [
           "Index",
-          "public readonly uint Index",
+          "public readonly uint Index;",
           "객체 슬롯 인덱스입니다.",
           "field"
         ],
         [
           "Generation",
-          "public readonly uint Generation",
+          "public readonly uint Generation;",
           "슬롯 재사용을 구분하는 세대입니다.",
           "field"
         ],
@@ -1655,7 +3663,50 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Index",
+          "matches": [
+            {
+              "signature": "public readonly uint Index;",
+              "line": 18,
+              "sourceDeclaration": "public readonly uint Index;"
+            }
+          ]
+        },
+        {
+          "member": "Generation",
+          "matches": [
+            {
+              "signature": "public readonly uint Generation;",
+              "line": 19,
+              "sourceDeclaration": "public readonly uint Generation;"
+            }
+          ]
+        },
+        {
+          "member": "Invalid",
+          "matches": [
+            {
+              "signature": "public static ObjectHandle Invalid { get; }",
+              "line": 28,
+              "sourceDeclaration": "public static ObjectHandle Invalid => default;"
+            }
+          ]
+        },
+        {
+          "member": "IsValid",
+          "matches": [
+            {
+              "signature": "public bool IsValid { get; }",
+              "line": 30,
+              "sourceDeclaration": "public bool IsValid => Generation != 0;"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "6699561bd32f1c98b4c925ea19d4375fa3d4414c"
     },
     {
       "id": "script/Quaternion",
@@ -1663,7 +3714,7 @@
       "summary": "회전과 회전 보간에 사용하는 쿼터니언 값 타입입니다.",
       "group": "C# Script API",
       "source": "ScriptCore/Quaternion.cs",
-      "signature": "public struct Quaternion",
+      "signature": "public struct Quaternion(float x, float y, float z, float w)",
       "members": [
         [
           "Identity",
@@ -1697,91 +3748,399 @@
         ],
         [
           "Normalized",
-          "public Quaternion Normalized { get; }",
+          "public readonly Quaternion Normalized { get; }",
           "정규화된 회전입니다.",
           "property"
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Identity",
+          "matches": [
+            {
+              "signature": "public static Quaternion Identity { get; }",
+              "line": 21,
+              "sourceDeclaration": "public static Quaternion Identity => new(0f, 0f, 0f, 1f);"
+            }
+          ]
+        },
+        {
+          "member": "CreateFromAxisAngle",
+          "matches": [
+            {
+              "signature": "public static Quaternion CreateFromAxisAngle(Float3 axis, float angle)",
+              "line": 24,
+              "sourceDeclaration": "public static Quaternion CreateFromAxisAngle(Float3 axis, float angle)"
+            }
+          ]
+        },
+        {
+          "member": "CreateFromYawPitchRoll",
+          "matches": [
+            {
+              "signature": "public static Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll)",
+              "line": 33,
+              "sourceDeclaration": "public static Quaternion CreateFromYawPitchRoll(float yaw, float pitch, float roll)"
+            }
+          ]
+        },
+        {
+          "member": "LookRotation",
+          "matches": [
+            {
+              "signature": "public static Quaternion LookRotation(Float3 forward, Float3 up)",
+              "line": 48,
+              "sourceDeclaration": "public static Quaternion LookRotation(Float3 forward, Float3 up)"
+            },
+            {
+              "signature": "public static Quaternion LookRotation(Float3 forward)",
+              "line": 86,
+              "sourceDeclaration": "public static Quaternion LookRotation(Float3 forward) => LookRotation(forward, new Float3(0f, 1f, 0f));"
+            }
+          ]
+        },
+        {
+          "member": "Slerp",
+          "matches": [
+            {
+              "signature": "public static Quaternion Slerp(Quaternion a, Quaternion b, float t)",
+              "line": 89,
+              "sourceDeclaration": "public static Quaternion Slerp(Quaternion a, Quaternion b, float t)"
+            }
+          ]
+        },
+        {
+          "member": "Normalized",
+          "matches": [
+            {
+              "signature": "public readonly Quaternion Normalized { get; }",
+              "line": 125,
+              "sourceDeclaration": "public readonly Quaternion Normalized"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "19f68e3157f0e089920190dcd1cc603a5f75d52c"
     },
     {
       "id": "script/Physics",
       "title": "Physics",
-      "summary": "할당 없이 광선과 구 범위의 물리 질의를 수행합니다.",
+      "summary": "씬을 선택하는 Entity와 호출자 버퍼를 사용하는 물리 쿼리·접촉 관측 API입니다.",
       "group": "C# Script API",
       "source": "ScriptCore/Physics.cs",
       "signature": "public static class Physics",
       "members": [
         [
           "AllLayers",
-          "public const uint AllLayers = ~0u",
-          "모든 레이어를 대상으로 하는 기본 마스크입니다.",
+          "public const uint AllLayers = uint.MaxValue;",
+          "쿼리의 전체 레이어 마스크 상수.",
+          "field"
+        ],
+        [
+          "MaxQueryCapacity",
+          "public const int MaxQueryCapacity = 256;",
+          "단일 쿼리 버퍼 상한.",
+          "field"
+        ],
+        [
+          "MaxBatchRequests",
+          "public const int MaxBatchRequests = 64;",
+          "배치 요청 상한.",
+          "field"
+        ],
+        [
+          "MaxBatchHitCapacity",
+          "public const int MaxBatchHitCapacity = 4096;",
+          "배치 hit 저장소 상한.",
           "field"
         ],
         [
           "Raycast",
-          "public static bool Raycast(Float3 origin, Float3 direction, float maxDistance, out RaycastHit hit, uint layerMask = AllLayers)",
-          "가장 가까운 충돌 하나를 찾습니다.",
-          "method"
-        ],
-        [
-          "RaycastAll",
-          "public static int RaycastAll(Float3 origin, Float3 direction, float maxDistance, Span<RaycastHit> results, uint layerMask = AllLayers)",
-          "광선에 걸리는 충돌을 결과 버퍼에 채웁니다. 반환값은 실제 충돌 수입니다.",
+          "public static PhysicsQueryResult Raycast(Entity sceneAnchor, Float3 origin, Float3 direction, float distance, Span<PhysicsHit> results, uint layers = AllLayers, bool includeSensors = false)",
+          "sceneAnchor의 씬에서 광선 쿼리. 결과와 용량/잘림 상태를 함께 반환.",
           "method"
         ],
         [
           "OverlapSphere",
-          "public static int OverlapSphere(Float3 position, float radius, Span<RaycastHit> results, uint layerMask = AllLayers)",
-          "구 범위 안에 겹치는 충돌을 결과 버퍼에 채웁니다.",
+          "public static PhysicsQueryResult OverlapSphere(Entity sceneAnchor, Float3 position, float radius, Span<PhysicsHit> results, uint layers = AllLayers, bool includeSensors = false)",
+          "sceneAnchor의 씬에서 구 겹침 쿼리.",
+          "method"
+        ],
+        [
+          "QueryBatch",
+          "public static PhysicsError QueryBatch(Entity sceneAnchor, ReadOnlySpan<PhysicsQueryRequest> requests, Span<PhysicsHit> hits, Span<PhysicsBatchResult> results)",
+          "범위가 겹치지 않는 요청들을 한 owner read window에서 처리.",
+          "method"
+        ],
+        [
+          "ObserveContacts",
+          "public static ContactStream ObserveContacts(Entity owner, ShapeRole selfRole, ShapeRole otherRole, ContactPhases phases = ContactPhases.Begin, int capacity = 256, ContactGrouping grouping = ContactGrouping.ShapePairs)",
+          "OnBeginSimulation에서 접촉 스트림을 등록. owner-thread 수명 계약을 따른다.",
+          "method"
+        ],
+        [
+          "BindContactRole",
+          "public static void BindContactRole(PhysicsBodyComponent body, uint shapeId, ShapeRole role)",
+          "현재 시뮬레이션에 한정된 명시적 shape 역할 등록.",
           "method"
         ]
       ],
-      "note": "",
-      "sections": []
+      "note": "sceneAnchor는 살아 있는 씬의 Entity입니다. 방향은 단위 벡터여야 합니다. Written 범위만 읽고 Error·RequiredCapacity·Truncated를 확인합니다. 접촉 관측과 역할 등록은 OnBeginSimulation에서 수행합니다.",
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "AllLayers",
+          "matches": [
+            {
+              "signature": "public const uint AllLayers = uint.MaxValue;",
+              "line": 105,
+              "sourceDeclaration": "public const uint AllLayers = uint.MaxValue;"
+            }
+          ]
+        },
+        {
+          "member": "MaxQueryCapacity",
+          "matches": [
+            {
+              "signature": "public const int MaxQueryCapacity = 256;",
+              "line": 106,
+              "sourceDeclaration": "public const int MaxQueryCapacity = 256;"
+            }
+          ]
+        },
+        {
+          "member": "MaxBatchRequests",
+          "matches": [
+            {
+              "signature": "public const int MaxBatchRequests = 64;",
+              "line": 107,
+              "sourceDeclaration": "public const int MaxBatchRequests = 64;"
+            }
+          ]
+        },
+        {
+          "member": "MaxBatchHitCapacity",
+          "matches": [
+            {
+              "signature": "public const int MaxBatchHitCapacity = 4096;",
+              "line": 108,
+              "sourceDeclaration": "public const int MaxBatchHitCapacity = 4096;"
+            }
+          ]
+        },
+        {
+          "member": "Raycast",
+          "matches": [
+            {
+              "signature": "public static PhysicsQueryResult Raycast(Entity sceneAnchor, Float3 origin, Float3 direction, float distance, Span<PhysicsHit> results, uint layers = AllLayers, bool includeSensors = false)",
+              "line": 118,
+              "sourceDeclaration": "public static PhysicsQueryResult Raycast(Entity sceneAnchor, Float3 origin, Float3 direction, float distance,"
+            }
+          ]
+        },
+        {
+          "member": "OverlapSphere",
+          "matches": [
+            {
+              "signature": "public static PhysicsQueryResult OverlapSphere(Entity sceneAnchor, Float3 position, float radius, Span<PhysicsHit> results, uint layers = AllLayers, bool includeSensors = false)",
+              "line": 122,
+              "sourceDeclaration": "public static PhysicsQueryResult OverlapSphere(Entity sceneAnchor, Float3 position, float radius,"
+            }
+          ]
+        },
+        {
+          "member": "QueryBatch",
+          "matches": [
+            {
+              "signature": "public static PhysicsError QueryBatch(Entity sceneAnchor, ReadOnlySpan<PhysicsQueryRequest> requests, Span<PhysicsHit> hits, Span<PhysicsBatchResult> results)",
+              "line": 112,
+              "sourceDeclaration": "public static PhysicsError QueryBatch(Entity sceneAnchor, ReadOnlySpan<PhysicsQueryRequest> requests,"
+            }
+          ]
+        },
+        {
+          "member": "ObserveContacts",
+          "matches": [
+            {
+              "signature": "public static ContactStream ObserveContacts(Entity owner, ShapeRole selfRole, ShapeRole otherRole, ContactPhases phases = ContactPhases.Begin, int capacity = 256, ContactGrouping grouping = ContactGrouping.ShapePairs)",
+              "line": 77,
+              "sourceDeclaration": "public static ContactStream ObserveContacts(Entity owner, ShapeRole selfRole, ShapeRole otherRole,"
+            }
+          ]
+        },
+        {
+          "member": "BindContactRole",
+          "matches": [
+            {
+              "signature": "public static void BindContactRole(PhysicsBodyComponent body, uint shapeId, ShapeRole role)",
+              "line": 86,
+              "sourceDeclaration": "public static void BindContactRole(PhysicsBodyComponent body, uint shapeId, ShapeRole role)"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "730b394602976841e996cf7b803dacaf1622e249"
     },
     {
-      "id": "script/RaycastHit",
-      "title": "RaycastHit",
-      "summary": "물리 질의에서 반환되는 충돌 결과입니다.",
+      "id": "script/PhysicsHit",
+      "title": "PhysicsHit",
+      "summary": "씬 물리 쿼리의 충돌 결과 값입니다. ComponentId·ShapeId·LayerId와 위치 정보를 제공하며 Entity를 복원합니다.",
       "group": "C# Script API",
       "source": "ScriptCore/Physics.cs",
-      "signature": "public struct RaycastHit",
+      "signature": "public struct PhysicsHit",
       "members": [
         [
-          "Layer",
-          "public uint Layer",
-          "충돌 대상의 레이어 비트입니다.",
+          "ComponentId",
+          "public ulong ComponentId;",
+          "컴포넌트 신원.",
+          "field"
+        ],
+        [
+          "ShapeId",
+          "public uint ShapeId;",
+          "shape 신원.",
+          "field"
+        ],
+        [
+          "Face",
+          "public uint Face;",
+          "face 인덱스.",
+          "field"
+        ],
+        [
+          "LayerId",
+          "public ulong LayerId;",
+          "레이어 신원. 비트 마스크와 구분.",
           "field"
         ],
         [
           "Point",
-          "public Float3 Point",
-          "접촉 지점입니다.",
+          "public Float3 Point;",
+          "교차 위치.",
           "field"
         ],
         [
           "Normal",
-          "public Float3 Normal",
-          "접촉면 법선입니다.",
+          "public Float3 Normal;",
+          "교차 법선.",
           "field"
         ],
         [
           "Distance",
-          "public float Distance",
-          "질의 시작점에서의 거리입니다.",
+          "public float Distance;",
+          "교차 거리.",
           "field"
         ],
         [
           "Entity",
-          "public Entity Entity { get; }",
-          "충돌 대상 엔티티입니다.",
+          "public readonly Entity Entity { get; }",
+          "네이티브 핸들의 비소유 Entity 관찰 값.",
+          "property"
+        ],
+        [
+          "HasLocation",
+          "public readonly bool HasLocation { get; }",
+          "위치 정보가 있는지 확인.",
           "property"
         ]
       ],
-      "note": "",
-      "sections": []
+      "note": "이전 RaycastHit 문서 주소를 보존합니다. 현재 공개 타입은 PhysicsHit이며 Layer는 LayerId(ulong)로 대체됐습니다. Written 범위 밖 결과를 읽지 않습니다.",
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "ComponentId",
+          "matches": [
+            {
+              "signature": "public ulong ComponentId;",
+              "line": 16,
+              "sourceDeclaration": "public ulong ComponentId;"
+            }
+          ]
+        },
+        {
+          "member": "ShapeId",
+          "matches": [
+            {
+              "signature": "public uint ShapeId;",
+              "line": 17,
+              "sourceDeclaration": "public uint ShapeId;"
+            }
+          ]
+        },
+        {
+          "member": "Face",
+          "matches": [
+            {
+              "signature": "public uint Face;",
+              "line": 18,
+              "sourceDeclaration": "public uint Face;"
+            }
+          ]
+        },
+        {
+          "member": "LayerId",
+          "matches": [
+            {
+              "signature": "public ulong LayerId;",
+              "line": 19,
+              "sourceDeclaration": "public ulong LayerId;"
+            }
+          ]
+        },
+        {
+          "member": "Point",
+          "matches": [
+            {
+              "signature": "public Float3 Point;",
+              "line": 20,
+              "sourceDeclaration": "public Float3 Point;"
+            }
+          ]
+        },
+        {
+          "member": "Normal",
+          "matches": [
+            {
+              "signature": "public Float3 Normal;",
+              "line": 21,
+              "sourceDeclaration": "public Float3 Normal;"
+            }
+          ]
+        },
+        {
+          "member": "Distance",
+          "matches": [
+            {
+              "signature": "public float Distance;",
+              "line": 22,
+              "sourceDeclaration": "public float Distance;"
+            }
+          ]
+        },
+        {
+          "member": "Entity",
+          "matches": [
+            {
+              "signature": "public readonly Entity Entity { get; }",
+              "line": 25,
+              "sourceDeclaration": "public readonly Entity Entity => new(Object);"
+            }
+          ]
+        },
+        {
+          "member": "HasLocation",
+          "matches": [
+            {
+              "signature": "public readonly bool HasLocation { get; }",
+              "line": 26,
+              "sourceDeclaration": "public readonly bool HasLocation => Location != 0;"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "730b394602976841e996cf7b803dacaf1622e249"
     },
     {
       "id": "script/Float3",
@@ -1789,7 +4148,7 @@
       "summary": "위치·방향·크기에 사용하는 3성분 벡터 값 타입입니다.",
       "group": "C# Script API",
       "source": "ScriptCore/ObjectHandle.cs",
-      "signature": "public struct Float3",
+      "signature": "public struct Float3(float x, float y, float z)",
       "members": [
         [
           "Zero",
@@ -1817,13 +4176,13 @@
         ],
         [
           "Length",
-          "public float Length { get; }",
+          "public readonly float Length { get; }",
           "벡터의 길이입니다.",
           "property"
         ],
         [
           "Normalized",
-          "public Float3 Normalized { get; }",
+          "public readonly Float3 Normalized { get; }",
           "정규화된 벡터입니다.",
           "property"
         ],
@@ -1847,7 +4206,103 @@
         ]
       ],
       "note": "",
-      "sections": []
+      "sections": [],
+      "memberEvidence": [
+        {
+          "member": "Zero",
+          "matches": [
+            {
+              "signature": "public static Float3 Zero { get; }",
+              "line": 93,
+              "sourceDeclaration": "public static Float3 Zero    => default;"
+            }
+          ]
+        },
+        {
+          "member": "One",
+          "matches": [
+            {
+              "signature": "public static Float3 One { get; }",
+              "line": 94,
+              "sourceDeclaration": "public static Float3 One     => new(1f, 1f, 1f);"
+            }
+          ]
+        },
+        {
+          "member": "Up",
+          "matches": [
+            {
+              "signature": "public static Float3 Up { get; }",
+              "line": 95,
+              "sourceDeclaration": "public static Float3 Up      => new(0f, 1f, 0f);"
+            }
+          ]
+        },
+        {
+          "member": "Forward",
+          "matches": [
+            {
+              "signature": "public static Float3 Forward { get; }",
+              "line": 97,
+              "sourceDeclaration": "public static Float3 Forward => new(0f, 0f, 1f);"
+            }
+          ]
+        },
+        {
+          "member": "Length",
+          "matches": [
+            {
+              "signature": "public readonly float Length { get; }",
+              "line": 107,
+              "sourceDeclaration": "public readonly float Length        => MathF.Sqrt(LengthSquared);"
+            }
+          ]
+        },
+        {
+          "member": "Normalized",
+          "matches": [
+            {
+              "signature": "public readonly Float3 Normalized { get; }",
+              "line": 110,
+              "sourceDeclaration": "public readonly Float3 Normalized"
+            }
+          ]
+        },
+        {
+          "member": "Dot",
+          "matches": [
+            {
+              "signature": "public static float Dot(Float3 a, Float3 b)",
+              "line": 122,
+              "sourceDeclaration": "public static float Dot(Float3 a, Float3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;"
+            }
+          ]
+        },
+        {
+          "member": "Cross",
+          "matches": [
+            {
+              "signature": "public static Float3 Cross(Float3 a, Float3 b)",
+              "line": 124,
+              "sourceDeclaration": "public static Float3 Cross(Float3 a, Float3 b) => new("
+            }
+          ]
+        },
+        {
+          "member": "Lerp",
+          "matches": [
+            {
+              "signature": "public static Float3 Lerp(Float3 a, Float3 b, float t)",
+              "line": 131,
+              "sourceDeclaration": "public static Float3 Lerp(Float3 a, Float3 b, float t) => a + (b - a) * t;"
+            }
+          ]
+        }
+      ],
+      "sourceBlob": "6699561bd32f1c98b4c925ea19d4375fa3d4414c"
     }
-  ]
+  ],
+  "aliases": {
+    "script/RaycastHit": "script/PhysicsHit"
+  }
 }

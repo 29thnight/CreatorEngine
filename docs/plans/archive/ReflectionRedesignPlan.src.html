@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>컴파일타임 리플렉션 전환 — 헤더툴 은퇴와 typed 방문 계약 (PHASE 18)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../../RefactoringPlanDashboard.html">대시보드</a> · <a href="../MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="ReflectionRedesignPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/archive/ReflectionRedesignPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>컴파일타임 리플렉션 전환 — 헤더툴 은퇴와 typed 방문 계약 (PHASE 18)</h1><p>이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 종료/승계</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Reflgen schema</ve-node><ve-node id="n1" at="2 1">Authoring</ve-node><ve-node id="n2" at="3 1" key>Cooked data</ve-node><ve-node id="n3" at="3 2">Pak manifest</ve-node><ve-node id="n4" at="2 2">Reader</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<p><strong>단일 소유 계획:</strong> <a href="../SerializationPlan.html">SerializationPlan</a>. 이 문서는 이전 진입 링크를 보존하는 인계 문서다.</p>
+<ul>
+<li>이 문서의 완료·대체된 구현 단계는 활성 계획에서 제거했다. 남은 후속은 아래 단일 소유 계획을 따른다.</li>
+<li>현행 서술 정본은 reflgen::schema_of/type_descriptor다. 과거 reflect()/meta::schema 생성 체계를 신규 목표로 사용하지 않는다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>reflgen schema → authoring document/cooked archive → pak → runtime consumer</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/AuthoringCookedDocument.h#L14">Engine/Utility_Framework/AuthoringCookedDocument.h:14</a> — <code>inline constexpr std::array&lt;std::byte, 4&gt; kCookedDocumentMagic{</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflgenAuthoringSerializers.h#L26">Engine/Utility_Framework/ReflgenAuthoringSerializers.h:26</a> — <code>concept ReflgenRecord = std::is_class_v&lt;T&gt; &amp;&amp; reflgen::reflectable&lt;T&gt;;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L21">Engine/SceneRuntime/SceneManager.h:21</a> — <code>class Scene;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="-ct0--기준선안전망-2026-08-16-잔여-2건"></span>
+<span id="-ct1--즉효-저위험-2026-08-16"></span>
+<span id="-ct10--사강-코드-일소-2026-08-17-감사-dead-목록-이행"></span>
+<span id="-ct11--팩토리-접합-factoryregistry--type-필드-2026-08-17-싱글턴-재확인-후속"></span>
+<span id="-ct11-b--registry-구조-효율화-2026-08-17"></span>
+<span id="-ct11-c--metaaliashmetautilityh-흡수-은퇴-2026-08-17"></span>
+<span id="-ct2--죽은-갈래-일소-2026-08-16-f13eaab7"></span>
+<span id="-ct3--헤더-전파-절단-2026-08-16"></span>
+<span id="-ct4--신-코어--어댑터--typeid-교체-2026-08-17-2커밋-분리"></span>
+<span id="-ct5--본대-이전-2026-08-17-단일-스윕"></span>
+<span id="-ct6-a--typed-직렬화기--런타임-브리지-2026-08-17"></span>
+<span id="-ct6-b--인스펙터-속성-소비-2026-08-17-스코프-조정"></span>
+<span id="-ct6-c--인스펙터-typed-draw--ab-토글-2026-08-17-df551178"></span>
+<span id="-ct6-d--팩토리-분기-소멸--ondeserialized-후크-2026-08-17"></span>
+<span id="-ct7--은퇴정산-2026-08-17--phase-18-완결"></span>
+<span id="-ct7-b--crtp-정체성-베이스-2026-08-17-사용자-결정"></span>
+<span id="-ct7-c--enumregistry-은퇴매크로-0종-2026-08-17-사용자-점검-요청"></span>
+<span id="-ct8--함수형-describe--canonical-변수-treflection-2026-08-17-사용자-지시"></span>
+<span id="-ct9--metaschema-로컬-스키마identity-단일-원본라이브러리-분리-2026-08-17-사용자-확정안"></span>
+<span id="-ct9-b--열거형-자급화--구-코드-존치-전수-감사-2026-08-17"></span>
+<span id="1-결정-사항-분석에서-확정된-것"></span>
+<span id="2-실측-요약-변경-대상의-크기"></span>
+<span id="3-트랙-ct--슬라이스"></span>
+<span id="4-순서와-의존"></span>
+<span id="5-완료-기준"></span>
+<span id="6-함정-착수-전-필독"></span>
+<span id="sec-1-결정-사항-분석에서-확정된-것"></span>
+<span id="sec-2-실측-요약-변경-대상의-크기"></span>
+<span id="sec-3-트랙-ct--슬라이스"></span>
+<span id="sec-4-순서와-의존"></span>
+<span id="sec-5-완료-기준"></span>
+<span id="sec-6-함정-착수-전-필독"></span>
+<span id="원계획-ct4-착수-전-설계--이행-기록-위해-보존"></span>
+<span id="원계획-ct6-착수-전-설계--이행-기록-위해-보존"></span>
+<span id="원계획-ct7-착수-전-설계--이행-기록-위해-보존"></span></p>
+</details>
+</main></body></html>

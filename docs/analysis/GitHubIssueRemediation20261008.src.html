@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>GitHub issue remediation — 2026-10-08</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="GitHubIssueRemediation20261008.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/GitHubIssueRemediation20261008.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>GitHub issue remediation — 2026-10-08</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Job input</ve-node><ve-node id="n1" at="2 1">Scheduler</ve-node><ve-node id="n2" at="3 1" key>Workers</ve-node><ve-node id="n3" at="3 2">Completion</ve-node><ve-node id="n4" at="2 2">Join</ve-node><ve-node id="n5" at="1 2">Consumer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.</li>
+<li>과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang#L8">Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang:8</a> — <code>struct WireInstance</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang#L20">Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang:20</a> — <code>struct VSIn</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang#L27">Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang:27</a> — <code>struct VSOut</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp#L90">Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp:90</a> — <code>bool DX12Test::RunWireFrameTest(std::string&amp; outLog)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp#L150">Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp:150</a> — <code>draws[0].worldMatrix = math::matrix4x4::identity();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp#L152">Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp:152</a> — <code>draws[1].worldMatrix = math::translation_matrix(math::vector3{ 3.f, 0.f, 0.f });</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4">ScriptCore/BlackBoard.cs:4</a> — <code>public enum BlackBoardType</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28">ScriptCore/BlackBoard.cs:28</a> — <code>public sealed class BlackBoard</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30">ScriptCore/BlackBoard.cs:30</a> — <code>private readonly struct Value(BlackBoardType type, object boxed)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L13">ScriptCore/MeshRenderer.cs:13</a> — <code>public sealed class MeshRenderer : NativeComponent</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L15">ScriptCore/MeshRenderer.cs:15</a> — <code>public string MaterialName =&gt; Native.MeshGetMaterialName(OwnerHandle);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/MeshRenderer.cs#L24">ScriptCore/MeshRenderer.cs:24</a> — <code>public void InstantiateMaterial(string newName) =&gt; Native.MeshInstantiateMaterial(OwnerHandle, newName);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L16">Engine/SceneRuntime/Terrain.h:16</a> — <code>class [[reflgen::reflect]] TerrainComponent : public meta::identity&lt;TerrainComponent, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L20">Engine/SceneRuntime/Terrain.h:20</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Terrain.h#L22">Engine/SceneRuntime/Terrain.h:22</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L8">Engine/SceneRuntime/BlackBoard.h:8</a> — <code>class Entity;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L9">Engine/SceneRuntime/BlackBoard.h:9</a> — <code>class Transform;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/BlackBoard.h#L10">Engine/SceneRuntime/BlackBoard.h:10</a> — <code>class MenuBarWindow;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L19">Engine/SceneRuntime/MeshRenderer.h:19</a> — <code>class [[reflgen::reflect]] MeshRenderer : public meta::identity&lt;MeshRenderer, Component&gt;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L23">Engine/SceneRuntime/MeshRenderer.h:23</a> — <code>void gc_trace(gc::tracer&amp; tracer) const override</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/MeshRenderer.h#L25">Engine/SceneRuntime/MeshRenderer.h:25</a> — <code>Component::gc_trace(tracer);</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Base: <code>9c1c2aeae0e85cc3a2caacea142aee1e706cf88f</code>. Scope: audit all 33 open issues against current consumers and canonical plans, then fix valid issues sequentially. Existing unrelated dirty changes are preserved. Issue closure requires validation evidence. The original implementation task excluded GitHub status changes; the explicit 2026-10-09 closure request and its results are recorded below.</p>
+<p>Backend implementation remains neutral. PHASE 4.9 owns cross-backend runtime/pixel acceptance; this does not block scoped DX12 fixes. RG6 acceptance is not a performance-improvement claim. Material recovery preserves authored sources and does not restore native fallback.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Audit / implementation / validation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/131">#131</a> [Render] Graph-only 전환 후 남은 native draw 스트림과 PooledDraw 상태 정리</td>
+<td>Valid; removed unused authored/material owners, transparency classification and empty native sort/shadow replay. WireFrame consumes graph geometry; native reference/replay compatibility remains. Latest Debug full raster integration passed; Editor graph WireFrame static/skinned passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/132">#132</a> [Render] SelectReadyInput의 draw 목록 복사·비우기·재복사 제거</td>
+<td>Valid; implemented and Debug/Release DX12 raster validated in GraphOnlyMaterialCleanup20261008.md.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/133">#133</a> [Render] 동일 recording 안에서 같은 재질 binding 중복 준비 줄이기</td>
+<td>Valid; recording/device/complete-layout/descriptor-token cache implemented with weak packet owners. Debug/Release native binding probes passed 183 checks and 64 GPU components each.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/134">#134</a> [Editor] Graph-only 전환 후 WireFrame 지오메트리 입력 연결 복구</td>
+<td>Valid; sealed graph geometry and poses connected to WireFrame, typed static/skinned input layouts and batch keys fixed. Debug Editor build and graph WireFrame static/skinned runtime passed (2 draws, 1 batch, shared skin palette).</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/135">#135</a> [Render] scene mesh cache hit 시 불변 vertex remap 재복사 제거</td>
+<td>Valid; immutable remap span retains shared vector owner, cache hits share its storage. Debug/Release mesh probes passed 1,117,791 checks each, including shared remap storage identity.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/136">#136</a> [Render] Forward shading 소비자가 없는 live 뷰의 타일 광원 컬링 생략</td>
+<td>Valid; live consumer flag gates Forward tile allocation and cull declaration, isolated cull/readback defaults retained. Native opaque-only allocation/declaration checks passed on DX12 and Vulkan.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/137">#137</a> [RenderGraph] recording wave마다 전체 record unit을 재순회하는 비용 제거</td>
+<td>Valid; worker unit lists with monotonic wave cursors replace per-wave full scans. Ordering preserved; full Debug raster and Editor parallel GPU parity passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/138">#138</a> [RenderGraph] imported resource 중복 검증의 이중 순회 정리</td>
+<td>Valid; compile-local texture/buffer full-ID sets replace quadratic physical import checks. Full Debug raster integration passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/139">#139</a> [RHI] barrier batch 변환마다 발생하는 임시 vector 할당 줄이기</td>
+<td>Valid; native barrier scratch storage is per encoder, retained capacity and arbitrary batch sizes. Latest Vulkan Release build and resource lifetime native probe passed; full scene parity is separately tracked.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/140">#140</a> [RenderGraph] 기록 실패로 폐기된 그래프의 예정 resource state가 풀에 반영되는 문제</td>
+<td>Valid; planned graph state writeback/pool state now commits on queue acceptance notifications. Compile-only and abort retain initial state. Compile-only, throwing callback, sequential and parallel queue acceptance passed in Debug/Release DX12 and Release Vulkan, validation=0.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/141">#141</a> [Render] VolumetricFog off→on 전환에서 pass-owned 3D texture 해제 누락</td>
+<td>Valid; transactional volume allocation and GPU completion retirement implemented; Debug/Release failure injection and shutdown cycles passed with validation=0.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/142">#142</a> [Profiler] 잘못된 child_end로 손자 노드가 중복 루트가 되고 Flame Graph 비율이 왜곡됨</td>
+<td>Valid; implemented. Debug/Release aggregate-only: 78 checks each; nested-range mutation rejected in both. Full core retains pre-existing pool-growth/events failure. Logs: GitHubIssueAudit20261008/profile-nested-focused.log.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/143">#143</a> [Material] 실패한 shader preparation 누적으로 새 요청 admission이 포화되는 경로 복구</td>
+<td>Valid; failed revision pruning and full-budget polling implemented. Debug passed 80 failed revisions then normal recovery and 64 pending overflow progress; Release also passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/144">#144</a> [Render] SSGI history 부분 할당 실패 후 불완전한 자원을 정상 준비로 판정</td>
+<td>Valid; whole four-texture history set is allocated atomically. Debug/Release partial failure tests 2/3/4 and retry/shutdown passed with validation=0.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/145">#145</a> [Render] Graph-only GBuffer의 clear depth로 HZB를 만들어 occlusion 작업이 무효화됨</td>
+<td>Valid; live clear-only GBuffer explicitly selects frustum-only visibility; standalone occluder depth remains enabled by default. Full Debug raster consumer regression passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/146">#146</a> [Asset] 복구되지 않은 graph/meta identity 때문에 모델 전체 재임포트가 반복됨</td>
+<td>Valid; geometry generation cache no longer invalidated by material graph pair failure; material construction owns graph recovery. Regression pending.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/147">#147</a> [Asset] shadergraph 구문 오류가 재질 복구 전에 장면 준비 전체를 중단함</td>
+<td>Valid; Editor graph-only dependency parse failure logs original error and continues to material recovery. Scene/prefab and Player policies preserved. Regression pending.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/148">#148</a> [Asset] 비동기 장면 예열이 임시 재질용 복구 graph를 게시하고 실제 생성 시 다시 게시함</td>
+<td>Valid; temporary inline prewarm defers recoverable graph publication to actual material owner. Normal prewarm still prepares instances. Regression pending.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/149">#149</a> [Editor] SceneOverlay 없는 뷰의 gizmo 수집·배치 준비 생략</td>
+<td>Valid; SceneOverlay gates producer collection and Icon/Line input preparation, stale inputs cleared. Editor regression pending.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/150">#150</a> [RHI] BeginFrame 중간 실패가 반쯤 열린 recording을 남겨 다음 재시도를 막음</td>
+<td>Valid; both backend BeginFrame paths guard partial recording and abort on all subsequent failures, preserving error. Failure injection pending.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/151">#151</a> [Vulkan] 패스마다 encoder를 파괴·재할당하는 경로의 저장 공간 재사용</td>
+<td>Valid; Vulkan worker and immediate encoders rebind/reset logical state while retaining storage. Diagnostics drained once. Vulkan Release native resource lifetime probe passed with validation=0 and encoderDrops=0; full scene parity remains separate.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/152">#152</a> [Material] 투명 source별 패스가 전체 prepared draw 목록을 반복 검색함</td>
+<td>Valid; source-contiguous prepared chunk ranges replace full blended source scans, including special tile callbacks. Full Debug Scene composition/blended source regression passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/153">#153</a> [Render] Forward+ tile buffer 확장·종료 시 기존 GPU buffer 해제 누락</td>
+<td>Valid; transactional tile pair replacement and retirement implemented; Debug/Release partial allocation, growth/abort and shutdown tests passed with validation=0.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/154">#154</a> [Render] 제출 전 실패한 프레임의 SSGI·Fog history를 다음 프레임이 유효한 결과로 사용</td>
+<td>Valid; temporal metadata commits on queue acceptance and resets on abort/rejection; Fog initialization and history have independent watches. Editor SSGI/Fog and multi-watch acceptance/rejection native tests passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/155">#155</a> [Vulkan] texture upload transaction 이력 누적으로 프레임별 eviction 검사가 이차 비용으로 증가</td>
+<td>Valid; pending texture transaction map uses full handle ID and prunes completed metadata. Quarantined transactions retained. Vulkan Release native resource lifetime probe passed with validation=0 and encoderDrops=0; full scene parity remains separate.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/156">#156</a> [Material] static·transformed mesh cache의 상호 소유로 256개 이후 신규 캐시 입장이 막힘</td>
+<td>Valid; unreferenced transformed owners are evicted before full static-cache admission, retaining external/in-flight owners. Debug/Release 260 completed geometry admission passed; Release also read back an externally retained output after eviction (GPU validation=0).</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/157">#157</a> [Render] 생성 IBL 교체 시 이전 GPU 소비 완료 전에 texture를 즉시 해제</td>
+<td>Valid; IBL replacements retain previous generated handles until recording acceptance and GPU retirement; abort restores previous environment. Cooked replacement abort/partial preparation tests passed on DX12 Debug/Release and Vulkan Release; Editor generated IBL HDR regression passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/158">#158</a> [DX12] resize·파이프라인 재생성 후 완료된 retired display texture가 계속 보관됨</td>
+<td>Valid; retired display collection requires completed producer work, exclusive consumer lease and no lost completion. Faulted producer resources remain quarantined. Resize/runtime regression pending.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/159">#159</a> [Render] 제출 전 폐기된 IBL 생성·readback을 준비 완료 및 cache capture로 확정함</td>
+<td>Valid; IBL recording abort rolls back ready/dirty flags and discards unsubmitted captures; capture completion is assigned only on queue acceptance. Debug/Release DX12 and Release Vulkan cooked replacement abort/capture discard/partial allocation tests passed; Editor generated IBL HDR quadrature/mirror passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/160">#160</a> [Render] valid fallback texture handle과 함께 반환된 업로드 오류를 성공으로 처리</td>
+<td>Valid; Sprite/UI/Icon reject invalid handle OR nonempty error, Decal explicitly skips failed upload, HDR rejects valid fallback+error. Debug Editor build and normal consumer regressions passed; explicit fallback+error injection remains unverified.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/161">#161</a> [Material] regression 전용 publication·packet 계층을 제품 API에서 분리</td>
+<td>Valid; extracted SceneCoverage product contract and moved regression-only SceneMaterialSlot/PipelineSlot to existing Tools/regression support. Direct product probe passed 121 checks and runtime probe 60 checks; Scene packet probes passed 169 checks and 16 GPU components in Debug/Release.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/162">#162</a> [Material] pass layout 교체를 위해 RenderBindings 전체를 복제하는 wrapper 정리</td>
+<td>Valid; Scene Shadow consumes the same material packet with its Program layout at binding; removed copying RebindPass API. Debug/Release binding probes passed; full Debug Scene integration passed.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/29thnight/CreatorEngine/issues/163">#163</a> [RHI] 실체 없는 RenderFrameServices include 호환 façade 제거</td>
+<td>Valid; removed empty DX12 include facade and added exact interface/format includes to four consumers. Latest Debug RenderEngine and full Editor build passed; exact includes also fixed remaining Editor format consumers.</td>
+</tr>
+</tbody></table></div>
+<h2>Additional validation observations</h2>
+<ul>
+<li>Product API separation: 121 product checks, 60 runtime checks passed. Native bindings: 183 checks/64 GPU components; Scene packet: 169/16; mesh: 1,117,791/454,560 in Release (Debug final mesh run in progress).</li>
+<li>Queue acceptance state test caught a parallel batch recording-ID timing defect in the initial implementation. The graph now snapshots current recording ID before admission; sequential/parallel acceptance and abort tests pass in Debug with GPU validation=0.</li>
+<li>Asset authoring ownership SourceOnly passed. The existing runtime-change boundary script still expects void ApplyAssetChange while baseline and current source both declare bool; this is a pre-existing script mismatch, not runtime evidence.</li>
+</ul>
+<h2>Current acceptance boundaries</h2>
+<ul>
+<li>All 33 issues were checked against current consumers and canonical plans, and have scoped code changes. This is not a claim that all issues satisfy every closure gate.</li>
+<li>The full Debug DX12 raster integration passed 21,072,207 checks / 3,879,955 GPU components. Negative-path failure counts are expected assertions, not failed test runs. Latest Release full integration also passed the same checks/components after final lifecycle changes.</li>
+<li>Latest native resource tests passed on DX12 Debug/Release and Vulkan Release with validation=0. They cover Fog allocation/off-on/shutdown, SSGI partial allocation/retry, Forward pair growth/rollback, graph compile-only/callback failure/sequential/parallel acceptance, multiple metadata watchers, and cooked IBL abort/capture discard/partial preparation.</li>
+<li>Editor Debug passed graph WireFrame static/skinned batching, SSGI, Fog, generated IBL HDR quadrature/mirror, SkyBox, parallel pixel parity, descriptor recycler and resize. The final compile-only RenderGraph expectation was amended to require unchanged external state until acceptance; final Debug re-run passed, including RG4 parallel parity and RG5 129-frame pass matrix.</li>
+<li>No performance improvement is claimed. Equivalent-work CPU/allocation measurements remain the performance closure gate for #133/#137/#138/#139/#151/#152/#155.</li>
+<li>Explicit native BeginFrame mid-failure injection (#150), retired cross-device display lease/fault recovery (#158), and valid-fallback-plus-error consumer injection (#160) still require targeted runtime closure checks. Canonical backend/runtime scope is PHASE 4.9; lifetime failure evidence must not be replaced by a build result.</li>
+<li>Full profiler regression retains the pre-existing pool-growth/events failure; the corrected nested aggregation gate passed in both configurations.</li>
+<li>No issue was commented on or closed on GitHub, and no commit/push was performed for this task.</li>
+</ul>
+<h2>Final run results and limits</h2>
+<ul>
+<li>VS 2026 / v18 / v145 full Editor builds passed in Debug and Release. EnvironmentCooker Release also built after capture submission API cleanup.</li>
+<li>Latest complete DX12 raster probes: Debug and Release each 21,072,207 checks / 3,879,955 GPU components, process exit=0. Final binding/Scene packet probes passed in both configurations.</li>
+<li>Cache admission: Debug 1,119,877 mesh checks; Release 1,119,903 / 454,580 GPU components, including 260 completed geometries, bounded static entries, and readback from an externally retained first output after eviction.</li>
+<li>Editor Release terminal results succeeded for WireFrame, SSGI, Fog, IBL and parallel recording. Editor Debug final RenderGraph terminal result succeeded; initial outdated compile-time writeback assertions were corrected to test submission acceptance instead.</li>
+<li>Asset authoring runtime semantic checks all passed: source intake/reuse, runtime reload, Terrain/Foliage/BlackBoard transactions, collision matrix, tags, input map and animator single truth. The script exited 1 in cleanup because an already missing model sidecar was removed. Added an existence guard; the cleanup change itself has not been re-run through the entire suite. Probe asset files were then removed individually. Temporary diagnostic logs remain under the exact CE_AssetWriterProbe_2f4bf2c7f5ae4ecb8a60a8e45ae30a0f directory; bulk cleanup commands were rejected by automatic approval review.</li>
+<li>Vulkan Release resource tests passed with validation=0 / encoderDrops=0. The separate actual Scene-only run did not produce an acceptance marker before the 900-second wall limit (including cold preparation/cleanup) and was terminated. It is not Vulkan full-scene acceptance; PHASE 4.9 remains responsible for that gate.</li>
+<li>Logs are under Build/Verification/GitHubIssueAudit20261008. Performance timings in concurrent correctness runs are not performance acceptance evidence.</li>
+</ul>
+<h2>2026-10-09 follow-up: Editor status and continuous capture</h2>
+<p>Base: <code>329fad205f6560fc4462354b9287d64a68049c8a</code> plus the preserved local worktree. This follow-up fixes two newly observed problems; it does not close all 33 historical issues or replace their targeted acceptance gates.</p>
+<ul>
+<li><code>GetLiveStatus</code> now tries the render-state lock and returns an explicit busy response on contention. It neither waits for driver pipeline compilation on the UI thread nor reads unlocked mutable state. Release TestShadow returned all 45 contended status requests successfully, maximum command execution 0.2334 ms. This was the normal DX12 run; the earlier long GPU-validation driver compile was not repeated.</li>
+<li>Sparse event ranges are copied into compact collector-owned storage instead of retaining whole producer pages. Dense ranges retain page sharing; existing immutable snapshot/late-event tests remain in the full core suite. The intermediate TestShadow run had zero CPU source loss with 256 pages, versus the previous exhausted 8,192-page pool.</li>
+<li>GPU recording admission now waits until the first collected frame establishes the actual recording range. A stale asynchronous Record frame cannot admit work outside that range. Already admitted GPU work still participates in drain, timeout, generation isolation and explicit loss accounting; a regression retains the loss check for an admitted frame evicted before its result arrives.</li>
+<li>Corrected the existing pool-growth probe to inspect its oversized frame before Pause&#39;s empty tail legitimately evicts it under a one-page retention budget. Its no-loss and pool-growth assertions remain.</li>
+<li>VS 2026 Release full Editor build passed. Final profiler core Debug/Release each passed 1,387 checks. Sparse-page retention and premature GPU-admission mutations were each rejected in Debug/Release (two focused mutation runs, not the whole mutation catalog).</li>
+<li>Final actual <code>Dynamic_CPP/Assets/Scenes/TestShadow.creator</code> load/play/stop passed; hierarchy: 127 objects, zero violations; Editor exit 0. Saved <code>TestShadow-fixed.ceprof</code>: 766 frames, finalized and complete, CPU source drops 0, late GPU spans 0, writer/counter/frame-boundary loss 0. Producer pool remained at 256 pages (252 free after stop).</li>
+<li>Evidence: <code>Build/Verification/IssueFollowup20261009/</code> (<code>build-final.log</code>, <code>profile-core.log</code>, <code>profile-gpu-boundary.log</code>, and <code>Final/commands.jsonl</code>, <code>Final/profile-result.json</code>, <code>Final/status-samples.json</code>, <code>Final/exit-off.json</code>, <code>Final/TestShadow-fixed.ceprof</code>). No FPS improvement, fresh Debug Editor build, or Vulkan runtime acceptance is claimed. Existing Utility_Framework PDB LNK4020 warnings remain.</li>
+<li>GitHub issue states, commits and remote branches were not changed by this follow-up.</li>
+</ul>
+<h2>2026-10-09 closure-candidate audit after AssetDepot merge</h2>
+<p>Base: <code>329fad205f6560fc4462354b9287d64a68049c8a</code> plus preserved local changes. The current GitHub snapshot still contains 33 open issues. This audit checks the original criteria of the 14 previously selected closure candidates; it adds no FPS or new phase acceptance requirement.</p>
+<p>Thirteen candidates retain their implementation and supporting regression evidence. #134 remains pending its originally requested actual Scene View visual verification. GPU fixture output alone does not establish that selected/all static, skinned and typed geometry is displayed correctly in the product viewport.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Current audit result and evidence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>#131</td>
+<td>Closure candidate confirmed. Removed authored owner/revision fields, empty opaque-shadow indices and native sorting remain absent. Graph geometry migration remains wired to the Editor contributor; existing draw identity/coverage/replay and Debug/Release integration evidence is retained. #134&#39;s separate product visual check remains outstanding.</td>
+</tr>
+<tr>
+<td>#132</td>
+<td>Closure candidate confirmed. Readiness checks precede one SceneViewInput copy; copied records receive selection revisions directly. No clear/repopulate remains. Existing empty/repeated/multiple-slot/deferred/failed coverage regressions are retained.</td>
+</tr>
+<tr>
+<td>#134</td>
+<td>Keep open for original product acceptance. Static/skinned GPU WireFrame fixture and contributor source prove geometry transport, but no sufficient actual Scene View selected/all/opaque/transparent display record was found.</td>
+</tr>
+<tr>
+<td>#135</td>
+<td>Closure candidate confirmed. Fresh Release mesh probe: 1,119,903 checks / 454,580 GPU components, including remap storage identity and retained-owner readback.</td>
+</tr>
+<tr>
+<td>#140</td>
+<td>Closure candidate confirmed. Fresh Release resource-lifetime probe preserves imported initial state on compile-only and callback abort, and commits on sequential/parallel queue acceptance. Existing transient failure/recovery and DX12/Vulkan evidence is retained; this run is not fresh Vulkan acceptance.</td>
+</tr>
+<tr>
+<td>#141</td>
+<td>Closure candidate confirmed. Fog implementation is unchanged by the merge. Fresh allocation rollback, six on/off cycles and resource retirement checks pass; prior product pixel/multi-view evidence remains applicable.</td>
+</tr>
+<tr>
+<td>#142</td>
+<td>Closure candidate confirmed. Nested child-range implementation is unchanged. Original Debug/Release nested-range mutation was rejected; current full profiler core passes 1,387 checks in both configurations, including the previously blocked pool-growth case.</td>
+</tr>
+<tr>
+<td>#143</td>
+<td>Closure candidate confirmed. Fresh Release: 80 distinct failed revisions, memoized repeated failure, normal recovery without host recreation, and 64 pending requests with overflow progress pass. GenerationStore reserves unique IDs and publishes immutable generations; the migrated fixture now follows that identity contract.</td>
+</tr>
+<tr>
+<td>#144</td>
+<td>Closure candidate confirmed. SSGI implementation is unchanged by the merge. Fresh second/third/fourth allocation failure, complete-set retry and shutdown recovery pass; prior product pixel/resize/multi-view evidence is retained.</td>
+</tr>
+<tr>
+<td>#153</td>
+<td>Closure candidate confirmed. Fresh first/second tile-buffer allocation failure, growth/rollback, old-pair retirement and shutdown checks pass; existing product/readback evidence is retained.</td>
+</tr>
+<tr>
+<td>#156</td>
+<td>Closure candidate confirmed. Fresh Release mesh probe admits 260 completed geometries, bounds cache entries and reads an externally retained output after eviction; GPU validation is clean.</td>
+</tr>
+<tr>
+<td>#161</td>
+<td>Closure candidate confirmed. SceneInput includes the small coverage contract; standalone packet/publication support remains outside Engine. Fresh Scene packet probe: 171 checks / 16 GPU components, two in-flight packets and abort/publication/retirement preserved. Existing product/runtime probes are retained.</td>
+</tr>
+<tr>
+<td>#162</td>
+<td>Closure candidate confirmed. No RebindPass reference remains; main/shadow use one packet with their Program layouts. Fresh bindings probe: 200 checks / 64 GPU components; layout, recording and descriptor validation preserved. Existing actual scene/shadow regressions are retained.</td>
+</tr>
+<tr>
+<td>#163</td>
+<td>Closure candidate confirmed. No RenderFrameServices.h source/project reference remains. Current Release Editor and focused probe builds pass using direct includes; prior Debug include/build evidence is retained.</td>
+</tr>
+</tbody></table></div>
+<h3>Test migration repairs and fresh execution</h3>
+<ul>
+<li>Fixed legacy texture raw access to borrow from ownership_cpp, and Scene packet comparisons to compare retained object addresses through the existing test helper. No product owner-comparison operator was introduced.</li>
+<li>Shader admission fixtures now create completed immutable generations with distinct revision IDs. Previously, copied revisions shared the same identity tuple, so the first memoized failure correctly matched all later copies and the supposed corrected revision. Repeated requests for the same actual failed revision still assert memoization.</li>
+<li>Split missing image preparation from actual upload failure in the bindings fixture. Pending preparation must retain the accepted packet without incrementing upload failure counts. A mismatched pinned image/descriptor triggers actual neutral substitution; its valid fallback plus error is rejected and the accepted packet remains intact.</li>
+<li>VS 2026 / v18 / v145 Release builds of MaterialMeshSurfaceProbe, MaterialRenderBindingsProbe, MaterialRasterSurfaceProbe and MaterialScenePacketProbe passed. Fresh mesh, bindings, admission, resource-lifetime and Scene packet processes exited 0 with GPU validation enabled and no validation errors. Existing Utility_Framework LNK4020 warnings remain.</li>
+<li>Evidence: <code>Build/Verification/IssueClosureCandidates20261009/</code>: <code>static-audit.json</code>, <code>mesh-runtime.log</code>, <code>bindings-accepted-runtime.log</code>, <code>admission-final-runtime.log</code>, <code>issue-resource-lifetime-runtime.log</code>, <code>scene-packet-final-runtime.log</code> and the corresponding build logs. The open issue snapshot is <code>Build/Verification/IssueFollowup20261009/issues-current.json</code>.</li>
+<li>Remaining original acceptance work: #134 plus #133, #136, #137, #138, #139, #145, #146, #147, #148, #149, #150, #151, #152, #154, #155, #157, #158, #159, #160. Prior implementation does not replace the specific operation-count, failure-injection, lifetime or product-runtime evidence required by those issues.</li>
+<li>No fresh Debug Editor build, Vulkan full-scene acceptance, FPS improvement, GitHub issue closure, commit or push is claimed by this audit. RG7/RG8 phase status is unchanged.</li>
+</ul>
+<h2>2026-10-09 #134 actual Scene View verification and skinning repair</h2>
+<p>This follow-up supersedes the pending #134 visual gate above. All 14 selected closure candidates now have supporting evidence; the other 19 issues retain their original outstanding gates. GitHub issue states have not been changed.</p>
+<ul>
+<li>Actual Release Editor, <code>Dynamic_CPP/Assets/Scenes/TestShadow.creator</code>: enabled Wireframe overlay from the Scene View toolbar. Static floor and the large character displayed green geometry, but CreatorRobot initially had no wire overlay. Selecting and framing its typed MeshRenderer confirmed the omission; the isolated fixture alone had missed this product input.</li>
+<li><code>WireFrame.slang</code> read all four bone indices even when later weights were zero. Cooked model vertices use index 255 for unused influences. Reading beyond the palette can consume unrelated upload data, including nonfinite values; multiplying by zero does not reliably remove them. The common material mesh shader already skips these unused reads. WireFrame now likewise reads only positive-weight influences.</li>
+<li>Restarted the same Editor/project with the corrected shader: CreatorRobot&#39;s wire geometry reappeared on its shaded surface. The Scene View overlay remained global with no selection and with CreatorRobot selected. During Play, the animated character&#39;s wire surface followed its pose; the Game View showed shaded geometry without Editor wires. No separate selected-only wire mode was introduced. These visual runs used validation OFF to exercise the ordinary product path.</li>
+<li>Extended the existing Editor wireframe regression, without another test project: typed one-bone vertices now contain <code>{0,255,255,255}</code> with weights <code>{1,0,0,0}</code>. The second graph draw is Blended; explicit pixel checks require both opaque and blended geometry edges. Existing static/skinned transport, moved-vs-bind-pose pixels, two-draw/one-batch and one-shared-palette assertions remain.</li>
+<li>Final VS 2026 / v18 / v145 Release full Editor build passed. The focused <code>dx12.wireframe</code> command passed in the actual Editor executable with GPU-based validation enabled. Both instances&#39; edge green was 1.000; triangle interior was 0.000; moved skinned edge was 1.000 and bind-pose edge 0.000. Validation problems=0, droppedMessages=0, process exit=0. No fresh Debug or Vulkan execution is claimed; existing Utility_Framework PDB warnings remain.</li>
+<li>Evidence: <code>Build/Verification/Issue134Live20261009/</code>: <code>wire-all.png</code> (before repair), <code>wire-fixed.png</code>, <code>wire-playing-selected.png</code>, <code>source-hashes.json</code>, <code>commands.jsonl</code>, <code>build-release-final.log</code>, and <code>Release/results.jsonl</code>, <code>Release/process.json</code>. The first overlapping build attempt failed with an Editor.lib file lock; after the original build completed, the sequential final build passed. Acceptance uses the final build and test artifacts only.</li>
+<li>Scoped changes: <code>Dynamic_CPP/Assets/Shaders/DefaultPassShader/WireFrame.slang</code> and <code>Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedWireFrameTest.cpp</code>. Scene assets were not saved or changed. No FPS improvement, phase-status change, commit, push or GitHub closure was performed.</li>
+</ul>
+<h2>2026-10-09 authorized GitHub closure</h2>
+<p>After the owner explicitly requested closing the verified candidates, each issue received a scoped implementation/validation comment and was closed with reason <code>completed</code>. A fresh GitHub query confirmed all 14 are CLOSED: #131, #132, #134, #135, #140, #141, #142, #143, #144, #153, #156, #161, #162, #163.</p>
+<p>The remaining 19 are OPEN: #133, #136, #137, #138, #139, #145, #146, #147, #148, #149, #150, #151, #152, #154, #155, #157, #158, #159, #160. Their original acceptance work remains outstanding.</p>
+<p>Every closure comment explicitly distinguishes local verified changes from remote publication: latest fixes and evidence updates include uncommitted/unpushed work based on <code>329fad205f6560fc4462354b9287d64a68049c8a</code>. No commit or push was performed by the closure operation. Earlier statements of no GitHub changes describe their respective historical steps, not this final state.</p>
+<p>Evidence: <code>Build/Verification/IssueClosureCandidates20261009/closures.jsonl</code> retains comment URLs; <code>github-final-state.json</code> retains the independently fetched final issue states and timestamps.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="2026-10-09-134-actual-scene-view-verification-and-skinning-repair"></span><span id="2026-10-09-authorized-github-closure"></span><span id="2026-10-09-closure-candidate-audit-after-assetdepot-merge"></span><span id="2026-10-09-follow-up-editor-status-and-continuous-capture"></span><span id="additional-validation-observations"></span><span id="current-acceptance-boundaries"></span><span id="final-run-results-and-limits"></span><span id="sec-2026-10-09-134-actual-scene-view-verification-and-skinning-repair"></span><span id="sec-2026-10-09-authorized-github-closure"></span><span id="sec-2026-10-09-closure-candidate-audit-after-assetdepot-merge"></span><span id="sec-2026-10-09-follow-up-editor-status-and-continuous-capture"></span><span id="sec-additional-validation-observations"></span><span id="sec-current-acceptance-boundaries"></span><span id="sec-final-run-results-and-limits"></span><span id="test-migration-repairs-and-fresh-execution"></span></details></main></body></html>

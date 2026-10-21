@@ -1,5 +1,52 @@
 # Material Graph 제품 generation·바인딩·쿠킹 계약
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/RenderEngine/MaterialGraphProduct.h:76](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.h#L76) — `bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capabilities, const Budget& budget,`
+- [Engine/RenderEngine/MaterialGraphProduct.h:211](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.h#L211) — `bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOverride> parameters,`
+- [Engine/RenderEngine/MaterialGraphProduct.h:217](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.h#L217) — `bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,`
+- [Engine/RenderEngine/MaterialGraphProduct.cpp:523](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.cpp#L523) — `bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capabilities, const Budget& budget,`
+- [Engine/RenderEngine/MaterialGraphProduct.cpp:1113](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.cpp#L1113) — `bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOverride> parameters,`
+- [Engine/RenderEngine/MaterialGraphProduct.cpp:1123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphProduct.cpp#L1123) — `bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,`
+- [Tools/regression/verify-material-product.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-product.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-product.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-product.ps1#L10) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-product.ps1:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-product.ps1#L75) — `$caseRoot = Join-Path $output ("CookGate-$configuration-" + [Guid]::NewGuid().ToString('N'))`
+- [Tools/regression/verify-material-ibl-bake.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-ibl-bake.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-ibl-bake.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-ibl-bake.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-ibl-bake.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-ibl-bake.ps1#L10) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [Tools/regression/verify-material-datasystem.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-datasystem.ps1#L8) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-datasystem.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-datasystem.ps1#L9) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-datasystem.ps1:34](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-datasystem.ps1#L34) — `$package = Join-Path $output ("DataSystemGate-$configuration-" + [Guid]::NewGuid().ToString('N'))`
+- [Tools/regression/verify-material-render-bindings.ps1:7](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-render-bindings.ps1#L7) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-material-render-bindings.ps1:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-render-bindings.ps1#L8) — `if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {`
+- [Tools/regression/verify-material-render-bindings.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-material-render-bindings.ps1#L9) — `$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'`
+- [ScriptCore/BlackBoard.cs:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L4) — `public enum BlackBoardType`
+- [ScriptCore/BlackBoard.cs:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L28) — `public sealed class BlackBoard`
+- [ScriptCore/BlackBoard.cs:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/BlackBoard.cs#L30) — `private readonly struct Value(BlackBoardType type, object boxed)`
+- [Engine/RenderEngine/DataSystem.h:311](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L311) — `using ModelPreparation = own::shared_owner<PreparedRuntimeAsset>;`
+- [Engine/RenderEngine/DataSystem.h:314](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L314) — `ModelPreparation PrepareModelAssetByPath(std::string_view path, bool allowMounted = true);`
+- [Engine/RenderEngine/DataSystem.h:363](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L363) — `own::shared_owner<SceneAssetPreparation> PrepareSceneAssets(`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 **2026-10-02 통합 완료 · 기존 LX 제품 기반은 MAT-7-BASE 이력 · 공통 재질 소비 MAT-7 완료. PHASE 4.25는 LX 마감·MAT-9 때문에 진행 중.**
 
 **2026-10-02 실행 환경 방향:** LX가 generation/instance·바인딩·자원/PSO 수명의 공통 runtime을 소유한다. ShaderMeta는 생성된 셰이더의 계약 표현이며 기존 authored 코드 셰이더 입력도 LX 계약으로 적응한다. 코드 입력 어댑터와 공통 graphics/compute owner를 연결했고, 코드 셰이더의 generic property도 유지한다. 프레임 owner 없는 RT registry 대체 조회를 제거했다. Code 입력 준비·진단 registry는 유지한다.
@@ -342,3 +389,5 @@ encrypted cooked Scene을 readback·종료까지 validation/encoder drop 0개로
 
 Blender rendered grid/route parity·Standard 성능 수용은 MAT-9, artist preview·표시는
 MAT-8, Editor canvas/HTTP는 LX-3/LX-3H가 계속 소유한다.
+
+</details>

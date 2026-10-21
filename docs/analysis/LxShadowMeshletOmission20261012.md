@@ -1,5 +1,49 @@
 # LX 보이는 그림자 메시렛 누락 변이 (2026-10-12)
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:18](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L18) — `struct LXSceneLight`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:82](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L82) — `uint LXSceneOwner(uint record) { return record != 0u ? lx_sceneRecords[record].material.z : lx_drawOwner; }`
+- [Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang:471](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang#L471) — `void LXSceneShadowMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,`
+- [Engine/RenderEngine/DataSystem.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L30) — `own::shared_owner<const Texture> descriptor;`
+- [Engine/RenderEngine/DataSystem.h:44](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L44) — `std::vector<own::shared_owner<const Material>> materials;`
+- [Engine/RenderEngine/DataSystem.h:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.h#L45) — `std::vector<own::shared_owner<const Texture>> textures;`
+- [Engine/Utility_Framework/PathFinder.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/PathFinder.h#L9) — `class InternalPath : public Singleton<InternalPath>`
+- [Engine/Utility_Framework/PathFinder.h:75](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/PathFinder.h#L75) — `file::create_directories(runtimeDirectory, runtimeDirError);`
+- [Engine/Utility_Framework/PathFinder.h:77](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/PathFinder.h#L77) — `!file::is_directory(runtimeDirectory, runtimeDirError) || runtimeDirError)`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:98](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L98) — `class SceneHost final : private IRHIUploadTransactionListener`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:101](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L101) — `explicit SceneHost(job_scheduler& scheduler = ce::get_job_scheduler());`
+- [Engine/RenderEngine/MaterialGraphSceneHost.h:108](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.h#L108) — `bool RequestProgram(const EnhancedFrameContext& context, own::shared_owner<const Generation> generation,`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+- [Engine/RenderEngine/DataSystem.cpp:3551](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L3551) — `const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");`
+- [Engine/RenderEngine/DataSystem.cpp:4355](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L4355) — `std::string& error, const file::path& shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader"),`
+- [Engine/RenderEngine/DataSystem.cpp:4478](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/DataSystem.cpp#L4478) — `own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialGraphAuthoring(`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:61](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L61) — `std::memcpy(local, static_cast<const std::byte*>(geometry.vertexData) + index * geometry.vertexStride,`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L87) — `sphere.radius = std::hypot(high[0] - low[0], high[1] - low[1], high[2] - low[2]) * .5f * 1.0001f + 1e-4f;`
+- [Engine/RenderEngine/MaterialGraphSceneHost.cpp:89](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/MaterialGraphSceneHost.cpp#L89) — `if (!shadow_math::IntersectsClip(sphere, lightViewProjection))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 후속 목록 4번의 변이는 실제 GPU 그림자 셰이더에서 비스킨드 사각형의 첫 메시렛을 제외한다. 깊이 파일을 사후 편집하는 검사가 아니다. 저장소의 원본 셰이더·C++ 소스·실행 파일을 유지하고, 실행마다 복사한 격리 프로젝트의 `Includes/MaterialGraphSceneHost.slang`만 변경한다. SceneHost는 그 프로젝트의 셰이더를 실제 컴파일한다.
 
 ```slang
@@ -40,13 +84,13 @@ const bool visible = LXSceneMeshletVisible(remap, vertexCount, lane, lx_shadowVi
 
 Release는 구성·출력 디렉터리를 바꾼다. 정상 대조군은 변이 스위치 대신 `-ShadowEquivalenceOnly`로 새로운 격리 프로젝트에서 실행한다. 변이 플래그는 동치 모드를 자동 활성화하고 backOff 변이 모드와 동시 사용을 거부한다.
 
-- [스크립트](../../Tools/regression/verify-lx-shadow-baseline.ps1)
-- [Debug 변이 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/verdict.json), [비교 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/equivalence.json), [변이 원본·규칙·해시](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/mutation.json), [명령별 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/results.jsonl)
-- [Release 변이 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/verdict.json), [비교 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/equivalence.json), [변이 원본·규칙·해시](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/mutation.json), [명령별 결과](../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/results.jsonl)
-- [Debug 정상 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Debug/verdict.json), [동치 상세](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Debug/equivalence.json)
-- [Release 정상 판정](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Release/verdict.json), [동치 상세](../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Release/equivalence.json)
-- [전체 판정·원본 대조](../../Build/Verification/ShadowMeshletOmission-20261012/overall.json)
-- [문서 구조·링크·스크립트 검사](../../Build/Verification/ShadowMeshletOmission-20261012/document-verification.json)
+- 스크립트 (`../../Tools/regression/verify-lx-shadow-baseline.ps1` — 현행 master에 없는 이전/제안 경로; 당시 기록으로만 참조)
+- Debug 변이 판정 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 비교 결과 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/equivalence.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 변이 원본·규칙·해시 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/mutation.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령별 결과 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Debug/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 변이 판정 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 비교 결과 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/equivalence.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 변이 원본·규칙·해시 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/mutation.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 명령별 결과 (`../../Build/Verification/ShadowMeshletOmission-20261012/Mutant-Release/results.jsonl` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Debug 정상 판정 (`../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Debug/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 동치 상세 (`../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Debug/equivalence.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- Release 정상 판정 (`../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Release/verdict.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조), 동치 상세 (`../../Build/Verification/ShadowMeshletOmission-20261012/Normal-Release/equivalence.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 전체 판정·원본 대조 (`../../Build/Verification/ShadowMeshletOmission-20261012/overall.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
+- 문서 구조·링크·스크립트 검사 (`../../Build/Verification/ShadowMeshletOmission-20261012/document-verification.json` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조)
 
 각 실행의 `identity-before.json`·`identity-after.json`은 저장소 소스, exe/runtime, 실제 사용한 격리 셰이더와 실행 스크립트 해시를 기록한다. `fixture-inputs.json`은 복사·변이 적용 후 입력을 기록한다. `capture-manifest.json`은 삭제 전 깊이·행렬 파일의 크기·해시다.
 
@@ -63,3 +107,5 @@ DX12의 두 합성 메시·두 포즈에서 비스킨드 사각형 메시렛 하
 네 실행의 GPU validation 메시지 1건은 레이어 활성 안내다. 기존 profiler 종료 진단은 이번 범위에서 해결하지 않는다. 검증 레이어를 켠 실행 시간은 성능 수용에 사용하지 않는다.
 
 문서 갱신 중 이전 단계의 두 분석 HTML에서 문자 단위 치환 오류를 발견해 복구했다. 대화 실행 기록의 손상 전 원본과 대조하여 CSS 일치와 승인된 설명 변경만 남은 것을 확인했다. 세 HTML의 시작·종료 루트, 실제 태그 중첩, 로컬 링크 및 스크립트 구문·diff 검사를 다시 통과했다. GPU 테스트 소스·셰이더 원본·실행 결과에는 이 문서 오류가 적용되지 않았다.
+
+</details>

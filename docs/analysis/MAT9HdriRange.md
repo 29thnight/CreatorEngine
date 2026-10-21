@@ -1,5 +1,43 @@
 # MAT-9 HDR 에너지 보존과 큐브 변환 대조
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.
+- GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Tools/regression/rebind-environment-reference.py:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/rebind-environment-reference.py#L15) — `parser = argparse.ArgumentParser(description=__doc__)`
+- [Tools/regression/rebind-environment-reference.py:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/rebind-environment-reference.py#L22) — `raise ValueError('Reference output must be new')`
+- [Tools/regression/rebind-environment-reference.py:23](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/rebind-environment-reference.py#L23) — `spec = importlib.util.spec_from_file_location('comparison', Path(__file__).with_name('compare-material-blender-images.py'))`
+- [Tools/regression/measure-environment-integrals.py:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-environment-integrals.py#L11) — `import struct`
+- [Tools/regression/measure-environment-integrals.py:78](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-environment-integrals.py#L78) — `raise ValueError('Invalid cooked environment identity/checksum')`
+- [Tools/regression/measure-environment-integrals.py:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-environment-integrals.py#L79) — `size, brdf = struct.unpack_from('<II', data, 40)`
+- [Tools/regression/compare-material-blender-images.py:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-blender-images.py#L9) — `import struct`
+- [Tools/regression/compare-material-blender-images.py:13](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-blender-images.py#L13) — `sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'blender'))`
+- [Tools/regression/compare-material-blender-images.py:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/compare-material-blender-images.py#L24) — `raise ValueError('Invalid RGBA32F image: ' + str(path))`
+- [Tools/regression/measure-material-blender-images.ps1:12](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L12) — `$repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/measure-material-blender-images.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L15) — `$Reference=[IO.Path]::GetFullPath($Reference)`
+- [Tools/regression/measure-material-blender-images.ps1:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/measure-material-blender-images.ps1#L49) — `if($ReferenceRepeat) { $comparisonArguments+=@('--reference-repeat',[IO.Path]::GetFullPath($ReferenceRepeat)) }`
+- [Tools/build.ps1:2](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2) — `[CmdletBinding()]`
+- [Tools/build.ps1:4](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4) — `[ValidateSet('Game')][string]$Target = 'Game',`
+- [Tools/build.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21) — `$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-10-01. 기존 MAT-9의 source/cube·diffuse·mirror 검증 단계다.
 전체 MAT-9 완료 또는 전체 HDRI 재질 수용으로 세지 않는다.
 
@@ -124,3 +162,5 @@ Dashboard Vite build 및 inline script 구문 검증, Python 구문 검사와 di
 
 MAT-9 progress, 기존 완료 공수 32/34일을 유지한다. mirror·전체 HDRI 수렴/수용·special,
 texture/normal-map·route parity·실제 씬 성능·원래 area-light gate는 기존 잔여 범위다.
+
+</details>

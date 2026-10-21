@@ -1,5 +1,51 @@
 # Add Component 검색·분류와 C# 생성/부착 검증
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 창·메뉴/명령과 scene 편집은 값/세대 핸들을 경계로 전달한다. 실제 Component 변경·dirty publication·Undo 수용을 분리해 확인한다.
+- Workspace W9 설정/프로필·Rendering 진단과 완료된 PBR-W9는 다른 작업이다. 미구현 설정을 동작하는 제품 스위치로 표시하지 않는다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Editor/EngineEntry/EditorComponentCatalog.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorComponentCatalog.h#L26) — `if (i && std::isupper(value)`
+- [Editor/EngineEntry/EditorComponentCatalog.h:27](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorComponentCatalog.h#L27) — `&& (std::islower(static_cast<unsigned char>(type[i - 1]))`
+- [Editor/EngineEntry/EditorComponentCatalog.h:28](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/EditorComponentCatalog.h#L28) — `|| (i + 1 < type.size() && std::isupper(static_cast<unsigned char>(type[i - 1]))`
+- [Tools/regression/verify-editor-theme.ps1:16](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L16) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-theme.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L17) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-editor-theme.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-theme.ps1#L36) — `$settingsBytes = [IO.File]::ReadAllBytes($settingsPath)`
+- [Tools/regression/verify-cli-script-reload.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-script-reload.ps1#L1) — `[CmdletBinding()]`
+- [Tools/regression/verify-cli-script-reload.ps1:63](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-script-reload.ps1#L63) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
+- [Tools/regression/verify-cli-script-reload.ps1:174](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-cli-script-reload.ps1#L174) — `$failures.Add("identity-after-failure : ReloadProbeBefore 의 ScriptComponent 가 $($probe1.Count) 개다(기대 1)")`
+- [Tools/regression/verify-editor-text-fallback.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-text-fallback.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-editor-text-fallback.ps1:19](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-text-fallback.ps1#L19) — `$korean = Join-Path ([Environment]::GetFolderPath('Fonts')) 'malgun.ttf'`
+- [Tools/regression/verify-editor-text-fallback.ps1:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-text-fallback.ps1#L21) — `$emoji = Join-Path ([Environment]::GetFolderPath('Fonts')) 'seguiemj.ttf'`
+- [Tools/regression/verify-script-add-awake-once.ps1:14](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L14) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-script-add-awake-once.ps1:15](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L15) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [Tools/regression/verify-script-add-awake-once.ps1:17](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-script-add-awake-once.ps1#L17) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-editor-component-catalog.ps1:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-catalog.ps1#L1) — `[CmdletBinding()]`
+- [Tools/regression/verify-editor-component-catalog.ps1:5](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-catalog.ps1#L5) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-editor-component-browser.ps1:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-browser.ps1#L9) — `$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))`
+- [Tools/regression/verify-editor-component-browser.ps1:10](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-browser.ps1#L10) — `$Exe = [IO.Path]::GetFullPath($Exe)`
+- [Tools/regression/verify-editor-component-browser.ps1:11](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-editor-component-browser.ps1#L11) — `$Work = [IO.Path]::GetFullPath($Work)`
+- [ScriptCore/Audio.cs:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L8) — `public readonly struct AudioAssetId : IEquatable<AudioAssetId>`
+- [ScriptCore/Audio.cs:46](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L46) — `public readonly struct AudioParameter`
+- [ScriptCore/Audio.cs:83](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Audio.cs#L83) — `public struct AudioPlaySettings`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 2026-09-13. 사용자 요청 범위는 기존 C# 검색·부착과 **새 스크립트 생성 → 컴파일 → 자동 부착**이다.
 
 ## 사용 흐름
@@ -76,11 +122,11 @@ Unity의 [컴포넌트 검색·카테고리 탐색](https://docs.unity3d.com/cn/
 해시 확인 후 복원했다. 실제 UI 확인에서도 사용자 씬을 저장하지 않았고 EngineSettings와
 imgui.ini를 시작 전 바이트로 복원한 뒤 SHA-256 일치를 확인했다.
 
-최종 화면: [카테고리](../../Artifacts/phase21-add-component/ui-categories.png),
-[Rendering과 추가 상태](../../Artifacts/phase21-add-component/ui-rendering.png),
-[검색](../../Artifacts/phase21-add-component/ui-search.png),
-[새 스크립트](../../Artifacts/phase21-add-component/ui-new-script.png),
-[이름별 스크립트 패널](../../Artifacts/phase21-add-component/ui-script-attached.png).
+최종 화면: 카테고리 (`../../Artifacts/phase21-add-component/ui-categories.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+Rendering과 추가 상태 (`../../Artifacts/phase21-add-component/ui-rendering.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+검색 (`../../Artifacts/phase21-add-component/ui-search.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+새 스크립트 (`../../Artifacts/phase21-add-component/ui-new-script.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+이름별 스크립트 패널 (`../../Artifacts/phase21-add-component/ui-script-attached.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 방향키 선택 후 검색 입력 유지와 폼 이름 자동 포커스도 확인했다.
 이 최초 검증에서는 노출 필드의 기존 드로어를 유지했다. 배치·한글 글리프 후속 수정은 아래에 기록한다.
 화면과 로그는 `Artifacts/phase21-add-component/`에 둔다. 이 검증은 DX12 기준이며
@@ -114,14 +160,14 @@ Bobber의 `?`는 `[SerializeField(DisplayName = "가로 흔들기")]`로 노출�
 | 실제 UI | 카테고리/Rendering/검색 아이콘, Bobber 한글 체크박스 토글, FollowTarget 한글 문자열·Float3 X=3 직접 입력, SoundProbe 문자열/정수 직접 편집 확인 |
 | 폭 변화 | 창 확대/복원으로 Inspector의 Float3 세로→가로→세로 배치와 수정 값 보존 확인 |
 
-UI 증거: [카테고리](../../Artifacts/phase21-component-polish/ui-categories.png),
-[Rendering](../../Artifacts/phase21-component-polish/ui-rendering.png),
-[검색](../../Artifacts/phase21-component-polish/ui-search.png),
-[한글 체크박스](../../Artifacts/phase21-component-polish/ui-bobber-korean.png),
-[좁은 폭](../../Artifacts/phase21-component-polish/ui-script-stacked.png),
-[넓은 폭](../../Artifacts/phase21-component-polish/ui-script-wide.png),
-[문자열·정수 편집](../../Artifacts/phase21-component-polish/ui-script-string-int.png),
-[폭 복원](../../Artifacts/phase21-component-polish/ui-script-width-return.png).
+UI 증거: 카테고리 (`../../Artifacts/phase21-component-polish/ui-categories.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+Rendering (`../../Artifacts/phase21-component-polish/ui-rendering.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+검색 (`../../Artifacts/phase21-component-polish/ui-search.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+한글 체크박스 (`../../Artifacts/phase21-component-polish/ui-bobber-korean.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+좁은 폭 (`../../Artifacts/phase21-component-polish/ui-script-stacked.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+넓은 폭 (`../../Artifacts/phase21-component-polish/ui-script-wide.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+문자열·정수 편집 (`../../Artifacts/phase21-component-polish/ui-script-string-int.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조),
+폭 복원 (`../../Artifacts/phase21-component-polish/ui-script-width-return.png` — 로컬 실행 산출물 미보존; 당시 기록으로만 참조).
 오브젝트 참조의 빈 상태·해제 비활성화 배치는 확인했다. 자동화의 drag 동작으로 값 변경을 확인하지
 못했으므로 참조 드롭과 숫자 드래그를 이번 UI 통과 실적으로 세지 않는다. 직접 숫자 입력은 확인했다.
 전체 폭/DPI 행렬과 Vulkan은 이번 검증에 포함하지 않았다.
@@ -132,3 +178,5 @@ UI 검증에서 씬은 저장하지 않았으며 종료 후 EngineSettings와 im
 새 폰트 검증 코드의 실패였다. ImGui 컨텍스트 초기화와 예외 처리를 추가하고,
 제외 범위를 무시하는 `IsGlyphInFont` 대신 실제 표시되는 baked glyph로 아이콘 영역을 검사하도록
 수정했다. 최종 실행은 366개 검사를 통과하며 실패도 콘솔 오류와 종료 코드로 보고한다.
+
+</details>

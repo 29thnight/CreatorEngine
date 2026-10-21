@@ -1,5 +1,51 @@
 # 코드 컨벤션 — 두 층, 두 표기
 
+<!-- master-doc-review:start -->
+## 2026-10-20 master 구현 대조
+
+기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+
+[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+
+### 현행 계약과 이 문서의 적용 범위
+
+- 포매팅 정본은 저장소 .clang-format이다. 현재는 InsertBraces=true, Allman 중괄호, 공백 4칸과 NamespaceIndentation=All을 사용한다. 이전의 짧은 if/for 또는 namespace 들여쓰기 생략 예시는 현행 규약으로 사용하지 않는다.
+- 포인터·참조는 타입 왼쪽 정렬이다. 엔진 공개 객체와 기반 라이브러리의 기존 명명 책임은 구분하되, 소스 포맷 충돌은 현재 .clang-format을 우선한다.
+
+### 해당 구현에서 확인한 선언·소유 경계
+
+- [Engine/SceneRuntime/Entity.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L39) — `Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);`
+- [Engine/SceneRuntime/Entity.h:40](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L40) — `Entity(Scene* scene, size_t instanceID, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);`
+- [Engine/SceneRuntime/Entity.h:53](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L53) — `static gc::root_ref<Entity> Create(gc::domain& domain, Scene* scene, size_t instanceID,`
+- [.clang-format:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L22) — `InsertBraces: true`
+- [.clang-format:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L26) — `BreakBeforeBraces: Allman`
+- [.clang-format:29](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L29) — `IndentWidth: 4`
+- [.clang-format:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L30) — `NamespaceIndentation: All`
+- [.clang-format:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/.clang-format#L36) — `PointerAlignment: Left`
+- [Editor/EngineEntry/Resource.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/Resource.h#L1) — `//{{NO_DEPENDENCIES}}`
+- [Engine/RenderEngine/BoneRegion.h:9](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/BoneRegion.h#L9) — `enum class BoneRegion`
+- [Engine/RenderEngine/BoneRegion.h:20](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/BoneRegion.h#L20) — `std::string ToLower(std::string boneName);`
+- [Engine/Utility_Framework/Sha256.h:30](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L30) — `public:`
+- [Engine/Utility_Framework/Sha256.h:31](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L31) — `void Update(const void* data, std::size_t length) noexcept`
+- [Engine/Utility_Framework/Sha256.h:47](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Sha256.h#L47) — `Transform(m_buffer);`
+- [Engine/SceneRuntime/InputManager.h:22](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L22) — `public:`
+- [Engine/SceneRuntime/InputManager.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L26) — `public:`
+- [Engine/SceneRuntime/InputManager.h:79](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/InputManager.h#L79) — `public:`
+- [Engine/Utility_Framework/Delegate.h:8](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.h#L8) — `public:`
+- [Engine/Utility_Framework/Delegate.h:49](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.h#L49) — `public:`
+- [Engine/Utility_Framework/Delegate.h:87](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Delegate.h#L87) — `std::function<Ret(Args...)> callback;`
+- [Engine/Utility_Framework/Paklib.hpp:282](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L282) — `std::array<u8, 32> k{}; for (size_t i = 0; i < 32; i++) { unsigned v; std::sscanf(std::string(hex.substr(2 * i, 2)).c_str(), "%02x", &v); k[i] = (u8)v; }`
+- [Engine/Utility_Framework/Paklib.hpp:294](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L294) — `Entry e{}; e.path = std::string(virtualPath); e.pathHash = fnv1a64(e.path); e.fileId = (u64)m_entries.size() + 1; e.uncompressedSize = bytes.size(); e.chunkSize = m_opt.chunkSize;`
+- [Engine/Utility_Framework/Paklib.hpp:544](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/Paklib.hpp#L544) — `if (!data.empty()) fwrite(data.data(), 1, data.size(), fp); std::fclose(fp);`
+
+### 이전 근거의 유효 범위
+
+기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
+
+<!-- master-doc-review:end -->
+
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
 > 2026-09-20 결정. §9의 네 항목에 답이 달렸고(9-1 (a) · 9-2 (b) · 9-3 (a) ·
 > 9-4 제안대로) 그 결과가 본문에 반영돼 있다. 남은 것은 **이행**이다 — §8의
 > 개명과 §7.3의 재포맷은 아직 실행되지 않았다. `.clang-format` 자체는
@@ -671,3 +717,5 @@ private:
 비트 읽기·쓰기는 `test/set`으로 명시하고 iterator 프록시를 생성하지 않는다.
 bool 값의 직렬화 형식을 유지해야 하는 시퀀스는 `std::deque<bool>` 등을 사용한다.
 외부 라이브러리 구현은 이 규칙 때문에 수정하지 않는다.
+
+</details>

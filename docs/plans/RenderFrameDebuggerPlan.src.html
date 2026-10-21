@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>내장 렌더 프레임 디버거 — 독립 단일 프레임 캡처 (14-7)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="RenderFrameDebuggerPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RenderFrameDebuggerPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>내장 렌더 프레임 디버거 — 독립 단일 프레임 캡처 (14-7)</h1><p>RF0~7: 대상 Scene/Game view의 다음 완료 submission 하나를 수동 캡처하고 .ceframe으로 자원/Pass/바인딩/내용을 재열람한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Producers</ve-node><ve-node id="n1" at="2 1">Records</ve-node><ve-node id="n2" at="3 1" key>Collector</ve-node><ve-node id="n3" at="3 2">Snapshot</ve-node><ve-node id="n4" at="2 2">Stream</ve-node><ve-node id="n5" at="1 2">Viewer</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<ul>
+<li>RF0&#126;7: 대상 Scene/Game view의 다음 완료 submission 하나를 수동 캡처하고 .ceframe으로 자원/Pass/바인딩/내용을 재열람한다.</li>
+<li>프로파일러 서비스·counter/marker·조건부 trigger에 의존하지 않는다. bounded 읽기/캡처·정상/실패/손상·view/generation·GPU 완료 수명과 overhead를 실제 UI/제품으로 수용한다.</li>
+</ul>
+<h2>적용할 구조와 경계</h2>
+<p><code>producer counters/events → bounded profiler records → snapshot/stream → viewer</code></p>
+<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<h2>추적할 잔여 항목</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>추적 ID</th>
+<th>소유 단위 (잔여 작업은 위 목록)</th>
+<th>대시보드 보존 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>14-7</code> · PHASE 14</td>
+<td>독립 Render Frame Debugger (RF0&#126;RF7)</td>
+<td>todo</td>
+</tr>
+</tbody></table></div>
+<p>대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.</p>
+<h2>master 소스 근거</h2>
+<p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/EngineDiagnostics/ProfilerViewerTransport.h#L127">Engine/EngineDiagnostics/ProfilerViewerTransport.h:127</a> — <code>codec(timing.frame_close_ticks) &amp;&amp; codec(timing.snapshot_ticks) &amp;&amp; codec(timing.replenish_ticks) &amp;&amp;</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MemoryProfilerSnapshot.cpp#L180">Editor/EngineGUIWindow/MemoryProfilerSnapshot.cpp:180</a> — <code>auto result = std::make_shared&lt;snapshot&gt;();</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineGUIWindow/MemoryProfilerSnapshot.h#L13">Editor/EngineGUIWindow/MemoryProfilerSnapshot.h:13</a> — <code>using snapshot = ce::profiler_viewer::diagnostics::memory_snapshot;</code></li>
+</ul>
+<h2>검증 경계</h2>
+<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<details><summary>이전 절 링크 호환</summary>
+
+<p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>
+<p><span id="0-결정-요약"></span>
+<span id="1-현재-소스-기준선"></span>
+<span id="10-검증-행렬"></span>
+<span id="101-metadata-정확성"></span>
+<span id="102-framesubmission-정확성"></span>
+<span id="103-previewreplay"></span>
+<span id="104-lifecycle와-failure"></span>
+<span id="105-buildbackendproduct"></span>
+<span id="106-overhead"></span>
+<span id="11-실패-정책과-관측-가능성"></span>
+<span id="11-프로파일러와-렌더-캡처는-서로-다른-서비스다"></span>
+<span id="12-구현-중-지켜야-할-결정"></span>
+<span id="12-현재-renderer-diagnostics는-최신-상태-표시이지-캡처가-아니다"></span>
+<span id="13-pass-경계와-공용-command-경로는-이미-좋은-계측-지점이다"></span>
+<span id="13-최종-완료-조건"></span>
+<span id="14-다른-계획과의-관계"></span>
+<span id="14-현재-draw-경로는-gpu-명령-전에-오브젝트-신원을-잃는다"></span>
+<span id="15-갱신-규칙"></span>
+<span id="15-현재-frame-id와-gpu-query-record는-unity-수준-판정에-부족하다"></span>
+<span id="16-정확한-draw-step-replay의-입력-수명은-아직-없다"></span>
+<span id="2-제품-목표와-비목표"></span>
+<span id="2026-10-01-render-debug-메뉴의-제품-진입-조건"></span>
+<span id="21-사용자-완료-흐름"></span>
+<span id="22-단일-프레임-디버깅의-완료-기준"></span>
+<span id="23-첫-슬라이스에서-뒤로-미루는-고급-기능"></span>
+<span id="3-목표-계층과-의존-방향"></span>
+<span id="31-독립-rendercapture-코어-소유"></span>
+<span id="32-renderengine-소유"></span>
+<span id="33-engineguiwindow와-editor-adapter-소유"></span>
+<span id="4-공통-데이터-모델"></span>
+<span id="41-capture와-frame-identity"></span>
+<span id="42-pass-identity"></span>
+<span id="43-event-tree"></span>
+<span id="44-object와-asset-reference"></span>
+<span id="45-instancing과-batch-관계"></span>
+<span id="46-render-state-snapshot"></span>
+<span id="47-resource와-preview-artifact"></span>
+<span id="48-completeness는-first-class-data다"></span>
+<span id="5-수집완료재현-lifecycle"></span>
+<span id="51-request-state-machine"></span>
+<span id="52-request-수락-경계"></span>
+<span id="53-passcommand-trace"></span>
+<span id="54-병렬-record의-결정적-병합"></span>
+<span id="55-fence-완료와-publication"></span>
+<span id="56-preview와-event-step-replay"></span>
+<span id="57-replay-packet-수명"></span>
+<span id="6-에디터-ux"></span>
+<span id="61-별도-toolpanel"></span>
+<span id="62-tree-기본-정책"></span>
+<span id="63-detail과-editor-selection"></span>
+<span id="64-preview-정책"></span>
+<span id="65-입력과-workspace"></span>
+<span id="7-저장-포맷"></span>
+<span id="71-ceprof와-분리한-ceframe"></span>
+<span id="72-ceframe-1차-chunk"></span>
+<span id="8-실행-슬라이스"></span>
+<span id="9-의존-관계와-병행-가능성"></span>
+<span id="91-hard-dependency"></span>
+<span id="92-soft-dependency"></span>
+<span id="93-병행-금지-또는-조율-필요"></span>
+<span id="a-metadata-mvp"></span>
+<span id="b-pass-output-preview"></span>
+<span id="c-draw-level-step"></span>
+<span id="editorworkspaceredesignplanmd"></span>
+<span id="multicamerarenderplanmd"></span>
+<span id="profilingcaptureplanmd"></span>
+<span id="rf0--데이터-계약상태-기계자가-검증-p0-2일"></span>
+<span id="rf1--frameviewpasscommand-metadata-capture-p0-3일"></span>
+<span id="rf2--오브젝트배치자산-의미-연결-p0-3일"></span>
+<span id="rf3--metadata-중심-editor-mvp-p1-25일"></span>
+<span id="rf4--pass-output-preview-p1-3일"></span>
+<span id="rf5--drawdispatch-단위-정확한-step-replay-p1-45일"></span>
+<span id="rf6--ceframe-저장불러오기-p2-2일"></span>
+<span id="rf7--수동-단일-캡처의-playershipping성능-검증-p2-25일"></span>
+<span id="rhiboundaryplanmd"></span>
+<span id="scriptablerenderpipelineplanmd"></span>
+<span id="sec-0-결정-요약"></span>
+<span id="sec-1-현재-소스-기준선"></span>
+<span id="sec-10-검증-행렬"></span>
+<span id="sec-11-실패-정책과-관측-가능성"></span>
+<span id="sec-12-구현-중-지켜야-할-결정"></span>
+<span id="sec-13-최종-완료-조건"></span>
+<span id="sec-14-다른-계획과의-관계"></span>
+<span id="sec-15-갱신-규칙"></span>
+<span id="sec-2-제품-목표와-비목표"></span>
+<span id="sec-2026-10-01-render-debug-메뉴의-제품-진입-조건"></span>
+<span id="sec-3-목표-계층과-의존-방향"></span>
+<span id="sec-4-공통-데이터-모델"></span>
+<span id="sec-5-수집완료재현-lifecycle"></span>
+<span id="sec-6-에디터-ux"></span>
+<span id="sec-7-저장-포맷"></span>
+<span id="sec-8-실행-슬라이스"></span>
+<span id="sec-9-의존-관계와-병행-가능성"></span></p>
+</details>
+</main></body></html>

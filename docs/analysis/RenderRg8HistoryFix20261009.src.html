@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>RG8 normal timing history: SSGI ping-pong identity fix</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="RenderRg8HistoryFix20261009.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/RenderRg8HistoryFix20261009.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>RG8 normal timing history: SSGI ping-pong identity fix</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L58">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:58</a> — <code>class EnhancedSSGIPass : public EnhancedRenderPass</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L60">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:60</a> — <code>public:</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h#L241">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.h:241</a> — <code>math::matrix4x4 m_previousViewProjection{ math::matrix4x4::identity() };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L63">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:63</a> — <code>math::matrix4x4 inverseProjection{ math::matrix4x4::identity() };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L64">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:64</a> — <code>math::matrix4x4 inverseView{ math::matrix4x4::identity() };</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp#L398">Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSGIPass.cpp:398</a> — <code>void EnhancedSSGIPass::Declare(EnhancedRenderGraph&amp; graph, const EnhancedFrameContext&amp; context)</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<p>Base: <code>d5a6a26a</code>, with preserved local changes described in
+<a href="RenderRg8Pr168Measurement20261009.html">the initial measurement</a>. VS 2026 Release,
+DX12, RTX 4070 Ti, TestShadow 1496 x 692. No RG8 completion or adoption claimed.</p>
+<h2>Proven cause and correction</h2>
+<p>Temporary evidence-only diagnostics showed that the immediately preceding
+submission was stored and passed <code>FindFresh</code>, but its structural signature did
+not match the next graph. The first differing byte was consistently offset
+11558. Decoding both signatures identified <code>SSGI.History0</code>&#39;s version count,
+followed by the history/depth indices used by <code>SSGI.Resolve</code> and
+<code>SSGI.StoreHistory</code>.</p>
+<p>SSGI imported both textures in physical slot 0/1 order while alternating which
+slot it reads/writes. Thus equivalent consecutive frames had different declared
+resource/version topology. The history cache correctly rejected the mismatch;
+its latest-sample replacement meant the usable parity was usually overwritten.</p>
+<p><code>EnhancedSSGIPass::Declare</code> now imports by logical role relative to the current
+write slot. Role0 is the current destination and Role1 the previous history.
+The physical handles, states, writeback pointers, read/write array indexing and
+retirement rules are unchanged. Structural matching and freshness thresholds are
+unchanged. Temporary signature dumps were removed before the final build.</p>
+<h2>Remeasurement</h2>
+<p>The same-process forward 0/1/2 and reverse 2/1/0 runs each collected 64 ordinary
+candidates after 16 warmup frames. Every segment accepted its first 32 eligible
+samples with <strong>zero rejected candidates</strong>, totaling 192 accepted frames.
+Actual schedule and calibrated intervals were independently verified using the
+existing audit functions. This resolves the earlier history-input failure.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>Order / mode</th>
+<th align="right">GPU median / p95 ms</th>
+<th align="right">Full-view CPU median / p95 ms</th>
+<th align="right">Record-submit CPU median ms</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forward 0</td>
+<td align="right">2.2031 / 4.5978</td>
+<td align="right">10.9135 / 14.7043</td>
+<td align="right">1.3226</td>
+</tr>
+<tr>
+<td>Forward 1</td>
+<td align="right">1.6640 / 2.8959</td>
+<td align="right">7.2981 / 12.8352</td>
+<td align="right">1.5368</td>
+</tr>
+<tr>
+<td>Forward 2</td>
+<td align="right">3.0300 / 4.9868</td>
+<td align="right">13.4318 / 15.5975</td>
+<td align="right">7.2631</td>
+</tr>
+<tr>
+<td>Reverse 2</td>
+<td align="right">2.2129 / 4.3346</td>
+<td align="right">14.2176 / 18.2816</td>
+<td align="right">6.6644</td>
+</tr>
+<tr>
+<td>Reverse 1</td>
+<td align="right">2.2267 / 2.7658</td>
+<td align="right">9.0580 / 11.3100</td>
+<td align="right">1.8869</td>
+</tr>
+<tr>
+<td>Reverse 0</td>
+<td align="right">2.7561 / 3.4017</td>
+<td align="right">7.1646 / 11.7650</td>
+<td align="right">0.9039</td>
+</tr>
+</tbody></table></div>
+<p>Mode2 submitted compute in 55/64 accepted frames; the remaining nine had complete
+cost history and selected <code>insufficient-gain</code>. All 64 measured overlaps were zero.
+Mode2 scheduling CPU alone was median <strong>4.2045 ms forward / 3.8823 ms reverse</strong>,
+with recording at 1.5986 / 1.5967 ms and submission at 0.5987 / 0.6248 ms.
+Therefore fixing the history exposes a material scheduling cost; it does not
+establish async gain. Clocks were not locked, evidence serialization remains
+enabled, and forward/reverse GPU rankings are inconsistent.</p>
+<p>Examples of executed compute work include Geometry.Visibility reset/cull,
+Geometry.Occlusion mip construction, and SSAO. Compute submissions must not be
+equated with concurrent GPU work. The absence of measured overlap is confirmed;
+its specific remaining cause is not established by this change.</p>
+<h2>Validation and remaining work</h2>
+<p>Release build passed (existing PDB LNK4020 warnings retained). The final binary
+passed native execution 428 checks, queue planning 111 checks, full RenderGraph
+regression and the native GPU-validation gate. Product capture comparisons are
+collected separately from timing: 384 logical attachment/stage comparisons across
+pre-fix versus fixed mode0 and fixed mode0 versus modes1/2 were exactly equal,
+with matched controlled inputs, no nonfinite values and maximum error zero.
+Shared stage readbacks are counted by logical stage name, not as independent GPU
+work. Both timing processes and all six capture processes exited normally.
+Product GPU validation, Debug/Vulkan execution,
+and broader workload acceptance are not claimed here.</p>
+<p>Keep default OFF. Next investigate the per-frame candidate search cost and the
+actual waits/batches/pass intervals that prevent selected queues from overlapping.
+Do not relax measurement completeness or structural equality to force compute.</p>
+<p>Evidence: <code>Build/Verification/Phase43/RG8History20261009/</code> contains <code>probe</code>,
+<code>signature-probe</code>, decoded <code>signature-difference.txt</code>, <code>fixed-normal</code>,
+<code>fixed-native</code>, <code>fixed-captures</code>, binary identities, <code>summarize-fixed.py</code>, and
+<code>fixed-performance-summary.json</code>. Build log: <code>Build/rg8-history-fixed.log</code>.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="proven-cause-and-correction"></span><span id="remeasurement"></span><span id="sec-proven-cause-and-correction"></span><span id="sec-remeasurement"></span><span id="sec-validation-and-remaining-work"></span><span id="validation-and-remaining-work"></span></details></main></body></html>

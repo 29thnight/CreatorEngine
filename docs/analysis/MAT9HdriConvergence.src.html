@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>MAT-9 전체 HDRI 26조건 수렴·수용 — 2026-10-01</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="MAT9HdriConvergence.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/MAT9HdriConvergence.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>MAT-9 전체 HDRI 26조건 수렴·수용 — 2026-10-01</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Document</ve-node><ve-node id="n1" at="2 1">Program</ve-node><ve-node id="n2" at="3 1" key>Frame input</ve-node><ve-node id="n3" at="3 2">Scene stages</ve-node><ve-node id="n4" at="2 2">GPU packets</ve-node><ve-node id="n5" at="1 2">RHI submit</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>live material은 compiled graph 프로그램과 밀봉된 scene/view/geometry 입력을 소비한다. 준비·실패 상태에서 옛 instance를 대체 경로로 선택하는 구안을 현행 계약으로 사용하지 않는다.</li>
+<li>GPU scene packet·resident table·visibility/REAC 최적화는 구현 기반이다. shader의 물리 의미, route별 출력과 전체 비용의 수용은 소스 존재와 별개다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/rebind-environment-reference.py#L15">Tools/regression/rebind-environment-reference.py:15</a> — <code>parser = argparse.ArgumentParser(description=__doc__)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/rebind-environment-reference.py#L22">Tools/regression/rebind-environment-reference.py:22</a> — <code>raise ValueError(&#39;Reference output must be new&#39;)</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/rebind-environment-reference.py#L23">Tools/regression/rebind-environment-reference.py:23</a> — <code>spec = importlib.util.spec_from_file_location(&#39;comparison&#39;, Path(__file__).with_name(&#39;compare-material-blender-images.py&#39;))</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>판정</h2>
+<p><strong>고정 HDRI 범위는 26/26 통과했다.</strong> 재질 20조건, 제어 6조건이다.
+기존 target을 유지했고 진단 shader snapshot은 제품 수용에 사용하지 않았다.
+MAT-9 전체 및 PHASE 4.25 완료 판정은 아니다.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>항목</th>
+<th align="right">고정 상한</th>
+<th align="right">제품 측정 최대</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>상대 RMS</td>
+<td align="right">1%</td>
+<td align="right">0.495878%</td>
+</tr>
+<tr>
+<td>p95 normalized</td>
+<td align="right">1%</td>
+<td align="right">0.468087%</td>
+</tr>
+<tr>
+<td>max normalized</td>
+<td align="right">5%</td>
+<td align="right">3.592395%</td>
+</tr>
+<tr>
+<td>독립 시드 상대 RMS</td>
+<td align="right">0.25%</td>
+<td align="right">0.171682%</td>
+</tr>
+</tbody></table></div>
+<p><a href="MAT9HdriConvergenceTargets.json">수용 판정</a>,
+<a href="MAT9HdriConvergenceComparison.json">전체 측정</a>,
+<a href="MAT9HdriConvergenceComparison.png">이미지 대조</a>.</p>
+<h2>같은 조건에서의 개선</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>조건</th>
+<th align="right">이전 제품 RMS</th>
+<th align="right">현재 제품 RMS</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>forest 이방성</td>
+<td align="right">1.0659%</td>
+<td align="right">0.4774%</td>
+</tr>
+<tr>
+<td>autumn 금속</td>
+<td align="right">2.3418%</td>
+<td align="right">0.4959%</td>
+</tr>
+<tr>
+<td>autumn 이방성</td>
+<td align="right">1.6345%</td>
+<td align="right">0.2148%</td>
+</tr>
+</tbody></table></div>
+<p>이전 4096-sample reference의 노이즈가 재질 오차와 섞였다. 이번에는 전체 조건을
+Blender 5.1.1 Cycles CPU 131072 samples, seed 0/11로 각각 새로 렌더했다.
+autumn 금속의 시드 RMS는 0.0542%로, 이전 제품 오차를 설명하지 못했다.</p>
+<p>이전 Native 픽셀은 최초 캡처대로 보존했다. 그 캡처 당시 reference의 samples는 4096이지만
+Native가 소비하는 geometry·재질 입력·HDRI source/cook·strength가 새 고샘플 reference와
+같음을 확인한 뒤 새 reference 픽셀로 이전 오차를 계산했다.
+이 계산은 현재 제품 수용에 사용하지 않는다.
+<a href="MAT9HdriConvergenceBaseline.json">이전 픽셀의 고샘플 대조</a>.
+현재 수용은 새 reference manifest를 그대로 소비한 <strong>별도 제품 Native 실행</strong>이다.</p>
+<h2>제품 변경</h2>
+<ul>
+<li><code>CEIBL005</code>는 기존 1024 방향/PDF bank 뒤에 4096 반사 bank를 저장한다.
+두 bank는 쿠킹·GPU 업로드·파일 재저장·bootstrap/선택 캐시에 포함된다.</li>
+<li>Scene 반사는 <strong>GGX 1024 + environment 4096</strong>의 서로 다른 수를 MIS 가중에 반영한다.
+prepared directional albedo 및 정규화의 GGX 1024 순서는 유지한다.</li>
+<li>확산 및 sheen proposal은 원래 1024 bank를 쓴다. Scene 반사의 radiance는
+retained source RGBA32F를 float bilinear wrap-U/clamp-V로 조회한다.
+큐브 변환을 통한 추가 angular resampling과 반사 샘플 분산을 구분했다.</li>
+<li>mirror source 경로 및 픽셀 중심 normal/view 보정은 유지한다.
+전체 4096/4096 적분, 1024-only Source/MIS 가중/VNDF 진단을 제품 기본값으로 채택하지 않았다.</li>
+<li>reader는 CEIBL001&#126;004를 계속 읽는다. Scene은 기존 1024 및 새 5120 폭을 검증하며
+이전 bank에서는 원래 sample count로 동작한다. source-bearing v4 GPU capture는 v4로 재저장된다.</li>
+</ul>
+<p>기본 forest와 autumn 파일은 각각 <strong>103159928 bytes / 98.38 MiB</strong>이며 v4 대비 <strong>128 KiB</strong> 증가했다.
+source 8 MiB 및 맵 수 8개는 유지한다. 기본 forest와 Debug 배포본의 전체 SHA는
+<code>7b4e9ad53d806195b2fdf4af2cb0ac39dc2709524028eb2707d5dd3d9a631acb</code>로 같다.
+recipe SHA는 <code>c40f0bc775d49d61f81ae29259aca9973b58e6a3dc8da109179b8b97a98b691a</code>다.
+원본 EXR은 bootstrap에서 읽지 않는다.</p>
+<p><a href="MAT9HdriConvergenceForestCook.json">forest 쿠킹 검증</a>,
+<a href="MAT9HdriConvergenceAutumnCook.json">autumn 쿠킹 검증</a>.
+두 환경 모두 5120 방향/PDF가 유효하고 lookup PDF와 최대 상대 차이는 4.35e-7 미만이다.
+두 환경의 8-map GPU upload/readback roundtrip은 각 새 쿠킹 파일과 전체 SHA가 같다.</p>
+<p>v4와 비교해 source·environment cube·irradiance·BRDF·CDF rows/marginal·첫 1024 bank는 byte 일치한다.
+prefilter mip 4에는 작은 float 차이가 있으므로 네 lighting map 전체의 byte 일치를 주장하지 않는다.
+forest prefilter 전체 상대 L2 차이는 6.185e-8, 최대 절대 차이 0.00060463이며 autumn은
+3.630e-10 / 0.000095367이다. strict lighting byte-equality 진단은 미통과로 기록하며
+픽셀 수용 상한을 변경하지 않았다. <a href="MAT9HdriConvergenceCookDelta.json">전체 맵 변화 기록</a>.</p>
+<h2>검증 범위</h2>
+<ul>
+<li>original forest EXR 및 autumn HDR, strength 0.35, Raw scene-linear Rec.709.</li>
+<li>같은 triangle soup의 64×64 sphere, eye (0,0,3), FOV π/4, Gaussian filter 0.01,
+max bounce 1. 직접 조명은 없다.</li>
+<li>원래 고정된 Core/Layered 10개 입력 × 두 환경 + emission/white/mirror 제어 × 두 환경.</li>
+<li>공통 emission coverage를 2 pixels erode한 344 interior pixels를 모든 재질에 사용한다.
+재질별 mask·입력·target 변경은 없다. 현재 capture manifest와 reference는 정확히 같다.</li>
+<li>Release Native: <strong>433369 checks, validation 0, 정상 종료</strong>, 전체 26조건 통과.</li>
+<li>기존 방향광·균일 환경 24조건 회귀도 <strong>24/24 통과</strong>했다.
+Release Native <strong>400520 checks, validation 0, 정상 종료</strong>이며 최대 RMS 0.179170%,
+p95 0.195771%, max normalized 0.448656%다. 독립 시드 RMS 최대는 0.223588%다.
+<a href="MAT9HdriConvergenceCoreTargets.json">회귀 판정</a>,
+<a href="MAT9HdriConvergenceCoreComparison.json">회귀 측정</a>,
+<a href="MAT9HdriConvergenceCoreComparison.png">회귀 이미지</a>.</li>
+<li>Debug Editor 전체 빌드와 38-file shared runtime manifest:
+<code>833e1b42210a8d9e73fe7c344671387bfd3e5d187b42878f0931bbe0a21854f3</code>.</li>
+<li>실제 Debug Editor HTTP <strong>11 checks, 정상 종료</strong>: v5 default bootstrap,
+배경 토글 IBL generation 1→1, HDR 변경 후 v5 캐싱, 손상 파일 거부·기존 환경 보존.
+runtime autumn v5는 authoring 파일과 SHA
+<code>63a59a27284f0a4ba0c6aa0cc17b7fb5d82d58ef0d1ad5bd040ec8828a168f58</code>가 같다.</li>
+<li>shader backend verification은 DXIL/SPIR-V 범위이며 Vulkan GUI runtime 수용은 아니다.</li>
+<li>기존 profiler 종료 진단 <code>shutdown abandoned=1 retained=1 foreign=0 - [RHIThread]</code>는 남았다.
+정상 종료와 구분하며 해결 항목으로 세지 않는다.</li>
+<li>계획·대시보드 반영 뒤 웹 빌드, inline script 구문, 변경 Python 도구 구문,
+<code>git diff --check</code>를 통과했다. 기존 줄바꿈 변환 경고는 수용 실패로 세지 않는다.</li>
+</ul>
+<p>주요 실행: <code>Build/Obj/Mat9Images-Release-hdri-v5-full-converged</code>,
+<code>NeutralEnvironment/Debug-DX12-hdri-v5-converged</code>, <code>mat9-hdri-v5-*</code> 로그.
+reference: <code>Mat9Hdri-v4-dense-{0,11}</code>의 source 렌더 픽셀을 보존하고
+<code>rebind-environment-reference.py</code>로 새 engine cook만 연결한 <code>Mat9Hdri-v5-dense-{0,11}</code>.</p>
+<h2>기존 잔여 및 성능 한계</h2>
+<p>환경광의 반사 leg는 1024→4096이고 source 조회도 추가 비용이 있다.
+cached 방향을 쓰므로 매 픽셀 CDF 역탐색은 하지 않지만, <strong>최초 준비·이동 카메라·cache miss 비용의
+성능 수용은 아직 별도 게이트</strong>다. 이번 quality 실행과 CPU reference 렌더는 FPS 수용 근거가 아니다.
+default warm load는 원본 decode 및 GPU 환경 생성 없이 cooked resource를 올린다.</p>
+<p>현재 수용은 상수 Core/Layered의 두 HDRI 범위다. 기존 special transport,
+texture/normal-map filtering, Deferred/Forward route parity, 실제 모델의 cold/warm/이동 카메라 및
+tier별 성능, 원래 grid의 area-light ABI/consumer 게이트는 계획에 그대로 남긴다.
+MAT-9 progress·기존 완료 공수 32/34일을 유지하고 새 공수 행을 추가하지 않는다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-같은-조건에서의-개선"></span><span id="sec-검증-범위"></span><span id="sec-기존-잔여-및-성능-한계"></span><span id="sec-제품-변경"></span><span id="sec-판정"></span><span id="같은-조건에서의-개선"></span><span id="검증-범위"></span><span id="기존-잔여-및-성능-한계"></span><span id="제품-변경"></span><span id="판정"></span></details></main></body></html>

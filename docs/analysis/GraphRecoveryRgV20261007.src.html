@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko" data-register="instrument"><head><title>그래프 재질 복구·RG-V 수용 — 2026-10-07</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterDocumentationAudit20261020.html">전체 검증 원장</a> · <a href="GraphRecoveryRgV20261007.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/analysis/GraphRecoveryRgV20261007.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · SOURCE CONTRACT</p><h1>그래프 재질 복구·RG-V 수용 — 2026-10-07</h1><p>문서가 참조하는 현재 소스 선언·소유 경계를 대조했다. 이전 측정과 현행 구현을 구분한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 현행 선언·원래 기록 분리</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>2026-10-20 master 구현 대조</h2>
+<p>기준: <code>27de3f5a02aadde7456aab680db3184c36ee735e</code>. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.</p>
+<p><a href="MasterDocumentationAudit20261020.html">전체 대조·링크 정리 원장</a></p>
+<h3>현행 계약과 이 문서의 적용 범위</h3>
+<ul>
+<li>제품 live graph는 명시적 버전과 dependency order를 사용한다. 선언 metadata 재사용과 dependency recording은 현재 구현 기반이다.</li>
+<li>소프트웨어 RHI의 frozen recording은 독립 target의 병렬 native 번역과 조기 sealed-batch handoff를 지원한다. 직렬 전용 번역·별도 C# SRP 저작 전환을 후속 필수 작업으로 두지 않는다.</li>
+<li>queue/alias/hazard·reader join·retirement를 보존하고 실제 overlap·fallback·whole-frame 비용으로 RG8 채택을 판정한다.</li>
+</ul>
+<h3>해당 구현에서 확인한 선언·소유 경계</h3>
+<ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L2">Tools/build.ps1:2</a> — <code>[CmdletBinding()]</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L4">Tools/build.ps1:4</a> — <code>[ValidateSet(&#39;Game&#39;)][string]$Target = &#39;Game&#39;,</code></li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/build.ps1#L21">Tools/build.ps1:21</a> — <code>$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot &#39;..&#39;))</code></li>
+</ul>
+<h3>이전 근거의 유효 범위</h3>
+<p>기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.</p>
+<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
+
+<h2>결과와 계약</h2>
+<p>Editor 모델 import/load와 씬 재질 로드에서 요청한 그래프의 원본·컴파일·텍스처 바인딩이 실패하면 원본을 보존하고 별도 <code>Assets/Materials/Recovered_&lt;GUID&gt;.shadergraph</code>와 identity를 게시한다. 기본 그래프는 <strong>Principled BSDF → Material Output</strong> 두 노드·한 연결이며, 공통 그래프 컴파일·재질 소비 경로에 연결된다. 유효한 모델 geometry는 유지한다. 복구 그래프를 열어 편집·저장·적용할 수 있고 씬 저장·재로드에서도 같은 그래프를 해석한다.</p>
+<p>이 정책은 재질 자산 소유자의 복구다. Shadow/GBuffer/Forward의 그래프 전용 admission과 정확한 generation 선택을 유지한다. GPU 프로그램 준비 중에는 기다리며, device/PSO 실패를 성공한 렌더링으로 처리하지 않는다. Player의 cooked closure와 모델 geometry/identity 검증은 엄격하게 유지한다. 기존 authored model graph 또는 sidecar가 있으면 오류를 이유로 원본을 덮어쓰지 않는다.</p>
+<p><strong>RG-V 기본 native C++ viewer는 DX12 Debug/Release 수용 완료</strong>다. C# IR 연결은 PHASE 4.6 CSRP-5/6, alias/queue/subresource range 확장은 RG7&#126;9의 별도 범위다. Vulkan runtime 수용을 이번 결과로 올리지 않는다.</p>
+<h2>구현과 발견한 문제</h2>
+<ul>
+<li>immutable compiled snapshot에 view/history/scene epoch/extent를 담는다. reader는 inactive/unready 결과와 다른 씬·뷰·history·크기의 snapshot을 거부한다. Editor 카메라 history가 씬 전환에서 고정되므로 scene epoch 검사가 필요하다.</li>
+<li>Window &gt; RenderPass에서 pass/resource/edge 원인, authored/compiled order, version, culling, lifetime/state/barrier, wave와 critical path를 읽는다. sampled submitted frame을 표시하며 미지원 alias/queue/range를 명시한다. GPU 객체를 소유하지 않는다.</li>
+<li><code>render.graph [scene|game|preview]</code>와 <code>render.graph view &lt;target&gt;</code>은 같은 snapshot을 조회하고 실제 UI reader를 선택한다. UI draw/matching/stale 계수로 실제 표시와 창 닫기 후 정지를 관측한다.</li>
+<li>완료된 Material Preview를 재사용하면 나중의 snapshot 요청이 실행되지 않던 문제를 수정했다. 요청이 있을 때 한 번 새 snapshot을 만들고, 일치하는 preview snapshot은 재사용한다. DX12/Vulkan 두 구현에 적용했다.</li>
+<li><code>.shadergraph</code>가 Editor 등록 확장자에서 누락돼 복구 원본 게시가 거부되던 문제를 수정했다.</li>
+<li>제거된 fallback 스트림을 전달하던 네 replay fixture 호출을 정리했다. Debug RenderTests의 Unity object section 한도는 <code>/bigobj</code>로 해결했다.</li>
+<li>검증 도구는 native commandlet과 live HTTP 명령을 분리한다. 최초 graph UI fit이 문서 revision을 바꾸므로 편집 전 다시 읽는다. 캡처에서는 정확한 pending-program 응답만 재시도한다. quit의 사라지는 endpoint를 polling하지 않고 최종 process exit code로 판정한다.</li>
+</ul>
+<h2>최종 증거</h2>
+<p>Artifacts: <code>Build/Verification/GraphRecoveryRgV20261007/Scene-Debug-final</code> 및 <code>Scene-Release-final</code>.</p>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>검사</th>
+<th align="right">Debug</th>
+<th align="right">Release</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>네 프로젝트 빌드: RenderEngine / Editor / RenderTests / CreatorEditor</td>
+<td align="right">통과</td>
+<td align="right">통과</td>
+</tr>
+<tr>
+<td>native 24 permutations + missing-edge/wrong-order/stale scene/history/resize/view + immutable reset retention</td>
+<td align="right">통과</td>
+<td align="right">통과</td>
+</tr>
+<tr>
+<td>복구 graph 수 / 손상 원본 hash 보존</td>
+<td align="right">5 / 7개 모두</td>
+<td align="right">5 / 7개 모두</td>
+</tr>
+<tr>
+<td>capture: 전체 / CreatorRobot의 서로 다른 메시 / 편집한 Ground generation 소비</td>
+<td align="right">5 / 4 / 1</td>
+<td align="right">5 / 4 / 1</td>
+</tr>
+<tr>
+<td>실제 Scene / Game / 완료 후 늦게 연 Material Preview reader</td>
+<td align="right">통과</td>
+<td align="right">통과</td>
+</tr>
+<tr>
+<td>같은 뷰·크기에서 씬 epoch 교체</td>
+<td align="right">4 → 5</td>
+<td align="right">4 → 5</td>
+</tr>
+<tr>
+<td>render extent 변경</td>
+<td align="right">2246×1094 → 1124×548</td>
+<td align="right">2246×1094 → 1124×548</td>
+</tr>
+<tr>
+<td>sample snapshot 최대 capacity bytes / copy ms</td>
+<td align="right">38,596 / 2.0093</td>
+<td align="right">34,780 / 0.1750</td>
+</tr>
+<tr>
+<td>RenderPass UI p95 ms, 512 samples</td>
+<td align="right">0.5181</td>
+<td align="right">0.1374</td>
+</tr>
+<tr>
+<td>viewer 닫기 후 UI draw 정지</td>
+<td align="right">통과</td>
+<td align="right">통과</td>
+</tr>
+<tr>
+<td>GPU validation problems / dropped / exit code</td>
+<td align="right">0 / 0 / 0</td>
+<td align="right">0 / 0 / 0</td>
+</tr>
+</tbody></table></div>
+<p>각 <code>result.json</code>은 <code>complete=true</code>, failures가 비었고 exitCode=0이다. <code>compiler-binary-hashes.json</code>은 검사한 launcher/runtime DLL identity를 기록한다. <code>capture-model-audit.json</code>은 Robot의 네 mesh ID와 편집한 Ground의 정확한 runtime generation 소비를 추가로 검사한다. 모든 draw는 <code>lattice</code> 경로다. 저장·재로드에서 불필요한 추가 복구 graph가 생성되지 않았고 기본 graph의 Roughness 편집은 새 runtime generation으로 반영됐다.</p>
+<p>비용 gate는 snapshot copy ≤10 ms, capacity estimate ≤4 MiB, 실제 reader UI p95 ≤10 ms로 검사했다. 측정 최대 UI 시간은 Debug 38.5329 / Release 38.9193 ms였다. 따라서 이 수용을 모든 전환 프레임의 hard 10 ms 상한으로 해석하지 않는다. capacity estimate는 vector/string capacity 기준이며 allocator bookkeeping은 제외한다. 기본 표시 상태의 비용으로, 모든 tree를 펼친 최악 표시 비용을 증명하지 않는다.</p>
+<h2>제외한 시도와 범위</h2>
+<p>초기 native HTTP 호출, 누락된 <code>.shadergraph</code> 게시, 확장자 없는 model 경로, 최초 UI revision, GPU preparation 응답과 quit polling 때문에 끝난 실행은 최종 수용에서 제외했다. 숨김 640×480 창은 canvas가 38×11로 줄어 렌더 크기가 64×64로 clamp됐으므로 그 resize 검사도 제외했다. 마지막 두 실행은 일반 크기의 Editor와 새 scene epoch 검사로 독립 수행했다. fixture 자산의 변경/손상은 검증용 프로젝트 복사본에만 가했다.</p>
+<p>C# source 표시·IR 연결, RG7&#126;9 확장과 Vulkan runtime은 기존 해당 페이즈에 남는다. CSM depth-content cache를 구현한 작업은 아니다. 계획 공수는 RG-V 기본 viewer 4인일을 회수하여 전체 355인일 중 기성 106 / 잔여 249(+별도 미산정)로 갱신한다. commit/push는 하지 않았다.</p>
+<p>대시보드 집계 대조에서 RND-ENV의 명시적 earnedDays가 없어 progress가 자동 5인일 기성으로 계산되던 기존 불일치도 수정했다. 이 행은 잔여 10인일·미수용 상태이므로 earnedDays=0을 명시한다. PHASE 4 계열 데이터 집계는 원장과 동일한 355 / 106 / 249다.</p>
+</details>
+<details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p><span id="sec-결과와-계약"></span><span id="sec-구현과-발견한-문제"></span><span id="sec-제외한-시도와-범위"></span><span id="sec-최종-증거"></span><span id="결과와-계약"></span><span id="구현과-발견한-문제"></span><span id="제외한-시도와-범위"></span><span id="최종-증거"></span></details></main></body></html>
