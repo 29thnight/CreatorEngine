@@ -109,6 +109,84 @@ struct RHITimelinePoint
     }
 };
 
+// Resource retirement may depend on independent graphics/compute/copy queues.
+// A scalar frame fence is sufficient only after an explicit join. This bounded
+// set preserves each native timeline and never treats missing/lost completion
+// as evidence that a resource may be reused.
+class RHICompletionSet
+{
+public:
+    static constexpr size_t kCapacity = 8;
+
+    bool Add(const RHITimelinePoint& point)
+    {
+        if (!m_valid || !point.IsValid())
+        {
+            m_valid = false;
+            return false;
+        }
+        const RHIQueueIdentity producer = point.fence->GetProducer();
+        for (size_t index = 0; index < m_size; ++index)
+        {
+            RHITimelinePoint& existing = m_points[index];
+            if (existing.fence->GetProducer().deviceGeneration != producer.deviceGeneration)
+            {
+                m_valid = false;
+                return false;
+            }
+            // Two native fences must not be merged by numeric values alone,
+            // even if they describe the same queue identity.
+            if (existing.fence.operator->() == point.fence.operator->())
+            {
+                existing.value = (std::max)(existing.value, point.value);
+                return true;
+            }
+        }
+        if (m_size == kCapacity)
+        {
+            m_valid = false;
+            return false;
+        }
+        m_points[m_size++] = point;
+        return true;
+    }
+
+    bool Add(const RHICompletionSet& other)
+    {
+        if (!other.IsValid())
+        {
+            m_valid = false;
+            return false;
+        }
+        for (const auto& point : other.GetPoints())
+        {
+            if (!Add(point)) return false;
+        }
+        return true;
+    }
+
+    bool IsValid() const
+    {
+        return m_valid && m_size != 0 && std::all_of(m_points.begin(), m_points.begin() + m_size,
+            [](const RHITimelinePoint& point) { return point.IsValid(); });
+    }
+
+    bool IsComplete() const
+    {
+        return IsValid() && std::all_of(m_points.begin(), m_points.begin() + m_size,
+            [](const RHITimelinePoint& point) { return point.IsComplete(); });
+    }
+
+    std::span<const RHITimelinePoint> GetPoints() const { return {m_points.data(), m_size}; }
+    size_t Size() const { return m_size; }
+    void Reset() { *this = {}; }
+
+private:
+    std::array<RHITimelinePoint, kCapacity> m_points{};
+    size_t m_size{0};
+    bool m_valid{true};
+};
+
 inline bool ValidateQueueWait(const RHIQueueIdentity& consumer,
     const RHITimelinePoint& point, std::string& error)
 {

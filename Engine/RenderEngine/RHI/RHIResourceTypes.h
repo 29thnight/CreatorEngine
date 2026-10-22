@@ -434,6 +434,8 @@ struct RHITextureInfo
     // Backend guarantee for explicit states across graphics-queue submissions.
     // Unknown backends and automatically decaying resources remain conservative.
     bool retainsExplicitStateOnGraphicsQueue{false};
+    // A 3D depth extent is not an array layer count for image barriers/views.
+    bool is3D{false};
 
     bool IsValid() const { return 0 != width && 0 != height; }
 };
@@ -598,6 +600,12 @@ struct RHICompletionPoint
 {
     uint64_t value{ 0 };
     bool IsValid() const { return 0 != value; }
+};
+
+struct RHIBufferInfo
+{
+    uint64_t bytes{0};
+    bool IsValid() const { return bytes != 0; }
 };
 
 enum class RHIUploadSegmentState : uint8_t

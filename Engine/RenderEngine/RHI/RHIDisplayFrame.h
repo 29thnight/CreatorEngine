@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Utility_Framework/LifetimeToken.h"
 #include "../../Utility_Framework/Ownership.h"
+#include "RHIResourceTypes.h"
 
 #include "../FrameCameraSnapshot.h"
 #include "../Render/Temporal/TemporalReconstruction.h"
@@ -39,6 +40,62 @@ struct RHIDisplayConsumerLease
     // 포기된 소비자는 장치 해체 중에도 완료를 증명할 수 없다.
     // 해당 표시 슬롯을 영구 사용 불가로 남겨 덮어쓰기를 막는다.
     std::atomic<bool> m_completionLost{ false };
+};
+
+enum class RHISharedImageTransport : uint8_t
+{
+    None,
+    Win32D3D12Resource
+};
+
+struct RHIDisplayAdapterIdentity
+{
+    std::array<uint8_t, 8> luid{};
+    bool valid{false};
+    // Current D3D12 presentation queues use node zero. A linked adapter's
+    // different node is not proven compatible by the shared LUID alone.
+    uint32_t nodeMask{1};
+
+    bool operator==(const RHIDisplayAdapterIdentity&) const = default;
+};
+
+struct RHIGpuPresentationCapabilities
+{
+    bool sharedD3D12Resource{false};
+    RHIDisplayAdapterIdentity adapter;
+};
+
+// An immutable completed producer image. The completion receipt is captured by
+// the producer after polling its real fence; zero/device-loss never means ready.
+// The sink must retain consumerLease through its final GPU use. lifetimeToken
+// keeps the transport handle valid while the frame is published/opened.
+struct RHIGpuDisplayImage
+{
+    RHISharedImageTransport transport{RHISharedImageTransport::None};
+    RHIDisplayAdapterIdentity adapter;
+    void* sharedHandle{nullptr};
+    uint32_t width{0};
+    uint32_t height{0};
+    RHIFormat format{RHIFormat::Unknown};
+    RHIDisplayFrameMetadata metadata;
+    RHICompletionPoint producerCompletion;
+    uint64_t observedProducerCompletion{0};
+    own::shared_owner<RHIDisplayConsumerLease> consumerLease;
+    ce::lifetime_token lifetimeToken;
+
+    bool IsReady() const
+    {
+        return transport != RHISharedImageTransport::None && adapter.valid && sharedHandle && width && height &&
+            format != RHIFormat::Unknown && producerCompletion.IsValid() &&
+            observedProducerCompletion != UINT64_MAX && observedProducerCompletion >= producerCompletion.value &&
+            consumerLease && !consumerLease->m_completionLost.load(std::memory_order_acquire) && lifetimeToken;
+    }
+
+    bool IsCompatible(const RHIGpuPresentationCapabilities& capabilities) const
+    {
+        return IsReady() && transport == RHISharedImageTransport::Win32D3D12Resource &&
+            capabilities.sharedD3D12Resource && capabilities.adapter.valid && capabilities.adapter == adapter;
+    }
 };
 
 // One completed real-frame export. Shared handles are process-local transport

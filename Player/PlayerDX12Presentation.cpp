@@ -69,6 +69,19 @@ namespace Player
 
             bool IsActive() const override { return m_active.load(std::memory_order_acquire); }
             const char* GetName() const override { return "dx12"; }
+            RHIGpuPresentationCapabilities QueryGpuPresentationCapabilities() const override
+            {
+                RHIGpuPresentationCapabilities capabilities;
+                if (IsActive() && m_resources.GetDevice())
+                {
+                    const LUID adapter = m_resources.GetDevice()->GetAdapterLuid();
+                    static_assert(sizeof(adapter) == sizeof(capabilities.adapter.luid));
+                    std::memcpy(capabilities.adapter.luid.data(), &adapter, sizeof(adapter));
+                    capabilities.adapter.valid = true;
+                    capabilities.sharedD3D12Resource = true;
+                }
+                return capabilities;
+            }
             bool IsQuarantined() const { return m_quarantined; }
             bool AcceptsTemporalFrames() const override { return m_exportTemporalInputs.load(std::memory_order_acquire); }
             void OpenTemporalFrame(const RHITemporalDisplayPacket& packet) override
@@ -337,7 +350,7 @@ namespace Player
                     D3D12_RESOURCE_BARRIER sourceBarrier{};
                     sourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
                     sourceBarrier.Transition = {m_pendingUse.resource.Get(),
-                        D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, D3D12_RESOURCE_STATE_COMMON,
                         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
                     if (!sdkColor) commands->ResourceBarrier(1, &sourceBarrier);
                     ID3D12DescriptorHeap* heaps[]{m_srvHeap.Get()};

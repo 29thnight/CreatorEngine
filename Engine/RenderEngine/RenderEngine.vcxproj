@@ -1064,4 +1064,20 @@
     <ClInclude Include="RenderArena.h" />
     <ClCompile Include="RenderArena.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphSubresources.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanSharedDisplayImage.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClInclude Include="Render\Scene\LiveViewScheduling.h" />
+    <ClInclude Include="Render\Scene\PreparedViewInputPool.h" />
+    <ClInclude Include="RHI\RHISubresourceRange.h" />
+    <ClInclude Include="RHI\RHIExecutionPolicy.h" />
+    <ClInclude Include="RHI\DX12\DX12SubresourceRange.h" />
+    <ClInclude Include="RHI\Vulkan\VulkanSharedDisplayImage.h" />
+  </ItemGroup>
 </Project>

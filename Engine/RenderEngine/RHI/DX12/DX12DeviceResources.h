@@ -202,6 +202,9 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     bool GetPrimaryGraphicsQueue(own::shared_owner<IRHICommandQueue>& queue, std::string& outError);
     bool JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError);
     bool WaitForLastFrameSubmission(std::string& outError);
+    // Producer-thread snapshot after a successful EndFrame. GPU completion and
+    // native submission success are separate publication requirements.
+    RHISubmissionTicket GetLastFrameSubmissionTicket() const;
     bool ShutdownQueueService(std::string& outError);
     /// 이미 닫힌 backend command list 묶음을 제출하고 같은 queue fence로
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
@@ -292,7 +295,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     ID3D12Device* GetDevice() const { return m_device.Get(); }
     bool EncodeIndirectBuffer(const RHIBufferSlice& slice, uint64_t& payload) const override
     {
-        const auto entry = DescribeBuffer(slice.buffer);
+        const auto entry = DescribeNativeBuffer(slice.buffer);
         if (!entry.IsValid() || slice.offset >= entry.bytes || slice.size > entry.bytes - slice.offset)
         {
             return false;
@@ -504,7 +507,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
-    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const { return m_resourceTable.DescribeBuffer(handle); }
+    DX12BufferEntry DescribeNativeBuffer(RHIBufferHandle handle) const { return m_resourceTable.DescribeBuffer(handle); }
 
     RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
     {
@@ -513,6 +516,19 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
                 nullptr != m_drawIndirectSignature.Get()};
     }
     RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
+    RHISubresourceCapabilities GetSubresourceCapabilities() const override { return {true, false, true}; }
+    bool SupportsConcurrentTextureShaderReads() const override { return true; }
+    RHIBufferInfo DescribeBuffer(RHIBufferHandle handle) const override
+    {
+        ID3D12Resource* const resource = Resolve(handle);
+        if (!resource)
+        {
+            return {};
+        }
+        const D3D12_RESOURCE_DESC description = resource->GetDesc();
+        return description.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER ? RHIBufferInfo{description.Width}
+                                                                        : RHIBufferInfo{};
+    }
     bool IsAtomicMin64Buffer(RHIBufferHandle buffer) const override;
     RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override { return m_meshShaderCapabilities; }
     RHIShaderArrayCapabilities GetShaderArrayCapabilities() const override { return m_shaderArrayCapabilities; }

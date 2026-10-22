@@ -6,6 +6,22 @@
 #include "VulkanLoader.h"
 #include "../RHIHandle.h"
 #include "../RHIFormat.h"
+#include "../RHISubresourceRange.h"
+
+struct RHIBindingDesc;
+
+struct VulkanImageViewEntry
+{
+    VkImageViewType type{VK_IMAGE_VIEW_TYPE_2D};
+    RHIFormat format{RHIFormat::Unknown};
+    RHITextureSubresourceRange range;
+    VkImageView view{VK_NULL_HANDLE};
+};
+
+struct VulkanImageViewCache
+{
+    std::vector<VulkanImageViewEntry> entries;
+};
 
 // 핸들 → Vulkan 리소스 표 (5c-4a).
 //
@@ -63,14 +79,23 @@ struct VulkanImageEntry
     uint32_t  mipLevels{ 1 };
     RHIFormat format{ RHIFormat::Unknown };
     bool      is3D{ false };
+    bool      externalShared{false};
+    uint32_t  queueFamily{VK_QUEUE_FAMILY_IGNORED};
 
     /// 지금 레이아웃. 배리어가 `oldLayout` 을 요구하는데 Vulkan 은 그것을
     /// 되물을 방법이 없다 — 아는 쪽이 적어 둔다(`RHITransition::before` 가
     /// 같은 이유로 before 를 받는 것과 짝이다).
     VkImageLayout layout{ VK_IMAGE_LAYOUT_UNDEFINED };
+    // Copy-on-write on first use of a new view. Frozen recordings retain the
+    // exact immutable cache generation; producer additions cannot race replay.
+    own::shared_owner<const VulkanImageViewCache> imageViews;
 
     bool IsValid() const { return VK_NULL_HANDLE != image; }
 };
+
+bool DescribeVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding,
+                            VulkanImageViewEntry& description);
+VkImageView ResolveVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding);
 
 /// 표 한 칸이 드는 버퍼.
 struct VulkanBufferEntry
@@ -95,6 +120,8 @@ class VulkanResourceTable
 {
 public:
     VulkanResourceTable() : m_buffers(RHIHandleBits::kMaxSlots) {}
+    void SetSeparateDepthStencilLayouts(bool enabled) { m_separateDepthStencilLayouts = enabled; }
+    bool SupportsSeparateDepthStencilLayouts() const { return m_separateDepthStencilLayouts; }
 
     /// 소유하고 등록한다. 놓을 때 vkDestroy 까지 한다.
     RHITextureHandle AddImage(const VulkanImageEntry& entry)
@@ -149,6 +176,7 @@ public:
     VkImageView GetOrCreateCubeView(VkDevice device, RHITextureHandle handle,
         RHIFormat format, uint32_t baseMip, uint32_t mipLevels,
         uint32_t firstSlice = 0);
+    VkImageView GetOrCreateImageView(VkDevice device, const RHIBindingDesc& binding);
 
     /// 칸을 비우고 세대를 올린다. 소유한 칸이면 실물도 놓는다.
     ///
@@ -178,6 +206,7 @@ public:
 
   private:
     friend class VulkanRecordingResources;
+    bool m_separateDepthStencilLayouts{false};
     template<typename T>
     struct Slot
     {

@@ -68,6 +68,7 @@ public:
     void AbortFrame();
     bool EndFrame(std::string& outError);
     bool WaitForLastFrameSubmission(std::string& outError);
+    RHISubmissionTicket GetLastFrameSubmissionTicket() const;
     bool UsesOwnedQueueExecution() const;
     uint32_t GetQueueExecutionMode() const;
     // Producer-thread override, applied by the next BeginFrame without rebuilding
@@ -103,6 +104,10 @@ public:
     bool CreateDisplayTexture(uint32_t width, uint32_t height,
         RHITextureHandle& outTexture, DisplayToken& outToken,
         std::string& outError);
+    // Publish the joined producer fence receipt under displayLifetimeMutex.
+    // Stored metadata does not acquire the consumer lease; OpenGpuFrame does.
+    void SealDisplayFrame(DisplayToken token, const RHIDisplayFrameMetadata& metadata,
+        RHICompletionPoint completion, uint64_t observedCompletion);
     // Allocate once per display slot/generation, before recording graph copies.
     // Caller imports destinations as COPY_DEST and leaves that state after copy.
     bool CreateTemporalDisplayTextures(DisplayToken token, TemporalExtent renderExtent,

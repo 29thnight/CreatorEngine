@@ -35,6 +35,7 @@
     X(vkEnumerateDeviceExtensionProperties)   \
     X(vkGetPhysicalDeviceProperties)          \
     X(vkGetPhysicalDeviceProperties2)         \
+    X(vkGetPhysicalDeviceImageFormatProperties2) \
     X(vkGetPhysicalDeviceFeatures2)           \
     X(vkGetPhysicalDeviceMemoryProperties)    \
     X(vkGetPhysicalDeviceMemoryProperties2)   \
@@ -137,6 +138,7 @@
 
 // Optional device extensions must never become prerequisites for indexed rendering.
 #define VK_OPTIONAL_DEVICE_FUNCTIONS(X) \
+    X(vkGetMemoryWin32HandlePropertiesKHR) \
     X(vkCmdDrawMeshTasksEXT)            \
     X(vkCmdDrawMeshTasksIndirectEXT)
 

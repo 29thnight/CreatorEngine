@@ -1008,14 +1008,16 @@ namespace EnhancedSceneRenderer
     void SetGizmoIconTextures(
         own::shared_owner<const EnhancedGizmoIconTextures> textures);
 
-    /// Host가 파이프라인 조립 기여자를 설치한다(E4-2, §4.4). 파이프라인이
-    /// 설 때마다 UI 노드 뒤·live_present 앞에서 Contribute가 불린다.
+    /// Host 기여자 목록을 교체한다. 각 기여자는 AfterOpaque,
+    /// BeforePostProcess, BeforePresent 중 하나의 지점을 선언한다.
     /// 조립은 RenderThread에서 일어나므로 Editor는 렌더러 초기화 전에
     /// 설치해야 첫 조립부터 실린다. Player는 설치하지 않는다.
     /// 해제({})는 이후 조립에만 영향을 준다 — 살아 있는 파이프라인의 기여
     /// 노드는 기여자가 아니라 자기 패스 묶음을 붙들므로 안전하다.
     void SetRenderFeatureContributor(
         own::shared_owner<IRenderFeatureContributor> contributor);
+    bool AddRenderFeatureContributor(own::shared_owner<IRenderFeatureContributor> contributor, std::string& outError);
+    bool RemoveRenderFeatureContributor(std::string_view name);
 
     /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
     /// GetLiveDisplayTexture의 ID 해석이 이 sink를 소비한다 — Core는

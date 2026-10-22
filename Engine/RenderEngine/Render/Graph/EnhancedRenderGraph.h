@@ -151,6 +151,15 @@ struct RGBufferDesc
     std::string name;
 };
 
+// Declaration-time metadata; this never allocates or retains a native resource.
+struct RGResourceDescription
+{
+    RGResourceKind kind{RGResourceKind::Texture};
+    RHIFormat format{RHIFormat::Unknown};
+    uint32_t width{}, height{}, arraySize{};
+    uint64_t bytes{};
+};
+
 // transient 리소스 풀 (PHASE 3-9, 상시 러너의 프레임당 생성 비용 제거).
 //
 // 그래프는 프레임마다 새로 만들어지는데 transient도 매번 CreateCommittedResource로
@@ -313,6 +322,9 @@ public:
     struct Stats
     {
         bool structuralScheduleReused{false}; // Declarations/DAG/lifetimes reused; native state/barrier/allocation plans remain per frame.
+        bool programBindingReused{false};     // Exact streamed bindings admitted the immutable program before Compile.
+        uint32_t programUsageCopiesAvoided{
+            0}; // Usage records bound from retained storage instead of copied into the frame arena.
         uint32_t passesDeclared{ 0 };
         uint32_t passesCulled{ 0 };
         uint32_t passesExecuted{ 0 };
@@ -435,12 +447,18 @@ public:
     void SetTransientAliasing(bool enabled, bool extendLifetimes = false)
     {
         RequireQueueIdle();
+        InvalidateProgramBinding();
         m_aliasing = enabled;
         m_extendLifetimes = extendLifetimes;
     }
     // Diagnostic only: placed RT/DS targets and float-view-compatible UAV buffers.
     // Other placed kinds fail Compile rather than silently remain unpoisoned.
-    void SetPlacedTransientPoison(bool enabled) { m_poison = enabled; }
+    void SetPlacedTransientPoison(bool enabled)
+    {
+        RequireQueueIdle();
+        InvalidateProgramBinding();
+        m_poison = enabled;
+    }
 
     /// 디바이스 서비스는 필수다 — 인코더가 이것 없이는 아무것도 못 건다.
     ///
@@ -479,6 +497,7 @@ public:
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
     RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
     RGHandle FindImportedTexture(RHITextureHandle texture) const;
+    bool DescribeResource(RGHandle handle, RGResourceDescription& description) const;
     // Declaration-time validation against real pass usages, not a second stage registry.
     // Any version of this physical graph resource written by this producer matches.
     bool HasDeclaredWriter(RGHandle resource, std::string_view producer) const;
@@ -530,6 +549,8 @@ public:
         RGHandle        handle;
         RHIResourceState state{ RHIResourceState::Common };
         RGAccessMode access{ RGAccessMode::LegacyState };
+        RHITextureSubresourceRange textureRange{};
+        RHIBufferSubresourceRange bufferRange{};
     };
 
     // Every usage payload is copied once into the graph's non-pmr frame arena.
@@ -619,6 +640,7 @@ public:
     ///   이미 들고 있으므로 호출부가 같은 값을 도로 넘기지 않는다.
     bool Compile(std::string& outError);
     struct StructuralSchedule;
+    class GraphProgram;
     static constexpr size_t MaxStructuralSchedules = 8;
     // Source must be a frozen submitted graph; immutable CPU metadata is shared.
     void InheritStructuralSchedule(const EnhancedRenderGraph& previous);
@@ -627,6 +649,44 @@ public:
         const own::shared_owner<const StructuralSchedule>& alternate);
     void InheritStructuralSchedule(std::span<const own::shared_owner<const StructuralSchedule>> schedules);
     own::shared_owner<const StructuralSchedule> SnapshotStructuralSchedule() const;
+
+    // The program owns only validated logical declarations and scheduling data.
+    // Current imports, callbacks and their lifetime owner belong to FrameBindings.
+    struct ResourceBinding
+    {
+        RHITextureHandle texture;
+        RHIBufferHandle buffer;
+        RHIResourceState initialState{RHIResourceState::Common};
+        RHIResourceState* stateWriteback{nullptr};
+    };
+    struct PassBinding
+    {
+        ExecuteCallback execute;
+        SplitExecuteCallback splitExecute;
+        RepeatedExecuteCallback repeatedExecute;
+        uint32_t recordCost{0};
+    };
+    struct FrameBindings
+    {
+        // Caller-owned reusable vectors indexed by the program's logical slots.
+        // Transient resource slots contain empty ResourceBindings.
+        ce::lifetime_token owner;
+        std::vector<ResourceBinding> resources;
+        std::vector<PassBinding> passes;
+    };
+    own::shared_owner<const GraphProgram> SnapshotProgram() const;
+    void InheritProgram(const own::shared_owner<const GraphProgram>& program);
+    // Streaming migration path: existing Declare bodies provide new frame
+    // callbacks and imports. Equal usage lists reuse retained program storage.
+    // A shape change falls through to a full Compile in the same frame.
+    void BeginProgramBinding();
+    bool IsProgramBindingOpen() const { return m_programBindingOpen; }
+    bool FinishProgramBinding(std::string& outError);
+    // Direct path for features with immutable per-view packets; no Declare runs.
+    // Bind into a Reset graph and call Compile to specialize native state.
+    bool BindProgram(const own::shared_owner<const GraphProgram>& program, const FrameBindings& bindings,
+                     std::string& outError);
+    RGHandle RebindProgramHandle(RGHandle logical) const;
 
     struct QueueHint
     {
@@ -668,8 +728,8 @@ public:
     // minimumGpuNanoseconds is the per-pass measured time a compute candidate needs.
     // Overlap placement may reorder compatible same-queue immutable reads.
     // Writers and state/ownership changes join every reader, not the last declared
-    // reader. Cross-queue reads remain ordered until a backend shared-state contract
-    // exists; in particular graphics SRV and compute SRV are not the same DX12 state.
+    // reader. Cross-queue reads remain ordered unless the backend and resource
+    // support the explicit shared texture state established by graphics fanout/fanin.
     bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
         const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
         QueueSchedule& output, std::string& outError) const;
@@ -689,6 +749,7 @@ public:
     void SetMeasurementDomain(RGMeasurementDomain domain)
     {
         RequireQueueIdle();
+        InvalidateProgramBinding();
         m_measurementDomain = domain;
         m_queueDiagnostics.measurementDomain = domain;
     }
@@ -718,6 +779,7 @@ public:
         double submissionMilliseconds{0.0}; // Includes CPU submission-ticket waits, not GPU completion waits.
         double totalMilliseconds{0.0}; // Entire SubmitQueues call, including failed attempts.
         RHITimelinePoint completion; // Graphics epilogue joins both queues.
+        RHICompletionSet retirement; // Accepted terminal point on every queue, including partial submissions.
         RHICommandFailure failure; // Immutable diagnostic result after SubmitQueues returns.
         uint32_t plannedBatches{0}, plannedComputeBatches{0}, plannedWaits{0};
         uint32_t submittedBatches{0}, computeBatches{0}, submittedWaits{0};
@@ -776,7 +838,17 @@ public:
 
     // Explicit diagnostic copy only. It owns no GPU objects and never drives execution.
     // Legacy inference and explicit versioned accesses remain distinguishable.
-    struct DiagnosticUsage { uint32_t resource; RHIResourceState state; bool inferredWrite; RGAccessMode access{RGAccessMode::LegacyState}; uint16_t version{0}; RGResourceKind kind{RGResourceKind::Texture}; };
+    struct DiagnosticUsage
+    {
+        uint32_t resource;
+        RHIResourceState state;
+        bool inferredWrite;
+        RGAccessMode access{RGAccessMode::LegacyState};
+        uint16_t version{0};
+        RGResourceKind kind{RGResourceKind::Texture};
+        RHITextureSubresourceRange textureRange{};
+        RHIBufferSubresourceRange bufferRange{};
+    };
     struct DiagnosticBarrier
     {
         uint32_t resource;
@@ -784,6 +856,8 @@ public:
         bool uav;
         bool afterPass{false};
         bool aliasing{false};
+        RHITextureSubresourceRange textureRange{};
+        RHIBufferSubresourceRange bufferRange{};
     };
     struct DiagnosticPass
     {
@@ -1104,17 +1178,41 @@ private:
     void ReleaseResources();
     bool CheckDeclarationCapacity(std::size_t count, uint16_t limit, const char* kind, std::string_view name);
     bool BuildOrder(std::string& outError);
+    struct ResourceRangeSchema
+    {
+        RHITextureInfo texture;
+        RHIBufferInfo buffer;
+    };
+    struct SubresourceCell
+    {
+        RHITextureSubresourceRange texture;
+        RHIBufferSubresourceRange buffer;
+        RHIResourceState state{RHIResourceState::Common};
+        bool previousWrite{true};
+        uint16_t atomicVersion{RGHandle::kInvalid};
+    };
+    std::vector<ResourceRangeSchema> m_rangeSchemas;
+    bool m_hasSubresourceUsages{false};
+    bool ValidateSubresources(std::string& outError);
+    bool BuildSubresourceDependencies(std::string& outError);
+    std::vector<SubresourceCell> BuildSubresourceCells(uint16_t resource, bool states) const;
+    bool CoversSubresource(uint16_t resource, const RGPassUsage& usage, const SubresourceCell& cell, bool states) const;
+    void PlanSubresourceBarriers(const ce::dynamic_bitset* batchEnds, PhaseBarrierPlan* prologue,
+                                 PhaseBarrierPlan* epilogue);
     void CullPasses();
     /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
     bool CreateAliasedTransients(std::string& outError);
+    bool ResourcesHappenBefore(uint16_t before, uint16_t after) const;
+    bool CanShareTextureReads(uint16_t resource) const;
     RHITransientResourceDesc TransientDescription(const Resource& resource) const;
     // Queue execution specializes the same planner at submission boundaries.
     // Pass states persist inside each batch; boundary plans use COMMON.
-    void PlanBarriers(const ce::dynamic_bitset* batchEnds = nullptr,
-        PhaseBarrierPlan* prologue = nullptr, PhaseBarrierPlan* epilogue = nullptr,
-        const ce::dynamic_bitset* retainedGraphicsTextures = nullptr);
+    void PlanBarriers(const ce::dynamic_bitset* batchEnds = nullptr, PhaseBarrierPlan* prologue = nullptr,
+                      PhaseBarrierPlan* epilogue = nullptr,
+                      const ce::dynamic_bitset* retainedGraphicsTextures = nullptr,
+                      const ce::dynamic_bitset* sharedReadTextures = nullptr);
     bool ValidateFinalStates(std::string& outError) const;
     bool ValidateRepeatedPasses(std::string& outError) const;
     void PlanRepeatedBarriers(Pass& pass, ce::dynamic_bitset& previousWrite);
@@ -1141,6 +1239,8 @@ private:
     uint32_t m_declarationPacketJobs{};
     bool m_collectingDeclarationPackets{};
     bool m_cancelledDeclarationPackets{};
+    // Declared before resources/callbacks so it is destroyed after both.
+    ce::lifetime_token m_frameBindingsOwner;
     ce::render_vector<Resource> m_resourceStorage;
     std::span<Resource> m_resources;
     // Declaration-local indices. Reset removes every entry, and generation bits
@@ -1181,6 +1281,8 @@ private:
     // Queue assignment is part of state compatibility. Whole-resource access is
     // conservative for all subresources until declarations expose a narrower range.
     struct QueuePlanningScratch;
+    mutable own::unique_owner<QueuePlanningScratch> m_queuePlanningScratch;
+    mutable std::mutex m_queuePlanningMutex;
     void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
         std::vector<std::vector<uint16_t>>& predecessors,
         std::vector<std::vector<uint16_t>>& successors) const;
@@ -1217,6 +1319,7 @@ public:
         {
             RGTextureDesc texture;
             RGBufferDesc buffer;
+            ResourceRangeSchema importedSchema;
             std::string name;
             bool imported{false}, bufferKind{false}, firstImport{true};
             std::vector<Resource::Version> versions;
@@ -1248,11 +1351,36 @@ public:
         ce::dynamic_bitset culled;
         std::vector<DiagnosticSnapshot::VersionEdge> edges;
     };
+    class GraphProgram
+    {
+      public:
+        size_t ResourceCount() const { return m_schedule->resources.size(); }
+        size_t PassCount() const { return m_schedule->passes.size(); }
+        RGHandle ResourceHandle(uint16_t index, uint16_t version) const;
+
+      private:
+        friend class EnhancedRenderGraph;
+        own::shared_owner<const StructuralSchedule> m_schedule;
+        std::vector<size_t> m_usageOffsets;
+        std::vector<RGPassUsage> m_usages;
+    };
+
 private:
     own::shared_owner<const StructuralSchedule> m_structuralSchedule;
     own::shared_owner<const StructuralSchedule> m_alternateSchedule;
     std::array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules - 2> m_additionalSchedules;
     own::shared_owner<const StructuralSchedule> m_activeStructuralSchedule;
+    own::shared_owner<const GraphProgram> m_graphProgram;
+    own::shared_owner<const GraphProgram> m_bindingProgram;
+    // Storage is frame-local, retained across Reset, and never shared with a
+    // program or another in-flight graph. Epoch patching cannot mutate a program.
+    ce::render_vector<RGPassUsage> m_programUsages;
+    ce::dynamic_bitset m_programUsageMatches;
+    bool m_programBindingOpen{false}, m_programBindingValidated{false};
+    uint32_t m_programUsageCopiesAvoided{0};
+    void PrepareProgramBinding(const own::shared_owner<const GraphProgram>& program);
+    void PublishProgram();
+    void InvalidateProgramBinding() noexcept { m_programBindingValidated = false; }
     bool MatchesStructuralSchedule(const StructuralSchedule& schedule) const;
     void CaptureStructuralDeclarations(StructuralSchedule& schedule) const;
     const std::vector<int32_t>& DependencyWaves() const

@@ -488,6 +488,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     }
     m_memoryBudgetSupported = VkHasExtension(extensions,
         VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    m_externalMemoryWin32Supported = VkHasExtension(extensions, VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
     m_meshShaderExtensionSupported = VkHasExtension(extensions,
         VK_EXT_MESH_SHADER_EXTENSION_NAME);
     const bool hasRobustness2 = VkHasExtension(extensions,
@@ -550,6 +551,10 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     queueInfo.pQueuePriorities = &priority;
 
     std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    if (m_externalMemoryWin32Supported)
+    {
+        deviceExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+    }
     if (m_memoryBudgetSupported)
     {
         deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
@@ -596,6 +601,7 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     VkPhysicalDeviceVulkan12Features features12{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
     features12.timelineSemaphore = VK_TRUE;
+    features12.separateDepthStencilLayouts = available12.separateDepthStencilLayouts;
     // Fixed shader arrays are fully populated and immutable until completion.
     // Nonuniform indexing is optional and reported only after device creation.
     features12.shaderSampledImageArrayNonUniformIndexing =
@@ -728,6 +734,7 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     }
 
     m_indirectDrawCapabilities.indexedDraw = nullptr != vkCmdDrawIndexedIndirect;
+    m_resourceTable.SetSeparateDepthStencilLayouts(features12.separateDepthStencilLayouts == VK_TRUE);
     m_shaderArrayCapabilities.sampledImageNonUniformIndexing =
         VK_TRUE == features12.shaderSampledImageArrayNonUniformIndexing &&
         VK_TRUE == features2.features.shaderSampledImageArrayDynamicIndexing;
@@ -905,6 +912,7 @@ void VulkanDeviceResources::Shutdown()
     m_deviceIncarnation = 0;
     m_queueFamily = UINT32_MAX;
     m_memoryBudgetSupported = false;
+    m_externalMemoryWin32Supported = false;
     m_nullDescriptorSupported = false;
     m_meshShaderExtensionSupported = false;
     m_indirectDrawCapabilities = {};
