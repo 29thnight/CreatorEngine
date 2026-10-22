@@ -2634,6 +2634,7 @@ namespace
 
         void InvalidateDisplayResultsLocked()
         {
+            viewScheduler.Reset();
             {
                 std::lock_guard<std::mutex> lock(debugMutex);
                 graphSnapshots.fill({});
@@ -2857,10 +2858,30 @@ namespace
         // TimeSystem의 총 경과 초를 넘기는데, 여기서는 TickLive가 받는
         // 델타를 쌓는다(엔트리 계층에 역의존하지 않는다는 규약 그대로).
         float    totalSeconds{ 0.f };
-        // 카메라 순회 시작점 회전. 총 인플라이트 예산이 1만 남는 틱에서
-        // 항상 목록 앞(씬뷰)이 선점하면 게임뷰가 상대적으로 굶는다 —
-        // 큐가 FIFO라 완전한 기아는 없지만 편향 자체를 없앤다.
-        uint32_t viewRotation{ 0 };
+        LiveViewScheduler viewScheduler;
+
+        std::array<LiveViewScheduleRequest, LiveViewScheduler::Capacity> ViewScheduleRequests(
+            const EnhancedLiveFramePacket& frame, bool includeDiagnosticRequests = false)
+        {
+            std::array<LiveViewScheduleRequest, LiveViewScheduler::Capacity> requests{};
+            const uint32_t count = (std::min)(frame.viewCount, kEnhancedMaxLiveCameraViews);
+            for (uint32_t index = 0; index < count; ++index)
+            {
+                const auto& view = frame.views[index];
+                auto& request = requests[index];
+                request.viewId = view.key.viewId;
+                request.historyRevision = view.key.historyRevision;
+                request.sceneEpoch = frame.sceneEpoch;
+                request.resizeGeneration = frame.resizeGeneration;
+                request.contentRevision = view.contentRevision;
+                request.cameraCutRevision = view.camera.cameraCutRevision;
+                request.policy = view.updatePolicy;
+                request.target = DisplayTargetIndex(view.displayTarget);
+                request.force = controlledCaptureFrame || frame.temporalFixture.IsValid() ||
+                    (includeDiagnosticRequests && HasGraphSnapshotRequest(view.displayTarget));
+            }
+            return requests;
+        }
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
 
@@ -8386,23 +8407,25 @@ namespace
                                     return renderThreadStopRequested;
                                 });
                         }
-                        // 보통의 Editor + Game 두 뷰가 쓸 공용 credit을 먼저 확보한 뒤
-                        // 같은 입력을 확정한다. 이 보수적인 묶음 승인은 GPU 작업의
-                        // 겹침을 줄일 수 있고, 모든 뷰의 표시 슬롯 확보를 보장하지 않는다.
+                        // 한 뷰가 진행할 credit만 있으면 최신 입력을 확정한다.
+                        // 실제 뷰 선택은 각각의 주기·우선순위·표시 lease로 결정한다.
                         const auto& waitingFrame = renderQueue.front().frame;
                         uint32_t requiredCredits = 0;
                         if (!waitingFrame.sceneLoading && waitingFrame.width != 0 && waitingFrame.height != 0)
                         {
                             const uint32_t viewCount = (std::min)(waitingFrame.viewCount, kEnhancedMaxLiveCameraViews);
-                            for (uint32_t i = 0; i < viewCount && requiredCredits < 2; ++i)
+                            const auto requests = ViewScheduleRequests(waitingFrame);
+                            const auto now = capture_steady_nanoseconds();
+                            for (uint32_t i = 0; i < viewCount; ++i)
                             {
-                                if (waitingFrame.views[i].key.IsValid())
+                                if (viewScheduler.IsDue(requests[i], now))
                                 {
-                                    ++requiredCredits;
+                                    requiredCredits = 1;
+                                    break;
                                 }
                             }
                         }
-                        if (requiredCredits != 0 && pendingGpu + requiredCredits > 2 && !renderThreadStopRequested)
+                        if (requiredCredits != 0 && !LiveViewScheduler::HasGpuCredit(pendingGpu) && !renderThreadStopRequested)
                         {
                             ++renderGpuAdmissionWaits;
                             // 가장 오래된 제출의 펜스 완료가 깨운다. 새 발행이 깨워도
@@ -9144,6 +9167,8 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         view.viewFlags = views[i].viewFlags;
         view.materialPreview = views[i].materialPreview;
         view.materialPreviewFloor = views[i].materialPreviewFloor;
+        view.updatePolicy = views[i].updatePolicy;
+        view.contentRevision = views[i].contentRevision;
         if (view.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview)
         {
             view.camera = MaterialPreviewCamera(frame.width, frame.height);
@@ -9692,6 +9717,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     {
         return;
     }
+    const auto viewScheduleRequests = state.ViewScheduleRequests(frame, true);
+    const auto viewPlan = state.viewScheduler.BuildPlan(
+        viewScheduleRequests, cameraCount, capture_steady_nanoseconds());
     struct GeometrySourceGuard final
     {
         LiveState& state;
@@ -9784,16 +9812,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         LiveStopwatch watch;
         watch.Start();
         bool renderedAny = false;
-        const uint32_t startIndex = state.viewRotation++ % cameraCount;
-
-        for (uint32_t step = 0; step < cameraCount; ++step)
+        for (uint32_t step = 0; step < viewPlan.count; ++step)
         {
-            const EnhancedLiveViewPacket& viewPacket =
-                frame.views[(startIndex + step) % cameraCount];
+            const uint32_t packetViewIndex = viewPlan.order[step];
+            const EnhancedLiveViewPacket& viewPacket = frame.views[packetViewIndex];
             if (!viewPacket.key.IsValid()) continue;
             if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
                 continue;
-            if (totalPending >= 2)
+            if (!LiveViewScheduler::HasGpuCredit(totalPending))
             {
                 ++state.framesInFlight;
                 continue;
@@ -9805,10 +9831,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 ++state.viewOverflowSkips;
                 continue;
             }
-            if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
-                p.views[viewIndex].ready && p.views[viewIndex].previewComplete &&
-                p.views[viewIndex].completedSceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame &&
-                !state.HasGraphSnapshotRequest(viewPacket.displayTarget))
+            if (!viewPlan.due[packetViewIndex])
             {
                 continue;
             }
@@ -9932,6 +9955,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
             state.consecutiveFrameFailures = 0;
             state.RecordSceneAdmission(frame);
+            if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview ||
+                (p.graphInput && !p.graphInput->Draws().empty() &&
+                    (!viewPacket.materialPreview || p.graphInput->Draws()[0].material->representationId ==
+                        viewPacket.materialPreview->instance->representationId)))
+            {
+                state.viewScheduler.MarkSubmitted(viewScheduleRequests[packetViewIndex], capture_steady_nanoseconds());
+            }
             // W8: 인코더가 버린 명령을 프레임마다 비우며 모은다. 성공한 프레임에
             // 쌓이는 것이 특히 중요하다 — 실패 경로는 이미 소리를 내지만 이쪽은
             // "그려졌다"고 보고되면서 물체가 빠진 경우다.
@@ -10076,18 +10106,15 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // 하면 뷰1의 기록 입력이 뷰2 밀봉으로 재구성되어 무효가 된다.
     uint32_t consideredViews = 0;
     uint32_t leaseSkippedViews = 0;
-    const uint32_t startIndex = state.viewRotation++ % cameraCount;
-    for (uint32_t step = 0; step < cameraCount; ++step)
+    for (uint32_t step = 0; step < viewPlan.count; ++step)
     {
-        const uint32_t packetViewIndex = (startIndex + step) % cameraCount;
+        const uint32_t packetViewIndex = viewPlan.order[step];
         const EnhancedLiveViewPacket& viewPacket = frame.views[packetViewIndex];
         if (!viewPacket.key.IsValid()) continue;
         // The diagnostic clock must not enter another camera's temporal history.
         if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
             continue;
-        ++consideredViews;
-
-        if (totalPending >= 2)
+        if (!LiveViewScheduler::HasGpuCredit(static_cast<uint32_t>(totalPending)))
         {
             ++state.framesInFlight;
             continue;
@@ -10153,8 +10180,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
         if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
             view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete &&
-            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame &&
-            !state.HasGraphSnapshotRequest(viewPacket.displayTarget))
+            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !viewPlan.due[packetViewIndex])
         {
             // Reopening a hidden preview reuses its completed image. The public
             // demand snapshot was cleared while hidden, so publish it again.
@@ -10166,6 +10192,11 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 cached.sourceCaptureNanoseconds, cached.completedAgeMs);
             continue;
         }
+        if (!viewPlan.due[packetViewIndex])
+        {
+            continue;
+        }
+        ++consideredViews;
         int renderSlot = -1;
         {
             // OpenDisplayTexture도 같은 잠금 아래 소비자 lease를 등록한다.
@@ -10325,6 +10356,11 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
         state.consecutiveFrameFailures = 0;
         state.RecordSceneAdmission(frame);
+        if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview ||
+            view->slots[renderSlot].previewComplete)
+        {
+            state.viewScheduler.MarkSubmitted(viewScheduleRequests[packetViewIndex], capture_steady_nanoseconds());
+        }
         ++totalPending;
         state.gpuMaxPendingSubmissions = (std::max)(
             state.gpuMaxPendingSubmissions, static_cast<uint32_t>(totalPending));
