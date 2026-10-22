@@ -4403,14 +4403,17 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     }
 
     // Device/storage validity is not structural: validate even when reusing a DAG.
-    for (const auto& resource : m_resources)
+    for (size_t resourceIndex = 0; resourceIndex < m_resources.size(); ++resourceIndex)
     {
+        const auto& resource = m_resources[resourceIndex];
         if (!resource.imported)
         {
             continue;
         }
-        const bool live = resource.IsBuffer() ? m_deviceServices->DescribeBuffer(resource.buffer).IsValid()
-                                              : m_deviceServices->DescribeTexture(resource.handle).IsValid();
+        const auto nativeTexture =
+            resource.IsBuffer() ? RHITextureInfo{} : m_deviceServices->DescribeTexture(resource.handle);
+        const bool live =
+            resource.IsBuffer() ? m_deviceServices->DescribeBuffer(resource.buffer).IsValid() : nativeTexture.IsValid();
         const auto state = resource.state;
         const bool kindState =
             resource.IsBuffer()
@@ -4423,6 +4426,43 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
         {
             outError = "RenderGraph has a stale native import or incompatible initial state: " + resource.name;
             return false;
+        }
+        const bool external = state == RHIResourceState::ExternalShared ||
+                              std::ranges::any_of(m_finalStateRequirements,
+                                                  [&](const auto& requirement)
+                                                  {
+                                                      return requirement.handle.index == resourceIndex &&
+                                                             requirement.state == RHIResourceState::ExternalShared;
+                                                  });
+        if (external)
+        {
+            if (m_scheduling != RGSchedulingMode::ExplicitVersioned || resource.IsBuffer() || nativeTexture.is3D ||
+                nativeTexture.mipLevels != 1 || nativeTexture.depthOrArraySize != 1 ||
+                RHITextureAspects(nativeTexture.format) != RHITextureAspect::Color)
+            {
+                outError = "External presentation storage requires a versioned single color image: " + resource.name;
+                return false;
+            }
+            for (const auto& pass : m_passes)
+            {
+                for (const auto& usage : pass.usages)
+                {
+                    if (usage.handle.index != resourceIndex)
+                    {
+                        continue;
+                    }
+                    RHITextureSubresourceRange range;
+                    if (usage.access != RGAccessMode::Write || usage.state != RHIResourceState::CopyDest ||
+                        usage.bufferRange != RHIBufferSubresourceRange{} ||
+                        !ResolveRHITextureSubresourceRange(usage.textureRange, 1, 1, RHITextureAspect::Color, range) ||
+                        !IsWholeRHITextureRange(range, 1, 1, RHITextureAspect::Color) || pass.repeated)
+                    {
+                        outError = "External presentation storage must be fully overwritten by a CopyDest Write: " +
+                                   resource.name;
+                        return false;
+                    }
+                }
+            }
         }
     }
     if (!ValidateSubresources(outError))
@@ -4772,6 +4812,12 @@ bool EnhancedRenderGraph::IsComputeStateCompatible(uint16_t passIndex) const
     {
         for (const auto& usage : usages)
         {
+            if (usage.handle.index < m_resources.size() &&
+                (m_resources[usage.handle.index].initialState == RHIResourceState::ExternalShared ||
+                 m_resources[usage.handle.index].state == RHIResourceState::ExternalShared))
+            {
+                return false; // External acquire/release belongs to the graphics presentation owner.
+            }
             // Placed objects retain their individual native state across leases.
             // Compute lists cannot transition from a graphics-only initial state.
             if (usage.handle.index < m_resources.size() && m_resources[usage.handle.index].aliasGroup != UINT32_MAX &&

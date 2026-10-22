@@ -1068,6 +1068,77 @@ namespace ConsoleCmd
         data.Set("executeOrder", indices(snapshot->executeOrder));
         data.Set("waves", indices(snapshot->dependencyWaves));
         data.Set("criticalPath", indices(snapshot->criticalPath));
+        // -1 preserves the RHI "all remaining" sentinel without narrowing a
+        // UINT64_MAX buffer size into an ambiguous signed byte count.
+        const auto textureRange = [](const RHITextureSubresourceRange& range)
+        {
+            auto value = CommandData::Object();
+            value.Set("firstMip", CommandData::Int(range.firstMip));
+            value.Set("mipCount",
+                      CommandData::Int(range.mipCount == UINT32_MAX ? int64_t(-1) : int64_t(range.mipCount)));
+            value.Set("firstLayer", CommandData::Int(range.firstLayer));
+            value.Set("layerCount",
+                      CommandData::Int(range.layerCount == UINT32_MAX ? int64_t(-1) : int64_t(range.layerCount)));
+            value.Set("aspect", CommandData::Int(static_cast<int>(range.aspect)));
+            return value;
+        };
+        const auto bufferRange = [](const RHIBufferSubresourceRange& range)
+        {
+            auto value = CommandData::Object();
+            value.Set("offset", CommandData::Int(range.offset));
+            value.Set("size", CommandData::Int(range.size == UINT64_MAX ? int64_t(-1) : int64_t(range.size)));
+            return value;
+        };
+        const auto usageData = [&](const auto& source)
+        {
+            auto usages = CommandData::Array();
+            for (const auto& usage : source)
+            {
+                auto item = CommandData::Object();
+                item.Set("resource", CommandData::Int(usage.resource));
+                item.Set("version", CommandData::Int(usage.version));
+                item.Set("access", CommandData::Int(static_cast<int>(usage.access)));
+                item.Set("state", CommandData::Int(static_cast<int>(usage.state)));
+                if (usage.kind == RGResourceKind::Buffer)
+                {
+                    item.Set("bufferRange", bufferRange(usage.bufferRange));
+                }
+                else
+                {
+                    item.Set("textureRange", textureRange(usage.textureRange));
+                }
+                usages.Append(std::move(item));
+            }
+            return usages;
+        };
+        const auto barrierData = [&](const auto& source)
+        {
+            auto barriers = CommandData::Array();
+            for (const auto& barrier : source)
+            {
+                auto item = CommandData::Object();
+                item.Set("resource", CommandData::Int(barrier.resource));
+                item.Set("before", CommandData::Int(static_cast<int>(barrier.before)));
+                item.Set("after", CommandData::Int(static_cast<int>(barrier.after)));
+                item.Set("uav", CommandData::Bool(barrier.uav));
+                item.Set("afterPass", CommandData::Bool(barrier.afterPass));
+                item.Set("aliasing", CommandData::Bool(barrier.aliasing));
+                if (barrier.resource < snapshot->resources.size())
+                {
+                    if (snapshot->resources[barrier.resource].buffer)
+                    {
+                        item.Set("bufferRange", bufferRange(barrier.bufferRange));
+                    }
+                    else
+                    {
+                        item.Set("textureRange", textureRange(barrier.textureRange));
+                    }
+                }
+                barriers.Append(std::move(item));
+            }
+            return barriers;
+        };
+        data.Set("subresourceRangeRemaining", CommandData::Int(-1));
         auto passes = CommandData::Array();
         for (const auto& pass : snapshot->passes)
         {
@@ -1077,30 +1148,20 @@ namespace ConsoleCmd
             row.Set("compiled", CommandData::Int(pass.compiledIndex));
             row.Set("culled", CommandData::Bool(pass.culled));
             row.Set("sideEffect", CommandData::Bool(pass.sideEffect));
-            auto usages = CommandData::Array();
-            for (const auto& usage : pass.usages)
+            row.Set("usages", usageData(pass.usages));
+            row.Set("barriers", barrierData(pass.barriers));
+            row.Set("repeatCount", CommandData::Int(pass.repeatCount));
+            auto phases = CommandData::Array();
+            for (const auto& phase : pass.phases)
             {
                 auto item = CommandData::Object();
-                item.Set("resource", CommandData::Int(usage.resource));
-                item.Set("version", CommandData::Int(usage.version));
-                item.Set("access", CommandData::Int(static_cast<int>(usage.access)));
-                item.Set("state", CommandData::Int(static_cast<int>(usage.state)));
-                usages.Append(std::move(item));
+                item.Set("name", CommandData::String(phase.name));
+                item.Set("usages", usageData(phase.usages));
+                item.Set("firstBarriers", barrierData(phase.firstBarriers));
+                item.Set("repeatBarriers", barrierData(phase.repeatBarriers));
+                phases.Append(std::move(item));
             }
-            row.Set("usages", std::move(usages));
-            auto barriers = CommandData::Array();
-            for (const auto& barrier : pass.barriers)
-            {
-                auto item = CommandData::Object();
-                item.Set("resource", CommandData::Int(barrier.resource));
-                item.Set("before", CommandData::Int(static_cast<int>(barrier.before)));
-                item.Set("after", CommandData::Int(static_cast<int>(barrier.after)));
-                item.Set("uav", CommandData::Bool(barrier.uav));
-                item.Set("afterPass", CommandData::Bool(barrier.afterPass));
-                item.Set("aliasing", CommandData::Bool(barrier.aliasing));
-                barriers.Append(std::move(item));
-            }
-            row.Set("barriers", std::move(barriers));
+            row.Set("phases", std::move(phases));
             passes.Append(std::move(row));
         }
         data.Set("passes", std::move(passes));

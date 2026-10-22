@@ -1891,16 +1891,17 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = entry.image;
-        barrier.subresourceRange = ToVulkanSubresourceRange(transition.range, entry.mipLevels,
-            entry.is3D ? 1u : entry.depthOrArraySize, entry.format, m_resourceTable.SupportsSeparateDepthStencilLayouts());
+        barrier.subresourceRange =
+            ToVulkanSubresourceRange(transition.range, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                     entry.format, m_resourceTable.SupportsSeparateDepthStencilLayouts());
         ApplyVulkanExternalImageOwnership(transition, entry.externalShared, entry.queueFamily, barrier);
 
         barriers.push_back(barrier);
         RHITextureSubresourceRange resolved;
-        ResolveRHITextureSubresourceRange(transition.range, entry.mipLevels,
-            entry.is3D ? 1u : entry.depthOrArraySize, RHITextureAspects(entry.format), resolved);
+        ResolveRHITextureSubresourceRange(transition.range, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                          RHITextureAspects(entry.format), resolved);
         if (IsWholeRHITextureRange(resolved, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
-                                  RHITextureAspects(entry.format)))
+                                   RHITextureAspects(entry.format)))
         {
             m_resourceTable.SetLayout(transition.texture, after.layout);
         }

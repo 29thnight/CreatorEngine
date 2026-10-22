@@ -91,6 +91,10 @@ namespace
         Require(std::ranges::any_of(snapshot.versionEdges, [&](const auto& edge)
                                     { return edge.producer == producer.index && edge.consumer == consumer.index; }),
                 "Read of an inherited range depends on its real reaching writer");
+        Require(snapshot.passes[producer.index].usages[0].textureRange == layer0 &&
+                    std::ranges::any_of(snapshot.passes[producer.index].barriers,
+                                        [](const auto& barrier) { return barrier.textureRange.layerCount == 1; }),
+                "Diagnostic snapshots preserve declared and lowered subresource ranges");
         services.encoder.Reset();
         Require(graph.Execute(error), error);
         Require(
@@ -383,6 +387,103 @@ namespace
         Require(!graph->Compile(error), "A partially submitted execution cannot be recompiled before Reset");
         graph->Reset();
     }
+
+    void CheckPreparationFailure()
+    {
+        using namespace ce::regression;
+        QueueServices services;
+        auto graphics = own::make_shared<PortableQueue>(RHIQueueIdentity{43, 1, RHIQueueKind::Graphics});
+        auto compute = own::make_shared<PortableQueue>(RHIQueueIdentity{43, 2, RHIQueueKind::Compute});
+        Graph::QueueEndpoint graphicsEndpoint{graphics}, computeEndpoint{compute};
+        PortableQueueRecorder recorder{services};
+        recorder.rejectPreparationAt = 1;
+        auto graph = own::make_shared<Graph>(services, RGSchedulingMode::ExplicitVersioned);
+        const auto pass = graph->AddPass("Pre-submit translation", {}, [](const auto&) {}, true);
+        graph->DeclareComputeCompatible(pass);
+        std::string error;
+        Require(graph->Compile(error), error);
+        int ownerDestroyed = 0;
+        Graph::QueueExecution execution;
+        Require(!graph->SubmitQueues(graph, recorder, graphicsEndpoint, &computeEndpoint, {{pass, true, 1000000}}, 1,
+                                     own::make_shared<Owner>(&ownerDestroyed), execution, error),
+                "Preparation rejection fails before submission begins");
+        Require(recorder.preparations == 2 && graphics->submissions == 0 && compute->submissions == 0 &&
+                    graphics->waits.empty() && compute->waits.empty() && !execution.submissionAttempted &&
+                    !execution.recoveryRequired && !execution.retirement.IsValid(),
+                "Every batch translation completes before the first native wait, signal or submit");
+        Require(execution.failure.stage == RHICommandFailureStage::Translation && !execution.failure.message.empty() &&
+                    ownerDestroyed == 1,
+                "Pre-native failure publishes translation diagnostics and releases unsubmitted ownership");
+        graph->Reset();
+    }
+
+    void CheckExternalPresentation()
+    {
+        using namespace ce::regression;
+        QueueServices services;
+        services.retainTextureStates = false;
+        services.subresourceCapabilities = {true, true, true};
+        RHITextureDesc descriptor{};
+        descriptor.width = descriptor.height = 16;
+        descriptor.format = RHIFormat::RGBA8Unorm;
+        RHITextureHandle native;
+        std::string error;
+        Require(services.CreateTexture(descriptor, native, error), error);
+        Graph invalid{services, RGSchedulingMode::ExplicitVersioned};
+        const auto unreadable = invalid.ImportTexture(native, RHIResourceState::ExternalShared, "External display");
+        invalid.AddPass(
+            "Discarded external input", {{unreadable, RHIResourceState::ShaderResource, RGAccessMode::Read}},
+            [](const auto&) {}, true);
+        Require(!invalid.Compile(error) && error.find("fully overwritten") != std::string::npos,
+                "External reacquisition cannot read contents discarded by the native ownership acquire");
+
+        for (const bool explicitRange : {false, true})
+        {
+            auto graphics = own::make_shared<PortableQueue>(RHIQueueIdentity{44, 1, RHIQueueKind::Graphics});
+            auto compute = own::make_shared<PortableQueue>(RHIQueueIdentity{44, 2, RHIQueueKind::Compute});
+            Graph::QueueEndpoint graphicsEndpoint{graphics}, computeEndpoint{compute};
+            PortableQueueRecorder recorder{services};
+            auto graph = own::make_shared<Graph>(services, RGSchedulingMode::ExplicitVersioned);
+            const auto output = graph->Write(graph->ImportTexture(native, RHIResourceState::ExternalShared, "Display"));
+            const auto range = explicitRange ? RHITextureSubresourceRange{0, 1, 0, 1} : RHITextureSubresourceRange{};
+            const auto present =
+                graph->AddPass("Full display copy", {{output, RHIResourceState::CopyDest, RGAccessMode::Write, range}},
+                               [](const auto&) {});
+            const auto work = graph->AddPass("Independent compute", {}, [](const auto&) {}, true);
+            graph->DeclareComputeCompatible(present);
+            graph->DeclareComputeCompatible(work);
+            graph->RequireImportedFinalState(output, RHIResourceState::ExternalShared);
+            Require(graph->Compile(error), error);
+            Graph::QueueExecution execution;
+            Require(graph->SubmitQueues(graph, recorder, graphicsEndpoint, &computeEndpoint,
+                                        {{present, true, 1000000}, {work, true, 1000000}}, 1, own::make_shared<int>(1),
+                                        execution, error),
+                    error);
+            Require(execution.computeBatches == 1, "External ownership operations stay on graphics");
+            size_t transitions = 0;
+            for (const auto& recorded : recorder.recorded)
+            {
+                for (const auto& transition : recorded->encoder.textureTransitions)
+                {
+                    if (transition.texture != native)
+                    {
+                        continue;
+                    }
+                    ++transitions;
+                    Require(recorded->queue.kind == RHIQueueKind::Graphics &&
+                                ((transition.before == RHIResourceState::ExternalShared &&
+                                  transition.after == RHIResourceState::CopyDest) ||
+                                 (transition.before == RHIResourceState::CopyDest &&
+                                  transition.after == RHIResourceState::ExternalShared)),
+                            "External acquire/release never passes through the generic COMMON queue handoff");
+                }
+            }
+            Require(transitions == 2, "Whole and range planners preserve direct external acquire/copy/release");
+            graphics->Complete();
+            compute->Complete();
+            graph->Reset();
+        }
+    }
 } // namespace
 
 int main()
@@ -495,6 +596,13 @@ int main()
         imported.Reset();
         services.ReleaseTexture(secondNative);
         Require(!imported.BindProgram(importedProgram, importedBindings, error), "Stale native import is rejected");
+        Graph stale{services, RGSchedulingMode::ExplicitVersioned};
+        const auto staleInput = stale.ImportTexture(secondNative, RHIResourceState::Common, "Released storage");
+        stale.AddPass(
+            "Read released", {{staleInput, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {},
+            true);
+        Require(!stale.Compile(error) && error.find("stale native import") != std::string::npos,
+                "A cold fallback cannot publish a program for stale native storage");
         texture.width = 32;
         Require(services.CreateTexture(texture, secondNative, error), error);
         importedBindings.resources[0].texture = secondNative;
@@ -511,6 +619,8 @@ int main()
         CheckSubresources(services);
         CheckQueues();
         CheckPartialSubmission();
+        CheckPreparationFailure();
+        CheckExternalPresentation();
         std::cout << "program bindings, ownership, partial-range hazards/barriers, shared reads and happens-before "
                      "async aliasing passed\n";
     }

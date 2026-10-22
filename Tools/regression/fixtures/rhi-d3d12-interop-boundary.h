@@ -45,11 +45,26 @@ enum D3D12_RESOURCE_STATES
     D3D12_RESOURCE_STATE_COPY_DEST = 1,
     D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE = 2
 };
-enum D3D12_TEXTURE_LAYOUT { D3D12_TEXTURE_LAYOUT_UNKNOWN };
-enum D3D12_HEAP_TYPE { D3D12_HEAP_TYPE_DEFAULT };
-enum D3D12_HEAP_FLAGS { D3D12_HEAP_FLAG_SHARED = 1 };
-enum D3D_FEATURE_LEVEL { D3D_FEATURE_LEVEL_11_0 };
-enum D3D12_RESOURCE_BARRIER_TYPE { D3D12_RESOURCE_BARRIER_TYPE_TRANSITION };
+enum D3D12_TEXTURE_LAYOUT
+{
+    D3D12_TEXTURE_LAYOUT_UNKNOWN
+};
+enum D3D12_HEAP_TYPE
+{
+    D3D12_HEAP_TYPE_DEFAULT
+};
+enum D3D12_HEAP_FLAGS
+{
+    D3D12_HEAP_FLAG_SHARED = 1
+};
+enum D3D_FEATURE_LEVEL
+{
+    D3D_FEATURE_LEVEL_11_0
+};
+enum D3D12_RESOURCE_BARRIER_TYPE
+{
+    D3D12_RESOURCE_BARRIER_TYPE_TRANSITION
+};
 constexpr uint32_t D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES = UINT32_MAX;
 struct D3D12_HEAP_PROPERTIES
 {
@@ -63,7 +78,10 @@ struct D3D12_RESOURCE_DESC
     uint32_t Height{};
     uint16_t DepthOrArraySize{}, MipLevels{};
     DXGI_FORMAT Format{};
-    struct { uint32_t Count{}, Quality{}; } SampleDesc;
+    struct
+    {
+        uint32_t Count{}, Quality{};
+    } SampleDesc;
     D3D12_TEXTURE_LAYOUT Layout{};
     D3D12_RESOURCE_FLAGS Flags{};
 };
@@ -82,10 +100,16 @@ namespace ce::interop_boundary
         ComObject() { ++liveObjects; }
         virtual ~ComObject() { --liveObjects; }
         void AddRef() { ++references; }
-        void Release() { if (--references == 0) delete this; }
+        void Release()
+        {
+            if (--references == 0)
+            {
+                delete this;
+            }
+        }
         int references{1};
     };
-}
+} // namespace ce::interop_boundary
 
 struct ID3D12Resource : ce::interop_boundary::ComObject
 {
@@ -102,12 +126,17 @@ struct D3D12_RESOURCE_BARRIER
         D3D12_RESOURCE_STATES StateBefore{}, StateAfter{};
     } Transition;
 };
-struct IDXGIAdapter1 : ce::interop_boundary::ComObject {};
+struct IDXGIAdapter1 : ce::interop_boundary::ComObject
+{
+};
 struct IDXGIFactory4 : ce::interop_boundary::ComObject
 {
     HRESULT EnumAdapterByLuid(LUID, int, void** result)
     {
-        if (ce::interop_boundary::failStep == 2) return E_FAIL;
+        if (ce::interop_boundary::failStep == 2)
+        {
+            return E_FAIL;
+        }
         *result = new IDXGIAdapter1;
         return S_OK;
     }
@@ -115,13 +144,17 @@ struct IDXGIFactory4 : ce::interop_boundary::ComObject
 struct ID3D12Device : ce::interop_boundary::ComObject
 {
     HRESULT CreateCommittedResource(const D3D12_HEAP_PROPERTIES* heap, D3D12_HEAP_FLAGS,
-        const D3D12_RESOURCE_DESC* description, D3D12_RESOURCE_STATES initial, const void*, int, void** result)
+                                    const D3D12_RESOURCE_DESC* description, D3D12_RESOURCE_STATES initial, const void*,
+                                    int, void** result)
     {
         using namespace ce::interop_boundary;
         resourceHeap = *heap;
         resourceDescription = *description;
         resourceInitialState = initial;
-        if (failStep == 4) return E_FAIL;
+        if (failStep == 4)
+        {
+            return E_FAIL;
+        }
         auto* resource = new ID3D12Resource;
         resource->description = *description;
         *result = resource;
@@ -129,7 +162,10 @@ struct ID3D12Device : ce::interop_boundary::ComObject
     }
     HRESULT CreateSharedHandle(ID3D12Resource*, const SECURITY_ATTRIBUTES*, uint32_t, const wchar_t*, HANDLE* result)
     {
-        if (ce::interop_boundary::failStep == 5) return E_FAIL;
+        if (ce::interop_boundary::failStep == 5)
+        {
+            return E_FAIL;
+        }
         *result = new uint32_t(1);
         ++ce::interop_boundary::liveHandles;
         return S_OK;
@@ -137,13 +173,19 @@ struct ID3D12Device : ce::interop_boundary::ComObject
 };
 inline HRESULT CreateDXGIFactory1(int, void** result)
 {
-    if (ce::interop_boundary::failStep == 1) return E_FAIL;
+    if (ce::interop_boundary::failStep == 1)
+    {
+        return E_FAIL;
+    }
     *result = new IDXGIFactory4;
     return S_OK;
 }
 inline HRESULT D3D12CreateDevice(IDXGIAdapter1*, D3D_FEATURE_LEVEL, int, void** result)
 {
-    if (ce::interop_boundary::failStep == 3) return E_FAIL;
+    if (ce::interop_boundary::failStep == 3)
+    {
+        return E_FAIL;
+    }
     *result = new ID3D12Device;
     return S_OK;
 }
@@ -159,10 +201,22 @@ namespace Microsoft::WRL
     template<class T>
     class ComPtr
     {
-    public:
+      public:
         ComPtr() = default;
-        ~ComPtr() { if (m_pointer) m_pointer->Release(); }
-        ComPtr(const ComPtr& other) : m_pointer(other.m_pointer) { if (m_pointer) m_pointer->AddRef(); }
+        ~ComPtr()
+        {
+            if (m_pointer)
+            {
+                m_pointer->Release();
+            }
+        }
+        ComPtr(const ComPtr& other) : m_pointer(other.m_pointer)
+        {
+            if (m_pointer)
+            {
+                m_pointer->AddRef();
+            }
+        }
         ComPtr(ComPtr&& other) noexcept : m_pointer(std::exchange(other.m_pointer, nullptr)) {}
         ComPtr& operator=(const ComPtr& other)
         {
@@ -181,7 +235,7 @@ namespace Microsoft::WRL
         T** operator&() { return &m_pointer; }
         explicit operator bool() const { return m_pointer != nullptr; }
 
-    private:
+      private:
         T* m_pointer{};
     };
-}
+} // namespace Microsoft::WRL

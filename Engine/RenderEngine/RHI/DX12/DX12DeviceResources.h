@@ -507,7 +507,10 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
-    DX12BufferEntry DescribeNativeBuffer(RHIBufferHandle handle) const { return m_resourceTable.DescribeBuffer(handle); }
+    DX12BufferEntry DescribeNativeBuffer(RHIBufferHandle handle) const
+    {
+        return m_resourceTable.DescribeBuffer(handle);
+    }
 
     RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
     {

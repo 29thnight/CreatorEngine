@@ -78,7 +78,10 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
 
         ~DisplayTransport()
         {
-            if (sharedHandle) CloseHandle(sharedHandle);
+            if (sharedHandle)
+            {
+                CloseHandle(sharedHandle);
+            }
         }
     };
 
@@ -1078,9 +1081,13 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     static_assert(sizeof(adapter) == sizeof(transport.adapter.luid));
     std::memcpy(transport.adapter.luid.data(), &adapter, sizeof(adapter));
     transport.adapter.valid = true;
-    if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap,
-        D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COMMON,
-        nullptr, IID_PPV_ARGS(&transport.texture)); })))
+    if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource",
+                                 [&]
+                                 {
+                                     return impl.resources.GetDevice()->CreateCommittedResource(
+                                         &heap, D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                         IID_PPV_ARGS(&transport.texture));
+                                 })))
     {
         outError = "공유 텍스처 생성 실패";
         return false;
@@ -1093,8 +1100,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
         return false;
     }
 
-    if (FAILED(impl.resources.GetDevice()->CreateSharedHandle(transport.texture.Get(),
-        nullptr, GENERIC_ALL, nullptr, &transport.sharedHandle)) ||
+    if (FAILED(impl.resources.GetDevice()->CreateSharedHandle(transport.texture.Get(), nullptr, GENERIC_ALL, nullptr,
+                                                              &transport.sharedHandle)) ||
         nullptr == transport.sharedHandle)
     {
         impl.resources.ReleaseTexture(outTexture);
@@ -1110,12 +1117,15 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     return true;
 }
 
-void EnhancedSceneRendererLiveDX12Adapter::SealDisplayFrame(DisplayToken token,
-    const RHIDisplayFrameMetadata& metadata, RHICompletionPoint completion, uint64_t observedCompletion)
+void EnhancedSceneRendererLiveDX12Adapter::SealDisplayFrame(DisplayToken token, const RHIDisplayFrameMetadata& metadata,
+                                                            RHICompletionPoint completion, uint64_t observedCompletion)
 {
     for (auto& display : m_impl->activeDisplays)
     {
-        if (display.token != token) continue;
+        if (display.token != token)
+        {
+            continue;
+        }
         if (!completion.IsValid() || observedCompletion == UINT64_MAX || observedCompletion < completion.value)
         {
             display.publishedCompletion = {};
@@ -1313,7 +1323,10 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
         if (display.token == token &&
             !display.consumerLease->m_completionLost.load(std::memory_order_acquire))
         {
-            if (!display.transport) return 0;
+            if (!display.transport)
+            {
+                return 0;
+            }
             const auto& transport = *display.transport;
             RHIGpuDisplayImage image;
             image.transport = RHISharedImageTransport::Win32D3D12Resource;

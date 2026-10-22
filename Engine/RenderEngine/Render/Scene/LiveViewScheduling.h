@@ -58,8 +58,9 @@ class LiveViewScheduler
         auto policy = request.policy;
         if (policy.mode == LiveViewUpdateMode::Automatic)
         {
-            policy.mode = request.target == 2 ? LiveViewUpdateMode::OnDemand :
-                request.target == 0 ? LiveViewUpdateMode::FixedRate : LiveViewUpdateMode::Continuous;
+            policy.mode = request.target == 2   ? LiveViewUpdateMode::OnDemand
+                          : request.target == 0 ? LiveViewUpdateMode::FixedRate
+                                                : LiveViewUpdateMode::Continuous;
             if (policy.mode == LiveViewUpdateMode::FixedRate && policy.framesPerSecond == 0)
             {
                 policy.framesPerSecond = 60;
@@ -92,12 +93,10 @@ class LiveViewScheduler
         {
             return true;
         }
-        return now < state.submittedAt ||
-            now - state.submittedAt >= 1000000000ull / policy.framesPerSecond;
+        return now < state.submittedAt || now - state.submittedAt >= 1000000000ull / policy.framesPerSecond;
     }
 
-    Plan BuildPlan(const std::array<LiveViewScheduleRequest, Capacity>& requests,
-        uint32_t count, uint64_t now)
+    Plan BuildPlan(const std::array<LiveViewScheduleRequest, Capacity>& requests, uint32_t count, uint64_t now)
     {
         Plan plan;
         plan.count = (std::min)(count, Capacity);
@@ -127,29 +126,29 @@ class LiveViewScheduler
             }
             const auto policy = ResolvePolicy(request);
             overdue[index] = policy.maximumDeferralMilliseconds != 0 && now >= state.waitingSince &&
-                now - state.waitingSince >= uint64_t{policy.maximumDeferralMilliseconds} * 1000000ull;
+                             now - state.waitingSince >= uint64_t{policy.maximumDeferralMilliseconds} * 1000000ull;
         }
         const auto before = [&](uint32_t left, uint32_t right)
+        {
+            if (plan.due[left] != plan.due[right])
             {
-                if (plan.due[left] != plan.due[right])
+                return plan.due[left];
+            }
+            if (overdue[left] != overdue[right])
+            {
+                return overdue[left];
+            }
+            if (overdue[left] && requests[left].target < Capacity && requests[right].target < Capacity)
+            {
+                const auto leftWait = m_states[requests[left].target].waitingSince;
+                const auto rightWait = m_states[requests[right].target].waitingSince;
+                if (leftWait != rightWait)
                 {
-                    return plan.due[left];
+                    return leftWait < rightWait;
                 }
-                if (overdue[left] != overdue[right])
-                {
-                    return overdue[left];
-                }
-                if (overdue[left] && requests[left].target < Capacity && requests[right].target < Capacity)
-                {
-                    const auto leftWait = m_states[requests[left].target].waitingSince;
-                    const auto rightWait = m_states[requests[right].target].waitingSince;
-                    if (leftWait != rightWait)
-                    {
-                        return leftWait < rightWait;
-                    }
-                }
-                return ResolvePolicy(requests[left]).priority > ResolvePolicy(requests[right]).priority;
-            };
+            }
+            return ResolvePolicy(requests[left]).priority > ResolvePolicy(requests[right]).priority;
+        };
         // 뷰 상한은 셋이다. stable_sort의 임시 heap 없이 안정 순서를 만든다.
         for (uint32_t index = 1; index < plan.count; ++index)
         {
@@ -196,9 +195,9 @@ class LiveViewScheduler
     static bool Matches(const LiveViewScheduleRequest& left, const LiveViewScheduleRequest& right)
     {
         return left.viewId == right.viewId && left.historyRevision == right.historyRevision &&
-            left.sceneEpoch == right.sceneEpoch && left.resizeGeneration == right.resizeGeneration &&
-            left.contentRevision == right.contentRevision && left.cameraCutRevision == right.cameraCutRevision &&
-            left.policy == right.policy;
+               left.sceneEpoch == right.sceneEpoch && left.resizeGeneration == right.resizeGeneration &&
+               left.contentRevision == right.contentRevision && left.cameraCutRevision == right.cameraCutRevision &&
+               left.policy == right.policy;
     }
 
     std::array<State, Capacity> m_states{};

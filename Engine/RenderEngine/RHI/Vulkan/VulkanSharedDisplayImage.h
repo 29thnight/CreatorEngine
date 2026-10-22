@@ -12,21 +12,21 @@ class VulkanDeviceResources;
 // commands separately retain their opened native resource and consumer lease.
 class VulkanSharedDisplayImage
 {
-public:
+  public:
     VulkanSharedDisplayImage();
     ~VulkanSharedDisplayImage();
     VulkanSharedDisplayImage(const VulkanSharedDisplayImage&) = delete;
     VulkanSharedDisplayImage& operator=(const VulkanSharedDisplayImage&) = delete;
 
     bool Initialize(VulkanDeviceResources& resources, uint32_t width, uint32_t height,
-        const RHIGpuPresentationCapabilities& consumer, std::string& outError);
+                    const RHIGpuPresentationCapabilities& consumer, std::string& outError);
     RHITextureHandle GetTexture() const;
     own::shared_owner<RHIDisplayConsumerLease> GetConsumerLease() const;
     bool CanReuse() const;
-    RHIGpuDisplayImage DescribeCompletedFrame(const RHIDisplayFrameMetadata& metadata,
-        RHICompletionPoint completion, uint64_t observedCompletion, ce::lifetime_token owner) const;
+    RHIGpuDisplayImage DescribeCompletedFrame(const RHIDisplayFrameMetadata& metadata, RHICompletionPoint completion,
+                                              uint64_t observedCompletion, ce::lifetime_token owner) const;
 
-private:
+  private:
     struct Impl;
     own::unique_owner<Impl> m_impl;
 };

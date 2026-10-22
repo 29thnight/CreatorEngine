@@ -86,15 +86,15 @@ struct RHIGpuDisplayImage
     bool IsReady() const
     {
         return transport != RHISharedImageTransport::None && adapter.valid && sharedHandle && width && height &&
-            format != RHIFormat::Unknown && producerCompletion.IsValid() &&
-            observedProducerCompletion != UINT64_MAX && observedProducerCompletion >= producerCompletion.value &&
-            consumerLease && !consumerLease->m_completionLost.load(std::memory_order_acquire) && lifetimeToken;
+               format != RHIFormat::Unknown && producerCompletion.IsValid() &&
+               observedProducerCompletion != UINT64_MAX && observedProducerCompletion >= producerCompletion.value &&
+               consumerLease && !consumerLease->m_completionLost.load(std::memory_order_acquire) && lifetimeToken;
     }
 
     bool IsCompatible(const RHIGpuPresentationCapabilities& capabilities) const
     {
         return IsReady() && transport == RHISharedImageTransport::Win32D3D12Resource &&
-            capabilities.sharedD3D12Resource && capabilities.adapter.valid && capabilities.adapter == adapter;
+               capabilities.sharedD3D12Resource && capabilities.adapter.valid && capabilities.adapter == adapter;
     }
 };
 

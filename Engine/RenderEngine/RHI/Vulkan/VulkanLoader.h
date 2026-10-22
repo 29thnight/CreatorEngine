@@ -29,26 +29,26 @@
     X(vkEnumerateInstanceLayerProperties) \
     X(vkEnumerateInstanceExtensionProperties)
 
-#define VK_INSTANCE_FUNCTIONS(X)              \
-    X(vkDestroyInstance)                      \
-    X(vkEnumeratePhysicalDevices)             \
-    X(vkEnumerateDeviceExtensionProperties)   \
-    X(vkGetPhysicalDeviceProperties)          \
-    X(vkGetPhysicalDeviceProperties2)         \
-    X(vkGetPhysicalDeviceImageFormatProperties2) \
-    X(vkGetPhysicalDeviceFeatures2)           \
-    X(vkGetPhysicalDeviceMemoryProperties)    \
-    X(vkGetPhysicalDeviceMemoryProperties2)   \
-    X(vkGetPhysicalDeviceQueueFamilyProperties) \
-    X(vkCreateDevice)                         \
-    X(vkGetDeviceProcAddr)                    \
-    X(vkCreateDebugUtilsMessengerEXT)         \
-    X(vkDestroyDebugUtilsMessengerEXT)        \
-    X(vkCreateWin32SurfaceKHR)                \
-    X(vkDestroySurfaceKHR)                    \
-    X(vkGetPhysicalDeviceSurfaceSupportKHR)   \
-    X(vkGetPhysicalDeviceSurfaceCapabilitiesKHR) \
-    X(vkGetPhysicalDeviceSurfaceFormatsKHR)   \
+#define VK_INSTANCE_FUNCTIONS(X)                                                                                       \
+    X(vkDestroyInstance)                                                                                               \
+    X(vkEnumeratePhysicalDevices)                                                                                      \
+    X(vkEnumerateDeviceExtensionProperties)                                                                            \
+    X(vkGetPhysicalDeviceProperties)                                                                                   \
+    X(vkGetPhysicalDeviceProperties2)                                                                                  \
+    X(vkGetPhysicalDeviceImageFormatProperties2)                                                                       \
+    X(vkGetPhysicalDeviceFeatures2)                                                                                    \
+    X(vkGetPhysicalDeviceMemoryProperties)                                                                             \
+    X(vkGetPhysicalDeviceMemoryProperties2)                                                                            \
+    X(vkGetPhysicalDeviceQueueFamilyProperties)                                                                        \
+    X(vkCreateDevice)                                                                                                  \
+    X(vkGetDeviceProcAddr)                                                                                             \
+    X(vkCreateDebugUtilsMessengerEXT)                                                                                  \
+    X(vkDestroyDebugUtilsMessengerEXT)                                                                                 \
+    X(vkCreateWin32SurfaceKHR)                                                                                         \
+    X(vkDestroySurfaceKHR)                                                                                             \
+    X(vkGetPhysicalDeviceSurfaceSupportKHR)                                                                            \
+    X(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)                                                                       \
+    X(vkGetPhysicalDeviceSurfaceFormatsKHR)                                                                            \
     X(vkGetPhysicalDeviceSurfacePresentModesKHR)
 
 #define VK_DEVICE_FUNCTIONS(X)          \
@@ -137,9 +137,9 @@
     X(vkQueuePresentKHR)
 
 // Optional device extensions must never become prerequisites for indexed rendering.
-#define VK_OPTIONAL_DEVICE_FUNCTIONS(X) \
-    X(vkGetMemoryWin32HandlePropertiesKHR) \
-    X(vkCmdDrawMeshTasksEXT)            \
+#define VK_OPTIONAL_DEVICE_FUNCTIONS(X)                                                                                \
+    X(vkGetMemoryWin32HandlePropertiesKHR)                                                                             \
+    X(vkCmdDrawMeshTasksEXT)                                                                                           \
     X(vkCmdDrawMeshTasksIndirectEXT)
 
 namespace VulkanApi

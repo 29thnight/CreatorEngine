@@ -410,7 +410,7 @@ private:
     VkQueue          m_queue{ VK_NULL_HANDLE };
     uint32_t         m_queueFamily{ UINT32_MAX };
     bool             m_memoryBudgetSupported{ false };
-    bool             m_externalMemoryWin32Supported{false};
+    bool m_externalMemoryWin32Supported{false};
     bool             m_nullDescriptorSupported{ false };
     bool             m_meshShaderExtensionSupported{ false };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;

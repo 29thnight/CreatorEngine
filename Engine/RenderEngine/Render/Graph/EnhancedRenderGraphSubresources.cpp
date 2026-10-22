@@ -500,7 +500,7 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
         }
         for (const auto& cell : cells[index])
         {
-            bool initialized = resource.imported;
+            bool initialized = resource.imported && resource.state != RHIResourceState::ExternalShared;
             std::vector<uint16_t> writers;
             for (uint16_t version = 0; version < resource.versions.size(); ++version)
             {
@@ -637,6 +637,7 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
     const auto& order = GetExecuteOrder();
     std::vector<std::vector<SubresourceCell>> cells(m_resources.size());
     std::vector<RHIResourceState> finalStates(m_resources.size());
+    ce::dynamic_bitset externalResources(m_resources.size(), false);
     m_stats.barriersEmitted = m_stats.barrierBatches = 0;
     const auto countPlan = [&](const auto& plan, uint32_t repetitions = 1)
     {
@@ -673,11 +674,13 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
         {
             resource.initialState = resource.state;
         }
+        externalResources.set(index, resource.initialState == RHIResourceState::ExternalShared ||
+                                         finalStates[index] == RHIResourceState::ExternalShared);
         cells[index] = BuildSubresourceCells(index, true);
         for (auto& cell : cells[index])
         {
             cell.state = resource.initialState;
-            if (queuePlan)
+            if (queuePlan && !externalResources.test(index))
             {
                 transition(*prologue, index, cell, RHIResourceState::Common);
             }
@@ -771,7 +774,11 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
             {
                 continue;
             }
-            auto target = RHIResourceState::Common;
+            if (queuePlan && externalResources.test(index))
+            {
+                continue; // Graphics retains this state until the explicit external release.
+            }
+            auto target = externalResources.test(index) ? RHIResourceState::CopyDest : RHIResourceState::Common;
             if (!queuePlan)
             {
                 for (const auto& requirement : m_finalStateRequirements)

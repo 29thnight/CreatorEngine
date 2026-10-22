@@ -6,6 +6,12 @@
 #include "../../Engine/RenderEngine/RHI/RHIParallelCommandPool.h"
 #include "../../Engine/RenderEngine/RHI/RHISoftwareRecorder.h"
 #include "../../Engine/RenderEngine/RHI/RHISubmissionThread.h"
+#if __has_include("../../Engine/RenderEngine/RHI/RHIDisplaySubmission.h")
+#include "../../Engine/RenderEngine/RHI/RHIDisplaySubmission.h"
+#define CE_RHI_DISPLAY_SUBMISSION_PROOF 1
+#else
+#define CE_RHI_DISPLAY_SUBMISSION_PROOF 0
+#endif
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
@@ -671,8 +677,7 @@ namespace
         }
     }
 
-    RHISoftwareBatch record_batch(RHISoftwareRecorder& recorder, const BatchSpec& spec,
-                                  ce::lifetime_token owner = {})
+    RHISoftwareBatch record_batch(RHISoftwareRecorder& recorder, const BatchSpec& spec, ce::lifetime_token owner = {})
     {
         if (!owner)
         {
@@ -1291,27 +1296,40 @@ namespace
             require(submission.AcquireClient(&unrelatedOwner, error), error.c_str());
             auto batch = record_batch(recorder, spec);
             RHISubmissionTicket translating, tail, unrelated;
-            require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch),
-                                                     translating, error), error.c_str());
+            require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), translating,
+                                                    error),
+                    error.c_str());
             const bool entered = gate.WaitEntered();
             bool tailSawSubmission{};
-            require(submission.Enqueue(&device, "ordered owner tail", [&](std::string&)
-            {
-                tailSawSubmission = translating.IsComplete();
-                return true;
-            }, tail, error), error.c_str());
-            require(submission.Enqueue(&unrelatedOwner, "unrelated native submission", [](std::string&)
-            {
-                return true;
-            }, unrelated, error), error.c_str());
+            require(submission.Enqueue(
+                        &device, "ordered owner tail",
+                        [&](std::string&)
+                        {
+                            tailSawSubmission = translating.IsComplete();
+                            return true;
+                        },
+                        tail, error),
+                    error.c_str());
+            require(submission.Enqueue(
+                        &unrelatedOwner, "unrelated native submission", [](std::string&) { return true; }, unrelated,
+                        error),
+                    error.c_str());
             const bool progressed = wait_observed([&] { return unrelated.IsComplete(); });
             const bool ordered = !tail.IsComplete() && !translating.IsComplete();
             gate.Open();
             require(submission.Wait(translating, error) && submission.Wait(tail, error) &&
-                        submission.Wait(unrelated, error), error.c_str());
-            require(entered && progressed && ordered && tailSawSubmission &&
-                        submission.GetStats().orderingErrors == 0,
+                        submission.Wait(unrelated, error),
+                    error.c_str());
+            require(entered && progressed && ordered && tailSawSubmission && submission.GetStats().orderingErrors == 0,
                     "Translation blocked unrelated native work or allowed same-owner overtaking.");
+#if CE_RHI_DISPLAY_SUBMISSION_PROOF
+            require(PollRHIDisplaySubmission(translating, tail) == RHIDisplaySubmissionStatus::Succeeded &&
+                        PollRHIDisplaySubmission(tail, tail) == RHIDisplaySubmissionStatus::Succeeded,
+                    "Successful graph and tail tickets did not establish CPU publication proof.");
+            require(PollRHIDisplaySubmission({}, tail) == RHIDisplaySubmissionStatus::Failed &&
+                        PollRHIDisplaySubmission(translating, {}) == RHIDisplaySubmissionStatus::Failed,
+                    "A missing submission ticket established CPU publication proof.");
+#endif
             device.m_completed.store(1);
             submission.ReleaseClient(&unrelatedOwner);
             submission.ReleaseClient(&device);
@@ -1392,10 +1410,8 @@ namespace
             bool cancelled{};
             std::thread cancellation(
                 [&] { cancelled = submission.AbandonForDeviceError(&cancelledOwner, abandoned, error); });
-            const bool removedBeforeDestruction = wait_observed([&]
-            {
-                return submission.GetOwnerStats(&cancelledOwner).pendingTasks == 0;
-            });
+            const bool removedBeforeDestruction =
+                wait_observed([&] { return submission.GetOwnerStats(&cancelledOwner).pendingTasks == 0; });
             translationGate.Open();
             const bool destructorEntered = destructionGate.WaitEntered();
             const auto destroying = submission.GetStats();
@@ -1502,21 +1518,38 @@ namespace
         }
 #if CE_RHI_STRUCTURED_FAILURE
         // Replay failure never reaches native execute, but retains the exact
-        // software command identity through the actual submission FIFO.
+        // software command identity through the actual submission FIFO. An
+        // already admitted EndFrame tail may still signal a higher GPU fence;
+        // that numeric completion must never make the failed image publishable.
         {
             ++g_scenarios;
             RHISubmissionThread submission(bytes);
             ProbeDevice device;
+            ReplayGate gate;
             auto pool = own::make_shared<ProbePool>(scheduler);
             pool->m_encoders[0].m_failCommand = 12;
-            auto translator = own::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
+            auto translator = own::make_shared<GatedTranslator>(*pool, services, gate);
             std::string error;
             require(submission.AcquireClient(&device, error), error.c_str());
             auto batch = record_batch(recorder, spec);
             const uint64_t commandRecordingId = batch.GetRecordingId();
-            RHISubmissionTicket ticket;
+            RHISubmissionTicket ticket, tail;
             require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), ticket, error),
                     error.c_str());
+            const bool entered = gate.WaitEntered();
+            const bool tailAdmitted = submission.Enqueue(
+                &device, "successful higher-fence frame tail",
+                [&](std::string&)
+                {
+                    device.m_completed.store(17);
+                    return true;
+                },
+                tail, error);
+#if CE_RHI_DISPLAY_SUBMISSION_PROOF
+            const auto preparing = PollRHIDisplaySubmission(ticket, tail);
+#endif
+            gate.Open();
+            require(entered && tailAdmitted, "Failed replay fixture did not admit a later frame tail.");
             require(!submission.Wait(ticket, error) && pool->m_submitCalls == 0,
                     "Failed replay reached the native submission boundary.");
             RHICommandFailure failure, consumed;
@@ -1527,6 +1560,19 @@ namespace
                     "FIFO replay failure lost exact target, opcode, index or recording provenance.");
             require(submission.ConsumeFailure(&device, consumed) && equal_failure(failure, consumed),
                     "Owner failure consumption lost replay provenance.");
+            require(submission.Wait(tail, error) && device.GetCompletedFenceValue() == 17 &&
+                        pool->m_completion < device.GetCompletedFenceValue(),
+                    "The admitted frame tail did not advance the higher GPU completion independently.");
+#if CE_RHI_DISPLAY_SUBMISSION_PROOF
+            const bool pixelsPublishable =
+                device.GetCompletedFenceValue() >= pool->m_completion &&
+                PollRHIDisplaySubmission(ticket, tail) == RHIDisplaySubmissionStatus::Succeeded;
+            require(preparing == RHIDisplaySubmissionStatus::Pending && !pixelsPublishable &&
+                        PollRHIDisplaySubmission(ticket, tail) == RHIDisplaySubmissionStatus::Failed &&
+                        PollRHIDisplaySubmission(tail, ticket) == RHIDisplaySubmissionStatus::Failed &&
+                        PollRHIDisplaySubmission(tail, tail) == RHIDisplaySubmissionStatus::Succeeded,
+                    "A successful higher-fence tail concealed a failed scene batch at publication.");
+#endif
             submission.MarkUnrecoverableDeviceError(&device, "Injected cleanup after failed CPU replay.");
             RHILifecycleResult abandoned;
             require(submission.AbandonForDeviceError(&device, abandoned, error) && abandoned.IsClean(), error.c_str());

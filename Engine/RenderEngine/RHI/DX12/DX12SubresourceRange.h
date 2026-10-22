@@ -17,13 +17,13 @@ inline RHITextureAspect DX12TextureAspects(const D3D12_RESOURCE_DESC& descriptio
         return RHITextureAspect::Depth;
     default:
         return (description.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) != 0 ? RHITextureAspect::Depth
-                                                                              : RHITextureAspect::Color;
+                                                                                  : RHITextureAspect::Color;
     }
 }
 
 inline void AppendDX12TextureTransitions(ID3D12Resource& resource, D3D12_RESOURCE_STATES before,
-                                        D3D12_RESOURCE_STATES after, const RHITextureSubresourceRange& range,
-                                        std::vector<D3D12_RESOURCE_BARRIER>& barriers)
+                                         D3D12_RESOURCE_STATES after, const RHITextureSubresourceRange& range,
+                                         std::vector<D3D12_RESOURCE_BARRIER>& barriers)
 {
     const D3D12_RESOURCE_DESC description = resource.GetDesc();
     const uint32_t layers = description.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D
@@ -53,9 +53,9 @@ inline void AppendDX12TextureTransitions(ID3D12Resource& resource, D3D12_RESOURC
     const uint32_t aspectBits = static_cast<uint8_t>(resolved.aspect);
     for (uint32_t plane = 0; plane < 2; ++plane)
     {
-        const uint32_t planeBits = plane == 0 ? static_cast<uint8_t>(RHITextureAspect::Color) |
-                                                   static_cast<uint8_t>(RHITextureAspect::Depth)
-                                             : static_cast<uint8_t>(RHITextureAspect::Stencil);
+        const uint32_t planeBits =
+            plane == 0 ? static_cast<uint8_t>(RHITextureAspect::Color) | static_cast<uint8_t>(RHITextureAspect::Depth)
+                       : static_cast<uint8_t>(RHITextureAspect::Stencil);
         if ((aspectBits & planeBits) == 0)
         {
             continue;
@@ -64,8 +64,8 @@ inline void AppendDX12TextureTransitions(ID3D12Resource& resource, D3D12_RESOURC
         {
             for (uint32_t mip = resolved.firstMip; mip < resolved.firstMip + resolved.mipCount; ++mip)
             {
-                barrier.Transition.Subresource = mip + layer * description.MipLevels +
-                                                 plane * description.MipLevels * layers;
+                barrier.Transition.Subresource =
+                    mip + layer * description.MipLevels + plane * description.MipLevels * layers;
                 barriers.push_back(barrier);
             }
         }

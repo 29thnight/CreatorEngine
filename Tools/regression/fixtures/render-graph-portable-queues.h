@@ -84,6 +84,7 @@ namespace ce::regression
             PortableRenderEncoder encoder;
         };
         std::vector<own::unique_owner<Recorded>> recorded;
+        size_t preparations{}, rejectPreparationAt{SIZE_MAX};
         explicit PortableQueueRecorder(PortableRenderServices& services) : services(services) {}
         IRenderDeviceServices& DeviceServices() const override { return services; }
         bool Record(const own::shared_owner<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
@@ -100,6 +101,16 @@ namespace ce::regression
             result->recording = recorded.size();
             result->owner = std::move(owner);
             batch = std::move(result);
+            return true;
+        }
+        bool PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>&,
+                                    const ce::pooled_owner<IRHIQueueCommandBatch>&, std::string& error) override
+        {
+            if (preparations++ == rejectPreparationAt)
+            {
+                error = "Injected preparation rejection";
+                return false;
+            }
             return true;
         }
 

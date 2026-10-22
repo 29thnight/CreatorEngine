@@ -1077,6 +1077,7 @@
     <ClInclude Include="Render\Scene\PreparedViewInputPool.h" />
     <ClInclude Include="RHI\RHISubresourceRange.h" />
     <ClInclude Include="RHI\RHIExecutionPolicy.h" />
+    <ClInclude Include="RHI\RHIDisplaySubmission.h" />
     <ClInclude Include="RHI\DX12\DX12SubresourceRange.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSharedDisplayImage.h" />
   </ItemGroup>
