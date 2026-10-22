@@ -1046,18 +1046,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RenderAllocator.h" />
-    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-      <CompileAs>CompileAsC</CompileAs>
-      <CompileAsWinRT>false</CompileAsWinRT>
-      <PreprocessorDefinitions>MI_STATIC_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\ThirdParty\mimalloc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WarningLevel>Level3</WarningLevel>
-      <DisableSpecificWarnings>4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <Optimization>MaxSpeed</Optimization>
-      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RenderContainerReusePolicy.h" />

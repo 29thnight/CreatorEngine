@@ -56,6 +56,12 @@ namespace ce
 '''
 
 
+def production_sources(root: Path) -> list[str]:
+    # Preserve comparisons with revisions before the Utility extraction.
+    utility_arena = "Engine/Utility_Framework/Arena.cpp"
+    return [*PRODUCTION, *([utility_arena] if (root / utility_arena).is_file() else [])]
+
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -80,7 +86,7 @@ def dependencies(root: Path, enkits: Path, compiler: str, build: Path) -> set[Pa
     include = build / "dependency-include"
     include.mkdir()
     (include / "enkiTS").symlink_to(enkits / "src", target_is_directory=True)
-    sources = [root / path for path in [PROBE, COMMAND_PROBE, *PRODUCTION]] + [enkits / "src/TaskScheduler.cpp"]
+    sources = [root / path for path in [PROBE, COMMAND_PROBE, *production_sources(root)]] + [enkits / "src/TaskScheduler.cpp"]
     args = [compiler, "-std=c++23", "-pthread", "-DCE_CONTRACT_STANDALONE=1", "-DCE_SHIPPING=1",
             *include_flags(root, include), "-MM", *map(str, sources)]
     result = execute(args, cwd=root)
@@ -170,7 +176,7 @@ def build_and_run(source: Path, build: Path, compiler: str, sanitize: bool, benc
     structured_failure = "GetCommandFailure" in (source / "Engine/RenderEngine/RHI/RHISubmissionThread.h").read_text()
     compile_command = [compiler, *flags, *sanitize_flags, f"-DCE_RHI_BYTE_ADMISSION={int(byte_capacity)}",
                        f"-DCE_RHI_STRUCTURED_FAILURE={int(structured_failure)}",
-                       str(source / PROBE), *[str(source / path) for path in PRODUCTION],
+                       str(source / PROBE), *[str(source / path) for path in production_sources(source)],
                        str(source / "external/enkiTS/src/TaskScheduler.cpp"), str(build / "mimalloc.o"),
                        "-Wl,--wrap=mi_malloc", "-Wl,--wrap=mi_malloc_aligned", "-o", str(build / "translation")]
     compiled = execute(compile_command, cwd=source)
@@ -190,6 +196,8 @@ def build_and_run(source: Path, build: Path, compiler: str, sanitize: bool, benc
     result["structured_failure_available"] = structured_failure
     if commands_probe:
         selected = ["Engine/RenderEngine/RenderArena.cpp", *PRODUCTION[:4]]
+        if (source / "Engine/Utility_Framework/Arena.cpp").is_file():
+            selected.append("Engine/Utility_Framework/Arena.cpp")
         old_command = [compiler, *flags, *sanitize_flags, str(source / COMMAND_PROBE),
                        *[str(source / path) for path in selected], str(build / "mimalloc.o"),
                        "-o", str(build / "commands")]

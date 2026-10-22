@@ -1788,7 +1788,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RenderAllocator.h" />
-    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c"><Filter>ThirdParty\mimalloc</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty"><UniqueIdentifier>{c42eab0b-07d5-4dac-98d0-e8c612580101}</UniqueIdentifier></Filter>

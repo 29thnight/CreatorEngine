@@ -1,0 +1,93 @@
+{
+  "status": "passed",
+  "baseline_local_commit": "c3dd735933a8e2b64795bb86e07ac56cd09543d8",
+  "baseline_published_commit": "d2a705ff3b03d9936484b4cac94e8e710f9f4ab5",
+  "baseline_tree": "3ff049a3f19c43447407201b89c924bdf2a127db",
+  "source_checks": {
+    "utility-normal.json": {
+      "matched_source_files": 57,
+      "external_dependency_files": 0,
+      "mismatches": []
+    },
+    "utility-sanitized.json": {
+      "matched_source_files": 57,
+      "external_dependency_files": 0,
+      "mismatches": []
+    },
+    "graph-sanitized.json": {
+      "matched_source_files": 0,
+      "external_dependency_files": 0,
+      "mismatches": [],
+      "receipt_has_source_hashes": false,
+      "note": "This runner emits correctness status only; final Graph inputs are additionally checked by the allocation runner frozen-source aggregate."
+    },
+    "rhi-comparison.json": {
+      "matched_source_files": 145,
+      "external_dependency_files": 3,
+      "mismatches": []
+    },
+    "rhi-sanitized.json": {
+      "matched_source_files": 145,
+      "external_dependency_files": 3,
+      "mismatches": []
+    },
+    "vulkan-sanitized.json": {
+      "matched_source_files": 141,
+      "external_dependency_files": 19,
+      "mismatches": []
+    },
+    "graph-allocations.json": {
+      "matched_source_files": 1045,
+      "frozen_inputs_sha256": "97dab63ae43d98230eb443ccbaf1ab66f61b37cd83af5e975e62496346eea3aa",
+      "mismatches": []
+    },
+    "queue-sanitized.json": {
+      "matched_source_files": 106,
+      "mismatches": []
+    }
+  },
+  "project_static_audit": {
+    "mimalloc_providers": [
+      "Engine/Utility_Framework/Utility_Framework.vcxproj"
+    ],
+    "xml_parse": "passed",
+    "python_ast": "passed",
+    "diff_whitespace": "passed"
+  },
+  "final_code_sha256": {
+    "Engine/RenderEngine/RenderAllocator.h": "3ba96de75f6e17ac99b189ceeef4b654daf61cd31a7dad5d42cb88623c95f7ce",
+    "Engine/RenderEngine/RenderArena.cpp": "19c7da524801c6750c914a9f12dcc3dd57def5a6f319bc0ae36377a0e0908f4a",
+    "Engine/RenderEngine/RenderArena.h": "8549bf2b40ef65a03467067cc63d092f8a825769fce4a8d0ab313884ab30e29b",
+    "Engine/RenderEngine/RenderEngine.vcxproj": "367c8e66f2ccf26bb9bd27f886b72cc785cd27c63572ed7d34075b664c0bc68c",
+    "Engine/RenderEngine/RenderEngine.vcxproj.filters": "8dc5bc64d8e1b3208ddae5c1eb4cdb734b8e79ebbfcbb3afe567156d209a8f02",
+    "Engine/Utility_Framework/Arena.cpp": "f3968cf7beb3c42de74fc17d6ee8f126aad5d4492cf3d936f3248e683be09f3b",
+    "Engine/Utility_Framework/Arena.h": "b31d0babe5c076f489e2a687a65370418cc88266b39c74643cbe9d9b4151c4c5",
+    "Engine/Utility_Framework/FixedPool.h": "53c741d262109788b888aa4ec2b7daf2f1c5e21fb8dd4e778dfaeea9343cf13c",
+    "Engine/Utility_Framework/HeapAllocator.h": "e7ce047cbad40b3fe41aaa7539f1c7efd374a00bd8d473588d52c00db1eed554",
+    "Engine/Utility_Framework/LinearArena.h": "4093daa2f3156646c249d0d1c098d1b3b21b4ae5f9bd3d88de3420317232dd61",
+    "Engine/Utility_Framework/StackArena.h": "49100822207d4f1ffa422761047ffff131c3d19a04fa1553998fa63cd03db38b",
+    "Engine/Utility_Framework/Utility_Framework.vcxproj": "a25c6e717520ba823e4e9749bdc48cb34024f072cdcd92512abd15c0c865a6b2",
+    "Engine/Utility_Framework/Utility_Framework.vcxproj.filters": "0c3842ca32d4070f827bfebc241d7fe7c503620d055f2a13f5a974d3b1a40ae2",
+    "Tools/regression/utility_allocators_probe.cpp": "d9f30747243790082c206f49d996a7b67d4a2de676a800100ecd03d7b4c59c1f",
+    "Tools/regression/verify-render-graph-declaration-storage.py": "083261447a6902e6fe1328756647c62c277c1f2c63cc6744eedb99e7cb6573e5",
+    "Tools/regression/verify-render-graph-packet-dispatch.py": "d4b42c421eb114492ddc3e3ad2f8445c73d56316aae6f72532e6d1e90a153e5e",
+    "Tools/regression/verify-render-graph-program.py": "1f1c5068c92af9e8362f2a7045436449fdc919723ac5ebde1aca7f829f806d52",
+    "Tools/regression/verify-rhi-software-commands.ps1": "be3ae2a690b5776ea9afba66a09f4fffd68c0bf69a3fe3d427a9fd9032c0d13f",
+    "Tools/regression/verify-rhi-software-portable.py": "ea3650605710639a242a237fe00bde5e61a19e41839b4b469d75cb3dde5eadd8",
+    "Tools/regression/verify-rhi-software-queue.py": "73bd255f0fb7a1525490031faccbe4bdd362107fccd722d6682f27b92c91d644",
+    "Tools/regression/verify-scene-packet-preparation.py": "adb4517cc1975ee704e0286001e65bcb05fba1dddbe150f1053e273bffc89f74",
+    "Tools/regression/verify-ssgi-declaration-cpu.py": "c09db39eca45e232c107fa2c39ec93e03575c90a96c5f4e92e9e8f80d047f458",
+    "Tools/regression/verify-utility-allocators.py": "4ea14ef2c6e228a270a789e21bed0157ebc9dddab925aa93c09505b30a735a21",
+    "Tools/regression/verify-vulkan-software-commands.py": "d1939c6db493a1b78529cb4a1d0d46b81a3ba396598fb556b73b75c5a0ecba0e"
+  },
+  "limits": [
+    "Windows Editor/MSVC project build was not executed in this Linux environment.",
+    "No native GPU execution or new latency improvement is claimed.",
+    "ASan/UBSan passed with LeakSanitizer disabled because process inspection is restricted."
+  ],
+  "additional_checks": {
+    "documentation_examples": "six C++ blocks passed GCC C++23 strict-warning syntax compilation",
+    "legacy_mirror_closure": "four mirrored runners include all quoted dependencies except the explicit mimalloc shim",
+    "legacy_ssgi_same_baseline_smoke": "compile/link/run succeeded, strict allocation-improvement gate failed as expected when comparing unchanged SSGI/Graph code with c3dd735; not an acceptance gate for extraction"
+  }
+}

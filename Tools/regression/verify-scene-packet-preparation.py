@@ -83,6 +83,9 @@ def main():
     if not compiler:
         parser.error("C++23 compiler unavailable")
     arena = [Path("Engine/RenderEngine") / name for name in ("RenderArena.cpp", "RenderArena.h", "RenderAllocator.h")]
+    arena += [Path("Engine/Utility_Framework") / name for name in
+              ("Arena.cpp", "Arena.h", "HeapAllocator.h", "Ownership.h", "LifetimeToken.h")]
+    arena += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
     scheduler = [Path("Engine/Utility_Framework") / name for name in
                  ("JobScheduler.cpp", "JobScheduler.h", "ThreadPool.cpp", "ThreadPool.h")]
     probe = Path(__file__).with_name("scene_packet_preparation_cpu_probe.cpp")
@@ -140,7 +143,8 @@ inline void* mi_malloc_aligned(size_t size, size_t alignment)
         executable = target / "scene-packet-preparation"
         command = [compiler, "-std=c++23", "-O2", "-g", "-pthread", "-DCE_CONTRACT_STANDALONE=1", "-DCE_SHIPPING=1",
                    "-I", str(target), "-I", str(mirror), "-I", str(root), str(compiled_probe),
-                   str(mirror / arena[0]), str(root / scheduler[0]), str(root / scheduler[2]),
+                   *[str(mirror / path) for path in arena if path.suffix == ".cpp"],
+                   str(root / scheduler[0]), str(root / scheduler[2]),
                    str(enki / "TaskScheduler.cpp"), "-o", str(executable)]
         if args.sanitize != "none":
             command += ["-fsanitize=" + ("address,undefined" if args.sanitize == "address" else "thread"),

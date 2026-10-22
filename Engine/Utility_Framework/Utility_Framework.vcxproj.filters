@@ -60,6 +60,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Arena.cpp"><Filter>Core.Memory</Filter></ClCompile>
+    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c"><Filter>Core.Memory</Filter></ClCompile>
     <ClCompile Include="ThreadPool.cpp"><Filter>Core.Thread</Filter></ClCompile>
     <ClCompile Include="JobScheduler.cpp"><Filter>Core.Thread</Filter></ClCompile>
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp">
@@ -111,6 +113,11 @@
   <ItemGroup>
     <ClInclude Include="ArtifactStoreGuard.h" />
     <ClInclude Include="Ownership.h" />
+    <ClInclude Include="Arena.h"><Filter>Core.Memory</Filter></ClInclude>
+    <ClInclude Include="HeapAllocator.h"><Filter>Core.Memory</Filter></ClInclude>
+    <ClInclude Include="LinearArena.h"><Filter>Core.Memory</Filter></ClInclude>
+    <ClInclude Include="StackArena.h"><Filter>Core.Memory</Filter></ClInclude>
+    <ClInclude Include="FixedPool.h"><Filter>Core.Memory</Filter></ClInclude>
     <ClInclude Include="LifetimeToken.h" />
     <ClInclude Include="BaseTypeDef.h">
       <Filter>Core.definition\Type</Filter>

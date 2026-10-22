@@ -25,6 +25,10 @@ def compile_probe(root, compiler, executable, probe=None, extra_sources=(), sani
         "Tools/regression/fixtures/render-graph-portable-platform.cpp",
         str(probe or Path("Tools/regression/render_graph_program_probe.cpp")),
     ] + [str(source) for source in extra_sources]
+    # Older source snapshots keep the implementation in RenderArena.cpp.
+    utility_arena = "Engine/Utility_Framework/Arena.cpp"
+    if (root / utility_arena).is_file():
+        sources.append(utility_arena)
     command = [compiler, "-std=c++23", "-O1", "-g", "-pthread", "-ffunction-sections", "-fdata-sections",
                "-DCE_CONTRACT_STANDALONE=1", "-DCE_SHIPPING=1", "-D_dupenv_s=mi_dupenv_s",
                "-include", str(root / "ThirdParty/mimalloc/include/mimalloc.h"),
