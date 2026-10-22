@@ -27,7 +27,7 @@ namespace
         }
         return result;
     }
-}
+} // namespace
 
 int main()
 {
@@ -38,16 +38,15 @@ int main()
     Expect(plan.count == 3 && plan.order[0] == 1, "Game has priority over Scene and preview");
     Expect(plan.due[0] && plan.due[1] && plan.due[2], "initial outputs are all due");
     Expect(LiveViewScheduler::HasGpuCredit(0) && LiveViewScheduler::HasGpuCredit(1),
-        "a single free credit admits one view without reserving a pair");
+           "a single free credit admits one view without reserving a pair");
     Expect(!LiveViewScheduler::HasGpuCredit(2) && !LiveViewScheduler::HasGpuCredit(3),
-        "view policy cannot increase the shared GPU budget");
+           "view policy cannot increase the shared GPU budget");
 
     scheduler.MarkSubmitted(requests[0], start);
     scheduler.MarkSubmitted(requests[1], start);
     scheduler.MarkSubmitted(requests[2], start);
     plan = scheduler.BuildPlan(requests, 3, start + 1000000);
-    Expect(!plan.due[0] && plan.due[1] && !plan.due[2],
-        "Scene cadence and preview dirtiness are independent of Game");
+    Expect(!plan.due[0] && plan.due[1] && !plan.due[2], "Scene cadence and preview dirtiness are independent of Game");
     Expect(scheduler.IsDue(requests[0], start + 16666667), "default Scene cadence reaches 60 Hz");
     Expect(!scheduler.IsDue(requests[2], start + 1000000000), "unchanged preview stays cached");
 
@@ -103,7 +102,7 @@ int main()
     requests[1].target = 99;
     plan = scheduler.BuildPlan(requests, 100, start + 270000000);
     Expect(plan.count == LiveViewScheduler::Capacity && !plan.due[0] && !plan.due[1],
-        "invalid identities and oversized counts stay within bounded storage");
+           "invalid identities and oversized counts stay within bounded storage");
     scheduler.Reset();
     Expect(scheduler.IsDue(requests[2], start), "backend rebuild invalidates previous admissions");
     std::printf("LiveViewScheduling: %s\n", failures == 0 ? "PASS" : "FAIL");

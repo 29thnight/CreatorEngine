@@ -63,6 +63,11 @@ namespace Player
                 m_exportTemporalInputs.store(m_temporal->HasProxy(), std::memory_order_release);
                 m_temporal->CommitConfiguration();
                 m_suspended = false;
+                const LUID adapter = m_resources.GetDevice()->GetAdapterLuid();
+                uint64_t adapterBits{};
+                static_assert(sizeof(adapter) == sizeof(adapterBits));
+                std::memcpy(&adapterBits, &adapter, sizeof(adapterBits));
+                m_adapterLuid.store(adapterBits, std::memory_order_relaxed);
                 m_active.store(true, std::memory_order_release);
                 return true;
             }
@@ -72,9 +77,11 @@ namespace Player
             RHIGpuPresentationCapabilities QueryGpuPresentationCapabilities() const override
             {
                 RHIGpuPresentationCapabilities capabilities;
-                if (IsActive() && m_resources.GetDevice())
+                if (IsActive())
                 {
-                    const LUID adapter = m_resources.GetDevice()->GetAdapterLuid();
+                    // Render-thread capability polling must not dereference
+                    // presentation-thread native objects during shutdown.
+                    const uint64_t adapter = m_adapterLuid.load(std::memory_order_relaxed);
                     static_assert(sizeof(adapter) == sizeof(capabilities.adapter.luid));
                     std::memcpy(capabilities.adapter.luid.data(), &adapter, sizeof(adapter));
                     capabilities.adapter.valid = true;
@@ -349,9 +356,9 @@ namespace Player
                     }
                     D3D12_RESOURCE_BARRIER sourceBarrier{};
                     sourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                    sourceBarrier.Transition = {m_pendingUse.resource.Get(),
-                        D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, D3D12_RESOURCE_STATE_COMMON,
-                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
+                    sourceBarrier.Transition = {m_pendingUse.resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                                                D3D12_RESOURCE_STATE_COMMON,
+                                                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
                     if (!sdkColor) commands->ResourceBarrier(1, &sourceBarrier);
                     ID3D12DescriptorHeap* heaps[]{m_srvHeap.Get()};
                     commands->SetDescriptorHeaps(1, heaps);
@@ -714,6 +721,7 @@ namespace Player
             uint32_t m_width{0};
             uint32_t m_height{0};
             std::atomic<bool> m_active{false};
+            std::atomic<uint64_t> m_adapterLuid{0};
             std::atomic<bool> m_exportTemporalInputs{false};
             bool m_shutdown{true};
             bool m_quarantined{false};

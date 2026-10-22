@@ -90,7 +90,7 @@ class RHISoftwareQueueRecorder final : public IRHIQueueRecorder
                         std::string& error) override;
     bool ExecuteSubmission(const std::function<bool(std::string&)>& submit, std::string& error) override;
     bool PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>& queue,
-        const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
+                                const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
 
   private:
     own::shared_owner<RHISoftwareQueueState> m_state;

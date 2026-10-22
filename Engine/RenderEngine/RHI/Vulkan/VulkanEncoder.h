@@ -401,7 +401,7 @@ private:
         VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
     };
     VkImageLayout GetRecordedImageLayout(RHITextureHandle texture, const RHITextureSubresourceRange& range,
-                                        VkImageLayout fallback) const;
+                                         VkImageLayout fallback) const;
     std::vector<RecordedImageLayout> m_recordedImageLayouts;
 
     /// 지금 걸린 파이프라인이 구워진 셋 레이아웃과 그 레이아웃 핸들 (5c-4d).

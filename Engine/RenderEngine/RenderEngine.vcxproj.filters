@@ -1818,6 +1818,9 @@
     <ClInclude Include="RHI\RHIExecutionPolicy.h">
       <Filter>RHI\Core</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHIDisplaySubmission.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\DX12\DX12SubresourceRange.h">
       <Filter>RHI\DX12\Device</Filter>
     </ClInclude>

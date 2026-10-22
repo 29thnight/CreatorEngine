@@ -580,7 +580,7 @@ bool RHISoftwareCommandQueue::PrepareBatch(const ce::pooled_owner<IRHIQueueComma
     }
     auto expected = RHISoftwareQueueCommandBatch::State::Sealed;
     if (!software->m_state.compare_exchange_strong(expected, RHISoftwareQueueCommandBatch::State::Consumed,
-        std::memory_order_acq_rel, std::memory_order_acquire))
+                                                   std::memory_order_acq_rel, std::memory_order_acquire))
     {
         error = "Software queue batch has already been consumed.";
         return false;
@@ -827,7 +827,8 @@ bool RHISoftwareQueueRecorder::ExecuteSubmission(const std::function<bool(std::s
 }
 
 bool RHISoftwareQueueRecorder::PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>& queue,
-    const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
+                                                      const ce::pooled_owner<IRHIQueueCommandBatch>& batch,
+                                                      std::string& error)
 {
     const auto wrapped = own::dynamic_owner_cast<RHISoftwareCommandQueue>(queue);
     if (!wrapped || wrapped->m_state.operator->() != m_state.operator->())

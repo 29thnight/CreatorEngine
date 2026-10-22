@@ -1072,7 +1072,8 @@ ID3D12Resource* DX12Encoder::ResolveRecorded(RHIBufferHandle handle) const
 DX12BufferEntry DX12Encoder::DescribeRecordedBuffer(RHIBufferHandle handle) const
 {
     return m_recordingResources && m_recordingResources->resourceTable
-        ? m_recordingResources->resourceTable->DescribeBuffer(handle) : m_resources->DescribeNativeBuffer(handle);
+               ? m_recordingResources->resourceTable->DescribeBuffer(handle)
+               : m_resources->DescribeNativeBuffer(handle);
 }
 uint64_t DX12Encoder::ResolveRecordedGpuAddress(RHIBufferHandle handle) const
 {

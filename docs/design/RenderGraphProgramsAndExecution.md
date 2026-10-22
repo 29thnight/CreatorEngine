@@ -94,6 +94,13 @@ native 상태를 별도로 유지한다. 비활성 object에는 queue prologue/e
 compute queue에서 다룰 수 없는 초기 상태를 가진 placed resource는 graphics 경로에 남긴다.
 현재 native placed allocator는 DX12에서 지원하며 Vulkan은 capability에 따라 committed 경로를 쓴다.
 
+DX12 buffer는 `ExecuteCommandLists` 완료 때 Common으로 decay할 수 있다. Microsoft의
+[resource barrier 규약](https://learn.microsoft.com/en-us/windows/win32/direct3d12/using-resource-barriers-to-synchronize-resource-states-in-direct3d-12)은
+이 경우 다음 전이의 BeforeState에 Common 또는 승격 가능한 상태를 허용한다. 현재 graph가 허용하는
+buffer SRV/UAV/copy/index/indirect/vertex 상태는 이 조건에 들어간다. 따라서 legacy pool의 마지막
+상태 기록만을 이유로 trailing Common barrier를 추가하지 않는다. alias activation 자체가 상태를
+초기화한다는 뜻은 아니며, decay를 이용한 barrier 생략은 backend capability와 제출 완료를 근거로 해야 한다.
+
 ## 불변 texture의 graphics/compute 읽기 공유
 
 지원 대상은 backend가 `SupportsConcurrentTextureShaderReads()`를 제공하고 명시적 상태가 유지되는
@@ -106,7 +113,17 @@ epilogue는 마지막 compute batch를 기다린 뒤 원래 계획된 최종 상
 계약이 있을 때만 graphics/compute read-read dependency를 생략한다. capability가 없는 backend는
 기존 ownership ordering을 유지한다. 현재 DX12가 이 계약을 지원하며 Vulkan은 지원하지 않는다.
 
+`ExternalShared` 표시용 이미지는 별도 계약이다. 단일 mip/layer의 color image를 전체 CopyDest Write로
+덮어쓴 후 외부 소유자에게 반환한다. native acquire가 이전 내용을 버리므로 Read/Modify를 허용하지
+않고 graphics queue에 남긴다. 전체/범위 planner 모두 ExternalShared→CopyDest→ExternalShared의
+직접 전이를 보존하며, generic Common prologue 또는 batch handoff를 사이에 넣지 않는다.
+
 ## 완료와 실패 후 수명
+
+기록이 끝나면 모든 prologue/main/epilogue batch에 `PrepareSubmissionBatch()`를 호출한다.
+software-to-native 번역과 producer worker 합류를 이 단계에서 끝낸 뒤 RHI 제출 소유자에게 넘긴다.
+이 단계는 GPU wait/signal/submit을 실행하지 않으며, 뒤쪽 batch의 번역이 실패해도 제출된 앞부분이
+생기지 않는다. 이 실패는 `Translation` 진단으로 반환하고 unsubmitted owner를 즉시 해제한다.
 
 각 성공한 native batch 제출의 timeline point를 `QueueExecution::retirement`에 추가한다.
 같은 native fence에서는 가장 큰 발급 값을 유지하고 서로 다른 queue fence는 따로 유지한다.

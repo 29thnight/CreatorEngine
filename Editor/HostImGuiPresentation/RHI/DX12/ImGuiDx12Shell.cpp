@@ -27,6 +27,7 @@ struct ImGuiDx12Shell::Impl
 
     bool active{ false };
     std::atomic<bool> sharedGpuImages{false};
+    std::atomic<uint64_t> sharedAdapterLuid{0};
     bool frameOpen{ false };
     bool deviceLost{ false };
     uint64_t frameIndex{ 0 };
@@ -44,6 +45,7 @@ struct ImGuiDx12Shell::Impl
             return deviceLost;
         }
         deviceLost = true;
+        sharedGpuImages.store(false, std::memory_order_release);
         std::printf("[ImGui] DX12 장치 제거 — 표시를 멈춘다: %s\n", error.c_str());
         std::fflush(stdout);
         return true;
@@ -533,8 +535,13 @@ bool ImGuiDx12Shell::Initialize(void* windowHandle, uint32_t width, uint32_t hei
 
     impl.width = width;
     impl.height = height;
+    const LUID adapter = impl.resources.GetDevice()->GetAdapterLuid();
+    uint64_t adapterBits{};
+    static_assert(sizeof(adapter) == sizeof(adapterBits));
+    std::memcpy(&adapterBits, &adapter, sizeof(adapterBits));
+    impl.sharedAdapterLuid.store(adapterBits, std::memory_order_relaxed);
     impl.sharedGpuImages.store((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) == 0,
-        std::memory_order_release);
+                               std::memory_order_release);
     impl.active = true;
     return true;
 }
@@ -548,8 +555,8 @@ void ImGuiDx12Shell::NewFrame()
 {
     Impl& impl = *m_impl;
     if (!impl.active || impl.frameOpen) return;
-    impl.sharedGpuImages.store((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) == 0,
-        std::memory_order_release);
+    impl.sharedGpuImages.store(!impl.deviceLost && (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) == 0,
+                               std::memory_order_release);
     if (impl.deviceLost)
     {
         ImGui_ImplDX12_NewFrame();
@@ -724,10 +731,11 @@ bool ImGuiDx12Shell::IsTextureReady(const Texture* texture) const
 RHIGpuPresentationCapabilities ImGuiDx12Shell::QueryGpuPresentationCapabilities() const
 {
     RHIGpuPresentationCapabilities capabilities;
-    if (m_impl->active && m_impl->sharedGpuImages.load(std::memory_order_acquire) &&
-        m_impl->resources.GetDevice())
+    // The render thread asks while the UI thread owns device initialization,
+    // loss and shutdown. Publish value data; never inspect native device state.
+    if (m_impl->sharedGpuImages.load(std::memory_order_acquire))
     {
-        const LUID adapter = m_impl->resources.GetDevice()->GetAdapterLuid();
+        const uint64_t adapter = m_impl->sharedAdapterLuid.load(std::memory_order_relaxed);
         static_assert(sizeof(adapter) == sizeof(capabilities.adapter.luid));
         std::memcpy(capabilities.adapter.luid.data(), &adapter, sizeof(adapter));
         capabilities.adapter.valid = true;
@@ -986,6 +994,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
 void ImGuiDx12Shell::Shutdown()
 {
     Impl& impl = *m_impl;
+    impl.sharedGpuImages.store(false, std::memory_order_release);
 
     if (impl.active && impl.frameOpen)
     {

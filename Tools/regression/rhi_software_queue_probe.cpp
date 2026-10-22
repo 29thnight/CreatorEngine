@@ -231,12 +231,12 @@ namespace
 
     class ProbeRecording final : public IRHIQueueRecording,
                                  public IRHIQueueCommandBatch,
-                                 public std::enable_shared_from_this<ProbeRecording>
+                                 public own::enable_owner_from_this<ProbeRecording>
     {
       public:
         std::array<ProbeEncoder, 8> m_encoders;
         RHIQueueIdentity m_identity;
-        std::shared_ptr<const void> m_owner;
+        ce::lifetime_token m_owner;
         ProbeReplayState* m_replay{};
         uint32_t m_targetCount{};
         uint64_t m_id{};
@@ -258,9 +258,9 @@ namespace
             ++encoder.m_segments;
             return encoder;
         }
-        bool Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) override
+        bool Finish(ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override
         {
-            require(submissionDepth && m_replay->active.load() == 0, "native finish before owner join");
+            require(m_replay->active.load() == 0, "native finish before translation workers joined");
             if (m_failFinish)
             {
                 error = "injected native finish failure";
@@ -306,10 +306,10 @@ namespace
       public:
         struct Pending
         {
-            std::shared_ptr<IRHIQueueCommandBatch> batch;
+            ce::pooled_owner<IRHIQueueCommandBatch> batch;
             uint64_t value{};
         };
-        std::shared_ptr<ProbeFence> m_fence = std::make_shared<ProbeFence>();
+        own::shared_owner<ProbeFence> m_fence = own::make_shared<ProbeFence>();
         std::array<Pending, 128> m_pending;
         ProbeEvents* m_events{};
         bool m_rejectSubmit{};
@@ -352,11 +352,11 @@ namespace
             }
             return true;
         }
-        bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value, RHITimelinePoint& point,
+        bool Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, uint64_t value, RHITimelinePoint& point,
                     std::string& error) override
         {
             require(submissionDepth != 0, "native submit bypassed submission owner");
-            const auto native = std::dynamic_pointer_cast<ProbeRecording>(batch);
+            const auto native = ce::dynamic_pooled_cast<ProbeRecording>(batch);
             require(native && native->m_sealed && !native->m_submitted && native->GetQueueIdentity() == GetIdentity(),
                     "invalid translated native batch");
             native->m_submitted = true;
@@ -419,7 +419,7 @@ namespace
         ProbeDeviceServices& m_services;
         uint32_t m_workers;
         ProbeReplayState m_replay;
-        std::weak_ptr<ProbeRecording> m_last;
+        own::weak_owner<ProbeRecording> m_last;
         bool m_failBegin{};
         bool m_failFinish{};
         std::atomic<bool> m_rejectAdmission{};
@@ -429,17 +429,16 @@ namespace
         uint64_t m_nextRecordingId{1};
         IRenderDeviceServices& DeviceServices() const override { return m_services; }
         uint32_t GetWorkerCount() const override { return m_workers; }
-        bool BeginRecording(const std::shared_ptr<IRHICommandQueue>& queue, uint32_t count,
-                            std::shared_ptr<const void> token, std::shared_ptr<IRHIQueueRecording>& result,
-                            std::string& error) override
+        bool BeginRecording(const own::shared_owner<IRHICommandQueue>& queue, uint32_t count, ce::lifetime_token token,
+                            ce::pooled_owner<IRHIQueueRecording>& result, std::string& error) override
         {
-            require(submissionDepth && count > 0 && count <= 8, "native begin outside owner/target contract");
+            require(count > 0 && count <= 8, "native begin outside target contract");
             if (m_failBegin)
             {
                 error = "injected native begin failure";
                 return false;
             }
-            auto recording = std::make_shared<ProbeRecording>();
+            auto recording = own::make_shared<ProbeRecording>();
             recording->m_identity = queue->GetIdentity();
             recording->m_targetCount = count;
             recording->m_owner = std::move(token);
@@ -450,11 +449,11 @@ namespace
             result = std::move(recording);
             return true;
         }
-        bool Record(const std::shared_ptr<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
-                    std::shared_ptr<const void> token, std::shared_ptr<IRHIQueueCommandBatch>& batch,
+        bool Record(const own::shared_owner<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
+                    ce::lifetime_token token, ce::pooled_owner<IRHIQueueCommandBatch>& batch,
                     std::string& error) override
         {
-            std::shared_ptr<IRHIQueueRecording> recording;
+            ce::pooled_owner<IRHIQueueRecording> recording;
             if (!BeginRecording(queue, 1, std::move(token), recording, error))
             {
                 return false;
@@ -520,9 +519,9 @@ namespace
       public:
         uint32_t m_created{};
         RHIQueueCapabilities QueryQueueCapabilities() const override { return {true, true, true, true}; }
-        bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue, std::string&) override
+        bool CreateQueue(RHIQueueKind kind, own::shared_owner<IRHICommandQueue>& queue, std::string&) override
         {
-            auto native = std::make_shared<ProbeQueue>();
+            auto native = own::make_shared<ProbeQueue>();
             native->m_fence->m_identity = {83, ++m_created, kind};
             queue = std::move(native);
             return true;
@@ -532,15 +531,15 @@ namespace
     struct ProbeContext
     {
         ProbeDeviceServices services;
-        std::shared_ptr<ProbeNativeRecorder> native;
-        std::shared_ptr<ProbeValidator> validator = std::make_shared<ProbeValidator>();
+        own::shared_owner<ProbeNativeRecorder> native;
+        own::shared_owner<ProbeValidator> validator = own::make_shared<ProbeValidator>();
         std::unique_ptr<RHISoftwareQueueRecorder> recorder;
-        std::shared_ptr<ProbeQueue> nativeQueue = std::make_shared<ProbeQueue>();
-        std::shared_ptr<IRHICommandQueue> queue;
+        own::shared_owner<ProbeQueue> nativeQueue = own::make_shared<ProbeQueue>();
+        own::shared_owner<IRHICommandQueue> queue;
         explicit ProbeContext(job_scheduler& scheduler, uint32_t workers = 8, bool parallel = true,
                               uint64_t arenaBytes = 256ull << 20)
         {
-            native = std::make_shared<ProbeNativeRecorder>(services, scheduler, workers);
+            native = own::make_shared<ProbeNativeRecorder>(services, scheduler, workers);
             RHISoftwareQueueOptions options;
             options.maxPendingArenaBytes = arenaBytes;
             if (parallel)
@@ -562,10 +561,9 @@ namespace
             // have been retired, including the deliberately unfenced cases.
             nativeQueue->m_pending = {};
         }
-        std::shared_ptr<IRHIQueueCommandBatch> Record(uint32_t targets, std::shared_ptr<const void> token,
-                                                      uint32_t base = 100)
+        ce::pooled_owner<IRHIQueueCommandBatch> Record(uint32_t targets, ce::lifetime_token token, uint32_t base = 100)
         {
-            std::shared_ptr<IRHIQueueRecording> recording;
+            ce::pooled_owner<IRHIQueueRecording> recording;
             std::string error;
             require(recorder->BeginRecording(queue, targets, std::move(token), recording, error),
                     "software begin failed");
@@ -580,7 +578,7 @@ namespace
                     }
                 }
             }
-            std::shared_ptr<IRHIQueueCommandBatch> batch;
+            ce::pooled_owner<IRHIQueueCommandBatch> batch;
             if (!recording->Finish(batch, error))
             {
                 throw std::runtime_error("software finish failed: " + error);
@@ -603,8 +601,8 @@ namespace
             {
                 ProbeContext context(scheduler, workerCount, parallel);
                 const auto targets = (std::max)(1u, workerCount);
-                auto owner = std::make_shared<int>(17);
-                const std::weak_ptr<int> lifetime = owner;
+                auto owner = own::make_shared<int>(17);
+                const own::weak_owner<int> lifetime = owner;
                 auto batch = context.Record(targets, owner);
                 auto alias = batch;
                 require(context.native->m_replay.calls.load() == 0, "recording performed native replay early");
@@ -645,8 +643,8 @@ namespace
         }
         ProbeContext context(scheduler);
         std::string error;
-        auto owner = std::make_shared<int>(1);
-        std::shared_ptr<IRHIQueueCommandBatch> batch;
+        auto owner = own::make_shared<int>(1);
+        ce::pooled_owner<IRHIQueueCommandBatch> batch;
         uint32_t callbacks{};
         require(context.recorder->Record(
                     context.queue,
@@ -664,13 +662,114 @@ namespace
         context.Drain();
     }
 
+    void verify_submission_preparation(job_scheduler& scheduler)
+    {
+        {
+            ProbeContext context(scheduler);
+            auto owner = own::make_shared<int>(1);
+            const own::weak_owner<int> lifetime = owner;
+            auto batch = context.Record(8, owner);
+            owner.reset();
+            std::string error;
+            require(context.recorder->PrepareSubmissionBatch(context.queue, batch, error),
+                    "pre-submit native preparation failed");
+            const auto calls = context.native->m_replay.calls.load();
+            auto native = context.native->m_last.lock();
+            require(calls == 72 && native && native->m_sealed && context.native->m_replay.active.load() == 0,
+                    "preparation returned before native targets were translated and sealed");
+            require(context.native->m_ownerEntries.load() == 0 && context.nativeQueue->m_submissions == 0 &&
+                        context.nativeQueue->m_fence->m_issued.load() == 0,
+                    "preparation entered the native submission transaction");
+            require(context.recorder->PrepareSubmissionBatch(context.queue, batch, error) &&
+                        context.native->m_replay.calls.load() == calls,
+                    "idempotent prepared-batch inspection replayed native commands");
+            RHITimelinePoint point;
+            require(context.recorder->ExecuteSubmission(
+                        [&](std::string& failure) { return context.queue->Submit(batch, 1, point, failure); }, error),
+                    "prepared batch submission failed");
+            require(context.native->m_replay.calls.load() == calls && context.native->m_ownerEntries.load() != 0 &&
+                        context.nativeQueue->m_submissions == 1 && point.IsValid(),
+                    "native submission replayed commands or did not consume the prepared batch once");
+            batch.reset();
+            native.reset();
+            require(!lifetime.expired(), "prepared submission lost the native GPU lifetime owner");
+            context.Drain();
+            require(lifetime.expired(), "prepared batch did not retire after native completion");
+        }
+        {
+            ProbeContext context(scheduler);
+            auto owner = own::make_shared<int>(2);
+            const own::weak_owner<int> lifetime = owner;
+            auto batch = context.Record(4, owner);
+            owner.reset();
+            std::string error;
+            require(context.recorder->PrepareSubmissionBatch(context.queue, batch, error),
+                    "cancelled batch preparation failed");
+            require(!context.native->m_last.expired() && !lifetime.expired(),
+                    "prepared batch did not retain its native storage");
+            batch.reset();
+            require(context.native->m_last.expired() && lifetime.expired() && context.nativeQueue->m_submissions == 0 &&
+                        context.native->m_ownerEntries.load() == 0,
+                    "cancelling prepared work leaked native storage or submitted it");
+        }
+        for (uint32_t failure = 0; failure < 4; ++failure)
+        {
+            ProbeContext context(scheduler);
+            auto first = context.Record(1, own::make_shared<int>(3));
+            auto owner = own::make_shared<int>(4);
+            const own::weak_owner<int> lifetime = owner;
+            auto rejected = context.Record(8, owner, 200);
+            owner.reset();
+            std::string error;
+            require(context.recorder->PrepareSubmissionBatch(context.queue, first, error),
+                    "first batch did not prepare before later preparation failure");
+            switch (failure)
+            {
+            case 0:
+                context.native->m_failBegin = true;
+                break;
+            case 1:
+                context.native->m_failFinish = true;
+                break;
+            case 2:
+                context.native->m_replay.failValue = 200;
+                break;
+            case 3:
+                ++context.services.m_descriptorVersion;
+                break;
+            }
+            RHICommandFailure diagnostic;
+            {
+                const RHICommandFailureScope capture(diagnostic);
+                require(!context.recorder->PrepareSubmissionBatch(context.queue, rejected, error) && !error.empty(),
+                        "failed preparation was accepted");
+            }
+            require(context.native->m_ownerEntries.load() == 0 && context.nativeQueue->m_submissions == 0 &&
+                        context.native->m_replay.active.load() == 0,
+                    "preparation failure submitted a prefix or left translation jobs active");
+            require(diagnostic.stage == RHICommandFailureStage::Translation && !diagnostic.executionUncertain &&
+                        diagnostic.recordingId == rejected->GetRecordingId() && diagnostic.backendGeneration == 19,
+                    "preparation failure lost translation identity or reported uncertain execution");
+            const auto calls = context.native->m_replay.calls.load();
+            require(!context.recorder->PrepareSubmissionBatch(context.queue, rejected, error) &&
+                        context.native->m_replay.calls.load() == calls,
+                    "failed preparation retried a partly translated batch");
+            rejected.reset();
+            require(lifetime.expired(), "failed preparation retained an unsubmitted native owner");
+            first.reset();
+        }
+        std::cout << "{\"test\":\"pre_submit_native_preparation\",\"failure_cases\":4,"
+                     "\"replay_before_transaction\":true,\"no_replay_during_submit\":true,"
+                     "\"cancel_releases_native_owner\":true,\"native_or_gpu\":false}\n";
+    }
+
     void verify_failures(job_scheduler& scheduler)
     {
         for (uint32_t failure = 0; failure < 9; ++failure)
         {
             ProbeContext context(scheduler);
-            auto owner = std::make_shared<int>(1);
-            std::weak_ptr<int> lifetime = owner;
+            auto owner = own::make_shared<int>(1);
+            own::weak_owner<int> lifetime = owner;
             auto batch = context.Record(8, owner);
             owner.reset();
             switch (failure)
@@ -759,7 +858,7 @@ namespace
             require(lifetime.expired(), "failed unsubmitted software/native owner leaked");
         }
         ProbeContext context(scheduler);
-        auto batch = context.Record(1, std::make_shared<int>(1));
+        auto batch = context.Record(1, own::make_shared<int>(1));
         RHICommandFailure diagnostic;
         RHITimelinePoint point;
         context.native->m_rejectAdmission.store(true);
@@ -784,7 +883,7 @@ namespace
         for (const bool uncertain : {false, true})
         {
             ProbeContext context(scheduler);
-            auto batch = context.Record(8, std::make_shared<int>(1));
+            auto batch = context.Record(8, own::make_shared<int>(1));
             context.native->m_dispatchToOwner = true;
             context.nativeQueue->m_throwBeforeExecute = !uncertain;
             context.nativeQueue->m_throwAfterExecute = uncertain;
@@ -802,7 +901,7 @@ namespace
         }
         ProbeContext context(scheduler);
         context.native->m_dispatchToOwner = true;
-        auto batch = context.Record(1, std::make_shared<int>(1));
+        auto batch = context.Record(1, own::make_shared<int>(1));
         RHITimelinePoint point;
         RHICommandFailure failure;
         failure.executionUncertain = true;
@@ -824,7 +923,7 @@ namespace
         context.native->m_replay.failValue = 100;
         context.native->m_replay.gatedValue = 212;
         context.native->m_replay.gate = &gate;
-        auto batch = context.Record(8, std::make_shared<int>(1));
+        auto batch = context.Record(8, own::make_shared<int>(1));
         std::atomic<bool> returned{};
         bool result{};
         std::string error;
@@ -855,7 +954,7 @@ namespace
     void verify_concurrent_aliases(job_scheduler& scheduler)
     {
         ProbeContext context(scheduler);
-        auto batch = context.Record(8, std::make_shared<int>(1));
+        auto batch = context.Record(8, own::make_shared<int>(1));
         std::barrier start(3);
         std::array<bool, 2> results{};
         std::array<RHITimelinePoint, 2> points;
@@ -879,10 +978,10 @@ namespace
     void verify_versions_and_cancel(job_scheduler& scheduler)
     {
         ProbeContext context(scheduler);
-        auto owner = std::make_shared<int>(1);
-        std::weak_ptr<int> lifetime = owner;
-        std::shared_ptr<IRHIQueueRecording> recording;
-        std::shared_ptr<IRHIQueueCommandBatch> batch;
+        auto owner = own::make_shared<int>(1);
+        own::weak_owner<int> lifetime = owner;
+        ce::pooled_owner<IRHIQueueRecording> recording;
+        ce::pooled_owner<IRHIQueueCommandBatch> batch;
         std::string error;
         require(context.recorder->BeginRecording(context.queue, 1, owner, recording, error), "begin failed");
         recording->AcquireEncoder(0).Dispatch(7, 1, 1);
@@ -891,20 +990,20 @@ namespace
         require(!recording->Finish(batch, error) && !batch, "changed upload recording was accepted");
         recording.reset();
         require(lifetime.expired(), "cancel retained a frame owner in idle pool");
-        require(!context.recorder->BeginRecording(context.queue, 0, std::make_shared<int>(1), recording, error),
+        require(!context.recorder->BeginRecording(context.queue, 0, own::make_shared<int>(1), recording, error),
                 "zero target count accepted");
-        require(!context.recorder->BeginRecording(context.queue, 9, std::make_shared<int>(1), recording, error),
+        require(!context.recorder->BeginRecording(context.queue, 9, own::make_shared<int>(1), recording, error),
                 "oversized target count accepted");
-        require(!context.recorder->BeginRecording(context.nativeQueue, 1, std::make_shared<int>(1), recording, error),
+        require(!context.recorder->BeginRecording(context.nativeQueue, 1, own::make_shared<int>(1), recording, error),
                 "native queue bypassed domain validation");
         require(!context.recorder->BeginRecording(context.queue, 1, {}, recording, error),
                 "ownerless recording accepted");
-        auto sealed = context.Record(1, std::make_shared<int>(1));
+        auto sealed = context.Record(1, own::make_shared<int>(1));
         RHITimelinePoint point;
         require(!context.queue->Submit(sealed, 0, point, error), "reserved signal accepted");
         require(context.queue->Submit(sealed, 1, point, error), "invalid argument consumed an otherwise sealed batch");
         context.Drain();
-        require(context.recorder->BeginRecording(context.queue, 8, std::make_shared<int>(1), recording, error),
+        require(context.recorder->BeginRecording(context.queue, 8, own::make_shared<int>(1), recording, error),
                 "empty batch begin failed");
         require(recording->Finish(batch, error), "empty batch seal failed");
         recording.reset();
@@ -914,7 +1013,7 @@ namespace
         require(!context.queue->Signal(3, point, error) && !point.IsValid(), "unissued future signal accepted");
 
         ProbeContext serial(scheduler, 0);
-        require(serial.recorder->BeginRecording(serial.queue, 1, std::make_shared<int>(1), recording, error),
+        require(serial.recorder->BeginRecording(serial.queue, 1, own::make_shared<int>(1), recording, error),
                 "serial-only software begin failed");
         recording->AcquireEncoder(0).Dispatch(1, 1, 1);
         recording->AcquireEncoder(0).Dispatch(2, 1, 1);
@@ -946,7 +1045,7 @@ namespace
             desc.uploadRecordingId = context.services.GetCurrentUploadRecordingId();
             desc.descriptorVersion = context.services.GetDescriptorVersionToken();
             desc.queue = context.nativeQueue->GetIdentity();
-            desc.lifetimeToken = std::make_shared<int>(1);
+            desc.lifetimeToken = own::make_shared<int>(1);
             RHISoftwareBatch input;
             require(software.FinishRecording(order, desc, input, error), "direct software seal failed");
             RHITranslatedBatch translated;
@@ -1000,7 +1099,7 @@ namespace
         desc.uploadRecordingId = context.services.GetCurrentUploadRecordingId();
         desc.descriptorVersion = context.services.GetDescriptorVersionToken();
         desc.queue = context.nativeQueue->GetIdentity();
-        desc.lifetimeToken = std::make_shared<int>(1);
+        desc.lifetimeToken = own::make_shared<int>(1);
         RHISoftwareBatch input;
         require(software.FinishRecording(order, desc, input, error), "canonical failure seal failed");
         const auto recordingId = input.GetRecordingId();
@@ -1027,19 +1126,19 @@ namespace
         ProbeContext context(scheduler);
         ProbeEvents events;
         context.nativeQueue->m_events = &events;
-        auto computeNative = std::make_shared<ProbeQueue>();
+        auto computeNative = own::make_shared<ProbeQueue>();
         computeNative->m_fence->m_identity = {83, 2, RHIQueueKind::Compute};
         computeNative->m_events = &events;
-        std::shared_ptr<IRHICommandQueue> compute;
+        own::shared_owner<IRHICommandQueue> compute;
         std::string error;
         require(context.recorder->WrapQueue(computeNative, compute, error), "compute wrapping failed");
-        auto graphicsFirst = context.Record(1, std::make_shared<int>(1));
-        std::shared_ptr<IRHIQueueCommandBatch> computeBatch;
+        auto graphicsFirst = context.Record(1, own::make_shared<int>(1));
+        ce::pooled_owner<IRHIQueueCommandBatch> computeBatch;
         require(context.recorder->Record(
-                    compute, [](RHIEncoder& encoder) { encoder.Dispatch(7, 1, 1); }, std::make_shared<int>(1),
+                    compute, [](RHIEncoder& encoder) { encoder.Dispatch(7, 1, 1); }, own::make_shared<int>(1),
                     computeBatch, error),
                 "compute recording failed");
-        auto graphicsLast = context.Record(1, std::make_shared<int>(1));
+        auto graphicsLast = context.Record(1, own::make_shared<int>(1));
         ProbeGate middle;
         bool transactionResult{};
         std::string transactionError;
@@ -1090,10 +1189,10 @@ namespace
         computeNative->m_fence->m_completed.store(1);
         require(compute->CollectCompleted() == 1, "compute native retirement was not forwarded");
         ProbeContext other(scheduler);
-        auto foreign = other.Record(1, std::make_shared<int>(1));
+        auto foreign = other.Record(1, own::make_shared<int>(1));
         RHITimelinePoint point;
         require(!context.queue->Submit(foreign, 4, point, error), "foreign recorder domain batch accepted");
-        auto fence = std::make_shared<ProbeFence>();
+        auto fence = own::make_shared<ProbeFence>();
         fence->m_identity = {99, 1, RHIQueueKind::Graphics};
         fence->m_issued.store(1);
         require(!context.queue->Wait({fence, 1}, error), "cross-device timeline wait accepted");
@@ -1102,10 +1201,10 @@ namespace
     void verify_pool_lifetime(job_scheduler& scheduler)
     {
         ProbeDeviceServices services;
-        auto native = std::make_shared<ProbeNativeRecorder>(services, scheduler, 8);
-        auto validator = std::make_shared<ProbeValidator>();
-        std::weak_ptr<ProbeNativeRecorder> nativeLifetime = native;
-        std::weak_ptr<ProbeValidator> validatorLifetime = validator;
+        auto native = own::make_shared<ProbeNativeRecorder>(services, scheduler, 8);
+        auto validator = own::make_shared<ProbeValidator>();
+        own::weak_owner<ProbeNativeRecorder> nativeLifetime = native;
+        own::weak_owner<ProbeValidator> validatorLifetime = validator;
         auto recorder =
             std::make_unique<RHISoftwareQueueRecorder>(native, validator, RHISoftwareQueueOptions{}, scheduler);
         RHISoftwareBatchDesc desc;
@@ -1114,14 +1213,14 @@ namespace
         ProbeFactory factory;
         RHISoftwareQueueFactory wrappedFactory(factory, *recorder);
         require(wrappedFactory.QueryQueueCapabilities().crossQueueTimeline, "factory capabilities were changed");
-        std::shared_ptr<IRHICommandQueue> queue;
+        own::shared_owner<IRHICommandQueue> queue;
         std::string error;
         require(wrappedFactory.CreateQueue(RHIQueueKind::Graphics, queue, error) && factory.m_created == 1,
                 "wrapper created extra native queues");
         require(recorder->WrapQueue(queue, queue, error) && queue, "in-place idempotent wrapping lost queue");
-        std::array<std::shared_ptr<IRHIQueueCommandBatch>, 65> batches;
-        auto owner = std::make_shared<int>(1);
-        const std::weak_ptr<int> lifetime = owner;
+        std::array<ce::pooled_owner<IRHIQueueCommandBatch>, 65> batches;
+        auto owner = own::make_shared<int>(1);
+        const own::weak_owner<int> lifetime = owner;
         for (auto& batch : batches)
         {
             require(recorder->Record(
@@ -1155,11 +1254,11 @@ namespace
         require(arenaBytes > 0, "arena credit sizing did not activate backing storage");
         sizing.CancelRecording();
         ProbeContext context(scheduler, 8, true, arenaBytes);
-        auto first = context.Record(1, std::make_shared<int>(1));
-        auto owner = std::make_shared<int>(2);
-        const std::weak_ptr<int> failedOwner = owner;
-        std::shared_ptr<IRHIQueueRecording> rejected;
-        std::shared_ptr<IRHIQueueCommandBatch> output;
+        auto first = context.Record(1, own::make_shared<int>(1));
+        auto owner = own::make_shared<int>(2);
+        const own::weak_owner<int> failedOwner = owner;
+        ce::pooled_owner<IRHIQueueRecording> rejected;
+        ce::pooled_owner<IRHIQueueCommandBatch> output;
         require(context.recorder->BeginRecording(context.queue, 1, std::move(owner), rejected, error),
                 "byte-limit recording begin failed");
         rejected->AcquireEncoder(0).Dispatch(17, 1, 1);
@@ -1171,44 +1270,44 @@ namespace
         require(!rejected->Finish(output, error), "rejected seal could be retried after credit changed");
         rejected.reset();
         // first remains aliased and GPU-in-flight; only its CPU arena credit is returned.
-        auto next = context.Record(1, std::make_shared<int>(3));
+        auto next = context.Record(1, own::make_shared<int>(3));
         auto alias = next;
         next.reset();
-        require(context.recorder->BeginRecording(context.queue, 1, std::make_shared<int>(4), rejected, error),
+        require(context.recorder->BeginRecording(context.queue, 1, own::make_shared<int>(4), rejected, error),
                 "second byte-limit recording begin failed");
         rejected->AcquireEncoder(0).Dispatch(18, 1, 1);
         require(!rejected->Finish(output, error), "one alias release returned live sealed arena credit");
         rejected.reset();
         alias.reset();
-        auto afterCancel = context.Record(1, std::make_shared<int>(5));
+        auto afterCancel = context.Record(1, own::make_shared<int>(5));
         afterCancel.reset();
         context.native->m_failBegin = true;
-        auto failure = context.Record(1, std::make_shared<int>(6));
+        auto failure = context.Record(1, own::make_shared<int>(6));
         require(!context.queue->Submit(failure, 2, point, error), "injected translation failure succeeded");
         context.native->m_failBegin = false;
-        auto afterFailure = context.Record(1, std::make_shared<int>(7));
+        auto afterFailure = context.Record(1, own::make_shared<int>(7));
         context.native->m_rejectAdmission.store(true);
         require(!context.queue->Submit(afterFailure, 2, point, error), "owner rejection unexpectedly submitted");
-        require(context.recorder->BeginRecording(context.queue, 1, std::make_shared<int>(8), rejected, error),
+        require(context.recorder->BeginRecording(context.queue, 1, own::make_shared<int>(8), rejected, error),
                 "owner rejection follow-up recording failed");
         rejected->AcquireEncoder(0).Dispatch(19, 1, 1);
         require(!rejected->Finish(output, error), "owner admission rejection returned unconsumed arena credit");
         rejected.reset();
         afterFailure.reset();
         context.native->m_rejectAdmission.store(false);
-        auto final = context.Record(1, std::make_shared<int>(9));
+        auto final = context.Record(1, own::make_shared<int>(9));
         require(context.queue->Submit(final, 2, point, error), "credit cancellation/reuse failed");
         context.Drain();
 
         ProbeContext concurrent(scheduler, 8, true, arenaBytes);
-        std::array<std::shared_ptr<IRHIQueueRecording>, 2> recordings;
-        std::array<std::shared_ptr<IRHIQueueCommandBatch>, 2> batches;
+        std::array<ce::pooled_owner<IRHIQueueRecording>, 2> recordings;
+        std::array<ce::pooled_owner<IRHIQueueCommandBatch>, 2> batches;
         std::array<bool, 2> accepted{};
         std::array<std::string, 2> errors;
         for (auto& recording : recordings)
         {
             require(
-                concurrent.recorder->BeginRecording(concurrent.queue, 1, std::make_shared<int>(1), recording, error),
+                concurrent.recorder->BeginRecording(concurrent.queue, 1, own::make_shared<int>(1), recording, error),
                 "concurrent byte-limit begin failed");
             recording->AcquireEncoder(0).Dispatch(21, 1, 1);
         }
@@ -1226,14 +1325,14 @@ namespace
         require(accepted[0] != accepted[1], "concurrent seals overcommitted the domain arena byte limit");
         recordings = {};
         batches = {};
-        auto recycled = concurrent.Record(1, std::make_shared<int>(2));
+        auto recycled = concurrent.Record(1, own::make_shared<int>(2));
         require(bool(recycled), "concurrent cancellation lost arena credit");
     }
 
     void verify_warm_reuse(job_scheduler& scheduler)
     {
         ProbeContext context(scheduler);
-        const auto owner = std::make_shared<int>(1);
+        const auto owner = own::make_shared<int>(1);
         std::array<const IRHIQueueCommandBatch*, 3> addresses{};
         for (size_t repeat = 0; repeat < 4; ++repeat)
         {
@@ -1242,9 +1341,9 @@ namespace
                 auto batch = context.Record(shape == 1 ? 1 : 8, owner);
                 if (repeat)
                 {
-                    require(batch.get() == addresses[shape], "idle CPU recording object was not reused");
+                    require(batch.operator->() == addresses[shape], "idle CPU recording object was not reused");
                 }
-                addresses[shape] = batch.get();
+                addresses[shape] = batch.operator->();
             }
         }
         std::array<uint64_t, 3> allocations{};
@@ -1256,7 +1355,7 @@ namespace
                 const auto before = renderAllocations.load();
                 const auto beforeBytes = renderBytes.load();
                 auto batch = context.Record(shape == 1 ? 1 : 8, owner);
-                require(batch.get() == addresses[shape], "warm wrapper address changed");
+                require(batch.operator->() == addresses[shape], "warm wrapper address changed");
                 const auto count = renderAllocations.load() - before;
                 const auto allocatedBytes = renderBytes.load() - beforeBytes;
                 if (repeat)
@@ -1273,11 +1372,11 @@ namespace
                   << "],\"requested_bytes\":[" << bytes[0] << ',' << bytes[1] << ',' << bytes[2]
                   << "],\"includes_control_blocks\":true,\"native_or_gpu\":false}\n";
 
-        // Fail the next warmed shared-lease control block. std::shared_ptr must
+        // Fail the next warmed shared-lease control block. ce::pooled_owner must
         // return the raw pooled object via its deleter without leaking the owner.
-        auto failedOwner = std::make_shared<int>(1);
-        const std::weak_ptr<int> failedLifetime = failedOwner;
-        std::shared_ptr<IRHIQueueRecording> recording;
+        auto failedOwner = own::make_shared<int>(1);
+        const own::weak_owner<int> failedLifetime = failedOwner;
+        ce::pooled_owner<IRHIQueueRecording> recording;
         std::string error;
         bool rejected{};
         rejectNextAllocation.store(true);
@@ -1291,7 +1390,7 @@ namespace
         }
         require(rejected && failedLifetime.expired() && !recording, "failed pooled lease allocation leaked an owner");
         auto recycled = context.Record(8, owner);
-        require(recycled.get() == addresses[0], "failed lease allocation lost reusable storage");
+        require(recycled.operator->() == addresses[0], "failed lease allocation lost reusable storage");
     }
 } // namespace
 
@@ -1325,6 +1424,8 @@ int main()
         scheduler.start(8);
         activeTest = "basic";
         verify_basic(scheduler);
+        activeTest = "submission_preparation";
+        verify_submission_preparation(scheduler);
         activeTest = "failures";
         verify_failures(scheduler);
         activeTest = "failure_handoff";

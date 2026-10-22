@@ -43,6 +43,7 @@
 #include "../../RHI/Vulkan/VulkanSoftwareCommandValidator.h"
 #include "../../RHI/Vulkan/VulkanSharedDisplayImage.h"
 #include "../../RHI/RHIExecutionPolicy.h"
+#include "../../RHI/RHIDisplaySubmission.h"
 #include "../../RHI/RHISoftwareRecorder.h"
 #include "../../RHI/Vulkan/VulkanPipelineCache.h"
 #include "../../RHI/RHIShaderCompiler.h"
@@ -1434,14 +1435,12 @@ namespace
             {
                 Slot& slot = slots[slotIndex];
                 if (!slot.pending || completed < slot.fenceValue) continue;
-                if (slot.publishable && (!slot.submissionTicket.IsComplete() || !slot.frameTicket.IsComplete()))
+                const auto submission = PollRHIDisplaySubmission(slot.submissionTicket, slot.frameTicket);
+                if (slot.publishable && submission == RHIDisplaySubmissionStatus::Pending)
                 {
                     continue;
                 }
-                RHICommandFailure submissionFailure;
-                const bool submitted = slot.publishable && slot.submissionTicket.IsValid() &&
-                    slot.frameTicket.IsValid() && !slot.submissionTicket.GetCommandFailure(submissionFailure) &&
-                    !slot.frameTicket.GetCommandFailure(submissionFailure);
+                const bool submitted = slot.publishable && submission == RHIDisplaySubmissionStatus::Succeeded;
 
                 RHIReadbackImage image{};
                 std::string readbackError;
@@ -1755,8 +1754,10 @@ namespace
                                 [&](const LivePassNode& node, const LiveBlackboard& board)
                                 {
                                     if (capture && stageCaptureOk)
+                                    {
                                         stageCaptureOk = capture->DeclareStage(resources, graph, board, node, width,
                                                                                height, outError);
+                                    }
                                 });
                 if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(resources, graph, Execution().blackboard, width, height, outError))
@@ -3100,7 +3101,7 @@ namespace
                 request.policy = view.updatePolicy;
                 request.target = DisplayTargetIndex(view.displayTarget);
                 request.force = controlledCaptureFrame || frame.temporalFixture.IsValid() ||
-                    (includeDiagnosticRequests && HasGraphSnapshotRequest(view.displayTarget));
+                                (includeDiagnosticRequests && HasGraphSnapshotRequest(view.displayTarget));
             }
             return requests;
         }
@@ -7510,6 +7511,7 @@ namespace
                                   [&](const LivePassNode& node, const LiveBlackboard& board)
                                   {
                                       if (capture && stageCaptureOk)
+                                      {
                                           stageCaptureOk =
                                               capture->DeclareStage(dx12.Resources(), graph, board, node,
                                                                     node.OutputsDisplayResolution(binding)
@@ -7519,6 +7521,7 @@ namespace
                                                                         ? p.Execution().frameContext.displayHeight
                                                                         : p.Execution().frameContext.height,
                                                                     outError);
+                                      }
                                   });
                 if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(dx12.Resources(), graph, p.Execution().blackboard,
@@ -7748,10 +7751,10 @@ namespace
                         {
                             continue;
                         }
-                        snapshot.motionStaticValid|=draw.geometry->Source()->Bones().empty();
-                        snapshot.motionSkinnedValid|=!draw.geometry->Source()->Bones().empty();
-                        snapshot.motionInstancedValid|=draw.temporalInstanceId!=0;
-                        snapshot.motionAlphaValid|=draw.queue!=material_graph::SceneCoverage::Opaque;
+                        snapshot.motionStaticValid |= draw.geometry->Source()->Bones().empty();
+                        snapshot.motionSkinnedValid |= !draw.geometry->Source()->Bones().empty();
+                        snapshot.motionInstancedValid |= draw.temporalInstanceId != 0;
+                        snapshot.motionAlphaValid |= draw.queue != material_graph::SceneCoverage::Opaque;
                     }
                 }
                 snapshot.motionDecalValid = snapshot.motionVectorsValid && p.Execution().decal.HasPreparedDecals() &&
@@ -8283,18 +8286,14 @@ namespace
                             break;
                         }
                         auto& completedSlot = view.slots[slotIndex];
-                        if (completedSlot.key.IsValid() &&
-                            (!completedSlot.submissionTicket.IsComplete() || !completedSlot.frameTicket.IsComplete()))
+                        const auto submission =
+                            PollRHIDisplaySubmission(completedSlot.submissionTicket, completedSlot.frameTicket);
+                        if (completedSlot.key.IsValid() && submission == RHIDisplaySubmissionStatus::Pending)
                         {
                             break;
                         }
-                        RHICommandFailure submissionFailure;
-                        const bool submitted = completedSlot.submissionTicket.IsValid() &&
-                            completedSlot.frameTicket.IsValid() &&
-                            !completedSlot.submissionTicket.GetCommandFailure(submissionFailure) &&
-                            !completedSlot.frameTicket.GetCommandFailure(submissionFailure);
                         const bool belongsToView =
-                            submitted && completedSlot.key == view.key;
+                            submission == RHIDisplaySubmissionStatus::Succeeded && completedSlot.key == view.key;
                         if (belongsToView)
                         {
                             std::lock_guard<std::mutex> displayLock(
@@ -8883,7 +8882,8 @@ namespace
                                 }
                             }
                         }
-                        if (requiredCredits != 0 && !LiveViewScheduler::HasGpuCredit(pendingGpu) && !renderThreadStopRequested)
+                        if (requiredCredits != 0 && !LiveViewScheduler::HasGpuCredit(pendingGpu) &&
+                            !renderThreadStopRequested)
                         {
                             ++renderGpuAdmissionWaits;
                             // 가장 오래된 제출의 펜스 완료가 깨운다. 새 발행이 깨워도
@@ -10200,8 +10200,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         return;
     }
     const auto viewScheduleRequests = state.ViewScheduleRequests(frame, true);
-    const auto viewPlan = state.viewScheduler.BuildPlan(
-        viewScheduleRequests, cameraCount, capture_steady_nanoseconds());
+    const auto viewPlan =
+        state.viewScheduler.BuildPlan(viewScheduleRequests, cameraCount, capture_steady_nanoseconds());
     struct GeometrySourceGuard final
     {
         LiveState& state;
@@ -10261,13 +10261,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
 
         const auto presentationSink = state.CopyPresentationSink();
-        const auto presentationCapabilities = presentationSink
-            ? presentationSink->QueryGpuPresentationCapabilities() : RHIGpuPresentationCapabilities{};
+        const auto presentationCapabilities =
+            presentationSink ? presentationSink->QueryGpuPresentationCapabilities() : RHIGpuPresentationCapabilities{};
         if (state.vulkanPipeline &&
             (rtWidth != state.vulkanPipeline->width || rtHeight != state.vulkanPipeline->height ||
-                presentationCapabilities.sharedD3D12Resource !=
-                    state.vulkanPipeline->configuredPresentation.sharedD3D12Resource ||
-                presentationCapabilities.adapter != state.vulkanPipeline->configuredPresentation.adapter))
+             presentationCapabilities.sharedD3D12Resource !=
+                 state.vulkanPipeline->configuredPresentation.sharedD3D12Resource ||
+             presentationCapabilities.adapter != state.vulkanPipeline->configuredPresentation.adapter))
         {
             if (!state.TeardownVulkanPipeline())
             {
@@ -10672,8 +10672,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         view->viewFlags = viewPacket.viewFlags;
 
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
-        if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
-            view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete &&
+        if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview && view->displaySlot >= 0 &&
+            view->slots[view->displaySlot].previewComplete &&
             view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !viewPlan.due[packetViewIndex])
         {
             // Reopening a hidden preview reuses its completed image. The public

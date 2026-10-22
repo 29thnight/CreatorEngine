@@ -6,7 +6,7 @@
 using namespace VulkanApi;
 
 bool DescribeVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding,
-                            VulkanImageViewEntry& description)
+                             VulkanImageViewEntry& description)
 {
     if (!image.IsValid())
     {
@@ -27,41 +27,55 @@ bool DescribeVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc
     const uint32_t layers = image.is3D ? 1u : image.depthOrArraySize;
     if (binding.dim == RHIBindingDesc::Dim::Default)
     {
-        description.type = image.is3D ? VK_IMAGE_VIEW_TYPE_3D
-                                     : layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+        description.type = image.is3D   ? VK_IMAGE_VIEW_TYPE_3D
+                           : layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                        : VK_IMAGE_VIEW_TYPE_2D;
     }
     else
     {
         requested.firstMip = binding.mostDetailedMip;
         requested.mipCount = binding.mipLevels;
         requested.firstLayer = binding.firstSlice;
-        requested.layerCount = binding.dim == RHIBindingDesc::Dim::TextureCube ? 6u
-            : binding.dim == RHIBindingDesc::Dim::Texture2DArray ? binding.sliceCount : 1u;
+        requested.layerCount = binding.dim == RHIBindingDesc::Dim::TextureCube      ? 6u
+                               : binding.dim == RHIBindingDesc::Dim::Texture2DArray ? binding.sliceCount
+                                                                                    : 1u;
         switch (binding.dim)
         {
         case RHIBindingDesc::Dim::Texture2D:
-            if (image.is3D) return false;
+            if (image.is3D)
+            {
+                return false;
+            }
             description.type = VK_IMAGE_VIEW_TYPE_2D;
             break;
         case RHIBindingDesc::Dim::Texture2DArray:
-            if (image.is3D) return false;
+            if (image.is3D)
+            {
+                return false;
+            }
             description.type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
             break;
         case RHIBindingDesc::Dim::Texture3D:
-            if (!image.is3D) return false;
+            if (!image.is3D)
+            {
+                return false;
+            }
             description.type = VK_IMAGE_VIEW_TYPE_3D;
             break;
         case RHIBindingDesc::Dim::TextureCube:
             if (image.is3D || image.width != image.height || binding.firstSlice % 6 != 0 ||
-                binding.kind != RHIBindingDesc::Kind::ShaderResource) return false;
+                binding.kind != RHIBindingDesc::Kind::ShaderResource)
+            {
+                return false;
+            }
             description.type = VK_IMAGE_VIEW_TYPE_CUBE;
             break;
         default:
             return false;
         }
     }
-    return ResolveRHITextureSubresourceRange(requested, image.mipLevels, layers,
-                                             RHITextureAspects(image.format), description.range);
+    return ResolveRHITextureSubresourceRange(requested, image.mipLevels, layers, RHITextureAspects(image.format),
+                                             description.range);
 }
 
 VkImageView ResolveVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding)
@@ -71,10 +85,12 @@ VkImageView ResolveVulkanImageView(const VulkanImageEntry& image, const RHIBindi
     {
         return VK_NULL_HANDLE;
     }
-    const VkImageViewType defaultType = image.is3D ? VK_IMAGE_VIEW_TYPE_3D
-        : image.depthOrArraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-    if (requested.type == defaultType && IsWholeRHITextureRange(requested.range, image.mipLevels,
-            image.is3D ? 1u : image.depthOrArraySize, RHITextureAspects(image.format)))
+    const VkImageViewType defaultType = image.is3D                   ? VK_IMAGE_VIEW_TYPE_3D
+                                        : image.depthOrArraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                                                     : VK_IMAGE_VIEW_TYPE_2D;
+    if (requested.type == defaultType &&
+        IsWholeRHITextureRange(requested.range, image.mipLevels, image.is3D ? 1u : image.depthOrArraySize,
+                               RHITextureAspects(image.format)))
     {
         return image.view;
     }
@@ -116,14 +132,14 @@ VkImageView VulkanResourceTable::GetOrCreateImageView(VkDevice device, const RHI
         return VK_NULL_HANDLE;
     }
     auto cache = image.imageViews ? own::make_shared<VulkanImageViewCache>(*image.imageViews)
-                                 : own::make_shared<VulkanImageViewCache>();
+                                  : own::make_shared<VulkanImageViewCache>();
     cache->entries.reserve(cache->entries.size() + 1);
     VkImageViewCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     info.image = image.image;
     info.viewType = view.type;
     info.format = ToVulkan(view.format);
     info.subresourceRange = ToVulkanSubresourceRange(view.range, image.mipLevels,
-        image.is3D ? 1u : image.depthOrArraySize, image.format, true);
+                                                     image.is3D ? 1u : image.depthOrArraySize, image.format, true);
     if (vkCreateImageView(device, &info, nullptr, &view.view) != VK_SUCCESS)
     {
         return VK_NULL_HANDLE;

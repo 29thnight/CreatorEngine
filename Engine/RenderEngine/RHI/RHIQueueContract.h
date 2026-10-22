@@ -115,7 +115,7 @@ struct RHITimelinePoint
 // as evidence that a resource may be reused.
 class RHICompletionSet
 {
-public:
+  public:
     static constexpr size_t kCapacity = 8;
 
     bool Add(const RHITimelinePoint& point)
@@ -160,28 +160,32 @@ public:
         }
         for (const auto& point : other.GetPoints())
         {
-            if (!Add(point)) return false;
+            if (!Add(point))
+            {
+                return false;
+            }
         }
         return true;
     }
 
     bool IsValid() const
     {
-        return m_valid && m_size != 0 && std::all_of(m_points.begin(), m_points.begin() + m_size,
-            [](const RHITimelinePoint& point) { return point.IsValid(); });
+        return m_valid && m_size != 0 &&
+               std::all_of(m_points.begin(), m_points.begin() + m_size,
+                           [](const RHITimelinePoint& point) { return point.IsValid(); });
     }
 
     bool IsComplete() const
     {
         return IsValid() && std::all_of(m_points.begin(), m_points.begin() + m_size,
-            [](const RHITimelinePoint& point) { return point.IsComplete(); });
+                                        [](const RHITimelinePoint& point) { return point.IsComplete(); });
     }
 
     std::span<const RHITimelinePoint> GetPoints() const { return {m_points.data(), m_size}; }
     size_t Size() const { return m_size; }
     void Reset() { *this = {}; }
 
-private:
+  private:
     std::array<RHITimelinePoint, kCapacity> m_points{};
     size_t m_size{0};
     bool m_valid{true};

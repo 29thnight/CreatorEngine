@@ -106,8 +106,8 @@ public:
         std::string& outError);
     // Publish the joined producer fence receipt under displayLifetimeMutex.
     // Stored metadata does not acquire the consumer lease; OpenGpuFrame does.
-    void SealDisplayFrame(DisplayToken token, const RHIDisplayFrameMetadata& metadata,
-        RHICompletionPoint completion, uint64_t observedCompletion);
+    void SealDisplayFrame(DisplayToken token, const RHIDisplayFrameMetadata& metadata, RHICompletionPoint completion,
+                          uint64_t observedCompletion);
     // Allocate once per display slot/generation, before recording graph copies.
     // Caller imports destinations as COPY_DEST and leaves that state after copy.
     bool CreateTemporalDisplayTextures(DisplayToken token, TemporalExtent renderExtent,

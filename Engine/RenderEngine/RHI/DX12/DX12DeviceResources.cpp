@@ -3686,11 +3686,20 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
         // same allocation. Graph range validation needs their actual aspects.
         switch (desc.Format)
         {
-        case DXGI_FORMAT_R16_TYPELESS: info.format = RHIFormat::D16Unorm; break;
-        case DXGI_FORMAT_R32_TYPELESS: info.format = RHIFormat::D32Float; break;
-        case DXGI_FORMAT_R24G8_TYPELESS: info.format = RHIFormat::D24UnormS8Uint; break;
-        case DXGI_FORMAT_R32G8X24_TYPELESS: info.format = RHIFormat::D32FloatS8Uint; break;
-        default: break;
+        case DXGI_FORMAT_R16_TYPELESS:
+            info.format = RHIFormat::D16Unorm;
+            break;
+        case DXGI_FORMAT_R32_TYPELESS:
+            info.format = RHIFormat::D32Float;
+            break;
+        case DXGI_FORMAT_R24G8_TYPELESS:
+            info.format = RHIFormat::D24UnormS8Uint;
+            break;
+        case DXGI_FORMAT_R32G8X24_TYPELESS:
+            info.format = RHIFormat::D32FloatS8Uint;
+            break;
+        default:
+            break;
         }
     }
     info.is3D = desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D;

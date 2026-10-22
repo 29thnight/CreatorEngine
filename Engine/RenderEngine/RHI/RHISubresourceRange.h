@@ -60,8 +60,8 @@ struct RHIBufferSubresourceRange
 };
 
 constexpr bool ResolveRHITextureSubresourceRange(const RHITextureSubresourceRange& range, uint32_t mipLevels,
-                                                uint32_t arrayLayers, RHITextureAspect supportedAspects,
-                                                RHITextureSubresourceRange& resolved)
+                                                 uint32_t arrayLayers, RHITextureAspect supportedAspects,
+                                                 RHITextureSubresourceRange& resolved)
 {
     const uint8_t supported = static_cast<uint8_t>(supportedAspects);
     const uint8_t requested = range.aspect == RHITextureAspect::All ? supported : static_cast<uint8_t>(range.aspect);
@@ -81,7 +81,7 @@ constexpr bool ResolveRHITextureSubresourceRange(const RHITextureSubresourceRang
 }
 
 constexpr bool ResolveRHIBufferSubresourceRange(const RHIBufferSubresourceRange& range, uint64_t bytes,
-                                               RHIBufferSubresourceRange& resolved)
+                                                RHIBufferSubresourceRange& resolved)
 {
     if (bytes == 0 || range.offset >= bytes)
     {

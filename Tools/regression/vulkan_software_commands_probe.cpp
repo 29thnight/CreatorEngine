@@ -91,36 +91,37 @@ namespace
         {
             auto* identity = static_cast<VkPhysicalDeviceIDProperties*>(result->pNext);
             require(identity && identity->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
-                "Shared-image identity did not query the native device ID structure");
+                    "Shared-image identity did not query the native device ID structure");
             identity->deviceLUIDValid = VK_TRUE;
             identity->deviceNodeMask = 1;
             std::memcpy(identity->deviceLUID, &ce::interop_boundary::adapterLuid, VK_LUID_SIZE);
         };
-        vkGetPhysicalDeviceImageFormatProperties2 = [](VkPhysicalDevice,
-            const VkPhysicalDeviceImageFormatInfo2* input, VkImageFormatProperties2* output)
+        vkGetPhysicalDeviceImageFormatProperties2 =
+            [](VkPhysicalDevice, const VkPhysicalDeviceImageFormatInfo2* input, VkImageFormatProperties2* output)
         {
             const auto* external = static_cast<const VkPhysicalDeviceExternalImageFormatInfo*>(input->pNext);
             require(external && external->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO &&
-                external->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT &&
-                input->format == VK_FORMAT_R8G8B8A8_UNORM && input->type == VK_IMAGE_TYPE_2D &&
-                input->tiling == VK_IMAGE_TILING_OPTIMAL,
-                "External format capability query did not describe the transport resource");
+                        external->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT &&
+                        input->format == VK_FORMAT_R8G8B8A8_UNORM && input->type == VK_IMAGE_TYPE_2D &&
+                        input->tiling == VK_IMAGE_TILING_OPTIMAL,
+                    "External format capability query did not describe the transport resource");
             auto* properties = static_cast<VkExternalImageFormatProperties*>(output->pNext);
             output->imageFormatProperties.maxExtent = {4096, 4096, 1};
             output->imageFormatProperties.maxMipLevels = output->imageFormatProperties.maxArrayLayers = 1;
             output->imageFormatProperties.sampleCounts = VK_SAMPLE_COUNT_1_BIT;
-            properties->externalMemoryProperties.externalMemoryFeatures = VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT |
-                VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
-            properties->externalMemoryProperties.compatibleHandleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT;
+            properties->externalMemoryProperties.externalMemoryFeatures =
+                VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT;
+            properties->externalMemoryProperties.compatibleHandleTypes =
+                VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT;
             return failImportStep == 1 ? VK_ERROR_FORMAT_NOT_SUPPORTED : VK_SUCCESS;
         };
         vkGetPhysicalDeviceMemoryProperties = [](VkPhysicalDevice, VkPhysicalDeviceMemoryProperties* result)
         {
             *result = {};
             result->memoryTypeCount = 1;
-            result->memoryTypes[0].propertyFlags =
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+            result->memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
+                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
             result->memoryHeapCount = 1;
             result->memoryHeaps[0].size = 1ull << 30;
         };
@@ -151,13 +152,17 @@ namespace
             {
                 const auto* importInfo = static_cast<const VkImportMemoryWin32HandleInfoKHR*>(info->pNext);
                 require(importInfo && importInfo->sType == VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR &&
-                    importInfo->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT && importInfo->handle,
-                    "Shared image allocation omitted its Win32 import handle");
+                            importInfo->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT &&
+                            importInfo->handle,
+                        "Shared image allocation omitted its Win32 import handle");
                 const auto* dedicated = static_cast<const VkMemoryDedicatedAllocateInfo*>(importInfo->pNext);
                 require(dedicated && dedicated->sType == VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO &&
-                    dedicated->image && !dedicated->buffer && info->memoryTypeIndex == 0,
-                    "Shared image allocation lost its dedicated image or compatible memory type");
-                if (failImportStep == 4) return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+                            dedicated->image && !dedicated->buffer && info->memoryTypeIndex == 0,
+                        "Shared image allocation lost its dedicated image or compatible memory type");
+                if (failImportStep == 4)
+                {
+                    return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+                }
                 ++sharedMemoryImports;
             }
             *result = make_handle<VkDeviceMemory>();
@@ -169,13 +174,16 @@ namespace
         {
             const auto* external = static_cast<const VkExternalMemoryImageCreateInfo*>(info->pNext);
             require(external && external->sType == VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO &&
-                external->handleTypes == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT &&
-                info->imageType == VK_IMAGE_TYPE_2D && info->format == VK_FORMAT_R8G8B8A8_UNORM &&
-                info->mipLevels == 1 && info->arrayLayers == 1 && info->samples == VK_SAMPLE_COUNT_1_BIT &&
-                info->initialLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-                (info->usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT),
-                "Imported Vulkan image did not match its dedicated D3D12 resource");
-            if (failImportStep == 2) return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+                        external->handleTypes == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT &&
+                        info->imageType == VK_IMAGE_TYPE_2D && info->format == VK_FORMAT_R8G8B8A8_UNORM &&
+                        info->mipLevels == 1 && info->arrayLayers == 1 && info->samples == VK_SAMPLE_COUNT_1_BIT &&
+                        info->initialLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+                        (info->usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT),
+                    "Imported Vulkan image did not match its dedicated D3D12 resource");
+            if (failImportStep == 2)
+            {
+                return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+            }
             *result = make_handle<VkImage>();
             ++sharedImageCreates;
             return VK_SUCCESS;
@@ -183,10 +191,10 @@ namespace
         vkGetImageMemoryRequirements = [](VkDevice, VkImage, VkMemoryRequirements* result)
         { *result = {64 * 64 * 4, 256, 1}; };
         vkGetMemoryWin32HandlePropertiesKHR = [](VkDevice, VkExternalMemoryHandleTypeFlagBits type, HANDLE handle,
-            VkMemoryWin32HandlePropertiesKHR* result)
+                                                 VkMemoryWin32HandlePropertiesKHR* result)
         {
             require(type == VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT && handle,
-                "Imported memory type query used the wrong external handle kind");
+                    "Imported memory type query used the wrong external handle kind");
             result->memoryTypeBits = 1;
             return failImportStep == 3 ? VK_ERROR_INVALID_EXTERNAL_HANDLE : VK_SUCCESS;
         };
@@ -214,8 +222,14 @@ namespace
         vkCreateImageView =
             [](VkDevice, const VkImageViewCreateInfo* info, const VkAllocationCallbacks*, VkImageView* result)
         {
-            if (observeImageCommands) observedImageView = *info;
-            if (importingSharedImage && failImportStep == 6) return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+            if (observeImageCommands)
+            {
+                observedImageView = *info;
+            }
+            if (importingSharedImage && failImportStep == 6)
+            {
+                return VK_ERROR_OUT_OF_DEVICE_MEMORY;
+            }
             *result = make_handle<VkImageView>();
             return VK_SUCCESS;
         };
@@ -310,21 +324,31 @@ namespace
                                    const VkClearRect*) {};
         vkCmdPipelineBarrier2 = [](VkCommandBuffer, const VkDependencyInfo* info)
         {
-            if (!observeImageCommands) return;
+            if (!observeImageCommands)
+            {
+                return;
+            }
             observedImageBarriers.clear();
             observedBufferBarriers.clear();
             if (info->imageMemoryBarrierCount)
+            {
                 observedImageBarriers.assign(info->pImageMemoryBarriers,
-                    info->pImageMemoryBarriers + info->imageMemoryBarrierCount);
+                                             info->pImageMemoryBarriers + info->imageMemoryBarrierCount);
+            }
             if (info->bufferMemoryBarrierCount)
+            {
                 observedBufferBarriers.assign(info->pBufferMemoryBarriers,
-                    info->pBufferMemoryBarriers + info->bufferMemoryBarrierCount);
+                                              info->pBufferMemoryBarriers + info->bufferMemoryBarrierCount);
+            }
         };
         vkCmdCopyBuffer = [](VkCommandBuffer, VkBuffer, VkBuffer, uint32_t, const VkBufferCopy*) {};
         vkCmdCopyImage = [](VkCommandBuffer, VkImage, VkImageLayout, VkImage, VkImageLayout, uint32_t count,
                             const VkImageCopy* regions)
         {
-            if (observeImageCommands) observedImageCopies.assign(regions, regions + count);
+            if (observeImageCommands)
+            {
+                observedImageCopies.assign(regions, regions + count);
+            }
         };
         vkCmdClearColorImage = [](VkCommandBuffer, VkImage, VkImageLayout, const VkClearColorValue*, uint32_t,
                                   const VkImageSubresourceRange*) {};
@@ -584,33 +608,46 @@ namespace
         image.format = RHIFormat::RGBA8Unorm;
         const RHITextureHandle texture = fixture.device.m_resourceTable.AddImage(image);
         observeImageCommands = true;
-        RHITransition transition{texture, RHIResourceState::Common, RHIResourceState::ShaderResource,
-            {1, 2, 2, 2, RHITextureAspect::Color}};
+        RHITransition transition{
+            texture, RHIResourceState::Common, RHIResourceState::ShaderResource, {1, 2, 2, 2, RHITextureAspect::Color}};
         RHIBufferTransition buffer{fixture.arguments, RHIResourceState::Common, RHIResourceState::CopyDest, {17, 31}};
         RHIBarrierBatch batch{{&transition, 1}, {&buffer, 1}};
         encoder.ResourceBarriers(batch);
         require(observedImageBarriers.size() == 1 && observedBufferBarriers.size() == 1,
-            "Subresource barriers lost their native image/buffer payloads");
+                "Subresource barriers lost their native image/buffer payloads");
         const auto range = observedImageBarriers[0].subresourceRange;
-        require(range.baseMipLevel == 1 && range.levelCount == 2 && range.baseArrayLayer == 2 && range.layerCount == 2 &&
-            range.aspectMask == VK_IMAGE_ASPECT_COLOR_BIT && observedBufferBarriers[0].offset == 17 &&
-            observedBufferBarriers[0].size == 31, "Native barriers widened precise subresource ranges");
+        require(range.baseMipLevel == 1 && range.levelCount == 2 && range.baseArrayLayer == 2 &&
+                    range.layerCount == 2 && range.aspectMask == VK_IMAGE_ASPECT_COLOR_BIT &&
+                    observedBufferBarriers[0].offset == 17 && observedBufferBarriers[0].size == 31,
+                "Native barriers widened precise subresource ranges");
         require(encoder.GetRecordedImageLayout(texture, transition.range, VK_IMAGE_LAYOUT_GENERAL) ==
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, "Partial layout tracker lost the recorded range");
-        transition = {texture, RHIResourceState::ShaderResource, RHIResourceState::UnorderedAccess,
-            {2, 1, 3, 1, RHITextureAspect::Color}};
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                "Partial layout tracker lost the recorded range");
+        transition = {texture,
+                      RHIResourceState::ShaderResource,
+                      RHIResourceState::UnorderedAccess,
+                      {2, 1, 3, 1, RHITextureAspect::Color}};
         encoder.ResourceBarriers({{&transition, 1}});
         bool mixedRejected = false;
         try
         {
             encoder.GetRecordedImageLayout(texture, {1, 2, 2, 2, RHITextureAspect::Color}, VK_IMAGE_LAYOUT_GENERAL);
         }
-        catch (const std::invalid_argument&) { mixedRejected = true; }
+        catch (const std::invalid_argument&)
+        {
+            mixedRejected = true;
+        }
         require(mixedRejected, "Mixed-layout descriptor view was silently accepted");
         buffer.range = {UINT64_MAX, 1};
         bool overflowRejected = false;
-        try { encoder.ResourceBarriers({{}, {&buffer, 1}}); }
-        catch (const std::invalid_argument&) { overflowRejected = true; }
+        try
+        {
+            encoder.ResourceBarriers({{}, {&buffer, 1}});
+        }
+        catch (const std::invalid_argument&)
+        {
+            overflowRejected = true;
+        }
         require(overflowRejected, "Overflowing native buffer range was accepted");
 
         RHIBindingDesc binding;
@@ -623,14 +660,15 @@ namespace
         const auto view = fixture.device.m_resourceTable.GetOrCreateImageView(fixture.device.GetDevice(), binding);
         const auto frozen = fixture.device.m_resourceTable.Resolve(texture);
         require(view && observedImageView.subresourceRange.baseMipLevel == 1 &&
-            observedImageView.subresourceRange.levelCount == 2 && observedImageView.subresourceRange.baseArrayLayer == 2 &&
-            observedImageView.subresourceRange.layerCount == 2 && frozen.imageViews->entries.size() == 1,
-            "Native descriptor view did not preserve mip/layer range");
+                    observedImageView.subresourceRange.levelCount == 2 &&
+                    observedImageView.subresourceRange.baseArrayLayer == 2 &&
+                    observedImageView.subresourceRange.layerCount == 2 && frozen.imageViews->entries.size() == 1,
+                "Native descriptor view did not preserve mip/layer range");
         binding.firstSlice = 4;
         require(fixture.device.m_resourceTable.GetOrCreateImageView(fixture.device.GetDevice(), binding) &&
-            frozen.imageViews->entries.size() == 1 &&
-            fixture.device.m_resourceTable.Resolve(texture).imageViews->entries.size() == 2,
-            "Mutable view creation changed a frozen recording cache generation");
+                    frozen.imageViews->entries.size() == 1 &&
+                    fixture.device.m_resourceTable.Resolve(texture).imageViews->entries.size() == 2,
+                "Mutable view creation changed a frozen recording cache generation");
 
         VulkanImageEntry destination = image;
         destination.image = make_handle<VkImage>();
@@ -638,10 +676,11 @@ namespace
         const auto copiedTexture = fixture.device.m_resourceTable.AddImage(destination);
         encoder.CopyTexture(copiedTexture, texture, 9, 14);
         require(observedImageCopies.size() == 1 && observedImageCopies[0].srcSubresource.mipLevel == 2 &&
-            observedImageCopies[0].srcSubresource.baseArrayLayer == 3 &&
-            observedImageCopies[0].dstSubresource.mipLevel == 1 &&
-            observedImageCopies[0].dstSubresource.baseArrayLayer == 2 && observedImageCopies[0].extent.width == 16,
-            "CopyTexture did not decode exact array/mip subresource indices");
+                    observedImageCopies[0].srcSubresource.baseArrayLayer == 3 &&
+                    observedImageCopies[0].dstSubresource.mipLevel == 1 &&
+                    observedImageCopies[0].dstSubresource.baseArrayLayer == 2 &&
+                    observedImageCopies[0].extent.width == 16,
+                "CopyTexture did not decode exact array/mip subresource indices");
 
         VulkanImageEntry external;
         external.image = make_handle<VkImage>();
@@ -654,20 +693,20 @@ namespace
         transition = {display, RHIResourceState::ExternalShared, RHIResourceState::CopyDest};
         encoder.ResourceBarriers({{&transition, 1}});
         require(observedImageBarriers[0].srcQueueFamilyIndex == VK_QUEUE_FAMILY_EXTERNAL &&
-            observedImageBarriers[0].dstQueueFamilyIndex == 3 &&
-            observedImageBarriers[0].oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-            observedImageBarriers[0].newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            "External image acquisition lost ownership or overwrite layout");
+                    observedImageBarriers[0].dstQueueFamilyIndex == 3 &&
+                    observedImageBarriers[0].oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+                    observedImageBarriers[0].newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                "External image acquisition lost ownership or overwrite layout");
         encoder.CopyTexture(display, fixture.image);
         require(observedImageCopies[0].extent.width == 64 && observedImageCopies[0].extent.height == 64,
-            "Shared display copy did not overwrite the complete image");
+                "Shared display copy did not overwrite the complete image");
         transition = {display, RHIResourceState::CopyDest, RHIResourceState::ExternalShared};
         encoder.ResourceBarriers({{&transition, 1}});
         require(observedImageBarriers[0].srcQueueFamilyIndex == 3 &&
-            observedImageBarriers[0].dstQueueFamilyIndex == VK_QUEUE_FAMILY_EXTERNAL &&
-            observedImageBarriers[0].newLayout == VK_IMAGE_LAYOUT_GENERAL &&
-            observedImageBarriers[0].dstStageMask == VK_PIPELINE_STAGE_2_NONE,
-            "Shared display release did not publish external ownership/layout");
+                    observedImageBarriers[0].dstQueueFamilyIndex == VK_QUEUE_FAMILY_EXTERNAL &&
+                    observedImageBarriers[0].newLayout == VK_IMAGE_LAYOUT_GENERAL &&
+                    observedImageBarriers[0].dstStageMask == VK_PIPELINE_STAGE_2_NONE,
+                "Shared display release did not publish external ownership/layout");
         observeImageCommands = false;
     }
 
@@ -675,7 +714,7 @@ namespace
     {
         class Timeline final : public IRHITimelineFence
         {
-        public:
+          public:
             RHIQueueIdentity identity{1, 1, RHIQueueKind::Graphics};
             RHITimelineSnapshot completion{RHITimelineStatus::Available, 0};
             uint64_t issued{7};
@@ -688,8 +727,9 @@ namespace
         compute->identity = {1, 2, RHIQueueKind::Compute};
         RHICompletionSet completion;
         require(!completion.IsComplete() && completion.Add(RHITimelinePoint{graphics, 3}) &&
-            completion.Add(RHITimelinePoint{graphics, 5}) && completion.Add(RHITimelinePoint{compute, 7}) &&
-            completion.Size() == 2, "Completion set did not retain distinct queue timelines");
+                    completion.Add(RHITimelinePoint{graphics, 5}) && completion.Add(RHITimelinePoint{compute, 7}) &&
+                    completion.Size() == 2,
+                "Completion set did not retain distinct queue timelines");
         graphics->completion.completedValue = 5;
         require(!completion.IsComplete(), "Graphics completion retired an outstanding compute reader");
         compute->completion.completedValue = 7;
@@ -697,28 +737,30 @@ namespace
         compute->completion.status = RHITimelineStatus::DeviceLost;
         require(!completion.IsComplete(), "Device loss was misread as successful completion");
         require(!completion.Add(RHITimelinePoint{graphics, 0}) && !completion.IsValid(),
-            "Invalid completion did not poison retirement");
+                "Invalid completion did not poison retirement");
         for (const auto software : {"0", "1"})
         {
             for (const auto queues : {"0", "1", "2"})
             {
                 const auto policy = ParseRHIExecutionPolicy(software, queues);
                 require((policy.cpu == RHICpuExecutor::SoftwareParallel) == (std::string_view{software} == "1") &&
-                    static_cast<uint32_t>(policy.gpu) == static_cast<uint32_t>(queues[0] - '0'),
-                    "CPU executor selection changed GPU queue placement");
+                            static_cast<uint32_t>(policy.gpu) == static_cast<uint32_t>(queues[0] - '0'),
+                        "CPU executor selection changed GPU queue placement");
                 const auto single = ResolveRHIExecutionPolicy(policy, {false, false});
                 const auto owned = ResolveRHIExecutionPolicy(policy, {true, false});
                 const auto asynchronous = ResolveRHIExecutionPolicy(policy, {true, true});
                 require(single.effective.cpu == policy.cpu && owned.effective.cpu == policy.cpu &&
-                    asynchronous.effective == policy && single.effective.gpu == RHIGpuQueuePolicy::PrimaryGraphics &&
-                    (single.fallback == RHIQueuePolicyFallback::None) ==
-                        (policy.gpu == RHIGpuQueuePolicy::PrimaryGraphics),
-                    "Unsupported queue policy altered CPU recording or silently retained unavailable queues");
+                            asynchronous.effective == policy &&
+                            single.effective.gpu == RHIGpuQueuePolicy::PrimaryGraphics &&
+                            (single.fallback == RHIQueuePolicyFallback::None) ==
+                                (policy.gpu == RHIGpuQueuePolicy::PrimaryGraphics),
+                        "Unsupported queue policy altered CPU recording or silently retained unavailable queues");
                 require((owned.fallback == RHIQueuePolicyFallback::ComputeQueueUnavailable) ==
-                        (policy.gpu == RHIGpuQueuePolicy::GraphicsCompute) &&
-                    owned.effective.gpu == (policy.gpu == RHIGpuQueuePolicy::GraphicsCompute
-                        ? RHIGpuQueuePolicy::OwnedGraphics : policy.gpu),
-                    "Compute fallback did not preserve the supported owned graphics queue");
+                                (policy.gpu == RHIGpuQueuePolicy::GraphicsCompute) &&
+                            owned.effective.gpu == (policy.gpu == RHIGpuQueuePolicy::GraphicsCompute
+                                                        ? RHIGpuQueuePolicy::OwnedGraphics
+                                                        : policy.gpu),
+                        "Compute fallback did not preserve the supported owned graphics queue");
             }
         }
 
@@ -761,36 +803,37 @@ namespace
             const auto images = sharedImageCreates;
             const auto destroyed = destroyedImages.load();
             VulkanSharedDisplayImage failed;
-            require(!failed.Initialize(fixture.device, 64, 64, consumer, fixture.error) &&
-                !fixture.error.empty() && !failed.GetTexture().IsValid(),
-                "Failed shared transport initialization published a partial image");
+            require(!failed.Initialize(fixture.device, 64, 64, consumer, fixture.error) && !fixture.error.empty() &&
+                        !failed.GetTexture().IsValid(),
+                    "Failed shared transport initialization published a partial image");
             require(ce::interop_boundary::liveObjects == 0 && ce::interop_boundary::liveHandles == 0 &&
-                destroyedImages - destroyed == sharedImageCreates - images,
-                "Shared transport initialization failure leaked native ownership");
+                        destroyedImages - destroyed == sharedImageCreates - images,
+                    "Shared transport initialization failure leaked native ownership");
         }
         ce::interop_boundary::failStep = failImportStep = 0;
         auto producer = own::make_shared<VulkanSharedDisplayImage>();
         auto incompatible = consumer;
         incompatible.adapter.nodeMask = 2;
         require(!producer->Initialize(fixture.device, 64, 64, incompatible, fixture.error) &&
-            !producer->GetTexture().IsValid(), "Shared transport accepted an incompatible linked-adapter node");
+                    !producer->GetTexture().IsValid(),
+                "Shared transport accepted an incompatible linked-adapter node");
         require(producer->Initialize(fixture.device, 64, 64, consumer, fixture.error),
-            "Compatible shared transport failed initialization");
+                "Compatible shared transport failed initialization");
         const auto native = fixture.device.m_resourceTable.Resolve(producer->GetTexture());
         const auto metadata = fixture.device.DescribeTexture(producer->GetTexture());
-        require(native.externalShared && native.queueFamily == fixture.device.GetQueueFamily() &&
-            native.memory && native.view && metadata.width == 64 && metadata.height == 64 &&
-            metadata.mipLevels == 1 && !metadata.is3D,
-            "Shared transport registry metadata did not retain external image ownership");
+        require(native.externalShared && native.queueFamily == fixture.device.GetQueueFamily() && native.memory &&
+                    native.view && metadata.width == 64 && metadata.height == 64 && metadata.mipLevels == 1 &&
+                    !metadata.is3D,
+                "Shared transport registry metadata did not retain external image ownership");
         require(ce::interop_boundary::resourceInitialState == D3D12_RESOURCE_STATE_COMMON &&
-            ce::interop_boundary::resourceHeap.CreationNodeMask == 1 &&
-            ce::interop_boundary::resourceHeap.VisibleNodeMask == 1 &&
-            ce::interop_boundary::resourceDescription.Width == 64 &&
-            ce::interop_boundary::resourceDescription.Height == 64 &&
-            ce::interop_boundary::resourceDescription.Format == DXGI_FORMAT_R8G8B8A8_UNORM &&
-            ce::interop_boundary::resourceDescription.MipLevels == 1 &&
-            ce::interop_boundary::resourceDescription.DepthOrArraySize == 1,
-            "D3D12 transport allocation did not match the import description/state");
+                    ce::interop_boundary::resourceHeap.CreationNodeMask == 1 &&
+                    ce::interop_boundary::resourceHeap.VisibleNodeMask == 1 &&
+                    ce::interop_boundary::resourceDescription.Width == 64 &&
+                    ce::interop_boundary::resourceDescription.Height == 64 &&
+                    ce::interop_boundary::resourceDescription.Format == DXGI_FORMAT_R8G8B8A8_UNORM &&
+                    ce::interop_boundary::resourceDescription.MipLevels == 1 &&
+                    ce::interop_boundary::resourceDescription.DepthOrArraySize == 1,
+                "D3D12 transport allocation did not match the import description/state");
         require(producer->CanReuse(), "Unpublished shared image acquired a permanent consumer lease");
         RHIDisplayFrameMetadata frame;
         frame.m_frameId = 23;
@@ -798,17 +841,17 @@ namespace
         require(!image.IsReady() && producer->CanReuse(), "Incomplete producer image retained publication ownership");
         image = producer->DescribeCompletedFrame(frame, {7}, 7, producer);
         require(image.IsCompatible(consumer) && image.metadata.m_frameId == 23 && !producer->CanReuse(),
-            "Published GPU image lost metadata or its consumer reuse exclusion");
+                "Published GPU image lost metadata or its consumer reuse exclusion");
         image = {};
         require(producer->CanReuse(), "Consumer image release failed to make the completed slot reusable");
         image = producer->DescribeCompletedFrame(frame, {7}, 7, producer);
         producer.reset();
         require(ce::interop_boundary::liveHandles == 1 && image.IsReady(),
-            "Published transport handle was destroyed before its immutable image owner");
+                "Published transport handle was destroyed before its immutable image owner");
         const auto texture = native.image;
         image = {};
         require(ce::interop_boundary::liveObjects == 0 && ce::interop_boundary::liveHandles == 0 && texture,
-            "Shared transport final publication release leaked native ownership");
+                "Shared transport final publication release leaked native ownership");
         importingSharedImage = false;
     }
 
@@ -822,15 +865,15 @@ namespace
         resource.description.DepthOrArraySize = 3;
         std::vector<D3D12_RESOURCE_BARRIER> barriers;
         AppendDX12TextureTransitions(resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST,
-            {1, 2, 1, 1, RHITextureAspect::Stencil}, barriers);
+                                     {1, 2, 1, 1, RHITextureAspect::Stencil}, barriers);
         require(barriers.size() == 2 && barriers[0].Transition.Subresource == 17 &&
-            barriers[1].Transition.Subresource == 18,
-            "DX12 stencil/mip/layer range did not select its exact native subresources");
+                    barriers[1].Transition.Subresource == 18,
+                "DX12 stencil/mip/layer range did not select its exact native subresources");
         barriers.clear();
-        AppendDX12TextureTransitions(resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST,
-            {}, barriers);
+        AppendDX12TextureTransitions(resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST, {},
+                                     barriers);
         require(barriers.size() == 1 && barriers[0].Transition.Subresource == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-            "DX12 whole texture transition lost its all-subresource fast path");
+                "DX12 whole texture transition lost its all-subresource fast path");
         resource.description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
         resource.description.DepthOrArraySize = 16;
         resource.description.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -839,16 +882,25 @@ namespace
         try
         {
             AppendDX12TextureTransitions(resource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST,
-                {0, 1, 1, 1, RHITextureAspect::Color}, barriers);
+                                         {0, 1, 1, 1, RHITextureAspect::Color}, barriers);
         }
-        catch (const std::invalid_argument&) { rejected = true; }
+        catch (const std::invalid_argument&)
+        {
+            rejected = true;
+        }
         require(rejected, "DX12 interpreted a volume depth slice as an array layer");
         resource.description.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
         resource.description.Width = 128;
         ValidateDX12BufferTransitionRange(resource, {});
         rejected = false;
-        try { ValidateDX12BufferTransitionRange(resource, {16, 32}); }
-        catch (const std::invalid_argument&) { rejected = true; }
+        try
+        {
+            ValidateDX12BufferTransitionRange(resource, {16, 32});
+        }
+        catch (const std::invalid_argument&)
+        {
+            rejected = true;
+        }
         require(rejected, "DX12 legacy buffer states silently accepted partial transitions");
     }
 

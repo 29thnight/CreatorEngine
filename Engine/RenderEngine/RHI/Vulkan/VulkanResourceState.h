@@ -49,11 +49,14 @@ struct VulkanBarrierState
 };
 
 inline void ApplyVulkanExternalImageOwnership(const RHITransition& transition, bool externalShared,
-    uint32_t queueFamily, VkImageMemoryBarrier2& barrier)
+                                              uint32_t queueFamily, VkImageMemoryBarrier2& barrier)
 {
     const bool acquire = transition.before == RHIResourceState::ExternalShared;
     const bool release = transition.after == RHIResourceState::ExternalShared;
-    if (!acquire && !release) return;
+    if (!acquire && !release)
+    {
+        return;
+    }
     if (!externalShared || queueFamily == VK_QUEUE_FAMILY_IGNORED || acquire == release ||
         barrier.subresourceRange.aspectMask != VK_IMAGE_ASPECT_COLOR_BIT ||
         barrier.subresourceRange.baseMipLevel != 0 || barrier.subresourceRange.levelCount != 1 ||
@@ -80,9 +83,9 @@ inline void ApplyVulkanExternalImageOwnership(const RHITransition& transition, b
     }
 }
 
-inline VkImageSubresourceRange ToVulkanSubresourceRange(const RHITextureSubresourceRange& range,
-                                                       uint32_t mipLevels, uint32_t arrayLayers, RHIFormat format,
-                                                       bool separateDepthStencil)
+inline VkImageSubresourceRange ToVulkanSubresourceRange(const RHITextureSubresourceRange& range, uint32_t mipLevels,
+                                                        uint32_t arrayLayers, RHIFormat format,
+                                                        bool separateDepthStencil)
 {
     const RHITextureAspect supported = RHITextureAspects(format);
     RHITextureSubresourceRange resolved;

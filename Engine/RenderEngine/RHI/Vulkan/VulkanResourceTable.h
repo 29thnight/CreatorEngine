@@ -79,8 +79,8 @@ struct VulkanImageEntry
     uint32_t  mipLevels{ 1 };
     RHIFormat format{ RHIFormat::Unknown };
     bool      is3D{ false };
-    bool      externalShared{false};
-    uint32_t  queueFamily{VK_QUEUE_FAMILY_IGNORED};
+    bool externalShared{false};
+    uint32_t queueFamily{VK_QUEUE_FAMILY_IGNORED};
 
     /// 지금 레이아웃. 배리어가 `oldLayout` 을 요구하는데 Vulkan 은 그것을
     /// 되물을 방법이 없다 — 아는 쪽이 적어 둔다(`RHITransition::before` 가
@@ -94,7 +94,7 @@ struct VulkanImageEntry
 };
 
 bool DescribeVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding,
-                            VulkanImageViewEntry& description);
+                             VulkanImageViewEntry& description);
 VkImageView ResolveVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding);
 
 /// 표 한 칸이 드는 버퍼.

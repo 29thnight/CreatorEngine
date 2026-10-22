@@ -647,9 +647,8 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
             }
             if (!entry.IsValid()) return;
 
-            const VkImageView view = m_recordingResources
-                ? ResolveVulkanImageView(entry, desc)
-                : m_resources->GetOrCreateImageView(m_device, desc);
+            const VkImageView view = m_recordingResources ? ResolveVulkanImageView(entry, desc)
+                                                          : m_resources->GetOrCreateImageView(m_device, desc);
 
             if (VK_NULL_HANDLE == view)
             {
@@ -675,8 +674,9 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
                 return;
             }
             pending.image.imageLayout = GetRecordedImageLayout(desc.resource, bindingView.range,
-                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type ? VK_IMAGE_LAYOUT_GENERAL
-                                                                 : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                                               VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type
+                                                                   ? VK_IMAGE_LAYOUT_GENERAL
+                                                                   : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         resolved.push_back(pending);
     }
@@ -820,8 +820,8 @@ void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
     NoteUnimplemented("ClearRenderTargetRect");  // 〃
 }
 
-VkImageLayout VulkanEncoder::GetRecordedImageLayout(RHITextureHandle texture,
-    const RHITextureSubresourceRange& range, VkImageLayout fallback) const
+VkImageLayout VulkanEncoder::GetRecordedImageLayout(RHITextureHandle texture, const RHITextureSubresourceRange& range,
+                                                    VkImageLayout fallback) const
 {
     const auto overlaps = [](const RHITextureSubresourceRange& left, const RHITextureSubresourceRange& right)
     {
@@ -909,13 +909,14 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = entry.image;
-        barrier.subresourceRange = ToVulkanSubresourceRange(transition.range, entry.mipLevels,
-            entry.is3D ? 1u : entry.depthOrArraySize, entry.format, m_resources->SupportsSeparateDepthStencilLayouts());
+        barrier.subresourceRange =
+            ToVulkanSubresourceRange(transition.range, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                     entry.format, m_resources->SupportsSeparateDepthStencilLayouts());
         ApplyVulkanExternalImageOwnership(transition, entry.externalShared, entry.queueFamily, barrier);
         imageBarriers.push_back(barrier);
         RHITextureSubresourceRange resolved;
-        ResolveRHITextureSubresourceRange(transition.range, entry.mipLevels,
-            entry.is3D ? 1u : entry.depthOrArraySize, RHITextureAspects(entry.format), resolved);
+        ResolveRHITextureSubresourceRange(transition.range, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                          RHITextureAspects(entry.format), resolved);
         m_recordedImageLayouts.push_back({transition.texture, resolved, after.layout});
     }
 
@@ -1046,10 +1047,13 @@ void VulkanEncoder::CopyResource(RHITextureHandle destination, RHITextureHandle 
         static_cast<uint32_t>(regions.size()), regions.data());
 }
 
-void VulkanEncoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source,
-    uint32_t destinationSubresource, uint32_t sourceSubresource)
+void VulkanEncoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source, uint32_t destinationSubresource,
+                                uint32_t sourceSubresource)
 {
-    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources)
+    {
+        return;
+    }
     const VulkanImageEntry src = ResolveResource(source);
     const VulkanImageEntry dst = ResolveResource(destination);
     if (!src.IsValid() || !dst.IsValid() || src.format != dst.format || src.is3D != dst.is3D ||
@@ -1057,25 +1061,27 @@ void VulkanEncoder::CopyTexture(RHITextureHandle destination, RHITextureHandle s
     {
         throw std::invalid_argument("CopyTexture requires compatible live image handles");
     }
-    const auto decode = [](const VulkanImageEntry& image, uint32_t subresource,
-        VkImageSubresourceLayers& layers, VkExtent3D& extent)
+    const auto decode =
+        [](const VulkanImageEntry& image, uint32_t subresource, VkImageSubresourceLayers& layers, VkExtent3D& extent)
     {
         const uint32_t arrayLayers = image.is3D ? 1u : image.depthOrArraySize;
         const VkImageAspectFlags aspects = AspectOf(image.format);
         const bool stencil = (aspects & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
         const uint64_t planeSize = uint64_t{image.mipLevels} * arrayLayers;
-        if (!planeSize || uint64_t{subresource} >= planeSize * (stencil ? 2u : 1u)) return false;
+        if (!planeSize || uint64_t{subresource} >= planeSize * (stencil ? 2u : 1u))
+        {
+            return false;
+        }
         const uint32_t plane = static_cast<uint32_t>(subresource / planeSize);
         const uint32_t inPlane = static_cast<uint32_t>(subresource % planeSize);
         layers.mipLevel = inPlane % image.mipLevels;
         layers.baseArrayLayer = inPlane / image.mipLevels;
         layers.layerCount = 1;
-        layers.aspectMask = plane ? VK_IMAGE_ASPECT_STENCIL_BIT
-            : (aspects & VK_IMAGE_ASPECT_DEPTH_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+        layers.aspectMask = plane                                   ? VK_IMAGE_ASPECT_STENCIL_BIT
+                            : (aspects & VK_IMAGE_ASPECT_DEPTH_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                                                    : VK_IMAGE_ASPECT_COLOR_BIT;
         const auto mipExtent = [mip = layers.mipLevel](uint32_t value)
-        {
-            return mip < 32 ? (std::max)(1u, value >> mip) : 1u;
-        };
+        { return mip < 32 ? (std::max)(1u, value >> mip) : 1u; };
         extent = {mipExtent(image.width), mipExtent(image.height), image.is3D ? mipExtent(image.depthOrArraySize) : 1u};
         return true;
     };
@@ -1086,14 +1092,15 @@ void VulkanEncoder::CopyTexture(RHITextureHandle destination, RHITextureHandle s
         copy.srcSubresource.aspectMask != copy.dstSubresource.aspectMask ||
         copy.extent.width > destinationExtent.width || copy.extent.height > destinationExtent.height ||
         copy.extent.depth > destinationExtent.depth ||
-        (dst.externalShared && (copy.extent.width != destinationExtent.width ||
-            copy.extent.height != destinationExtent.height || copy.extent.depth != destinationExtent.depth)))
+        (dst.externalShared &&
+         (copy.extent.width != destinationExtent.width || copy.extent.height != destinationExtent.height ||
+          copy.extent.depth != destinationExtent.depth)))
     {
         throw std::invalid_argument("CopyTexture subresources or extents are incompatible");
     }
     EndRenderTargets();
-    vkCmdCopyImage(m_commandBuffer, src.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        dst.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    vkCmdCopyImage(m_commandBuffer, src.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst.image,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 }
 
 void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc& desc, const float values[4])

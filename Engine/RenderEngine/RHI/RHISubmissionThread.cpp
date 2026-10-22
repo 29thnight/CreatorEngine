@@ -197,10 +197,8 @@ struct RHISubmissionThread::Impl
 
     bool HasPreparationLocked() const
     {
-        return std::any_of(queue.begin(), queue.end(), [](const Entry& entry)
-        {
-            return entry.preparation && !entry.preparation->started;
-        });
+        return std::any_of(queue.begin(), queue.end(),
+                           [](const Entry& entry) { return entry.preparation && !entry.preparation->started; });
     }
 
     void RunPreparations()
@@ -214,12 +212,13 @@ struct RHISubmissionThread::Impl
                 std::unique_lock lock(mutex);
                 preparationWake.wait(lock, [this] { return stopRequested || HasPreparationLocked(); });
                 const auto found = std::find_if(queue.begin(), queue.end(), [](const Entry& entry)
-                {
-                    return entry.preparation && !entry.preparation->started;
-                });
+                                                { return entry.preparation && !entry.preparation->started; });
                 if (found == queue.end())
                 {
-                    if (stopRequested) break;
+                    if (stopRequested)
+                    {
+                        break;
+                    }
                     continue;
                 }
                 preparation = found->preparation;
@@ -388,8 +387,7 @@ struct RHISubmissionThread::Impl
                 const auto canExecuteOrStop = [this]
                 {
                     return ExecutableEntryLocked() != queue.size() ||
-                        (stopRequested && queue.empty() &&
-                            (!HasPendingRetirementsLocked() || abandonRetirements));
+                           (stopRequested && queue.empty() && (!HasPendingRetirementsLocked() || abandonRetirements));
                 };
                 if (!HasPendingRetirementsLocked())
                 {
@@ -415,8 +413,7 @@ struct RHISubmissionThread::Impl
                     hasEntry = true;
                     spaceWake.notify_one();
                 }
-                else if (stopRequested && queue.empty() &&
-                    (!HasPendingRetirementsLocked() || abandonRetirements))
+                else if (stopRequested && queue.empty() && (!HasPendingRetirementsLocked() || abandonRetirements))
                 {
                     break;
                 }
@@ -577,34 +574,36 @@ RHISubmissionThread::~RHISubmissionThread()
         impl.preparationWake.notify_all();
         impl.spaceWake.notify_all();
         // 정상 진행 중인 작업은 끝낸다. 완료되지 않은 자원을 조용히 폐기하지 않는다.
-        impl.drainWake.wait(lock, [&impl]
-        {
-            if (!impl.queue.empty() || impl.runningOwner != nullptr || impl.preparingOwner != nullptr)
-            {
-                return false;
-            }
-            bool uncertain = false;
-            for (Impl::Retirement& retirement : impl.retirements)
-            {
-                if (retirement.releaseReady)
-                {
-                    continue;
-                }
-                const auto owner = impl.owners.find(retirement.owner);
-                if (owner != impl.owners.end())
-                {
-                    if (owner->second.faulted || owner->second.gpuIdleVerified)
-                    {
-                        retirement.releaseReady = true;
-                    }
-                    else
-                    {
-                        uncertain = uncertain || owner->second.submissionBlocked;
-                    }
-                }
-            }
-            return uncertain || !impl.HasPendingRetirementsLocked();
-        });
+        impl.drainWake.wait(lock,
+                            [&impl]
+                            {
+                                if (!impl.queue.empty() || impl.runningOwner != nullptr ||
+                                    impl.preparingOwner != nullptr)
+                                {
+                                    return false;
+                                }
+                                bool uncertain = false;
+                                for (Impl::Retirement& retirement : impl.retirements)
+                                {
+                                    if (retirement.releaseReady)
+                                    {
+                                        continue;
+                                    }
+                                    const auto owner = impl.owners.find(retirement.owner);
+                                    if (owner != impl.owners.end())
+                                    {
+                                        if (owner->second.faulted || owner->second.gpuIdleVerified)
+                                        {
+                                            retirement.releaseReady = true;
+                                        }
+                                        else
+                                        {
+                                            uncertain = uncertain || owner->second.submissionBlocked;
+                                        }
+                                    }
+                                }
+                                return uncertain || !impl.HasPendingRetirementsLocked();
+                            });
         if (impl.HasPendingRetirementsLocked())
         {
             std::fputs("Fatal RHI teardown invariant: forced service destruction retains uncertain accepted "
@@ -747,11 +746,14 @@ bool RHISubmissionThread::Enqueue(const void* owner, const char* label, Work wor
         EntryKind::Submission, false, 0);
 }
 
-bool RHISubmissionThread::EnqueueInternal(
-    const void* owner, const char* label, Work work, RHISubmissionTicket& outTicket, std::string& outError,
-    RHICompletionPoint retirementPoint, CompletionQuery completionQuery, ce::lifetime_token lifetimeToken,
-    EntryKind kind, bool allowTransition, uint64_t expectedGeneration, own::shared_owner<RHIRecordedBatch> recordedBatch,
-    RHISubmissionIdentity identity, uint64_t softwareBytes, uint64_t commandRecordingId, Work preparation)
+bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label, Work work,
+                                          RHISubmissionTicket& outTicket, std::string& outError,
+                                          RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
+                                          ce::lifetime_token lifetimeToken, EntryKind kind, bool allowTransition,
+                                          uint64_t expectedGeneration,
+                                          own::shared_owner<RHIRecordedBatch> recordedBatch,
+                                          RHISubmissionIdentity identity, uint64_t softwareBytes,
+                                          uint64_t commandRecordingId, Work preparation)
 {
     if (nullptr == owner || !work)
     {
@@ -1196,10 +1198,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
         it = impl.queue.erase(it);
     }
     impl.spaceWake.notify_all();
-    impl.drainWake.wait(lock, [&impl, owner]
-    {
-        return impl.runningOwner != owner && impl.preparingOwner != owner;
-    });
+    impl.drainWake.wait(lock, [&impl, owner] { return impl.runningOwner != owner && impl.preparingOwner != owner; });
     for (Impl::Retirement& retirement : impl.retirements)
     {
         if (retirement.owner == owner)
@@ -1419,33 +1418,32 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
     cpuContext = ce::current_cpu_context;
 #endif
     Work preparation = [pool, translator, software, translated, cpuContext](std::string& error)
-            {
-                RHICommandFailureScope::SetIdentity(software->GetRecordingId(), software->GetDesc().backendGeneration);
-                RHICommandFailureScope::SetStage(RHICommandFailureStage::Translation);
+    {
+        RHICommandFailureScope::SetIdentity(software->GetRecordingId(), software->GetDesc().backendGeneration);
+        RHICommandFailureScope::SetStage(RHICommandFailureStage::Translation);
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
-                const ce::dx_capture::submission_context_scope context(software->GetDesc().captureContext);
+        const ce::dx_capture::submission_context_scope context(software->GetDesc().captureContext);
 #endif
-                const ce::profile_context_scope recordingContext(cpuContext);
-                RHICommandFailure failure;
-                {
-                    ce::profile_rhi_scope translate{ce::marker<"RHISoftwareTranslate">()};
-                    RHICommandTranslationOptions options;
-                    if (pool->SupportsParallelTranslation())
-                    {
-                        options.mode = RHICommandTranslationMode::Parallel;
-                        options.maxTranslationJobs =
-                            (std::min)(IRHIParallelCommandPool::kMaxWorkers, pool->GetWorkerCount());
-                        options.minCommandsPerJob = 256;
-                    }
-                    if (!translator->Translate(std::move(*software), options, *translated, failure))
-                    {
-                        RHICommandFailureScope::Report(failure);
-                        error = failure.message;
-                        return false;
-                    }
-                }
-                return true;
-            };
+        const ce::profile_context_scope recordingContext(cpuContext);
+        RHICommandFailure failure;
+        {
+            ce::profile_rhi_scope translate{ce::marker<"RHISoftwareTranslate">()};
+            RHICommandTranslationOptions options;
+            if (pool->SupportsParallelTranslation())
+            {
+                options.mode = RHICommandTranslationMode::Parallel;
+                options.maxTranslationJobs = (std::min)(IRHIParallelCommandPool::kMaxWorkers, pool->GetWorkerCount());
+                options.minCommandsPerJob = 256;
+            }
+            if (!translator->Translate(std::move(*software), options, *translated, failure))
+            {
+                RHICommandFailureScope::Report(failure);
+                error = failure.message;
+                return false;
+            }
+        }
+        return true;
+    };
     if (!EnqueueInternal(
             owner, "software batch submit",
             [pool, translated, identity](std::string& error)

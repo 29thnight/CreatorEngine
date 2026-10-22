@@ -24,7 +24,10 @@ struct IDisplayPresentationSink
 
     virtual RHIDisplayTexture OpenGpuFrame(const RHIGpuDisplayImage& image)
     {
-        if (!image.IsCompatible(QueryGpuPresentationCapabilities())) return {};
+        if (!image.IsCompatible(QueryGpuPresentationCapabilities()))
+        {
+            return {};
+        }
         const uint64_t texture = OpenSharedTexture(image.sharedHandle, image.consumerLease);
         return texture ? RHIDisplayTexture{texture, image.width, image.height, image.metadata} : RHIDisplayTexture{};
     }

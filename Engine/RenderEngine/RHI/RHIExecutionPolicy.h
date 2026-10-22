@@ -48,7 +48,7 @@ struct RHIResolvedExecutionPolicy
 };
 
 constexpr RHIResolvedExecutionPolicy ResolveRHIExecutionPolicy(RHIExecutionPolicy requested,
-    RHIExecutionCapabilities capabilities)
+                                                               RHIExecutionCapabilities capabilities)
 {
     RHIResolvedExecutionPolicy result{requested, requested};
     if (requested.gpu != RHIGpuQueuePolicy::PrimaryGraphics && !capabilities.ownedGraphics)
@@ -67,8 +67,9 @@ constexpr RHIResolvedExecutionPolicy ResolveRHIExecutionPolicy(RHIExecutionPolic
 constexpr RHIExecutionPolicy ParseRHIExecutionPolicy(std::string_view software, std::string_view queues)
 {
     return {software == "1" ? RHICpuExecutor::SoftwareParallel : RHICpuExecutor::NativeParallel,
-        queues == "2" ? RHIGpuQueuePolicy::GraphicsCompute : queues == "1" ? RHIGpuQueuePolicy::OwnedGraphics
-                                                                        : RHIGpuQueuePolicy::PrimaryGraphics};
+            queues == "2"   ? RHIGpuQueuePolicy::GraphicsCompute
+            : queues == "1" ? RHIGpuQueuePolicy::OwnedGraphics
+                            : RHIGpuQueuePolicy::PrimaryGraphics};
 }
 
 inline RHIExecutionPolicy ReadRHIExecutionPolicy()

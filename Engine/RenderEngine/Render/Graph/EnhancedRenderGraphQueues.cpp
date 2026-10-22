@@ -177,8 +177,11 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             const auto& resource = m_resources[index];
             if (resource.used && !resource.IsBuffer())
             {
-                retainedGraphicsTextures.set(index, m_deviceServices->DescribeTexture(resource.handle).
-                    retainsExplicitStateOnGraphicsQueue);
+                const bool external = resource.initialState == RHIResourceState::ExternalShared ||
+                                      resource.state == RHIResourceState::ExternalShared;
+                retainedGraphicsTextures.set(
+                    index,
+                    external || m_deviceServices->DescribeTexture(resource.handle).retainsExplicitStateOnGraphicsQueue);
             }
         }
         const auto rejectComputeUses = [&](std::span<const RGPassUsage> usages)
@@ -657,6 +660,39 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             outError = "Recorder returned a foreign batch";
             return false;
         }
+    }
+    // Software-to-native translation may schedule producer worker jobs. Finish
+    // every batch before entering the RHI submission task or issuing GPU waits.
+    // A preparation failure therefore cannot leave an accepted GPU prefix.
+    try
+    {
+        for (const auto& recording : recordings)
+        {
+            output.failure.Reset();
+            output.failure.stage = RHICommandFailureStage::Translation;
+            output.failure.recordingId = recording.batch->GetRecordingId();
+            RHICommandFailureScope failureScope{output.failure};
+            if (!recorder.PrepareSubmissionBatch(recording.endpoint->queue, recording.batch, outError))
+            {
+                if (output.failure.message.empty())
+                {
+                    output.failure.message = outError;
+                }
+                return false;
+            }
+        }
+    }
+    catch (const std::exception& exception)
+    {
+        outError = std::string("Queue submission preparation failed: ") + exception.what();
+        output.failure.message = outError;
+        return false;
+    }
+    catch (...)
+    {
+        outError = "Queue submission preparation failed with an unknown exception";
+        output.failure.message = outError;
+        return false;
     }
     // No callbacks or allocation of recordings/diagnostics after submission begins.
     cpu.FinishPhase();

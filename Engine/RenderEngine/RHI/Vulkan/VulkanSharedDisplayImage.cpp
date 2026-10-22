@@ -30,12 +30,24 @@ struct VulkanSharedDisplayImage::Impl
             else
             {
                 const VkDevice device = resources->GetDevice();
-                if (native.view) vkDestroyImageView(device, native.view, nullptr);
-                if (native.image) vkDestroyImage(device, native.image, nullptr);
-                if (native.memory) vkFreeMemory(device, native.memory, nullptr);
+                if (native.view)
+                {
+                    vkDestroyImageView(device, native.view, nullptr);
+                }
+                if (native.image)
+                {
+                    vkDestroyImage(device, native.image, nullptr);
+                }
+                if (native.memory)
+                {
+                    vkFreeMemory(device, native.memory, nullptr);
+                }
             }
         }
-        if (sharedHandle) CloseHandle(sharedHandle);
+        if (sharedHandle)
+        {
+            CloseHandle(sharedHandle);
+        }
     }
 };
 
@@ -43,7 +55,7 @@ VulkanSharedDisplayImage::VulkanSharedDisplayImage() = default;
 VulkanSharedDisplayImage::~VulkanSharedDisplayImage() = default;
 
 bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint32_t width, uint32_t height,
-    const RHIGpuPresentationCapabilities& consumer, std::string& outError)
+                                          const RHIGpuPresentationCapabilities& consumer, std::string& outError)
 {
     outError.clear();
     if (m_impl || !width || !height || !resources.IsInitialized() || !consumer.sharedD3D12Resource ||
@@ -64,8 +76,8 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
         return false;
     }
 
-    constexpr VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    constexpr VkImageUsageFlags usage =
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkPhysicalDeviceExternalImageFormatInfo externalFormat{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO};
     externalFormat.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT;
@@ -78,12 +90,13 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
     VkExternalImageFormatProperties externalProperties{VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES};
     VkImageFormatProperties2 imageProperties{VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2};
     imageProperties.pNext = &externalProperties;
-    const VkResult supported = vkGetPhysicalDeviceImageFormatProperties2(resources.GetPhysicalDevice(), &format,
-        &imageProperties);
+    const VkResult supported =
+        vkGetPhysicalDeviceImageFormatProperties2(resources.GetPhysicalDevice(), &format, &imageProperties);
     if (supported != VK_SUCCESS ||
-        !(externalProperties.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) ||
+        !(externalProperties.externalMemoryProperties.externalMemoryFeatures &
+          VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) ||
         !(externalProperties.externalMemoryProperties.compatibleHandleTypes &
-            VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT) ||
+          VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT) ||
         width > imageProperties.imageFormatProperties.maxExtent.width ||
         height > imageProperties.imageFormatProperties.maxExtent.height ||
         !(imageProperties.imageFormatProperties.sampleCounts & VK_SAMPLE_COUNT_1_BIT))
@@ -121,9 +134,10 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
     description.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     description.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     if (FAILED(candidate->sharedDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED, &description,
-        D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&candidate->sharedResource))) ||
+                                                                D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                                                IID_PPV_ARGS(&candidate->sharedResource))) ||
         FAILED(candidate->sharedDevice->CreateSharedHandle(candidate->sharedResource.Get(), nullptr, GENERIC_ALL,
-            nullptr, &candidate->sharedHandle)))
+                                                           nullptr, &candidate->sharedHandle)))
     {
         outError = "Could not allocate the shared D3D12 display resource.";
         return false;
@@ -155,10 +169,11 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
     vkGetImageMemoryRequirements(device, native.image, &requirements);
     VkMemoryWin32HandlePropertiesKHR handleProperties{VK_STRUCTURE_TYPE_MEMORY_WIN32_HANDLE_PROPERTIES_KHR};
     result = vkGetMemoryWin32HandlePropertiesKHR(device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT,
-        candidate->sharedHandle, &handleProperties);
-    const uint32_t memoryType = result == VK_SUCCESS
-        ? resources.FindMemoryType(requirements.memoryTypeBits & handleProperties.memoryTypeBits,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) : UINT32_MAX;
+                                                 candidate->sharedHandle, &handleProperties);
+    const uint32_t memoryType =
+        result == VK_SUCCESS ? resources.FindMemoryType(requirements.memoryTypeBits & handleProperties.memoryTypeBits,
+                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+                             : UINT32_MAX;
     if (memoryType == UINT32_MAX)
     {
         outError = "The shared display resource has no compatible Vulkan device-local memory type.";
@@ -175,7 +190,10 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
     allocation.allocationSize = requirements.size;
     allocation.memoryTypeIndex = memoryType;
     result = vkAllocateMemory(device, &allocation, nullptr, &native.memory);
-    if (result == VK_SUCCESS) result = vkBindImageMemory(device, native.image, native.memory, 0);
+    if (result == VK_SUCCESS)
+    {
+        result = vkBindImageMemory(device, native.image, native.memory, 0);
+    }
     if (result != VK_SUCCESS)
     {
         outError = "Vulkan D3D12 display memory import failed: " + ResultToString(result);
@@ -222,13 +240,18 @@ own::shared_owner<RHIDisplayConsumerLease> VulkanSharedDisplayImage::GetConsumer
 bool VulkanSharedDisplayImage::CanReuse() const
 {
     return m_impl && m_impl->consumerLease.use_count() == 1 &&
-        !m_impl->consumerLease->m_completionLost.load(std::memory_order_acquire);
+           !m_impl->consumerLease->m_completionLost.load(std::memory_order_acquire);
 }
 
 RHIGpuDisplayImage VulkanSharedDisplayImage::DescribeCompletedFrame(const RHIDisplayFrameMetadata& metadata,
-    RHICompletionPoint completion, uint64_t observedCompletion, ce::lifetime_token owner) const
+                                                                    RHICompletionPoint completion,
+                                                                    uint64_t observedCompletion,
+                                                                    ce::lifetime_token owner) const
 {
-    if (!m_impl) return {};
+    if (!m_impl)
+    {
+        return {};
+    }
     RHIGpuDisplayImage image;
     image.transport = RHISharedImageTransport::Win32D3D12Resource;
     image.adapter = m_impl->adapter;

@@ -56,7 +56,7 @@ public:
     // This may allocate/record native targets but must not submit, wait, or signal
     // GPU queues. A graph prepares every batch before its first queue operation.
     virtual bool PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>&,
-        const ce::pooled_owner<IRHIQueueCommandBatch>&, std::string&)
+                                        const ce::pooled_owner<IRHIQueueCommandBatch>&, std::string&)
     {
         return true;
     }
