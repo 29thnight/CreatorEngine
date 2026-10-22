@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
+using System.Text.Json;
 
 namespace CreatorEngine;
 
@@ -9,17 +10,56 @@ namespace CreatorEngine;
 ///
 /// ScriptCore 자체는 기본 컨텍스트에 상주한다 — 네이티브가 붙잡고 있는 진입점
 /// 함수 포인터가 여기 있기 때문에, 이쪽이 언로드되면 엔진이 죽는다.
-/// 교체되는 것은 GameScripts 쪽뿐이다.
+/// GameScripts와 선택적 추가 언어 어셈블리·전용 의존성은 같은 세대로 교체한다.
 ///
 /// 언로드는 참조가 하나라도 남으면 실패한다. 그래서 리로드 전에 인스턴스를 전부
 /// 버리고(ScriptRegistry.Clear) 팩토리 표도 비운다. 표에 담긴 델리게이트가
 /// 스크립트 타입을 가리키고 있어, 이것 하나만 남아도 컨텍스트가 살아남는다.
 /// </summary>
-internal sealed class ScriptLoadContext(string name) : AssemblyLoadContext(name, isCollectible: true)
+internal sealed class ScriptLoadContext(string name, string assemblyDirectory) : AssemblyLoadContext(name, isCollectible: true)
 {
     // 지금 실행 중인 ScriptCore. 호스트가 hostfxr로 직접 올린 것이라
     // 일반적인 probing 경로로는 찾을 수 없어(FileNotFoundException) 여기서 직접 물려준다.
     private static readonly Assembly CoreAssembly = typeof(Component).Assembly;
+    private static readonly HashSet<string> FrameworkAssemblies = FindFrameworkAssemblies();
+    private readonly string _directory = Path.GetFullPath(assemblyDirectory);
+
+    private static HashSet<string> FindFrameworkAssemblies()
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location) ?? string.Empty;
+        string paths = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string ?? string.Empty;
+        foreach (string path in paths.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            // Only runtime-pack assemblies are shared. Application dependencies such as
+            // FSharp.Core must belong to this collectible generation even when a tool
+            // has already loaded another copy in the default context.
+            if (string.Equals(Path.GetDirectoryName(path), runtimeDirectory, StringComparison.OrdinalIgnoreCase))
+                names.Add(Path.GetFileNameWithoutExtension(path));
+        }
+        return names;
+    }
+
+    public Assembly LoadScript(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        AssemblyName identity = AssemblyName.GetAssemblyName(fullPath);
+        foreach (Assembly loaded in Assemblies)
+        {
+            if (!string.Equals(loaded.GetName().Name, identity.Name, StringComparison.OrdinalIgnoreCase)) continue;
+            if (loaded.GetName().FullName != identity.FullName)
+                throw new FileLoadException($"Conflicting script dependency identity: {identity.FullName}", fullPath);
+            return loaded;
+        }
+
+        // Entry assemblies and private dependencies use streams so editor builds can
+        // replace DLLs and portable PDBs while the current generation is running.
+        using var input = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        string pdbPath = Path.ChangeExtension(fullPath, ".pdb");
+        if (!File.Exists(pdbPath)) return LoadFromStream(input);
+        using var pdb = new FileStream(pdbPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return LoadFromStream(input, pdb);
+    }
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
@@ -30,8 +70,18 @@ internal sealed class ScriptLoadContext(string name) : AssemblyLoadContext(name,
             return CoreAssembly;
         }
 
-        // 나머지(System.* 등)는 기본 컨텍스트가 해석하게 둔다.
-        return null;
+        string simpleName = assemblyName.Name ?? throw new FileLoadException("A dependency has no assembly name.");
+        if (FrameworkAssemblies.Contains(simpleName)) return null;
+
+        // Build integration deploys a flat private dependency closure next to
+        // GameScripts.dll. Never probe the current working directory or allow private
+        // dependencies to escape into the default ALC and retain an old generation.
+        if (simpleName.IndexOfAny(['/', '\\']) >= 0)
+            throw new FileLoadException("Invalid script dependency name.");
+        string path = Path.Combine(_directory, simpleName + ".dll");
+        if (!File.Exists(path))
+            throw new FileNotFoundException($"Missing private script dependency: {assemblyName.FullName}", path);
+        return LoadScript(path);
     }
 }
 
@@ -80,31 +130,13 @@ internal static class ScriptAssemblyLoader
             return false;
         }
 
-        _assemblyPath = assemblyPath;
-        _context = new ScriptLoadContext($"GameScripts#{_generation}");
+        _assemblyPath = Path.GetFullPath(assemblyPath);
 
         try
         {
-            Assembly assembly;
-            using (var stream = new FileStream(assemblyPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            {
-                // 심볼도 함께 올려야 예외 스택에 줄 번호가 남는다.
-                string pdbPath = Path.ChangeExtension(assemblyPath, ".pdb");
-                if (File.Exists(pdbPath))
-                {
-                    using var pdb = new FileStream(pdbPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                    assembly = _context.LoadFromStream(stream, pdb);
-                }
-                else
-                {
-                    assembly = _context.LoadFromStream(stream);
-                }
-            }
-
-            if (!InvokeRegistry(assembly))
-            {
-                Native.Log(2, "[ScriptCore] ScriptRegistry를 찾지 못했습니다 — 등록된 스크립트가 없습니다.");
-            }
+            string[] entries = ReadAssemblySet(_assemblyPath);
+            _context = new ScriptLoadContext($"GameScripts#{_generation}", Path.GetDirectoryName(_assemblyPath)!);
+            RegisterAssemblySet(_context, entries, validationOnly: false);
 
             ++_generation;
             return true;
@@ -118,18 +150,89 @@ internal static class ScriptAssemblyLoader
     }
 
     /// <summary>
-    /// 생성기가 만든 등록 진입점을 찾아 호출한다.
-    ///
-    /// 리플렉션은 여기 한 곳뿐이다. AOT 배포에서는 스크립트를 정적 링크하고
-    /// 이 경로 대신 직접 호출로 바꾸면 된다(설계 문서 06절 모드 분리).
+    /// Optional additive script-language manifest. The native ABI still points to
+    /// GameScripts.dll; every declared assembly shares its collectible generation.
+    /// The absence of a manifest retains the original C#-only deployment contract.
     /// </summary>
+    private static string[] ReadAssemblySet(string primaryPath)
+    {
+        string manifestPath = primaryPath + ".scripts.json";
+        if (!File.Exists(manifestPath)) return [primaryPath];
+        using var input = new FileStream(manifestPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (input.Length is <= 0 or > 16384)
+            throw new InvalidDataException("Script assembly manifest must be between 1 and 16384 bytes.");
+        byte[] bytes = new byte[checked((int)input.Length)];
+        input.ReadExactly(bytes);
+        ReadOnlyMemory<byte> json = bytes;
+        if (json.Span.StartsWith(new byte[] { 0xef, 0xbb, 0xbf })) json = json[3..];
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("schemaVersion", out JsonElement version)
+            || !version.TryGetInt32(out int schema) || schema != 1
+            || !root.TryGetProperty("assemblies", out JsonElement entries) || entries.ValueKind != JsonValueKind.Array
+            || entries.GetArrayLength() > 64)
+            throw new InvalidDataException("Invalid script assembly manifest schema.");
+
+        string directory = Path.GetDirectoryName(primaryPath)!;
+        var paths = new List<string>(entries.GetArrayLength() + 1) { primaryPath };
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Path.GetFileName(primaryPath), "ScriptCore.dll" };
+        foreach (JsonElement entry in entries.EnumerateArray())
+        {
+            string? name = entry.ValueKind == JsonValueKind.String ? entry.GetString() : null;
+            if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(['/', '\\', ':']) >= 0
+                || !name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || name.Contains("..", StringComparison.Ordinal)
+                || !names.Add(name))
+                throw new InvalidDataException("Script manifest entries must be unique sibling DLL filenames, excluding ScriptCore.");
+            string path = Path.Combine(directory, name);
+            if (!File.Exists(path)) throw new FileNotFoundException("A declared script assembly is missing.", path);
+            paths.Add(path);
+        }
+        return [.. paths];
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static bool InvokeRegistry(Assembly assembly)
-        => InvokeRegistry(assembly, ScriptFactory.Register,
-                          AniBehaviorFactory.Register, BTNodeFactory.Register);
+    private static void RegisterAssemblySet(ScriptLoadContext context, string[] entries, bool validationOnly)
+    {
+        var components = new HashSet<string>(StringComparer.Ordinal);
+        var animations = new HashSet<string>(StringComparer.Ordinal);
+        var trees = new HashSet<string>(StringComparer.Ordinal);
+        void RegisterComponent(string name, Func<Component> factory)
+        {
+            if (string.IsNullOrWhiteSpace(name) || factory is null || !components.Add(name))
+                throw new InvalidDataException($"Duplicate or invalid script component registration: {name}");
+            if (!validationOnly) ScriptFactory.Register(name, factory);
+        }
+        void RegisterAnimation(string name, Func<AniBehavior> factory)
+        {
+            if (string.IsNullOrWhiteSpace(name) || factory is null || !animations.Add(name))
+                throw new InvalidDataException($"Duplicate or invalid animation registration: {name}");
+            if (!validationOnly) AniBehaviorFactory.Register(name, factory);
+        }
+        void RegisterTree(string name, int kind, Func<BTNode> factory)
+        {
+            if (string.IsNullOrWhiteSpace(name) || factory is null || !trees.Add(name))
+                throw new InvalidDataException($"Duplicate or invalid behavior-tree registration: {name}");
+            if (!validationOnly) BTNodeFactory.Register(name, kind, factory);
+        }
+
+        for (int i = 0; i < entries.Length; ++i)
+        {
+            Assembly assembly = context.LoadScript(entries[i]);
+            if (InvokeRegistry(assembly, RegisterComponent, RegisterAnimation, RegisterTree)) continue;
+            // Preserve legacy initial C# Load behavior when there are no additions.
+            // Reload validation has always required the registry entry point.
+            if (!validationOnly && entries.Length == 1)
+                Native.Log(2, "[ScriptCore] ScriptRegistry를 찾지 못했습니다 — 등록된 스크립트가 없습니다.");
+            else
+                throw new InvalidDataException($"ScriptRegistry.RegisterAll is missing: {entries[i]}");
+        }
+    }
 
     /// <summary>
     /// 생성기가 만든 등록 진입점을 찾아, 주어진 sink 로 등록을 흘린다.
+    ///
+    /// 리플렉션은 세대 로드 때 이 진입점을 찾는 데만 쓴다. NativeAOT의 정적
+    /// 링크 경로는 별도 구현이 필요하며 이 collectible 로더가 지원하지 않는다.
     ///
     /// sink 를 인자로 받는 이유는 <see cref="Validate"/> 때문이다. 검증은 **실제
     /// 등록 경로를 그대로 태우되** 살아 있는 표에는 아무것도 넣지 않아야 한다.
@@ -195,21 +298,14 @@ internal static class ScriptAssemblyLoader
             return false;
         }
 
-        var probe = new ScriptLoadContext("validate");
+        ScriptLoadContext? probe = null;
         try
         {
-            Assembly assembly;
-            using (var stream = new FileStream(assemblyPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            {
-                assembly = probe.LoadFromStream(stream);
-            }
-
-            // 등록을 **버린다.** 살아 있는 표는 이 호출로 한 항목도 바뀌지 않는다.
-            if (!InvokeRegistry(assembly, static (_, _) => { }, static (_, _) => { }, static (_, _, _) => { }))
-            {
-                Native.Log(2, "[ScriptCore] 리로드 취소 — ScriptRegistry 진입점이 없습니다.");
-                return false;
-            }
+            string path = Path.GetFullPath(assemblyPath);
+            string[] entries = ReadAssemblySet(path);
+            probe = new ScriptLoadContext("validate", Path.GetDirectoryName(path)!);
+            // 등록을 **버린다.** 살아 있는 표에는 아무것도 넣지 않는다.
+            RegisterAssemblySet(probe, entries, validationOnly: true);
             return true;
         }
         catch (Exception ex)
@@ -219,7 +315,7 @@ internal static class ScriptAssemblyLoader
         }
         finally
         {
-            probe.Unload();
+            probe?.Unload();
         }
     }
 
