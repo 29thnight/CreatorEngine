@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "Render/Graph/EnhancedGpuMeasurementHistory.h"
@@ -108,7 +109,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         // waits 940 -> 1240 us. Without shadows nothing overlaps (1240 > 1200).
         struct OverlapGraph
         {
-            std::unique_ptr<EnhancedRenderGraph> graph;
+            own::unique_owner<EnhancedRenderGraph> graph;
             RGPassId shadow, gbuffer, raw, filter, lxColor;
             uint32_t depthResource{0}, filteredResource{0};
             std::vector<EnhancedRenderGraph::QueueHint> hints;
@@ -119,7 +120,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             bool recordingSideEffect = false)
         {
             OverlapGraph result;
-            result.graph = std::make_unique<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
+            result.graph = own::make_unique<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
                 orderPolicy);
             auto& g = *result.graph;
             if (model)
@@ -486,7 +487,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         }
         struct TimingFixture
         {
-            std::unique_ptr<EnhancedRenderGraph> graph;
+            own::unique_owner<EnhancedRenderGraph> graph;
             std::vector<GpuPassTimingIdentity> identities;
             std::vector<EnhancedRenderGraph::QueueHint> hints;
         };
@@ -494,7 +495,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             uint32_t repeats, RGMeasurementDomain domain = RGMeasurementDomain::Normal)
         {
             TimingFixture result;
-            result.graph = std::make_unique<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            result.graph = own::make_unique<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             auto& g = *result.graph;
             g.SetMeasurementDomain(domain);
             const auto first = g.Write(g.CreateBuffer({firstBytes, true, false, "timing-first"}));
@@ -529,7 +530,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             auto original = buildTiming(256, "duplicate (x2)", false, 2);
             auto rebuilt = buildTiming(256, "duplicate (x2)", false, 2);
             require(original.identities == rebuilt.identities &&
-                original.identities.front().graphSignature.get() != rebuilt.identities.front().graphSignature.get(),
+                original.identities.front().graphSignature.operator->() != rebuilt.identities.front().graphSignature.operator->(),
                 "Structurally identical rebuilt graphs lost stable timing identity.");
             auto captured = buildTiming(256, "duplicate (x2)", false, 2, RGMeasurementDomain::Capture);
             require(captured.graph->GetMeasurementDomain() == RGMeasurementDomain::Capture &&
@@ -565,7 +566,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         }
         {
             EnhancedGpuMeasurementHistory history;
-            const auto signature = std::make_shared<const std::string>("same-structural-signature");
+            const auto signature = own::make_shared<const std::string>("same-structural-signature");
             const auto token = [](uint64_t submission, uint64_t view, uint64_t frame, uint64_t tick)
             {
                 GpuFrameToken result{};
@@ -588,7 +589,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
                 *history.Find(RGMeasurementDomain::Normal, 7)->nanoseconds[0] == 0,
                 "Successful capture replaced a structurally identical normal sample.");
             history.Discard(RGMeasurementDomain::Capture, token(13, 7, 21, 1020));
-            require(history.Find(RGMeasurementDomain::Normal, 7)->graphSignature == signature &&
+            require(own::identity(history.Find(RGMeasurementDomain::Normal, 7)->graphSignature) == own::identity(signature) &&
                 !history.Find(RGMeasurementDomain::Capture, 7)->graphSignature,
                 "Failed capture tombstoned normal history or omitted its own watermark.");
             require(!history.Store(RGMeasurementDomain::Capture,
@@ -596,7 +597,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
                 !history.Find(RGMeasurementDomain::Capture, 7)->graphSignature,
                 "Late successful capture resurrected an invalidated capture sample.");
             history.Discard(RGMeasurementDomain::Normal, token(9, 7, 19, 990));
-            require(history.Find(RGMeasurementDomain::Normal, 7)->graphSignature == signature &&
+            require(own::identity(history.Find(RGMeasurementDomain::Normal, 7)->graphSignature) == own::identity(signature) &&
                 history.Find(RGMeasurementDomain::Normal, 7)->token.submissionId == 10,
                 "Late failure invalidated a newer normal sample.");
             const auto current = token(14, 7, 21, 1050);
@@ -627,7 +628,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             history.Clear();
             require(!history.Find(RGMeasurementDomain::Normal, 7) &&
                 !history.Find(RGMeasurementDomain::Capture, 28), "History reset retained a measurement domain.");
-            const auto alternate = std::make_shared<const std::string>("alternate-history-role");
+            const auto alternate = own::make_shared<const std::string>("alternate-history-role");
             require(history.Store(RGMeasurementDomain::Normal, {signature, {uint64_t{7}}, token(30,7,30,2000)}) &&
                 history.Store(RGMeasurementDomain::Normal, {alternate, {uint64_t{9}}, token(31,7,31,2001)}) &&
                 history.FindFresh(RGMeasurementDomain::Normal, token(32,7,32,2010),1000,signature) &&
@@ -640,18 +641,18 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             require(!history.FindFresh(RGMeasurementDomain::Capture, token(33,7,33,2010),1000,signature) &&
                 !history.FindFresh(RGMeasurementDomain::Normal, token(42,7,42,2010),1000,signature) &&
                 !history.FindFresh(RGMeasurementDomain::Normal, token(33,7,33,2010),1000,
-                    std::make_shared<const std::string>("unknown")), "Variant lookup bypassed domain, age or signature guards.");
+                    own::make_shared<const std::string>("unknown")), "Variant lookup bypassed domain, age or signature guards.");
             for(uint64_t i=0;i<5;++i)
-                history.Store(RGMeasurementDomain::Normal, {std::make_shared<const std::string>("variant-"+std::to_string(i)),
+                history.Store(RGMeasurementDomain::Normal, {own::make_shared<const std::string>("variant-"+std::to_string(i)),
                     {i},token(40+i,7,40+i,2100+i)});
             require(!history.FindFresh(RGMeasurementDomain::Normal,token(45,7,45,2110),1000,
-                    std::make_shared<const std::string>("variant-0")) &&
+                    own::make_shared<const std::string>("variant-0")) &&
                 history.FindFresh(RGMeasurementDomain::Normal,token(45,7,45,2110),1000,
-                    std::make_shared<const std::string>("variant-1")), "Per-view signature cache was unbounded or evicted too early.");
+                    own::make_shared<const std::string>("variant-1")), "Per-view signature cache was unbounded or evicted too early.");
             history.Discard(RGMeasurementDomain::Normal,token(46,7,46,2200));
             require(!history.Store(RGMeasurementDomain::Normal,{alternate,{uint64_t{9}},token(45,7,45,2110)}) &&
                 !history.FindFresh(RGMeasurementDomain::Normal,token(47,7,47,2210),1000,
-                    std::make_shared<const std::string>("variant-4")), "Failure watermark restored an older graph variant.");
+                    own::make_shared<const std::string>("variant-4")), "Failure watermark restored an older graph variant.");
             require(history.Store(RGMeasurementDomain::Normal,{signature,{uint64_t{12}},token(47,7,47,2210)}) &&
                 history.FindFresh(RGMeasurementDomain::Normal,token(48,7,48,2220),1000,signature) &&
                 !history.FindFresh(RGMeasurementDomain::Normal,token(48,7,48,2220),1000,alternate),

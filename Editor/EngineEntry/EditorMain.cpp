@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "EditorProjectLayerSettings.h"
 #include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "EditorObjectOperations.h"
@@ -140,13 +141,13 @@ void Editor::EditorMain::Initialize()
 	// 파이프라인은 렌더 스레드에서 서므로 렌더러 초기화(렌더 스레드 기동) 전에
 	// 설치해야 첫 조립부터 오버레이가 실린다(E4-2). Player는 설치하지 않는다.
 	EnhancedSceneRenderer::SetRenderFeatureContributor(
-		std::make_shared<EditorSceneOverlayContributor>());
+		own::make_shared<EditorSceneOverlayContributor>());
 
 	// 표시 sink도 같은 시점에 설치한다(E4-6a) — RT가 첫 리드백 프레임을
 	// 게시하기 전에 있어야 한다. 셸이 아직 Initialize 전이어도 위임은
 	// 안전하다(비활성 셸은 no-op/0).
 	EnhancedSceneRenderer::SetDisplayPresentationSink(
-		std::make_shared<ImGuiHostPresentationSink>([this]
+		own::make_shared<ImGuiHostPresentationSink>([this]
         {
             NotifyDisplayAvailable();
         }));
@@ -242,7 +243,7 @@ void Editor::EditorMain::Initialize()
         GetImGuiHost().GetBackendName());
 
 	BootProgress::Step(L"Preparing editor tools", L"Connecting gizmos, menus and inspectors");
-	m_gizmoRenderer = std::make_shared<GizmoRenderer>(
+	m_gizmoRenderer = own::make_shared<GizmoRenderer>(
 		EnhancedSceneRenderer::GetRenderScene(),
 		EditorSessionState::Get().EditorCamera());
 	// Scene 과 Game 은 여기서 만들지 않는다(PHASE 21 W3). 본문이 자유

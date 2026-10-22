@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "ThreadPool.h"
 #include "StandardLibrary.h"
 #include "JobGraph.h"
@@ -89,7 +90,7 @@ class job_scheduler
     // 선행 실패의 후손은 본문을 건너뛰고 독립 가지는 끝까지 실행한다.
     // 최종 handle은 공유 callback 캡처를 해제한 뒤에만 완료된다.
     job_handle submit_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,
-                            std::shared_ptr<job_graph_diagnostics> diagnostics = {});
+                            own::shared_owner<job_graph_diagnostics> diagnostics = {});
     job_handle parallel_for(std::size_t count, std::size_t grain, std::function<void(std::size_t, std::size_t)> task);
 
   private:

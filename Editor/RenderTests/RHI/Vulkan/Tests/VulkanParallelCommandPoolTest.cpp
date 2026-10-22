@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/ParallelRecordingJobsSelfTest.h"
 #include "RHI/Vulkan/VulkanCommandBufferPool.h"
@@ -119,7 +120,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             batchDesc.backendGeneration =
                 GetRHISubmissionThread().GetOwnerGeneration(&resources);
             batchDesc.displayToken = 29;
-            batchDesc.lifetimeToken = std::make_shared<uint64_t>(31);
+            batchDesc.lifetimeToken = own::make_shared<uint64_t>(31);
             recorded = graph.RecordParallel(pool, 4, batchDesc, batch, error);
             batchContract = recorded && batch.IsReadyForSubmit() &&
                 17 == batch.GetFrameId() &&

@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #pragma once
 
 #include "PlayRequest.h"
@@ -78,7 +79,7 @@ namespace wave
     };
 
     [[nodiscard]] ParameterType TypeOfParameter(const ParameterValue& value) noexcept;
-    [[nodiscard]] std::shared_ptr<const SoundGraphProgram> CompileSoundGraph(
+    [[nodiscard]] own::shared_owner<const SoundGraphProgram> CompileSoundGraph(
         const SoundGraphDefinition& definition, const std::function<bool(const ClipKey&)>& hasClip,
         std::string& error);
     [[nodiscard]] bool ResolveGraphParameters(const SoundGraphProgram& program,

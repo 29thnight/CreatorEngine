@@ -120,22 +120,6 @@ namespace material_graph
         // Seal does not dispatch asynchronous readers or recurse. Borrowed previous
         // pointers are cleared on every return; only owned key/array capacity persists.
         static thread_local SealScratch scratch;
-        scratch.identities.resize(draws.size());
-        size_t identityCount{};
-        for (const auto& draw : draws)
-        {
-            if (draw.temporalObjectId)
-            {
-                scratch.identities[identityCount++] = {draw.temporalObjectId, draw.temporalIncarnation,
-                                                       draw.temporalInstanceId, draw.modelMeshView.handle};
-            }
-        }
-        auto identities = std::span(scratch.identities.data(), identityCount);
-        std::sort(identities.begin(), identities.end());
-        if (std::adjacent_find(identities.begin(), identities.end()) != identities.end())
-        {
-            return Fail(error, "Scene view contains duplicate temporal object/instance/mesh identities.");
-        }
         const bool previousViewMatches =
             previous && previous->View().sceneEpoch == view.sceneEpoch && previous->View().viewId == view.viewId &&
             previous->View().historyRevision == view.historyRevision &&
@@ -143,7 +127,38 @@ namespace material_graph
             previous->View().width == view.width && previous->View().height == view.height &&
             previous->View().frameId < view.frameId;
         const size_t previousCount = previousViewMatches && !view.temporalFrame.reset ? previous->Draws().size() : 0;
-        scratch.previous.resize(previousCount);
+        bool stableOrder = previousViewMatches && previousCount == draws.size();
+        for (size_t index = 0; stableOrder && index < draws.size(); ++index)
+        {
+            const auto& now = draws[index];
+            const auto& old = previous->Draws()[index];
+            stableOrder = now.temporalObjectId == old.temporalObjectId &&
+                          now.temporalIncarnation == old.temporalIncarnation &&
+                          now.temporalInstanceId == old.temporalInstanceId && now.modelMeshView.handle == old.mesh;
+        }
+        ce::profile_instant(stableOrder ? ce::marker<"MaterialSceneSealTopologyReuse">()
+                                        : ce::marker<"MaterialSceneSealTopologyRebuild">());
+        if (!stableOrder)
+        {
+            scratch.identities.resize(draws.size());
+            size_t identityCount{};
+            for (const auto& draw : draws)
+            {
+                if (draw.temporalObjectId)
+                {
+                    scratch.identities[identityCount++] = {draw.temporalObjectId, draw.temporalIncarnation,
+                                                           draw.temporalInstanceId, draw.modelMeshView.handle};
+                }
+            }
+            auto identities = std::span(scratch.identities.data(), identityCount);
+            std::sort(identities.begin(), identities.end());
+            if (std::adjacent_find(identities.begin(), identities.end()) != identities.end())
+            {
+                return Fail(error, "Scene view contains duplicate temporal object/instance/mesh identities.");
+            }
+        }
+        const size_t sortedPreviousCount = stableOrder ? 0 : previousCount;
+        scratch.previous.resize(sortedPreviousCount);
         struct BorrowedDrawsScope
         {
             ce::render_vector<PreviousDraw>& entries;
@@ -155,13 +170,13 @@ namespace material_graph
                 }
             }
         } borrowedDraws{scratch.previous};
-        for (size_t index = 0; index < previousCount; ++index)
+        for (size_t index = 0; index < sortedPreviousCount; ++index)
         {
             const auto& old = previous->Draws()[index];
             scratch.previous[index] = {
                 {old.temporalObjectId, old.temporalIncarnation, old.temporalInstanceId, old.mesh}, &old, index};
         }
-        auto previousDraws = std::span(scratch.previous.data(), previousCount);
+        auto previousDraws = std::span(scratch.previous.data(), sortedPreviousCount);
         std::sort(previousDraws.begin(), previousDraws.end(), [](const PreviousDraw& left, const PreviousDraw& right)
                   { return left.key < right.key || (left.key == right.key && left.ordinal < right.ordinal); });
         auto candidate = own::make_shared<SceneViewInput>(ConstructionKey{});
@@ -233,7 +248,7 @@ namespace material_graph
                 }
                 if (const auto* stream = geometry.StreamMetadata())
                 {
-                    if (stream != (*pin)->streamMetadata.get())
+                    if (stream != (*pin)->streamMetadata.operator->())
                     {
                         return Fail(error, "Scene graph thin metadata has no exact descriptor provenance.");
                     }
@@ -295,12 +310,16 @@ namespace material_graph
             input.previousGeometry = input.geometry;
             if (previousViewMatches && !view.temporalFrame.reset && draw.temporalObjectId)
             {
-                const TemporalKey key{input.temporalObjectId, input.temporalIncarnation, input.temporalInstanceId,
-                                      input.mesh};
-                const auto found = std::lower_bound(previousDraws.begin(), previousDraws.end(), key,
-                                                    [](const PreviousDraw& entry, const TemporalKey& value)
-                                                    { return entry.key < value; });
-                const auto* old = found != previousDraws.end() && found->key == key ? found->draw : nullptr;
+                const SceneDrawInput* old = stableOrder ? &previous->Draws()[sourceIndex] : nullptr;
+                if (!stableOrder)
+                {
+                    const TemporalKey key{input.temporalObjectId, input.temporalIncarnation, input.temporalInstanceId,
+                                          input.mesh};
+                    const auto found = std::lower_bound(previousDraws.begin(), previousDraws.end(), key,
+                                                        [](const PreviousDraw& entry, const TemporalKey& value)
+                                                        { return entry.key < value; });
+                    old = found != previousDraws.end() && found->key == key ? found->draw : nullptr;
+                }
                 if (old && old->geometry && old->geometry->Source()->Bones().size() == draw.boneCount)
                 {
                     if (input.geometry->SharesSceneTopology(*old->geometry))
@@ -350,7 +369,7 @@ namespace material_graph
             total.chunks += chunks;
             total.cpuPayloadBytes += cost.cpuPayloadBytes;
             total.gpuPayloadBytes += cost.gpuPayloadBytes;
-            if (input.previousGeometry != input.geometry)
+            if (input.previousGeometry.operator->() != input.geometry.operator->())
             {
                 const auto& oldCost = input.previousGeometry->Cost();
                 if (oldCost.cpuPayloadBytes > budget.cpuPayloadBytes - total.cpuPayloadBytes ||

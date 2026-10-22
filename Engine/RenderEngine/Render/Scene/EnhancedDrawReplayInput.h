@@ -50,7 +50,7 @@ struct EnhancedDrawReplayInput
         };
         if (mesh.handle.domain == assets::ModelMeshDomain::Granular)
         {
-            const auto& blob = mesh.handle.blob;
+            const auto& blob = mesh.handle.Blob();
             number(static_cast<uint64_t>(mesh.handle.domain));
             number(static_cast<uint64_t>(blob.kind));
             number(blob.byteSize); number(blob.representation); number(blob.schemaVersion);

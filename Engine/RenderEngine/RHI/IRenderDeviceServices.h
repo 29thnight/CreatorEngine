@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include <stdint.h>
 #include "../../Utility_Framework/StandardLibrary.h"
 
@@ -305,7 +306,7 @@ public:
         return false;
     }
     virtual bool CreateTransientHeap(const RHITransientAllocationInfo&,
-        std::shared_ptr<RHITransientHeap>&, std::string& error)
+        own::shared_owner<RHITransientHeap>&, std::string& error)
     {
         error = "Transient placed allocation is unsupported";
         return false;
@@ -452,15 +453,13 @@ struct RHIModelMeshView
             return false;
         }
         if (!origin.byteSource || !handle.modelId.IsNil() || handle.generation != 0 ||
-            handle.meshId != descriptor.meshId || handle.asset != origin.entry.asset ||
-            handle.blob != origin.blob || handle.resolverRevision != origin.resolverRevision ||
-            handle.mountId != origin.mountId.value || handle.assetSetId != origin.assetSetId ||
-            handle.manifestRevision != origin.manifestRevision ||
-            descriptor.vertexAttributeMask != vertexAttributeMask ||
-            descriptor.vertexStride != vertexStride || descriptor.vertexLayoutHash != vertexLayoutHash ||
+            handle.meshId != descriptor.meshId || handle.asset != origin.entry.asset || handle.Blob() != origin.blob ||
+            handle.resolverRevision != origin.resolverRevision || handle.mountId != origin.mountId.value ||
+            handle.assetSetId != origin.assetSetId || handle.manifestRevision != origin.manifestRevision ||
+            descriptor.vertexAttributeMask != vertexAttributeMask || descriptor.vertexStride != vertexStride ||
+            descriptor.vertexLayoutHash != vertexLayoutHash ||
             uint64_t(descriptor.vertexCount) * descriptor.vertexStride != vertexBytes ||
-            descriptor.coarseLodCount > descriptor.coarseLods.size() ||
-            sourceLodIndex > descriptor.coarseLodCount)
+            descriptor.coarseLodCount > descriptor.coarseLods.size() || sourceLodIndex > descriptor.coarseLodCount)
         {
             return false;
         }
@@ -589,14 +588,15 @@ struct RHIModelMeshView
     mix(handle.asset.key.assetId.value.data.data(), handle.asset.key.assetId.value.data.size());
     mix(handle.asset.key.subassetId.value.data.data(), handle.asset.key.subassetId.value.data.size());
     mix(&handle.asset.kind, sizeof(handle.asset.kind));
-    mix(handle.blob.contentSha256.data(), handle.blob.contentSha256.size());
-    mix(&handle.blob.byteSize, sizeof(handle.blob.byteSize));
-    mix(&handle.blob.kind, sizeof(handle.blob.kind));
-    mix(&handle.blob.representation, sizeof(handle.blob.representation));
-    mix(&handle.blob.schemaVersion, sizeof(handle.blob.schemaVersion));
-    mixString(handle.blob.targetPlatform);
-    mixString(handle.blob.targetAbi);
-    mixString(handle.blob.artifactPath);
+    const auto& blob = handle.Blob();
+    mix(blob.contentSha256.data(), blob.contentSha256.size());
+    mix(&blob.byteSize, sizeof(blob.byteSize));
+    mix(&blob.kind, sizeof(blob.kind));
+    mix(&blob.representation, sizeof(blob.representation));
+    mix(&blob.schemaVersion, sizeof(blob.schemaVersion));
+    mixString(blob.targetPlatform);
+    mixString(blob.targetAbi);
+    mixString(blob.artifactPath);
     mix(&handle.resolverRevision, sizeof(handle.resolverRevision));
     mix(&handle.mountId, sizeof(handle.mountId));
     mix(handle.assetSetId.value.data.data(), handle.assetSetId.value.data.size());
@@ -748,4 +748,3 @@ public:
 
     virtual uint32_t GetModelGenerationUploadCount() const = 0;
 };
-

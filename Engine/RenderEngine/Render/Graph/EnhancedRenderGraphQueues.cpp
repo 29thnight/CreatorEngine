@@ -1,4 +1,5 @@
-#include "RGSetupTaskGraph.h"
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/RHIProfilingContext.h"
@@ -13,26 +14,14 @@ void EnhancedRenderGraph::RequireQueueIdle() const
     }
 }
 
-bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph>& self,
+bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
     IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
     const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
-    std::shared_ptr<const void> owner, QueueExecution& output, std::string& outError)
+    ce::lifetime_token owner, QueueExecution& output, std::string& outError)
 {
     output = {};
     outError.clear();
-    if (m_setupTasks)
-    {
-        try
-        {
-            ce::profile_scope join{ce::marker<"RenderGraphSetupExecuteJoin">()};
-            m_setupTasks->Join(RGSetupWaitPoint::Execute);
-        }
-        catch (const std::exception& failure)
-        {
-            outError = failure.what();
-            return false;
-        }
-    }
+
     // The report survives every return path, including recording and submission
     // rejection. CPU queue-operation tickets are inside submissionMilliseconds;
     // these durations must never be presented as CPU waits for GPU completion.
@@ -73,7 +62,7 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
             }
         }
     } cpu{output};
-    if (!self || self.get() != this || !owner || !m_queueLease.expired() || m_queueExecutionAttempted ||
+    if (!self || self.operator->() != this || !owner || !m_queueLease.expired() || m_queueExecutionAttempted ||
         m_statesCommitted || m_recordedRecording != 0 || m_preparedPool || m_aliasing || (m_profiler && compute && (!graphics.profiler || !compute->profiler)) ||
         m_scheduling != RGSchedulingMode::ExplicitVersioned || &recorder.DeviceServices() != m_deviceServices ||
         !graphics.queue || graphics.queue->GetIdentity().kind != RHIQueueKind::Graphics)
@@ -280,16 +269,16 @@ bool EnhancedRenderGraph::SubmitQueues(const std::shared_ptr<EnhancedRenderGraph
     // Destruction order matters: graph releases its handles before external storage.
     struct Lease
     {
-        std::shared_ptr<const void> owner;
-        std::shared_ptr<EnhancedRenderGraph> graph;
+        ce::lifetime_token owner;
+        own::shared_owner<EnhancedRenderGraph> graph;
     };
-    auto lease = std::make_shared<Lease>(Lease{std::move(owner), self});
+    auto lease = own::make_shared<Lease>(Lease{std::move(owner), self});
     m_queueLease = lease;
     struct Recording
     {
         QueueEndpoint* endpoint;
-        std::shared_ptr<IRHIQueueCommandBatch> batch;
-        std::shared_ptr<IRHIQueueRecording> targets;
+        ce::pooled_owner<IRHIQueueCommandBatch> batch;
+        ce::pooled_owner<IRHIQueueRecording> targets;
     };
     std::vector<Recording> recordings(output.plannedBatches);
     std::vector<RHITimelinePoint> points(output.plannedBatches);

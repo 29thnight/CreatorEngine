@@ -65,28 +65,40 @@ namespace assets
         std::uint64_t generation{};
         ModelMeshDomain domain{ ModelMeshDomain::LegacyAggregate };
         experiment::cooked::TypedAssetReference asset{};
-        experiment::cooked::AssetBlobRecord blob{};
+        own::shared_owner<const experiment::cooked::AssetBlobRecord> blob{};
         std::uint64_t resolverRevision{};
         std::uint64_t mountId{};
         experiment::AssetId assetSetId{};
         std::uint64_t manifestRevision{};
 
+        [[nodiscard]] const experiment::cooked::AssetBlobRecord& Blob() const noexcept
+        {
+            static const experiment::cooked::AssetBlobRecord empty{};
+            return blob ? *blob : empty;
+        }
+
         [[nodiscard]] bool IsValid() const noexcept
         {
+            const auto& record = Blob();
             if (domain == ModelMeshDomain::Granular)
             {
-                return IsUuidV8(meshId) && asset.key.assetId.value == meshId
-                    && asset.kind == experiment::cooked::CookedAssetKind::Mesh
-                    && blob.kind == experiment::cooked::CookedAssetKind::Mesh
-                    && blob.byteSize != 0u && blob.representation != 0u
-                    && blob.schemaVersion != 0u && resolverRevision != 0u
-                    && mountId != 0u && assetSetId.IsValid() && manifestRevision != 0u;
+                return IsUuidV8(meshId) && asset.key.assetId.value == meshId &&
+                       asset.kind == experiment::cooked::CookedAssetKind::Mesh &&
+                       record.kind == experiment::cooked::CookedAssetKind::Mesh && record.byteSize != 0u &&
+                       record.representation != 0u && record.schemaVersion != 0u && resolverRevision != 0u &&
+                       mountId != 0u && assetSetId.IsValid() && manifestRevision != 0u;
             }
             return domain == ModelMeshDomain::LegacyAggregate
                 && IsUuidV8(modelId) && IsUuidV8(meshId) && generation != 0u;
         }
-        friend auto operator<=>(const ModelMeshHandle&,
-            const ModelMeshHandle&) noexcept = default;
+        friend auto operator<=>(const ModelMeshHandle& a, const ModelMeshHandle& b) noexcept
+        {
+            return std::tie(a.modelId, a.meshId, a.generation, a.domain, a.asset, a.Blob(), a.resolverRevision,
+                            a.mountId, a.assetSetId, a.manifestRevision) <=>
+                   std::tie(b.modelId, b.meshId, b.generation, b.domain, b.asset, b.Blob(), b.resolverRevision,
+                            b.mountId, b.assetSetId, b.manifestRevision);
+        }
+        friend bool operator==(const ModelMeshHandle& a, const ModelMeshHandle& b) noexcept { return (a <=> b) == 0; }
     };
 
     // Small descriptor identity only; no parent model or CPU geometry is needed.
@@ -169,7 +181,7 @@ namespace assets
         math::aabb bounds{};
         experiment::MeshletPayload meshlets{};
         experiment::MeshLodChain coarseLods{};
-        std::shared_ptr<const cluster::Archive> clusterArchive{};
+        own::shared_owner<const cluster::Archive> clusterArchive{};
           own::shared_owner<const ModelMeshDescriptor> streamDescriptor{};
     };
 

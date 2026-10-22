@@ -172,7 +172,7 @@ struct EnhancedLiveViewPacket
 {
     EnhancedLiveViewKey key;
     FrameCameraSnapshot camera;
-    std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
+    own::shared_owner<const EnhancedGizmoSceneData> gizmos;
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
@@ -842,7 +842,7 @@ struct EnhancedLiveDebugSnapshot
     uint32_t nativeRecordOwnerJoins{0};
     uint32_t nativeRecordDispatcherHandoffs{0};
     bool nativeRecordBatched{false};
-    std::shared_ptr<const RHIRecordingDiagnostics> nativeRecordDiagnostics;
+    own::shared_owner<const RHIRecordingDiagnostics> nativeRecordDiagnostics;
     uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
     uint64_t nativeRecordEstimatedWork{0};
     bool nativeRecordParallelDeclined{false};
@@ -999,7 +999,7 @@ namespace EnhancedSceneRenderer
     /// EditorAssetPresentation이나 파일 경로를 모르며, 프레임 packet이 공유
     /// 소유권을 복사해 RenderThread 소비 완료까지 수명을 보장한다.
     void SetGizmoIconTextures(
-        std::shared_ptr<const EnhancedGizmoIconTextures> textures);
+        own::shared_owner<const EnhancedGizmoIconTextures> textures);
 
     /// Host가 파이프라인 조립 기여자를 설치한다(E4-2, §4.4). 파이프라인이
     /// 설 때마다 UI 노드 뒤·live_present 앞에서 Contribute가 불린다.
@@ -1008,7 +1008,7 @@ namespace EnhancedSceneRenderer
     /// 해제({})는 이후 조립에만 영향을 준다 — 살아 있는 파이프라인의 기여
     /// 노드는 기여자가 아니라 자기 패스 묶음을 붙들므로 안전하다.
     void SetRenderFeatureContributor(
-        std::shared_ptr<IRenderFeatureContributor> contributor);
+        own::shared_owner<IRenderFeatureContributor> contributor);
 
     /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
     /// GetLiveDisplayTexture의 ID 해석이 이 sink를 소비한다 — Core는
@@ -1016,7 +1016,7 @@ namespace EnhancedSceneRenderer
     /// 렌더러 초기화(렌더 스레드 기동) 전에 설치하고, 렌더 스레드가 멎은
     /// 뒤에 해제({})한다.
     void SetDisplayPresentationSink(
-        std::shared_ptr<IDisplayPresentationSink> sink);
+        own::shared_owner<IDisplayPresentationSink> sink);
 
     struct EnvironmentPreparationProgress
     {
@@ -1209,7 +1209,7 @@ namespace EnhancedSceneRenderer
 
     /// Request a snapshot on the next submitted frame and read the last requested
     /// immutable graph. No GPU resources are owned by this diagnostic value.
-    std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot> GetLiveGraphSnapshot(
+    own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot> GetLiveGraphSnapshot(
         EnhancedLiveDisplayTarget target);
 
     /// 현재 패스 파라미터. 파이프라인이 아직 없으면 기본값을 돌려준다.

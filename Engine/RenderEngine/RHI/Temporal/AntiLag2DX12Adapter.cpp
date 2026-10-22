@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "AntiLag2DX12Adapter.h"
 #include <Windows.h>
 #include <d3d12.h>
@@ -26,12 +27,15 @@ namespace
     TemporalResult Result(HRESULT hr)
     { return { hr == S_OK ? TemporalStatus::Success : TemporalStatus::FeatureUnsupported, hr }; }
 }
-AntiLag2DX12Adapter::AntiLag2DX12Adapter() : m_state(std::make_unique<State>()) {}
+AntiLag2DX12Adapter::AntiLag2DX12Adapter() : m_state(own::make_unique<State>()) {}
 AntiLag2DX12Adapter::~AntiLag2DX12Adapter()
 {
     // Shutdown is explicit after FSR final consumption. Preserve a context
     // still installed in a proxy instead of leaving a dangling callback pointer.
-    if (m_state && m_state->swapchain) (void)m_state.release();
+    if (m_state && m_state->swapchain)
+    {
+        (void)new decltype(m_state)(std::move(m_state));
+    }
     else Shutdown();
 }
 TemporalResult AntiLag2DX12Adapter::Initialize(ID3D12Device* device)

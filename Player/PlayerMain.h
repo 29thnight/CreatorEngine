@@ -1,3 +1,4 @@
+#include "../Engine/Utility_Framework/Ownership.h"
 #pragma once
 class ProjectLayerSettings;
 namespace wave
@@ -82,7 +83,7 @@ namespace Player
 		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
 
 	private:
-        std::shared_ptr<ProjectLayerSettings> m_projectLayers;
+        own::shared_owner<ProjectLayerSettings> m_projectLayers;
         std::unique_ptr<wave::AudioHost> m_audioHost;
         std::unique_ptr<wave::PlaybackService> m_audioPlayback;
         std::unique_ptr<wave::AudioCatalog> m_audioCatalog;
@@ -103,7 +104,7 @@ namespace Player
         void StopPresentation();
 
 	private:
-        std::shared_ptr<Presentation> m_presentation;
+        own::shared_owner<Presentation> m_presentation;
         std::atomic_bool m_presentationFailed{false};
         std::atomic<uint64_t> m_submittedGameFrameId{0};
         uint64_t m_temporalRealFrameId{0};

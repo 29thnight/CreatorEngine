@@ -78,7 +78,7 @@ struct ImGuiDx12Shell::Impl
         ComPtr<ID3D12Resource> resource;
         // 생산 측 종료 뒤 핸들 값이 재사용될 수 있으므로 lease 소유자로 식별한다.
         // 캐시 자체가 강한 참조를 가지면 슬롯 재사용을 막으므로 약한 참조만 둔다.
-        std::weak_ptr<RHIDisplayConsumerLease> m_consumerLease;
+        own::weak_owner<RHIDisplayConsumerLease> m_consumerLease;
         uint64_t textureId{ 0 };
         uint64_t lastUsedFrame{ 0 };
     };
@@ -86,18 +86,18 @@ struct ImGuiDx12Shell::Impl
 
     struct DisplayUse
     {
-        std::shared_ptr<RHIDisplayConsumerLease> m_lease;
+        own::shared_owner<RHIDisplayConsumerLease> m_lease;
         ComPtr<ID3D12Resource> m_resource;
     };
     std::vector<DisplayUse> m_pendingDisplayUses;
     RHICompletionRetireQueue<std::vector<DisplayUse>> m_displayUseRetireQueue;
 
-    void RetainDisplayUse(std::shared_ptr<RHIDisplayConsumerLease> consumerLease,
+    void RetainDisplayUse(own::shared_owner<RHIDisplayConsumerLease> consumerLease,
         const ComPtr<ID3D12Resource>& resource)
     {
         for (const DisplayUse& use : m_pendingDisplayUses)
         {
-            if (use.m_lease == consumerLease)
+            if (own::identity(use.m_lease) == own::identity(consumerLease))
             {
                 return;
             }
@@ -717,7 +717,7 @@ bool ImGuiDx12Shell::IsTextureReady(const Texture* texture) const
 }
 
 uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue,
-    std::shared_ptr<RHIDisplayConsumerLease> consumerLease)
+    own::shared_owner<RHIDisplayConsumerLease> consumerLease)
 {
     Impl& impl = *m_impl;
     HANDLE sharedHandle = static_cast<HANDLE>(sharedHandleValue);
@@ -736,7 +736,7 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue,
     const auto found = impl.sharedTextures.find(sharedHandle);
     if (found != impl.sharedTextures.end())
     {
-        if (found->second.m_consumerLease.lock() == consumerLease)
+        if (own::identity(found->second.m_consumerLease) == own::identity(consumerLease))
         {
             found->second.lastUsedFrame = impl.frameIndex;
             impl.RetainDisplayUse(std::move(consumerLease), found->second.resource);

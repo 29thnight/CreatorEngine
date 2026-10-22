@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 
 #include "VulkanLoader.h"
@@ -183,7 +185,7 @@ public:
         uint32_t generation{0};
         bool alive{false};
         bool owned{false};
-        std::shared_ptr<const void> m_lease;
+        ce::lifetime_token m_lease;
     };
 
     template<typename T>
@@ -205,7 +207,7 @@ public:
         Slot<T>& target = slots[slot];
         if (!target.m_lease || target.m_lease.use_count() != 1)
         {
-            target.m_lease = std::make_shared<uint8_t>();
+            target.m_lease = own::make_shared<uint8_t>();
         }
         target.entry = entry;
         target.alive = true;
@@ -246,7 +248,7 @@ public:
         Slot<VulkanBufferEntry>& target = m_buffers[slot];
         if (!target.m_lease || target.m_lease.use_count() != 1)
         {
-            target.m_lease = std::make_shared<uint8_t>();
+            target.m_lease = own::make_shared<uint8_t>();
         }
         target.entry = entry;
         target.alive = true;
@@ -299,4 +301,3 @@ public:
     mutable std::mutex m_imageRegistryMutex;
     mutable std::mutex m_bufferRegistryMutex;
 };
-

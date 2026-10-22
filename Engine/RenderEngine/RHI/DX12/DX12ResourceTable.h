@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -39,7 +41,7 @@ class DX12ResourceTable
         {
             Microsoft::WRL::ComPtr<ID3D12Resource> resource;
             Microsoft::WRL::ComPtr<ID3D12Heap> heap;
-            std::shared_ptr<const void> allocation;
+            ce::lifetime_token allocation;
             uint32_t generation{};
             uint64_t address{};
             uint64_t bytes{};
@@ -78,10 +80,10 @@ class DX12ResourceTable
         }
     };
 
-    std::shared_ptr<const RecordingSnapshot> CaptureRecordingSnapshot() const
+    own::shared_owner<const RecordingSnapshot> CaptureRecordingSnapshot() const
     {
         std::scoped_lock lock(m_textureRegistryMutex, m_bufferRegistryMutex);
-        std::shared_ptr<RecordingSnapshot> snapshot;
+        own::shared_owner<RecordingSnapshot> snapshot;
         for (const auto& candidate : m_recordingSnapshots)
         {
             if (candidate.use_count() == 1)
@@ -92,7 +94,7 @@ class DX12ResourceTable
         }
         if (!snapshot)
         {
-            snapshot = std::make_shared<RecordingSnapshot>();
+            snapshot = own::make_shared<RecordingSnapshot>();
             m_recordingSnapshots.push_back(snapshot);
         }
         const auto copy = [](const auto& source, uint32_t count, auto& destination)
@@ -132,7 +134,7 @@ class DX12ResourceTable
 
     RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource, bool allowIndirectArguments = false,
                               Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
-                              std::shared_ptr<const void> allocationLifetime = {})
+                              ce::lifetime_token allocationLifetime = {})
     {
         if (nullptr == resource.Get())
         {
@@ -184,7 +186,7 @@ class DX12ResourceTable
         return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.sparseHeap.Get()
                                                                                          : nullptr;
     }
-    std::shared_ptr<const void> ResolveBufferLifetime(RHIBufferHandle handle) const
+    ce::lifetime_token ResolveBufferLifetime(RHIBufferHandle handle) const
     {
         if (!handle.IsValid())
         {
@@ -352,7 +354,7 @@ class DX12ResourceTable
     {
         Microsoft::WRL::ComPtr<ID3D12Resource> owned; // 소유할 때만
         Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap;
-        std::shared_ptr<const void> allocationLifetime;
+        ce::lifetime_token allocationLifetime;
         ID3D12Resource* external{nullptr}; // 임포트일 때만
         uint32_t generation{0};
         bool alive{false};
@@ -419,7 +421,7 @@ class DX12ResourceTable
 
     uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external,
                            bool allowIndirectArguments = false, Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
-                           std::shared_ptr<const void> allocationLifetime = {})
+                           ce::lifetime_token allocationLifetime = {})
     {
         std::lock_guard lock(m_bufferRegistryMutex);
 
@@ -631,7 +633,7 @@ class DX12ResourceTable
         freeList.push_back(slot);
     }
 
-    mutable ce::render_vector<std::shared_ptr<RecordingSnapshot>> m_recordingSnapshots;
+    mutable ce::render_vector<own::shared_owner<RecordingSnapshot>> m_recordingSnapshots;
 
     // Texture registration can overlap material uploads and shadow history creation.
     std::vector<Slot> m_textures;

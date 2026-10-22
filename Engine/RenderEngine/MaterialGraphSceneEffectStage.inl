@@ -1,5 +1,6 @@
+#include "../Utility_Framework/Ownership.h"
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-RGHandle SceneHost::EffectStage::DeclareColor(const own::shared_owner<const FrameInput>& prepared,
+RGHandle SceneHost::EffectStage::DeclareColor(const own::shared_owner<const Frame>& prepared,
                                               EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& expected,
                                               const SceneSurfaceTargets::Outputs& inputs,
                                               const SceneColorInputs& inputWork, RGHandle lighting,
@@ -7,7 +8,7 @@ RGHandle SceneHost::EffectStage::DeclareColor(const own::shared_owner<const Fram
 {
 
     const SceneShadingInputs commands{{inputWork.layer, {}}, inputWork.material};
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!frame || frame->draws.empty())
     {
         return lighting;
@@ -73,7 +74,7 @@ RGHandle SceneHost::EffectStage::DeclareColor(const own::shared_owner<const Fram
 }
 
 std::vector<SceneHost::ForwardDraw> SceneHost::EffectStage::BlendedDraws(
-    const own::shared_owner<const FrameInput>& prepared) const
+    const own::shared_owner<const Frame>& prepared) const
 {
     std::vector<ForwardDraw> result;
     if (!prepared)
@@ -92,14 +93,14 @@ std::vector<SceneHost::ForwardDraw> SceneHost::EffectStage::BlendedDraws(
     return result;
 }
 
-RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const FrameInput>& prepared,
+RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Frame>& prepared,
                                                 EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque,
                                                 const std::vector<std::size_t>& indices, const SceneLayerWork& commands,
                                                 RGHandle lighting, RGHandle shadowMap,
                                                 const EnhancedForwardLighting& forward) const
 {
 
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (indices.empty())
     {
         throw std::runtime_error("METEOR blended range is empty.");
@@ -153,7 +154,7 @@ RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Fr
     return lighting;
 }
 
-RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<const FrameInput>& prepared,
+RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<const Frame>& prepared,
                                                       EnhancedRenderGraph& graph,
                                                       const SceneSurfaceTargets::Outputs& opaque,
                                                       const SceneLayerWork& commands, RGHandle lighting,
@@ -195,7 +196,7 @@ RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<co
     // composite itself is METEOR.Scene.Volume, declared once before this stream.
     EnhancedForwardLighting shared = tiles;
     // Medium bindings belong to VolumeStage; only its graph read crosses into layer work.
-    if (const auto medium = this->volume.frame)
+    if (const auto& medium = this->volume.frame)
     {
         shared.graphVolumeCoefficients = medium->GraphCoefficients(graph);
     }
@@ -206,13 +207,13 @@ RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<co
     return lighting;
 }
 
-void SceneHost::EffectStage::DeclareRefractionCapture(const own::shared_owner<const FrameInput>& prepared,
+void SceneHost::EffectStage::DeclareRefractionCapture(const own::shared_owner<const Frame>& prepared,
                                                       EnhancedRenderGraph& graph,
                                                       const SceneSurfaceTargets::Outputs& inputs,
                                                       const SceneShadingInputs& commands,
                                                       std::optional<std::size_t> index) const
 {
-    const auto frame = prepared;
+    const auto& frame = prepared;
     const auto targets = this->refraction->DeclareCaptureOutputs(graph);
     auto uses = graph.CreateDeclarationUsages({
         {inputs.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
@@ -244,7 +245,7 @@ void SceneHost::EffectStage::DeclareRefractionCapture(const own::shared_owner<co
     NormalizeSceneReads(graph, uses);
     graph.AddPass(
         "METEOR.Scene.RefractionCapture", uses,
-        [this, frame, inputs, index](const auto& execution)
+        [this, frame = frame, inputs, index](const auto& execution)
         {
             frame->CheckCurrent(execution.graph);
             const auto depth =
@@ -290,7 +291,7 @@ void SceneHost::EffectStage::DeclareRefractionCapture(const own::shared_owner<co
         });
 }
 
-RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const FrameInput>& prepared,
+RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Frame>& prepared,
                                                 EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& inputs,
                                                 const SceneShadingInputs& commands, RGHandle lighting,
                                                 RGHandle ambientOcclusion, RGHandle shadowMap, bool transmissionStage,
@@ -298,7 +299,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                                                 std::vector<std::size_t> blendedGroup) const
 {
 
-    const auto frame = prepared;
+    const auto& frame = prepared;
     const bool reconstruct = !blended && !transmissionStage;
     const auto lookup = blended ? this->lookup.layered : this->lookup.opaque;
     const auto selected = [blended, blendedGroup](const Frame::Draw& draw)
@@ -316,7 +317,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                                                                !draw.program->hasSpecial &&
                                                                draw.program->hasTransmission == transmissionStage;
                                                     });
-    std::shared_ptr<const IndirectMaterialBatch> blendedCommands;
+    own::shared_owner<const IndirectMaterialBatch> blendedCommands;
     if (blended && ordinary)
     {
         const std::array single{*blended};
@@ -438,7 +439,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
         NormalizeSceneReads(graph, captureUses);
         graph.AddPass(
             reconstruct ? "METEOR.Scene.Lookup.Resolve" : "METEOR.Scene.LookupCapture", captureUses,
-            [this, frame, inputs, first, count, part, transmissionStage, blended, lookup, selected, forward,
+            [this, frame = frame, inputs, first, count, part, transmissionStage, blended, lookup, selected, forward,
              reconstruct](const auto& execution)
             {
                 frame->CheckCurrent(execution.graph);
@@ -591,7 +592,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
         NormalizeSceneReads(graph, captureUses);
         graph.AddPass(
             "METEOR.Scene.SubsurfaceCapture", captureUses,
-            [this, frame, inputs, shadowMap, transmissionStage, blended, lookup, selected, forward,
+            [this, frame = frame, inputs, shadowMap, transmissionStage, blended, lookup, selected, forward,
              reconstruct](const auto& execution)
             {
                 frame->CheckCurrent(execution.graph);
@@ -712,8 +713,8 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
             : transmissionStage ? "METEOR.Scene.TransmissionColor"
                                 : "METEOR.Scene.Color",
             uses,
-            [this, frame, inputs, lighting, ambientOcclusion, shadowMap, transmissionStage, blended, lookup, selected,
-             forward, blendedCommands, reconstruct](const auto& execution) mutable
+            [this, frame = frame, inputs, lighting, ambientOcclusion, shadowMap, transmissionStage, blended, lookup,
+             selected, forward, blendedCommands, reconstruct](const auto& execution) mutable
             {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
@@ -841,7 +842,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     return lighting;
 }
 
-RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<const FrameInput>& prepared,
+RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<const Frame>& prepared,
                                                        EnhancedRenderGraph& graph,
                                                        const SceneSurfaceTargets::Outputs& inputs,
                                                        const SceneShadingInputs& commands, RGHandle lighting,
@@ -849,9 +850,9 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
                                                        bool transmissionStage, std::optional<std::size_t> blended,
                                                        EnhancedForwardLighting forward) const
 {
-    const auto frame = prepared;
+    const auto& frame = prepared;
     const bool reconstruct = !blended && !transmissionStage;
-    const auto effects = this->runtime.frame;
+    const auto& effects = this->runtime.frame;
     const auto lookup = blended ? this->lookup.layered : this->lookup.opaque;
     const auto selected = [blended, transmissionStage](const Frame::Draw& draw)
     {
@@ -912,10 +913,10 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
         }
         return uses;
     };
-    const auto raster = [this, frame, effects, lookup, inputs, ambientOcclusion, shadowMap, transmissionStage, blended,
-                         selected, reconstruct](const EnhancedRenderGraph::ExecuteContext& execution,
-                                                std::size_t tileIndex, int part, RGHandle lighting,
-                                                EnhancedForwardLighting forward)
+    const auto raster = [this, frame = frame, effects = effects, lookup, inputs, ambientOcclusion, shadowMap,
+                         transmissionStage, blended, selected,
+                         reconstruct](const EnhancedRenderGraph::ExecuteContext& execution, std::size_t tileIndex,
+                                      int part, RGHandle lighting, EnhancedForwardLighting forward)
     {
         frame->CheckCurrent(execution.graph);
         effects->CheckCurrent(*execution.graph);
@@ -1046,8 +1047,8 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     phases[phaseCount++] = {"METEOR.Scene.RuntimeEffectColor", colorUses};
     graph.AddRepeatedPassView("METEOR.Scene.RuntimeEffects", external, std::span{phases}.first(phaseCount),
                               static_cast<std::uint32_t>(effects->Tiles().size()),
-                              [effects, raster, inputs, lighting, forward](const auto& execution,
-                                                                           std::uint32_t iteration, std::uint32_t phase)
+                              [effects = effects, raster, inputs, lighting,
+                               forward](const auto& execution, std::uint32_t iteration, std::uint32_t phase)
                               {
                                   if (phase == 0)
                                   {

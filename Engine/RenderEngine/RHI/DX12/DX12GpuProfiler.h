@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -268,7 +269,12 @@ class DX12GpuProfiler : public IRHIGpuProfiler
 
     // 슬롯마다의 사용 패스 수와 표. atomic 은 복사도 이동도 안 되므로
     // vector 가 아니라 고정 배열로 둔다.
-    std::unique_ptr<std::atomic<uint32_t>[]> m_slotUsedPasses;
+    struct PassSlots
+    {
+        explicit PassSlots(size_t count) : m_values(count) {}
+        std::vector<std::atomic<uint32_t>> m_values;
+    };
+    own::unique_owner<PassSlots> m_slotUsedPasses;
     std::vector<GpuFrameToken> m_slotTokens;
     double m_lastTotalMs{0.0};
 };

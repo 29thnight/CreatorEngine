@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 // Current CEGE contains authenticated metadata and QMC2 pages only.
 namespace
 {
@@ -71,7 +72,7 @@ WireWriter GeometryStreamMetadata(const ModelGeometryArtifact& value,
 
 void ValidateStreamDescriptors(ModelGeometryStreamMetadata& value)
 {
-    auto flat = std::make_shared<std::vector<MeshletDescriptor>>();
+    auto flat = own::make_shared<std::vector<MeshletDescriptor>>();
     uint64_t primitiveBase{};
     const auto append = [&](const MeshletPayload& payload, uint32_t level) {
         const auto& settings = payload.settings;
@@ -181,7 +182,7 @@ bool ReadModelGeometryStreamMetadata(std::span<const std::byte> prefix, uint64_t
         Require(levels == value.lods.levels.size() + 1, "Streaming LOD count");
         for (uint32_t level = 0; level < levels; ++level)
             value.counts.push_back({reader.Integer<uint32_t>(), reader.Integer<uint32_t>(), reader.Integer<uint32_t>(), reader.Integer<uint32_t>()});
-        auto archive = std::make_shared<assets::cluster::Archive>(); archive->mask = value.attributes; archive->sourceVertices = value.vertexCount;
+        auto archive = own::make_shared<assets::cluster::Archive>(); archive->mask = value.attributes; archive->sourceVertices = value.vertexCount;
         archive->pagedTopology = true; archive->grid.positionError = reader.Float();
         Require(archive->grid.positionError >= 0, "Streaming quantization error");
         const auto pages = reader.Count(kModelSubAssetMaxBytes / 44, 44); archive->packets.resize(pages);
@@ -227,7 +228,7 @@ bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArt
         value.requiredBoneCount = metadata.requiredBoneCount; value.requiredSkinBindingSha256 = metadata.requiredSkinBindingSha256;
         std::vector<std::byte> vertices(uint64_t(metadata.vertexCount) * metadata.stride);
         ce::dynamic_bitset seen(metadata.vertexCount);
-        auto archive = std::make_shared<assets::cluster::Archive>(*metadata.archive);
+        auto archive = own::make_shared<assets::cluster::Archive>(*metadata.archive);
         archive->packets.clear();
         archive->pagedTopology = false; // Explicit CPU expansion uses QMC1 attribute packets.
         uint32_t page{};
@@ -312,7 +313,7 @@ bool ModelGeometryStreamIdentity(std::string_view path, Sha256Digest& digest)
     digest = value; return true;
 }
 
-bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved, std::shared_ptr<const ModelGeometryStreamMetadata>& out,
+bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved, own::shared_owner<const ModelGeometryStreamMetadata>& out,
                                      std::string& failure, std::atomic<std::size_t>* inputStaging)
 {
     return Checked([&] {
@@ -334,7 +335,7 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved, std::shared_p
         std::vector<std::byte> bytes(prefix); Sha256Digest actual{};
         Require(resolved.byteSource->ReadAt(resolved.blob.artifactPath, 0, bytes, failure) && ComputeSha256(bytes, actual, failure) && actual == expected,
                 "Thin metadata SHA-256 differs from trusted manifest locator");
-        auto value = std::make_shared<ModelGeometryStreamMetadata>();
+        auto value = own::make_shared<ModelGeometryStreamMetadata>();
         Require(ReadModelGeometryStreamMetadata(bytes, total, *value, failure), "Malformed thin metadata");
         const auto cpuPath = assets::cpu_geometry::Path(value->cpuGeometrySha256);
         // Pin an available loose file without reading its payload. An absent
@@ -353,7 +354,7 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved, std::shared_p
                                       "Exact CPU geometry artifact SHA-256");
             return result;
         };
-        auto archive = std::make_shared<assets::cluster::Archive>(*value->archive);
+        auto archive = own::make_shared<assets::cluster::Archive>(*value->archive);
         archive->pageReader = [source = resolved.byteSource, path = resolved.blob.artifactPath, offsets = archive->fileOffsets,
             sizes = archive->packetSizes, hashes = value->pageHashes, descriptors = value->flatDescriptors, counts = value->counts,
             groups = value->lods.groups, mask = value->attributes, vertices = value->vertexCount, bones = value->requiredBoneCount,

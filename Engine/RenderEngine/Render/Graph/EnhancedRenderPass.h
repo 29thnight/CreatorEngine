@@ -118,7 +118,7 @@ struct EnhancedMaterialCoverage
 struct EnhancedForwardMaterialDrawSnapshot
 {
     own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
-    std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
+    std::vector<own::shared_owner<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
     // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
     EnhancedMaterialSealIdentity seal{};
@@ -155,7 +155,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 struct EnhancedMaterialDrawSnapshot
 {
     own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
-    std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
+    std::vector<own::shared_owner<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
     EnhancedMaterialSealIdentity seal{};
     EnhancedMaterialCoverage coverage{};
@@ -261,12 +261,12 @@ struct EnhancedDrawItem
     // M6-P1a 제품 GBuffer 경로는 이 immutable 값만 본다. 위 legacy
     // factor/texture 필드는 아직 snapshot을 만들지 않는 격리 selftest의 호환
     // 경계다.
-    std::shared_ptr<const EnhancedMaterialDrawSnapshot> materialSnapshot{};
+    own::shared_owner<const EnhancedMaterialDrawSnapshot> materialSnapshot{};
 
     // M6-P2a 제품 Forward 경로의 immutable 값/texture generation owner.
     // Forward pass는 이 값이 있으면 위 legacy field를 읽지 않는다. P2b에서
     // ShaderMeta generation/permutation/property block을 같은 경계에 합친다.
-    std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>
+    own::shared_owner<const EnhancedForwardMaterialDrawSnapshot>
         forwardMaterialSnapshot{};
 
     // Fixture/producer transfer slot. Product frame records empty this owner

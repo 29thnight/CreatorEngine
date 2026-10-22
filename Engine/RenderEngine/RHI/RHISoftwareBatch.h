@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareEncoder.h"
 #include "RHIRecordedBatch.h"
 #include "RHIQueueContract.h"
@@ -17,7 +19,7 @@ struct RHISoftwareRecordingStorage
     ce::render_vector<Target> targets;
     uint32_t activeTargetCount{};
     ce::render_vector<uint32_t> targetOrder;
-    ce::render_vector<std::shared_ptr<RHISoftwareRecordingBudget>> budgets;
+    ce::render_vector<own::shared_owner<RHISoftwareRecordingBudget>> budgets;
     ce::render_vector<ce::render_unique_ptr<RHISoftwareEncoder>> encoders;
     void Reset() noexcept;
     size_t RetainedBytes() const noexcept;
@@ -37,7 +39,7 @@ struct RHISoftwareBatchDesc
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
     ce::dx_capture::submission_context captureContext{};
 #endif
-    std::shared_ptr<const void> lifetimeToken;
+    ce::lifetime_token lifetimeToken;
 };
 
 // Software state is intentionally distinct from RHIRecordedBatch's native state.
@@ -64,7 +66,7 @@ class RHISoftwareBatch final
     friend class RHIQueueCommandTranslator;
     void MoveFrom(RHISoftwareBatch&& other) noexcept;
 
-    std::shared_ptr<RHISoftwareRecordingStorage> m_storage;
+    ce::pooled_owner<RHISoftwareRecordingStorage> m_storage;
     RHISoftwareBatchDesc m_desc;
     uint64_t m_recordingId{};
     RHISoftwareBatchState m_state{RHISoftwareBatchState::Empty};

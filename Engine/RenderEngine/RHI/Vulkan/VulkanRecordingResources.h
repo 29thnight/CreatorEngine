@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "VulkanBindingTable.h"
 #include "VulkanPipelineCache.h"
@@ -47,6 +49,6 @@ class VulkanRecordingResources final
     std::vector<std::vector<RHIBindingDesc>> m_bindings;
     std::vector<std::vector<VkSampler>> m_samplers;
     std::vector<VulkanRenderTargetBinding> m_renderTargets;
-    std::shared_ptr<const void> m_renderTargetLease;
-    std::vector<std::shared_ptr<const void>> m_uploadLeases;
+    ce::lifetime_token m_renderTargetLease;
+    std::vector<ce::lifetime_token> m_uploadLeases;
 };

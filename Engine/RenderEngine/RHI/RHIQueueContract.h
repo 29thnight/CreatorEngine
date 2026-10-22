@@ -1,4 +1,6 @@
 #pragma once
+#include "../RenderAllocator.h"
+#include "../../Utility_Framework/Ownership.h"
 #include <stdint.h>
 #include "RHICommandFailure.h"
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -86,7 +88,7 @@ public:
 struct RHITimelinePoint
 {
     // Keeps the native synchronization object alive through queued waits.
-    std::shared_ptr<IRHITimelineFence> fence;
+    own::shared_owner<IRHITimelineFence> fence;
     uint64_t value{0};
 
     bool IsValid() const
@@ -182,12 +184,12 @@ public:
     virtual bool Wait(const RHITimelinePoint& point, std::string& error) = 0;
     // CPU admission only. Backend retains the sealed one-shot recording and its
     // resources until this queue's GPU completion, including unfenced failures.
-    virtual bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch,
+    virtual bool Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch,
         uint64_t value, RHITimelinePoint& point, std::string& error) = 0;
     // Optional structured result for the same virtual Submit contract. The sink
     // is request-local; synchronous owner handoffs must restore it explicitly.
     // Native backends mark the actual API boundary, never infer execution from text.
-    bool SubmitWithDiagnostics(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value,
+    bool SubmitWithDiagnostics(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, uint64_t value,
                                RHITimelinePoint& point, RHICommandFailure& failure)
     {
         failure.Reset();
@@ -210,6 +212,6 @@ class IRHICommandQueueFactory
 public:
     virtual ~IRHICommandQueueFactory() = default;
     virtual RHIQueueCapabilities QueryQueueCapabilities() const = 0;
-    virtual bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue,
+    virtual bool CreateQueue(RHIQueueKind kind, own::shared_owner<IRHICommandQueue>& queue,
         std::string& error) = 0;
 };

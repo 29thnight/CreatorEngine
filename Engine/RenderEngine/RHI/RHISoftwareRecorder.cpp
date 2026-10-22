@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareRecorder.h"
 #include "RHIProfilingContext.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
@@ -39,7 +40,7 @@ size_t RHISoftwareRecordingStorage::RetainedBytes() const noexcept
     size_t bytes =
         targets.capacity() * sizeof(Target) + targetOrder.capacity() * sizeof(uint32_t) +
         budgets.capacity() *
-            (sizeof(std::shared_ptr<RHISoftwareRecordingBudget>) + sizeof(RHISoftwareRecordingBudget)) +
+            (sizeof(own::shared_owner<RHISoftwareRecordingBudget>) + sizeof(RHISoftwareRecordingBudget)) +
         encoders.capacity() * (sizeof(ce::render_unique_ptr<RHISoftwareEncoder>) + sizeof(RHISoftwareEncoder));
     for (const auto& target : std::span(targets.data(), targets.size()))
     {
@@ -91,7 +92,7 @@ namespace
         }
     };
 
-    std::shared_ptr<RHISoftwareRecordingStorage> AcquireSoftwareStorage()
+    ce::pooled_owner<RHISoftwareRecordingStorage> AcquireSoftwareStorage()
     {
         static const auto pool = ce::make_render_shared<SoftwareStoragePool>();
         RHISoftwareRecordingStorage* storage{};
@@ -110,9 +111,10 @@ namespace
         }
         if (!storage)
         {
-            storage = ce::make_render_unique<RHISoftwareRecordingStorage>().release();
+            auto* memory = ce::render_allocator<RHISoftwareRecordingStorage>{}.allocate(1);
+            try { storage = std::construct_at(memory); } catch (...) { ce::render_allocator<RHISoftwareRecordingStorage>{}.deallocate(memory, 1); throw; }
         }
-        return std::shared_ptr<RHISoftwareRecordingStorage>(
+        return ce::pooled_owner<RHISoftwareRecordingStorage>(
             storage, [state = pool](auto* value) { state->Release(value); }, ce::render_allocator<std::byte>{});
     }
 

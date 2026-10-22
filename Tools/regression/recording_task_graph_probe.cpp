@@ -55,6 +55,29 @@ namespace
                 "split producer did not join every slice");
         graph = Build({0, 0, 0}, {0, 1, 2}, {0, 1, 2}, {}, {{false, {}}, {false, {0}}, {false, {1}}});
         Require(!graph.ReplacesWaveJoins(), "single-target coalescing would be expanded into more jobs");
+        if (RenderContainerReuseEnabled())
+        {
+            const std::array targets{0u, 1u, 0u};
+            const std::array waves{0u, 0u, 1u};
+            const std::array units{0u, 1u, 2u};
+            const std::array passes{RHIRecordingPassDependencies{false, {}}, RHIRecordingPassDependencies{false, {}},
+                                    RHIRecordingPassDependencies{false, {0}}};
+            RHIRecordingTaskGraph reusable;
+            Require(RHIBuildRecordingTaskGraph(targets, waves, units, {}, passes, 4, reusable), "reuse seed failed");
+            const auto* previous = reusable.scratch.previous.data();
+            const auto* frontier = reusable.scratch.frontiers[0].data();
+            const auto* dependency = reusable.nodes[2].dependencies.data();
+            for (unsigned frame = 0; frame < 32; ++frame)
+            {
+                Require(RHIBuildRecordingTaskGraph(targets, waves, units, {}, passes, 4, reusable),
+                        "reuse build failed");
+                Require(reusable.scratch.previous.data() == previous &&
+                            reusable.scratch.frontiers[0].data() == frontier &&
+                            reusable.nodes[2].dependencies.data() == dependency &&
+                            reusable.nodes[2].dependencies == std::vector<uint32_t>{0},
+                        "recording scratch or nested dependencies were reallocated or accumulated");
+            }
+        }
         RHIRecordingTaskGraph invalid;
         Require(!RHIBuildRecordingTaskGraph(std::array{4u}, std::array{0u}, std::array{0u}, {},
                                             std::array{RHIRecordingPassDependencies{}}, 4, invalid),

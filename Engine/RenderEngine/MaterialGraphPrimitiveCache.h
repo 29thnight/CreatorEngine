@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "MaterialGraphPrimitiveCacheContract.h"
 #include "MaterialGraphSceneGpuData.h"
@@ -154,9 +155,9 @@ namespace material_graph
                    std::uint64_t{values.sliceCapacity} <= std::uint64_t{values.dispatchWidth} * 65535;
         }
 
-        bool Prepare(const EnhancedFrameContext& context, std::shared_ptr<TransientBufferPool> pool,
-                     std::shared_ptr<ScenePrimitiveCacheResources> resources,
-                     std::shared_ptr<const SceneGpuData> sceneData, std::shared_ptr<const SceneMaterialWork> material,
+        bool Prepare(const EnhancedFrameContext& context, own::shared_owner<TransientBufferPool> pool,
+                     own::shared_owner<ScenePrimitiveCacheResources> resources,
+                     own::shared_owner<const SceneGpuData> sceneData, own::shared_owner<const SceneMaterialWork> material,
                      const math::matrix4x4& projection, std::string& error)
         {
             if (m_device)
@@ -369,11 +370,11 @@ namespace material_graph
         }
 
         IRenderDeviceServices* m_device{};
-        std::shared_ptr<TransientBufferPool> m_pool;
-        std::shared_ptr<ScenePrimitiveCacheResources> m_resources;
-        std::shared_ptr<const SceneGpuData> m_sceneData;
-        std::shared_ptr<const SceneMaterialWork> m_material;
-        std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 2> m_compute;
+        own::shared_owner<TransientBufferPool> m_pool;
+        own::shared_owner<ScenePrimitiveCacheResources> m_resources;
+        own::shared_owner<const SceneGpuData> m_sceneData;
+        own::shared_owner<const SceneMaterialWork> m_material;
+        std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 2> m_compute;
         std::array<RHIBufferHandle, 2> m_buffers{};
         RHIBufferSlice m_constants;
         RHIBindingTable m_inputs, m_outputs;

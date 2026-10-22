@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../../Utility_Framework/Ownership.h"
 #if CE_DEVELOPMENT && !CE_SHIPPING
 #include "../../../../Utility_Framework/StandardLibrary.h"
 #endif
@@ -117,7 +118,7 @@ public:
 private:
     FsrBackendStorage m_effectBackend;
     FsrBackendStorage m_sharedBackend;
-    std::unique_ptr<FfxFsr3UpscalerContext> m_context;
+    own::unique_owner<FfxFsr3UpscalerContext> m_context;
     FfxResourceInternal m_shared[3]{};
     uint32_t m_sharedCount{ 0 };
     FsrContextDescription m_description;
@@ -172,8 +173,8 @@ private:
     FsrBackendStorage m_opticalFlowBackend;
     FsrBackendStorage m_interpolationBackend;
     FsrBackendStorage m_sharedBackend;
-    std::unique_ptr<FfxOpticalflowContext> m_opticalFlow;
-    std::unique_ptr<FfxFrameInterpolationContext> m_interpolation;
+    own::unique_owner<FfxOpticalflowContext> m_opticalFlow;
+    own::unique_owner<FfxFrameInterpolationContext> m_interpolation;
     FfxResourceInternal m_shared[5]{};
     uint32_t m_sharedCount{ 0 };
     FsrBackendDevice m_device;

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="RHI\Temporal"><UniqueIdentifier>{4D213E9B-7064-41BB-ACAB-23370295E2C3}</UniqueIdentifier></Filter>
@@ -450,7 +450,6 @@
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp">
       <Filter>Render\Core</Filter>
     </ClCompile>
-    <ClCompile Include="Render\Graph\EnhancedRenderGraphDeclaration.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp">
       <Filter>Render\Graph</Filter>
     </ClCompile>
@@ -994,7 +993,6 @@
     <ClInclude Include="Render\Core\EnhancedLightPacking.h">
       <Filter>Render\Core</Filter>
     </ClInclude>
-    <ClInclude Include="Render\Graph\RGSetupTaskGraph.h" />
     <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h">
       <Filter>Render\Core</Filter>
     </ClInclude>
@@ -1667,6 +1665,9 @@
     <ClInclude Include="MaterialGraphPreparationTasks.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
+    <ClInclude Include="MaterialGraphPacketGroups.h">
+      <Filter>Render\MaterialGraph</Filter>
+    </ClInclude>
     <ClInclude Include="MaterialGraphPacketPlan.h">
       <Filter>Render\MaterialGraph</Filter>
     </ClInclude>
@@ -1794,6 +1795,7 @@
     <Filter Include="ThirdParty\mimalloc"><UniqueIdentifier>{c42eab0b-07d5-4dac-98d0-e8c612580102}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="RenderContainerReusePolicy.h" />
     <ClInclude Include="RenderArena.h" />
     <ClCompile Include="RenderArena.cpp" />
   </ItemGroup>

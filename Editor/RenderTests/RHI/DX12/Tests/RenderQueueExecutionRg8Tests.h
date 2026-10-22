@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -16,12 +17,12 @@ namespace Rg8QueueExecutionTests
     class FaultQueue final : public IRHICommandQueue
     {
     public:
-        FaultQueue(std::shared_ptr<IRHICommandQueue> queue, DX12QueueService& service,
+        FaultQueue(own::shared_owner<IRHICommandQueue> queue, DX12QueueService& service,
             bool rejectWait, bool rejectSubmit)
             : m_queue(std::move(queue)), m_service(service), m_rejectWait(rejectWait), m_rejectSubmit(rejectSubmit)
         {
         }
-        const std::shared_ptr<IRHICommandQueue>& Native() const { return m_queue; }
+        const own::shared_owner<IRHICommandQueue>& Native() const { return m_queue; }
         RHIQueueIdentity GetIdentity() const override { return m_queue->GetIdentity(); }
         bool Signal(uint64_t value, RHITimelinePoint& point, std::string& error) override
         {
@@ -36,7 +37,7 @@ namespace Rg8QueueExecutionTests
             }
             return m_queue->Wait(point, error);
         }
-        bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value,
+        bool Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, uint64_t value,
             RHITimelinePoint& point, std::string& error) override
         {
             if (m_rejectSubmit)
@@ -49,7 +50,7 @@ namespace Rg8QueueExecutionTests
         size_t CollectCompleted() override { return m_queue->CollectCompleted(); }
         size_t GetPendingBatchCount() const override { return m_queue->GetPendingBatchCount(); }
     private:
-        std::shared_ptr<IRHICommandQueue> m_queue;
+        own::shared_owner<IRHICommandQueue> m_queue;
         DX12QueueService& m_service;
         bool m_rejectWait;
         bool m_rejectSubmit;
@@ -60,11 +61,11 @@ namespace Rg8QueueExecutionTests
     public:
         explicit FaultRecorder(IRHIQueueRecorder& recorder) : m_recorder(recorder) {}
         IRenderDeviceServices& DeviceServices() const override { return m_recorder.DeviceServices(); }
-        bool Record(const std::shared_ptr<IRHICommandQueue>& queue,
-            const std::function<void(RHIEncoder&)>& commands, std::shared_ptr<const void> token,
-            std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) override
+        bool Record(const own::shared_owner<IRHICommandQueue>& queue,
+            const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+            ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override
         {
-            const auto fault = std::dynamic_pointer_cast<FaultQueue>(queue);
+            const auto fault = own::dynamic_owner_cast<FaultQueue>(queue);
             return m_recorder.Record(fault ? fault->Native() : queue, commands, std::move(token), batch, error);
         }
     private:
@@ -168,7 +169,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         for (uint32_t mode = 0; mode < 2; ++mode)
         {
             require(device.BeginFrame(error), error);
-            auto storage = std::make_shared<Storage>();
+            auto storage = own::make_shared<Storage>();
             storage->device = &device;
             require(device.CreateBufferReadback(256, storage->readback, error), error);
             RHITextureDesc textureDesc{};
@@ -180,7 +181,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const auto computeToken = computeProfiler.BeginFrame(mode + 1, mode + 1, 7);
             graphics.profiler = &graphicsProfiler;
             compute.profiler = &computeProfiler;
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             auto first = graph->Write(graph->CreateBuffer({256, true, false, "queue-input"}));
             auto second = graph->Write(graph->CreateBuffer({256, true, false, "queue-output"}));
             auto imported = graph->Write(graph->ImportTexture(storage->texture, storage->state, "imported-final-state", &storage->state));
@@ -299,11 +300,11 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             EnhancedRenderGraph::QueueExecution duplicate;
             require(!graph->SubmitQueues(graph, recorder, graphics, mode ? &compute : nullptr,
                 {}, 100, storage, duplicate, error) && !duplicate.submissionAttempted, "Pending graph was submitted twice.");
-            std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
+            own::weak_owner<EnhancedRenderGraph> graphWeak = graph;
             graph.reset();
             require(graphics.queue->CollectCompleted() == 0 && compute.queue->CollectCompleted() == 0 &&
                 !graphWeak.expired(), "Blocked GPU released graph storage.");
-            std::shared_ptr<IRHICommandQueue> unrelated;
+            own::shared_owner<IRHICommandQueue> unrelated;
             require(service.CreateQueue(RHIQueueKind::Copy, unrelated, error), error);
             RHITimelinePoint high;
             require(unrelated->Signal(100000, high, error), error);
@@ -350,7 +351,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             require(retiredPool.leased == 0 && retiredPool.cached >= 3 &&
                 DX12QueueService::QueryRecordingPool(compute.queue).leased == 0, "Completed recording storage was not cached.");
             // Validate actual epilogue state, not only the CPU writeback field.
-            std::shared_ptr<IRHIQueueCommandBatch> restoreProbe;
+            ce::pooled_owner<IRHIQueueCommandBatch> restoreProbe;
             require(recorder.Record(graphics.queue, [&](RHIEncoder& encoder)
             {
                 RHITransition transitions[]{ {storage->texture, RHIResourceState::ShaderResource, RHIResourceState::Common} };
@@ -423,11 +424,11 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const auto nativeCompute = overlapCompute.queue;
             if (submissionFailure)
             {
-                overlapCompute.queue = std::make_shared<Rg8QueueExecutionTests::FaultQueue>(nativeCompute,
+                overlapCompute.queue = own::make_shared<Rg8QueueExecutionTests::FaultQueue>(nativeCompute,
                     overlapService, mode == OverlapCase::WaitFailure, mode == OverlapCase::UnfencedSubmission);
             }
             Rg8QueueExecutionTests::FaultRecorder overlapRecorder(recorder);
-            auto storage = std::make_shared<Storage>();
+            auto storage = own::make_shared<Storage>();
             storage->device = &device;
             require(device.CreateBufferReadback(256, storage->readback, error) &&
                 device.CreateBufferReadback(256, storage->graphicsReadback, error) &&
@@ -445,7 +446,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             finalTextureDesc.clearColor[3] = 1.0f;
             require(device.CreateBuffer(importedDesc, storage->prefixBuffer, error) &&
                 device.CreateTexture(finalTextureDesc, storage->texture, error), error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
                 mode == OverlapCase::PreserveDeclarationOrder ? RGOrderPolicy::PreserveDeclarationOrder :
                     RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph::QueueCostModel model;
@@ -685,7 +686,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     execution.submittedWaits == (mode == OverlapCase::WaitFailure ? 0u : 1u) &&
                     storage->state == RHIResourceState::Common,
                     "Partial reordered failure published completion or final states.");
-                std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
+                own::weak_owner<EnhancedRenderGraph> graphWeak = graph;
                 graph.reset();
                 require(overlapGraphics.queue->CollectCompleted() == 0 && nativeCompute->CollectCompleted() == 0 &&
                     !graphWeak.expired() && DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 3 &&
@@ -726,8 +727,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 resetRejected = true;
             }
             require(resetRejected, "Blocked reordered graph was reset.");
-            std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
-            std::weak_ptr<Storage> storageWeak = storage;
+            own::weak_owner<EnhancedRenderGraph> graphWeak = graph;
+            own::weak_owner<Storage> storageWeak = storage;
             graph.reset();
             storage.reset();
             require(overlapGraphics.queue->CollectCompleted() == 0 && nativeCompute->CollectCompleted() == 0 &&
@@ -839,7 +840,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             // implicit COMMON decay, and RenderTarget cannot promote from COMMON.
             // Validate the native epilogue state with an
             // explicit transition, rather than trusting only CPU writeback.
-            std::shared_ptr<IRHIQueueCommandBatch> finalStateProbe;
+            ce::pooled_owner<IRHIQueueCommandBatch> finalStateProbe;
             require(recorder.Record(overlapGraphics.queue, [&](RHIEncoder& encoder)
             {
                 const RHITransition transition{storage->texture,
@@ -869,10 +870,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const uint32_t wantedSlices = smallFallback ? 1u : workers;
             require(device.BeginFrame(error), error);
             DX12QueueRecorder parallelRecorder(device, workers);
-            auto storage = std::make_shared<Storage>();
+            auto storage = own::make_shared<Storage>();
             storage->device = &device;
             require(device.CreateBufferReadback(1024, storage->readback, error), error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             graph->SetParallelRecordCostThreshold(smallFallback ? 100u : 0u);
             graph->SetQueueExecutionMode(2);
             const auto output = graph->Write(graph->CreateBuffer({1024, true, false, "parallel-queue-output"}));
@@ -959,7 +960,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 parallelBaseline = image.data;
             }
             require(correct && image.data == parallelBaseline, "Parallel/small-fallback queue payload or callback count differs.");
-            std::weak_ptr<EnhancedRenderGraph> graphWeak = graph;
+            own::weak_owner<EnhancedRenderGraph> graphWeak = graph;
             graph.reset();
             require(graphics.queue->CollectCompleted() + compute.queue->CollectCompleted() == execution.submittedBatches &&
                 graphWeak.expired() && DX12QueueService::QueryRecordingPool(graphics.queue).leased == 0 &&
@@ -968,8 +969,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             storage.reset();
             device.AbortFrame();
         }
-        auto owner = std::make_shared<int>(1);
-        auto failure = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+        auto owner = own::make_shared<int>(1);
+        auto failure = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         failure->AddPass("recording-failure", {}, [](const auto&)
         {
             throw std::runtime_error("injected recording failure");
@@ -985,7 +986,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         service.RejectNextTestSubmission(true);
         require(!failure->SubmitQueues(failure, recorder, graphics, &compute, {}, 100, owner, rejected, error) &&
             rejected.submissionAttempted && rejected.recoveryRequired && !rejected.completion.IsValid(), "Unfenced submit failure was accepted.");
-        std::weak_ptr<EnhancedRenderGraph> failedWeak = failure;
+        own::weak_owner<EnhancedRenderGraph> failedWeak = failure;
         failure.reset();
         require(graphics.queue->CollectCompleted() == 0 && !failedWeak.expired(), "Unfenced graph was reclaimed early.");
         require(DX12QueueService::QueryRecordingPool(graphics.queue).leased > 0,
@@ -1027,16 +1028,16 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             }
         } frameCleanup{device, frameGate.Get()};
         require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.Get(), 1, error), error);
-        std::vector<std::shared_ptr<Storage>> frameStorage;
-        std::vector<std::weak_ptr<EnhancedRenderGraph>> frameGraphs;
+        std::vector<own::shared_owner<Storage>> frameStorage;
+        std::vector<own::weak_owner<EnhancedRenderGraph>> frameGraphs;
         uint64_t firstFrameFence = 0;
         for (uint32_t frame = 0; frame < 3; ++frame)
         {
             require(device.BeginFrame(error), error);
-            auto storage = std::make_shared<Storage>();
+            auto storage = own::make_shared<Storage>();
             storage->device = &device;
             require(device.CreateBufferReadback(256, storage->readback, error), error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             RHIBufferDesc prefixDesc{};
             prefixDesc.bytes = 256;
             prefixDesc.allowUnorderedAccess = true;
@@ -1141,13 +1142,13 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         frameStorage.clear();
         require(device.BeginFrame(error) && device.BeginQueueFrame(frameGraphics.queue, error), error);
         require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.Get(), 2, error), error);
-        auto abortGraph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+        auto abortGraph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         abortGraph->AddPass("abort-pending-frame", {}, nullptr, true);
         require(abortGraph->Compile(error), error);
         EnhancedRenderGraph::QueueExecution abortExecution;
         require(abortGraph->SubmitQueues(abortGraph, recorder, frameGraphics, &frameCompute,
             {}, 100, owner, abortExecution, error), error);
-        std::weak_ptr<EnhancedRenderGraph> abortWeak = abortGraph;
+        own::weak_owner<EnhancedRenderGraph> abortWeak = abortGraph;
         abortGraph.reset();
         gateOpened.store(false);
         std::jthread openAbortGate([&]

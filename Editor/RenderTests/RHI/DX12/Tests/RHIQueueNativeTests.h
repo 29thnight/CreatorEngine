@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "RHIQueueContractTests.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -19,7 +20,7 @@ bool DX12Test::RunQueueNativeTest(std::string& outLog)
     {
         DX12DeviceResources device;
         std::string error;
-        std::shared_ptr<IRHICommandQueue> graphics, compute, copy;
+        own::shared_owner<IRHICommandQueue> graphics, compute, copy;
         require(!device.CreateQueue(RHIQueueKind::Graphics, graphics, error) && !graphics,
             "Uninitialized device admitted queue creation.");
         require(device.Initialize(32, 32, error), error);
@@ -32,7 +33,7 @@ bool DX12Test::RunQueueNativeTest(std::string& outLog)
         require(graphics->GetIdentity().queueId != compute->GetIdentity().queueId &&
             compute->GetIdentity().queueId != copy->GetIdentity().queueId,
             "Native queue identity collision.");
-        std::shared_ptr<IRHICommandQueue> invalid = graphics;
+        own::shared_owner<IRHICommandQueue> invalid = graphics;
         require(!device.CreateQueue(static_cast<RHIQueueKind>(255), invalid, error) && !invalid,
             "Invalid queue kind was accepted or output was not cleared.");
         RHITimelinePoint source, intermediate, finished, rejected;
@@ -52,11 +53,11 @@ bool DX12Test::RunQueueNativeTest(std::string& outLog)
         require(source.IsComplete() && intermediate.IsComplete() && finished.IsComplete(),
             "Native graphics-compute-copy timeline chain did not complete.");
         require(!copy->Wait({source.fence, 8}, error), "Unissued native value admitted a wait.");
-        auto forged = std::make_shared<QueueContractTestFence>();
+        auto forged = own::make_shared<QueueContractTestFence>();
         forged->producer = graphics->GetIdentity();
         require(!copy->Wait({forged, 7}, error), "Non-native timeline was admitted by DX12.");
         DX12QueueService foreign(device.GetDevice());
-        std::shared_ptr<IRHICommandQueue> foreignQueue;
+        own::shared_owner<IRHICommandQueue> foreignQueue;
         require(foreign.CreateQueue(RHIQueueKind::Copy, foreignQueue, error) &&
             foreignQueue->GetIdentity().deviceGeneration != graphics->GetIdentity().deviceGeneration &&
             !foreignQueue->Wait(source, error), "Foreign incarnation admitted a native wait.");
@@ -71,7 +72,7 @@ bool DX12Test::RunQueueNativeTest(std::string& outLog)
             !graphics->Signal(8, rejected, error) && !compute->Wait(source, error) &&
             !device.QueryQueueCapabilities().graphics, "Shutdown failed to revoke native queue/timeline admission.");
         require(device.Initialize(32, 32, error), error);
-        std::shared_ptr<IRHICommandQueue> restarted;
+        own::shared_owner<IRHICommandQueue> restarted;
         require(device.CreateQueue(RHIQueueKind::Graphics, restarted, error) &&
             restarted->GetIdentity().deviceGeneration != graphics->GetIdentity().deviceGeneration &&
             !restarted->Wait(source, error), "Restart reused an incarnation or accepted a retired point.");
@@ -88,7 +89,7 @@ bool DX12Test::RunQueueNativeTest(std::string& outLog)
             SUCCEEDED(D3D12CreateDevice(warp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&nativeDevice))) &&
             SUCCEEDED(nativeDevice.As(&removable)), "WARP removal fixture creation failed.");
         DX12QueueService lost(nativeDevice.Get());
-        std::shared_ptr<IRHICommandQueue> lostQueue;
+        own::shared_owner<IRHICommandQueue> lostQueue;
         RHITimelinePoint lostPoint;
         require(lost.CreateQueue(RHIQueueKind::Copy, lostQueue, error) &&
             lostQueue->Signal(1, lostPoint, error), error);

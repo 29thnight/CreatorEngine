@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanPipelineCache.h"
 #include "../RHIGraphicsPipelineRequest.h"
 #include "VulkanFormat.h"
@@ -454,7 +455,7 @@ void VulkanPipelineCache::Shutdown()
 
     // This lifecycle boundary may wait. RequestGraphics and invalidation never do.
     // Jobs own native results; join them before destroying layouts or the device.
-    const auto join = [](const std::shared_ptr<PendingGraphics>& request) {
+    const auto join = [](const own::shared_owner<PendingGraphics>& request) {
         try
         {
             if (request->completion.valid())
@@ -959,7 +960,7 @@ RHIPipelineHandle VulkanPipelineCache::PublishPipeline(VulkanPipelineEntry entry
     }
 
     PipelineSlot& slot = m_pipelines[slotIndex];
-    slot.m_lease = std::make_shared<uint8_t>();
+    slot.m_lease = own::make_shared<uint8_t>();
     slot.entry = entry;
     slot.alive = true;
     return { RHIHandleBits::Encode(slotIndex, slot.generation) };
@@ -1283,7 +1284,7 @@ RHIPipelineRequestState VulkanPipelineCache::RequestGraphics(const RHIGraphicsPi
         outError = "Vulkan graphics pipeline preparation budget exceeded";
         return RHIPipelineRequestState::Failed;
     }
-    auto request = std::make_shared<PendingGraphics>();
+    auto request = own::make_shared<PendingGraphics>();
     request->device = m_device;
     request->layout = Resolve(desc.layout);
     if (!request->layout.IsValid() || !request->input.Prepare(desc, outError))

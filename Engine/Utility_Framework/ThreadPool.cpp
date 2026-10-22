@@ -1,3 +1,4 @@
+#include "Ownership.h"
 #include "ThreadPool.h"
 #include <enkiTS/TaskScheduler.h>
 #include "StandardLibrary.h"
@@ -187,7 +188,7 @@ struct thread_pool::state
                 // 이 순회가 반환할 때까지 전체 간선과 노드의 수명을 유지해야 한다.
                 auto* lifetime = &graph_;
                 lifetime->retain();
-                auto* diagnostics = graph_.diagnostics_.get();
+                auto* diagnostics = graph_.diagnostics_.operator->();
                 if (diagnostics)
                 {
                     if (kind_ == gate_kind::ready)
@@ -294,7 +295,7 @@ struct thread_pool::state
         state& owner_;
         std::function<void(std::size_t)> execute_;
         std::function<void(std::exception_ptr)> complete_;
-        std::shared_ptr<job_graph_diagnostics> diagnostics_;
+        own::shared_owner<job_graph_diagnostics> diagnostics_;
         // 수락된 그래프와 제출 호출이 각각 하나씩 보관한다. 완료 순회는 진입/반환 때 증감한다.
         std::atomic<uint64_t> references_{2};
         std::mutex failure_mutex_;
@@ -308,7 +309,7 @@ struct thread_pool::state
         std::vector<enki::Dependency> dependencies_;
 
         graph_work(state& owner, std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
-                   std::function<void(std::exception_ptr)> complete, std::shared_ptr<job_graph_diagnostics> diagnostics)
+                   std::function<void(std::exception_ptr)> complete, own::shared_owner<job_graph_diagnostics> diagnostics)
             : owner_(owner), execute_(std::move(execute)), complete_(std::move(complete)),
               diagnostics_(std::move(diagnostics))
         {
@@ -372,7 +373,7 @@ struct thread_pool::state
         }
 
         void prepare(std::function<void(std::size_t)> execute, std::function<void(std::exception_ptr)> complete,
-                     std::shared_ptr<job_graph_diagnostics> diagnostics)
+                     own::shared_owner<job_graph_diagnostics> diagnostics)
         {
             execute_ = std::move(execute);
             complete_ = std::move(complete);
@@ -596,7 +597,7 @@ struct thread_pool::state
     }
     void dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
                         std::function<void(std::exception_ptr)> complete,
-                        std::shared_ptr<job_graph_diagnostics> diagnostics)
+                        own::shared_owner<job_graph_diagnostics> diagnostics)
     {
         auto graph = acquire_graph(nodes);
         if (graph)
@@ -752,7 +753,7 @@ void thread_pool::dispatch(std::size_t count, std::function<void(std::size_t)> e
 }
 void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
                                  std::function<void(std::exception_ptr)> complete,
-                                 std::shared_ptr<job_graph_diagnostics> diagnostics)
+                                 own::shared_owner<job_graph_diagnostics> diagnostics)
 {
     auto state = snapshot();
     if (!state)

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "AIManager.h"
 #include "BehaviorTreeComponent.h"
 #include "StateMachineComponent.h"
@@ -9,7 +10,7 @@
 #include "../Utility_Framework/StandardLibrary.h"
 //#include <execution>
 
-std::shared_ptr<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float deltaSeconds,
+own::shared_owner<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float deltaSeconds,
     const std::optional<math::bounding_frustum>& cameraFrustum)
 {
     std::vector<AIRegistration> registrations;
@@ -64,7 +65,7 @@ std::shared_ptr<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float de
         snapshot.m_components.push_back(captured);
     }
 
-    auto batch = std::make_shared<AIUpdateBatch>(std::move(snapshot));
+    auto batch = own::make_shared<AIUpdateBatch>(std::move(snapshot));
     batch->m_visibleIndices.reserve(batch->m_snapshot.m_components.size());
     return batch;
 }
@@ -284,4 +285,3 @@ void AIManager::InitalizeBehaviorTreeSystem()
     }
 
 }
-

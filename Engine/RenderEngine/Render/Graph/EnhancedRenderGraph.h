@@ -1,5 +1,8 @@
 #pragma once
-class RGSetupTaskGraph;
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
+#include "../../RenderContainerReusePolicy.h"
+#include "../../RHI/RHIRecordingTaskGraph.h"
 class RHISoftwareRecorder;
 class RHISoftwareBatch;
 struct RHISoftwareBatchDesc;
@@ -181,7 +184,7 @@ public:
     // retirement. Excludes committed resources and physical residency.
     // Query on the producer or after a synchronized lifecycle boundary.
     AliasHeapMemory GetAliasHeapMemory() const;
-    std::shared_ptr<AliasHeapAccounting> aliasHeapAccounting;
+    own::shared_owner<AliasHeapAccounting> aliasHeapAccounting;
     struct AliasedEntry
     {
         RHITextureHandle texture;
@@ -194,15 +197,15 @@ public:
         AliasedGroup(const AliasedGroup&) = delete;
         AliasedGroup& operator=(const AliasedGroup&) = delete;
         IRenderDeviceServices* owner{nullptr};
-        std::shared_ptr<RHITransientHeap> heap;
+        own::shared_owner<RHITransientHeap> heap;
         RHITransientAllocationInfo allocation;
         std::vector<RHITransientResourceDesc> descriptions;
         std::vector<AliasedEntry> entries;
-        void TrackHeap(const std::shared_ptr<AliasHeapAccounting>& accounting);
+        void TrackHeap(const own::shared_owner<AliasHeapAccounting>& accounting);
         void SetCached(bool cached);
         ~AliasedGroup();
     private:
-        std::shared_ptr<AliasHeapAccounting> m_accounting;
+        own::shared_owner<AliasHeapAccounting> m_accounting;
         bool m_cached{false};
     };
     using AllocationKey = std::array<uint64_t, 6>;
@@ -222,7 +225,7 @@ public:
     // Clear before the owning device shuts down, on the same producer thread.
     void ClearAliasingCache();
     IRenderDeviceServices* aliasOwner{nullptr};
-    std::vector<std::shared_ptr<AliasedGroup>> freeAliasedGroups;
+    std::vector<own::shared_owner<AliasedGroup>> freeAliasedGroups;
     std::unordered_map<AllocationKey, RHITransientAllocationInfo, AllocationKeyHash> allocationCache;
     uint64_t freeAliasBytes{0};
     uint64_t maxFreeAliasBytes{128ull * 1024 * 1024};
@@ -349,7 +352,7 @@ public:
         uint32_t recordingOwnerJoinCount{0}; // CPU 소유자의 대기 경계 수이며 선행 의존 간선 수가 아니다.
         uint32_t recordingDispatcherHandoffCount{0};
         bool recordingNativeGraph{false};
-        std::shared_ptr<const RHIRecordingDiagnostics> recordingDiagnostics;
+        own::shared_owner<const RHIRecordingDiagnostics> recordingDiagnostics;
         uint32_t recordingWorkerJobCount{0};
         uint32_t recordingWaveCount{0}; // Includes command-target append constraints.
         bool recordingBalanced{false}; // CPU work hint used without adding joins.
@@ -463,20 +466,15 @@ public:
         RGOrderPolicy orderPolicy = RGOrderPolicy::DependencyOrder);
     const IRenderDeviceServices& DeviceServices() const { return *m_deviceServices; }
     uint64_t ResourceEpoch() const { return m_resourceEpoch; }
-    const EnhancedRenderGraph* DeclarationGraph() const { return m_branch ? m_branch->parent : this; }
-    uint64_t DeclarationEpoch() const { return DeclarationGraph()->ResourceEpoch(); }
-    // A node builds in private storage. Only the owner merges its declarations;
-    // callbacks keep that storage and resolve their original handles through it.
-    template<class F>
-    void PublishDeclaration(F&& callback)
+    const EnhancedRenderGraph* DeclarationGraph() const { return this; }
+    uint64_t DeclarationEpoch() const { return ResourceEpoch(); }
+    RGHandle CanonicalDeclarationHandle(RGHandle handle) const
     {
-        std::lock_guard lock{m_branchMutex};
-        std::forward<F>(callback)();
+        return !handle.IsValid() || handle.epoch == m_resourceEpoch ||
+                       m_scheduling != RGSchedulingMode::ExplicitVersioned
+                   ? handle
+                   : RGHandle{};
     }
-    RGSetupTaskGraph& SetupTasks();
-    std::shared_ptr<EnhancedRenderGraph> CreateDeclarationBranch(std::span<const RGHandle> inputs);
-    void MergeDeclarationBranch(const std::shared_ptr<EnhancedRenderGraph>& branch);
-    RGHandle CanonicalDeclarationHandle(RGHandle handle) const;
     RGSchedulingMode GetSchedulingMode() const { return m_scheduling; }
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
     RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
@@ -624,11 +622,11 @@ public:
     static constexpr size_t MaxStructuralSchedules = 8;
     // Source must be a frozen submitted graph; immutable CPU metadata is shared.
     void InheritStructuralSchedule(const EnhancedRenderGraph& previous);
-    void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous);
-    void InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous,
-        const std::shared_ptr<const StructuralSchedule>& alternate);
-    void InheritStructuralSchedule(std::span<const std::shared_ptr<const StructuralSchedule>> schedules);
-    std::shared_ptr<const StructuralSchedule> SnapshotStructuralSchedule() const;
+    void InheritStructuralSchedule(const own::shared_owner<const StructuralSchedule>& previous);
+    void InheritStructuralSchedule(const own::shared_owner<const StructuralSchedule>& previous,
+        const own::shared_owner<const StructuralSchedule>& alternate);
+    void InheritStructuralSchedule(std::span<const own::shared_owner<const StructuralSchedule>> schedules);
+    own::shared_owner<const StructuralSchedule> SnapshotStructuralSchedule() const;
 
     struct QueueHint
     {
@@ -709,7 +707,7 @@ public:
 
     struct QueueEndpoint
     {
-        std::shared_ptr<IRHICommandQueue> queue;
+        own::shared_owner<IRHICommandQueue> queue;
         uint64_t nextSignal{1}; // Exclusive submission ownership; advances on accepted signals.
         IRHIGpuProfiler* profiler{nullptr}; // Queue-local query heap and clock; owner pins lifetime.
     };
@@ -757,10 +755,10 @@ public:
     // ready for these queues. owner pins imported storage, descriptors and any pool;
     // services must outlive queue collection. No upload/frame-ring reset until done.
     // All callbacks are recorded before any submission. Retained batches pin self.
-    bool SubmitQueues(const std::shared_ptr<EnhancedRenderGraph>& self,
+    bool SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
         IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
         const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
-        std::shared_ptr<const void> owner, QueueExecution& output, std::string& outError);
+        ce::lifetime_token owner, QueueExecution& output, std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
     /// 〃 (G-1). 호출부 30곳이 `resources.GetCommandList()` 를 넘겼다.
@@ -915,7 +913,7 @@ private:
         const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch, std::string& outError,
         RHISoftwareRecorder* software, RHISoftwareBatchDesc* softwareDesc, RHISoftwareBatch* softwareBatch);
     void RequireQueueIdle() const;
-    std::weak_ptr<const void> m_queueLease;
+    ce::weak_lifetime_token m_queueLease;
     bool m_queueExecutionAttempted{false};
     QueueDiagnostics m_queueDiagnostics;
     void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
@@ -924,38 +922,8 @@ private:
     void OnUploadAccepted(uint64_t recording, RHICompletionPoint) override;
     uint64_t m_recordedRecording{};
     bool m_statesCommitted{};
-    struct DeclarationBranchState
-    {
-        struct Mapping
-        {
-            uint16_t resource{RGHandle::kInvalid};
-            uint16_t baseVersions{};
-            uint16_t appendedStart{};
-        };
-        struct KnownWriter
-        {
-            uint16_t resource{};
-            std::string_view name;
-        };
-        EnhancedRenderGraph* parent{};
-        size_t baseResources{};
-        bool merged{};
-        ce::render_vector<uint16_t> baseVersions;
-        ce::render_vector<uint16_t> parentResources;
-        ce::render_vector<Mapping> mapping;
-        ce::render_vector<KnownWriter> knownWriters;
-    };
-    EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling, RGOrderPolicy orderPolicy,
-                        bool declarationBranch);
-    RGHandle LocalDeclarationHandle(RGHandle handle) const;
-    RGHandle SnapshotDeclarationResource(RGHandle handle);
-    RGHandle MapBranchHandle(RGHandle handle) const;
-    std::unique_ptr<DeclarationBranchState> m_branch;
-    std::unique_ptr<RGSetupTaskGraph> m_setupTasks;
-    mutable std::recursive_mutex m_branchMutex;
-    ce::render_vector<std::shared_ptr<EnhancedRenderGraph>> m_declarationBranches;
-    ce::render_vector<std::shared_ptr<EnhancedRenderGraph>> m_declarationBranchPool;
-    size_t m_nextDeclarationBranch{};
+    RGHandle LocalDeclarationHandle(RGHandle handle) const { return handle; }
+    RHIRecordingTaskGraph m_recordingTrialGraph, m_recordingDiagnosticGraph;
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
 private:
@@ -1008,6 +976,46 @@ private:
         std::vector<RHIBufferHandle> uavBufferBarriers;
     };
 
+    struct PhaseBarrierPlans
+    {
+        std::vector<PhaseBarrierPlan> storage;
+        size_t active{};
+
+        bool empty() const { return active == 0; }
+        size_t size() const { return active; }
+        auto begin() const { return storage.begin(); }
+        auto end() const { return storage.begin() + active; }
+        PhaseBarrierPlan& operator[](size_t index) { return storage[index]; }
+        const PhaseBarrierPlan& operator[](size_t index) const { return storage[index]; }
+        void clear()
+        {
+            if (!RenderContainerReuseEnabled())
+            {
+                storage.clear();
+                active = 0;
+                return;
+            }
+            for (size_t index = 0; index < active; ++index)
+            {
+                auto& plan = storage[index];
+                plan.transitions.clear();
+                plan.bufferTransitions.clear();
+                plan.uavBarriers.clear();
+                plan.uavBufferBarriers.clear();
+            }
+            active = 0;
+        }
+        void resize(size_t count)
+        {
+            clear();
+            if (storage.size() < count)
+            {
+                storage.resize(count);
+            }
+            active = count;
+        }
+    };
+
     struct Pass
     {
         std::string              name;
@@ -1038,7 +1046,7 @@ private:
         std::span<RepeatedPhase> phases;
         bool repeated{false};
         RepeatedExecuteCallback repeatedExecute;
-        std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
+        PhaseBarrierPlans firstPhaseBarriers, repeatPhaseBarriers;
     };
 
     struct ResourceDeclaration
@@ -1123,7 +1131,7 @@ private:
     // 활성 구간만 현재 핸들·상태·버전 선언을 포함한다.
     // The arena owns every borrowed name/usage before Add* returns. Retained
     // records contain no callbacks; producer-affine captures stay in Pass.
-    std::unique_ptr<DeclarationWork> m_declarationWork;
+    own::unique_owner<DeclarationWork> m_declarationWork;
     ce::render_arena_resource m_packetArena;
     ce::render_vector<ResourceDeclaration> m_resourceDeclarations;
     ce::render_vector<PassDeclaration> m_passDeclarations;
@@ -1140,8 +1148,8 @@ private:
     std::unordered_map<uint32_t, uint16_t> m_importedTextures, m_importedBuffers;
     std::vector<uint16_t> m_atomicResources;
     RGTransientPool* m_transientPool{ nullptr };
-    std::vector<std::shared_ptr<RGTransientPool::AliasedGroup>> m_transientHeaps;
-    std::shared_ptr<RGTransientPool::AliasHeapAccounting> m_aliasHeapAccounting;
+    std::vector<own::shared_owner<RGTransientPool::AliasedGroup>> m_transientHeaps;
+    own::shared_owner<RGTransientPool::AliasHeapAccounting> m_aliasHeapAccounting;
     bool m_aliasing{false}, m_extendLifetimes{false};
     bool m_poison{false};
     // Active declarations are a prefix of retained metadata. Reset releases all
@@ -1152,7 +1160,7 @@ private:
     std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
     bool m_executeOrderOverridden{false}; // Queue specialization owns a mutable copy only when it reorders.
-    std::shared_ptr<const std::string> m_timingSignature;
+    own::shared_owner<const std::string> m_timingSignature;
     // Byte offset of each pass's culled field inside m_timingSignature.
     ce::render_vector<size_t> m_signatureCulledOffsets;
     void BuildTimingSignature();
@@ -1233,18 +1241,18 @@ public:
         std::vector<ResourceDeclaration> resources;
         std::vector<PassDeclaration> passes;
         std::vector<FinalStateRequirement> finalStateRequirements;
-        std::shared_ptr<const std::string> key;
-        std::shared_ptr<const std::string> timingSignature;
+        own::shared_owner<const std::string> key;
+        own::shared_owner<const std::string> timingSignature;
         std::vector<uint16_t> order, criticalPath;
         std::vector<int32_t> waves;
         ce::dynamic_bitset culled;
         std::vector<DiagnosticSnapshot::VersionEdge> edges;
     };
 private:
-    std::shared_ptr<const StructuralSchedule> m_structuralSchedule;
-    std::shared_ptr<const StructuralSchedule> m_alternateSchedule;
-    std::array<std::shared_ptr<const StructuralSchedule>, MaxStructuralSchedules - 2> m_additionalSchedules;
-    std::shared_ptr<const StructuralSchedule> m_activeStructuralSchedule;
+    own::shared_owner<const StructuralSchedule> m_structuralSchedule;
+    own::shared_owner<const StructuralSchedule> m_alternateSchedule;
+    std::array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules - 2> m_additionalSchedules;
+    own::shared_owner<const StructuralSchedule> m_activeStructuralSchedule;
     bool MatchesStructuralSchedule(const StructuralSchedule& schedule) const;
     void CaptureStructuralDeclarations(StructuralSchedule& schedule) const;
     const std::vector<int32_t>& DependencyWaves() const

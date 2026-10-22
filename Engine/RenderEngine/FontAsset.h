@@ -12,14 +12,14 @@ enum class TextAlignment : std::uint8_t;
 // full atlas version forever; frame sealing retains the returned actual Texture.
 class TextAtlasPage final
 {
-public:
+  public:
     own::shared_owner<const Texture> GetTexture() const
     {
         std::lock_guard lock(m_mutex);
         return m_texture;
     }
 
-private:
+  private:
     friend class FontAsset;
     void Publish(own::shared_owner<const Texture> texture)
     {
@@ -36,13 +36,10 @@ struct TextGlyph
 {
     float left{}, top{}, right{}, bottom{};
     float uvLeft{}, uvTop{}, uvRight{}, uvBottom{};
-    std::shared_ptr<TextAtlasPage> atlasPage;
+    own::shared_owner<TextAtlasPage> atlasPage;
     // Synthetic CPU/RHI fixtures may supply a standalone immutable texture.
     own::shared_owner<const Texture> texture;
-    own::shared_owner<const Texture> GetTexture() const
-    {
-        return atlasPage ? atlasPage->GetTexture() : texture;
-    }
+    own::shared_owner<const Texture> GetTexture() const { return atlasPage ? atlasPage->GetTexture() : texture; }
 };
 
 struct TextLayout
@@ -61,7 +58,7 @@ struct TextLayout
 // only trusted project/engine fonts are supported, not arbitrary network fonts.
 class FontAsset final
 {
-public:
+  public:
     static constexpr std::size_t kMaxFontBytes = 32u * 1024u * 1024u;
     static constexpr std::size_t kMaxTextBytes = 1024u * 1024u;
     static constexpr std::size_t kMaxLayoutCharacters = 16384u;
@@ -72,25 +69,34 @@ public:
     static constexpr float kRasterPixelHeight = 64.0f;
     static constexpr float kSdfEdge = 128.0f / 255.0f;
 
-    static std::shared_ptr<FontAsset> Load(const std::filesystem::path& path, std::string& error);
+    static own::shared_owner<FontAsset> Load(const std::filesystem::path& path, std::string& error);
     ~FontAsset();
     FontAsset(const FontAsset&) = delete;
     FontAsset& operator=(const FontAsset&) = delete;
 
     // One optional bundled fallback face. Called during loading, before sharing.
     bool AddFallback(const std::filesystem::path& path, std::string& error);
-    std::shared_ptr<const TextLayout> BuildLayout(std::string_view utf8, float fontPixelSize,
-        float maxWidth, TextAlignment alignment, std::string& error);
+    own::shared_owner<const TextLayout> BuildLayout(std::string_view utf8, float fontPixelSize, float maxWidth,
+                                                    TextAlignment alignment, std::string& error);
     // No I/O or rasterization; queried only for a pressure-truncated layout.
     bool CanRetryAtlas() const;
     const std::filesystem::path& GetPath() const noexcept { return m_path; }
     std::uint64_t GetRevision() const noexcept { return m_revision.load(std::memory_order_acquire); }
 
-private:
+  private:
     struct Impl;
-    FontAsset();
+
+  public:
+    class ConstructionKey
+    {
+        friend class FontAsset;
+        ConstructionKey() = default;
+    };
+    explicit FontAsset(ConstructionKey);
+
+  private:
     std::filesystem::path m_path;
-    std::unique_ptr<Impl> m_impl;
+    own::unique_owner<Impl> m_impl;
     mutable std::mutex m_mutex;
-    std::atomic<std::uint64_t> m_revision{ 1 };
+    std::atomic<std::uint64_t> m_revision{1};
 };

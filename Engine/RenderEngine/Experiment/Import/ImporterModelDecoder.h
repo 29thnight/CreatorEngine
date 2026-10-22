@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "ImportedScene.h"
 #include "SceneToModelDraft.h"
@@ -43,7 +44,7 @@ namespace experiment::importer
 
         // 임포터를 직접 주입한다(검사에서 한 포맷만 태우고 싶을 때).
         ImporterModelDecoder(ImporterDecoderOptions options,
-            std::vector<std::unique_ptr<IAssetImporter>> importers);
+            std::vector<own::unique_owner<IAssetImporter>> importers);
 
         [[nodiscard]] ModelDecodeResult Decode(
             const ModelLoadRequest& request) override;
@@ -54,7 +55,7 @@ namespace experiment::importer
 
     private:
         ImporterDecoderOptions options_{};
-        std::vector<std::unique_ptr<IAssetImporter>> importers_{};
+        std::vector<own::unique_owner<IAssetImporter>> importers_{};
     };
 
     // ImportNote → ModelLoadIssue. 코드 표가 서로 달라 억지로 사상하면 로그가

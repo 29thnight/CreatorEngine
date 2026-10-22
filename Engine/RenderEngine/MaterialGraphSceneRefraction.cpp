@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphSceneRefraction.h"
 
 #include "RHI/RHIShaderCompiler.h"
@@ -107,8 +108,8 @@ namespace material_graph
 
     bool SceneRefractionResources::Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                                            RHITextureHandle environment, std::uint64_t memoryBudget,
-                                           std::shared_ptr<const SceneRefractionFrame>& result, std::string& error,
-                                           std::shared_ptr<const SceneVolumeFrame> volume)
+                                           own::shared_owner<const SceneRefractionFrame>& result, std::string& error,
+                                           own::shared_owner<const SceneVolumeFrame> volume)
     {
         const auto count = std::uint64_t(context.width) * context.height;
         if (!context.resources || !context.rootSignatures || !context.psoManager || !count || count > UINT32_MAX ||
@@ -120,7 +121,7 @@ namespace material_graph
         {
             return false;
         }
-        auto candidate = std::make_shared<SceneRefractionFrame>();
+        auto candidate = own::make_shared<SceneRefractionFrame>();
         candidate->device_ = device_;
         candidate->width_ = context.width;
         candidate->height_ = context.height;

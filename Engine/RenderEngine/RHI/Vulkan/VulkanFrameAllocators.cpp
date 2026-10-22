@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanFrameAllocators.h"
 
 #include <stdint.h>
@@ -70,7 +72,7 @@ VulkanUploadSegmentAllocator::Segment* VulkanUploadSegmentAllocator::CreateSegme
     uint64_t bytes, bool large, std::string& outError)
 {
     bytes = VulkanUploadAlignUp(bytes, 4096);
-    auto segment = std::make_unique<Segment>();
+    auto segment = own::make_unique<Segment>();
 
     VkBufferCreateInfo info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     info.size = bytes;
@@ -159,7 +161,7 @@ VulkanUploadSegmentAllocator::Segment* VulkanUploadSegmentAllocator::CreateSegme
         return nullptr;
     }
 
-    Segment* raw = segment.get();
+    Segment* raw = segment.operator->();
     m_segments.push_back(std::move(segment));
     m_slowPathCreates.fetch_add(1, std::memory_order_relaxed);
     if (std::this_thread::get_id() != m_ownerThread)
@@ -313,7 +315,7 @@ VulkanUploadSegmentAllocator::FindAvailableSegmentLocked(bool large,
             continue;
         }
         if (nullptr == best || candidate->capacity < best->capacity)
-            best = candidate.get();
+            best = candidate.operator->();
     }
     return best;
 }
@@ -586,7 +588,7 @@ bool VulkanUploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
     return true;
 }
 
-bool VulkanUploadSegmentAllocator::PinRecording(uint64_t recordingId, std::vector<std::shared_ptr<const void>>& leases,
+bool VulkanUploadSegmentAllocator::PinRecording(uint64_t recordingId, std::vector<ce::lifetime_token>& leases,
                                                 std::string& outError)
 {
     const std::lock_guard lock(m_mutex);
@@ -733,7 +735,7 @@ uint64_t VulkanUploadSegmentAllocator::GetRecordingUsedBytes() const
 
 bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device, uint32_t initialVersions, std::string& outError,
                                               uint32_t maxIndexingPoolDescriptors,
-                                              std::shared_ptr<VulkanDescriptorPoolBudget> budget)
+                                              own::shared_owner<VulkanDescriptorPoolBudget> budget)
 {
     if (VK_NULL_HANDLE == device || 0 == initialVersions)
     {
@@ -743,7 +745,7 @@ bool VulkanDescriptorPoolRecycler::Initialize(VkDevice device, uint32_t initialV
 
     Shutdown(device);
     m_maxIndexingPoolDescriptors = maxIndexingPoolDescriptors;
-    m_poolBudget = budget ? std::move(budget) : std::make_shared<VulkanDescriptorPoolBudget>();
+    m_poolBudget = budget ? std::move(budget) : own::make_shared<VulkanDescriptorPoolBudget>();
     if (m_poolBudget->m_limit && m_poolBudget->m_limit != maxIndexingPoolDescriptors)
     {
         outError = "Vulkan descriptor pool budget belongs to a different device limit.";

@@ -1,19 +1,19 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::shared_owner<const FrameInput>& prepared,
+std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::shared_owner<const Frame>& prepared,
                                                                   EnhancedRenderGraph& graph,
                                                                   RGHandle expectedVisibility, RGHandle visibility,
                                                                   const std::array<RGHandle, 2>& material,
                                                                   RGHandle layerList,
                                                                   std::array<RGHandle, 5> targets) const
 {
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!frame || frame->draws.empty())
         return targets;
     frame->CheckCurrent(&graph);
     RequireStage(visibility, expectedVisibility, "Temporal requires its final surface visibility version.");
     RequireStage(layerList, frame->raster->layers ? frame->raster->layers->GraphVisibleIds(graph) : RGHandle{},
                  "Temporal requires the ordered layer LOD list.");
-    const auto work = frame->raster->material;
+    const auto& work = frame->raster->material;
     if (work)
         work->ValidateInputs(graph, material);
     else if (material[0].IsValid() || material[1].IsValid())
@@ -39,7 +39,8 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
         NormalizeSceneReads(graph, uses);
         const auto pass = graph.AddPass(
             "METEOR.Scene.Temporal.Resolve", uses,
-            [this, frame, targets, visibility](const auto& execution) {
+            [this, frame = frame, targets, visibility](const auto& execution)
+            {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
                 std::array<RHITextureHandle, 4> colors;
@@ -79,7 +80,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
     }
     // Ordered layers have no opaque visibility record. Preserve their depth,
     // alpha and source order; this is the layer path, never an opaque fallback.
-    const auto replay = this->temporalCommands;
+    const auto& replay = this->temporalCommands;
     if (!replay)
         return targets;
     replay->Declare(graph, replay);
@@ -96,7 +97,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
             continue;
         uses.push_back({draw.geometry->GraphMeshlets(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
         uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
-        if (draw.previousGeometry != draw.geometry)
+        if (draw.previousGeometry.operator->() != draw.geometry.operator->())
             uses.push_back(
                 {draw.previousGeometry->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read});
         for (const auto& texture : draw.bindings->resources.textures)
@@ -108,7 +109,8 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
     NormalizeSceneReads(graph, uses);
     const auto pass = graph.AddPass(
         (replay->name + ".Raster").c_str(), uses,
-        [this, frame, targets, replay](const auto& execution) {
+        [this, frame = frame, targets, replay = replay](const auto& execution)
+        {
             frame->CheckCurrent(execution.graph);
             auto& encoder = *execution.encoder;
             std::array<RHITextureHandle, 4> colors;

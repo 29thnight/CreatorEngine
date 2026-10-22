@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "DX12DescriptorHeaps.h"
 #include "DX12PipelineLayoutTranslate.h"
 
@@ -93,7 +94,7 @@ bool DX12DescriptorRecycler::EnsurePage(uint32_t slot, std::string& outError)
     desc.NumDescriptors = m_descriptorsPerPage;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
-    auto page = std::make_unique<Page>();
+    auto page = own::make_unique<Page>();
     const HRESULT hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&page->heap));
     if (FAILED(hr))
     {
@@ -169,7 +170,7 @@ bool DX12DescriptorRecycler::BeginRecording(uint64_t recordingId, std::string& o
     }
 
     m_activeVersion = acquired.handle;
-    m_activePage = m_pages[acquired.handle.slot].get();
+    m_activePage = m_pages[acquired.handle.slot].operator->();
     m_activePage->cursor.store(0, std::memory_order_relaxed);
     m_activePage->sealed = false;
     return true;

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphGeometryContract.h"
 #include "MaterialGraphVisibilityContract.h"
 #include "MaterialGraphMeshSurface.h"
@@ -33,9 +34,9 @@ struct SceneFrameGeometry final
     static_assert(sizeof(Record) == 128);
     static_assert(offsetof(Record, owner) == 68);
     IRenderDeviceServices* device{};
-    std::shared_ptr<TransientBufferPool> pool;
+    own::shared_owner<TransientBufferPool> pool;
     std::vector<Record> records{Record{}};
-    std::vector<std::shared_ptr<const MeshSurfaceBatch>> geometry{nullptr};
+    std::vector<own::shared_owner<const MeshSurfaceBatch>> geometry{nullptr};
     uint32_t nextPrimitiveAddress{1};
     uint32_t FindRecord(uint32_t address) const
     {
@@ -57,7 +58,7 @@ struct SceneFrameGeometry final
     }
     RHIBufferSlice staging;
     RHIBufferHandle buffer;
-    std::shared_ptr<const ResidentBufferFrame> resident;
+    own::shared_owner<const ResidentBufferFrame> resident;
     mutable RGHandle graphTable;
     mutable const EnhancedRenderGraph* graphOwner{};
     mutable uint64_t graphEpoch{};
@@ -93,9 +94,9 @@ struct SceneFrameGeometry final
         RHIBufferDesc desc;
         desc.bytes = bytes;
         desc.debugName = L"METEOR.Scene.Geometry.Table";
-        return CreateSceneBuffer(*device, pool.get(), desc, buffer, error);
+        return CreateSceneBuffer(*device, pool.operator->(), desc, buffer, error);
     }
-    void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneFrameGeometry> owner) const
+    void Declare(EnhancedRenderGraph& graph, own::shared_owner<const SceneFrameGeometry> owner) const
     {
         if (graphOwner == graph.DeclarationGraph() && graphEpoch == graph.DeclarationEpoch())
         {

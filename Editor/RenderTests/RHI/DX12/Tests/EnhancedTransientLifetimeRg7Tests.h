@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 
 namespace
@@ -50,7 +51,7 @@ namespace
             Microsoft::WRL::ComPtr<ID3D12Fence> gate;
             std::array<std::array<RHIReadback, 4>, 3> readbacks{};
             std::array<std::array<RHIBufferHandle, 3>, 3> handles{};
-            std::array<std::weak_ptr<EnhancedRenderGraph>, 3> retained;
+            std::array<own::weak_owner<EnhancedRenderGraph>, 3> retained;
             std::array<RHISubmissionTicket, 3> tickets;
             RHIBufferHandle history;
             RHIResourceState historyState = RHIResourceState::Common;
@@ -128,7 +129,7 @@ namespace
                         throw std::runtime_error(error);
                     }
                     pool.BeginFrame(view);
-                    auto graph = std::make_shared<EnhancedRenderGraph>(resources, RGSchedulingMode::ExplicitVersioned);
+                    auto graph = own::make_shared<EnhancedRenderGraph>(resources, RGSchedulingMode::ExplicitVersioned);
                     graph->SetTransientAliasing(true);
                     graph->SetTransientPool(&cache);
                     graph->SetParallelRecordCostThreshold(0);

@@ -1,4 +1,5 @@
-﻿#include <atomic>
+#include "../Utility_Framework/Ownership.h"
+#include <atomic>
 
 namespace
 {
@@ -40,7 +41,7 @@ namespace
 
 bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders,
-    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
+    own::shared_owner<const EnhancedGizmoIconTextures> iconTextures,
     EnhancedGizmoLineCollector& lineCollector,
     EnhancedGizmoSceneData& out)
 {
@@ -50,7 +51,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     // packet이 raw const Texture*를 쓰는 pass 형식과 공유 소유권을 함께 싣는다.
     // EditorAssetPresentation이 shutdown되어도 이미 발행된 packet은 안전하다.
     out.iconTextures = std::move(iconTextures);
-    const EnhancedGizmoIconTextures* textures = out.iconTextures.get();
+    const EnhancedGizmoIconTextures* textures = out.iconTextures.operator->();
 
     // ── 아이콘 대상 — 카메라·라이트 오브젝트 ──
     //
@@ -262,7 +263,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 
 bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders,
-    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
+    own::shared_owner<const EnhancedGizmoIconTextures> iconTextures,
     EnhancedGizmoSceneData& out)
 {
     // 에디터 패스가 아니라 Core 수집기다(E4-3a) — GT가 표시 계층을

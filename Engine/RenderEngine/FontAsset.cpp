@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "FontAsset.h"
 #include "Texture.h"
 #include "Interfaces/Navigation.h"
@@ -29,16 +30,16 @@ namespace
 
     std::uint32_t read_be32(const unsigned char* value)
     {
-        return (std::uint32_t(value[0]) << 24u) | (std::uint32_t(value[1]) << 16u)
-            | (std::uint32_t(value[2]) << 8u) | std::uint32_t(value[3]);
+        return (std::uint32_t(value[0]) << 24u) | (std::uint32_t(value[1]) << 16u) | (std::uint32_t(value[2]) << 8u) |
+               std::uint32_t(value[3]);
     }
 
     bool validate_sfnt(const std::vector<unsigned char>& bytes, std::string& error)
     {
         // Reject collections and compressed containers. Their extra offset graph is
         // intentionally outside the supported TTF/OTF project-asset surface.
-        if (bytes.size() < 12u || (read_be32(bytes.data()) != 0x00010000u
-            && read_be32(bytes.data()) != 0x4f54544fu && read_be32(bytes.data()) != 0x74727565u))
+        if (bytes.size() < 12u || (read_be32(bytes.data()) != 0x00010000u && read_be32(bytes.data()) != 0x4f54544fu &&
+                                   read_be32(bytes.data()) != 0x74727565u))
         {
             error = "Expected a standalone TrueType/OpenType font (TTF/OTF).";
             return false;
@@ -63,15 +64,32 @@ namespace
             }
             switch (read_be32(table))
             {
-            case 0x636d6170u: hasCmap = length >= 4u; break;
-            case 0x68656164u: hasHead = length >= 54u; break;
-            case 0x68686561u: hasHhea = length >= 36u; break;
-            case 0x686d7478u: hasHmtx = length >= 4u; break;
-            case 0x6d617870u: hasMaxp = length >= 6u; break;
-            case 0x676c7966u: hasGlyf = length != 0u; break;
-            case 0x6c6f6361u: hasLoca = length >= 4u; break;
-            case 0x43464620u: hasCff = length >= 4u; break;
-            default: break;
+            case 0x636d6170u:
+                hasCmap = length >= 4u;
+                break;
+            case 0x68656164u:
+                hasHead = length >= 54u;
+                break;
+            case 0x68686561u:
+                hasHhea = length >= 36u;
+                break;
+            case 0x686d7478u:
+                hasHmtx = length >= 4u;
+                break;
+            case 0x6d617870u:
+                hasMaxp = length >= 6u;
+                break;
+            case 0x676c7966u:
+                hasGlyf = length != 0u;
+                break;
+            case 0x6c6f6361u:
+                hasLoca = length >= 4u;
+                break;
+            case 0x43464620u:
+                hasCff = length >= 4u;
+                break;
+            default:
+                break;
             }
         }
         if (!hasCmap || !hasHead || !hasHhea || !hasHmtx || !hasMaxp || (!hasCff && (!hasGlyf || !hasLoca)))
@@ -133,7 +151,7 @@ namespace
         }
         return value;
     }
-}
+} // namespace
 
 struct FontAsset::Impl
 {
@@ -148,7 +166,7 @@ struct FontAsset::Impl
     };
     struct CachedGlyph
     {
-        std::size_t page{ kNoPage };
+        std::size_t page{kNoPage};
         int x{}, y{}, width{}, height{}, offsetX{}, offsetY{};
         float advance{};
     };
@@ -157,11 +175,11 @@ struct FontAsset::Impl
         // 1 MiB staging + 4 MiB immutable RGBA snapshot per page (8 page cap).
         // RGBA uses the existing neutral upload formats; all channels hold SDF.
         std::vector<unsigned char> pixels = std::vector<unsigned char>(kAtlasSize * kAtlasSize, 0u);
-        int cursorX{ 1 }, cursorY{ 1 }, rowHeight{};
-        bool dirty{ true };
-        std::shared_ptr<TextAtlasPage> owner = std::make_shared<TextAtlasPage>();
+        int cursorX{1}, cursorY{1}, rowHeight{};
+        bool dirty{true};
+        own::shared_owner<TextAtlasPage> owner = own::make_shared<TextAtlasPage>();
     };
-    std::vector<std::unique_ptr<Face>> faces;
+    std::vector<own::unique_owner<Face>> faces;
     std::unordered_map<std::uint64_t, CachedGlyph> glyphs;
     std::vector<Page> pages;
     // Weak bookkeeping imposes a live resource bound without retaining retired
@@ -176,7 +194,7 @@ struct FontAsset::Impl
         snapshots.reserve(kMaxLiveAtlasSnapshots + kMaxAtlasPages);
     }
 
-    static std::unique_ptr<Face> LoadFace(const std::filesystem::path& path, std::string& error)
+    static own::unique_owner<Face> LoadFace(const std::filesystem::path& path, std::string& error)
     {
         std::ifstream input(path, std::ios::binary | std::ios::ate);
         if (!input)
@@ -190,7 +208,7 @@ struct FontAsset::Impl
             error = "Font is empty or exceeds the 32 MiB file budget: " + path.string();
             return {};
         }
-        auto face = std::make_unique<Face>();
+        auto face = own::make_unique<Face>();
         face->path = path;
         face->bytes.resize(static_cast<std::size_t>(length));
         input.seekg(0);
@@ -228,7 +246,7 @@ struct FontAsset::Impl
             const int glyph = stbtt_FindGlyphIndex(&faces[face]->info, static_cast<int>(codepoint));
             if (glyph != 0)
             {
-                return { face, glyph };
+                return {face, glyph};
             }
         }
         fallback = true;
@@ -237,7 +255,7 @@ struct FontAsset::Impl
         {
             glyph = stbtt_FindGlyphIndex(&faces[0]->info, '?');
         }
-        return { 0, glyph };
+        return {0, glyph};
     }
 
     bool CanDirtyPage(const Page* target)
@@ -288,8 +306,8 @@ struct FontAsset::Impl
         }
         int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
         stbtt_GetGlyphBitmapBox(&face.info, glyphIndex, face.scale, face.scale, &x0, &y0, &x1, &y1);
-        if (x1 - x0 + 2 * kSdfPadding > kMaxGlyphExtent || y1 - y0 + 2 * kSdfPadding > kMaxGlyphExtent
-            || x1 < x0 || y1 < y0)
+        if (x1 - x0 + 2 * kSdfPadding > kMaxGlyphExtent || y1 - y0 + 2 * kSdfPadding > kMaxGlyphExtent || x1 < x0 ||
+            y1 < y0)
         {
             return nullptr;
         }
@@ -299,14 +317,18 @@ struct FontAsset::Impl
         {
             return nullptr;
         }
-        unsigned char* bitmap = stbtt_GetGlyphSDF(&face.info, face.scale, glyphIndex, kSdfPadding,
-            kSdfOnEdge, kSdfDistanceScale, &glyph.width, &glyph.height, &glyph.offsetX, &glyph.offsetY);
+        unsigned char* bitmap =
+            stbtt_GetGlyphSDF(&face.info, face.scale, glyphIndex, kSdfPadding, kSdfOnEdge, kSdfDistanceScale,
+                              &glyph.width, &glyph.height, &glyph.offsetX, &glyph.offsetY);
         if (!bitmap)
         {
             return nullptr;
         }
-        const std::unique_ptr<unsigned char, void(*)(unsigned char*)> bitmapOwner(bitmap,
-            [](unsigned char* value) { stbtt_FreeSDF(value, nullptr); });
+        struct bitmap_release
+        {
+            unsigned char* value_;
+            ~bitmap_release() { stbtt_FreeSDF(value_, nullptr); }
+        } bitmapOwner{bitmap};
         if (glyph.width <= 0 || glyph.height <= 0 || glyph.width > kMaxGlyphExtent || glyph.height > kMaxGlyphExtent)
         {
             return nullptr;
@@ -350,7 +372,7 @@ struct FontAsset::Impl
         for (int row = 0; row < glyph.height; ++row)
         {
             std::copy_n(bitmap + row * glyph.width, glyph.width,
-                page.pixels.data() + (glyph.y + row) * kAtlasSize + glyph.x);
+                        page.pixels.data() + (glyph.y + row) * kAtlasSize + glyph.x);
         }
         page.cursorX += glyph.width + 1;
         page.rowHeight = std::max(page.rowHeight, glyph.height);
@@ -385,8 +407,8 @@ struct FontAsset::Impl
             {
                 std::fill_n(rgba.data() + index * 4u, 4u, page.pixels[index]);
             }
-            auto texture = Texture::CreateFromPixels(kAtlasSize, kAtlasSize,
-                "SDF font atlas", RHIFormat::RGBA8Unorm, rgba.data(), std::size_t(kAtlasSize) * 4u);
+            auto texture = Texture::CreateFromPixels(kAtlasSize, kAtlasSize, "SDF font atlas", RHIFormat::RGBA8Unorm,
+                                                     rgba.data(), std::size_t(kAtlasSize) * 4u);
             if (!texture)
             {
                 error = "Cannot create CPU SDF atlas texture.";
@@ -401,10 +423,10 @@ struct FontAsset::Impl
     }
 };
 
-FontAsset::FontAsset() : m_impl(std::make_unique<Impl>()) {}
+FontAsset::FontAsset(ConstructionKey) : m_impl(own::make_unique<Impl>()) {}
 FontAsset::~FontAsset() = default;
 
-std::shared_ptr<FontAsset> FontAsset::Load(const std::filesystem::path& path, std::string& error)
+own::shared_owner<FontAsset> FontAsset::Load(const std::filesystem::path& path, std::string& error)
 try
 {
     error.clear();
@@ -413,7 +435,7 @@ try
     {
         return {};
     }
-    auto font = std::shared_ptr<FontAsset>(new FontAsset());
+    auto font = own::make_shared<FontAsset>(ConstructionKey{});
     font->m_path = path;
     font->m_impl->faces.push_back(std::move(face));
     return font;
@@ -453,20 +475,20 @@ catch (const std::exception& exception)
     return false;
 }
 
-std::shared_ptr<const TextLayout> FontAsset::BuildLayout(std::string_view utf8, float fontPixelSize,
-    float maxWidth, TextAlignment alignment, std::string& error)
+own::shared_owner<const TextLayout> FontAsset::BuildLayout(std::string_view utf8, float fontPixelSize, float maxWidth,
+                                                           TextAlignment alignment, std::string& error)
 try
 {
     error.clear();
-    if (!std::isfinite(fontPixelSize) || fontPixelSize <= 0.0f || fontPixelSize > 4096.0f
-        || !std::isfinite(maxWidth) || maxWidth < 0.0f || maxWidth > 1000000.0f)
+    if (!std::isfinite(fontPixelSize) || fontPixelSize <= 0.0f || fontPixelSize > 4096.0f || !std::isfinite(maxWidth) ||
+        maxWidth < 0.0f || maxWidth > 1000000.0f)
     {
         error = "Text requires a finite font size in (0, 4096] and width in [0, 1000000].";
         return {};
     }
     std::lock_guard lock(m_mutex);
     m_impl->snapshotAdmissionDenied = false;
-    auto layout = std::make_shared<TextLayout>();
+    auto layout = own::make_shared<TextLayout>();
     if (utf8.empty())
     {
         return layout;
@@ -483,7 +505,12 @@ try
         ascent = std::max(ascent, face->ascent * scale);
         layout->lineHeight = std::max(layout->lineHeight, face->lineHeight * scale);
     }
-    struct PendingGlyph { Impl::CachedGlyph glyph; float x; std::size_t line; };
+    struct PendingGlyph
+    {
+        Impl::CachedGlyph glyph;
+        float x;
+        std::size_t line;
+    };
     std::vector<PendingGlyph> pending;
     pending.reserve(std::min(utf8.size(), kMaxLayoutCharacters));
     std::vector<float> lineWidths;
@@ -556,7 +583,8 @@ try
         }
         const auto& face = *m_impl->faces[faceIndex];
         float kerning = previousFace == faceIndex
-            ? stbtt_GetGlyphKernAdvance(&face.info, previousGlyph, glyphIndex) * face.scale * scale : 0.0f;
+                            ? stbtt_GetGlyphKernAdvance(&face.info, previousGlyph, glyphIndex) * face.scale * scale
+                            : 0.0f;
         const float advance = glyph->advance * scale;
         if (maxWidth > 0.0f && x > 0.0f && x + kerning + advance > maxWidth)
         {
@@ -566,7 +594,7 @@ try
         x += kerning;
         if (glyph->page != kNoPage)
         {
-            pending.push_back({ *glyph, x, lineWidths.size() });
+            pending.push_back({*glyph, x, lineWidths.size()});
         }
         x += advance;
         previousGlyph = glyphIndex;
@@ -584,8 +612,9 @@ try
         return {};
     }
     layout->glyphs.reserve(pending.size());
-    const float alignmentFactor = alignment == TextAlignment::Center ? 0.5f
-        : alignment == TextAlignment::Right ? 1.0f : 0.0f;
+    const float alignmentFactor = alignment == TextAlignment::Center  ? 0.5f
+                                  : alignment == TextAlignment::Right ? 1.0f
+                                                                      : 0.0f;
     for (const auto& placed : pending)
     {
         const auto& glyph = placed.glyph;

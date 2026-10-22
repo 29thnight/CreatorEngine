@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "XeSSFrameGeneration.h"
 
 #include <stdint.h>
@@ -134,7 +136,7 @@ struct XeSSFrameGenerationDX12State
     TemporalFrame m_pendingFrame;
     uint32_t m_markers{ 0 };
     std::function<TemporalResult()> m_drain;
-    std::shared_ptr<const void> m_lifetimeToken;
+    ce::lifetime_token m_lifetimeToken;
 
     TemporalResult Drain()
     {
@@ -217,7 +219,10 @@ XeSSFrameGenerationDX12::~XeSSFrameGenerationDX12()
 {
     // Preserve the context and both modules if shutdown cannot release a proxy
     // still referenced by the host. Unloading in that state is a use-after-free.
-    if (!Shutdown().IsSuccess()) (void)m_state.release();
+    if (!Shutdown().IsSuccess())
+    {
+        (void)new decltype(m_state)(std::move(m_state));
+    }
 }
 
 TemporalResult XeSSFrameGenerationDX12::QuerySupport(ID3D12Device* device, const wchar_t* runtimeDirectory,
@@ -226,7 +231,7 @@ TemporalResult XeSSFrameGenerationDX12::QuerySupport(ID3D12Device* device, const
     maximumInterpolatedFrames = 0;
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
     XeSSFrameGenerationDX12 probe;
-    probe.m_state = std::make_unique<XeSSFrameGenerationDX12State>();
+    probe.m_state = own::make_unique<XeSSFrameGenerationDX12State>();
     const auto result = probe.m_state->Load(device, runtimeDirectory);
     const auto maximum = probe.m_state->m_maximumFrames;
     const auto destroyed = probe.Shutdown();
@@ -257,7 +262,7 @@ TemporalResult XeSSFrameGenerationDX12::Initialize(ID3D12Device* device, ID3D12C
     const bool sameDevice = SUCCEEDED(queriedDevice) && queueDevice == device;
     if (queueDevice) queueDevice->Release();
     if (!sameDevice) return { TemporalStatus::InvalidInput, queriedDevice };
-    m_state = std::make_unique<XeSSFrameGenerationDX12State>();
+    m_state = own::make_unique<XeSSFrameGenerationDX12State>();
     auto& state = *m_state;
     state.m_drain = std::move(drain);
     auto result = state.Load(device, runtimeDirectory);
@@ -460,7 +465,7 @@ TemporalResult XeSSFrameGenerationDX12::Mark(uint64_t realFrameId, XeSSLatencyMa
 }
 
 TemporalResult XeSSFrameGenerationDX12::Prepare(ID3D12CommandList* commands, const TemporalFrame& frame,
-    const XeSSFrameGenerationDX12Bindings& bindings, std::shared_ptr<const void> lifetimeToken)
+    const XeSSFrameGenerationDX12Bindings& bindings, ce::lifetime_token lifetimeToken)
 {
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
     if (!m_state || !m_state->m_initialized) return { TemporalStatus::NotInitialized };
@@ -707,10 +712,13 @@ class XeSSFrameGeneratorBridgeDX12 final : public ITemporalFrameGenerator
 {
 public:
     XeSSFrameGeneratorBridgeDX12(DX12DeviceResources& resources, std::function<TemporalResult()> drain)
-        : m_resources(resources), m_drain(std::move(drain)), m_adapter(std::make_unique<XeSSFrameGenerationDX12>()) {}
+        : m_resources(resources), m_drain(std::move(drain)), m_adapter(own::make_unique<XeSSFrameGenerationDX12>()) {}
     ~XeSSFrameGeneratorBridgeDX12() override
     {
-        if (!Shutdown().IsSuccess()) (void)m_adapter.release();
+        if (!Shutdown().IsSuccess())
+        {
+            (void)new decltype(m_adapter)(std::move(m_adapter));
+        }
     }
     XeSSFrameGenerationDX12& GetAdapter() { return *m_adapter; }
     const std::function<TemporalResult()>& GetDrain() const { return m_drain; }
@@ -764,7 +772,7 @@ public:
 private:
     DX12DeviceResources& m_resources;
     std::function<TemporalResult()> m_drain;
-    std::unique_ptr<XeSSFrameGenerationDX12> m_adapter;
+    own::unique_owner<XeSSFrameGenerationDX12> m_adapter;
 };
 }
 #endif
@@ -773,14 +781,14 @@ TemporalResult CreateXeSSFrameGeneratorDX12(DX12DeviceResources& resources,
     ID3D12CommandQueue* queue, IDXGIFactory2* factory, void* window,
     const DXGI_SWAP_CHAIN_DESC1& description, const wchar_t* runtimeDirectory,
     const TemporalFrameGenerationConfig& config, bool depthInverted,
-    std::function<TemporalResult()> drain, std::unique_ptr<ITemporalFrameGenerator>& frameGenerator,
+    std::function<TemporalResult()> drain, own::unique_owner<ITemporalFrameGenerator>& frameGenerator,
     XeSSFrameGenerationDX12*& presentation)
 {
     presentation = nullptr;
     if (frameGenerator) return { TemporalStatus::AlreadyInitialized };
     if (!drain) return { TemporalStatus::InvalidInput };
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
-    auto bridge = std::make_unique<XeSSFrameGeneratorBridgeDX12>(resources, std::move(drain));
+    auto bridge = own::make_unique<XeSSFrameGeneratorBridgeDX12>(resources, std::move(drain));
     const auto result = bridge->GetAdapter().Initialize(resources.GetDevice(), queue, factory, window, description,
         runtimeDirectory, config, depthInverted, bridge->GetDrain());
     if (!result.IsSuccess()) return result;

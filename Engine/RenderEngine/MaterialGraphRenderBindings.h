@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "MaterialGraphRuntime.h"
 #include "MaterialGraphInstancePins.h"
@@ -44,7 +45,7 @@ namespace material_graph
         std::size_t publishedSize{};
         // Frame ownership pins complete immutable table values, including backend
         // version. Readers never touch the mutable descriptions or owner vector.
-        std::vector<std::unique_ptr<const RHIBindingTable>> publishedTables;
+        std::vector<own::unique_owner<const RHIBindingTable>> publishedTables;
         std::atomic<const RHIBindingTable*> publishedTable{};
     };
 
@@ -63,16 +64,16 @@ namespace material_graph
         own::local_view<const Instance> instance;
         // The immutable program owns the reflection snapshot; packets retain it
         // independently through frame retirement, without copying its vectors.
-        std::shared_ptr<const PassLayout> layout;
+        own::shared_owner<const PassLayout> layout;
         // CPU bytes and sampler descriptions are immutable across recordings.
         // Only the texture registration handles belong to this recording.
-        std::shared_ptr<const ResourcePacket> resourceOwner;
+        own::shared_owner<const ResourcePacket> resourceOwner;
         std::array<RHIBindingDesc, 64> textureValues{};
         RenderResourceView resources;
         RHIBufferSlice uniforms;
         RHIBindingTable textures;
         RHISamplerTable samplers;
-        std::shared_ptr<BindlessMaterialFrame> bindless;
+        own::shared_owner<BindlessMaterialFrame> bindless;
         RHIBufferSlice descriptorIndices;
         // CPU values for the recording's shared packet material table. GPU upload
         // addresses are deliberately not persisted as material identity.
@@ -102,11 +103,20 @@ namespace material_graph
         };
 
         bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
-                     own::shared_owner<const Instance> instance, const PassLayout& layout,
+                     const own::shared_owner<const Instance>& instance, const PassLayout& layout,
                      own::shared_owner<const RenderBindings>& result, std::string& error,
-                     own::shared_owner<InstanceFramePins> instancePins = {},
+                     const own::shared_owner<InstanceFramePins>& instancePins = {},
                      const TextureFramePins* imagePins = nullptr,
-                     std::shared_ptr<const PassLayout> layoutSnapshot = {});
+                     const own::shared_owner<const PassLayout>& layoutSnapshot = {});
+
+        // Synchronous preparation borrows the instance. On a cache miss the packet
+        // explicitly retains its pin table and layout through RHI/GPU retirement.
+        bool PrepareBorrowed(IRenderDeviceServices& device, IRenderTextureCache& textures,
+                             own::local_view<const Instance> instance, const PassLayout& layout,
+                             own::shared_owner<const RenderBindings>& result, std::string& error,
+                             const own::shared_owner<InstanceFramePins>& instancePins,
+                             const TextureFramePins* imagePins = nullptr,
+                             const own::shared_owner<const PassLayout>& layoutSnapshot = {});
 
         // Call after SetPipeline with this packet's layout, before a draw/dispatch.
         // Frame upload/descriptor handles cannot be reused in another recording.
@@ -140,7 +150,7 @@ namespace material_graph
         struct CpuDescription
         {
             own::weak_owner<const Instance> instance;
-            std::shared_ptr<const ResourcePacket> resources;
+            own::shared_owner<const ResourcePacket> resources;
             std::vector<RHITextureEntry> textureShapes;
             std::array<std::uint32_t, 128> descriptorIndices{};
             std::uint64_t lastUse{};
@@ -149,7 +159,7 @@ namespace material_graph
         IRenderDeviceServices* device_{};
         std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
         std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
-        std::shared_ptr<BindlessMaterialFrame> bindless_;
+        own::shared_owner<BindlessMaterialFrame> bindless_;
         RHISamplerTable bindlessSamplers_;
         std::map<InstanceFramePins::Key, CpuDescription> descriptions_;
         std::uint64_t descriptionClock_{};

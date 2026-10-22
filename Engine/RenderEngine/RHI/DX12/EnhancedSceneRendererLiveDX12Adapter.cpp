@@ -1,4 +1,6 @@
-﻿#include "DX12SoftwareCommandValidator.h"
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
+#include "DX12SoftwareCommandValidator.h"
 #include "DX12CommandTranslator.h"
 #include "../RHISoftwareRecorder.h"
 #include "../RHISoftwareQueueRecorder.h"
@@ -82,14 +84,14 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         TemporalFrame temporalFrame;
         TemporalMeasurementProvenance temporalProvenance;
         TemporalExtent temporalRenderExtent, temporalDisplayExtent;
-        std::shared_ptr<const void> temporalLifetime;
+        ce::lifetime_token temporalLifetime;
         bool temporalSealed{ false };
         bool temporalNativeGateActive{ false };
         uint64_t producerCompletion{};
         bool producerComplete{};
         bool producerCompletionLost{};
-        std::shared_ptr<RHIDisplayConsumerLease> consumerLease{
-            std::make_shared<RHIDisplayConsumerLease>() };
+        own::shared_owner<RHIDisplayConsumerLease> consumerLease{
+            own::make_shared<RHIDisplayConsumerLease>() };
     };
 
     DX12DeviceResources resources;
@@ -106,11 +108,11 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     DX12GpuProfiler::FrameTimings computeTimings;
     std::vector<DX12GpuProfiler::PassTiming> computeMerged;
     EnhancedRenderGraph::QueueEndpoint graphics;
-    std::shared_ptr<DX12QueueRecorder> ownedRecorder;
-    std::shared_ptr<DX12SoftwareCommandValidator> softwareValidator;
-    std::unique_ptr<RHISoftwareQueueRecorder> softwareQueueRecorder;
-    std::shared_ptr<IRHICommandQueue> softwareGraphicsQueue;
-    std::shared_ptr<IRHICommandQueue> softwareComputeQueue;
+    own::shared_owner<DX12QueueRecorder> ownedRecorder;
+    own::shared_owner<DX12SoftwareCommandValidator> softwareValidator;
+    own::unique_owner<RHISoftwareQueueRecorder> softwareQueueRecorder;
+    own::shared_owner<IRHICommandQueue> softwareGraphicsQueue;
+    own::shared_owner<IRHICommandQueue> softwareComputeQueue;
     bool ownedQueueExecution{false};
     std::optional<uint32_t> queueExecutionModeOverride;
     uint32_t profilerPassCapacity{kLiveProfilerPassCapacity};
@@ -221,7 +223,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
                 {
                     sample.graphSignature = identity.graphSignature;
                 }
-                else if (sample.graphSignature != identity.graphSignature &&
+                else if (sample.graphSignature.operator->() != identity.graphSignature.operator->() &&
                     *sample.graphSignature != *identity.graphSignature)
                 {
                     return false;
@@ -295,7 +297,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
 };
 
 EnhancedSceneRendererLiveDX12Adapter::EnhancedSceneRendererLiveDX12Adapter()
-    : m_impl(std::make_unique<Impl>())
+    : m_impl(own::make_unique<Impl>())
 {
 }
 
@@ -371,7 +373,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
         return false;
     }
     impl.profilerPassCapacity = profilerPassCapacity;
-    impl.ownedRecorder = std::make_shared<DX12QueueRecorder>(impl.resources, commandWorkers);
+    impl.ownedRecorder = own::make_shared<DX12QueueRecorder>(impl.resources, commandWorkers);
     if (!impl.ConfigureQueueExecution(impl.queueExecutionModeOverride.value_or(LiveDx12RequestedQueueExecutionMode()), outError))
     {
         return false;
@@ -646,26 +648,26 @@ bool EnhancedSceneRendererLiveDX12Adapter::BeginOwnedQueueRecording(std::string&
     return m_impl->resources.BeginQueueFrame(m_impl->graphics.queue, outError);
 }
 
-bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph,
-                                                            std::shared_ptr<const void> owner,
+bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_owner<EnhancedRenderGraph>& graph,
+                                                            ce::lifetime_token owner,
                                                             const RHIRecordedBatchDesc& desc,
                                                             double& recordingMilliseconds, std::string& outError)
 {
     Impl& impl = *m_impl;
-    IRHIQueueRecorder* recorder = impl.ownedRecorder.get();
+    IRHIQueueRecorder* recorder = impl.ownedRecorder.operator->();
     auto graphics = impl.graphics;
     auto compute = impl.compute;
     if (UsesSoftwareRecording())
     {
         if (!impl.softwareQueueRecorder)
         {
-            impl.softwareValidator = std::make_shared<DX12SoftwareCommandValidator>(impl.resources);
+            impl.softwareValidator = own::make_shared<DX12SoftwareCommandValidator>(impl.resources);
             RHISoftwareQueueOptions options;
             options.translation.mode = RHICommandTranslationMode::Parallel;
             options.translation.maxTranslationJobs = impl.commandPool.GetWorkerCount();
             options.translation.minCommandsPerJob = 256;
             impl.softwareQueueRecorder =
-                std::make_unique<RHISoftwareQueueRecorder>(impl.ownedRecorder, impl.softwareValidator, options);
+                own::make_unique<RHISoftwareQueueRecorder>(impl.ownedRecorder, impl.softwareValidator, options);
         }
         if ((!impl.softwareGraphicsQueue &&
              !impl.softwareQueueRecorder->WrapQueue(impl.graphics.queue, impl.softwareGraphicsQueue, outError)) ||
@@ -683,7 +685,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const std::shared_pt
         software.renderViewId = desc.captureContext.render_view_id;
 #endif
         impl.softwareQueueRecorder->SetFrameDesc(software);
-        recorder = impl.softwareQueueRecorder.get();
+        recorder = impl.softwareQueueRecorder.operator->();
         graphics.queue = impl.softwareGraphicsQueue;
         compute.queue = impl.softwareComputeQueue;
     }
@@ -710,7 +712,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const std::shared_pt
             if (const auto* matching = impl.gpuMeasurements.FindFresh(domain, impl.currentProfilerToken,
                     impl.profiler.Calibration().cpuTicksPerSecond, identity.graphSignature))
                 view = matching;
-            signatureMatches = view->graphSignature == identity.graphSignature ||
+            signatureMatches = view->graphSignature.operator->() == identity.graphSignature.operator->() ||
                 *view->graphSignature == *identity.graphSignature;
             checkedSignature = true;
             if (!signatureMatches && impl.evidenceTelemetry && !impl.reportedTimingSignatureMismatch)
@@ -895,7 +897,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::RecordSoftwareGraph(EnhancedRenderGra
     const RHIRecordedBatchDesc& desc, RHISoftwareBatch& outBatch, std::string& outError)
 {
     auto& impl = *m_impl;
-    std::shared_ptr<IRHICommandQueue> primary;
+    own::shared_owner<IRHICommandQueue> primary;
     if (!impl.resources.GetPrimaryGraphicsQueue(primary, outError))
     {
         return false;
@@ -919,12 +921,12 @@ bool EnhancedSceneRendererLiveDX12Adapter::EnqueueSoftwareBatch(RHISoftwareBatch
     RHISubmissionTicket& outTicket, std::string& outError)
 {
     auto& impl = *m_impl;
-    std::shared_ptr<DX12CommandListPool> frozen;
+    own::shared_owner<DX12CommandListPool> frozen;
     if (!impl.commandPool.CreateTranslationPool(frozen, outError))
     {
         return false;
     }
-    auto translator = std::make_shared<DX12CommandTranslator>(*frozen, impl.resources, batch.GetDesc().queue);
+    auto translator = own::make_shared<DX12CommandTranslator>(*frozen, impl.resources, batch.GetDesc().queue);
     return GetRHISubmissionThread().EnqueueSoftwareBatch(&impl.resources, impl.resources, frozen,
         std::move(translator), std::move(batch), outTicket, outError);
 }
@@ -1193,7 +1195,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
 
 void EnhancedSceneRendererLiveDX12Adapter::SealTemporalDisplayFrame(DisplayToken token,
     const TemporalFrame& frame, const TemporalMeasurementProvenance& provenance,
-    std::shared_ptr<const void> lifetimeToken, bool nativeGateActive)
+    ce::lifetime_token lifetimeToken, bool nativeGateActive)
 {
     for (auto& display : m_impl->activeDisplays)
     {
@@ -1485,11 +1487,17 @@ namespace
         nativeTimings.swap(merged);
         profiler.MergeSlices(timings, nativeTimings);
 
-        outTimings.clear();
-        outTimings.reserve(nativeTimings.size());
-        for (DX12GpuProfiler::PassTiming& timing : nativeTimings)
+        outTimings.resize(nativeTimings.size());
+        for (size_t i = 0; i < nativeTimings.size(); ++i)
         {
-            outTimings.push_back({ timing.name, timing.milliseconds, timing.spanMilliseconds });
+            auto& target = outTimings[i];
+            const auto& timing = nativeTimings[i];
+            if (target.name != timing.name)
+            {
+                target.name = timing.name;
+            }
+            target.milliseconds = timing.milliseconds;
+            target.spanMilliseconds = timing.spanMilliseconds;
         }
         outTotalMilliseconds = profiler.GetLastTotalMilliseconds();
         merged.swap(nativeTimings);
@@ -1539,7 +1547,10 @@ namespace
                 outSlices[i].queueId = 0;
                 outSlices[i].passIndex = timings.slices[i].identity.passIndex;
                 outSlices[i].rhi = timings.slices[i].rhi;
-                outSlices[i].name.assign(timings.slices[i].name);
+                if (outSlices[i].name != timings.slices[i].name)
+                {
+                    outSlices[i].name.assign(timings.slices[i].name);
+                }
                 outSlices[i].beginCpuTick =
                     profiler.GpuTickToCpuTick(timings.slices[i].beginTicks);
                 outSlices[i].endCpuTick =

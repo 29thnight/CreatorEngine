@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "GpuGeometryVisibility.h"
 #include "RenderArena.h"
 #include "../EngineDiagnostics/ProfileScope.h"
@@ -351,7 +352,7 @@ bool GpuGeometryVisibility::Initialize(const EnhancedFrameContext& context, std:
     m_reset = std::move(resetPipeline);
     m_cull = std::move(cullPipeline);
     m_device = context.resources;
-    m_bufferPool = std::make_shared<BufferPool>(*m_device);
+    m_bufferPool = own::make_shared<BufferPool>(*m_device);
     m_device->RegisterUploadTransactionListener(this);
     return true;
 }
@@ -478,7 +479,7 @@ namespace
     class MeshletGroupLookup final
     {
       public:
-        explicit MeshletGroupLookup(std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries)
+        explicit MeshletGroupLookup(std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries)
             : m_geometries(geometries)
         {
             static thread_local Scratch scratch;
@@ -514,8 +515,8 @@ namespace
             {
                 const auto& geometry = m_geometries[owner];
                 if (!geometry->UsesDirectClusters() ||
-                    reinterpret_cast<std::uintptr_t>(geometry->Input()->ClusterStream().get()) != stream ||
-                    reinterpret_cast<std::uintptr_t>(geometry->ClusterResidency().get()) != residency)
+                    reinterpret_cast<std::uintptr_t>(geometry->Input()->ClusterStream().operator->()) != stream ||
+                    reinterpret_cast<std::uintptr_t>(geometry->ClusterResidency().operator->()) != residency)
                 {
                     return false;
                 }
@@ -591,7 +592,7 @@ namespace
             return hash ^ (hash >> 16u);
         }
 
-        std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> m_geometries;
+        std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> m_geometries;
         Scratch* m_scratch{};
         bool m_owned{};
     };
@@ -599,9 +600,9 @@ namespace
 
 bool GpuGeometryVisibility::PrepareMeshlets(
     const EnhancedFrameContext& context, const math::matrix4x4& projection,
-    std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
-    std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history, std::shared_ptr<const Frame> firstStage, bool ordered,
+    std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries,
+    own::shared_owner<const Frame>& result, std::string& error, bool currentFrameOcclusion,
+    own::shared_owner<const GpuGeometryOcclusion::Pyramid> history, own::shared_owner<const Frame> firstStage, bool ordered,
     float maxPixelError, uint32_t lodWidth, uint32_t lodHeight,
     const GpuGeometryOcclusion::ViewKey* cameraPredictionView)
 {
@@ -642,7 +643,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     }
     // This same storage becomes the frame's sealed declaration input. Keep its
     // local owner through history/recovery validation after PrepareInternal.
-    auto preparedInputs = std::make_shared<MeshletInputs>();
+    auto preparedInputs = own::make_shared<MeshletInputs>();
     auto& candidates = preparedInputs->candidates;
     auto& bins = preparedInputs->bins;
     std::optional<MeshletGroupLookup> groupOwners;
@@ -671,7 +672,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             {
                 groupOwners.emplace(geometries);
             }
-            const auto stream = geometry->Input()->ClusterStream();
+            const auto& stream = geometry->Input()->ClusterStream();
             const auto& residency = geometry->ClusterResidency();
             if (!stream || !residency)
                 return VisibilityFail(error, "Direct cluster groups require their sealed stream and residency.");
@@ -680,8 +681,8 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             for (unsigned row = 0; row < 4; ++row)
                 for (unsigned column = 0; column < 4; ++column)
                     worldBits[row * 4u + column] = std::bit_cast<std::uint32_t>(world.m[row][column]);
-            groupOwner = groupOwners->FindOwner(reinterpret_cast<std::uintptr_t>(stream.get()),
-                                                reinterpret_cast<std::uintptr_t>(residency.get()), worldBits, bin);
+            groupOwner = groupOwners->FindOwner(reinterpret_cast<std::uintptr_t>(stream.operator->()),
+                                                reinterpret_cast<std::uintptr_t>(residency.operator->()), worldBits, bin);
             if (groupOwner != bin && static_cast<std::uint32_t>(bins[groupOwner].baseVertex) != groupCount)
             {
                 return VisibilityFail(error, "Shared cluster groups have incompatible hierarchy domains.");
@@ -721,7 +722,8 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     }
     if (!result)
         return true;
-    auto frame = std::const_pointer_cast<Frame>(result);
+    // Construction is not published until this function returns.
+    auto* frame = const_cast<Frame*>(result.operator->());
     frame->m_ordered = ordered;
     if (cameraPredictionView)
     {
@@ -748,7 +750,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     if (firstStage)
     {
         if (firstStage->m_occlusionView != frame->m_occlusionView ||
-            firstStage->m_meshletGeometries != frame->m_meshletGeometries ||
+            !std::ranges::equal(firstStage->m_meshletGeometries, frame->m_meshletGeometries, [](const auto& a, const auto& b) { return a.operator->() == b.operator->(); }) ||
             firstStage->m_meshletOffsets != frame->m_meshletOffsets)
             return VisibilityFail(error, "Meshlet recovery requires the same sealed first-stage geometry and view.");
         // Occlusion history changes visibility, not desired/resident LOD.
@@ -875,7 +877,7 @@ bool GpuGeometryVisibility::PrepareOcclusionPipelines(const EnhancedFrameContext
 
 bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                                     std::span<const Candidate> candidates, std::span<const Bin> bins,
-                                    std::shared_ptr<const Frame>& result, std::string& error,
+                                    own::shared_owner<const Frame>& result, std::string& error,
                                     bool currentFrameOcclusion)
 {
     return PrepareInternal(context, viewProjection, candidates, bins, result, error, currentFrameOcclusion);
@@ -911,9 +913,9 @@ bool GpuGeometryVisibility::PrepareMeshletPipelines(const EnhancedFrameContext& 
 
 bool GpuGeometryVisibility::PrepareInternal(
     const EnhancedFrameContext& context, const math::matrix4x4& viewProjection, std::span<const Candidate> candidates,
-    std::span<const Bin> bins, std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-    std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
-    std::shared_ptr<MeshletInputs> preparedInputs)
+    std::span<const Bin> bins, own::shared_owner<const Frame>& result, std::string& error, bool currentFrameOcclusion,
+    std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries,
+    own::shared_owner<MeshletInputs> preparedInputs)
 {
     ce::profile_scope profile{ce::marker<"GpuVisibility.PrepareInternal">()};
     result.reset();
@@ -1057,7 +1059,7 @@ bool GpuGeometryVisibility::PrepareInternal(
         return false;
     }
 
-    auto frame = std::shared_ptr<Frame>(new Frame);
+    auto frame = own::make_shared<Frame>(Frame::ConstructionKey{});
     frame->m_device = m_device;
     frame->m_sharedReset = m_sharedReset.GetGeneration();
     frame->m_sharedCull = m_sharedCull.GetGeneration();
@@ -1178,7 +1180,7 @@ bool GpuGeometryVisibility::PrepareInternal(
         }
         else
         {
-            frame->m_meshletInputs = std::make_shared<MeshletInputs>();
+            frame->m_meshletInputs = own::make_shared<MeshletInputs>();
             frame->m_meshletInputs->candidates.assign(candidates.begin(), candidates.end());
             frame->m_meshletInputs->bins.assign(bins.begin(), bins.end());
         }
@@ -1319,12 +1321,12 @@ void GpuGeometryVisibility::Frame::DispatchMeshletStage(RHIEncoder& encoder, Mes
 
 void GpuGeometryVisibility::Frame::DeclareFirstStage(EnhancedRenderGraph& graph, const char* passPrefix) const
 {
-    const std::shared_ptr<const Frame> frames[]{m_self.lock()};
+    const own::shared_owner<const Frame> frames[]{m_self.lock()};
     DeclareFirstStageBatch(graph, frames, passPrefix);
 }
 
 void GpuGeometryVisibility::Frame::DeclareFirstStageBatch(EnhancedRenderGraph& graph,
-                                                          std::span<const std::shared_ptr<const Frame>> frames,
+                                                          std::span<const own::shared_owner<const Frame>> frames,
                                                           const char* passPrefix)
 {
     for (const auto& frame : frames)
@@ -1345,8 +1347,8 @@ void GpuGeometryVisibility::Frame::DeclareFirstStageBatch(EnhancedRenderGraph& g
 }
 
 void GpuGeometryVisibility::Frame::DeclareOcclusionBatch(
-    EnhancedRenderGraph& graph, std::span<const std::shared_ptr<const Frame>> frames,
-    std::span<const std::shared_ptr<const GpuGeometryOcclusion::Pyramid>> pyramids, const char* passPrefix)
+    EnhancedRenderGraph& graph, std::span<const own::shared_owner<const Frame>> frames,
+    std::span<const own::shared_owner<const GpuGeometryOcclusion::Pyramid>> pyramids, const char* passPrefix)
 {
     if (frames.size() != pyramids.size())
     {
@@ -1368,8 +1370,8 @@ void GpuGeometryVisibility::Frame::DeclareOcclusionBatch(
 }
 
 void GpuGeometryVisibility::Frame::DeclareCameraPredictionBatch(
-    EnhancedRenderGraph& graph, std::span<const std::shared_ptr<const Frame>> frames,
-    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid, const char* passPrefix)
+    EnhancedRenderGraph& graph, std::span<const own::shared_owner<const Frame>> frames,
+    own::shared_owner<const GpuGeometryOcclusion::Pyramid> pyramid, const char* passPrefix)
 {
     if (!pyramid || !passPrefix)
     {
@@ -1387,7 +1389,7 @@ void GpuGeometryVisibility::Frame::DeclareCameraPredictionBatch(
         if (frame->m_graph)
         {
             frame->CheckCurrent(&graph);
-            if (frame->m_pyramid != pyramid)
+            if (frame->m_pyramid.operator->() != pyramid.operator->())
             {
                 throw std::runtime_error("Shadow camera prediction cannot change its declared depth producer.");
             }
@@ -1401,7 +1403,7 @@ void GpuGeometryVisibility::Frame::DeclareCameraPredictionBatch(
 }
 
 void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& graph,
-                                                        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid,
+                                                        own::shared_owner<const GpuGeometryOcclusion::Pyramid> pyramid,
                                                         const char* passPrefix) const
 {
     CheckCurrent();
@@ -1415,7 +1417,7 @@ void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& gra
     m_pyramid = std::move(pyramid);
     if (passPrefix && !m_meshletGeometries.empty())
     {
-        const std::shared_ptr<const Frame> frames[]{m_self.lock()};
+        const own::shared_owner<const Frame> frames[]{m_self.lock()};
         DeclareMeshletBatch(graph, frames, passPrefix);
         return;
     }
@@ -1423,7 +1425,7 @@ void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& gra
 }
 
 void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& graph,
-                                                       std::span<const std::shared_ptr<const Frame>> frames,
+                                                       std::span<const own::shared_owner<const Frame>> frames,
                                                        const char* passPrefix)
 {
     ce::profile_scope profile{ce::marker<"GpuVisibility.MeshletDeclare">()};
@@ -1483,7 +1485,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         return;
     }
 
-    std::array<std::shared_ptr<const Frame>, kSharedViewCapacity> ownerStorage;
+    std::array<own::shared_owner<const Frame>, kSharedViewCapacity> ownerStorage;
     std::size_t ownerCount{};
     std::uint32_t pendingBins{};
     bool ordered{};
@@ -1494,7 +1496,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             continue;
         }
         const auto accepted = std::span{ownerStorage}.first(ownerCount);
-        if (std::ranges::find(accepted, frame) != accepted.end())
+        if (std::ranges::find(accepted, frame.operator->(), [](const auto& value) { return value.operator->(); }) != accepted.end())
         {
             continue;
         }
@@ -1505,7 +1507,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     const auto owners = std::span{ownerStorage}.first(ownerCount);
     // Upload assembly does not borrow declaration metadata. Finish it before
     // entering thread-local declaration scratch, including assisted upload work.
-    const auto shared = owners.size() > 1 ? BuildShared(owners) : std::shared_ptr<SharedBatch>{};
+    const auto shared = owners.size() > 1 ? BuildShared(owners) : own::shared_owner<SharedBatch>{};
     if (!shared)
     {
         owners.front()->UploadMeshletInputs();
@@ -1568,10 +1570,10 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         advance(*frame, cullUses, false);
         for (const auto& geometry : std::span{frame->m_meshletGeometries})
         {
-            auto hash = reinterpret_cast<uintptr_t>(geometry.get()) >> 3;
+            auto hash = reinterpret_cast<uintptr_t>(geometry.operator->()) >> 3;
             hash ^= hash >> 17;
             size_t slot = (hash * uintptr_t{0x9e3779b1}) & (geometrySlots - 1);
-            while (geometrySeen[slot] && geometrySeen[slot] != geometry.get())
+            while (geometrySeen[slot] && geometrySeen[slot] != geometry.operator->())
             {
                 slot = (slot + 1) & (geometrySlots - 1);
             }
@@ -1579,7 +1581,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
             {
                 continue;
             }
-            geometrySeen[slot] = geometry.get();
+            geometrySeen[slot] = geometry.operator->();
             const auto topology = geometry->GraphMeshlets(graph);
             resetUses.push_back({topology, RHIResourceState::ShaderResource, RGAccessMode::Read});
             if (geometry->UsesDirectClusters() && geometry->IsObjectSpace() &&
@@ -1631,9 +1633,9 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     }
     struct Declaration
     {
-        std::array<std::shared_ptr<const Frame>, kSharedViewCapacity> owners;
+        std::array<own::shared_owner<const Frame>, kSharedViewCapacity> owners;
         size_t count;
-        std::shared_ptr<SharedBatch> shared;
+        own::shared_owner<SharedBatch> shared;
     };
     const auto* declaration = graph.RetainDeclaration<Declaration>(ownerStorage, ownerCount, shared);
     const auto declare =
@@ -1700,11 +1702,11 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     }
 }
 
-void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const std::shared_ptr<const Frame>> frames)
+void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const own::shared_owner<const Frame>> frames)
 {
     struct Pending
     {
-        std::shared_ptr<assets::cluster::Stream> stream;
+        own::shared_owner<assets::cluster::Stream> stream;
         std::vector<std::uint32_t> words;
         std::uint32_t groups{};
     };
@@ -1733,7 +1735,7 @@ void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const std:
                 throw std::runtime_error("Streaming group feedback extent mismatch.");
             }
             const auto& stream = frame->m_meshletGeometries[bin]->Input()->ClusterStream();
-            auto& collected = pending[stream.get()];
+            auto& collected = pending[stream.operator->()];
             if (!collected.stream)
             {
                 collected.stream = stream;
@@ -1784,7 +1786,7 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
     }
     if (!m_meshletGeometries.empty())
     {
-        const std::shared_ptr<const Frame> frames[]{owner};
+        const own::shared_owner<const Frame> frames[]{owner};
         DeclareMeshletBatch(graph, frames,
                             m_ordered          ? "METEOR.BlendedMeshlet"
                             : m_firstStage     ? "METEOR.CameraMeshlet.Recovery"
@@ -1928,7 +1930,7 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
 
 void GpuGeometryVisibility::OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion)
 {
-    std::vector<std::shared_ptr<const Frame>> ready;
+    std::vector<own::shared_owner<const Frame>> ready;
     {
         std::lock_guard lock(m_recordingMutex);
         const auto found = m_recordings.find(recording);
@@ -1954,7 +1956,7 @@ void GpuGeometryVisibility::OnUploadCompleted(std::uint64_t completed)
 {
     if (!completed || completed == UINT64_MAX)
         return; // Device loss does not certify feedback or reusable GPU storage.
-    std::vector<std::shared_ptr<const Frame>> ready;
+    std::vector<own::shared_owner<const Frame>> ready;
     {
         std::lock_guard lock(m_recordingMutex);
         m_completed = (std::max)(m_completed, completed);

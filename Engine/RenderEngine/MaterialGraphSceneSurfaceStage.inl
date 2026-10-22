@@ -1,11 +1,12 @@
+#include "../Utility_Framework/Ownership.h"
 // Stage implementations included by MaterialGraphSceneHost.cpp inside material_graph.
-SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shared_owner<const FrameInput>& prepared,
+SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shared_owner<const Frame>& prepared,
                                                                  EnhancedRenderGraph& graph,
                                                                  const SceneFinalCullOutputs& cull,
                                                                  const SceneSurfaceTargets::Outputs& incoming) const
 {
     ce::profile_scope profile{ce::marker<"MaterialSceneVisibilityDeclare">()};
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!frame || frame->draws.empty())
     {
         RequireStage(cull.list, {}, "METEOR.Scene.Visibility received a list for an empty frame.");
@@ -35,7 +36,7 @@ SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shar
     return targets;
 }
 
-std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_owner<const FrameInput>& prepared,
+std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_owner<const Frame>& prepared,
                                                               EnhancedRenderGraph& graph, RGHandle expectedVisibility,
                                                               RGHandle visibility) const
 {
@@ -62,12 +63,14 @@ std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_
     return materialWork->GraphInputs(graph);
 }
 
-SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(
-    const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle expectedVisibility,
-    const SceneSurfaceTargets::Outputs& incoming, const std::array<RGHandle, 2>& material) const
+SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(const own::shared_owner<const Frame>& prepared,
+                                                                     EnhancedRenderGraph& graph,
+                                                                     RGHandle expectedVisibility,
+                                                                     const SceneSurfaceTargets::Outputs& incoming,
+                                                                     const std::array<RGHandle, 2>& material) const
 {
     ce::profile_scope profile{ce::marker<"MaterialSceneResolveDeclare">()};
-    const auto frame = prepared;
+    const auto& frame = prepared;
     gbuffer = incoming;
     if (!frame || frame->draws.empty())
     {
@@ -105,59 +108,62 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(
     frame->AddReconstructionReads(graph, restoreUses, inputs.visibility, material, true);
     frame->AddPassReadPlan(graph, restoreUses, PassReadPlan::Pass::Surface, RHIResourceState::PixelShaderResource);
     NormalizeSceneReads(graph, restoreUses);
-    graph.AddPass("METEOR.Scene.Material.Resolve", restoreUses, [this, frame, inputs](const auto& execution) {
-        frame->CheckCurrent(execution.graph);
-        auto& encoder = *execution.encoder;
-        std::array<RHITextureHandle, 5> colors;
-        const auto handles = Colors(inputs);
-        for (unsigned i = 0; i < colors.size(); ++i)
+    graph.AddPass(
+        "METEOR.Scene.Material.Resolve", restoreUses,
+        [this, frame = frame, inputs](const auto& execution)
         {
-            colors[i] = execution.ResolveHandle(handles[i]);
-        }
-        const auto targets = frame->device->CreateRenderTargets(colors, nullptr);
-        if (!targets.IsValid())
-        {
-            throw std::runtime_error("METEOR reconstructed surface target binding failed.");
-        }
-        encoder.BindRenderTargets(targets);
-        encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-        // 같은 callback의 visibility SRV만 공유한다. 적격 draw가 없으면 할당하지 않고
-        // descriptor를 다음 recording이나 다른 callback의 수명으로 넘기지 않는다.
-        RHIBindingTable visibility{};
-        for (const auto& draw : frame->RasterDrawsFor())
-        {
-            if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
+            frame->CheckCurrent(execution.graph);
+            auto& encoder = *execution.encoder;
+            std::array<RHITextureHandle, 5> colors;
+            const auto handles = Colors(inputs);
+            for (unsigned i = 0; i < colors.size(); ++i)
             {
-                continue;
+                colors[i] = execution.ResolveHandle(handles[i]);
             }
-            if (!visibility.IsValid())
+            const auto targets = frame->device->CreateRenderTargets(colors, nullptr);
+            if (!targets.IsValid())
             {
-                visibility = frame->CreateReconstructionVisibility(execution, inputs.visibility);
+                throw std::runtime_error("METEOR reconstructed surface target binding failed.");
             }
-            frame->BindReconstruction(encoder, draw, visibility,
-                                      draw.program->gbuffer[draw.doubleSided].GetHandle());
-            std::string error;
-            if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+            encoder.BindRenderTargets(targets);
+            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+            // 같은 callback의 visibility SRV만 공유한다. 적격 draw가 없으면 할당하지 않고
+            // descriptor를 다음 recording이나 다른 callback의 수명으로 넘기지 않는다.
+            RHIBindingTable visibility{};
+            for (const auto& draw : frame->RasterDrawsFor())
             {
-                throw std::runtime_error(error);
+                if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
+                {
+                    continue;
+                }
+                if (!visibility.IsValid())
+                {
+                    visibility = frame->CreateReconstructionVisibility(execution, inputs.visibility);
+                }
+                frame->BindReconstruction(encoder, draw, visibility,
+                                          draw.program->gbuffer[draw.doubleSided].GetHandle());
+                std::string error;
+                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                {
+                    throw std::runtime_error(error);
+                }
+                frame->DrawReconstruction(encoder, draw);
             }
-            frame->DrawReconstruction(encoder, draw);
-        }
-    });
+        });
     this->gbuffer = inputs;
     return inputs;
 }
 
 bool SceneHost::VisibilityStage::PrepareVisibility(const FrameInput& frame, const EnhancedFrameContext& context,
-                                                   const std::shared_ptr<const SceneFrameGeometry>& geometry,
+                                                   const own::shared_owner<const SceneFrameGeometry>& geometry,
                                                    HybridVisibilityPipelines& pipelines, const char* name,
                                                    bool depthOnly,
-                                                   const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
-                                                   std::shared_ptr<const SceneHybridVisibility>& result,
+                                                   const own::shared_owner<const GpuGeometryVisibility::Frame>& list,
+                                                   own::shared_owner<const SceneHybridVisibility>& result,
                                                    std::string& error,
                                                    const SceneHybridVisibility* sharedPreparation)
 {
-    auto hybrid = std::make_shared<SceneHybridVisibility>();
+    auto hybrid = own::make_shared<SceneHybridVisibility>();
     hybrid->name = name;
     hybrid->depthOnly = depthOnly;
     hybrid->geometry = geometry;
@@ -184,8 +190,8 @@ bool SceneHost::VisibilityStage::PrepareVisibility(const FrameInput& frame, cons
 }
 
 bool SceneHost::VisibilityStage::Prepare(const FrameInput& frame, const EnhancedFrameContext& context,
-                                         const std::shared_ptr<const SceneFrameGeometry>& geometry,
-                                         const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
+                                         const own::shared_owner<const SceneFrameGeometry>& geometry,
+                                         const own::shared_owner<const GpuGeometryVisibility::Frame>& list,
                                          HybridVisibilityPipelines& pipelines, std::string& error,
                                          const SceneHybridVisibility* sharedPreparation)
 {

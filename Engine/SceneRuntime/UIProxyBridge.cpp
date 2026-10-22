@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 // UIRenderProxy의 컴포넌트 읽기 생성자들 (PHASE 4-2 C1).
 //
 // 프록시 타입은 렌더 소유(UIRenderProxy.h), 컴포넌트 -> 프록시 변환은 게임플레이
@@ -96,7 +97,7 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
 
     SpriteSheetData data{};
     m_texture               = sprite->m_spriteSheetTexture;
-    m_spriteSheet           = std::make_shared<SpriteSheet>();
+    m_spriteSheet           = own::make_shared<SpriteSheet>();
 	data.spriteSheetPath    = sprite->m_spriteSheetPath;
     data.origin             = { sprite->uiinfo.size.x * 0.5f, sprite->uiinfo.size.y * 0.5f };
     data.position           = sprite->pos;

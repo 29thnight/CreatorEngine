@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "RHI/IRenderDeviceServices.h"
 #include "../Utility_Framework/StandardLibrary.h"
@@ -321,7 +322,7 @@ namespace material_graph
         return pool ? pool->Acquire(desc, handle, error) : device.CreateBuffer(desc, handle, error);
     }
 
-    inline void ReleaseSceneBuffer(IRenderDeviceServices& device, const std::shared_ptr<TransientBufferPool>& pool,
+    inline void ReleaseSceneBuffer(IRenderDeviceServices& device, const own::shared_owner<TransientBufferPool>& pool,
                                    RHIBufferHandle handle)
     {
         if (!handle.IsValid())

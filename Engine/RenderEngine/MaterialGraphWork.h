@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphFrameGeometry.h"
 #include "MaterialGraphResidentBuffer.h"
@@ -11,16 +12,16 @@ struct SceneMaterialWork final
 {
     using Bucket = IndirectMaterialBatch::Bucket;
     IRenderDeviceServices* device{};
-    std::shared_ptr<TransientBufferPool> pool;
-    std::shared_ptr<const SceneFrameGeometry> geometry;
-    std::shared_ptr<const ResidentBufferFrame> sceneRecordsOwner;
-    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6> pipelines;
+    own::shared_owner<TransientBufferPool> pool;
+    own::shared_owner<const SceneFrameGeometry> geometry;
+    own::shared_owner<const ResidentBufferFrame> sceneRecordsOwner;
+    std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> pipelines;
     std::vector<Bucket> buckets;
     RHIBufferSlice records;
     RHIBufferHandle work, ranges, arguments;
     uint32_t width{}, height{}, recordCount{}, commandCount{};
     uint64_t workBytes{};
-    std::unique_ptr<PacketDispatchWork> packetWork;
+    own::unique_owner<PacketDispatchWork> packetWork;
 
     bool UploadPackets(RHIBufferSlice sceneRecords, uint32_t bucketCount, std::string& error)
     {
@@ -48,7 +49,7 @@ struct SceneMaterialWork final
         }
         // Few-material views reserve records*tiles rather than one packet per
         // viewport pixel; the pixel bound still caps heavily overlapping views.
-        packetWork = std::make_unique<PacketDispatchWork>();
+        packetWork = own::make_unique<PacketDispatchWork>();
         if (!packetWork->Prepare(*device, pool, recordCount, static_cast<uint32_t>(capacity), capacities,
                                  width, height, "METEOR.Scene.Material", error))
             return false;
@@ -59,7 +60,7 @@ struct SceneMaterialWork final
         return true;
     }
     uint32_t PacketCapacity() const { return packetWork ? packetWork->values.packetCapacity : 0; }
-    void Declare(EnhancedRenderGraph& graph, RGHandle visibility, std::shared_ptr<const SceneMaterialWork> owner) const
+    void Declare(EnhancedRenderGraph& graph, RGHandle visibility, own::shared_owner<const SceneMaterialWork> owner) const
     {
         packetWork->Declare(graph, owner, pipelines, "METEOR.Scene.Material", true,
             [&graph, owner, visibility](auto& uses) {

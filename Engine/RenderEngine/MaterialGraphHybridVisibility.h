@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphFrameGeometry.h"
 #include "GpuGeometryVisibility.h"
 #include "RHI/RHIShaderSource.h"
@@ -99,11 +100,11 @@ struct SceneHybridVisibility final
     std::string name;
     bool depthOnly{};
     IRenderDeviceServices* device{};
-    std::shared_ptr<TransientBufferPool> pool;
-    std::shared_ptr<const SceneFrameGeometry> geometry;
-    std::shared_ptr<const GpuGeometryVisibility::Frame> visible;
-    std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, Pipeline::Count> compute;
-    std::shared_ptr<const LX::Runtime::GraphicsGeneration> resolve;
+    own::shared_owner<TransientBufferPool> pool;
+    own::shared_owner<const SceneFrameGeometry> geometry;
+    own::shared_owner<const GpuGeometryVisibility::Frame> visible;
+    std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, Pipeline::Count> compute;
+    own::shared_owner<const LX::Runtime::GraphicsGeneration> resolve;
     std::vector<std::array<uint32_t, 4>> records;
     RHIBufferSlice constants, metadata;
     RHIBufferHandle keys, routes, work, dispatchArguments;
@@ -195,7 +196,7 @@ struct SceneHybridVisibility final
         // First/final culling own different results. Only immutable preparation
         // can be shared, and only inside the same recording/descriptor lifetime.
         const bool shareGeometry = sharedPreparation && sharedPreparation->device == device &&
-            sharedPreparation->geometry == geometry && sharedPreparation->recording == recording &&
+            sharedPreparation->geometry.operator->() == geometry.operator->() && sharedPreparation->recording == recording &&
             sharedPreparation->descriptorVersion == descriptorVersion && sharedPreparation->vertices.IsValid() &&
             sharedPreparation->topologies.IsValid();
         const bool shareConstants = shareGeometry && sharedPreparation->width == width &&
@@ -219,24 +220,24 @@ struct SceneHybridVisibility final
         const std::wstring keyName(std::wstring(name.begin(), name.end()) + L".Keys");
         const std::wstring routeName(std::wstring(name.begin(), name.end()) + L".Routes");
         desc.debugName = keyName.c_str();
-        if (!CreateSceneBuffer(*device, pool.get(), desc, keys, error))
+        if (!CreateSceneBuffer(*device, pool.operator->(), desc, keys, error))
             return false;
         desc.bytes = uint64_t(meshlets) * 4;
         desc.debugName = routeName.c_str();
-        if (!CreateSceneBuffer(*device, pool.get(), desc, routes, error))
+        if (!CreateSceneBuffer(*device, pool.operator->(), desc, routes, error))
             return false;
         const std::wstring workName(std::wstring(name.begin(), name.end()) + L".Work");
         const std::wstring argumentsName(std::wstring(name.begin(), name.end()) + L".DispatchArguments");
         desc.bytes = WorkBytes();
         desc.debugName = workName.c_str();
-        if (!CreateSceneBuffer(*device, pool.get(), desc, work, error))
+        if (!CreateSceneBuffer(*device, pool.operator->(), desc, work, error))
         {
             return false;
         }
         desc.bytes = DispatchArgumentBytes;
         desc.allowIndirectArguments = true;
         desc.debugName = argumentsName.c_str();
-        if (!CreateSceneBuffer(*device, pool.get(), desc, dispatchArguments, error))
+        if (!CreateSceneBuffer(*device, pool.operator->(), desc, dispatchArguments, error))
         {
             return false;
         }
@@ -329,7 +330,7 @@ struct SceneHybridVisibility final
         }
         NormalizeSceneReads(graph, uses);
     }
-    void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const SceneHybridVisibility> owner) const
+    void Declare(EnhancedRenderGraph& graph, own::shared_owner<const SceneHybridVisibility> owner) const
     {
         if (graphOwner || graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
             throw std::runtime_error("METEOR raster requires one explicit versioned declaration per frame.");
@@ -404,7 +405,7 @@ struct SceneHybridVisibility final
         uses.push_back({graphRoutes, RHIResourceState::ShaderResource, RGAccessMode::Read});
         uses.push_back({graphKeys, RHIResourceState::UnorderedAccess, RGAccessMode::AtomicMin64});
     }
-    void DeclareSoftware(EnhancedRenderGraph& graph, std::shared_ptr<const SceneHybridVisibility> owner) const
+    void DeclareSoftware(EnhancedRenderGraph& graph, own::shared_owner<const SceneHybridVisibility> owner) const
     {
         if (graphOwner != graph.DeclarationGraph() || graphEpoch != graph.DeclarationEpoch())
         {
@@ -440,7 +441,7 @@ struct SceneHybridVisibility final
     }
     // Occluder stage: the merged atomic keys become the HZB source depth.
     RGHandle DeclareDepthResolve(EnhancedRenderGraph& graph, RGHandle depth,
-                                 std::shared_ptr<const SceneHybridVisibility> owner) const
+                                 own::shared_owner<const SceneHybridVisibility> owner) const
     {
         if (!depthOnly)
             throw std::runtime_error("METEOR visibility stage resolves its visibility target too.");
@@ -483,7 +484,7 @@ struct SceneHybridVisibility final
         e.Draw(3, 1);
     }
     SceneSurfaceTargets::Outputs DeclareResolve(EnhancedRenderGraph& graph, SceneSurfaceTargets::Outputs outputs,
-                                                std::shared_ptr<const SceneHybridVisibility> owner) const
+                                                own::shared_owner<const SceneHybridVisibility> owner) const
     {
         if (depthOnly)
             throw std::runtime_error("METEOR occluder stage has no visibility target.");

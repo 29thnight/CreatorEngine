@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 // 보유층의 광원 프록시를 뷰가 쓸 형태로 고르고 옮겨 담는다.
 //
 // ★ 함수로 뽑은 이유. 이 변환이 라이브 러너와 자가 검증 두 곳에 손으로
@@ -88,7 +89,7 @@ inline bool BuildViewFrustum(const FrameCameraSnapshot& camera,
 //   빠뜨리지는 않고 가끔 필요 없는 것을 남긴다. 원뿔로 좁히는 것은 이
 //   목록의 길이가 실제로 문제가 될 때 할 일이다.
 inline ViewLightSelection SelectLightsForView(
-    const std::vector<std::shared_ptr<LightRenderProxy>>& proxies,
+    const std::vector<own::shared_owner<LightRenderProxy>>& proxies,
     const FrameCameraSnapshot& camera)
 {
     struct Scored

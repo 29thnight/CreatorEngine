@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "EnhancedSceneRenderer.h"
 #include "../../RHI/RHIHandle.h"
@@ -72,7 +74,7 @@ public:
     // the pipeline. An unset override reads the environment at each frame boundary.
     bool SetQueueExecutionMode(uint32_t mode, std::string& outError);
     bool BeginOwnedQueueRecording(std::string& outError);
-    bool SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph, std::shared_ptr<const void> owner,
+    bool SubmitOwnedGraph(const own::shared_owner<EnhancedRenderGraph>& graph, ce::lifetime_token owner,
                           const RHIRecordedBatchDesc& desc, double& recordingMilliseconds, std::string& outError);
     IRHIParallelCommandPool& CommandPool();
     uint64_t GetBackendGeneration() const;
@@ -109,7 +111,7 @@ public:
     // the existing producer completion/promotion boundary makes the slot visible.
     void SealTemporalDisplayFrame(DisplayToken token, const TemporalFrame& frame,
         const TemporalMeasurementProvenance& provenance,
-        std::shared_ptr<const void> lifetimeToken = {}, bool nativeGateActive = false);
+        ce::lifetime_token lifetimeToken = {}, bool nativeGateActive = false);
     void RetireDisplayTexture(DisplayToken token);
     // Caller holds displayLifetimeMutex, as for retire/open/reuse.
     void CollectRetiredDisplays();
@@ -152,6 +154,5 @@ public:
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    own::unique_owner<Impl> m_impl;
 };
-

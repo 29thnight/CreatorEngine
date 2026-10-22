@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include <stdint.h>
 #include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
@@ -428,7 +429,7 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
         return false;
     }
     {
-        std::shared_ptr<RHITransientHeap> heap;
+        own::shared_owner<RHITransientHeap> heap;
         RHITransientAllocationInfo allocation{};
         if (resources.CreateTransientHeap(allocation, heap, error) || heap)
         {

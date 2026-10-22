@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
 #include "../RHIQueueContract.h"
@@ -384,7 +385,7 @@ private:
     // Layout is identical in every consuming project, including SDK-off Editor.
     // shared_ptr permits an incomplete optional-SDK type in disabled builds.
     TemporalResult m_temporalXeSSResult;
-    std::shared_ptr<XeSSUpscalerVulkan> m_temporalXeSSBootstrap;
+    own::shared_owner<XeSSUpscalerVulkan> m_temporalXeSSBootstrap;
     std::wstring m_temporalXeSSDirectory;
     VkInstance       m_instance{ VK_NULL_HANDLE };
     VkPhysicalDevice m_physicalDevice{ VK_NULL_HANDLE };
@@ -478,7 +479,7 @@ private:
     /// ★ 프레임마다 다시 만든다. `DX12DeviceResources` 는 제자리 되감기
     ///   (`ResetState`)를 하는데, 이쪽은 커맨드 버퍼가 슬롯마다 다른 객체라
     ///   되감을 것이 아니라 **갈아 끼울 것**이다.
-    std::unique_ptr<VulkanEncoder> m_encoder;
+    own::unique_owner<VulkanEncoder> m_encoder;
     uint32_t    m_encoderUnimplementedTotal{ 0 };
     const char* m_encoderLastUnimplemented{ nullptr };
 
@@ -581,7 +582,7 @@ public:
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    own::unique_owner<Impl> m_impl;
 };
 
 /// Mesh의 CPU 정점·인덱스를 device-local Vulkan buffer로 올려 공유하는 캐시.
@@ -657,5 +658,5 @@ private:
         std::string& outError, const RHIModelMeshView* modelView = nullptr);
 
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    own::unique_owner<Impl> m_impl;
 };

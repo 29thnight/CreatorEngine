@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
@@ -106,9 +107,9 @@ public:
     float* GetHeightMap() { return m_heightMap.data(); }
 
     // Mesh 접근자
-    std::shared_ptr<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }
-    TerrainMaterial* GetMaterial() const { return m_pMaterial.get(); }
-    const std::shared_ptr<TerrainMaterial>& GetMaterialShared() const
+    own::shared_owner<TerrainMesh> GetMesh() const { return m_pTerrainMesh; }
+    TerrainMaterial* GetMaterial() const { return m_pMaterial.operator->(); }
+    const own::shared_owner<TerrainMaterial>& GetMaterialShared() const
     {
         return m_pMaterial;
     }
@@ -145,11 +146,11 @@ private:
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
 
     [[reflgen::ignore]]
-    std::shared_ptr<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
+    own::shared_owner<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
 
     //TerrainMesh* m_pMesh{ nullptr };
     [[reflgen::ignore]]
-    std::shared_ptr<TerrainMaterial> m_pMaterial{}; // 프록시와 프레임 기록까지 공동 소유
+    own::shared_owner<TerrainMaterial> m_pMaterial{}; // 프록시와 프레임 기록까지 공동 소유
 
     [[reflgen::ignore]]
     TerrainBrush* m_currentBrush{ nullptr };

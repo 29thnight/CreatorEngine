@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 
 #include "Model.h"
 
@@ -126,7 +127,7 @@ namespace experiment
 	class ModelLoader final
 	{
 	public:
-		explicit ModelLoader(std::unique_ptr<IModelDecoder> decoder) noexcept;
+		explicit ModelLoader(own::unique_owner<IModelDecoder> decoder) noexcept;
 		ModelLoader(const ModelLoader&) = delete;
 		ModelLoader& operator=(const ModelLoader&) = delete;
 		ModelLoader(ModelLoader&&) noexcept = default;
@@ -146,6 +147,6 @@ namespace experiment
 			const ModelDraft& draft, const ModelImportOptions& importOptions);
 
 	private:
-		std::unique_ptr<IModelDecoder> decoder_{};
+		own::unique_owner<IModelDecoder> decoder_{};
 	};
 }

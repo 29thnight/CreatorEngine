@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanLoader.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -113,7 +114,7 @@ public:
         {
             if (!m_ownedViews)
             {
-                m_ownedViews = std::make_shared<OwnedViews>();
+                m_ownedViews = own::make_shared<OwnedViews>();
                 m_viewOwners.push_back(m_ownedViews);
             }
             m_ownedViews->m_views.push_back(view);
@@ -167,8 +168,7 @@ private:
       }
   };
     std::vector<VulkanRenderTargetBinding> m_bindings;
-    std::shared_ptr<OwnedViews> m_ownedViews;
-    std::vector<std::shared_ptr<OwnedViews>> m_viewOwners;
+    own::shared_owner<OwnedViews> m_ownedViews;
+    std::vector<own::shared_owner<OwnedViews>> m_viewOwners;
     mutable std::mutex                     m_mutex;
 };
-

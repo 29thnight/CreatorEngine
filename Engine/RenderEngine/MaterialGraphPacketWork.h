@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphTransientBufferPool.h"
 #include "MaterialGraphPacketPlan.h"
 
@@ -27,9 +28,9 @@ namespace material_graph
             uint64_t argumentOffset{};
             RHIBufferSlice selector;
         };
-        std::shared_ptr<const PacketDispatchPlan> plan;
+        own::shared_owner<const PacketDispatchPlan> plan;
         IRenderDeviceServices* device{};
-        std::shared_ptr<TransientBufferPool> pool;
+        own::shared_owner<TransientBufferPool> pool;
         RHIBufferHandle arguments, ranges, packets, scratch;
         RHIBindingTable outputs;
         RHIBufferSlice constants, plans;
@@ -41,7 +42,8 @@ namespace material_graph
         mutable const EnhancedRenderGraph* graphOwner{};
         mutable uint64_t graphEpoch{};
 
-        ~PacketDispatchWork()
+        ~PacketDispatchWork() { ResetForReuse(); }
+        void ResetForReuse()
         {
             if (device)
             {
@@ -50,11 +52,29 @@ namespace material_graph
                     ReleaseSceneBuffer(*device, pool, buffer);
                 }
             }
+            // Immutable CPU shape survives GPU recording retirement.
+            arguments = {};
+            ranges = {};
+            packets = {};
+            scratch = {};
+            outputs = {};
+            constants = {};
+            plans = {};
+            values = {};
+            levels.clear();
+            slices.clear();
+            scratchWords = argumentWords = 0;
+            graphArguments = graphRanges = graphPackets = graphScratch = {};
+            graphOwner = nullptr;
+            graphEpoch = 0;
+            pool.reset();
+            device = nullptr;
         }
-        bool Prepare(IRenderDeviceServices& services, std::shared_ptr<TransientBufferPool> buffers, uint32_t inputCount,
-                     uint32_t capacity, std::span<const uint32_t> bucketCapacities, uint32_t width, uint32_t height,
-                     std::string_view name, std::string& error)
+        bool Prepare(IRenderDeviceServices& services, own::shared_owner<TransientBufferPool> buffers,
+                     uint32_t inputCount, uint32_t capacity, std::span<const uint32_t> bucketCapacities, uint32_t width,
+                     uint32_t height, std::string_view name, std::string& error)
         {
+            ResetForReuse();
             device = &services;
             pool = std::move(buffers);
             const auto caps = device->GetMeshShaderCapabilities();
@@ -78,12 +98,20 @@ namespace material_graph
             values.width = width;
             values.height = height;
             values.sliceCapacity = sliceCapacity;
-            auto& cache = PacketDispatchPlanCache::Current();
-            const auto hits = cache.Hits();
-            plan = cache.Acquire(capacity, dispatchWidth, sliceCapacity, bucketCapacities, error,
-                                 PacketDispatchPlanCache::Enabled());
-            ce::profile_instant(cache.Hits() != hits ? ce::marker<"MaterialPacketPlanReuse">()
-                                                     : ce::marker<"MaterialPacketPlanBuild">());
+            if (!plan || !PacketDispatchPlanCache::Enabled() ||
+                !plan->Matches(capacity, dispatchWidth, sliceCapacity, bucketCapacities))
+            {
+                auto& cache = PacketDispatchPlanCache::Current();
+                const auto hits = cache.Hits();
+                plan = cache.Acquire(capacity, dispatchWidth, sliceCapacity, bucketCapacities, error,
+                                     PacketDispatchPlanCache::Enabled());
+                ce::profile_instant(cache.Hits() != hits ? ce::marker<"MaterialPacketPlanReuse">()
+                                                         : ce::marker<"MaterialPacketPlanBuild">());
+            }
+            else
+            {
+                ce::profile_instant(ce::marker<"MaterialPacketPlanReuse">());
+            }
             if (!plan)
             {
                 return false;
@@ -202,8 +230,8 @@ namespace material_graph
                              static_cast<uint32_t>((groups + 65534) / 65535), 1);
         }
         template<class Owner, class InputUses, class BindInputs>
-        void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const Owner> owner,
-                     const std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6>& pipelines,
+        void Declare(EnhancedRenderGraph& graph, own::shared_owner<const Owner> owner,
+                     const std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6>& pipelines,
                      const std::string& name, bool tileWork, InputUses inputUses, BindInputs bindInputs) const
         {
             if (graphOwner == graph.DeclarationGraph() && graphEpoch == graph.DeclarationEpoch())
@@ -228,8 +256,8 @@ namespace material_graph
             graphScratch = import(scratch, ".Scan");
             struct Declaration
             {
-                std::shared_ptr<const Owner> owner;
-                std::array<std::shared_ptr<const LX::Runtime::ComputeGeneration>, 6> pipelines;
+                own::shared_owner<const Owner> owner;
+                std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> pipelines;
                 BindInputs bindInputs;
             };
             const auto* declaration =

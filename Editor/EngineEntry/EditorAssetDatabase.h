@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #pragma once
 
 #include "Core.Minimal.h"
@@ -126,5 +127,5 @@ private:
 
 	struct Impl;
     // Accepted scheduler work retains the authoring state without a GT wait.
-    std::shared_ptr<Impl> m_impl;
+    own::shared_owner<Impl> m_impl;
 };
