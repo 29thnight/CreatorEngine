@@ -19,7 +19,7 @@ namespace CreatorEngine;
 /// </summary>
 public sealed class SimulationScope
 {
-    private sealed class PendingDelay
+    private class PendingDelay
     {
         public float Remaining;
         public TaskCompletionSource<bool> Completion = null!;
@@ -38,6 +38,13 @@ public sealed class SimulationScope
         /// </summary>
         public CancellationTokenRegistration Registration;
 
+        public void DisposeRegistrations()
+        {
+            Registration.Dispose();
+            if (this is OperationPendingDelay operation)
+                operation.OperationRegistration.Dispose();
+        }
+
         /// <summary>
         /// 이 대기가 등록된 엔진 프레임 (LC7-b · 2026-09-05).
         ///
@@ -51,6 +58,13 @@ public sealed class SimulationScope
         /// 그 다음 줄의 것은 159 → 160.
         /// </summary>
         public ulong CreatedFrame;
+    }
+
+    // Keep the existing C# delay record size unchanged. Only independently
+    // cancellable operations pay for a second token registration.
+    private sealed class OperationPendingDelay : PendingDelay
+    {
+        public CancellationTokenRegistration OperationRegistration;
     }
 
     private CancellationTokenSource _cts = new();
@@ -82,7 +96,15 @@ public sealed class SimulationScope
     /// 하지 않는다(<see cref="PendingDelay.CreatedFrame"/>).
     /// </summary>
     /// <exception cref="ArgumentException">seconds가 NaN일 때.</exception>
-    public Task Delay(float seconds)
+    public Task Delay(float seconds) => Delay(seconds, CancellationToken.None);
+
+    /// <summary>
+    /// Engine-time delay additionally bounded by an owning structured operation.
+    /// Call and cancel the operation on the game thread. Cancellation only marks
+    /// completion; Tick retires the record, so callbacks never mutate _pending.
+    /// This also retires cancelled infinite waits on the following engine tick.
+    /// </summary>
+    public Task Delay(float seconds, CancellationToken cancellationToken)
     {
         // 만기 판정보다 앞에서 걸러야 한다. 뒤로 미루면 NaN은 0초와 같은 길로 가고
         // 그 길에는 이 값을 되돌아볼 자리가 없다.
@@ -97,20 +119,24 @@ public sealed class SimulationScope
 
         CancellationToken token = _cts.Token;
         if (token.IsCancellationRequested) return Task.FromCanceled(token);
+        if (cancellationToken.IsCancellationRequested) return Task.FromCanceled(cancellationToken);
 
-        var pending = new PendingDelay
-        {
-            Remaining = seconds,
-            Completion = new TaskCompletionSource<bool>(),
-            CreatedFrame = Native.FrameCount,
-        };
+        bool hasOperationToken = cancellationToken.CanBeCanceled && cancellationToken != token;
+        PendingDelay pending = hasOperationToken ? new OperationPendingDelay() : new PendingDelay();
+        pending.Remaining = seconds;
+        pending.Completion = new TaskCompletionSource<bool>();
+        pending.CreatedFrame = Native.FrameCount;
         _pending.Add(pending);
 
         // 등록을 레코드가 소유한다 — 정상 완료 시 Tick이 놓는다(LC3).
         // 위에서 이미 취소 여부를 확인했으므로 이 Register가 그 자리에서 콜백을
         // 실행하는 일은 없다. 만에 하나 그렇더라도 필드에는 기본값이 남고,
         // 기본 등록의 Dispose는 아무 일도 하지 않는다.
-        pending.Registration = token.Register(() => pending.Completion.TrySetCanceled(token));
+        pending.Registration = token.Register(static (state, cancelledToken) =>
+            ((PendingDelay)state!).Completion.TrySetCanceled(cancelledToken), pending);
+        if (pending is OperationPendingDelay operation)
+            operation.OperationRegistration = cancellationToken.Register(static (state, cancelledToken) =>
+                ((PendingDelay)state!).Completion.TrySetCanceled(cancelledToken), pending);
         return pending.Completion.Task;
     }
 
@@ -161,6 +187,15 @@ public sealed class SimulationScope
         {
             PendingDelay p = _pending[i];
 
+            // A child operation can cancel independently of the component scope.
+            // Retire cancelled waits even when their remaining duration is infinity.
+            if (p.Completion.Task.IsCompleted)
+            {
+                _pending.RemoveAt(i);
+                p.DisposeRegistrations();
+                continue;
+            }
+
             // 등록된 프레임에는 만기를 판정하지도, 시간을 흘리지도 않는다(LC7-b).
             // dt는 "등록 이후 흐른 시간"이어야 하는데 이 프레임의 dt는 등록보다
             // 앞선 구간까지 담고 있다. 이 한 줄이 없으면 Delay(0f)의 길이가 등록이
@@ -179,7 +214,7 @@ public sealed class SimulationScope
             //
             // 자기 콜백 안에서 부르는 Dispose는 교착하지 않는다 — 다른 스레드가
             // 실행 중일 때만 기다리는데, 이 목록은 게임 스레드 전용이다.
-            p.Registration.Dispose();
+            p.DisposeRegistrations();
             p.Completion.TrySetResult(true);
         }
     }
@@ -231,6 +266,11 @@ public sealed class SimulationScope
         }
 
         // ② 대기 목록 해제. 통지가 어떻게 끝났든 반드시 비운다.
+        // Operation tokens may outlive the engine scope. Drop their callbacks too.
+        foreach (PendingDelay pending in _pending)
+        {
+            pending.DisposeRegistrations();
+        }
         _pending.Clear();
 
         // ③ 토큰 폐기. Dispose는 등록 해제를 기다릴 수 있어 여기서도 막힐 수 있다.
