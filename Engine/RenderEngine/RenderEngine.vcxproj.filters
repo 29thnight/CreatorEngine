@@ -1799,4 +1799,33 @@
     <ClInclude Include="RenderArena.h" />
     <ClCompile Include="RenderArena.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphSubresources.cpp">
+      <Filter>Render\Graph</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\VulkanSharedDisplayImage.cpp">
+      <Filter>RHI\Vulkan\Resources</Filter>
+    </ClCompile>
+    <ClInclude Include="Render\Scene\LiveViewScheduling.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\Scene\PreparedViewInputPool.h">
+      <Filter>Render\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHISubresourceRange.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIExecutionPolicy.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\RHIDisplaySubmission.h">
+      <Filter>RHI\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\DX12SubresourceRange.h">
+      <Filter>RHI\DX12\Device</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\Vulkan\VulkanSharedDisplayImage.h">
+      <Filter>RHI\Vulkan\Resources</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>

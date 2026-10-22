@@ -15,8 +15,10 @@ namespace
     // 그리드가 만드는 깊이. 와이어프레임이 같은 깊이로 가려져야 한다.
     // 이 슬롯은 기여 노드끼리만 잇는다 — Core 어휘(LiveSlots)에 두지 않는다.
     constexpr const char* kGizmoDepthSlot = "Gizmo.Depth";
+    constexpr LiveResourceSlot<LiveResourceSemantic::Depth> kGizmoDepth{kGizmoDepthSlot, RHIFormat::D32Float,
+                                                                        LiveResourceExtent::Display, true};
 
-    /// 한 파이프라인 조립에 딸린 패스 묶음. 노드 람다들이 shared_ptr로
+    /// 한 뷰 실행 슬롯에 딸린 패스 묶음. 노드 람다들이 shared_owner로
     /// 붙들어 desc와 수명을 같이한다 — desc가 노드를 놓으면(ShutdownAll 뒤
     /// Clear) 묶음도 함께 사라진다.
     struct EditorOverlayPassBundle
@@ -27,6 +29,7 @@ namespace
         EnhancedGizmoLinePass gizmoLine;
         FrameCameraSnapshot displayCamera;
         EnhancedFrameContext displayContext;
+        bool wireframeEnabled{};
 
         const EnhancedFrameContext& DisplayContext(const EnhancedFrameContext& input)
         {
@@ -52,21 +55,35 @@ namespace
             return displayContext;
         }
     };
+
+    struct EditorOverlayPassStorage
+    {
+        std::vector<own::shared_owner<EditorOverlayPassBundle>> views;
+
+        EditorOverlayPassBundle& Get(uint32_t viewIndex) const { return *views.at(viewIndex); }
+    };
 }
 
 void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
     const RenderFeatureContext& context)
 {
-    auto bundle = std::make_shared<EditorOverlayPassBundle>();
-
-    // 포스트 체인 LDR 위에 직접 그리는 구조라 PSO의 RTV 포맷을 표적에
-    // 맞춰야 한다(어긋나면 커맨드 리스트 무효 → 디바이스 제거, 실측).
-    bundle->grid.SetOutputFormat(context.ldrFormat);
-    bundle->wireframe.SetOutputFormat(context.ldrFormat);
-    bundle->gizmoIcon.SetOutputFormat(context.ldrFormat);
-    bundle->gizmoLine.SetOutputFormat(context.ldrFormat);
-
-    const EnhancedGizmoSceneData* gizmoScene = context.gizmoScene;
+    if (!context.viewCount)
+    {
+        throw std::invalid_argument("Editor overlays require at least one view execution slot.");
+    }
+    own::shared_owner<EditorOverlayPassStorage> bundles = own::make_shared<EditorOverlayPassStorage>();
+    bundles->views.reserve(context.viewCount);
+    for (uint32_t view = 0; view < context.viewCount; ++view)
+    {
+        own::shared_owner<EditorOverlayPassBundle> bundle = own::make_shared<EditorOverlayPassBundle>();
+        bundle->grid.SetOutputFormat(context.ldrFormat);
+        bundle->wireframe.SetOutputFormat(context.ldrFormat);
+        bundle->gizmoIcon.SetOutputFormat(context.ldrFormat);
+        bundle->gizmoLine.SetOutputFormat(context.ldrFormat);
+        bundles->views.push_back(std::move(bundle));
+    }
+    const EnhancedGizmoSceneData* fallbackGizmoScene = context.gizmoScene;
+    const auto gizmoSceneForView = context.gizmoSceneForView;
 
     // ── 기즈모 체인 — dx12.gizmoscene과 같은 Grid → WireFrame → Icon → Line 순서.
     // 포스트 체인 LDR 위에 얹고 GBuffer 깊이로 가린다.
@@ -79,22 +96,26 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
     //   (꺼지면 슬롯 유지)이 그대로 성립한다.
     {
         LivePassNode node;
+        node.perView = true;
+        node.requiredViewFlags = LiveViewFlags::kSceneOverlay;
         node.name = "Grid";
-        node.prepare = [bundle](const EnhancedFrameContext& ctx, std::string& err, uint32_t)
+        node.prepare = [bundles](const EnhancedFrameContext& ctx, std::string& err, uint32_t viewIndex)
         {
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
             return bundle->grid.PrepareFrame(bundle->DisplayContext(ctx), err);
         };
-        node.instance = [bundle](uint32_t) -> EnhancedRenderPass*
+        node.instance = [bundles](uint32_t viewIndex) -> EnhancedRenderPass*
         {
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
             return &bundle->grid;
         };
-        node.reads = { LiveSlots::kGBufferDepth };
-        node.modifies = { LiveSlots::kDisplayLdr };
-        node.writes = { kGizmoDepthSlot };
-        node.declare = [bundle](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-            const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+        node.Inputs({LiveResources::kGBufferDepth});
+        node.Updates({LiveResources::kDisplayLdr});
+        node.Outputs({kGizmoDepth});
+        node.declare = [bundles](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
+                                 const LiveFrameBinding& binding)
         {
-            if (0 == (binding.viewFlags & LiveViewFlags::kSceneOverlay)) return;
+            EditorOverlayPassBundle* bundle = &bundles->Get(binding.viewIndex);
 
             EnhancedGridPass::Inputs inputs{};
             inputs.color = bb.Get(LiveSlots::kDisplayLdr);
@@ -117,14 +138,16 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
     //   이어받는다.
     {
         LivePassNode node;
+        node.perView = true;
+        node.requiredViewFlags = LiveViewFlags::kSceneOverlay;
         node.name = "WireFrame";
-        node.prepare = [bundle](const EnhancedFrameContext& ctx,
-            std::string& err, uint32_t) -> bool
+        node.prepare = [bundles](const EnhancedFrameContext& ctx, std::string& err, uint32_t viewIndex) -> bool
         {
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
             auto input = bundle->DisplayContext(ctx);
             const auto* gizmoRenderer = GizmoRenderer::GetActive();
-            if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay)
-                || !gizmoRenderer || !gizmoRenderer->IsWireFrameEnabled())
+            bundle->wireframeEnabled = gizmoRenderer && gizmoRenderer->IsWireFrameEnabled();
+            if (!bundle->wireframeEnabled)
             {
                 input.graphSceneInput.reset();
                 input.draws = nullptr;
@@ -132,24 +155,23 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
             }
             return bundle->wireframe.PrepareFrame(input, err);
         };
-        node.instance = [bundle](uint32_t) -> EnhancedRenderPass*
+        node.instance = [bundles](uint32_t viewIndex) -> EnhancedRenderPass*
         {
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
             return &bundle->wireframe;
         };
-        node.modifies = { LiveSlots::kDisplayLdr, kGizmoDepthSlot };
-        node.active = []()
+        node.Updates({LiveResources::kDisplayLdr, kGizmoDepth});
+        node.declare = [bundles](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
+                                 const LiveFrameBinding& binding)
         {
-            const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
-            return (nullptr != gizmoRenderer) && gizmoRenderer->IsWireFrameEnabled();
-        };
-        node.declare = [bundle](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-            const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
-        {
-            if (0 == (binding.viewFlags & LiveViewFlags::kSceneOverlay)) return;
+            EditorOverlayPassBundle* bundle = &bundles->Get(binding.viewIndex);
 
             // 그리드가 이 뷰에서 깊이를 발행하지 않았으면(비활성 등)
             // 와이어도 서지 않는다.
-            if (!bb.Get(kGizmoDepthSlot).IsValid()) return;
+            if (!bundle->wireframeEnabled || !bb.Get(kGizmoDepthSlot).IsValid())
+            {
+                return;
+            }
 
             EnhancedWireFramePass::Inputs inputs{};
             inputs.color = bb.Get(LiveSlots::kDisplayLdr);
@@ -170,31 +192,30 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
 
     {
         LivePassNode node;
+        node.perView = true;
+        node.requiredViewFlags = LiveViewFlags::kSceneOverlay;
         node.name = "GizmoIcon";
-        node.instance = [bundle](uint32_t) -> EnhancedRenderPass*
+        node.instance = [bundles](uint32_t viewIndex) -> EnhancedRenderPass*
         {
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
             return &bundle->gizmoIcon;
         };
-        node.modifies = { LiveSlots::kDisplayLdr };
+        node.Updates({LiveResources::kDisplayLdr});
         // 프레임마다 갱신되는 아이콘을 준비 직전에 물린다 — 예전
         // PreparePipelineFrame의 feed와 같은 시점(PrepareAll)이다.
-        node.prepare = [bundle, gizmoScene](const EnhancedFrameContext& ctx,
-            std::string& err, uint32_t) -> bool
+        node.prepare = [bundles, gizmoSceneForView, fallbackGizmoScene](const EnhancedFrameContext& ctx,
+                                                                        std::string& err, uint32_t viewIndex) -> bool
         {
-            if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay))
-            {
-                bundle->gizmoIcon.SetIcons(nullptr);
-            }
-            else if (nullptr != gizmoScene)
-            {
-                bundle->gizmoIcon.SetIcons(&gizmoScene->icons);
-            }
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
+            const EnhancedGizmoSceneData* gizmoScene =
+                gizmoSceneForView ? gizmoSceneForView(viewIndex) : fallbackGizmoScene;
+            bundle->gizmoIcon.SetIcons(gizmoScene ? &gizmoScene->icons : nullptr);
             return bundle->gizmoIcon.PrepareFrame(bundle->DisplayContext(ctx), err);
         };
-        node.declare = [bundle](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-            const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+        node.declare = [bundles](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
+                                 const LiveFrameBinding& binding)
         {
-            if (0 == (binding.viewFlags & LiveViewFlags::kSceneOverlay)) return;
+            EditorOverlayPassBundle* bundle = &bundles->Get(binding.viewIndex);
 
             EnhancedGizmoIconPass::Inputs inputs{};
             inputs.color = bb.Get(LiveSlots::kDisplayLdr);
@@ -210,29 +231,35 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
 
     {
         LivePassNode node;
+        node.perView = true;
+        node.requiredViewFlags = LiveViewFlags::kSceneOverlay;
         node.name = "GizmoLine";
-        node.instance = [bundle](uint32_t) -> EnhancedRenderPass*
+        node.instance = [bundles](uint32_t viewIndex) -> EnhancedRenderPass*
         {
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
             return &bundle->gizmoLine;
         };
-        node.modifies = { LiveSlots::kDisplayLdr };
-        node.prepare = [bundle, gizmoScene](const EnhancedFrameContext& ctx,
-            std::string& err, uint32_t) -> bool
+        node.Updates({LiveResources::kDisplayLdr});
+        node.prepare = [bundles, gizmoSceneForView, fallbackGizmoScene](const EnhancedFrameContext& ctx,
+                                                                        std::string& err, uint32_t viewIndex) -> bool
         {
-            if (0 == (ctx.viewFlags & LiveViewFlags::kSceneOverlay))
-            {
-                bundle->gizmoLine.SetVertices({});
-            }
-            else if (nullptr != gizmoScene)
+            EditorOverlayPassBundle* bundle = &bundles->Get(viewIndex);
+            const EnhancedGizmoSceneData* gizmoScene =
+                gizmoSceneForView ? gizmoSceneForView(viewIndex) : fallbackGizmoScene;
+            if (gizmoScene)
             {
                 bundle->gizmoLine.SetVertices(gizmoScene->lineVertices);
             }
+            else
+            {
+                bundle->gizmoLine.SetVertices({});
+            }
             return bundle->gizmoLine.PrepareFrame(bundle->DisplayContext(ctx), err);
         };
-        node.declare = [bundle](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-            const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
+        node.declare = [bundles](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext& ctx,
+                                 const LiveFrameBinding& binding)
         {
-            if (0 == (binding.viewFlags & LiveViewFlags::kSceneOverlay)) return;
+            EditorOverlayPassBundle* bundle = &bundles->Get(binding.viewIndex);
 
             EnhancedGizmoLinePass::Inputs inputs{};
             inputs.color = bb.Get(LiveSlots::kDisplayLdr);

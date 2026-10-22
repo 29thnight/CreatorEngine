@@ -235,6 +235,11 @@ namespace
                 ? m_renderer->OpenSharedTexture(sharedHandle, std::move(consumerLease)) : 0;
         }
 
+        RHIGpuPresentationCapabilities QueryGpuPresentationCapabilities() const override
+        {
+            return m_renderer ? m_renderer->QueryGpuPresentationCapabilities() : RHIGpuPresentationCapabilities{};
+        }
+
         void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
             const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) override
         {

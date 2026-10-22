@@ -1,5 +1,6 @@
 #pragma once
 #include "RHIHandle.h"
+#include "RHISubresourceRange.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
 
@@ -71,6 +72,12 @@ enum class RHIResourceState
     IndirectArgument,
     // Read-only buffer shared by indexed IA and mesh-shader vertex pulling.
     VertexAndShaderResource,
+    // Immutable shader reads across graphics and compute. A graphics queue
+    // establishes/restores this stable state around a complete reader fanout.
+    SharedShaderResource,
+    // A dedicated image owned by an external presentation API. Reacquisition
+    // discards its previous contents and must fully overwrite the image.
+    ExternalShared,
 };
 
 /// 전이 하나. 그래프 밖에서 상태를 바꿀 때 쓴다(그래프 안은 usage 선언이 한다).
@@ -84,6 +91,7 @@ struct RHITransition
     RHITextureHandle texture;
     RHIResourceState before{ RHIResourceState::Common };
     RHIResourceState after{ RHIResourceState::Common };
+    RHITextureSubresourceRange range{};
 };
 
 /// 버퍼 전이. 상태 어휘는 텍스처와 같지만 핸들 타입을 섞지 않는다.
@@ -94,6 +102,7 @@ struct RHIBufferTransition
     RHIBufferHandle buffer;
     RHIResourceState before{ RHIResourceState::Common };
     RHIResourceState after{ RHIResourceState::Common };
+    RHIBufferSubresourceRange range{};
 };
 
 /// 한 pass 앞에서 함께 제출할 resource barrier 묶음.

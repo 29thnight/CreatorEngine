@@ -1840,6 +1840,7 @@ RHITextureInfo VulkanDeviceResources::DescribeTexture(RHITextureHandle handle) c
     info.depthOrArraySize = entry.depthOrArraySize;
     info.mipLevels = entry.mipLevels;
     info.format = entry.format;
+    info.is3D = entry.is3D;
     return info;
 }
 
@@ -1863,7 +1864,8 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
     //   것과 같은 판단이 여기 한 번 더 있는 것이다.
     if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
-    std::vector<VkImageMemoryBarrier2> barriers;
+    static thread_local std::vector<VkImageMemoryBarrier2> barriers;
+    barriers.clear();
     barriers.reserve(transitions.size());
 
     for (const RHITransition& transition : transitions)
@@ -1889,12 +1891,20 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = entry.image;
-        barrier.subresourceRange.aspectMask = AspectOf(entry.format);
-        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+        barrier.subresourceRange =
+            ToVulkanSubresourceRange(transition.range, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                     entry.format, m_resourceTable.SupportsSeparateDepthStencilLayouts());
+        ApplyVulkanExternalImageOwnership(transition, entry.externalShared, entry.queueFamily, barrier);
 
         barriers.push_back(barrier);
-        m_resourceTable.SetLayout(transition.texture, after.layout);
+        RHITextureSubresourceRange resolved;
+        ResolveRHITextureSubresourceRange(transition.range, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                          RHITextureAspects(entry.format), resolved);
+        if (IsWholeRHITextureRange(resolved, entry.mipLevels, entry.is3D ? 1u : entry.depthOrArraySize,
+                                   RHITextureAspects(entry.format)))
+        {
+            m_resourceTable.SetLayout(transition.texture, after.layout);
+        }
     }
 
     if (barriers.empty()) return;
@@ -1915,7 +1925,8 @@ void VulkanDeviceResources::TransitionBuffers(
     if (!m_frameOpen || transitions.empty()) return;
     if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
-    std::vector<VkBufferMemoryBarrier2> barriers;
+    static thread_local std::vector<VkBufferMemoryBarrier2> barriers;
+    barriers.clear();
     barriers.reserve(transitions.size());
     for (const RHIBufferTransition& transition : transitions)
     {
@@ -1932,8 +1943,13 @@ void VulkanDeviceResources::TransitionBuffers(
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.buffer = entry.buffer;
-        barrier.offset = 0;
-        barrier.size = VK_WHOLE_SIZE;
+        RHIBufferSubresourceRange resolved;
+        if (!ResolveRHIBufferSubresourceRange(transition.range, entry.bytes, resolved))
+        {
+            throw std::invalid_argument("Vulkan buffer transition has an invalid range");
+        }
+        barrier.offset = resolved.offset;
+        barrier.size = resolved.size;
         barriers.push_back(barrier);
     }
 

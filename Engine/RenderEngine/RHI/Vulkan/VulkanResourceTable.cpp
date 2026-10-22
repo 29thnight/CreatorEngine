@@ -1,12 +1,165 @@
 #include "VulkanResourceTable.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
+#include "../RHIResourceTypes.h"
 
 using namespace VulkanApi;
+
+bool DescribeVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding,
+                             VulkanImageViewEntry& description)
+{
+    if (!image.IsValid())
+    {
+        return false;
+    }
+    description.format = binding.format == RHIFormat::Unknown ? image.format : binding.format;
+    if (image.format == RHIFormat::D32Float && description.format == RHIFormat::R32Float &&
+        binding.kind == RHIBindingDesc::Kind::ShaderResource)
+    {
+        description.format = image.format;
+    }
+    if (description.format != image.format)
+    {
+        return false;
+    }
+    RHITextureSubresourceRange requested;
+    requested.aspect = RHIFormatIsDepth(image.format) ? RHITextureAspect::Depth : RHITextureAspect::Color;
+    const uint32_t layers = image.is3D ? 1u : image.depthOrArraySize;
+    if (binding.dim == RHIBindingDesc::Dim::Default)
+    {
+        description.type = image.is3D   ? VK_IMAGE_VIEW_TYPE_3D
+                           : layers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                        : VK_IMAGE_VIEW_TYPE_2D;
+    }
+    else
+    {
+        requested.firstMip = binding.mostDetailedMip;
+        requested.mipCount = binding.mipLevels;
+        requested.firstLayer = binding.firstSlice;
+        requested.layerCount = binding.dim == RHIBindingDesc::Dim::TextureCube      ? 6u
+                               : binding.dim == RHIBindingDesc::Dim::Texture2DArray ? binding.sliceCount
+                                                                                    : 1u;
+        switch (binding.dim)
+        {
+        case RHIBindingDesc::Dim::Texture2D:
+            if (image.is3D)
+            {
+                return false;
+            }
+            description.type = VK_IMAGE_VIEW_TYPE_2D;
+            break;
+        case RHIBindingDesc::Dim::Texture2DArray:
+            if (image.is3D)
+            {
+                return false;
+            }
+            description.type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+            break;
+        case RHIBindingDesc::Dim::Texture3D:
+            if (!image.is3D)
+            {
+                return false;
+            }
+            description.type = VK_IMAGE_VIEW_TYPE_3D;
+            break;
+        case RHIBindingDesc::Dim::TextureCube:
+            if (image.is3D || image.width != image.height || binding.firstSlice % 6 != 0 ||
+                binding.kind != RHIBindingDesc::Kind::ShaderResource)
+            {
+                return false;
+            }
+            description.type = VK_IMAGE_VIEW_TYPE_CUBE;
+            break;
+        default:
+            return false;
+        }
+    }
+    return ResolveRHITextureSubresourceRange(requested, image.mipLevels, layers, RHITextureAspects(image.format),
+                                             description.range);
+}
+
+VkImageView ResolveVulkanImageView(const VulkanImageEntry& image, const RHIBindingDesc& binding)
+{
+    VulkanImageViewEntry requested;
+    if (!DescribeVulkanImageView(image, binding, requested))
+    {
+        return VK_NULL_HANDLE;
+    }
+    const VkImageViewType defaultType = image.is3D                   ? VK_IMAGE_VIEW_TYPE_3D
+                                        : image.depthOrArraySize > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                                                     : VK_IMAGE_VIEW_TYPE_2D;
+    if (requested.type == defaultType &&
+        IsWholeRHITextureRange(requested.range, image.mipLevels, image.is3D ? 1u : image.depthOrArraySize,
+                               RHITextureAspects(image.format)))
+    {
+        return image.view;
+    }
+    if (requested.type == VK_IMAGE_VIEW_TYPE_CUBE && image.cubeView != VK_NULL_HANDLE &&
+        image.cubeViewFormat == requested.format && image.cubeViewBaseMip == requested.range.firstMip &&
+        image.cubeViewMipLevels == requested.range.mipCount && image.cubeViewFirstSlice == requested.range.firstLayer)
+    {
+        return image.cubeView;
+    }
+    if (image.imageViews)
+    {
+        for (const VulkanImageViewEntry& view : image.imageViews->entries)
+        {
+            if (view.type == requested.type && view.format == requested.format && view.range == requested.range)
+            {
+                return view.view;
+            }
+        }
+    }
+    return VK_NULL_HANDLE;
+}
+
+VkImageView VulkanResourceTable::GetOrCreateImageView(VkDevice device, const RHIBindingDesc& binding)
+{
+    const std::lock_guard lock(m_imageRegistryMutex);
+    Slot<VulkanImageEntry>* const slot = Find(m_images, binding.resource.id);
+    if (!slot || device == VK_NULL_HANDLE)
+    {
+        return VK_NULL_HANDLE;
+    }
+    VulkanImageEntry& image = slot->entry;
+    if (const VkImageView found = ResolveVulkanImageView(image, binding); found != VK_NULL_HANDLE)
+    {
+        return found;
+    }
+    VulkanImageViewEntry view;
+    if (!DescribeVulkanImageView(image, binding, view))
+    {
+        return VK_NULL_HANDLE;
+    }
+    auto cache = image.imageViews ? own::make_shared<VulkanImageViewCache>(*image.imageViews)
+                                  : own::make_shared<VulkanImageViewCache>();
+    cache->entries.reserve(cache->entries.size() + 1);
+    VkImageViewCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    info.image = image.image;
+    info.viewType = view.type;
+    info.format = ToVulkan(view.format);
+    info.subresourceRange = ToVulkanSubresourceRange(view.range, image.mipLevels,
+                                                     image.is3D ? 1u : image.depthOrArraySize, image.format, true);
+    if (vkCreateImageView(device, &info, nullptr, &view.view) != VK_SUCCESS)
+    {
+        return VK_NULL_HANDLE;
+    }
+    cache->entries.push_back(view);
+    image.imageViews = std::move(cache);
+    return view.view;
+}
 
 void VulkanResourceTable::DestroyImage(VkDevice device, VulkanImageEntry& entry)
 {
     if (VK_NULL_HANDLE == device) return;
+    if (entry.imageViews)
+    {
+        for (const VulkanImageViewEntry& view : entry.imageViews->entries)
+        {
+            vkDestroyImageView(device, view.view, nullptr);
+        }
+        entry.imageViews.reset();
+    }
 
     // ★ 순서가 있다. 뷰가 이미지에 붙은 객체라 이미지보다 먼저 죽어야 하고,
     //   메모리는 이미지가 놓인 뒤라야 자유롭다. DX12 는 ComPtr 한 번이라
@@ -21,6 +174,14 @@ void VulkanResourceTable::DestroyImage(VkDevice device, VulkanImageEntry& entry)
 
 void VulkanResourceTable::DestroyOwnedCubeView(VkDevice device, VulkanImageEntry& entry)
 {
+    if (device != VK_NULL_HANDLE && entry.imageViews)
+    {
+        for (const VulkanImageViewEntry& view : entry.imageViews->entries)
+        {
+            vkDestroyImageView(device, view.view, nullptr);
+        }
+        entry.imageViews.reset();
+    }
     if (VK_NULL_HANDLE != device && entry.ownsCubeView &&
         VK_NULL_HANDLE != entry.cubeView)
     {

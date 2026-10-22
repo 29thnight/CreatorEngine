@@ -394,7 +394,15 @@ private:
     /// resource table의 전역 layout을 worker들이 동시에 갱신할 수 없다 —
     /// descriptor는 자기 command buffer 앞에 기록된 barrier와 정확히 같은
     /// layout을 써야 한다.
-    std::unordered_map<uint32_t, VkImageLayout> m_recordedImageLayouts;
+    struct RecordedImageLayout
+    {
+        RHITextureHandle texture;
+        RHITextureSubresourceRange range;
+        VkImageLayout layout{VK_IMAGE_LAYOUT_UNDEFINED};
+    };
+    VkImageLayout GetRecordedImageLayout(RHITextureHandle texture, const RHITextureSubresourceRange& range,
+                                         VkImageLayout fallback) const;
+    std::vector<RecordedImageLayout> m_recordedImageLayouts;
 
     /// 지금 걸린 파이프라인이 구워진 셋 레이아웃과 그 레이아웃 핸들 (5c-4d).
     /// 앞엣것은 셋을 **할당**하는 데, 뒤엣것은 슬롯 번호를 **binding 번호로

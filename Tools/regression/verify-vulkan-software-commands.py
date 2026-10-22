@@ -4,7 +4,11 @@
 The Vulkan command pool, recording snapshot, validator, encoder, upload/descriptor
 allocators, resource/pipeline registries, common recorder/translator/FIFO and
 JobScheduler/enkiTS are the actual source. Vulkan function pointers are CPU mocks;
-this does not run a Vulkan device or validate rendered pixels. A mirrored header
+this does not run a Vulkan device or validate rendered pixels. Shared-image
+construction and rollback use the actual VulkanSharedDisplayImage implementation;
+D3D12/DXGI/WRL declarations and calls are CPU mocks, not a Windows SDK or COM ABI
+validation. DX12 exact subresource lowering uses the same declared native boundary.
+A mirrored header
 excludes unrelated texture-cache declarations/COM and trailing mesh declarations.
 One pre-existing GCC aggregate assignment is spelled with its explicit type in
 that mirror. Windows handle/environment/debug calls and the Win32 profiler's
@@ -30,14 +34,16 @@ RHI = Path('Engine/RenderEngine/RHI')
 VK = RHI / 'Vulkan'
 CPP = [VK / (name + '.cpp') for name in (
     'VulkanRecordingResources', 'VulkanSoftwareCommandValidator', 'VulkanEncoder',
-    'VulkanCommandBufferPool', 'VulkanFrameAllocators', 'VulkanResourceTable', 'VulkanPipelineCache')]
+    'VulkanCommandBufferPool', 'VulkanFrameAllocators', 'VulkanResourceTable', 'VulkanPipelineCache',
+    'VulkanSharedDisplayImage')]
 CPP += [RHI / (name + '.cpp') for name in (
     'RHICommandTranslator', 'RHISoftwareCommandList', 'RHISoftwareEncoder',
     'RHISoftwareBatch', 'RHISoftwareRecorder', 'RHISubmissionThread', 'RHIDeviceMemoryBudgetCoordinator')]
 CPP += [Path('Engine/RenderEngine/RenderArena.cpp'), Path('Engine/Utility_Framework/JobScheduler.cpp'),
         Path('Engine/Utility_Framework/ThreadPool.cpp')]
 DEVICE_METHODS = ('Initialize', 'Shutdown', 'PrepareParallelSubmission', 'AcceptParallelSubmission',
-                  'RejectNeverEnqueuedRecording', 'SubmitParallelCommandBuffers')
+                  'RejectNeverEnqueuedRecording', 'SubmitParallelCommandBuffers', 'FindMemoryType')
+SERVICE_METHODS = ('ReleaseTexture', 'DescribeTexture')
 
 
 def balanced_end(text, begin):
@@ -116,11 +122,14 @@ inline profiler_service& profiler() { static profiler_service value; return valu
 '''
             adaptations[str(path.relative_to(root))] = 'No-op Win32 profiler thread-name registration boundary only; CE_SHIPPING removes profile events.'
         adapted[path] = text
-        for include in re.findall(r'^\s*#\s*include\s*"([^"]+)"', text, re.M):
+        includes = re.findall(r'^\s*#\s*include\s*"([^"]+)"', text, re.M)
+        includes += re.findall(r'^\s*#\s*include\s*<(mathematics/[^>]+)>', text, re.M)
+        for include in includes:
             if include == 'vulkan_device_boundary.inc':
                 continue
             candidates = (path.parent / include, root / include,
-                          root / 'Engine/Utility_Framework' / include)
+                          root / 'Engine/Utility_Framework' / include,
+                          root / 'ThirdParty/Mathematics/include' / include)
             found = next((candidate.resolve() for candidate in candidates if candidate.is_file()), None)
             if found is None:
                 raise RuntimeError(f'unresolved include {include} in {path}')
@@ -133,20 +142,26 @@ inline profiler_service& profiler() { static profiler_service value; return valu
     device_source = snapshots[source].decode('utf-8-sig')
     methods = []
     body_hashes = {}
-    for method in DEVICE_METHODS:
-        match = re.search(r'(?:bool|void) VulkanDeviceResources::' + method + r'\(', device_source)
-        assert match
-        end = balanced_end(device_source, device_source.index('{', match.start()))
-        body = device_source[match.start():end]
-        methods.append(body)
-        body_hashes[method] = hashlib.sha256(body.encode()).hexdigest()
+    services_source = root / VK / 'VulkanRenderServices.cpp'
+    snapshots[services_source] = services_source.read_bytes()
+    for source_text, names in ((device_source, DEVICE_METHODS),
+                              (snapshots[services_source].decode('utf-8-sig'), SERVICE_METHODS)):
+        for method in names:
+            match = re.search(r'\w+ VulkanDeviceResources::' + method + r'\(', source_text)
+            assert match, f'could not extract native method {method}'
+            end = balanced_end(source_text, source_text.index('{', match.start()))
+            body = source_text[match.start():end]
+            if source_text[end:end + 6] == ' const':
+                raise RuntimeError('method extraction missed a const qualifier')
+            methods.append(body)
+            body_hashes[method] = hashlib.sha256(body.encode()).hexdigest()
     # Uncalled device/WSI endpoints fail explicitly at the mock boundary.
     clean = re.sub(r'//[^\n]*|/\*.*?\*/', '', device_header, flags=re.S)
     stubs = []
     for match in re.finditer(r'([\w:<>*&\s]+?)\s+([\w~]+)\s*\(([^;{}]*)\)\s*(const\s*)?override\s*;', clean):
         result, name, parameters, qualifier = match.groups()
         result = result.strip().split('\n')[-1].strip()
-        if name in DEVICE_METHODS or name in ('~VulkanDeviceResources', 'GetCompletedFenceValue', 'FlushCommandList'):
+        if name in DEVICE_METHODS + SERVICE_METHODS or name in ('~VulkanDeviceResources', 'GetCompletedFenceValue', 'FlushCommandList'):
             continue
         parameters = re.sub(r'\s*=\s*[^,)]*', '', parameters)
         stubs.append(f'{result} VulkanDeviceResources::{name}({parameters}) {qualifier or ""}'
@@ -177,10 +192,17 @@ inline profiler_service& profiler() { static profiler_service value; return valu
 #define CALLBACK
 using HANDLE=void*; using HINSTANCE=void*; using HWND=void*; using HMONITOR=void*;
 using LPCWSTR=const wchar_t*; using DWORD=uint32_t;
+struct LUID { uint32_t LowPart; int32_t HighPart; };
 struct SECURITY_ATTRIBUTES;
 inline DWORD GetEnvironmentVariableA(const char*, char*, DWORD) { return 0; }
 inline void OutputDebugStringA(const char*) {}
 ''')
+        interop = root / 'Tools/regression/fixtures/rhi-d3d12-interop-boundary.h'
+        (include / interop.name).write_bytes(snapshots[interop])
+        for native_header in ('d3d12.h', 'dxgi1_6.h', 'wrl/client.h'):
+            destination = include / native_header
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text('#include "rhi-d3d12-interop-boundary.h"\n')
         for path, data in list(snapshots.items()):
             if path.is_relative_to(sdk):
                 out = include / path.relative_to(sdk)
@@ -205,6 +227,7 @@ inline void mi_free(void* p) { std::free(p); }
                    '-DCE_SHIPPING=1', '-DCE_DX_TIMING_CAPTURE=0', '-Wall', '-Wextra',
                    '-Wno-unused-parameter', '-Wno-missing-field-initializers', '-Wno-unknown-pragmas',
                    '-I', str(include), '-I', str(mirror), '-I', str(mirror / 'Engine/Utility_Framework'),
+                   '-I', str(mirror / 'ThirdParty/Mathematics/include'),
                    str(mirror / probe.relative_to(root))]
         command += [str(mirror / path) for path in CPP]
         command += [str(include / 'enkiTS/TaskScheduler.cpp'), '-o', str(executable)]

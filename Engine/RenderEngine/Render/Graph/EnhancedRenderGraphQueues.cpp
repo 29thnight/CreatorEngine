@@ -1,6 +1,7 @@
 #include "../../../Utility_Framework/LifetimeToken.h"
 #include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/RHIProfilingContext.h"
 #include <stdint.h>
@@ -59,15 +60,17 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             {
                 *diagnostic = output;
                 diagnostic->completion = {}; // Diagnostic snapshots never retain native fence ownership.
+                diagnostic->retirement.Reset();
             }
         }
     } cpu{output};
     if (!self || self.operator->() != this || !owner || !m_queueLease.expired() || m_queueExecutionAttempted ||
-        m_statesCommitted || m_recordedRecording != 0 || m_preparedPool || m_aliasing || (m_profiler && compute && (!graphics.profiler || !compute->profiler)) ||
+        m_statesCommitted || m_recordedRecording != 0 || m_preparedPool ||
+        (m_profiler && compute && (!graphics.profiler || !compute->profiler)) ||
         m_scheduling != RGSchedulingMode::ExplicitVersioned || &recorder.DeviceServices() != m_deviceServices ||
         !graphics.queue || graphics.queue->GetIdentity().kind != RHIQueueKind::Graphics)
     {
-        outError = "Queue execution requires a fresh owned versioned graph, matching services, pinned storage and nonaliased resources";
+        outError = "Queue execution requires a fresh owned versioned graph, matching services and pinned storage";
         return false;
     }
     if (compute && ((graphics.profiler != nullptr) != (compute->profiler != nullptr) ||
@@ -168,13 +171,17 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         m_executeOrderOverridden = true;
         UpdateResourceUses();
         ce::dynamic_bitset retainedGraphicsTextures(m_resources.size(), false);
+        ce::dynamic_bitset sharedReadTextures(m_resources.size(), false);
         for (size_t index = 0; index < m_resources.size(); ++index)
         {
             const auto& resource = m_resources[index];
             if (resource.used && !resource.IsBuffer())
             {
-                retainedGraphicsTextures.set(index, m_deviceServices->DescribeTexture(resource.handle).
-                    retainsExplicitStateOnGraphicsQueue);
+                const bool external = resource.initialState == RHIResourceState::ExternalShared ||
+                                      resource.state == RHIResourceState::ExternalShared;
+                retainedGraphicsTextures.set(
+                    index,
+                    external || m_deviceServices->DescribeTexture(resource.handle).retainsExplicitStateOnGraphicsQueue);
             }
         }
         const auto rejectComputeUses = [&](std::span<const RGPassUsage> usages)
@@ -199,7 +206,25 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                 }
             }
         }
-        PlanBarriers(&batchEnds, &prologue, &epilogue, &retainedGraphicsTextures);
+        for (uint16_t index = 0; index < m_resources.size(); ++index)
+        {
+            if (!CanShareTextureReads(index))
+            {
+                continue;
+            }
+            bool graphicsRead = false, computeRead = false;
+            for (const auto& entry : plan.entries)
+            {
+                if (std::ranges::any_of(m_passes[entry.pass].usages,
+                                        [&](const auto& usage) { return usage.handle.index == index; }))
+                {
+                    graphicsRead |= entry.queue == RHIQueueKind::Graphics;
+                    computeRead |= entry.queue == RHIQueueKind::Compute;
+                }
+            }
+            sharedReadTextures.set(index, graphicsRead && computeRead);
+        }
+        PlanBarriers(&batchEnds, &prologue, &epilogue, &retainedGraphicsTextures, &sharedReadTextures);
     }
     diagnostic.specialized = true;
     diagnostic.schedule = plan;
@@ -636,6 +661,39 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             return false;
         }
     }
+    // Software-to-native translation may schedule producer worker jobs. Finish
+    // every batch before entering the RHI submission task or issuing GPU waits.
+    // A preparation failure therefore cannot leave an accepted GPU prefix.
+    try
+    {
+        for (const auto& recording : recordings)
+        {
+            output.failure.Reset();
+            output.failure.stage = RHICommandFailureStage::Translation;
+            output.failure.recordingId = recording.batch->GetRecordingId();
+            RHICommandFailureScope failureScope{output.failure};
+            if (!recorder.PrepareSubmissionBatch(recording.endpoint->queue, recording.batch, outError))
+            {
+                if (output.failure.message.empty())
+                {
+                    output.failure.message = outError;
+                }
+                return false;
+            }
+        }
+    }
+    catch (const std::exception& exception)
+    {
+        outError = std::string("Queue submission preparation failed: ") + exception.what();
+        output.failure.message = outError;
+        return false;
+    }
+    catch (...)
+    {
+        outError = "Queue submission preparation failed with an unknown exception";
+        output.failure.message = outError;
+        return false;
+    }
     // No callbacks or allocation of recordings/diagnostics after submission begins.
     cpu.FinishPhase();
     cpu.phase = CpuReport::Phase::Submit;
@@ -683,6 +741,11 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                     return false;
                 }
                 ++endpoint.nextSignal;
+                if (!output.retirement.Add(points[index]))
+                {
+                    error = "Accepted queue batch did not provide a valid retirement point";
+                    return false;
+                }
                 diagnostic.batches[index].submitted = true;
                 ++output.submittedBatches;
                 output.computeBatches += diagnostic.batches[index].queue == RHIQueueKind::Compute ? 1u : 0u;

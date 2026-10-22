@@ -1,6 +1,7 @@
 #pragma once
 #include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
+#include "LiveViewScheduling.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../../RHI/RHICommandProvenance.h"
@@ -177,6 +178,8 @@ struct EnhancedLiveViewPacket
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
     std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    LiveViewUpdatePolicy updatePolicy{};
+    uint64_t contentRevision{};
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -189,6 +192,10 @@ struct EnhancedLiveViewRequest
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
     std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    LiveViewUpdatePolicy updatePolicy{};
+    // OnDemand 뷰의 입력이 바뀔 때 Host가 올린다. historyRevision은
+    // 카메라 history의 신원이므로 일반 dirty 표시와 별개로 유지한다.
+    uint64_t contentRevision{};
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
@@ -1001,14 +1008,16 @@ namespace EnhancedSceneRenderer
     void SetGizmoIconTextures(
         own::shared_owner<const EnhancedGizmoIconTextures> textures);
 
-    /// Host가 파이프라인 조립 기여자를 설치한다(E4-2, §4.4). 파이프라인이
-    /// 설 때마다 UI 노드 뒤·live_present 앞에서 Contribute가 불린다.
+    /// Host 기여자 목록을 교체한다. 각 기여자는 AfterOpaque,
+    /// BeforePostProcess, BeforePresent 중 하나의 지점을 선언한다.
     /// 조립은 RenderThread에서 일어나므로 Editor는 렌더러 초기화 전에
     /// 설치해야 첫 조립부터 실린다. Player는 설치하지 않는다.
     /// 해제({})는 이후 조립에만 영향을 준다 — 살아 있는 파이프라인의 기여
     /// 노드는 기여자가 아니라 자기 패스 묶음을 붙들므로 안전하다.
     void SetRenderFeatureContributor(
         own::shared_owner<IRenderFeatureContributor> contributor);
+    bool AddRenderFeatureContributor(own::shared_owner<IRenderFeatureContributor> contributor, std::string& outError);
+    bool RemoveRenderFeatureContributor(std::string_view name);
 
     /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
     /// GetLiveDisplayTexture의 ID 해석이 이 sink를 소비한다 — Core는

@@ -6,6 +6,12 @@
 #include "../../Engine/RenderEngine/RHI/RHIParallelCommandPool.h"
 #include "../../Engine/RenderEngine/RHI/RHISoftwareRecorder.h"
 #include "../../Engine/RenderEngine/RHI/RHISubmissionThread.h"
+#if __has_include("../../Engine/RenderEngine/RHI/RHIDisplaySubmission.h")
+#include "../../Engine/RenderEngine/RHI/RHIDisplaySubmission.h"
+#define CE_RHI_DISPLAY_SUBMISSION_PROOF 1
+#else
+#define CE_RHI_DISPLAY_SUBMISSION_PROOF 0
+#endif
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
@@ -325,7 +331,7 @@ namespace
         uint32_t m_spin{};
         uint32_t m_worker{UINT32_MAX};
         bool m_trackLifetime{};
-        std::weak_ptr<const void> m_lifetime;
+        ce::weak_lifetime_token m_lifetime;
         std::atomic<uint32_t>* m_active{};
 
         void Feed(uint64_t kind, uint64_t first = 0, uint64_t second = 0, uint64_t third = 0)
@@ -671,12 +677,11 @@ namespace
         }
     }
 
-    RHISoftwareBatch record_batch(RHISoftwareRecorder& recorder, const BatchSpec& spec,
-                                  std::shared_ptr<const void> owner = {})
+    RHISoftwareBatch record_batch(RHISoftwareRecorder& recorder, const BatchSpec& spec, ce::lifetime_token owner = {})
     {
         if (!owner)
         {
-            static const auto defaultOwner = std::make_shared<uint32_t>(1);
+            static const auto defaultOwner = own::make_shared<uint32_t>(1);
             owner = defaultOwner;
         }
         std::string error;
@@ -794,8 +799,8 @@ namespace
                             spec.skew = pattern == 2 ? 73 : 0;
                             spec.reverse = pattern != 0;
                             const auto expected = expected_digests(spec);
-                            auto owner = std::make_shared<uint64_t>(71);
-                            std::weak_ptr<const void> lifetime(owner);
+                            auto owner = own::make_shared<uint64_t>(71);
+                            ce::weak_lifetime_token lifetime(owner);
                             pool.Reset();
                             for (auto& encoder : pool.m_encoders)
                             {
@@ -861,8 +866,8 @@ namespace
             pool.Reset();
             services.m_uploadRecordingId = 41;
             services.m_descriptorVersion = 17;
-            auto owner = std::make_shared<uint32_t>(7);
-            std::weak_ptr<const void> lifetime(owner);
+            auto owner = own::make_shared<uint32_t>(7);
+            ce::weak_lifetime_token lifetime(owner);
             for (auto& encoder : pool.m_encoders)
             {
                 encoder.m_trackLifetime = true;
@@ -986,8 +991,8 @@ namespace
         batch = record_batch(recorder, spec);
         require(translator.Translate(std::move(batch), parallel, translated, failure), failure.message.c_str());
         const auto retainedCount = translated.GetTranslationStats().commandCount;
-        auto rejectedOwner = std::make_shared<uint32_t>(1);
-        std::weak_ptr<const void> rejectedLifetime(rejectedOwner);
+        auto rejectedOwner = own::make_shared<uint32_t>(1);
+        ce::weak_lifetime_token rejectedLifetime(rejectedOwner);
         batch = record_batch(recorder, spec, rejectedOwner);
         rejectedOwner.reset();
         require(!translator.Translate(std::move(batch), parallel, translated, failure) && translated.IsValid() &&
@@ -1044,7 +1049,7 @@ namespace
         desc.queue = spec.queue;
         desc.uploadRecordingId = 41;
         desc.descriptorVersion = 17;
-        desc.lifetimeToken = std::make_shared<uint32_t>(1);
+        desc.lifetimeToken = own::make_shared<uint32_t>(1);
         const std::array<uint32_t, 8> reverse{7, 6, 5, 4, 3, 2, 1, 0};
         require(recorder.FinishRecording(reverse, desc, batch, error), error.c_str());
         require(translator.Translate(std::move(batch), parallel, translated, failure), failure.message.c_str());
@@ -1174,8 +1179,8 @@ namespace
             ++g_scenarios;
             RHISubmissionThread submission(bytes - 1);
             ProbeDevice device;
-            auto pool = std::make_shared<ProbePool>(scheduler);
-            auto translator = std::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
+            auto pool = own::make_shared<ProbePool>(scheduler);
+            auto translator = own::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
             std::string error;
             require(submission.AcquireClient(&device, error), error.c_str());
             auto batch = record_batch(recorder, spec);
@@ -1200,16 +1205,16 @@ namespace
             RHISubmissionThread submission(bytes);
             ProbeDevice device;
             ReplayGate gate;
-            auto firstPool = std::make_shared<ProbePool>(scheduler);
-            auto nextPool = std::make_shared<ProbePool>(scheduler);
+            auto firstPool = own::make_shared<ProbePool>(scheduler);
+            auto nextPool = own::make_shared<ProbePool>(scheduler);
             nextPool->m_completion = 1;
-            auto firstTranslator = std::make_shared<GatedTranslator>(*firstPool, services, gate);
-            auto nextTranslator = std::make_shared<RHICommandTranslator>(*nextPool, services, spec.queue);
+            auto firstTranslator = own::make_shared<GatedTranslator>(*firstPool, services, gate);
+            auto nextTranslator = own::make_shared<RHICommandTranslator>(*nextPool, services, spec.queue);
             std::string error;
             require(submission.AcquireClient(&device, error), error.c_str());
-            auto firstOwner = std::make_shared<uint32_t>(1);
-            auto nextOwner = std::make_shared<uint32_t>(2);
-            std::weak_ptr<const void> firstLifetime(firstOwner), nextLifetime(nextOwner);
+            auto firstOwner = own::make_shared<uint32_t>(1);
+            auto nextOwner = own::make_shared<uint32_t>(2);
+            ce::weak_lifetime_token firstLifetime(firstOwner), nextLifetime(nextOwner);
             auto first = record_batch(recorder, spec, firstOwner);
             auto next = record_batch(recorder, spec, nextOwner);
             firstOwner.reset();
@@ -1276,7 +1281,60 @@ namespace
             require(nextLifetime.expired(), "Completed second fence retained its native lease.");
             submission.ReleaseClient(&device);
         }
-        // A different owner's running work keeps two software entries queued.
+        // A translating owner cannot occupy the native submission thread. An
+        // unrelated owner progresses, while that owner's tail remains ordered.
+        {
+            ++g_scenarios;
+            RHISubmissionThread submission(bytes);
+            ProbeDevice device;
+            int unrelatedOwner{};
+            ReplayGate gate;
+            auto pool = own::make_shared<ProbePool>(scheduler);
+            auto translator = own::make_shared<GatedTranslator>(*pool, services, gate);
+            std::string error;
+            require(submission.AcquireClient(&device, error), error.c_str());
+            require(submission.AcquireClient(&unrelatedOwner, error), error.c_str());
+            auto batch = record_batch(recorder, spec);
+            RHISubmissionTicket translating, tail, unrelated;
+            require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), translating,
+                                                    error),
+                    error.c_str());
+            const bool entered = gate.WaitEntered();
+            bool tailSawSubmission{};
+            require(submission.Enqueue(
+                        &device, "ordered owner tail",
+                        [&](std::string&)
+                        {
+                            tailSawSubmission = translating.IsComplete();
+                            return true;
+                        },
+                        tail, error),
+                    error.c_str());
+            require(submission.Enqueue(
+                        &unrelatedOwner, "unrelated native submission", [](std::string&) { return true; }, unrelated,
+                        error),
+                    error.c_str());
+            const bool progressed = wait_observed([&] { return unrelated.IsComplete(); });
+            const bool ordered = !tail.IsComplete() && !translating.IsComplete();
+            gate.Open();
+            require(submission.Wait(translating, error) && submission.Wait(tail, error) &&
+                        submission.Wait(unrelated, error),
+                    error.c_str());
+            require(entered && progressed && ordered && tailSawSubmission && submission.GetStats().orderingErrors == 0,
+                    "Translation blocked unrelated native work or allowed same-owner overtaking.");
+#if CE_RHI_DISPLAY_SUBMISSION_PROOF
+            require(PollRHIDisplaySubmission(translating, tail) == RHIDisplaySubmissionStatus::Succeeded &&
+                        PollRHIDisplaySubmission(tail, tail) == RHIDisplaySubmissionStatus::Succeeded,
+                    "Successful graph and tail tickets did not establish CPU publication proof.");
+            require(PollRHIDisplaySubmission({}, tail) == RHIDisplaySubmissionStatus::Failed &&
+                        PollRHIDisplaySubmission(translating, {}) == RHIDisplaySubmissionStatus::Failed,
+                    "A missing submission ticket established CPU publication proof.");
+#endif
+            device.m_completed.store(1);
+            submission.ReleaseClient(&unrelatedOwner);
+            submission.ReleaseClient(&device);
+        }
+        // A blocked translation keeps two software entries queued.
         // Device-loss cancellation must destroy those captures before byte credit
         // wakes an unrelated producer, and must reject a same-owner waiter.
         for (const bool sameOwner : {false, true})
@@ -1286,6 +1344,7 @@ namespace
             ProbeDevice device;
             int blockingOwner{}, cancelledOwner{}, waitingOwner{};
             ReplayGate gate;
+            ReplayGate translationGate;
             ReplayGate destructionGate;
             std::atomic<bool> destructionCompleted{};
             std::string error;
@@ -1303,15 +1362,15 @@ namespace
                         blocker, error),
                     error.c_str());
             const bool entered = gate.WaitEntered();
-            auto firstPool = std::make_shared<ProbePool>(scheduler);
-            auto nextPool = std::make_shared<ProbePool>(scheduler);
-            auto waitingPool = std::make_shared<ProbePool>(scheduler);
-            auto firstTranslator = std::make_shared<RHICommandTranslator>(*firstPool, services, spec.queue);
-            auto nextTranslator = std::make_shared<RHICommandTranslator>(*nextPool, services, spec.queue);
-            auto waitingTranslator = std::make_shared<RHICommandTranslator>(*waitingPool, services, spec.queue);
-            auto firstOwner = std::make_shared<GatedDestruction>(destructionGate, destructionCompleted);
-            auto nextOwner = std::make_shared<uint32_t>(2);
-            std::weak_ptr<const void> firstLifetime(firstOwner), nextLifetime(nextOwner);
+            auto firstPool = own::make_shared<ProbePool>(scheduler);
+            auto nextPool = own::make_shared<ProbePool>(scheduler);
+            auto waitingPool = own::make_shared<ProbePool>(scheduler);
+            auto firstTranslator = own::make_shared<GatedTranslator>(*firstPool, services, translationGate);
+            auto nextTranslator = own::make_shared<RHICommandTranslator>(*nextPool, services, spec.queue);
+            auto waitingTranslator = own::make_shared<RHICommandTranslator>(*waitingPool, services, spec.queue);
+            auto firstOwner = own::make_shared<GatedDestruction>(destructionGate, destructionCompleted);
+            auto nextOwner = own::make_shared<uint32_t>(2);
+            ce::weak_lifetime_token firstLifetime(firstOwner), nextLifetime(nextOwner);
             auto first = record_batch(recorder, spec, firstOwner);
             auto next = record_batch(recorder, spec, nextOwner);
             auto waiting = record_batch(recorder, spec);
@@ -1324,6 +1383,7 @@ namespace
             RHISubmissionTicket firstTicket, nextTicket, waitingTicket;
             const bool admittedFirst = submission.EnqueueSoftwareBatch(
                 &cancelledOwner, device, firstPool, firstTranslator, std::move(first), firstTicket, error);
+            const bool translationEntered = translationGate.WaitEntered();
             const bool admittedNext = submission.EnqueueSoftwareBatch(&cancelledOwner, device, nextPool, nextTranslator,
                                                                       std::move(next), nextTicket, error);
             bool waitingAdmitted{};
@@ -1350,6 +1410,9 @@ namespace
             bool cancelled{};
             std::thread cancellation(
                 [&] { cancelled = submission.AbandonForDeviceError(&cancelledOwner, abandoned, error); });
+            const bool removedBeforeDestruction =
+                wait_observed([&] { return submission.GetOwnerStats(&cancelledOwner).pendingTasks == 0; });
+            translationGate.Open();
             const bool destructorEntered = destructionGate.WaitEntered();
             const auto destroying = submission.GetStats();
             const bool prematureAdmission = !sameOwner && producerReturned.load();
@@ -1359,7 +1422,8 @@ namespace
             const auto after = submission.GetStats();
             gate.Open();
             const bool blockerCompleted = submission.Wait(blocker, error);
-            require(entered && admittedFirst && admittedNext && waited && before.pendingSoftwareBytes == bytes * 2,
+            require(entered && translationEntered && removedBeforeDestruction && admittedFirst && admittedNext &&
+                        waited && before.pendingSoftwareBytes == bytes * 2,
                     "Cancellation fixture did not reach a saturated queued software cohort.");
             require(cancelled && abandoned.IsClean() && blockerCompleted, error.c_str());
             require(destructorEntered && !prematureAdmission && destroying.pendingSoftwareBytes == bytes * 2,
@@ -1409,14 +1473,14 @@ namespace
             ++g_scenarios;
             RHISubmissionThread submission(bytes);
             ProbeDevice device;
-            auto pool = std::make_shared<ProbePool>(scheduler);
+            auto pool = own::make_shared<ProbePool>(scheduler);
             pool->m_submitFailure = true;
             pool->m_executeBeforeFailure = executed;
-            auto translator = std::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
+            auto translator = own::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
             std::string error;
             require(submission.AcquireClient(&device, error), error.c_str());
-            auto owner = std::make_shared<uint32_t>(1);
-            std::weak_ptr<const void> lifetime(owner);
+            auto owner = own::make_shared<uint32_t>(1);
+            ce::weak_lifetime_token lifetime(owner);
             auto batch = record_batch(recorder, spec, owner);
 #if CE_RHI_STRUCTURED_FAILURE
             const uint64_t commandRecordingId = batch.GetRecordingId();
@@ -1454,21 +1518,38 @@ namespace
         }
 #if CE_RHI_STRUCTURED_FAILURE
         // Replay failure never reaches native execute, but retains the exact
-        // software command identity through the actual submission FIFO.
+        // software command identity through the actual submission FIFO. An
+        // already admitted EndFrame tail may still signal a higher GPU fence;
+        // that numeric completion must never make the failed image publishable.
         {
             ++g_scenarios;
             RHISubmissionThread submission(bytes);
             ProbeDevice device;
-            auto pool = std::make_shared<ProbePool>(scheduler);
+            ReplayGate gate;
+            auto pool = own::make_shared<ProbePool>(scheduler);
             pool->m_encoders[0].m_failCommand = 12;
-            auto translator = std::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
+            auto translator = own::make_shared<GatedTranslator>(*pool, services, gate);
             std::string error;
             require(submission.AcquireClient(&device, error), error.c_str());
             auto batch = record_batch(recorder, spec);
             const uint64_t commandRecordingId = batch.GetRecordingId();
-            RHISubmissionTicket ticket;
+            RHISubmissionTicket ticket, tail;
             require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), ticket, error),
                     error.c_str());
+            const bool entered = gate.WaitEntered();
+            const bool tailAdmitted = submission.Enqueue(
+                &device, "successful higher-fence frame tail",
+                [&](std::string&)
+                {
+                    device.m_completed.store(17);
+                    return true;
+                },
+                tail, error);
+#if CE_RHI_DISPLAY_SUBMISSION_PROOF
+            const auto preparing = PollRHIDisplaySubmission(ticket, tail);
+#endif
+            gate.Open();
+            require(entered && tailAdmitted, "Failed replay fixture did not admit a later frame tail.");
             require(!submission.Wait(ticket, error) && pool->m_submitCalls == 0,
                     "Failed replay reached the native submission boundary.");
             RHICommandFailure failure, consumed;
@@ -1479,6 +1560,19 @@ namespace
                     "FIFO replay failure lost exact target, opcode, index or recording provenance.");
             require(submission.ConsumeFailure(&device, consumed) && equal_failure(failure, consumed),
                     "Owner failure consumption lost replay provenance.");
+            require(submission.Wait(tail, error) && device.GetCompletedFenceValue() == 17 &&
+                        pool->m_completion < device.GetCompletedFenceValue(),
+                    "The admitted frame tail did not advance the higher GPU completion independently.");
+#if CE_RHI_DISPLAY_SUBMISSION_PROOF
+            const bool pixelsPublishable =
+                device.GetCompletedFenceValue() >= pool->m_completion &&
+                PollRHIDisplaySubmission(ticket, tail) == RHIDisplaySubmissionStatus::Succeeded;
+            require(preparing == RHIDisplaySubmissionStatus::Pending && !pixelsPublishable &&
+                        PollRHIDisplaySubmission(ticket, tail) == RHIDisplaySubmissionStatus::Failed &&
+                        PollRHIDisplaySubmission(tail, ticket) == RHIDisplaySubmissionStatus::Failed &&
+                        PollRHIDisplaySubmission(tail, tail) == RHIDisplaySubmissionStatus::Succeeded,
+                    "A successful higher-fence tail concealed a failed scene batch at publication.");
+#endif
             submission.MarkUnrecoverableDeviceError(&device, "Injected cleanup after failed CPU replay.");
             RHILifecycleResult abandoned;
             require(submission.AbandonForDeviceError(&device, abandoned, error) && abandoned.IsClean(), error.c_str());

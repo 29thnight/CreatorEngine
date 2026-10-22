@@ -268,6 +268,7 @@ class RHISoftwareQueueCommandBatch final : public IRHIQueueRecording, public IRH
         Empty,
         Recording,
         Sealed,
+        Prepared,
         Consumed
     };
 
@@ -300,6 +301,8 @@ class RHISoftwareQueueCommandBatch final : public IRHIQueueRecording, public IRH
         // owns the pool state until the last weak reference also disappears.
         m_lease.reset();
         ReleaseCpuStorage();
+        m_preparedNative.reset();
+        m_desc = {};
         m_identity = {};
         m_services = nullptr;
         m_domain = nullptr;
@@ -315,6 +318,7 @@ class RHISoftwareQueueCommandBatch final : public IRHIQueueRecording, public IRH
     ce::weak_pooled_owner<RHISoftwareQueueCommandBatch> m_lease;
     RHISoftwareRecorder m_recorder;
     RHISoftwareBatch m_batch;
+    ce::pooled_owner<IRHIQueueCommandBatch> m_preparedNative;
     RHISoftwareBatchDesc m_desc;
     RHIQueueIdentity m_identity;
     IRenderDeviceServices* m_services{};
@@ -335,6 +339,7 @@ struct RHISoftwareQueueState : own::enable_owner_from_this<RHISoftwareQueueState
     RHISoftwareBatchDesc m_frameDesc;
     uint64_t m_pendingArenaBytes{};
     std::mutex m_recordingMutex;
+    std::mutex m_preparationMutex;
     std::recursive_mutex m_submissionMutex;
     std::array<RHISoftwareQueueCommandBatch*, kRetainedRecordings> m_idle{};
     ~RHISoftwareQueueState()
@@ -442,7 +447,7 @@ void RHISoftwareQueueCommandBatch::ReleaseCpuStorage() noexcept
 {
     m_recorder.CancelRecording();
     m_batch = {};
-    m_desc = {};
+    m_desc.lifetimeToken.reset();
     // Credit returns only after all software storage has been released. A
     // consumed batch may still have CPU aliases and an independent GPU owner.
     if (const auto bytes = std::exchange(m_reservedArenaBytes, uint64_t{}))
@@ -513,7 +518,7 @@ bool RHISoftwareQueueCommandBatch::Finish(ce::pooled_owner<IRHIQueueCommandBatch
     }
     m_reservedArenaBytes = bytes;
     m_recordingId = m_batch.GetRecordingId();
-    m_desc = {};
+    m_desc.lifetimeToken.reset();
     m_state.store(State::Sealed, std::memory_order_release);
     batch = m_lease.lock();
     return true;
@@ -559,6 +564,54 @@ bool RHISoftwareCommandQueue::Wait(const RHITimelinePoint& point, std::string& e
     return m_state->Execute([&](std::string& failure) { return m_native->Wait(point, failure); }, error);
 }
 
+bool RHISoftwareCommandQueue::PrepareBatch(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
+{
+    error.clear();
+    const auto software = ce::dynamic_pooled_cast<RHISoftwareQueueCommandBatch>(batch);
+    if (!software || software->m_domain != m_state.operator->() || software->GetQueueIdentity() != GetIdentity())
+    {
+        error = "Software preparation requires a sealed batch from this queue domain.";
+        return false;
+    }
+    std::lock_guard preparationLock(m_state->m_preparationMutex);
+    if (software->m_state.load(std::memory_order_acquire) == RHISoftwareQueueCommandBatch::State::Prepared)
+    {
+        return true;
+    }
+    auto expected = RHISoftwareQueueCommandBatch::State::Sealed;
+    if (!software->m_state.compare_exchange_strong(expected, RHISoftwareQueueCommandBatch::State::Consumed,
+                                                   std::memory_order_acq_rel, std::memory_order_acquire))
+    {
+        error = "Software queue batch has already been consumed.";
+        return false;
+    }
+    // Preparation is a one-shot CPU operation. Failed replay cannot be retried
+    // from a partly recorded native target, even though no GPU work was issued.
+    struct ReleaseCpuStorage
+    {
+        RHISoftwareQueueCommandBatch& batch;
+        ~ReleaseCpuStorage() { batch.ReleaseCpuStorage(); }
+    } release{*software};
+    const ce::profile_rhi_context_scope rhiContext(MakeRHIProfileContext(software->m_desc, software->m_recordingId));
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+    const ce::dx_capture::submission_context_scope capture(software->m_desc.captureContext);
+#endif
+    RHICommandFailureScope::SetIdentity(software->m_recordingId, software->m_backendGeneration);
+    RHICommandFailureScope::SetStage(RHICommandFailureStage::Translation);
+    RHIQueueCommandTranslator translator(*m_state->m_nativeRecorder, m_native);
+    RHITranslatedBatch translated;
+    RHICommandFailure failure;
+    if (!translator.Translate(std::move(software->m_batch), m_state->m_options.translation, translated, failure))
+    {
+        RHICommandFailureScope::Report(failure);
+        error = failure.message;
+        return false;
+    }
+    software->m_preparedNative = std::move(translated.m_owned);
+    software->m_state.store(RHISoftwareQueueCommandBatch::State::Prepared, std::memory_order_release);
+    return true;
+}
+
 bool RHISoftwareCommandQueue::Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, uint64_t value,
                                      RHITimelinePoint& point, std::string& error)
 {
@@ -583,7 +636,13 @@ bool RHISoftwareCommandQueue::Submit(const ce::pooled_owner<IRHIQueueCommandBatc
             {
                 RHICommandFailureScope::SetStage(RHICommandFailureStage::Admission);
                 RHICommandFailureScope::SetIdentity(software->m_recordingId, software->m_backendGeneration);
-                auto expected = RHISoftwareQueueCommandBatch::State::Sealed;
+                // Graphs prepare all batches before entering this native owner.
+                // Direct legacy queue users retain the one-shot inline fallback.
+                if (!PrepareBatch(batch, failure))
+                {
+                    return false;
+                }
+                auto expected = RHISoftwareQueueCommandBatch::State::Prepared;
                 if (!software->m_state.compare_exchange_strong(expected, RHISoftwareQueueCommandBatch::State::Consumed,
                                                                std::memory_order_acq_rel, std::memory_order_acquire))
                 {
@@ -591,36 +650,16 @@ bool RHISoftwareCommandQueue::Submit(const ce::pooled_owner<IRHIQueueCommandBatc
                     return false;
                 }
                 const ce::profile_rhi_context_scope rhiContext(
-                    MakeRHIProfileContext(software->m_batch.GetDesc(), software->m_recordingId));
+                    MakeRHIProfileContext(software->m_desc, software->m_recordingId));
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
-                const auto captureContext = software->m_batch.GetDesc().captureContext;
+                const auto captureContext = software->m_desc.captureContext;
                 const ce::dx_capture::submission_context_scope capture(captureContext);
 #endif
-                // No retry can replay a prefix after any translation/submission
-                // failure. Native Submit owns retirement, including unfenced failure.
-                RHIQueueCommandTranslator translator(*m_state->m_nativeRecorder, m_native);
-                RHITranslatedBatch translated;
-                RHICommandFailure translationFailure;
-                RHICommandFailureScope::SetStage(RHICommandFailureStage::Translation);
-                bool succeeded{};
-                {
-                    struct ReleaseCpuStorage
-                    {
-                        RHISoftwareQueueCommandBatch& batch;
-                        ~ReleaseCpuStorage() { batch.ReleaseCpuStorage(); }
-                    } release{*software};
-                    succeeded = translator.Translate(std::move(software->m_batch), m_state->m_options.translation,
-                                                     translated, translationFailure);
-                }
-                if (!succeeded)
-                {
-                    RHICommandFailureScope::Report(translationFailure);
-                    failure = translationFailure.message;
-                    return false;
-                }
+                auto native = std::move(software->m_preparedNative);
+                // Native Submit owns retirement, including unfenced failure.
                 RHICommandFailureScope::SetStage(RHICommandFailureStage::Submission);
                 ce::profile_rhi_scope submitProfile{ce::marker<"RHINativeSubmit">()};
-                if (!m_native->Submit(translated.m_owned, value, point, failure))
+                if (!m_native->Submit(native, value, point, failure))
                 {
                     point = {};
                     return false;
@@ -785,6 +824,31 @@ bool RHISoftwareQueueRecorder::ExecuteSubmission(const std::function<bool(std::s
         return false;
     }
     return m_state->Execute(submit, error);
+}
+
+bool RHISoftwareQueueRecorder::PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>& queue,
+                                                      const ce::pooled_owner<IRHIQueueCommandBatch>& batch,
+                                                      std::string& error)
+{
+    const auto wrapped = own::dynamic_owner_cast<RHISoftwareCommandQueue>(queue);
+    if (!wrapped || wrapped->m_state.operator->() != m_state.operator->())
+    {
+        error = "Software preparation requires this recorder's queue.";
+        return false;
+    }
+    try
+    {
+        return wrapped->PrepareBatch(batch, error);
+    }
+    catch (const std::exception& exception)
+    {
+        error = exception.what();
+    }
+    catch (...)
+    {
+        error = "Unknown owned software preparation failure.";
+    }
+    return false;
 }
 
 RHIQueueCapabilities RHISoftwareQueueFactory::QueryQueueCapabilities() const
