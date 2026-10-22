@@ -62,6 +62,7 @@ public:
 
     virtual uint64_t OpenSharedTexture(void* sharedHandle,
         own::shared_owner<RHIDisplayConsumerLease> consumerLease) = 0;
+    virtual RHIGpuPresentationCapabilities QueryGpuPresentationCapabilities() const = 0;
     virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) = 0;
     virtual RHIDisplayTexture GetCpuFrameTexture(uint64_t key) = 0;

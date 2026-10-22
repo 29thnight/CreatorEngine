@@ -18,7 +18,7 @@ class DX12SoftwareCommandValidator final : public IRHISoftwareCommandValidator
         };
         const auto indirect = [&](RHIBufferHandle handle, uint64_t offset, uint64_t required)
         {
-            const auto buffer = m_resources.DescribeBuffer(handle);
+            const auto buffer = m_resources.DescribeNativeBuffer(handle);
             return offset % 4 == 0 && buffer.IsValid() && buffer.allowIndirectArguments && offset <= buffer.bytes &&
                    required <= buffer.bytes - offset;
         };

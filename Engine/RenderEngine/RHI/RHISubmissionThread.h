@@ -119,6 +119,8 @@ struct RHISubmissionThreadStats
     uint64_t lifecycleFailures{ 0 };
     uint64_t orderingErrors{ 0 };
     uint64_t lastCompletedSequence{ 0 };
+    uint64_t completedTranslations{0};
+    uint64_t failedTranslations{0};
     uint64_t threadIdHash{ 0 };
     uint32_t maxQueueDepth{ 0 };
     uint32_t pendingTasks{ 0 };
@@ -150,7 +152,10 @@ private:
     own::shared_owner<State> m_state;
 };
 
-/// 네이티브 제출과 수명 작업을 하나의 bounded FIFO·전용 스레드로 모은다.
+/// 네이티브 제출과 수명 작업을 bounded queue·전용 스레드로 모은다.
+/// Frozen software batches translate on a separate coordinator and workers.
+/// Admission order is preserved per owner; an unrelated ready owner may pass a
+/// translating batch. Native queue calls remain exclusive to the RHI thread.
 /// 직렬화된 표시 소유자는 자기 제출 ticket 뒤 네이티브 Present를 직접 부를 수 있다.
 /// 그 호출이 끝나기 전에는 다음 제출·resize·shutdown을 시작하지 않는다.
 ///
@@ -233,7 +238,7 @@ private:
                          ce::lifetime_token lifetimeToken, EntryKind kind, bool allowTransition,
                          uint64_t expectedGeneration = 0, own::shared_owner<RHIRecordedBatch> recordedBatch = {},
                          RHISubmissionIdentity identity = {}, uint64_t softwareBytes = 0,
-                         uint64_t commandRecordingId = 0);
+                         uint64_t commandRecordingId = 0, Work preparation = {});
 
     struct Impl;
     own::unique_owner<Impl> m_impl;

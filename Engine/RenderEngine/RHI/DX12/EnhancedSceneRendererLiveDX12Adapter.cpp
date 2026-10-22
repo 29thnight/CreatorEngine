@@ -4,6 +4,7 @@
 #include "DX12CommandTranslator.h"
 #include "../RHISoftwareRecorder.h"
 #include "../RHISoftwareQueueRecorder.h"
+#include "../RHIExecutionPolicy.h"
 #include "../../Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h"
 
 #include "../../GpuDiagnostics.h"
@@ -59,13 +60,7 @@ namespace
 
     uint32_t LiveDx12RequestedQueueExecutionMode()
     {
-        char value[8]{};
-        size_t bytes = 0;
-        if (getenv_s(&bytes, value, sizeof(value), "CREATOR_RENDERGRAPH_QUEUE_EXECUTION") != 0)
-        {
-            return 0;
-        }
-        return std::strcmp(value, "2") == 0 ? 2u : std::strcmp(value, "1") == 0 ? 1u : 0u;
+        return static_cast<uint32_t>(ReadRHIExecutionPolicy().gpu);
     }
 }
 
@@ -73,11 +68,30 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
 {
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
+    struct DisplayTransport
+    {
+        ComPtr<ID3D12Resource> texture;
+        HANDLE sharedHandle{nullptr};
+        RHIDisplayAdapterIdentity adapter;
+        uint32_t width{0};
+        uint32_t height{0};
+
+        ~DisplayTransport()
+        {
+            if (sharedHandle)
+            {
+                CloseHandle(sharedHandle);
+            }
+        }
+    };
+
     struct DisplayResource
     {
         DisplayToken token{ kInvalidDisplayToken };
-        ComPtr<ID3D12Resource> texture;
-        HANDLE sharedHandle{ nullptr };
+        own::shared_owner<DisplayTransport> transport;
+        RHIDisplayFrameMetadata displayMetadata;
+        RHICompletionPoint publishedCompletion;
+        uint64_t observedPublishedCompletion{0};
         std::array<ComPtr<ID3D12Resource>, 4> temporalTextures;
         std::array<HANDLE, 4> temporalHandles{};
         RHITemporalDisplayResources temporalResources;
@@ -509,9 +523,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownInterop()
     {
         for (Impl::DisplayResource& display : displays)
         {
-            if (nullptr != display.sharedHandle) ::CloseHandle(display.sharedHandle);
-            display.sharedHandle = nullptr;
-            display.texture.Reset();
+            display.transport.reset();
             for (auto& handle : display.temporalHandles)
             {
                 if (handle) ::CloseHandle(handle);
@@ -609,15 +621,19 @@ bool EnhancedSceneRendererLiveDX12Adapter::WaitForLastFrameSubmission(std::strin
     return m_impl->resources.WaitForLastFrameSubmission(outError);
 }
 
+RHISubmissionTicket EnhancedSceneRendererLiveDX12Adapter::GetLastFrameSubmissionTicket() const
+{
+    return m_impl->resources.GetLastFrameSubmissionTicket();
+}
+
 bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
 {
     Impl& impl = *m_impl;
     if (!impl.resources.EndFrame(outError)) return false;
     impl.commandPoolFrame = (impl.commandPoolFrame + 1u) % kFrameCount;
-    if (impl.ownedQueueExecution && !impl.resources.WaitForLastFrameSubmission(outError))
-    {
-        return false;
-    }
+    // EndFrame has admitted the tail behind the explicit queue join. The slot's
+    // submission ticket and GPU fence gate BeginFrame reuse; publication requires
+    // both successful native submission and that fence. Timestamp observers wait explicitly.
     return true;
 }
 
@@ -881,16 +897,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::EnqueueRecordedBatch(
 
 bool EnhancedSceneRendererLiveDX12Adapter::UsesSoftwareRecording() const
 {
-    static const bool enabled = []
-    {
-        char* value{};
-        size_t length{};
-        const bool available = _dupenv_s(&value, &length, "CREATOR_RHI_SOFTWARE_COMMANDS") == 0;
-        const bool result = available && value && std::strcmp(value, "1") == 0;
-        std::free(value);
-        return result;
-    }();
-    return enabled;
+    static const RHICpuExecutor executor = ReadRHIExecutionPolicy().cpu;
+    return executor == RHICpuExecutor::SoftwareParallel;
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::RecordSoftwareGraph(EnhancedRenderGraph& graph, uint32_t workerCount,
@@ -1065,24 +1073,36 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 
     Impl::DisplayResource display;
-    if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap,
-        D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-        nullptr, IID_PPV_ARGS(&display.texture)); })))
+    display.transport = own::make_shared<Impl::DisplayTransport>();
+    auto& transport = *display.transport;
+    transport.width = width;
+    transport.height = height;
+    const LUID adapter = impl.resources.GetDevice()->GetAdapterLuid();
+    static_assert(sizeof(adapter) == sizeof(transport.adapter.luid));
+    std::memcpy(transport.adapter.luid.data(), &adapter, sizeof(adapter));
+    transport.adapter.valid = true;
+    if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource",
+                                 [&]
+                                 {
+                                     return impl.resources.GetDevice()->CreateCommittedResource(
+                                         &heap, D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+                                         IID_PPV_ARGS(&transport.texture));
+                                 })))
     {
         outError = "공유 텍스처 생성 실패";
         return false;
     }
 
-    outTexture = impl.resources.RegisterExternalTexture(display.texture.Get());
+    outTexture = impl.resources.RegisterExternalTexture(transport.texture.Get());
     if (!outTexture.IsValid())
     {
         outError = "공유 텍스처 RHI 등록 실패";
         return false;
     }
 
-    if (FAILED(impl.resources.GetDevice()->CreateSharedHandle(display.texture.Get(),
-        nullptr, GENERIC_ALL, nullptr, &display.sharedHandle)) ||
-        nullptr == display.sharedHandle)
+    if (FAILED(impl.resources.GetDevice()->CreateSharedHandle(transport.texture.Get(), nullptr, GENERIC_ALL, nullptr,
+                                                              &transport.sharedHandle)) ||
+        nullptr == transport.sharedHandle)
     {
         impl.resources.ReleaseTexture(outTexture);
         outTexture = {};
@@ -1095,6 +1115,30 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
     outToken = display.token;
     impl.activeDisplays.push_back(std::move(display));
     return true;
+}
+
+void EnhancedSceneRendererLiveDX12Adapter::SealDisplayFrame(DisplayToken token, const RHIDisplayFrameMetadata& metadata,
+                                                            RHICompletionPoint completion, uint64_t observedCompletion)
+{
+    for (auto& display : m_impl->activeDisplays)
+    {
+        if (display.token != token)
+        {
+            continue;
+        }
+        if (!completion.IsValid() || observedCompletion == UINT64_MAX || observedCompletion < completion.value)
+        {
+            display.publishedCompletion = {};
+            display.observedPublishedCompletion = 0;
+            return;
+        }
+        // Store only the receipt. Keeping a packet here would retain its own
+        // consumer lease permanently and make this producer slot unreusable.
+        display.displayMetadata = metadata;
+        display.publishedCompletion = completion;
+        display.observedPublishedCompletion = observedCompletion;
+        return;
+    }
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
@@ -1240,11 +1284,7 @@ void EnhancedSceneRendererLiveDX12Adapter::CollectRetiredDisplays()
         {
             return false;
         }
-        if (display.sharedHandle)
-        {
-            CloseHandle(display.sharedHandle);
-            display.sharedHandle = nullptr;
-        }
+        display.transport.reset();
         for (const auto handle : {display.temporalResources.hudlessColor, display.temporalResources.uiColor,
             display.temporalResources.depth, display.temporalResources.motionVectors})
             if (handle.IsValid()) impl.resources.ReleaseTexture(handle);
@@ -1283,10 +1323,27 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
         if (display.token == token &&
             !display.consumerLease->m_completionLost.load(std::memory_order_acquire))
         {
+            if (!display.transport)
+            {
+                return 0;
+            }
+            const auto& transport = *display.transport;
+            RHIGpuDisplayImage image;
+            image.transport = RHISharedImageTransport::Win32D3D12Resource;
+            image.adapter = transport.adapter;
+            image.sharedHandle = transport.sharedHandle;
+            image.width = transport.width;
+            image.height = transport.height;
+            image.format = RHIFormat::RGBA8Unorm;
+            image.metadata = display.displayMetadata;
+            image.producerCompletion = display.publishedCompletion;
+            image.observedProducerCompletion = display.observedPublishedCompletion;
+            image.consumerLease = display.consumerLease;
+            image.lifetimeToken = display.transport;
             // 호출자는 생산자 슬롯 선택과 같은 뮤텍스를 쥔다. sink는 잠금을
             // 놓기 전에 이 참조를 확보해야 하며 CPU 드로우 데이터가 아직
             // 기록·제출되지 않은 동안에도 참조를 유지한다.
-            const auto textureId = sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+            const auto textureId = sink.OpenGpuFrame(image).m_textureId;
             if (textureId)
             {
                 sink.OpenTemporalRealFrame(display.temporalProvenance);

@@ -38,16 +38,14 @@ bool VulkanRecordingResources::Capture(VulkanDeviceResources& resources, std::st
         {
             const auto& source = bindings.m_requests[index]->descs;
             m_bindings[index].assign(source.begin(), source.end());
-            // Cube views are materialized by the owner before metadata becomes
-            // immutable. Replay never mutates a live resource registry.
+            // Materialize all view ranges before freezing metadata. Native
+            // translation only reads this recording's immutable view generation.
             for (const auto& view : source)
             {
-                if (view.dim == RHIBindingDesc::Dim::TextureCube && view.resource.IsValid() &&
-                    !resources.m_resourceTable.GetOrCreateCubeView(resources.m_device, view.resource, view.format,
-                                                                   view.mostDetailedMip, view.mipLevels,
-                                                                   view.firstSlice))
+                if (view.dim != RHIBindingDesc::Dim::Buffer && view.resource.IsValid() &&
+                    !resources.m_resourceTable.GetOrCreateImageView(resources.m_device, view))
                 {
-                    outError = "Vulkan recording snapshot cannot resolve a cube view.";
+                    outError = "Vulkan recording snapshot cannot resolve an image view.";
                     return false;
                 }
             }

@@ -3,6 +3,90 @@
 
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
+#include "RenderFeatureContributor.h"
+
+enum class LiveResourceCardinality : uint8_t
+{
+    Single,
+    List
+};
+enum class LiveResourceExtent : uint8_t
+{
+    Independent,
+    Render,
+    HalfRender,
+    Display,
+    RenderOrDisplay
+};
+enum class LiveResourceSemantic : uint8_t
+{
+    Generic,
+    LinearColor,
+    DisplayColor,
+    Albedo,
+    Material,
+    Normal,
+    Emissive,
+    Bitmask,
+    Depth,
+    Visibility,
+    Motion,
+    Mask,
+    AmbientOcclusion,
+    Geometry,
+    VisibleList,
+    Commands,
+    MaterialTiles
+};
+
+/// A feature contract describes what a handle means, independently of its current
+/// graph index, native allocation or frame. Unknown format is permitted only when
+/// the feature deliberately accepts every format of the stated semantic.
+struct LiveResourceContract
+{
+    RGResourceKind kind{RGResourceKind::Texture};
+    LiveResourceCardinality cardinality{LiveResourceCardinality::Single};
+    LiveResourceSemantic semantic{LiveResourceSemantic::Generic};
+    RHIFormat format{RHIFormat::Unknown};
+    LiveResourceExtent extent{LiveResourceExtent::Independent};
+    bool optional{};
+    uint32_t listSize{}; // Zero is variable length; nonzero is an exact cardinality.
+
+    bool Accepts(const LiveResourceContract& producer) const noexcept;
+};
+
+template<LiveResourceSemantic Semantic, RGResourceKind Kind = RGResourceKind::Texture,
+         LiveResourceCardinality Cardinality = LiveResourceCardinality::Single>
+struct LiveResourceSlot
+{
+    const char* name;
+    RHIFormat format{RHIFormat::Unknown};
+    LiveResourceExtent extent{LiveResourceExtent::Independent};
+    bool optional{};
+    uint32_t listSize{};
+
+    static constexpr RGResourceKind kKind = Kind;
+    static constexpr LiveResourceCardinality kCardinality = Cardinality;
+    constexpr LiveResourceContract Contract() const noexcept
+    {
+        return {Kind, Cardinality, Semantic, format, extent, optional, listSize};
+    }
+};
+
+struct LiveResourceBinding
+{
+    std::string name;
+    LiveResourceContract contract;
+
+    template<LiveResourceSemantic Semantic, RGResourceKind Kind, LiveResourceCardinality Cardinality>
+    LiveResourceBinding(LiveResourceSlot<Semantic, Kind, Cardinality> slot) : name(slot.name), contract(slot.Contract())
+    {
+    }
+    LiveResourceBinding(std::string slotName, LiveResourceContract slotContract)
+        : name(std::move(slotName)), contract(slotContract)
+    {
+    }
+};
 
 // 라이브 파이프라인 기술(記述) — LivePipelineDesc (PHASE 3-10, 슬라이스 1).
 //
@@ -86,6 +170,94 @@ namespace LiveSlots
     constexpr const char* kDisplayLdr        = "Display.LDR";
 }
 
+/// The built-in feature vocabulary. A plugin may define another typed slot without
+/// changing this catalog. Names remain stable for diagnostics and old consumers.
+namespace LiveResources
+{
+    /// Reserved engine outputs. Contributors may read all available built-ins;
+    /// stage-specific mutation is limited to scene HDR or display LDR. Other
+    /// names are private feature resources and use ordinary dependency checks.
+    bool IsBuiltin(std::string_view slot) noexcept;
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Albedo> kGBufferDiffuse{
+        LiveSlots::kGBufferDiffuse, RHIFormat::RGBA16Float, LiveResourceExtent::Render};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Material> kGBufferMetalRough{
+        LiveSlots::kGBufferMetalRough, RHIFormat::RGBA16Float, LiveResourceExtent::Render};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Normal> kGBufferNormal{
+        LiveSlots::kGBufferNormal, RHIFormat::RGBA16Float, LiveResourceExtent::Render};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Emissive> kGBufferEmissive{
+        LiveSlots::kGBufferEmissive, RHIFormat::RGBA16Float, LiveResourceExtent::Render};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Bitmask> kGBufferBitmask{
+        LiveSlots::kGBufferBitmask, RHIFormat::R32Uint, LiveResourceExtent::Render};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Depth> kGBufferDepth{
+        LiveSlots::kGBufferDepth, RHIFormat::D32Float, LiveResourceExtent::Render};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Albedo> kDecalBaseDiffuse{
+        LiveSlots::kDecalBaseDiffuse, RHIFormat::RGBA16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Material> kDecalBaseOrm{
+        LiveSlots::kDecalBaseOrm, RHIFormat::RGBA16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Normal> kDecalBaseNormal{
+        LiveSlots::kDecalBaseNormal, RHIFormat::RGBA16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Visibility> kVisibility{
+        LiveSlots::kVisibility, RHIFormat::RG32Uint, LiveResourceExtent::Render};
+
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Depth, RGResourceKind::Texture,
+                                      LiveResourceCardinality::List>
+        kShadowStaticDepths{LiveSlots::kShadowStaticDepths, RHIFormat::D32Float, LiveResourceExtent::Independent, true,
+                            3};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::VisibleList, RGResourceKind::Buffer,
+                                      LiveResourceCardinality::List>
+        kShadowFirstLists{LiveSlots::kShadowFirstLists, RHIFormat::Unknown, LiveResourceExtent::Independent, true, 3};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Depth, RGResourceKind::Texture,
+                                      LiveResourceCardinality::List>
+        kShadowOccluderDepths{LiveSlots::kShadowOccluderDepths, RHIFormat::D32Float, LiveResourceExtent::Independent,
+                              true, 3};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::VisibleList, RGResourceKind::Buffer,
+                                      LiveResourceCardinality::List>
+        kShadowFinalLists{LiveSlots::kShadowFinalLists, RHIFormat::Unknown, LiveResourceExtent::Independent, true, 3};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Geometry, RGResourceKind::Buffer> kMeteorGeometry{
+        LiveSlots::kMeteorGeometry, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::VisibleList, RGResourceKind::Buffer> kMeteorFirstList{
+        LiveSlots::kMeteorFirstList, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Depth> kMeteorOccluderDepth{
+        LiveSlots::kMeteorOccluderDepth, RHIFormat::D32Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Commands, RGResourceKind::Buffer> kMeteorLayerCommands{
+        LiveSlots::kMeteorLayerCommands, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::MaterialTiles, RGResourceKind::Buffer> kMeteorMaterialTiles{
+        LiveSlots::kMeteorMaterialTiles, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Commands, RGResourceKind::Buffer> kMeteorMaterialArguments{
+        LiveSlots::kMeteorMaterialArguments, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Commands, RGResourceKind::Buffer,
+                                      LiveResourceCardinality::List>
+        kMeteorBlendedCommands{LiveSlots::kMeteorBlendedCommands, RHIFormat::Unknown, LiveResourceExtent::Independent,
+                               true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::VisibleList, RGResourceKind::Buffer> kMeteorBlendedList{
+        LiveSlots::kMeteorBlendedList, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::VisibleList, RGResourceKind::Buffer> kMeteorFinalList{
+        LiveSlots::kMeteorFinalList, RHIFormat::Unknown, LiveResourceExtent::Independent, true};
+
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Motion> kTemporalMotion{
+        LiveSlots::kTemporalMotion, RHIFormat::RG16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Mask> kTemporalReactive{
+        LiveSlots::kTemporalReactive, RHIFormat::R16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Mask> kTemporalTransparency{
+        LiveSlots::kTemporalTransparency, RHIFormat::R16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Mask> kTemporalResponsive{
+        LiveSlots::kTemporalResponsive, RHIFormat::R16Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Depth> kTemporalDepth{
+        LiveSlots::kTemporalDepth, RHIFormat::D32Float, LiveResourceExtent::Render, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::DisplayColor> kHudlessLdr{
+        LiveSlots::kHudlessLdr, RHIFormat::RGBA8Unorm, LiveResourceExtent::Display, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::DisplayColor> kUiLayer{
+        LiveSlots::kUiLayer, RHIFormat::RGBA8Unorm, LiveResourceExtent::Display, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::Depth> kShadowMap{
+        LiveSlots::kShadowMap, RHIFormat::D32Float, LiveResourceExtent::Independent, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::AmbientOcclusion> kAmbientOcclusion{
+        LiveSlots::kAmbientOcclusion, RHIFormat::RG16Float, LiveResourceExtent::HalfRender, true};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::LinearColor> kLitColor{
+        LiveSlots::kLitColor, RHIFormat::RGBA16Float, LiveResourceExtent::RenderOrDisplay};
+    inline constexpr LiveResourceSlot<LiveResourceSemantic::DisplayColor> kDisplayLdr{
+        LiveSlots::kDisplayLdr, RHIFormat::RGBA8Unorm, LiveResourceExtent::RenderOrDisplay};
+} // namespace LiveResources
+
 /// 뷰의 표시 성격(E4-2). viewIndex로 갈음할 수 없다 — 뷰 배정은 회전·교체가
 /// 있어 인덱스가 카메라 정체를 말하지 않는다. 이름이 중립인 이유: RenderCore는
 /// "에디터"를 모른다 — 씬 오버레이 노드를 기여하는 것은 Host다.
@@ -109,6 +281,46 @@ namespace LiveViewFlags
 class LiveBlackboard
 {
   public:
+    LiveBlackboard() = default;
+    LiveBlackboard(const LiveBlackboard& other)
+        : m_slots(other.m_slots), m_generation(other.m_generation), m_writeScope(other.m_writeScope)
+    {
+    }
+    LiveBlackboard& operator=(const LiveBlackboard& other)
+    {
+        if (this != &other)
+        {
+            m_slots = other.m_slots;
+            m_generation = other.m_generation;
+            m_writeScope = other.m_writeScope;
+            m_writingFeature = {};
+            m_boundSlots.clear();
+            m_boundPlan = nullptr;
+            m_boundRevision = 0;
+        }
+        return *this;
+    }
+    LiveBlackboard(LiveBlackboard&& other) noexcept
+        : m_slots(std::move(other.m_slots)), m_generation(other.m_generation),
+          m_boundSlots(std::move(other.m_boundSlots)), m_boundPlan(std::exchange(other.m_boundPlan, nullptr)),
+          m_boundRevision(std::exchange(other.m_boundRevision, 0)), m_writeScope(other.m_writeScope)
+    {
+    }
+    LiveBlackboard& operator=(LiveBlackboard&& other) noexcept
+    {
+        if (this != &other)
+        {
+            m_slots = std::move(other.m_slots);
+            m_generation = other.m_generation;
+            m_boundSlots = std::move(other.m_boundSlots);
+            m_boundPlan = std::exchange(other.m_boundPlan, nullptr);
+            m_boundRevision = std::exchange(other.m_boundRevision, 0);
+            m_writeScope = other.m_writeScope;
+            m_writingFeature = {};
+        }
+        return *this;
+    }
+
     void Reset()
     {
         // Slots own their keys and buffers across frames. Only the current
@@ -116,6 +328,8 @@ class LiveBlackboard
         if (m_generation == UINT64_MAX || m_slots.size() > 4096)
         {
             m_slots.clear();
+            m_boundSlots.clear();
+            m_boundPlan = nullptr;
             m_generation = 1;
         }
         else
@@ -156,7 +370,7 @@ class LiveBlackboard
 
     // One slot may publish several independently versioned command buffers.
     // They remain real resource handles, never a dummy join token or hidden producer.
-    void SetList(std::string_view slot, std::vector<RGHandle> handles)
+    void SetList(std::string_view slot, std::span<const RGHandle> handles)
     {
         auto& destination = WritableSlot(slot);
         if (destination.handles.size() != handles.size())
@@ -166,6 +380,14 @@ class LiveBlackboard
         std::copy_n(handles.data(), handles.size(), destination.handles.data());
         destination.generation = m_generation;
     }
+    void SetList(std::string_view slot, const std::vector<RGHandle>& handles)
+    {
+        SetList(slot, std::span<const RGHandle>{handles});
+    }
+    void SetList(std::string_view slot, std::initializer_list<RGHandle> handles)
+    {
+        SetList(slot, std::span<const RGHandle>{handles.begin(), handles.size()});
+    }
     std::vector<RGHandle> GetList(std::string_view slot) const
     {
         const auto found = m_slots.find(slot);
@@ -173,8 +395,40 @@ class LiveBlackboard
                                                                                   : found->second.handles;
     }
 
+    /// A borrowed list for immediate consumption. Set/Reset invalidates this view;
+    /// recording callbacks must continue retaining their own frame-owned payload.
+    std::span<const RGHandle> GetListView(std::string_view slot) const
+    {
+        const auto found = m_slots.find(slot);
+        return found == m_slots.end() || found->second.generation != m_generation
+                   ? std::span<const RGHandle>{}
+                   : std::span<const RGHandle>{found->second.handles};
+    }
+
+    template<LiveResourceSemantic Semantic, RGResourceKind Kind>
+    RGHandle Get(LiveResourceSlot<Semantic, Kind> slot) const
+    {
+        return Get(slot.name);
+    }
+    template<LiveResourceSemantic Semantic, RGResourceKind Kind>
+    void Set(LiveResourceSlot<Semantic, Kind> slot, RGHandle handle)
+    {
+        Set(slot.name, handle);
+    }
+    template<LiveResourceSemantic Semantic, RGResourceKind Kind>
+    std::span<const RGHandle> GetListView(LiveResourceSlot<Semantic, Kind, LiveResourceCardinality::List> slot) const
+    {
+        return GetListView(slot.name);
+    }
+    template<LiveResourceSemantic Semantic, RGResourceKind Kind>
+    void SetList(LiveResourceSlot<Semantic, Kind, LiveResourceCardinality::List> slot,
+                 std::span<const RGHandle> handles)
+    {
+        SetList(slot.name, handles);
+    }
 
   private:
+    friend class LivePipelineDesc;
     struct SlotHash
     {
         using is_transparent = void;
@@ -186,10 +440,56 @@ class LiveBlackboard
     {
         std::vector<RGHandle> handles;
         uint64_t generation{};
+        uint64_t writePermission{};
     };
+    void BeginFeatureWrites(std::string_view node)
+    {
+        if (++m_writeScope == 0)
+        {
+            for (auto& [name, slot] : m_slots)
+            {
+                slot.writePermission = 0;
+            }
+            ++m_writeScope;
+        }
+        m_writingFeature = node;
+    }
+    void AllowFeatureWrite(uint32_t slot) { m_boundSlots[slot]->writePermission = m_writeScope; }
+    void EndFeatureWrites() { m_writingFeature = {}; }
+    void BindPlan(const void* plan, uint64_t revision, std::span<const LiveResourceBinding> resources)
+    {
+        if (m_boundPlan == plan && m_boundRevision == revision)
+        {
+            return;
+        }
+        m_boundSlots.resize(resources.size());
+        for (size_t index = 0; index < resources.size(); ++index)
+        {
+            m_boundSlots[index] = &WritableSlot(resources[index].name);
+        }
+        m_boundPlan = plan;
+        m_boundRevision = revision;
+    }
+    std::span<const RGHandle> BoundHandles(uint32_t index) const
+    {
+        const Slot& slot = *m_boundSlots[index];
+        return slot.generation == m_generation ? std::span<const RGHandle>{slot.handles} : std::span<const RGHandle>{};
+    }
+    void CopyBoundSlot(uint32_t destination, uint32_t source)
+    {
+        const std::span<const RGHandle> handles = BoundHandles(source);
+        Slot& slot = *m_boundSlots[destination];
+        slot.handles.assign(handles.begin(), handles.end());
+        slot.generation = m_generation;
+    }
     Slot& WritableSlot(std::string_view slot)
     {
         const auto found = m_slots.find(slot);
+        if (!m_writingFeature.empty() && (found == m_slots.end() || found->second.writePermission != m_writeScope))
+        {
+            throw std::runtime_error("Feature node '" + std::string{m_writingFeature} + "' wrote undeclared slot '" +
+                                     std::string{slot} + "'.");
+        }
         if (found != m_slots.end())
         {
             return found->second;
@@ -200,10 +500,15 @@ class LiveBlackboard
     }
 
     // 174d073에서 고친 빌린 키 저장 뒤 원본 문자열 변경 문제가 재발하지 않도록 저장 키는 std::string으로 소유한다.
-    // 조회 view와 iterator는 호출 안에서만 쓰며 보관하지 않는다. 핸들과 목록도 값으로 반환한다.
+    // 조회 문자열과 iterator는 호출 밖에서 보관하지 않는다. GetListView만 현재 세대의 값 범위를 빌린다.
     // 저장 키와 조회 view에 같은 해시·문자 비교를 적용해 주소와 종료 문자에 의존하지 않는다.
     std::unordered_map<std::string, Slot, SlotHash, std::equal_to<>> m_slots;
     uint64_t m_generation{1};
+    std::vector<Slot*> m_boundSlots;
+    const void* m_boundPlan{};
+    uint64_t m_boundRevision{};
+    uint64_t m_writeScope{};
+    std::string_view m_writingFeature;
 };
 
 /// 프레임마다 달라지는 값. 노드 정의는 정적이어야 하므로 이런 것은 캡처가
@@ -223,6 +528,8 @@ struct LiveFrameBinding
     // 플레이어가 볼 화면이라 저작 보조물이 나오면 안 된다(E4-2에서
     // isEditorView를 중립 비트로 교체했다).
     uint32_t        viewFlags{ 0 };
+    RHIResourceState sharedInitialState{RHIResourceState::Common};
+    RHIResourceState sharedFinalState{RHIResourceState::Common};
 };
 
 /// 패스 하나의 어댑터. 데이터 절반(검증·덤프의 근거)과 접착 절반(타입)이 있다.
@@ -241,11 +548,49 @@ struct LivePassNode
 
     /// 읽고 → 같은 이름으로 재발행한다.
     ///
-    /// ★ 꺼질 수 있는 노드는 이것만 가질 수 있다(Validate가 강제한다).
-    ///   꺼졌을 때 소비자가 끊기지 않는 것은 슬롯 값이 그대로 남을 때뿐이고,
-    ///   그것이 지금 배선의 `X.GetOutput().IsValid() ? X : 이전값` 폴백이
-    ///   하던 일이다 — 규약을 코드가 아니라 규칙으로 올린다.
+    /// 꺼졌을 때 기존 값이 그대로 남는다. 새 required 출력을 발행하는
+    /// 조건부 노드는 disabledPassthroughs로 호환 입력을 지정해야 한다.
     std::vector<std::string> modifies;
+
+    std::vector<LiveResourceBinding> inputContracts, outputContracts, updateContracts;
+    struct DisabledPassthrough
+    {
+        LiveResourceBinding output;
+        LiveResourceBinding input;
+    };
+    std::vector<DisabledPassthrough> disabledPassthroughs;
+    /// CPU-side ordering that cannot be inferred from a GPU resource (e.g. a
+    /// shared lighting preparation result). Names are resolved only at assembly.
+    std::vector<std::string> dependsOn;
+    uint32_t requiredViewFlags{};
+
+    void Inputs(std::initializer_list<LiveResourceBinding> resources)
+    {
+        inputContracts.assign(resources);
+        reads.clear();
+        for (const LiveResourceBinding& resource : inputContracts)
+        {
+            reads.push_back(resource.name);
+        }
+    }
+    void Outputs(std::initializer_list<LiveResourceBinding> resources)
+    {
+        outputContracts.assign(resources);
+        writes.clear();
+        for (const LiveResourceBinding& resource : outputContracts)
+        {
+            writes.push_back(resource.name);
+        }
+    }
+    void Updates(std::initializer_list<LiveResourceBinding> resources)
+    {
+        updateContracts.assign(resources);
+        modifies.clear();
+        for (const LiveResourceBinding& resource : updateContracts)
+        {
+            modifies.push_back(resource.name);
+        }
+    }
 
     /// 뷰마다 인스턴스를 따로 두는가(시간축 상태를 가진 패스 — SSGI · Fog).
     ///
@@ -287,10 +632,19 @@ struct LivePassNode
     std::function<bool(const LiveFrameBinding&)> displayResolutionOutput;
 
     bool IsActive() const { return !active || active(); }
+    bool IsActive(const LiveFrameBinding& binding) const
+    {
+        return (binding.viewFlags & requiredViewFlags) == requiredViewFlags && IsActive();
+    }
     bool OutputsDisplayResolution(const LiveFrameBinding& binding) const
     {
         return displayResolutionOutput && displayResolutionOutput(binding);
     }
+
+  private:
+    friend class LivePipelineDesc;
+    std::string m_contributorName;
+    RenderFeatureStage m_contributorStage{RenderFeatureStage::BeforePresent};
 };
 
 struct LivePassNodeSnapshot
@@ -306,7 +660,17 @@ public:
     void AddNode(LivePassNode node);
     void Clear()
     {
+        if (!m_currentContributor.empty())
+        {
+            throw std::logic_error(
+                "A feature contributor must append nodes; clearing the engine pipeline is forbidden.");
+        }
         m_nodes.clear();
+        m_planNodes.clear();
+        m_planResources.clear();
+        m_planConsumers.clear();
+        ++m_revision;
+        m_compiledRevision = 0;
     }
     bool IsEmpty() const { return m_nodes.empty(); }
     size_t NodeCount() const { return m_nodes.size(); }
@@ -322,6 +686,14 @@ public:
     ///   · 같은 슬롯을 둘이 writes한다 → 둘째는 수정이므로 modifies로 적어야
     ///     하고, 그래야 '꺼지면 값 유지' 규약이 성립한다.
     bool Validate(std::string& outError) const;
+
+    struct CompiledPlanStats
+    {
+        uint64_t revision{};
+        size_t nodes{}, resources{}, dependencies{};
+    };
+    CompiledPlanStats GetCompiledPlanStats() const;
+    std::span<const uint32_t> GetNodeDependencies(size_t index) const;
 
     /// 노드 순서대로 Initialize. perView 노드는 뷰 수만큼 돈다.
     ///
@@ -347,9 +719,9 @@ public:
         const EnhancedFrameContext& context, const LiveFrameBinding& binding,
         const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare = {}) const;
 
-    /// 활성 노드 중 이 슬롯을 reads로 두고 이번 프레임에 소비하는 노드가 있는가.
-    bool HasConsumer(const std::string& slot, const EnhancedFrameContext& context,
-        const LiveFrameBinding& binding) const;
+    /// 활성 read 또는 비활성 노드의 passthrough가 이번 프레임에 이 슬롯을 소비하는가.
+    /// 선택적 입력을 그대로 흘리는 update만으로는 생산을 강제하지 않는다.
+    bool HasConsumer(std::string_view slot, const EnhancedFrameContext& context, const LiveFrameBinding& binding) const;
 
     /// 렌더 디버그 창용. 노드 이름 · 활성 상태 · 슬롯 연결을 사람이 읽는 형태로.
     ///
@@ -372,5 +744,39 @@ public:
     static bool RunSelfTest(std::string& outLog);
 
 private:
-    std::vector<LivePassNode> m_nodes;
+  friend class RenderFeatureContributors;
+  struct CompiledResourceUse
+  {
+      uint32_t slot{};
+      LiveResourceContract contract;
+      bool typed{};
+  };
+  struct CompiledPassthrough
+  {
+      uint32_t output{}, input{};
+  };
+  struct CompiledConsumer
+  {
+      uint32_t node{};
+      bool whenDisabled{};
+  };
+  struct CompiledNode
+  {
+      uint32_t node{};
+      std::vector<CompiledResourceUse> inputs, outputs, updates;
+      std::vector<CompiledPassthrough> disabledPassthroughs;
+      std::vector<uint32_t> dependencies;
+  };
+  bool CompileFeaturePlan(std::string& outError) const;
+  void ValidatePublishedResources(const CompiledNode& node, const LiveBlackboard& blackboard,
+                                  const EnhancedRenderGraph& graph, const EnhancedFrameContext& context) const;
+  std::vector<LivePassNode> m_nodes;
+  std::string_view m_currentContributor;
+  RenderFeatureStage m_currentContributionStage{RenderFeatureStage::BeforePresent};
+  uint64_t m_revision{1};
+  mutable uint64_t m_compiledRevision{};
+  mutable uint64_t m_planBindingId{};
+  mutable std::vector<CompiledNode> m_planNodes;
+  mutable std::vector<LiveResourceBinding> m_planResources;
+  mutable std::vector<std::vector<CompiledConsumer>> m_planConsumers;
 };

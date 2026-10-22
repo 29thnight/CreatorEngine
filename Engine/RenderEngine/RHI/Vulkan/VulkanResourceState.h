@@ -48,6 +48,70 @@ struct VulkanBarrierState
     VkAccessFlags2        access{ VK_ACCESS_2_NONE };
 };
 
+inline void ApplyVulkanExternalImageOwnership(const RHITransition& transition, bool externalShared,
+                                              uint32_t queueFamily, VkImageMemoryBarrier2& barrier)
+{
+    const bool acquire = transition.before == RHIResourceState::ExternalShared;
+    const bool release = transition.after == RHIResourceState::ExternalShared;
+    if (!acquire && !release)
+    {
+        return;
+    }
+    if (!externalShared || queueFamily == VK_QUEUE_FAMILY_IGNORED || acquire == release ||
+        barrier.subresourceRange.aspectMask != VK_IMAGE_ASPECT_COLOR_BIT ||
+        barrier.subresourceRange.baseMipLevel != 0 || barrier.subresourceRange.levelCount != 1 ||
+        barrier.subresourceRange.baseArrayLayer != 0 || barrier.subresourceRange.layerCount != 1 ||
+        (acquire && transition.after != RHIResourceState::CopyDest))
+    {
+        throw std::invalid_argument("External presentation ownership requires a full dedicated image overwrite");
+    }
+    barrier.srcQueueFamilyIndex = acquire ? VK_QUEUE_FAMILY_EXTERNAL : queueFamily;
+    barrier.dstQueueFamilyIndex = release ? VK_QUEUE_FAMILY_EXTERNAL : queueFamily;
+    if (acquire)
+    {
+        // A producer fully overwrites the previous consumer image. Discarding
+        // also handles the first import, whose native initial layout is undefined.
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE;
+        barrier.srcAccessMask = VK_ACCESS_2_NONE;
+    }
+    else
+    {
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
+        barrier.dstAccessMask = VK_ACCESS_2_NONE;
+    }
+}
+
+inline VkImageSubresourceRange ToVulkanSubresourceRange(const RHITextureSubresourceRange& range, uint32_t mipLevels,
+                                                        uint32_t arrayLayers, RHIFormat format,
+                                                        bool separateDepthStencil)
+{
+    const RHITextureAspect supported = RHITextureAspects(format);
+    RHITextureSubresourceRange resolved;
+    if (!ResolveRHITextureSubresourceRange(range, mipLevels, arrayLayers, supported, resolved) ||
+        (!separateDepthStencil && supported == (RHITextureAspect::Depth | RHITextureAspect::Stencil) &&
+         resolved.aspect != supported))
+    {
+        throw std::invalid_argument("Vulkan image transition has an unsupported subresource range");
+    }
+    VkImageAspectFlags aspects = 0;
+    const uint8_t bits = static_cast<uint8_t>(resolved.aspect);
+    if ((bits & static_cast<uint8_t>(RHITextureAspect::Color)) != 0)
+    {
+        aspects |= VK_IMAGE_ASPECT_COLOR_BIT;
+    }
+    if ((bits & static_cast<uint8_t>(RHITextureAspect::Depth)) != 0)
+    {
+        aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    }
+    if ((bits & static_cast<uint8_t>(RHITextureAspect::Stencil)) != 0)
+    {
+        aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+    return {aspects, resolved.firstMip, resolved.mipCount, resolved.firstLayer, resolved.layerCount};
+}
+
 /// `isSource` 는 배리어의 `before` 쪽인가다 (위 ★ 참고).
 inline VulkanBarrierState ToVulkan(RHIResourceState state, bool isSource)
 {
@@ -79,6 +143,7 @@ inline VulkanBarrierState ToVulkan(RHIResourceState state, bool isSource)
                  VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_SHADER_READ_BIT };
 
     case RHIResourceState::ShaderResource:
+    case RHIResourceState::SharedShaderResource:
         return { VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                  VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
                  VK_ACCESS_2_SHADER_READ_BIT };
@@ -117,6 +182,8 @@ inline VulkanBarrierState ToVulkan(RHIResourceState state, bool isSource)
         return { VK_IMAGE_LAYOUT_GENERAL,
                  VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT };
 
+    case RHIResourceState::ExternalShared:
+        return {VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_NONE, VK_ACCESS_2_NONE};
     case RHIResourceState::Common:
     default:
         // 위 ★ — 어느 쪽이냐가 답을 바꾸는 유일한 상태다.

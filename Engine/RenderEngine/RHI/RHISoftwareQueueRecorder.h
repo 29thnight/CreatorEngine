@@ -63,6 +63,7 @@ class RHISoftwareCommandQueue final : public IRHICommandQueue
                             own::shared_owner<IRHICommandQueue> nativeQueue);
 
   private:
+    bool PrepareBatch(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error);
     own::shared_owner<RHISoftwareQueueState> m_state;
     own::shared_owner<IRHICommandQueue> m_native;
 };
@@ -88,6 +89,8 @@ class RHISoftwareQueueRecorder final : public IRHIQueueRecorder
                         ce::lifetime_token token, ce::pooled_owner<IRHIQueueRecording>& recording,
                         std::string& error) override;
     bool ExecuteSubmission(const std::function<bool(std::string&)>& submit, std::string& error) override;
+    bool PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>& queue,
+                                const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
 
   private:
     own::shared_owner<RHISoftwareQueueState> m_state;

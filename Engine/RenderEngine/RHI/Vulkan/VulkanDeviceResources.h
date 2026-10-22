@@ -121,6 +121,12 @@ public:
     }
 
     uint64_t GetLastSignaledFenceValue() const override { return m_lastAdmittedFenceValue; }
+    // Producer-thread snapshot after successful EndFrame; this receipt proves
+    // native admission success independently of an advancing GPU timeline.
+    RHISubmissionTicket GetLastFrameSubmissionTicket() const
+    {
+        return m_frameSubmissionTickets[(m_frameIndex + kFrameCount - 1) % kFrameCount];
+    }
     uint64_t GetCompletedFenceValue() const override;
     // RHI 잠금 밖의 직렬 RT·PT 소유자만 호출한다. 완료 조회 콜백에서 부르면
     // submission 잠금을 재진입하므로 GetCompletedFenceValue와 분리한다.
@@ -164,6 +170,15 @@ public:
         return m_shaderArrayCapabilities;
     }
     RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
+    RHISubresourceCapabilities GetSubresourceCapabilities() const override
+    {
+        return {true, true, m_resourceTable.SupportsSeparateDepthStencilLayouts()};
+    }
+    RHIBufferInfo DescribeBuffer(RHIBufferHandle handle) const override
+    {
+        const VulkanBufferEntry entry = m_resourceTable.Resolve(handle);
+        return entry.IsValid() ? RHIBufferInfo{entry.bytes} : RHIBufferInfo{};
+    }
     bool IsAtomicMin64Buffer(RHIBufferHandle handle) const override
     {
         const auto entry = m_resourceTable.Resolve(handle);
@@ -323,6 +338,7 @@ public:
     uint32_t GetApiVersion() const { return m_apiVersion; }
     bool IsValidationEnabled() const { return VK_NULL_HANDLE != m_debugMessenger; }
     bool IsMemoryBudgetSupported() const { return m_memoryBudgetSupported; }
+    bool SupportsWin32ExternalMemory() const { return m_externalMemoryWin32Supported; }
     RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator()
     {
         return m_persistentMemoryBudget;
@@ -394,6 +410,7 @@ private:
     VkQueue          m_queue{ VK_NULL_HANDLE };
     uint32_t         m_queueFamily{ UINT32_MAX };
     bool             m_memoryBudgetSupported{ false };
+    bool m_externalMemoryWin32Supported{false};
     bool             m_nullDescriptorSupported{ false };
     bool             m_meshShaderExtensionSupported{ false };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
