@@ -1,0 +1,8 @@
+{
+  "path": "Engine/RenderEngine/RHI/RHIRecordedBatch.h",
+  "before_sha256": "888be6373f36ce87d47b3b018b2c7d8e6b9dc3a3b8b9d0fddd9019a4102123c8",
+  "after_sha256": "b7a548fc5a0cd7bb162302da5c29d5319def1512bccab247904819c2220f55a2",
+  "non_whitespace_bytes_identical": true,
+  "preprocessor_directive_lines_identical": true,
+  "change": "Whole-header formatting with explicit repository clang-format config; no token changes."
+}

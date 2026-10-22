@@ -1,0 +1,94 @@
+{
+  "status": "PASS",
+  "baseline_local_commit": "7b5e03da9802c903eaeacc48278d23585b36cfb6",
+  "baseline_published_master": "24db52e894c820cb01eeee71297c5654b579c5a9",
+  "baseline_tree": "cc90afe59fffcc09e05d1fc18ccf51944b167a18",
+  "source_identity_checks": {
+    "graph": {
+      "matched": 28,
+      "mismatches": [],
+      "external_dependency_files": []
+    },
+    "feature": {
+      "matched": 5,
+      "mismatches": [],
+      "external_dependency_files": []
+    },
+    "rhi": {
+      "matched": 139,
+      "mismatches": [],
+      "external_dependency_files": [
+        "external/enkiTS/src/LockLessMultiReadPipe.h",
+        "external/enkiTS/src/TaskScheduler.cpp",
+        "external/enkiTS/src/TaskScheduler.h"
+      ]
+    },
+    "material_reviewed": {
+      "matched": 13,
+      "mismatches": [],
+      "external_dependency_files": []
+    }
+  },
+  "static_checks": {
+    "git_diff_check": "PASS",
+    "modified_python_syntax": "PASS",
+    "evidence_json_parse": "PASS"
+  },
+  "prepared_view_pool": {
+    "result": "PreparedViewInputPool: PASS",
+    "command": [
+      "g++",
+      "-std=c++23",
+      "-O1",
+      "-g",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer",
+      "-I/workspace/scratch/b74b0a3b6389/CreatorEngine/ThirdParty/ownership_cpp/include",
+      "Tools/regression/PreparedViewInputPoolTests.cpp",
+      "-o",
+      "/tmp/creator-prepared-view-allocation-check"
+    ],
+    "runtime_environment": {
+      "ASAN_OPTIONS": "detect_leaks=0"
+    },
+    "source_sha256": {
+      "Tools/regression/PreparedViewInputPoolTests.cpp": "cdbe8b7210fb92ed3cc9ba2ae4bd70b37ba39a7e1de86647a366bcb2d52505c5",
+      "Engine/RenderEngine/Render/Scene/PreparedViewInputPool.h": "5b6ec05787d80736ddf02525d8ca36b19c633006c4a60be453d4aa621e5ac80c"
+    }
+  },
+  "native_scene_integration": "Source review only; Windows Editor/DX12 build and native material pixel fixtures not executed in Linux",
+  "modified_code_sha256": {
+    "Engine/RenderEngine/MaterialGraphSceneEffectStage.inl": "b7c28bef4c1e70534e47f26abe13b0afb2fa1d60970858c5670c3c544d67a1e3",
+    "Engine/RenderEngine/MaterialGraphSceneHost.cpp": "1e08d838dbd672296503386d1beb094ae2c027aad0969b6f2e7c5188a17792f2",
+    "Engine/RenderEngine/MaterialGraphSceneHost.h": "1574057eeb94cae3802b3900d1516f6525b44d0ed3b826cf68318fa7f39138f6",
+    "Engine/RenderEngine/MaterialGraphSceneLayerStage.inl": "e06f7c8fb32c53bc9d093df9c51010ed34e069b588d6e861e20f1b113bdbffba",
+    "Engine/RenderEngine/MaterialGraphSceneStages.inl": "6ec31b795c3cee88025ab55a3e76cefca810fbce55129bca2ed4a73ed852a4eb",
+    "Engine/RenderEngine/RHI/RHICommandTranslator.cpp": "084e3659a87c8524b214e50fa7ea538eee9ec5f111c21b40ad8dac64329c67e7",
+    "Engine/RenderEngine/RHI/RHIParallelCommandPool.h": "82f55e402dae73da259409112baf862bce61abfda6f6e745628a27394add888f",
+    "Engine/RenderEngine/RHI/RHIRecordedBatch.h": "b7a548fc5a0cd7bb162302da5c29d5319def1512bccab247904819c2220f55a2",
+    "Engine/RenderEngine/RHI/RHISubmissionThread.cpp": "e87b18975fd2f611efe9766844bffcf364a95b564dfa7260b7bc28ec2d72b058",
+    "Engine/RenderEngine/Render/Core/EnhancedLightPacking.h": "675c6802217051bd0f7eb94a8091430a0218d31e08e610bf77dcae0c9945f450",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp": "89af2517151de79f22781fc294d58602aa5a8f0546ed2f51ac6dab224be2e206",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h": "b1faf96c5620c4bef6822299e721208fb12bf14e7c583da4e0a6546a9baaab51",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "66beefc1a70b67ded3a9e945da261ab397db532a84e4244fb1d55380df56639c",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "0fa6638de3c1ab297e5190fdce944dfd45d02ee383afd8c3f85e63f9f137d692",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp": "67d34fee0dba968ce51b52f871b19ca5fe4315c8f56c613508303e83b95e15ef",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphSubresources.cpp": "ba979d1a625779164c1dd8b78c0900848e5900d9bc5eb9e7dcb6c698ec43f9dd",
+    "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": "db8b2d50bc23bf9b27762ca3435240a7480d342914dc23831b6f9627138a6714",
+    "Engine/RenderEngine/RenderScene.cpp": "fa3eb7282968db6f288c4a636e172108be697e9c78b42790ef279d4b9f5b7a4b",
+    "Engine/RenderEngine/RenderScene.h": "236917d927d7889f6ecec8fab3384942fac0ee824a924967204a495a43edb683",
+    "Tools/regression/fixtures/live-pipeline-portable-pass.h": "e646a31c34994b3230fe972bc365a2bdd0ee7d62db764efe428bec3e9da6d775",
+    "Tools/regression/fixtures/render-graph-portable-platform.cpp": "497a41e1dcd8837f3b1c51dff9d4a415201d0c421d5f88ac3be07dd1735f69c0",
+    "Tools/regression/live_pipeline_contract_probe.cpp": "a28f1185af923f37ff8cec0499a59dde191e428e26eae10755d77d501eed19c5",
+    "Tools/regression/material_forward_blend_tests.inl": "2c1b1ec27ec90dbbf3a1e5679aa6bb54d8a0a5292e3d8d85d4713a96fea1e7ad",
+    "Tools/regression/render_graph_program_probe.cpp": "af80df663c623649f98a962c0f8a0858e63ee17873db42bff9644ebefee540e6",
+    "Tools/regression/rhi_software_translation_probe.cpp": "4d992260fa17e143b6a9aecc3d35bc1348d0b9bec5831eb915e7ec4cfffea54e",
+    "Tools/regression/verify-live-pipeline-contracts.py": "9637fddd48ffcb282696d1ebc05247b010fcb43cb5c2c2373bffbe12237b20e6",
+    "Tools/regression/verify-render-graph-program.py": "56d82ae7108121b79734e47e72877ca0a0ea8ae6212ffc4f994c8cf2338c9c9b",
+    "Tools/regression/verify-rhi-software-portable.py": "373d90764f95e0a7d4c80e197a32ccf29070314537f0c6066a058fb7ccbde60f",
+    "Tools/regression/fixtures/light-packing-portable-proxy-base.h": "ef1ebaaec3b6dfde39ed28aa0d909e1f552da21ce04bb22b0503683018af12dd",
+    "Tools/regression/fixtures/render-graph-allocation-counters.h": "aeef5e3a24d991e72ef4eb828ce52804ae0e1d48446f7e1cbea4f7948cb74c00",
+    "Tools/regression/render_graph_allocation_probe.cpp": "120e1a7a3cde6d34d33e5547a904da5b683fc51a91c0c323e3a08e86ad9e105a",
+    "Tools/regression/verify-render-graph-allocations.py": "a57a6291313ea4ab108dc07b378e162d9118d474f38d80994857dd99580e9047"
+  }
+}

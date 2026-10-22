@@ -81,16 +81,37 @@ bool EnhancedRenderGraph::ValidateSubresources(std::string& outError)
             }
         }
     }
-    std::vector<size_t> cellCounts(m_resources.size());
+    if (!m_subresourceScratch)
+    {
+        m_subresourceScratch = own::make_unique<SubresourceScratch>();
+    }
+    auto& scratch = *m_subresourceScratch;
+    scratch.accessCells.resize(m_resources.size());
+    scratch.stateCells.resize(m_resources.size());
+    const auto capabilities = m_deviceServices->GetSubresourceCapabilities();
     for (uint16_t index = 0; index < m_resources.size(); ++index)
     {
         // The Cartesian mip/layer partition is explicit compiler storage. Reject
         // pathological declarations before dependency or barrier allocation.
-        cellCounts[index] = BuildSubresourceCells(index, false).size();
-        if (cellCounts[index] == 0)
+        auto& accessCells = scratch.accessCells[index];
+        auto& stateCells = scratch.stateCells[index];
+        BuildSubresourceCells(index, false, accessCells, scratch);
+        if (accessCells.empty())
         {
             outError = "Subresource partition exceeds 65536 cells: " + m_resources[index].name;
             return false;
+        }
+        // State and access partitions are identical on fully range-capable
+        // resources. Reuse the validated geometry instead of rescanning every
+        // pass's usages a second time. Wider backends rebuild their own cells.
+        if (m_resources[index].IsBuffer() ? capabilities.bufferRanges
+                                          : capabilities.textureRanges && capabilities.separateDepthStencil)
+        {
+            stateCells.assign(accessCells.begin(), accessCells.end());
+        }
+        else
+        {
+            BuildSubresourceCells(index, true, stateCells, scratch);
         }
     }
     for (const auto& pass : m_passes)
@@ -135,7 +156,7 @@ bool EnhancedRenderGraph::ValidateSubresources(std::string& outError)
                         continue;
                     }
                     const auto index = usages[left].handle.index;
-                    for (const auto& cell : BuildSubresourceCells(index, true))
+                    for (const auto& cell : scratch.stateCells[index])
                     {
                         if (CoversSubresource(index, usages[left], cell, true) &&
                             CoversSubresource(index, usages[right], cell, true))
@@ -175,15 +196,15 @@ bool EnhancedRenderGraph::ValidateSubresources(std::string& outError)
     // one barrier per usage is insufficient for repeated range passes. Include
     // boundary convergence and prologue/epilogue without narrowing uint64_t sums.
     uint64_t maximumBarriers = 0;
-    for (const auto count : cellCounts)
+    for (const auto& cells : scratch.accessCells)
     {
-        maximumBarriers += 2 * count;
+        maximumBarriers += 2 * cells.size();
     }
     const auto countUsages = [&](std::span<const RGPassUsage> usages, uint32_t repetitions)
     {
         for (const auto& usage : usages)
         {
-            maximumBarriers += (2 * uint64_t(cellCounts[usage.handle.index]) + 1) * repetitions;
+            maximumBarriers += (2 * uint64_t(scratch.accessCells[usage.handle.index].size()) + 1) * repetitions;
             if (maximumBarriers > UINT32_MAX)
             {
                 return false;
@@ -213,29 +234,38 @@ bool EnhancedRenderGraph::ValidateSubresources(std::string& outError)
     return true;
 }
 
-std::vector<EnhancedRenderGraph::SubresourceCell> EnhancedRenderGraph::BuildSubresourceCells(uint16_t index,
-                                                                                             bool states) const
+void EnhancedRenderGraph::BuildSubresourceCells(uint16_t index, bool states, std::vector<SubresourceCell>& cells,
+                                                SubresourceScratch& scratch) const
 {
     const auto& resource = m_resources[index];
     const auto& schema = m_rangeSchemas[index];
     const auto capabilities = m_deviceServices->GetSubresourceCapabilities();
     const auto aspects = RHITextureAspects(schema.texture.format);
-    std::vector<SubresourceCell> cells;
+    cells.clear();
     if (resource.IsBuffer() && states && !capabilities.bufferRanges)
     {
         cells.push_back({{}, {0, schema.buffer.bytes}});
-        return cells;
+        return;
     }
     if (!resource.IsBuffer() && states && !capabilities.textureRanges)
     {
         cells.push_back(
             {{0, schema.texture.mipLevels, 0, (schema.texture.is3D ? 1u : schema.texture.depthOrArraySize), aspects},
              {}});
-        return cells;
+        return;
     }
-    std::vector<uint64_t> offsets{0, schema.buffer.bytes};
-    std::vector<uint32_t> mips{0, schema.texture.mipLevels},
-        layers{0, (schema.texture.is3D ? 1u : schema.texture.depthOrArraySize)};
+    auto& offsets = scratch.offsets;
+    auto& mips = scratch.mips;
+    auto& layers = scratch.layers;
+    if (resource.IsBuffer())
+    {
+        offsets.assign({0, schema.buffer.bytes});
+    }
+    else
+    {
+        mips.assign({0, schema.texture.mipLevels});
+        layers.assign({0, (schema.texture.is3D ? 1u : schema.texture.depthOrArraySize)});
+    }
     const auto add = [&](std::span<const RGPassUsage> usages)
     {
         for (const auto& usage : usages)
@@ -281,7 +311,7 @@ std::vector<EnhancedRenderGraph::SubresourceCell> EnhancedRenderGraph::BuildSubr
         Unique(offsets);
         if (offsets.size() - 1 > kMaximumSubresourceCells)
         {
-            return {};
+            return;
         }
         cells.reserve(offsets.size() - 1);
         for (size_t part = 1; part < offsets.size(); ++part)
@@ -299,7 +329,7 @@ std::vector<EnhancedRenderGraph::SubresourceCell> EnhancedRenderGraph::BuildSubr
         if (!aspectCount || !mipCount || !layerCount || mipCount > kMaximumSubresourceCells / aspectCount ||
             layerCount > kMaximumSubresourceCells / aspectCount / mipCount)
         {
-            return {};
+            return;
         }
         cells.reserve(mipCount * layerCount * aspectCount);
         for (size_t mip = 1; mip < mips.size(); ++mip)
@@ -329,7 +359,6 @@ std::vector<EnhancedRenderGraph::SubresourceCell> EnhancedRenderGraph::BuildSubr
             }
         }
     }
-    return cells;
 }
 
 bool EnhancedRenderGraph::CoversSubresource(uint16_t index, const RGPassUsage& usage, const SubresourceCell& cell,
@@ -379,7 +408,7 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
         const RGPassUsage* usage;
     };
     std::vector<std::vector<std::vector<Access>>> accesses(m_resources.size());
-    std::vector<std::vector<SubresourceCell>> cells(m_resources.size());
+    const auto& cells = m_subresourceScratch->accessCells;
     std::vector<Edge> dependencies;
     ce::dynamic_bitset alive(m_passes.size(), false);
     std::vector<uint16_t> roots;
@@ -402,7 +431,6 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
     {
         const auto& resource = m_resources[index];
         accesses[index].resize(resource.versions.size());
-        cells[index] = BuildSubresourceCells(index, false);
         if (resource.imported && !resource.firstImport)
         {
             outError = "RG2 duplicate physical import; reuse its handle: " + resource.name;
@@ -635,29 +663,37 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
 {
     const bool queuePlan = batchEnds != nullptr;
     const auto& order = GetExecuteOrder();
-    std::vector<std::vector<SubresourceCell>> cells(m_resources.size());
-    std::vector<RHIResourceState> finalStates(m_resources.size());
-    ce::dynamic_bitset externalResources(m_resources.size(), false);
+    auto& scratch = *m_subresourceScratch;
+    auto& cells = scratch.stateCells;
+    auto& finalStates = scratch.finalStates;
+    auto& externalResources = scratch.externalResources;
+    finalStates.resize(m_resources.size());
+    externalResources.assign(m_resources.size(), false);
     m_stats.barriersEmitted = m_stats.barrierBatches = 0;
-    const auto countPlan = [&](const auto& plan, uint32_t repetitions = 1)
+    const auto countBarriers = [&](size_t count, uint32_t repetitions = 1)
     {
-        const auto count = plan.transitions.size() + plan.bufferTransitions.size() + plan.uavBarriers.size() +
-                           plan.uavBufferBarriers.size();
         m_stats.barriersEmitted += static_cast<uint32_t>(count * repetitions);
         m_stats.barrierBatches += count ? repetitions : 0;
     };
-    const auto transition = [&](PhaseBarrierPlan& plan, uint16_t index, SubresourceCell& cell, RHIResourceState after)
+    const auto countPlan = [&](const auto& plan, uint32_t repetitions = 1)
+    {
+        countBarriers(plan.transitions.size() + plan.bufferTransitions.size() + plan.uavBarriers.size() +
+                          plan.uavBufferBarriers.size(),
+                      repetitions);
+    };
+    const auto transition =
+        [&](auto& transitions, auto& bufferTransitions, uint16_t index, SubresourceCell& cell, RHIResourceState after)
     {
         const auto& resource = m_resources[index];
         if (cell.state != after)
         {
             if (resource.IsBuffer())
             {
-                plan.bufferTransitions.push_back({resource.buffer, cell.state, after, cell.buffer});
+                bufferTransitions.push_back({resource.buffer, cell.state, after, cell.buffer});
             }
             else
             {
-                plan.transitions.push_back({resource.handle, cell.state, after, cell.texture});
+                transitions.push_back({resource.handle, cell.state, after, cell.texture});
             }
         }
         cell.state = after;
@@ -676,13 +712,14 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
         }
         externalResources.set(index, resource.initialState == RHIResourceState::ExternalShared ||
                                          finalStates[index] == RHIResourceState::ExternalShared);
-        cells[index] = BuildSubresourceCells(index, true);
         for (auto& cell : cells[index])
         {
             cell.state = resource.initialState;
+            cell.previousWrite = true;
+            cell.atomicVersion = RGHandle::kInvalid;
             if (queuePlan && !externalResources.test(index))
             {
-                transition(*prologue, index, cell, RHIResourceState::Common);
+                transition(prologue->transitions, prologue->bufferTransitions, index, cell, RHIResourceState::Common);
             }
         }
     }
@@ -701,7 +738,7 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
         pass.poisonBuffers.clear();
         pass.aliasClears.clear();
     }
-    const auto planUsages = [&](std::span<const RGPassUsage> usages, PhaseBarrierPlan& plan)
+    const auto planUsages = [&](std::span<const RGPassUsage> usages, auto& plan)
     {
         for (const auto& usage : usages)
         {
@@ -717,7 +754,7 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
                     usage.access == RGAccessMode::AtomicMin64 && cell.atomicVersion == usage.handle.version;
                 uav |= cell.state == usage.state && usage.state == RHIResourceState::UnorderedAccess &&
                        !siblingAtomic && (cell.previousWrite || WritesRange(usage));
-                transition(plan, index, cell, usage.state);
+                transition(plan.transitions, plan.bufferTransitions, index, cell, usage.state);
                 cell.previousWrite = WritesRange(usage);
                 cell.atomicVersion =
                     usage.access == RGAccessMode::AtomicMin64 ? usage.handle.version : RGHandle::kInvalid;
@@ -758,15 +795,9 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
         }
         else
         {
-            PhaseBarrierPlan plan;
-            planUsages(pass.usages, plan);
-            countPlan(plan);
-            pass.transitions = std::move(plan.transitions);
-            pass.bufferTransitions = std::move(plan.bufferTransitions);
-            pass.uavBarriers = std::move(plan.uavBarriers);
-            pass.uavBufferBarriers = std::move(plan.uavBufferBarriers);
+            planUsages(pass.usages, pass);
+            countPlan(pass);
         }
-        PhaseBarrierPlan final;
         for (uint16_t index = 0; index < m_resources.size(); ++index)
         {
             auto& resource = m_resources[index];
@@ -793,15 +824,13 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
             // carry one state. Converge all cells before returning that state.
             for (auto& cell : cells[index])
             {
-                transition(final, index, cell, target);
+                transition(pass.finalTransitions, pass.finalBufferTransitions, index, cell, target);
                 cell.previousWrite = true;
                 cell.atomicVersion = RGHandle::kInvalid;
             }
             resource.state = target;
         }
-        countPlan(final);
-        pass.finalTransitions = std::move(final.transitions);
-        pass.finalBufferTransitions = std::move(final.bufferTransitions);
+        countBarriers(pass.finalTransitions.size() + pass.finalBufferTransitions.size());
     }
     if (queuePlan)
     {
@@ -813,7 +842,7 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
             }
             for (auto& cell : cells[index])
             {
-                transition(*epilogue, index, cell, finalStates[index]);
+                transition(epilogue->transitions, epilogue->bufferTransitions, index, cell, finalStates[index]);
             }
             m_resources[index].state = finalStates[index];
         }

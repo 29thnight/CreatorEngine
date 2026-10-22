@@ -104,14 +104,29 @@ def snapshot(root: Path, enkits: Path, paths: set[Path], destination: Path,
     local_paths = sorted(path.relative_to(root).as_posix() for path in paths if path.is_relative_to(root))
     if baseline:
         existing = execute(["git", "ls-tree", "-r", "--name-only", baseline, "--", *local_paths], cwd=root).stdout.splitlines()
-        archive = subprocess.Popen(["git", "archive", baseline, "--", *existing], cwd=root, stdout=subprocess.PIPE)
-        assert archive.stdout is not None
-        extract = subprocess.run(["tar", "-x", "-C", str(destination)], stdin=archive.stdout,
-                                 capture_output=True, text=True, timeout=300)
-        archive.stdout.close()
-        code = archive.wait(timeout=300)
-        if code or extract.returncode:
-            raise RuntimeError(f"Pinned baseline archive failed: {code} {extract.stderr}")
+        # Read exactly the dependency blobs. git archive can request unrelated
+        # ancestor .gitattributes from a partial clone's promisor remote, even
+        # when every source needed by this fixture is already present locally.
+        objects = subprocess.run(["git", "cat-file", "--batch"], cwd=root,
+                                 input="".join(f"{baseline}:{path}\n" for path in existing).encode(),
+                                 capture_output=True, timeout=300)
+        if objects.returncode:
+            raise RuntimeError(f"Pinned baseline blob read failed: {objects.stderr.decode(errors='replace')}")
+        offset = 0
+        for relative in existing:
+            header_end = objects.stdout.find(b"\n", offset)
+            header = objects.stdout[offset:header_end].split()
+            if header_end < 0 or len(header) != 3 or header[1] != b"blob":
+                raise RuntimeError(f"Pinned baseline dependency is not a blob: {relative}")
+            count = int(header[2])
+            first = header_end + 1
+            last = first + count
+            if objects.stdout[last:last + 1] != b"\n":
+                raise RuntimeError(f"Truncated pinned baseline dependency: {relative}")
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(objects.stdout[first:last])
+            offset = last + 1
     else:
         for relative in local_paths:
             target = destination / relative

@@ -601,6 +601,18 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
     const EnhancedFrameContext& context, const LiveFrameBinding& binding,
     const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
 {
+    using Observer = std::function<void(const LivePassNode&, const LiveBlackboard&)>;
+    const auto invoke = [](const void* observer, const LivePassNode& node, const LiveBlackboard& values)
+    { (*static_cast<const Observer*>(observer))(node, values); };
+    DeclareAllImpl(blackboard, graph, context, binding, &afterDeclare, afterDeclare ? +invoke : nullptr);
+}
+
+void LivePipelineDesc::DeclareAllImpl(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
+                                      const EnhancedFrameContext& context, const LiveFrameBinding& binding,
+                                      const void* observer,
+                                      void (*afterDeclare)(const void*, const LivePassNode&,
+                                                           const LiveBlackboard&)) const
+{
     ce::profile_scope declarationProfile{ce::marker<"RenderGraphDeclare">()};
     ce::profile_instant(RenderContainerReuseEnabled() ? ce::marker<"RenderContainerReuse.On">()
                                                       : ce::marker<"RenderContainerReuse.Off">());
@@ -658,7 +670,7 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
             if (afterDeclare)
             {
                 ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
-                afterDeclare(node, blackboard);
+                afterDeclare(observer, node, blackboard);
             }
         }
         if (declarationPackets)

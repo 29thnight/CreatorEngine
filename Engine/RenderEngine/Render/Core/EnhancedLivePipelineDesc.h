@@ -719,6 +719,28 @@ public:
         const EnhancedFrameContext& context, const LiveFrameBinding& binding,
         const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare = {}) const;
 
+    // Declaration observers run synchronously and are never retained. Borrow a
+    // caller's functor instead of constructing an owning std::function every
+    // frame when its capture exceeds the implementation's small buffer.
+    template<class Observer>
+        requires(std::is_class_v<std::remove_cvref_t<Observer>> &&
+                 !std::is_same_v<std::remove_cvref_t<Observer>,
+                                 std::function<void(const LivePassNode&, const LiveBlackboard&)>> &&
+                 std::is_invocable_r_v<void, Observer&, const LivePassNode&, const LiveBlackboard&>)
+    void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
+                    const LiveFrameBinding& binding, Observer&& afterDeclare) const
+    {
+        using Callback = std::remove_reference_t<Observer>;
+        DeclareAllImpl(blackboard, graph, context, binding, std::addressof(afterDeclare),
+                       [](const void* observer, const LivePassNode& node, const LiveBlackboard& values)
+                       {
+                           // Callback preserves the argument's const qualifier;
+                           // mutable lvalue/rvalue functors remain callable too.
+                           auto* callback = const_cast<Callback*>(static_cast<const Callback*>(observer));
+                           (*callback)(node, values);
+                       });
+    }
+
     /// 활성 read 또는 비활성 노드의 passthrough가 이번 프레임에 이 슬롯을 소비하는가.
     /// 선택적 입력을 그대로 흘리는 update만으로는 생산을 강제하지 않는다.
     bool HasConsumer(std::string_view slot, const EnhancedFrameContext& context, const LiveFrameBinding& binding) const;
@@ -768,6 +790,9 @@ private:
       std::vector<uint32_t> dependencies;
   };
   bool CompileFeaturePlan(std::string& outError) const;
+  void DeclareAllImpl(LiveBlackboard& blackboard, EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
+                      const LiveFrameBinding& binding, const void* observer,
+                      void (*afterDeclare)(const void*, const LivePassNode&, const LiveBlackboard&)) const;
   void ValidatePublishedResources(const CompiledNode& node, const LiveBlackboard& blackboard,
                                   const EnhancedRenderGraph& graph, const EnhancedFrameContext& context) const;
   std::vector<LivePassNode> m_nodes;

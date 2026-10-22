@@ -193,17 +193,43 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         tiles.Declare(*graph, context);
         if (!meteorLayerWork.blended.empty()) {
             auto wrong = meteorLayerWork;
-            wrong.blended.pop_back();
+            wrong.blended = wrong.blended.first(wrong.blended.size() - 1);
             bool rejected = false;
             try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Blended rejects incomplete command-list slot before declaring layers");
             wrong = meteorLayerWork;
-            ++wrong.blended.front().epoch;
+            std::vector<RGHandle> wrongEpoch(wrong.blended.begin(), wrong.blended.end());
+            ++wrongEpoch.front().epoch;
+            wrong.blended = wrongEpoch;
             rejected = false;
             try { host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting()); }
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Blended rejects command inputs from another graph epoch");
+            wrong = meteorLayerWork;
+            ++wrong.declarationEpoch;
+            rejected = false;
+            try
+            {
+                host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting());
+            }
+            catch (const std::runtime_error& failure)
+            {
+                rejected = std::string_view{failure.what()}.find("command span belongs") != std::string_view::npos;
+            }
+            Check(rejected, "Blended rejects a stale span token before reading borrowed command storage");
+            wrong = meteorLayerWork;
+            wrong.declarationGraph = nullptr;
+            rejected = false;
+            try
+            {
+                host.DeclareBlendedStream(*graph, wrong, opaque, {}, tiles.GetLighting());
+            }
+            catch (const std::runtime_error& failure)
+            {
+                rejected = std::string_view{failure.what()}.find("command span belongs") != std::string_view::npos;
+            }
+            Check(rejected, "Blended rejects an unbound or unrelated span owner");
         }
         if (fixture == 0) {
             const auto selected = host.BlendedDraws();
@@ -214,7 +240,13 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
             catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "Blended duplicate indices rejected without publishing partial layer output");
         }
-        const auto blended = host.DeclareBlendedStream(*graph, meteorLayerWork, opaque, {}, tiles.GetLighting());
+        // Fixture zero contains one draw. Its public caller's temporary index
+        // vector is destroyed before graph Execute; shading callbacks must own
+        // their ordered index range through graph declaration storage.
+        const auto blended = fixture == 0
+                                 ? host.DeclareBlended(*graph, {host.BlendedDraws().front().index}, meteorLayerWork,
+                                                       opaque, {}, tiles.GetLighting())
+                                 : host.DeclareBlendedStream(*graph, meteorLayerWork, opaque, {}, tiles.GetLighting());
         if (fixture == 0) {
             bool rejected = false;
             try { host.DeclareBlendedStream(*graph, meteorLayerWork, blended, {}, tiles.GetLighting()); }

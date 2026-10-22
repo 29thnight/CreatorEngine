@@ -15,6 +15,29 @@ void EnhancedRenderGraph::RequireQueueIdle() const
     }
 }
 
+void EnhancedRenderGraph::ResetQueueDiagnostics()
+{
+    // The public report becomes empty while private storage keeps each batch's
+    // pass-list capacity. A subsequent report never exposes inactive batches.
+    auto& diagnostic = m_queueDiagnostics;
+    if (m_queueBatchPassScratch.size() < diagnostic.batches.size())
+    {
+        m_queueBatchPassScratch.resize(diagnostic.batches.size());
+    }
+    for (size_t index = 0; index < diagnostic.batches.size(); ++index)
+    {
+        diagnostic.batches[index].passes.swap(m_queueBatchPassScratch[index]);
+        m_queueBatchPassScratch[index].clear();
+    }
+    diagnostic.batches.clear();
+    diagnostic.waits.clear();
+    diagnostic.schedule.Reset();
+    diagnostic.execution = {};
+    diagnostic.specialized = false;
+    diagnostic.requestedExecutionMode = diagnostic.effectiveExecutionMode = 0;
+    diagnostic.measurementDomain = RGMeasurementDomain::Normal;
+}
+
 bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
     IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
     const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
@@ -88,7 +111,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         outError = "Queue endpoints must belong to the same device incarnation";
         return false;
     }
-    m_queueDiagnostics = {};
+    ResetQueueDiagnostics();
     m_stats.recordingJobDispatchCount = 0;
     m_stats.recordingOwnerJoinCount = 0;
     m_stats.recordingDispatcherHandoffCount = 0;
@@ -99,7 +122,18 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     diagnostic.requestedExecutionMode = GetQueueExecutionMode();
     diagnostic.measurementDomain = GetMeasurementDomain();
     cpu.diagnostic = &diagnostic.execution;
-    QueueSchedule plan;
+    if (!m_queueSubmissionScratch)
+    {
+        m_queueSubmissionScratch = own::make_unique<QueueSubmissionScratch>();
+    }
+    auto& scratch = *m_queueSubmissionScratch;
+    // Every local vector is destroyed after recording/translation/submission
+    // joins. Native batches retain their separate leases, never this arena.
+    // Barrier specialization has a different arena because it runs below while
+    // these planning arrays are still live.
+    scratch.arena.reset();
+    auto* arena = &scratch.arena;
+    auto& plan = scratch.schedule;
     if (!BuildQueueSchedule({true, compute != nullptr, false, compute != nullptr}, hints,
         minimumGpuNanoseconds, plan, outError))
     {
@@ -109,14 +143,17 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     // A queue's wait on a newer producer point covers all older points from
     // that producer queue. Keep the earliest required frontier, then split
     // batches at its producer/consumer so independent work is not held back.
-    std::vector<size_t> positions(m_passes.size(), 0);
+    ce::render_arena_vector<size_t> positions(m_passes.size(), 0, arena);
     for (size_t index = 0; index < plan.entries.size(); ++index)
     {
         positions[plan.entries[index].pass] = index + 1;
     }
     size_t graphicsFrontier = 0, computeFrontier = 0;
-    std::vector<QueueSchedule::Wait> waits;
-    ce::dynamic_bitset incoming(m_passes.size(), false), outgoing(m_passes.size(), false);
+    ce::render_arena_vector<QueueSchedule::Wait> waits{arena};
+    auto& incoming = scratch.incoming;
+    auto& outgoing = scratch.outgoing;
+    incoming.assign(m_passes.size(), false);
+    outgoing.assign(m_passes.size(), false);
     for (const auto& entry : plan.entries)
     {
         const QueueSchedule::Wait* newest = nullptr;
@@ -136,7 +173,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             outgoing.set(newest->producer, true);
         }
     }
-    plan.waits = std::move(waits);
+    plan.waits.assign(waits.begin(), waits.end());
     const auto count = plan.entries.size() + 2;
     const auto validCounter = [&](const QueueEndpoint& endpoint)
     {
@@ -147,7 +184,8 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         outError = "Queue signal range is exhausted";
         return false;
     }
-    ce::dynamic_bitset batchEnds(m_passes.size(), false);
+    auto& batchEnds = scratch.batchEnds;
+    batchEnds.assign(m_passes.size(), false);
     for (size_t index = 0; index < plan.entries.size(); ++index)
     {
         batchEnds.set(plan.entries[index].pass, index + 1 == plan.entries.size() ||
@@ -158,7 +196,10 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     // Reset is required before retry: Execute must never use a queue-specialized
     // pass plan without its prologue and epilogue.
     m_queueExecutionAttempted = true;
-    PhaseBarrierPlan prologue, epilogue;
+    auto& prologue = scratch.prologue;
+    auto& epilogue = scratch.epilogue;
+    prologue.clear();
+    epilogue.clear();
     if (plan.usesCompute)
     {
         // Queue placement may reorder the shared structural schedule. Materialize
@@ -170,8 +211,10 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         }
         m_executeOrderOverridden = true;
         UpdateResourceUses();
-        ce::dynamic_bitset retainedGraphicsTextures(m_resources.size(), false);
-        ce::dynamic_bitset sharedReadTextures(m_resources.size(), false);
+        auto& retainedGraphicsTextures = scratch.retainedGraphicsTextures;
+        auto& sharedReadTextures = scratch.sharedReadTextures;
+        retainedGraphicsTextures.assign(m_resources.size(), false);
+        sharedReadTextures.assign(m_resources.size(), false);
         for (size_t index = 0; index < m_resources.size(); ++index)
         {
             const auto& resource = m_resources[index];
@@ -234,8 +277,20 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     output.prologueBarriers = static_cast<uint32_t>(prologue.transitions.size() + prologue.bufferTransitions.size());
     output.epilogueBarriers = static_cast<uint32_t>(epilogue.transitions.size() + epilogue.bufferTransitions.size());
     diagnostic.batches.reserve(count);
-    diagnostic.batches.push_back({RHIQueueKind::Graphics, {}, output.prologueBarriers});
-    std::vector<uint32_t> passBatch(m_passes.size(), UINT32_MAX);
+    const auto appendBatch = [&](RHIQueueKind queue, uint32_t barriers) -> QueueDiagnostics::Batch&
+    {
+        const auto index = diagnostic.batches.size();
+        auto& batch = diagnostic.batches.emplace_back();
+        if (index < m_queueBatchPassScratch.size())
+        {
+            batch.passes.swap(m_queueBatchPassScratch[index]);
+        }
+        batch.queue = queue;
+        batch.barriers = barriers;
+        return batch;
+    };
+    appendBatch(RHIQueueKind::Graphics, output.prologueBarriers);
+    ce::render_arena_vector<uint32_t> passBatch(m_passes.size(), UINT32_MAX, arena);
     for (size_t begin = 0; begin < plan.entries.size();)
     {
         size_t end = begin + 1;
@@ -243,21 +298,19 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         {
             ++end;
         }
-        QueueDiagnostics::Batch batch;
-        batch.queue = plan.entries[begin].queue;
+        auto& batch = appendBatch(plan.entries[begin].queue, 0);
         batch.passes.reserve(end - begin);
         for (size_t index = begin; index < end; ++index)
         {
             const auto pass = plan.entries[index].pass;
-            passBatch[pass] = static_cast<uint32_t>(diagnostic.batches.size());
+            passBatch[pass] = static_cast<uint32_t>(diagnostic.batches.size() - 1);
             batch.passes.push_back(pass);
             batch.barriers += GetPassBarrierCount(RGPassId{pass});
         }
         output.plannedComputeBatches += batch.queue == RHIQueueKind::Compute ? 1u : 0u;
-        diagnostic.batches.push_back(std::move(batch));
         begin = end;
     }
-    diagnostic.batches.push_back({RHIQueueKind::Graphics, {}, output.epilogueBarriers});
+    appendBatch(RHIQueueKind::Graphics, output.epilogueBarriers);
     output.plannedBatches = static_cast<uint32_t>(diagnostic.batches.size());
     // Build the exact wait list before recording/submission. A batch index plus
     // one is a monotonic frontier on its producer queue; zero means no wait.
@@ -305,8 +358,8 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         ce::pooled_owner<IRHIQueueCommandBatch> batch;
         ce::pooled_owner<IRHIQueueRecording> targets;
     };
-    std::vector<Recording> recordings(output.plannedBatches);
-    std::vector<RHITimelinePoint> points(output.plannedBatches);
+    ce::render_arena_vector<Recording> recordings(output.plannedBatches, arena);
+    ce::render_arena_vector<RHITimelinePoint> points(output.plannedBatches, arena);
     struct PassTimer
     {
         IRHIGpuProfiler* profiler;
@@ -384,7 +437,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             for (uint32_t index = 0; index < output.plannedBatches; ++index)
             {
                 auto& recording = recordings[index];
-                if (!recorder.Record(recording.endpoint->queue, [&](RHIEncoder& encoder)
+                const auto commands = [&](RHIEncoder& encoder)
                 {
                     if (index == 0)
                     {
@@ -398,7 +451,11 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                     {
                         recordPass(encoder, *recording.endpoint, pass, 0, 1);
                     }
-                }, lease, recording.batch, outError))
+                };
+                // Record finishes this callback before returning. A borrowed
+                // wrapper keeps its capture on the stack instead of allocating
+                // a second owning std::function for every native batch.
+                if (!recorder.Record(recording.endpoint->queue, std::cref(commands), lease, recording.batch, outError))
                 {
                     return false;
                 }
@@ -420,11 +477,16 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             struct Target
             {
                 uint32_t batch, local;
-                std::vector<size_t> units;
+                ce::render_arena_vector<size_t> units;
                 size_t cursor{0};
+
+                Target(uint32_t batchIndex, uint32_t targetIndex, ce::render_arena_resource* arena)
+                    : batch(batchIndex), local(targetIndex), units(arena)
+                {
+                }
             };
-            std::vector<Unit> units;
-            std::vector<Target> targets;
+            ce::render_arena_vector<Unit> units{arena};
+            ce::render_arena_vector<Target> targets{arena};
             for (uint32_t batch = 0; batch < output.plannedBatches; ++batch)
             {
                 const size_t begin = units.size();
@@ -447,7 +509,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                 const uint32_t firstTarget = static_cast<uint32_t>(targets.size());
                 for (uint32_t target = 0; target < targetCount; ++target)
                 {
-                    targets.push_back({batch, target, {}});
+                    targets.emplace_back(batch, target, arena);
                 }
                 for (size_t index = begin; index < units.size(); ++index)
                 {
@@ -471,13 +533,13 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
             m_stats.recordedLists = static_cast<uint32_t>(targets.size());
             // RG4's contiguous targets preserve list submission order. Dependency
             // waves additionally preserve callback-produced CPU data across jobs.
-            std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
+            ce::render_arena_vector<ce::render_arena_vector<uint16_t>> predecessors(m_passes.size(), arena);
             for (const auto& edge : VersionEdges())
             {
                 predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
             }
-            std::vector<uint32_t> passWave(m_passes.size(), 0), targetWave(targets.size(), 0);
-            std::vector<uint32_t> passCompletionTarget(m_passes.size(), UINT32_MAX);
+            ce::render_arena_vector<uint32_t> passWave(m_passes.size(), 0, arena), targetWave(targets.size(), 0, arena);
+            ce::render_arena_vector<uint32_t> passCompletionTarget(m_passes.size(), UINT32_MAX, arena);
             uint32_t waveCount = 1;
             for (size_t begin = 0; begin < units.size();)
             {
@@ -528,7 +590,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                 waveCount = (std::max)(waveCount, wave + 1);
                 begin = end;
             }
-            std::vector<std::vector<uint32_t>> waveTargets(waveCount);
+            ce::render_arena_vector<ce::render_arena_vector<uint32_t>> waveTargets(waveCount, arena);
             for (uint32_t target = 0; target < targets.size(); ++target)
             {
                 uint32_t previous = UINT32_MAX;
@@ -607,13 +669,14 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                     ++m_stats.recordingOwnerJoinCount;
                     ++m_stats.recordingDispatcherHandoffCount;
                     ++m_stats.recordingWorkerJobCount;
-                    recorder.RunParallel([&](uint32_t)
+                    const auto recordRun = [&](uint32_t)
                     {
                         for (uint32_t run = begin; run < end; ++run)
                         {
                             recordTarget(waveTargets[run].front(), run);
                         }
-                    }, 1);
+                    };
+                    recorder.RunParallel(std::cref(recordRun), 1);
                 }
                 else
                 {
@@ -623,13 +686,14 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                     ++m_stats.recordingOwnerJoinCount;
                     ++m_stats.recordingDispatcherHandoffCount;
                     m_stats.recordingWorkerJobCount += jobs;
-                    recorder.RunParallel([&](uint32_t job)
+                    const auto recordWave = [&](uint32_t job)
                     {
                         for (size_t index = job; index < active.size(); index += jobs)
                         {
                             recordTarget(active[index], wave);
                         }
-                    }, jobs);
+                    };
+                    recorder.RunParallel(std::cref(recordWave), jobs);
                     ++wave;
                 }
             }
@@ -710,7 +774,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     try
     {
         output.failure.stage = RHICommandFailureStage::Admission;
-        if (!recorder.ExecuteSubmission([&](std::string& error)
+        const auto submit = [&](std::string& error)
         {
             size_t nextWait = 0;
             for (uint32_t index = 0; index < output.plannedBatches; ++index)
@@ -751,7 +815,10 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
                 output.computeBatches += diagnostic.batches[index].queue == RHIQueueKind::Compute ? 1u : 0u;
             }
             return true;
-        }, outError))
+        };
+        // ExecuteSubmission joins CPU admission before returning, including when
+        // it marshals to the RHI owner. Only native batches escape that join.
+        if (!recorder.ExecuteSubmission(std::cref(submit), outError))
         {
             return failSubmission();
         }

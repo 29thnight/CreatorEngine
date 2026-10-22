@@ -1,0 +1,119 @@
+{
+  "status": "passed",
+  "comparison": "same frozen Graph/RHI/fixture inputs; only Core and legacy light API selection differ",
+  "baseline": {
+    "status": "passed",
+    "sanitized": false,
+    "scope": "production feature contracts, light selection and graph declarations; mocked native services and frame payload",
+    "result": "LIVE_PIPELINE_CONTRACTS_OK checks=1008",
+    "allocation_measurements": [
+      {
+        "measurement": "warm_feature_dispatch",
+        "frames": 128,
+        "items": 34,
+        "standardCalls": 0,
+        "standardBytes": 0,
+        "mimallocCalls": 0,
+        "mimallocBytes": 0,
+        "native_or_gpu": false
+      },
+      {
+        "measurement": "warm_feature_dispatch_observer",
+        "frames": 128,
+        "items": 34,
+        "standardCalls": 128,
+        "standardBytes": 6144,
+        "mimallocCalls": 0,
+        "mimallocBytes": 0,
+        "native_or_gpu": false
+      },
+      {
+        "measurement": "warm_light_selection",
+        "frames": 128,
+        "items": 256,
+        "standardCalls": 384,
+        "standardBytes": 5636096,
+        "mimallocCalls": 0,
+        "mimallocBytes": 0,
+        "native_or_gpu": false
+      }
+    ],
+    "feature_core_ref": "7b5e03d",
+    "frozen_source_files": 1037,
+    "source_changed_during_run": [
+      "Tools/regression/render_graph_program_probe.cpp"
+    ],
+    "feature_source_sha256": {
+      "Engine/RenderEngine/Render/Core/RenderFeatureContributor.h": "0713e73e6479d784bee76da6b196fd14abcd5e341492a0d0e35791b8463d4bb0",
+      "Engine/RenderEngine/Render/Core/EnhancedLightPacking.h": "867473e75234ee7cf73e2d3909121919f3306ecb571751f65e8e63dc1880f79b",
+      "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h": "debd54233cf900b9e7ad58ad0b07d96674a34c5c18b0b6925b48cd31009aacb7",
+      "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp": "390baeefcd5be5e5de350ed679e1eeeef1ddb9f1613a97605d20450d65c69b97",
+      "Engine/RenderEngine/Render/Core/PassResourceRetirement.h": "b1eac8924104cd67cedcaf745273011848f898bf21026522de75bd8da2fa212f"
+    },
+    "boundaries": [
+      "Tools/regression/fixtures/live-pipeline-portable-pass.h",
+      "Tools/regression/fixtures/light-packing-portable-proxy-base.h",
+      "Tools/regression/fixtures/render-graph-portable-services.h",
+      "Tools/regression/fixtures/render-graph-portable-platform.cpp"
+    ]
+  },
+  "current": {
+    "status": "passed",
+    "sanitized": false,
+    "scope": "production feature contracts, light selection and graph declarations; mocked native services and frame payload",
+    "result": "LIVE_PIPELINE_CONTRACTS_OK checks=1027",
+    "allocation_measurements": [
+      {
+        "measurement": "warm_feature_dispatch",
+        "frames": 128,
+        "items": 34,
+        "standardCalls": 0,
+        "standardBytes": 0,
+        "mimallocCalls": 0,
+        "mimallocBytes": 0,
+        "native_or_gpu": false
+      },
+      {
+        "measurement": "warm_feature_dispatch_observer",
+        "frames": 128,
+        "items": 34,
+        "standardCalls": 0,
+        "standardBytes": 0,
+        "mimallocCalls": 0,
+        "mimallocBytes": 0,
+        "native_or_gpu": false
+      },
+      {
+        "measurement": "warm_light_selection",
+        "frames": 128,
+        "items": 256,
+        "standardCalls": 0,
+        "standardBytes": 0,
+        "mimallocCalls": 0,
+        "mimallocBytes": 0,
+        "native_or_gpu": false
+      }
+    ],
+    "feature_core_ref": "working-tree",
+    "frozen_source_files": 1037,
+    "source_changed_during_run": [
+      "Engine/RenderEngine/RHI/RHIRecordedBatch.h",
+      "Engine/RenderEngine/RHI/RHISubmissionThread.cpp",
+      "Tools/regression/render_graph_program_probe.cpp"
+    ],
+    "feature_source_sha256": {
+      "Engine/RenderEngine/Render/Core/RenderFeatureContributor.h": "0713e73e6479d784bee76da6b196fd14abcd5e341492a0d0e35791b8463d4bb0",
+      "Engine/RenderEngine/Render/Core/EnhancedLightPacking.h": "675c6802217051bd0f7eb94a8091430a0218d31e08e610bf77dcae0c9945f450",
+      "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h": "b1faf96c5620c4bef6822299e721208fb12bf14e7c583da4e0a6546a9baaab51",
+      "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp": "89af2517151de79f22781fc294d58602aa5a8f0546ed2f51ac6dab224be2e206",
+      "Engine/RenderEngine/Render/Core/PassResourceRetirement.h": "b1eac8924104cd67cedcaf745273011848f898bf21026522de75bd8da2fa212f"
+    },
+    "boundaries": [
+      "Tools/regression/fixtures/live-pipeline-portable-pass.h",
+      "Tools/regression/fixtures/light-packing-portable-proxy-base.h",
+      "Tools/regression/fixtures/render-graph-portable-services.h",
+      "Tools/regression/fixtures/render-graph-portable-platform.cpp"
+    ]
+  },
+  "common_source_snapshot_sha256": "18234babf0ab295823186484f8e4b567d7c4badd574bd51a2e4a27ffa0741e4f"
+}

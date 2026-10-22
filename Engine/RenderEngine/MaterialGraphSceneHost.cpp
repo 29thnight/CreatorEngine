@@ -444,6 +444,7 @@ namespace material_graph
         RGHandle BlendedCommandInput(const EnhancedRenderGraph& graph, const IndirectMaterialBatch& batch,
                                      const SceneLayerWork& commands)
         {
+            commands.CheckCurrent(graph);
             const auto expected = batch.GraphOutput(graph);
             const auto found =
                 std::ranges::find_if(commands.blended,
@@ -459,6 +460,15 @@ namespace material_graph
             return *found;
         }
     } // namespace
+
+    void SceneLayerWork::CheckCurrent(const EnhancedRenderGraph& graph) const
+    {
+        if (!blended.empty() &&
+            (declarationGraph != graph.DeclarationGraph() || declarationEpoch != graph.DeclarationEpoch()))
+        {
+            throw std::runtime_error("METEOR blended command span belongs to a reset or unrelated graph.");
+        }
+    }
 
     struct SceneHost::Program
     {

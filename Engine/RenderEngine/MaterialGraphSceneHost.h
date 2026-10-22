@@ -89,7 +89,12 @@ struct SceneFinalCullOutputs
 struct SceneLayerWork
 {
     RGHandle layer;
-    std::vector<RGHandle> blended;
+    // Declaration handles borrow graph/blackboard storage through its current
+    // declaration epoch. Validate this token before reading any span element.
+    std::span<const RGHandle> blended;
+    const EnhancedRenderGraph* declarationGraph{};
+    uint64_t declarationEpoch{};
+    void CheckCurrent(const EnhancedRenderGraph& graph) const;
 };
 struct SceneColorInputs
 {

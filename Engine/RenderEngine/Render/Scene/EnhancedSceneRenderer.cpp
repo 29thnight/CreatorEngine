@@ -550,7 +550,7 @@ namespace
 
     material_graph::SceneShadowResources GatherShadowResources(const LiveBlackboard& board, const char* slot)
     {
-        const auto handles = board.GetList(slot);
+        const auto handles = board.GetListView(slot);
         if (handles.size() != 3)
         {
             throw std::runtime_error("Shadow cascade slots must publish exactly three handles.");
@@ -561,7 +561,7 @@ namespace
     void PublishShadowResources(LiveBlackboard& board, const char* slot,
         const material_graph::SceneShadowResources& handles)
     {
-        board.SetList(slot, std::vector<RGHandle>(handles.begin(), handles.end()));
+        board.SetList(slot, std::span<const RGHandle>{handles});
     }
 
     SceneSurfaceTargets::Outputs GatherMaterialSurface(const LiveBlackboard& blackboard)
@@ -719,7 +719,7 @@ namespace
         std::vector<EnhancedDecalPass::Item> decals;
         std::vector<EnhancedSpritePass::Item> sprites;
         std::vector<EnhancedUIPass::Rect> uiRects;
-        EnhancedGizmoSceneData gizmoData;
+        own::shared_owner<const EnhancedGizmoSceneData> gizmoData;
         own::shared_owner<TextureFramePins> texturePins;
         own::shared_owner<const assets::ModelAssetGenerationPins> modelPins;
         assets::ModelGeometryPreparationPins geometryPins;
@@ -1545,14 +1545,13 @@ namespace
                 &evictionPass);
         }
 
+        template<class PrepareFrame>
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
-            const EnhancedLiveFramePacket& sourceFrame,
-            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
-            uint32_t sourceEngineFrame, bool sourceEngineFrameAvailable,
-            uint64_t resizeGeneration, uint64_t backendGeneration,
-            const std::function<bool(std::string&)>& prepareFrame,
-            std::string& outError, EnhancedPbrCapture* capture,
-            LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
+                    const EnhancedLiveFramePacket& sourceFrame, uint64_t sourceFrameId,
+                    uint64_t sourceCaptureNanoseconds, uint32_t sourceEngineFrame, bool sourceEngineFrameAvailable,
+                    uint64_t resizeGeneration, uint64_t backendGeneration, PrepareFrame&& prepareFrame,
+                    std::string& outError, EnhancedPbrCapture* capture, LiveGraphSnapshot* diagnosticOutput,
+                    bool& preparationDeferred)
         {
             const uint64_t profileCpuBegin = GpuSpanSink().on_cpu_render ? ProfileCpuTick() : 0;
             preparationDeferred = false;
@@ -1750,15 +1749,22 @@ namespace
                     binding.viewFlags |= LiveViewFlags::kHideSkyBox;
                 if (capture) capture->RecordTemporalProvenance(views[viewIndex].temporal.provenance);
                 bool stageCaptureOk = true;
-                desc.DeclareAll(Execution().blackboard, graph, Execution().frameContext, binding,
-                                [&](const LivePassNode& node, const LiveBlackboard& board)
-                                {
-                                    if (capture && stageCaptureOk)
+                if (capture)
+                {
+                    desc.DeclareAll(Execution().blackboard, graph, Execution().frameContext, binding,
+                                    [&](const LivePassNode& node, const LiveBlackboard& board)
                                     {
-                                        stageCaptureOk = capture->DeclareStage(resources, graph, board, node, width,
-                                                                               height, outError);
-                                    }
-                                });
+                                        if (stageCaptureOk)
+                                        {
+                                            stageCaptureOk = capture->DeclareStage(resources, graph, board, node, width,
+                                                                                   height, outError);
+                                        }
+                                    });
+                }
+                else
+                {
+                    desc.DeclareAll(Execution().blackboard, graph, Execution().frameContext, binding);
+                }
                 if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(resources, graph, Execution().blackboard, width, height, outError))
                 {
@@ -3057,6 +3063,7 @@ namespace
         std::vector<EnhancedDrawItem> shadowDraws;
 
         std::vector<EnhancedDrawItem> graphDraws;
+        std::vector<size_t> graphShadowIndices;
         // Same ordering as graphDraws/SceneDrawInput::sourceIndex. Eligibility
         // remains aligned when optional graph candidates are removed.
         ce::dynamic_bitset graphShadowEligible;
@@ -3067,13 +3074,16 @@ namespace
         // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —
         // 목록만 보면 잘린 사실이 안 보인다.
         ViewLightSelection            lastLightSelection{};
+        ViewLightSelectionScratch lightSelectionScratch;
+        RenderScene::LightProxySnapshot lightProxyScratch;
+        uint32_t lastVisibleLightCount{};
         // 데칼은 frameContext가 아니라 패스에 직접 건넨다(SetDecals) —
         // 그리는 패스가 하나뿐이라 컨텍스트에 실을 이유가 없다. 여기 두는
         // 것은 매 프레임 재할당을 피하기 위해서다.
         std::vector<EnhancedDecalPass::Item> decals;
         const std::vector<EnhancedDecalPass::Item> previewDecals;
         bool materialPreviewView{false};
-        EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
+        own::shared_owner<const EnhancedGizmoSceneData> gizmoData;
 
         bool controlledCaptureFrame{ false };
         uint32_t frameCounter{ 0 };
@@ -3977,7 +3987,7 @@ namespace
             featureContext.gizmoSceneForView = [&p](uint32_t viewIndex) -> const EnhancedGizmoSceneData*
             {
                 const auto& prepared = p.executions.at(viewIndex).prepared;
-                return prepared ? &prepared->gizmoData : nullptr;
+                return prepared && prepared->gizmoData ? &*prepared->gizmoData : nullptr;
             };
             featureContext.renderWidth = p.width;
             featureContext.renderHeight = p.height;
@@ -4569,12 +4579,13 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext&,
                                     const LiveFrameBinding&)
                 {
-                    bb.Set(LiveSlots::kLitColor,
-                           p.Execution().graphMaterials.DeclareBlendedStream(
-                               graph,
-                               {bb.Get(LiveSlots::kMeteorLayerCommands), bb.GetList(LiveSlots::kMeteorBlendedCommands)},
-                               bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kShadowMap),
-                               p.Execution().lightTiles.GetLighting()));
+                    bb.Set(LiveSlots::kLitColor, p.Execution().graphMaterials.DeclareBlendedStream(
+                                                     graph,
+                                                     {bb.Get(LiveSlots::kMeteorLayerCommands),
+                                                      bb.GetListView(LiveSlots::kMeteorBlendedCommands),
+                                                      graph.DeclarationGraph(), graph.DeclarationEpoch()},
+                                                     bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kShadowMap),
+                                                     p.Execution().lightTiles.GetLighting()));
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -6404,9 +6415,12 @@ namespace
                     requireTexture(decal.occRoughMetal);
                 }
             }
-            for (const auto& icon : gizmoData.icons)
+            if (gizmoData)
             {
-                requireTexture(icon.texture);
+                for (const auto& icon : gizmoData->icons)
+                {
+                    requireTexture(icon.texture);
+                }
             }
             if (skyEquirect)
             {
@@ -6609,8 +6623,8 @@ namespace
             materialPreviewView = viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             totalSeconds = frame.totalSeconds;
 
-            gizmoData = viewPacket.gizmos
-                ? *viewPacket.gizmos : EnhancedGizmoSceneData{};
+            // The sealed packet already owns immutable icon/line storage.
+            gizmoData = viewPacket.gizmos;
 
             shadowDraws.clear();
             graphDraws.clear();
@@ -6644,7 +6658,9 @@ namespace
                 inputView.camera = cameraSnapshot;
                 std::string error;
                 static const std::array<MaterialPreviewFloor, 2> floor{MaterialPreviewFloor{0}, MaterialPreviewFloor{1}};
-                std::vector<EnhancedDrawItem> previewDraws{draw};
+                std::array<EnhancedDrawItem, 3> previewDraws{};
+                size_t previewDrawCount = 1;
+                previewDraws[0] = std::move(draw);
                 for (unsigned i = 0; i < floor.size(); ++i)
                 {
                     const auto& ground = viewPacket.materialPreviewFloor[i];
@@ -6657,9 +6673,11 @@ namespace
                     tile.coverage = ground->coverage;
                     PinGraphInstance(tile, ground->instance);
                     tile.materialGraphSlot = ground->materialSlot;
-                    previewDraws.push_back(std::move(tile));
+                    previewDraws[previewDrawCount++] = std::move(tile);
                 }
-                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error, {}, graphFramePins))
+                if (!material_graph::SceneViewInput::Seal(
+                        inputView, std::span<const EnhancedDrawItem>{previewDraws.data(), previewDrawCount}, {},
+                        graphViewInput, error, {}, graphFramePins))
                 {
                     lastError = "Material preview: " + error;
                     return false;
@@ -6668,9 +6686,12 @@ namespace
                 key.direction = {0.4f, -0.6f, 0.7f, 0.f};
                 key.color = {1.f, 0.95f, 0.9f, 3.f};
                 lights.push_back(key);
-                lastPoolDraws = static_cast<uint32_t>(previewDraws.size());
+                lastPoolDraws = static_cast<uint32_t>(previewDrawCount);
                 lastCulledDraws = 0;
-                lastLightSelection = {};
+                lastLightSelection.lights.clear();
+                lastLightSelection.sceneLights = 0;
+                lastLightSelection.culledByFrustum = 0;
+                lastVisibleLightCount = 0;
                 return true;
             }
             // decals는 비우지 않는다 — BuildDrawPool이 프레임당 한 번 채우고
@@ -6851,10 +6872,12 @@ namespace
             math::bounding_frustum frustum;
             const bool cullDraws = BuildViewFrustum(cameraSnapshot, frustum);
 
-            const ViewLightSelection lightSelection =
-                SelectLightsForView(renderScene->GetLightProxySnapshot(), cameraSnapshot);
-            lights = lightSelection.lights;
-            lastLightSelection = lightSelection;
+            renderScene->CopyLightProxySnapshot(lightProxyScratch);
+            SelectLightsForView(lightProxyScratch, cameraSnapshot, lastLightSelection, lightSelectionScratch);
+            lightProxyScratch.clear();
+            lights.swap(lastLightSelection.lights);
+            lastLightSelection.lights.clear();
+            lastVisibleLightCount = static_cast<uint32_t>(lights.size());
             math::vector3 shadowDirection{0, -1, 0};
             float strongestShadowLight = -1.f;
             bool hasShadowLight = false;
@@ -6876,7 +6899,11 @@ namespace
             const bool gpuVisibility = backend == EnhancedLiveBackend::DX12
                 ? dx12.Resources().GetIndirectDrawCapabilities().indexedDraw
                 : (vulkanPipeline && vulkanPipeline->resources.GetIndirectDrawCapabilities().indexedDraw);
-            std::vector<size_t> graphShadowIndices;
+            const bool replayExtensions = pbrCapture && pbrCapture->controlled && pbrCapture->replayExtensions &&
+                                          pbrCapture->result.state == EnhancedPbrCaptureState::Pending &&
+                                          pbrCapture->target == viewPacket.displayTarget &&
+                                          frame.frameId > pbrCapture->afterFrameId;
+            graphShadowIndices.clear();
             uint32_t culled = 0;
             const material_graph::SceneInputBudget sceneInputBudget;
             uint32_t optionalGpuCandidates = 0;
@@ -6945,7 +6972,10 @@ namespace
                 graphDraw.materialSnapshot.reset();
                 graphDraw.forwardMaterialSnapshot.reset();
                 graphDraws.push_back(std::move(graphDraw));
-                graphShadowIndices.push_back(shadowIndex);
+                if (replayExtensions)
+                {
+                    graphShadowIndices.push_back(shadowIndex);
+                }
                 graphShadowEligible.push_back(relevantToShadow);
                 graphViewRequired.push_back(visible);
             }
@@ -6953,9 +6983,7 @@ namespace
             lastPoolDraws = static_cast<uint32_t>(drawPool.size());
             lastCulledDraws = culled;
 
-            if (pbrCapture && pbrCapture->controlled && pbrCapture->replayExtensions
-                && pbrCapture->result.state == EnhancedPbrCaptureState::Pending
-                && pbrCapture->target == viewPacket.displayTarget && frame.frameId > pbrCapture->afterFrameId)
+            if (replayExtensions)
             {
                 std::string replayError;
                 if (pbrCapture->latticeReplayExtension)
@@ -7107,11 +7135,18 @@ namespace
                 return false;
             }
             prepared->camera = cameraSnapshot;
-            prepared->shadowDraws = shadowDraws;
-            prepared->lights = lights;
+            // AcquirePreparation returns a slot with no readers. Transfer this
+            // view's arrays and keep its previous capacity for the next view.
+            // Decals and geometry pins remain shared sources across views.
+            prepared->shadowDraws.swap(shadowDraws);
+            shadowDraws.clear();
+            prepared->lights.swap(lights);
+            lights.clear();
             prepared->decals = materialPreviewView ? previewDecals : decals;
-            prepared->sprites = worldSprites;
-            prepared->uiRects = uiRects;
+            prepared->sprites.swap(worldSprites);
+            worldSprites.clear();
+            prepared->uiRects.swap(uiRects);
+            uiRects.clear();
             prepared->gizmoData = gizmoData;
             prepared->texturePins = textureFramePins;
             prepared->modelPins = modelFramePins;
@@ -7507,22 +7542,29 @@ namespace
                     binding.viewFlags |= LiveViewFlags::kHideSkyBox;
                 if (capture) capture->RecordTemporalProvenance(view.temporal.provenance);
                 bool stageCaptureOk = true;
-                p.desc.DeclareAll(p.Execution().blackboard, graph, p.Execution().frameContext, binding,
-                                  [&](const LivePassNode& node, const LiveBlackboard& board)
-                                  {
-                                      if (capture && stageCaptureOk)
+                if (capture)
+                {
+                    p.desc.DeclareAll(p.Execution().blackboard, graph, p.Execution().frameContext, binding,
+                                      [&](const LivePassNode& node, const LiveBlackboard& board)
                                       {
-                                          stageCaptureOk =
-                                              capture->DeclareStage(dx12.Resources(), graph, board, node,
-                                                                    node.OutputsDisplayResolution(binding)
-                                                                        ? p.Execution().frameContext.displayWidth
-                                                                        : p.Execution().frameContext.width,
-                                                                    node.OutputsDisplayResolution(binding)
-                                                                        ? p.Execution().frameContext.displayHeight
-                                                                        : p.Execution().frameContext.height,
-                                                                    outError);
-                                      }
-                                  });
+                                          if (stageCaptureOk)
+                                          {
+                                              stageCaptureOk =
+                                                  capture->DeclareStage(dx12.Resources(), graph, board, node,
+                                                                        node.OutputsDisplayResolution(binding)
+                                                                            ? p.Execution().frameContext.displayWidth
+                                                                            : p.Execution().frameContext.width,
+                                                                        node.OutputsDisplayResolution(binding)
+                                                                            ? p.Execution().frameContext.displayHeight
+                                                                            : p.Execution().frameContext.height,
+                                                                        outError);
+                                          }
+                                      });
+                }
+                else
+                {
+                    p.desc.DeclareAll(p.Execution().blackboard, graph, p.Execution().frameContext, binding);
+                }
                 if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(dx12.Resources(), graph, p.Execution().blackboard,
                                                  p.Execution().frameContext.width, p.Execution().frameContext.height,
@@ -7759,10 +7801,10 @@ namespace
                 }
                 snapshot.motionDecalValid = snapshot.motionVectorsValid && p.Execution().decal.HasPreparedDecals() &&
                                             !view.temporal.frame.reset;
-                snapshot.motionAlphaValid |= snapshot.motionVectorsValid &&
-                                             p.Execution().sprite.GetLastTemporalRecordedItemCount() != 0 &&
-                                             std::any_of(worldSprites.begin(), worldSprites.end(),
-                                                         [](const auto& item) { return item.previousWorldValid; });
+                snapshot.motionAlphaValid |=
+                    snapshot.motionVectorsValid && p.Execution().sprite.GetLastTemporalRecordedItemCount() != 0 &&
+                    std::any_of(p.Execution().prepared->sprites.begin(), p.Execution().prepared->sprites.end(),
+                                [](const auto& item) { return item.previousWorldValid; });
             });
             if (queueModeRequest.requestId != 0)
             {
@@ -11555,7 +11597,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     // 그 원인이 컬링인지 한도인지 여기서 갈린다.
     {
         const ViewLightSelection& sel = state.lastLightSelection;
-        const uint32_t visible = static_cast<uint32_t>(sel.lights.size());
+        const uint32_t visible = state.lastVisibleLightCount;
         char lightLine[192]{};
         std::snprintf(lightLine, sizeof(lightLine),
             "\n  광원 — 씬 %u개 · 뷰 %u개(절두체 밖 %u) · METEOR 조명",

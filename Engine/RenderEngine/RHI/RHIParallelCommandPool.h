@@ -16,7 +16,7 @@ class RHISubmissionTicket;
 class IRHIParallelCommandPool
 {
   public:
-    static constexpr uint32_t kMaxWorkers = 8;
+    static constexpr uint32_t kMaxWorkers = RHIRecordedBatch::kMaxCommandTargets;
 
     explicit IRHIParallelCommandPool(job_scheduler& scheduler = ce::get_job_scheduler()) : m_scheduler(scheduler) {}
     virtual ~IRHIParallelCommandPool() = default;
@@ -157,7 +157,8 @@ class IRHIParallelCommandPool
 
         RHIRecordedBatch batch;
         batch.m_pool = this;
-        batch.m_commandOrder.assign(workerOrder.begin(), workerOrder.end());
+        std::copy(workerOrder.begin(), workerOrder.end(), batch.m_commandOrder.begin());
+        batch.m_commandCount = static_cast<uint32_t>(workerOrder.size());
         batch.m_frameId = desc.frameId;
         batch.m_backendGeneration = desc.backendGeneration;
         batch.m_displayToken = desc.displayToken;
@@ -225,7 +226,8 @@ class IRHIParallelCommandPool
 
         // Execute 뒤 Signal 실패도 재시도할 수 없다. 예외가 나도 Started가 남는다.
         batch.m_state = RHIRecordedBatchState::SubmissionStarted;
-        if (!SubmitRecordedCommands(batch.m_frameSlot, batch.m_commandOrder, batch.m_completion, outError))
+        if (!SubmitRecordedCommands(batch.m_frameSlot, std::span(batch.m_commandOrder).first(batch.m_commandCount),
+                                    batch.m_completion, outError))
         {
             batch.m_state = RHIRecordedBatchState::SubmissionFailed;
             return false;

@@ -1129,6 +1129,16 @@ namespace
         ReplayGate& m_gate;
     };
 
+    class ThrowBeforeConsumeTranslator final : public IRHICommandTranslator
+    {
+      public:
+        bool Translate(RHISoftwareBatch&&, const RHICommandTranslationOptions&, RHITranslatedBatch&,
+                       RHICommandFailure&) override
+        {
+            throw std::runtime_error("Injected pre-consumption translation exception.");
+        }
+    };
+
     class GatedDestruction final
     {
       public:
@@ -1583,6 +1593,174 @@ namespace
     }
 #endif
 
+    void ticket_storage_contracts()
+    {
+        ++g_scenarios;
+        RHISubmissionThread submission;
+        int owner{}, failedOwner{};
+        std::string error;
+        require(submission.AcquireClient(&owner, error) && submission.AcquireClient(&failedOwner, error),
+                error.c_str());
+        RHISubmissionTicket failed;
+        require(submission.Enqueue(
+                    &failedOwner, "retained failure result",
+                    [](std::string& failure)
+                    {
+                        failure = "Retain this failure unchanged while later tickets complete.";
+                        return false;
+                    },
+                    failed, error),
+                error.c_str());
+        require(!submission.Wait(failed, error), "Injected retained ticket failure succeeded.");
+        const auto failedSequence = failed.GetSequence();
+        const std::string failedMessage = error;
+        // There are no GPU commands here; explicitly close the failed owner so
+        // later ticket reuse also crosses an owner shutdown/restart boundary.
+        submission.MarkUnrecoverableDeviceError(&failedOwner, "Retained result fixture cleanup.");
+        RHILifecycleResult abandoned;
+        require(submission.AbandonForDeviceError(&failedOwner, abandoned, error) && abandoned.IsClean(), error.c_str());
+        submission.ReleaseClient(&failedOwner);
+
+        // Keep more completed results than the bounded result cache can retain.
+        // Neither cache reuse nor its uncached fallback may mutate a caller's
+        // still-live ticket or an independently copied alias of that ticket.
+        std::array<RHISubmissionTicket, 96> retained;
+        std::array<uint64_t, 96> sequences{};
+        for (size_t index = 0; index < retained.size(); ++index)
+        {
+            require(
+                submission.Enqueue(
+                    &owner, "retained successful result", [](std::string&) { return true; }, retained[index], error) &&
+                    submission.Wait(retained[index], error),
+                error.c_str());
+            sequences[index] = retained[index].GetSequence();
+        }
+        const auto alias = retained.front();
+        for (size_t index = 0; index < retained.size(); ++index)
+        {
+            require(retained[index].IsComplete() && retained[index].GetSequence() == sequences[index] &&
+                        submission.Wait(retained[index], error),
+                    "Later admission overwrote a retained completed ticket.");
+            retained[index] = {};
+        }
+        for (uint32_t index = 0; index < 96; ++index)
+        {
+            RHISubmissionTicket recycled;
+            require(submission.Enqueue(
+                        &owner, "recycled successful result", [](std::string&) { return true; }, recycled, error) &&
+                        submission.Wait(recycled, error),
+                    error.c_str());
+        }
+        submission.ReleaseClient(&owner);
+        require(alias.IsComplete() && alias.GetSequence() == sequences.front() && submission.Wait(alias, error),
+                "Ticket alias changed after cache reuse and owner shutdown.");
+        require(failed.IsComplete() && failed.GetSequence() == failedSequence && !submission.Wait(failed, error) &&
+                    error == failedMessage,
+                "Retained failed ticket changed after cache reuse and owner shutdown.");
+    }
+
+    void submission_owner_contracts()
+    {
+        thread_pool workers;
+        job_scheduler scheduler(workers);
+        scheduler.start(4);
+        ProbeValidator validator;
+        ProbeDeviceServices services;
+        RHISoftwareRecorder recorder(validator);
+        BatchSpec spec;
+        spec.targets = spec.segments = 1;
+        // CPU ticket storage must not retain the pool, translator or frame owner
+        // after finite retirement, even while that ticket and service stay live.
+        {
+            ++g_scenarios;
+            RHISubmissionThread submission;
+            ProbeDevice device;
+            int otherOwner{};
+            auto pool = own::make_shared<ProbePool>(scheduler);
+            auto translator = own::make_shared<RHICommandTranslator>(*pool, services, spec.queue);
+            auto resources = own::make_shared<uint32_t>(9);
+            ce::weak_lifetime_token poolLifetime(pool), translatorLifetime(translator), resourceLifetime(resources);
+            auto batch = record_batch(recorder, spec, resources);
+            std::string error;
+            require(submission.AcquireClient(&device, error) && submission.AcquireClient(&otherOwner, error),
+                    error.c_str());
+            RHISubmissionTicket ticket;
+            require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), ticket, error),
+                    error.c_str());
+            pool.reset();
+            translator.reset();
+            resources.reset();
+            require(submission.Wait(ticket, error), error.c_str());
+            const auto sequence = ticket.GetSequence();
+            const auto identity = ticket.GetIdentity();
+            require(!poolLifetime.expired() && !translatorLifetime.expired() && !resourceLifetime.expired(),
+                    "CPU completion released the native submission owners before finite GPU completion.");
+            device.m_completed.store(identity.completion.value);
+            require(submission.Drain(&device, error), error.c_str());
+            require(poolLifetime.expired() && translatorLifetime.expired() && resourceLifetime.expired(),
+                    "Completed ticket storage retained native owners after finite retirement.");
+            submission.ReleaseClient(&device);
+            RHISubmissionTicket other;
+            require(submission.Enqueue(
+                        &otherOwner, "post-shutdown result", [](std::string&) { return true; }, other, error) &&
+                        submission.Wait(other, error),
+                    error.c_str());
+            require(ticket.IsComplete() && ticket.GetSequence() == sequence &&
+                        ticket.GetIdentity().completion.value == identity.completion.value &&
+                        submission.Wait(ticket, error) && poolLifetime.expired() && translatorLifetime.expired() &&
+                        resourceLifetime.expired(),
+                    "Owner shutdown changed a retained ticket or reattached retired native owners.");
+            submission.ReleaseClient(&otherOwner);
+        }
+        // A custom translator is allowed to throw without consuming its input.
+        // Reserve the other storage slots so reuse directly proves the CPU
+        // recording returned before its admission credits, while GPU resources
+        // remain quarantined until the explicit device-loss cleanup boundary.
+        {
+            ++g_scenarios;
+            std::array<RHISoftwareBatch, 8> parked;
+            for (auto& batch : parked)
+            {
+                batch = record_batch(recorder, spec);
+            }
+            auto warm = record_batch(recorder, spec);
+            warm = {};
+            allocation_probe::begin();
+            auto reference = record_batch(recorder, spec);
+            const auto expectedAllocations = allocation_probe::end();
+            reference = {};
+
+            RHISubmissionThread submission;
+            ProbeDevice device;
+            auto pool = own::make_shared<ProbePool>(scheduler);
+            auto translator = own::make_shared<ThrowBeforeConsumeTranslator>();
+            auto resources = own::make_shared<uint32_t>(11);
+            ce::weak_lifetime_token resourceLifetime(resources);
+            auto batch = record_batch(recorder, spec, resources);
+            resources.reset();
+            std::string error;
+            require(submission.AcquireClient(&device, error), error.c_str());
+            RHISubmissionTicket ticket;
+            require(submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), ticket, error),
+                    error.c_str());
+            const bool failed = !submission.Wait(ticket, error);
+            const bool cpuReleased = submission.GetStats().pendingSoftwareBytes == 0;
+            const bool gpuRetained = !resourceLifetime.expired();
+            allocation_probe::begin();
+            auto reused = record_batch(recorder, spec);
+            const auto observedAllocations = allocation_probe::end();
+            submission.MarkUnrecoverableDeviceError(&device, "Pre-consumption translation fixture cleanup.");
+            RHILifecycleResult abandoned;
+            require(submission.AbandonForDeviceError(&device, abandoned, error) && abandoned.IsClean(), error.c_str());
+            submission.ReleaseClient(&device);
+            require(failed && cpuReleased && pool->m_submitCalls == 0 && gpuRetained && resourceLifetime.expired(),
+                    "Pre-consumption translation exception violated CPU/GPU owner boundaries.");
+            require(observedAllocations == expectedAllocations,
+                    "Pre-consumption translation exception returned credits before releasing CPU recording storage.");
+        }
+        scheduler.shutdown();
+    }
+
     struct AllocationResult
     {
         std::array<uint64_t, 2> stable{};
@@ -1631,6 +1809,95 @@ namespace
         std::sort(scaleMimalloc.begin(), scaleMimalloc.end());
         result.stable = {stableStandard[samples / 2], stableMimalloc[samples / 2]};
         result.scale = {scaleStandard[samples / 2], scaleMimalloc[samples / 2]};
+        return result;
+    }
+
+    struct SubmissionAllocationResult
+    {
+        uint32_t targets{};
+        std::array<uint64_t, 2> minimum{};
+        std::array<uint64_t, 2> median{};
+        std::array<uint64_t, 2> maximum{};
+        std::array<uint64_t, 2> total{};
+        uint64_t commands{};
+        double minimumMicroseconds{};
+        double medianMicroseconds{};
+        double p95Microseconds{};
+        double maximumMicroseconds{};
+    };
+
+    std::array<SubmissionAllocationResult, 2> submission_allocation_contracts()
+    {
+        thread_pool workers;
+        job_scheduler scheduler(workers);
+        scheduler.start(8);
+        ProbeValidator validator;
+        ProbeDeviceServices services;
+        ProbeDevice device;
+        RHISoftwareRecorder recorder(validator);
+        RHISubmissionThread submission;
+        auto pool = own::make_shared<ProbePool>(scheduler);
+        auto translator =
+            own::make_shared<RHICommandTranslator>(*pool, services, RHIQueueIdentity{1, 1, RHIQueueKind::Graphics});
+        auto frameOwner = own::make_shared<uint32_t>(42);
+        std::string error;
+        require(submission.AcquireClient(&device, error), error.c_str());
+        constexpr size_t warmup = 16;
+        constexpr size_t samples = 33;
+        std::array<SubmissionAllocationResult, 2> result{};
+        for (size_t shape = 0; shape < result.size(); ++shape)
+        {
+            BatchSpec spec;
+            spec.targets = shape == 0 ? 1 : 8;
+            spec.draws = 512;
+            result[shape].targets = spec.targets;
+            std::array<uint64_t, samples> standard{}, mimalloc{};
+            std::array<double, samples> durations{};
+            for (size_t sample = 0; sample < warmup + samples; ++sample)
+            {
+                pool->Reset();
+                // Frozen frame recording and fixture setup are outside this
+                // scope. Count actual calls on producer, coordinator and workers
+                // from admission through CPU submit and finite GPU retirement.
+                auto batch = record_batch(recorder, spec, frameOwner);
+                result[shape].commands = batch.GetRecordingStats().commandCount;
+                RHISubmissionTicket ticket;
+                allocation_probe::begin();
+                const auto start = std::chrono::steady_clock::now();
+                const bool admitted =
+                    submission.EnqueueSoftwareBatch(&device, device, pool, translator, std::move(batch), ticket, error);
+                const bool submitted = admitted && submission.Wait(ticket, error);
+                device.m_completed.store(pool->m_completion);
+                const bool retired = submitted && submission.Drain(&device, error);
+                ticket = {};
+                const auto elapsed = std::chrono::steady_clock::now() - start;
+                const auto counts = allocation_probe::end();
+                require(admitted && submitted && retired, error.c_str());
+                require(submission.GetStats().pendingSoftwareBytes == 0 &&
+                            submission.GetStats().pendingRetirements == 0,
+                        "Submission allocation scope ended before CPU/GPU owners retired.");
+                if (sample >= warmup)
+                {
+                    standard[sample - warmup] = counts[0];
+                    mimalloc[sample - warmup] = counts[1];
+                    durations[sample - warmup] = std::chrono::duration<double, std::micro>(elapsed).count();
+                    result[shape].total[0] += counts[0];
+                    result[shape].total[1] += counts[1];
+                }
+            }
+            std::sort(standard.begin(), standard.end());
+            std::sort(mimalloc.begin(), mimalloc.end());
+            std::sort(durations.begin(), durations.end());
+            result[shape].minimum = {standard.front(), mimalloc.front()};
+            result[shape].median = {standard[samples / 2], mimalloc[samples / 2]};
+            result[shape].maximum = {standard.back(), mimalloc.back()};
+            result[shape].minimumMicroseconds = durations.front();
+            result[shape].medianMicroseconds = durations[samples / 2];
+            result[shape].p95Microseconds = durations[static_cast<size_t>(samples * .95)];
+            result[shape].maximumMicroseconds = durations.back();
+        }
+        submission.ReleaseClient(&device);
+        scheduler.shutdown();
         return result;
     }
 
@@ -1751,7 +2018,10 @@ int main(int argc, char** argv)
 #if CE_RHI_BYTE_ADMISSION
         byte_admission_contracts();
 #endif
+        ticket_storage_contracts();
+        submission_owner_contracts();
         const auto allocations = allocation_contracts();
+        const auto submissionAllocations = submission_allocation_contracts();
         std::array<TimingResult, 12> timingResults{};
         size_t timingCount{};
         if (timings)
@@ -1774,7 +2044,26 @@ int main(int argc, char** argv)
             << "\"stable8\":{\"standard\":" << allocations.stable[0] << ",\"mimalloc\":" << allocations.stable[1]
             << "},\"scale8_1_8\":{\"standard\":" << allocations.scale[0] << ",\"mimalloc\":" << allocations.scale[1]
             << "},\"allocated_arena_bytes\":" << allocations.allocatedBytes
-            << ",\"commands\":" << allocations.commandCount << "},\"timings\":[";
+            << ",\"commands\":" << allocations.commandCount << "},\"submission_allocations\":{"
+            << "\"scope\":\"EnqueueSoftwareBatch+Translate+Submit+finite completion retirement; recording excluded; "
+               "all-thread actual std new and mimalloc API requests\",\"warmup\":16,\"samples\":33,\"cases\":[";
+        for (size_t index = 0; index < submissionAllocations.size(); ++index)
+        {
+            if (index)
+            {
+                std::cout << ',';
+            }
+            const auto& result = submissionAllocations[index];
+            std::cout << "{\"targets\":" << result.targets << ",\"commands\":" << result.commands
+                      << ",\"standard\":{\"min\":" << result.minimum[0] << ",\"median\":" << result.median[0]
+                      << ",\"max\":" << result.maximum[0] << ",\"total\":" << result.total[0]
+                      << "},\"mimalloc\":{\"min\":" << result.minimum[1] << ",\"median\":" << result.median[1]
+                      << ",\"max\":" << result.maximum[1] << ",\"total\":" << result.total[1]
+                      << "},\"cpu_microseconds\":{\"min\":" << result.minimumMicroseconds
+                      << ",\"p50\":" << result.medianMicroseconds << ",\"p95\":" << result.p95Microseconds
+                      << ",\"max\":" << result.maximumMicroseconds << "}}";
+        }
+        std::cout << "]},\"timings\":[";
         for (size_t index = 0; index < timingCount; ++index)
         {
             const auto& result = timingResults[index];

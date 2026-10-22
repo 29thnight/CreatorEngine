@@ -106,20 +106,27 @@ RenderScene::ProxySnapshot RenderScene::GetPrimitiveProxySnapshot()
 
 RenderScene::LightProxySnapshot RenderScene::GetLightProxySnapshot()
 {
-	LightProxySnapshot snapshot;
-	SpinLock lock(m_lightProxyMapFlag);
-	snapshot.reserve(m_lightProxyMap.size());
-	for (const auto& [guid, proxy] : m_lightProxyMap)
-	{
-		(void)guid;
-		// 꺼진 광원은 여기서 거른다. 뷰마다 다시 거르면 카메라 수만큼
-		// 같은 판정을 반복하게 되고, 이 판정은 뷰와 무관하다.
-		if (nullptr != proxy && proxy->IsEnabled())
-		{
-			snapshot.push_back(proxy);
-		}
-	}
-	return snapshot;
+    LightProxySnapshot snapshot;
+    CopyLightProxySnapshot(snapshot);
+    return snapshot;
+}
+
+void RenderScene::CopyLightProxySnapshot(LightProxySnapshot& snapshot)
+{
+    // Drop previous owners before taking the map lock; retain vector capacity.
+    snapshot.clear();
+    SpinLock lock(m_lightProxyMapFlag);
+    snapshot.reserve(m_lightProxyMap.size());
+    for (const auto& [guid, proxy] : m_lightProxyMap)
+    {
+        (void)guid;
+        // 꺼진 광원은 여기서 거른다. 뷰마다 다시 거르면 카메라 수만큼
+        // 같은 판정을 반복하게 되고, 이 판정은 뷰와 무관하다.
+        if (nullptr != proxy && proxy->IsEnabled())
+        {
+            snapshot.push_back(proxy);
+        }
+    }
 }
 
 RenderScene::UIProxySnapshot RenderScene::GetUIProxySnapshot()

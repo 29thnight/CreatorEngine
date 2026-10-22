@@ -48,6 +48,20 @@ struct ViewLightSelection
     uint32_t culledByFrustum{ 0 };   // 뷰에 닿지 않아 뺀 수
 };
 
+// Retained by the producer or by one view execution slot. Scoring stores only
+// indices; sorting does not repeatedly move the 64-byte shader payload. A caller
+// must not share this scratch across concurrent selections.
+struct ViewLightSelectionScratch
+{
+    struct Scored
+    {
+        size_t proxyIndex{};
+        float score{};
+        bool isDirectional{};
+    };
+    std::vector<Scored> scored;
+};
+
 // 카메라 절두체. 직교 투영에서는 만들지 않는다 — compact slope frustum 생성은
 // 원근 전용이라 직교 행렬을 주면 표현할 수 없는 절두체가 나온다.
 inline bool BuildViewFrustum(const FrameCameraSnapshot& camera,
@@ -82,39 +96,37 @@ inline bool BuildViewFrustum(const FrameCameraSnapshot& camera,
 //       score = intensity / (1 + d*d)
 //
 //   카메라가 구 안에 있으면 d=0이라 세기 그대로가 되고, 멀어질수록 이차로
-//   준다. 1을 더하는 것은 0 나눗셈을 피하려는 것이고, 덕분에 점수가 유한해
-//   비교가 안전하다.
+//   준다. 1을 더해 0 나눗셈을 피한다. 입력 세기가 NaN인 경우에도 정렬
+//   비교가 일관되도록 아래 비교자는 NaN을 같은 광원 종류의 맨 뒤에 둔다.
 //
 // ★ 스포트도 구로 다룬다. 원뿔은 자기 구 안에 들어가므로 보수적이다 —
 //   빠뜨리지는 않고 가끔 필요 없는 것을 남긴다. 원뿔로 좁히는 것은 이
 //   목록의 길이가 실제로 문제가 될 때 할 일이다.
-inline ViewLightSelection SelectLightsForView(
-    const std::vector<own::shared_owner<LightRenderProxy>>& proxies,
-    const FrameCameraSnapshot& camera)
+inline void SelectLightsForView(std::span<const own::shared_owner<LightRenderProxy>> proxies,
+                                const FrameCameraSnapshot& camera, ViewLightSelection& selection,
+                                ViewLightSelectionScratch& scratch)
 {
-    struct Scored
-    {
-        EnhancedLight light{};
-        float         score{ 0.f };
-        bool          isDirectional{ false };
-    };
-
     math::bounding_frustum frustum;
     const bool hasFrustum = BuildViewFrustum(camera, frustum);
 
     const math::vector3& eye = camera.eyePosition;
 
-    ViewLightSelection selection;
-    std::vector<Scored> scored;
+    selection.lights.clear();
+    selection.sceneLights = 0;
+    selection.culledByFrustum = 0;
+    auto& scored = scratch.scored;
+    scored.clear();
     scored.reserve(proxies.size());
 
-    for (const auto& proxy : proxies)
+    for (size_t index = 0; index < proxies.size(); ++index)
     {
+        const auto& proxy = proxies[index];
         if (nullptr == proxy || !proxy->IsEnabled()) continue;
 
         ++selection.sceneLights;
 
-        Scored entry{};
+        ViewLightSelectionScratch::Scored entry{};
+        entry.proxyIndex = index;
         entry.isDirectional = proxy->IsInfiniteReach();
 
         if (entry.isDirectional)
@@ -150,25 +162,48 @@ inline ViewLightSelection SelectLightsForView(
                 (1.f + surfaceDistance * surfaceDistance);
         }
 
-        entry.light = MakeEnhancedLight(*proxy);
         scored.push_back(entry);
     }
 
-    // ★ stable_sort다. 점수가 같은 광원들의 순서가 프레임마다 뒤집히면
-    //   한도 경계에 걸린 것이 깜빡인다 — 투명 정렬에서 같은 이유로
-    //   stable_sort를 쓴 것과 같은 부류다.
-    std::stable_sort(scored.begin(), scored.end(),
-        [](const Scored& a, const Scored& b)
-        {
-            if (a.isDirectional != b.isDirectional) return a.isDirectional;
-            return a.score > b.score;
-        });
+    // Original ordinal preserves equal-score order without stable_sort's
+    // temporary allocation. NaN scores sort last within their light-type group;
+    // treating NaN as equal to every finite score would break strict ordering.
+    std::sort(scored.begin(), scored.end(),
+              [](const ViewLightSelectionScratch::Scored& a, const ViewLightSelectionScratch::Scored& b)
+              {
+                  if (a.isDirectional != b.isDirectional)
+                      return a.isDirectional;
+                  const bool aNan = std::isnan(a.score);
+                  const bool bNan = std::isnan(b.score);
+                  if (aNan != bNan)
+                  {
+                      return !aNan;
+                  }
+                  if (a.score > b.score)
+                  {
+                      return true;
+                  }
+                  if (a.score < b.score)
+                  {
+                      return false;
+                  }
+                  return a.proxyIndex < b.proxyIndex;
+              });
 
     selection.lights.reserve(scored.size());
-    for (const Scored& entry : scored)
+    for (const auto& entry : scored)
     {
-        selection.lights.push_back(entry.light);
+        selection.lights.push_back(MakeEnhancedLight(*proxies[entry.proxyIndex]));
     }
+}
 
+// Convenience for one-shot consumers. The live renderer supplies retained
+// output/scratch through the overload above to avoid allocating per view.
+inline ViewLightSelection SelectLightsForView(const std::vector<own::shared_owner<LightRenderProxy>>& proxies,
+                                              const FrameCameraSnapshot& camera)
+{
+    ViewLightSelection selection;
+    ViewLightSelectionScratch scratch;
+    SelectLightsForView(proxies, camera, selection, scratch);
     return selection;
 }
