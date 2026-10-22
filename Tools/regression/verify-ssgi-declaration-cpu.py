@@ -60,6 +60,9 @@ def main():
     if not compiler:
         parser.error("C++23 compiler unavailable")
     arena = [Path("Engine/RenderEngine") / name for name in ("RenderArena.cpp", "RenderArena.h", "RenderAllocator.h")]
+    arena += [Path("Engine/Utility_Framework") / name for name in
+              ("Arena.cpp", "Arena.h", "HeapAllocator.h", "Ownership.h", "LifetimeToken.h")]
+    arena += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
     probe = Path(__file__).with_name("ssgi_declaration_cpu_probe.cpp")
     inputs = [root / path for path in [SOURCE, HEADER, GRAPH] + arena]
     inputs += [probe, Path(__file__).resolve()]
@@ -120,7 +123,8 @@ inline void* mi_malloc_aligned(size_t size, size_t alignment)
         executable = target / "ssgi-declaration"
         command = [compiler, "-std=c++23", "-O2", "-g", "-Wall", "-Wextra", "-Werror",
                    "-Wno-mismatched-new-delete", "-I", str(target), "-I", str(mirror),
-                   str(compiled_probe), str(mirror / arena[0]), "-o", str(executable)]
+                   str(compiled_probe), *[str(mirror / path) for path in arena if path.suffix == ".cpp"],
+                   "-o", str(executable)]
         if args.sanitize:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"]
         print("Compiling exact SSGI baseline/current bodies, deferred callbacks and RenderArena", flush=True)

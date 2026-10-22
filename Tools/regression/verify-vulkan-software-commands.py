@@ -40,7 +40,7 @@ CPP += [RHI / (name + '.cpp') for name in (
     'RHICommandTranslator', 'RHISoftwareCommandList', 'RHISoftwareEncoder',
     'RHISoftwareBatch', 'RHISoftwareRecorder', 'RHISubmissionThread', 'RHIDeviceMemoryBudgetCoordinator')]
 CPP += [Path('Engine/RenderEngine/RenderArena.cpp'), Path('Engine/Utility_Framework/JobScheduler.cpp'),
-        Path('Engine/Utility_Framework/ThreadPool.cpp')]
+        Path('Engine/Utility_Framework/ThreadPool.cpp'), Path('Engine/Utility_Framework/Arena.cpp')]
 DEVICE_METHODS = ('Initialize', 'Shutdown', 'PrepareParallelSubmission', 'AcceptParallelSubmission',
                   'RejectNeverEnqueuedRecording', 'SubmitParallelCommandBuffers', 'FindMemoryType')
 SERVICE_METHODS = ('ReleaseTexture', 'DescribeTexture')

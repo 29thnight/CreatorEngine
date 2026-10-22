@@ -21,6 +21,11 @@
   <ItemGroup>
     <ClInclude Include="ArtifactStoreGuard.h" />
     <ClInclude Include="Ownership.h" />
+    <ClInclude Include="Arena.h" />
+    <ClInclude Include="HeapAllocator.h" />
+    <ClInclude Include="LinearArena.h" />
+    <ClInclude Include="StackArena.h" />
+    <ClInclude Include="FixedPool.h" />
     <ClInclude Include="LifetimeToken.h" />
     <ClInclude Include="BaseTypeDef.h" />
     <ClInclude Include="Benchmark.hpp" />
@@ -103,6 +108,19 @@
     <ClInclude Include="WarmupLedger.h" />
 </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Arena.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <CompileAs>CompileAsC</CompileAs>
+      <CompileAsWinRT>false</CompileAsWinRT>
+      <PreprocessorDefinitions>MI_STATIC_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\ThirdParty\mimalloc\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <Optimization>MaxSpeed</Optimization>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+    </ClCompile>
     <ClCompile Include="ThreadPool.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <PreprocessorDefinitions>ENKITS_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>

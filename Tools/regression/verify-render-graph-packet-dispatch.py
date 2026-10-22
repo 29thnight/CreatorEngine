@@ -78,8 +78,10 @@ def main():
     utility = Path("Engine/Utility_Framework")
     render = Path("Engine/RenderEngine")
     mirrored = [utility / name for name in ("StandardLibrary.h", "JobScheduler.h", "JobScheduler.cpp",
-                "ThreadPool.h", "ThreadPool.cpp", "JobGraph.h")]
+                "ThreadPool.h", "ThreadPool.cpp", "JobGraph.h", "Arena.cpp", "Arena.h", "HeapAllocator.h",
+                "Ownership.h", "LifetimeToken.h")]
     mirrored += [render / name for name in ("RenderArena.h", "RenderArena.cpp", "RenderAllocator.h")]
+    mirrored += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
     inputs = [ROOT / SOURCE, ROOT / HEADER, probe, Path(__file__).resolve()] + [ROOT / p for p in mirrored]
     snapshots = {path: path.read_bytes() for path in inputs}
     baseline_commit = subprocess.check_output(["git", "rev-parse", args.baseline_ref + "^{commit}"],
@@ -121,6 +123,7 @@ inline void mi_free(void* value) { std::free(value); }
                    "-I", str(target), "-I", str(mirror), "-I", str(include.parent),
                    str(target / "probe.cpp"), str(mirror / utility / "JobScheduler.cpp"),
                    str(mirror / utility / "ThreadPool.cpp"), str(mirror / render / "RenderArena.cpp"),
+                   str(mirror / utility / "Arena.cpp"),
                    str(enki / "TaskScheduler.cpp"), "-o", str(executable)]
         if args.sanitize:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"]
